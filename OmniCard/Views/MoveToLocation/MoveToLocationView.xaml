@@ -1,0 +1,109 @@
+<Window x:Class="OmniCard.Views.MoveToLocation.MoveToLocationView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:OmniCard.Views.MoveToLocation"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Title="Move to Location" Height="450" Width="500"
+        Background="{DynamicResource MaterialDesign.Brush.Background}"
+        TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="13"
+        FontFamily="{StaticResource AppFont}">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <Style x:Key="LocationListStyle" TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
+            <Setter Property="DisplayMemberPath" Value="Name"/>
+            <Setter Property="SelectedItem" Value="{Binding ViewModel.SelectedContainer}"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="1*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Search -->
+        <TextBox Text="{Binding ViewModel.SearchText, UpdateSourceTrigger=PropertyChanged}"
+                 Margin="0,0,0,8"/>
+
+        <!-- Tabs by container type -->
+        <TabControl Grid.Row="1" Margin="0,0,0,8">
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock>
+                        <Run Text="Binders"/>
+                        <Run Text="{Binding ViewModel.Binders.Count, Mode=OneWay, StringFormat='({0})'}"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                    </TextBlock>
+                </TabItem.Header>
+                <ListBox ItemsSource="{Binding ViewModel.Binders}"
+                         Style="{StaticResource LocationListStyle}"/>
+            </TabItem>
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock>
+                        <Run Text="Boxes"/>
+                        <Run Text="{Binding ViewModel.Boxes.Count, Mode=OneWay, StringFormat='({0})'}"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                    </TextBlock>
+                </TabItem.Header>
+                <ListBox ItemsSource="{Binding ViewModel.Boxes}"
+                         Style="{StaticResource LocationListStyle}"/>
+            </TabItem>
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock>
+                        <Run Text="Deck Boxes"/>
+                        <Run Text="{Binding ViewModel.DeckBoxes.Count, Mode=OneWay, StringFormat='({0})'}"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                    </TextBlock>
+                </TabItem.Header>
+                <ListBox ItemsSource="{Binding ViewModel.DeckBoxes}"
+                         Style="{StaticResource LocationListStyle}"/>
+            </TabItem>
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock>
+                        <Run Text="Display Cases"/>
+                        <Run Text="{Binding ViewModel.DisplayCases.Count, Mode=OneWay, StringFormat='({0})'}"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                    </TextBlock>
+                </TabItem.Header>
+                <ListBox ItemsSource="{Binding ViewModel.DisplayCases}"
+                         Style="{StaticResource LocationListStyle}"/>
+            </TabItem>
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock>
+                        <Run Text="Bulk"/>
+                        <Run Text="{Binding ViewModel.BulkContainers.Count, Mode=OneWay, StringFormat='({0})'}"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                    </TextBlock>
+                </TabItem.Header>
+                <ListBox ItemsSource="{Binding ViewModel.BulkContainers}"
+                         Style="{StaticResource LocationListStyle}"/>
+            </TabItem>
+        </TabControl>
+
+        <!-- Box section field -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8"
+                    Visibility="{Binding ViewModel.ShowBoxFields, Converter={StaticResource BoolToVis}}">
+            <TextBlock Text="Section:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <TextBox Text="{Binding ViewModel.Section, UpdateSourceTrigger=PropertyChanged}"
+                     Width="200" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Cancel" Command="{Binding ViewModel.CancelCommand}"
+                    IsCancel="True" Padding="16,6" Margin="0,0,8,0"/>
+            <Button Content="Move" Command="{Binding ViewModel.ConfirmCommand}"
+                    IsDefault="True" Padding="16,6" FontWeight="SemiBold"/>
+        </StackPanel>
+    </Grid>
+</Window>

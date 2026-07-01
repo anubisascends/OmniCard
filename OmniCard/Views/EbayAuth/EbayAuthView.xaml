@@ -1,0 +1,54 @@
+<Window x:Class="OmniCard.Views.EbayAuth.EbayAuthView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:OmniCard.Views.EbayAuth"
+        xmlns:converters="clr-namespace:OmniCard.Views.Root"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance {x:Type local:EbayAuthView}}"
+        Title="Connect to eBay" Height="700" Width="600"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Background="{DynamicResource MaterialDesign.Brush.Background}"
+        TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="13"
+        FontFamily="{StaticResource AppFont}">
+
+    <Window.Resources>
+        <converters:NullToCollapsedConverter x:Key="NullToCollapsed"/>
+        <converters:NullToVisibleConverter x:Key="NullToVisible"/>
+    </Window.Resources>
+
+    <Grid>
+        <wv2:WebView2 x:Name="WebView" />
+
+        <!-- Loading indicator — shown while WebView initializes, hidden when error appears -->
+        <Border Background="#AA000000"
+                Visibility="{Binding ViewModel.ErrorMessage, Converter={StaticResource NullToVisible}}"
+                VerticalAlignment="Center" HorizontalAlignment="Center"
+                CornerRadius="8" Padding="20">
+            <StackPanel>
+                <TextBlock Text="Connecting to eBay..." Foreground="White"
+                           FontSize="14" HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Error overlay — visible only when ErrorMessage is non-null -->
+        <Border Background="#CC000000"
+                Visibility="{Binding ViewModel.ErrorMessage, Converter={StaticResource NullToCollapsed}}"
+                VerticalAlignment="Center" HorizontalAlignment="Center"
+                CornerRadius="8" Padding="24">
+            <StackPanel>
+                <TextBlock Text="{Binding ViewModel.ErrorMessage}"
+                           Foreground="White" FontSize="14" TextWrapping="Wrap"
+                           MaxWidth="400" Margin="0,0,0,12"/>
+                <Button Content="Close" Padding="16,4" HorizontalAlignment="Center"
+                        Click="CloseButton_Click"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

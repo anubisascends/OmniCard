@@ -1,0 +1,58 @@
+<Window x:Class="OmniCard.Views.SealedProductEditor.AddSealedProductView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:OmniCard.Views.SealedProductEditor"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Title="Add Sealed Product" Height="400" Width="500"
+        Background="{DynamicResource MaterialDesign.Brush.Background}"
+        TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="13"
+        FontFamily="{StaticResource AppFont}">
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="1*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Search -->
+        <TextBox Text="{Binding ViewModel.SearchText, UpdateSourceTrigger=PropertyChanged}"
+                 VerticalContentAlignment="Center"
+                 Margin="0,0,0,8"/>
+
+        <!-- Template list -->
+        <DataGrid Grid.Row="1"
+                  ItemsSource="{Binding ViewModel.Templates}"
+                  SelectedItem="{Binding ViewModel.SelectedTemplate}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  SelectionMode="Single"
+                  Margin="0,0,0,8">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                <DataGridTextColumn Header="Type" Binding="{Binding ProductType}" Width="120"/>
+                <DataGridTextColumn Header="Set" Binding="{Binding SetCode}" Width="60"/>
+                <DataGridTextColumn Header="UPC" Binding="{Binding Upc}" Width="120"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Purchase price -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Purchase Price $:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <TextBox Text="{Binding ViewModel.PurchasePrice, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
+                     Width="100" VerticalContentAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Cancel" Command="{Binding ViewModel.CancelCommand}"
+                    IsCancel="True" Padding="16,6" Margin="0,0,8,0"/>
+            <Button Content="Add" Command="{Binding ViewModel.AddCommand}"
+                    IsDefault="True" Padding="16,6" FontWeight="SemiBold"/>
+        </StackPanel>
+    </Grid>
+</Window>

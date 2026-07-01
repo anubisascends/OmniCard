@@ -1,0 +1,180 @@
+<UserControl x:Class="OmniCard.Views.Root.LocationOverviewView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:OmniCard.Views.Root"
+             xmlns:models="clr-namespace:OmniCard.Models"
+             xmlns:helpers="clr-namespace:OmniCard.Helpers">
+
+    <UserControl.Resources>
+        <!-- Location tile template -->
+        <DataTemplate x:Key="LocationTileTemplate" DataType="{x:Type models:LocationTileSummary}">
+            <Button Command="{Binding DataContext.ViewModel.Collection.NavigateToLocationCommand,
+                        RelativeSource={RelativeSource AncestorType=Window}}"
+                    CommandParameter="{Binding Container.Id}"
+                    Cursor="Hand"
+                    Margin="4"
+                    Style="{x:Null}">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="TileBorder"
+                                CornerRadius="8"
+                                Height="120"
+                                ClipToBounds="True"
+                                Background="{DynamicResource MaterialDesign.Brush.Card.Background}">
+                            <Grid>
+                                <!-- Background card art -->
+                                <Image Source="{Binding CoverImageUri}"
+                                       Stretch="UniformToFill"
+                                       Opacity="0.3"
+                                       RenderOptions.BitmapScalingMode="HighQuality"/>
+
+                                <!-- Gradient overlay for readability -->
+                                <Border>
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <GradientStop Color="#CC000000" Offset="0"/>
+                                            <GradientStop Color="#33000000" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+
+                                <!-- Content -->
+                                <Grid Margin="12">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Name -->
+                                    <TextBlock Text="{Binding Container.Name}"
+                                               FontWeight="Bold"
+                                               FontSize="16"
+                                               Foreground="White"/>
+
+                                    <!-- Card count -->
+                                    <TextBlock Grid.Row="1"
+                                               Text="{Binding CardCount, StringFormat='{}{0} cards'}"
+                                               Foreground="#BBFFFFFF"
+                                               FontSize="12"/>
+
+                                    <!-- Total value -->
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding TotalMarketValue, StringFormat='${0:N2}'}"
+                                               FontWeight="Bold"
+                                               FontSize="16"
+                                               Foreground="White"
+                                               HorizontalAlignment="Right"/>
+
+                                    <!-- Price delta -->
+                                    <TextBlock Grid.Row="1" Grid.Column="1"
+                                               HorizontalAlignment="Right"
+                                               FontSize="12"
+                                               Foreground="{Binding PriceDelta, Converter={local:PriceDeltaColorConverter}}">
+                                        <TextBlock.Text>
+                                            <MultiBinding StringFormat="{}{0:+$#,##0.00;-$#,##0.00;$0.00} ({1:+0.0;-0.0;0.0}%)">
+                                                <Binding Path="PriceDelta"/>
+                                                <Binding Path="PriceDeltaPercent"/>
+                                            </MultiBinding>
+                                        </TextBlock.Text>
+                                    </TextBlock>
+
+                                    <!-- Set symbols -->
+                                    <ItemsControl Grid.Row="2" Grid.ColumnSpan="2"
+                                                  ItemsSource="{Binding SetSymbols}"
+                                                  VerticalAlignment="Bottom">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type models:SetCodeRarity}">
+                                                <Border Width="28" Height="28"
+                                                        Margin="0,0,4,0"
+                                                        Padding="4"
+                                                        CornerRadius="4"
+                                                        Background="#DD000000">
+                                                    <Border helpers:SetSymbol.SetCode="{Binding SetCode}"
+                                                            helpers:SetSymbol.Rarity="{Binding Rarity}"/>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TileBorder" Property="BorderBrush"
+                                        Value="{DynamicResource MaterialDesign.Brush.Primary}"/>
+                                <Setter TargetName="TileBorder" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+
+                <!-- Context menu -->
+                <Button.ContextMenu>
+                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                        <MenuItem Header="Change Cover Art..."
+                                  Click="ChangeCoverArt_Click"/>
+                        <Separator Visibility="{Binding Container.IsSystem, Converter={local:InverseBoolToVisibilityConverter}}"/>
+                        <MenuItem Header="Delete Location..."
+                                  Click="DeleteLocation_Click"
+                                  Visibility="{Binding Container.IsSystem, Converter={local:InverseBoolToVisibilityConverter}}"/>
+                    </ContextMenu>
+                </Button.ContextMenu>
+            </Button>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="12">
+
+            <!-- Browse All link -->
+            <Button Content="Browse Entire Collection"
+                    HorizontalAlignment="Left"
+                    Margin="0,0,0,12"
+                    Padding="12,6"
+                    Command="{Binding DataContext.ViewModel.Collection.BrowseAllCommand,
+                        RelativeSource={RelativeSource AncestorType=Window}}"
+                    Style="{StaticResource MaterialDesignFlatButton}"/>
+
+            <!-- Bulk container (same tile size as others, in a 3-column grid) -->
+            <UniformGrid Columns="3" Margin="0,0,0,12">
+                <ContentControl Content="{Binding DataContext.ViewModel.Collection.BulkSummary,
+                                    RelativeSource={RelativeSource AncestorType=Window}}"
+                                ContentTemplate="{StaticResource LocationTileTemplate}"/>
+            </UniformGrid>
+
+            <!-- Grouped containers by type -->
+            <ItemsControl ItemsSource="{Binding DataContext.ViewModel.Collection.GroupedLocations,
+                                RelativeSource={RelativeSource AncestorType=Window}}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Expander Header="{Binding Key, Converter={local:ContainerTypeDisplayConverter}}"
+                                  IsExpanded="True"
+                                  Margin="0,0,0,8">
+                            <ItemsControl ItemsSource="{Binding}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="3"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <StaticResource ResourceKey="LocationTileTemplate"/>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Expander>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

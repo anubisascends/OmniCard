@@ -1,0 +1,94 @@
+<Window x:Class="OmniCard.Views.StorageManager.StorageManagerView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:OmniCard.Views.StorageManager"
+        xmlns:models="clr-namespace:OmniCard.Models"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance {x:Type local:StorageManagerView}}"
+        Title="Manage Storage Locations" Height="450" Width="500"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{DynamicResource MaterialDesign.Brush.Background}"
+        TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="13"
+        FontFamily="{StaticResource AppFont}">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Container list -->
+        <ListView ItemsSource="{Binding ViewModel.Containers}"
+                  SelectedItem="{Binding ViewModel.SelectedContainer}"
+                  Margin="0,0,0,8">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Name" Width="180" DisplayMemberBinding="{Binding Name}"/>
+                    <GridViewColumn Header="Type" Width="100" DisplayMemberBinding="{Binding TypeDisplay}"/>
+                    <GridViewColumn Header="Cards" Width="60" DisplayMemberBinding="{Binding CardCount}"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <!-- Action buttons -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+            <Button Content="Add" Command="{Binding ViewModel.ShowAddCommand}" Padding="12,4" Margin="0,0,8,0"/>
+            <Button Content="Rename" Command="{Binding ViewModel.ShowEditCommand}" Padding="12,4" Margin="0,0,8,0"
+                    IsEnabled="{Binding ViewModel.CanEdit}"/>
+            <Button Content="Delete" Command="{Binding ViewModel.DeleteSelectedCommand}" Padding="12,4"
+                    IsEnabled="{Binding ViewModel.CanDelete}"/>
+        </StackPanel>
+
+        <!-- Add panel -->
+        <Border Grid.Row="2" Background="{DynamicResource MaterialDesign.Brush.Card.Background}" CornerRadius="4" Padding="8" Margin="0,0,0,8"
+                Visibility="{Binding ViewModel.IsAdding, Converter={StaticResource BoolToVis}}">
+            <StackPanel>
+                <TextBlock Text="Add New Container" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Name:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBox Text="{Binding ViewModel.NewContainerName, UpdateSourceTrigger=PropertyChanged}"
+                             Width="180" Margin="0,0,8,0"/>
+                    <TextBlock Text="Type:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox SelectedItem="{Binding ViewModel.NewContainerType}" Width="120"
+                              ItemsSource="{Binding Source={x:Static local:StorageManagerView.ContainerTypes}}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="Create" Command="{Binding ViewModel.ConfirmAddCommand}" Padding="8,2" Margin="0,0,4,0"/>
+                    <Button Content="Cancel" Command="{Binding ViewModel.CancelAddCommand}" Padding="8,2"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Edit panel -->
+        <Border Grid.Row="2" Background="{DynamicResource MaterialDesign.Brush.Card.Background}" CornerRadius="4" Padding="8" Margin="0,0,0,8"
+                Visibility="{Binding ViewModel.IsEditing, Converter={StaticResource BoolToVis}}">
+            <StackPanel>
+                <TextBlock Text="Rename Container" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="New Name:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBox Text="{Binding ViewModel.EditName, UpdateSourceTrigger=PropertyChanged}" Width="200"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="Save" Command="{Binding ViewModel.ConfirmEditCommand}" Padding="8,2" Margin="0,0,4,0"/>
+                    <Button Content="Cancel" Command="{Binding ViewModel.CancelEditCommand}" Padding="8,2"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Close button -->
+        <Button Grid.Row="3" Content="Close" Command="{Binding ViewModel.CloseCommand}"
+                HorizontalAlignment="Right" Padding="16,4"/>
+    </Grid>
+</Window>

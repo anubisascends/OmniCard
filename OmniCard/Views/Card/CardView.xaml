@@ -1,0 +1,44 @@
+﻿<Window x:Class="OmniCard.Views.Card.CardView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:OmniCard.Views.Card"
+        xmlns:root="clr-namespace:OmniCard.Views.Root"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        mc:Ignorable="d"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="ToolWindow"
+        d:DataContext="{d:DesignInstance {x:Type local:CardView}}"
+        Title="Card View..." Height="400" Width="400"
+        Background="{DynamicResource MaterialDesign.Brush.Background}"
+        TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="13"
+        FontFamily="{StaticResource AppFont}">
+
+    <Grid>
+        <ScrollViewer x:Name="ImageScroller"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto"
+                      PreviewMouseWheel="OnPreviewMouseWheel">
+            <Grid>
+                <Grid.LayoutTransform>
+                    <ScaleTransform ScaleX="{Binding ViewModel.Zoom}" ScaleY="{Binding ViewModel.Zoom}"/>
+                </Grid.LayoutTransform>
+                <Image Source="{Binding ViewModel.Card.TempImagePath, Converter={root:ScanImageConverter}}"
+                       Stretch="Uniform"/>
+            </Grid>
+        </ScrollViewer>
+        <Slider HorizontalAlignment="Right"
+                VerticalAlignment="Bottom"
+                Width="200"
+                Minimum="0.5"
+                Maximum="4"
+                Value="{Binding ViewModel.Zoom}"
+                TickFrequency="0.1"
+                IsSnapToTickEnabled="True"
+                Margin="15"/>
+    </Grid>
+</Window>

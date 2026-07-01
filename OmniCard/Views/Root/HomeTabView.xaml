@@ -1,0 +1,123 @@
+<UserControl x:Class="OmniCard.Views.Root.HomeTabView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:OmniCard.Views.Root"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Loading indicator -->
+        <StackPanel Grid.Row="0" Margin="8"
+                    Visibility="{Binding ViewModel.IsCalculatingCompletion, Converter={StaticResource BoolToVis}}">
+            <ProgressBar IsIndeterminate="True" Height="4" Margin="0,0,0,4"/>
+            <TextBlock Text="{Binding ViewModel.CompletionStatusMessage}"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+        </StackPanel>
+
+        <!-- Collection Stats Dashboard -->
+        <Border Grid.Row="1" Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                CornerRadius="4" Padding="12" Margin="8,4,8,4"
+                Visibility="{Binding ViewModel.IsCalculatingCompletion, Converter={local:InverseBoolToVisibilityConverter}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Row 1: Key stats -->
+                <StackPanel Grid.Column="0" HorizontalAlignment="Center" Margin="8,4">
+                    <TextBlock Text="{Binding ViewModel.StatTotalCards}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Total Cards" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" HorizontalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" HorizontalAlignment="Center" Margin="8,4">
+                    <TextBlock Text="{Binding ViewModel.StatTotalSets}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Sets" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" HorizontalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2" HorizontalAlignment="Center" Margin="8,4">
+                    <TextBlock Text="{Binding ViewModel.StatFoilCount}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Foils" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" HorizontalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Grid.Column="3" HorizontalAlignment="Center" Margin="8,4">
+                    <TextBlock Text="{Binding ViewModel.StatTotalValue, StringFormat='${0:F2}'}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Total Value" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Row 2: Rarity breakdown -->
+                <StackPanel Grid.Row="1" Grid.ColumnSpan="4" Orientation="Horizontal"
+                            HorizontalAlignment="Center" Margin="0,8,0,0">
+                    <Border Background="#555555" CornerRadius="3" Padding="8,4" Margin="4,0">
+                        <TextBlock><Run Text="{Binding ViewModel.StatCommonCount, Mode=OneWay}"/><Run Text=" Common"/></TextBlock>
+                    </Border>
+                    <Border Background="#C0C0C0" CornerRadius="3" Padding="8,4" Margin="4,0">
+                        <TextBlock Foreground="Black"><Run Text="{Binding ViewModel.StatUncommonCount, Mode=OneWay}"/><Run Text=" Uncommon"/></TextBlock>
+                    </Border>
+                    <Border Background="#FFD700" CornerRadius="3" Padding="8,4" Margin="4,0">
+                        <TextBlock Foreground="Black"><Run Text="{Binding ViewModel.StatRareCount, Mode=OneWay}"/><Run Text=" Rare"/></TextBlock>
+                    </Border>
+                    <Border Background="#F05030" CornerRadius="3" Padding="8,4" Margin="4,0">
+                        <TextBlock><Run Text="{Binding ViewModel.StatMythicCount, Mode=OneWay}"/><Run Text=" Mythic"/></TextBlock>
+                    </Border>
+                    <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                            BorderBrush="{DynamicResource MaterialDesign.Brush.TextBox.HoverBorder}"
+                            BorderThickness="1" CornerRadius="3" Padding="8,4" Margin="4,0"
+                            Visibility="{Binding ViewModel.StatOtherRarityCount, Converter={local:NullToCollapsedConverter}}">
+                        <TextBlock><Run Text="{Binding ViewModel.StatOtherRarityCount, Mode=OneWay}"/><Run Text=" Other"/></TextBlock>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Sets in collection -->
+        <Grid Grid.Row="2" Margin="8,0,8,8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <TextBlock Text="Sets in Collection" FontWeight="SemiBold" FontSize="14" Margin="0,4,0,4"
+                       Visibility="{Binding ViewModel.IsCalculatingCompletion, Converter={local:InverseBoolToVisibilityConverter}}"/>
+            <ListView Grid.Row="1"
+                      ItemsSource="{Binding ViewModel.SetCompletionResults}"
+                      SelectedItem="{Binding ViewModel.SelectedSetCompletion}"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Set Name" DisplayMemberBinding="{Binding SetName}" Width="350"/>
+                        <GridViewColumn Header="Code" DisplayMemberBinding="{Binding SetCode}" Width="80"/>
+                        <GridViewColumn Header="Completion" Width="180">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <materialDesign:PackIcon Kind="Check" Foreground="Green" Width="16" Height="16" Margin="0,0,4,0">
+                                            <materialDesign:PackIcon.Style>
+                                                <Style TargetType="materialDesign:PackIcon">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding CompletionPercent}" Value="100">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </materialDesign:PackIcon.Style>
+                                        </materialDesign:PackIcon>
+                                        <TextBlock Text="{Binding Converter={local:CompletionPercentConverter}}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Grid>
+    </Grid>
+</UserControl>

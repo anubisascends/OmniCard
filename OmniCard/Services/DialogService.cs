@@ -1,0 +1,156 @@
+﻿using Microsoft.Extensions.DependencyInjection;
+using System.Windows;
+using OmniCard.Models;
+using OmniCard.Views.Card;
+using OmniCard.Views.CollectionCardEditor;
+using OmniCard.Views.Connection;
+using OmniCard.Views.CoverArtPicker;
+using OmniCard.Views.CsvImport;
+using OmniCard.Views.DataLocation;
+using OmniCard.Views.EbayAuth;
+using OmniCard.Views.SortFilterBuilder;
+using OmniCard.Views.MoveToLocation;
+using OmniCard.Views.SealedProductEditor;
+using OmniCard.Views.StorageManager;
+
+namespace OmniCard.Services;
+
+public interface IDialogService
+{
+    (bool Connected, bool SetAsDefault) ConnectToScanner();
+    bool? ConnectToEbay();
+    void ShowCard(ScannedCard card);
+    bool? EditCollectionCard(CollectionCard card);
+    void ManageStorageContainers();
+    int? ShowImportPreview(CsvImportPreview preview);
+    bool OpenSortFilterBuilder(CardGame game);
+    void ShowDataLocation();
+    int? PickCoverArt(int containerId, string containerName);
+    MoveToLocationResult? PickMoveToLocation();
+    SealedProductTemplate? EditSealedProductTemplate(SealedProductTemplate? existing);
+    SealedProductInstance? AddSealedProduct();
+    List<SealedProductInstance>? CrackSealedProduct(SealedProductInstance instance);
+}
+
+public sealed class DialogService(IServiceProvider services) : IDialogService
+{
+    public IServiceProvider Services { get; } = services;
+
+    private CardView? _cardWindow;
+
+    public (bool Connected, bool SetAsDefault) ConnectToScanner()
+    {
+        var wnd = Services.GetRequiredService<ConnectionView>();
+        wnd.Owner = Application.Current.MainWindow;
+        var result = wnd.ShowDialog() == true;
+        return (result, result && wnd.ViewModel.SetAsDefault);
+    }
+
+    public bool? ConnectToEbay()
+    {
+        var wnd = Services.GetRequiredService<EbayAuthView>();
+        wnd.Owner = Application.Current.MainWindow;
+        return wnd.ShowDialog();
+    }
+
+    public void ShowCard(ScannedCard card)
+    {
+        if (_cardWindow is null)
+        {
+            _cardWindow = Services.GetRequiredService<CardView>();
+            _cardWindow.Owner = Application.Current.MainWindow;
+            _cardWindow.Closed += (_, _) => _cardWindow = null;
+        }
+
+        _cardWindow.ViewModel.Card = card;
+        _cardWindow.Show();
+        _cardWindow.Activate();
+    }
+
+    public bool? EditCollectionCard(CollectionCard card)
+    {
+        var wnd = Services.GetRequiredService<CollectionCardEditorView>();
+        wnd.Owner = Application.Current.MainWindow;
+        wnd.ViewModel.LoadCard(card);
+        return wnd.ShowDialog();
+    }
+
+    public void ManageStorageContainers()
+    {
+        var wnd = Services.GetRequiredService<StorageManagerView>();
+        wnd.Owner = Application.Current.MainWindow;
+        wnd.ShowDialog();
+    }
+
+    public int? ShowImportPreview(CsvImportPreview preview)
+    {
+        var wnd = Services.GetRequiredService<CsvImportView>();
+        wnd.Owner = Application.Current.MainWindow;
+        wnd.ViewModel.LoadPreview(preview);
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.ImportedCount : null;
+    }
+
+    public bool OpenSortFilterBuilder(CardGame game)
+    {
+        var wnd = Services.GetRequiredService<SortFilterBuilderView>();
+        wnd.ViewModel.Initialize(game);
+        wnd.Owner = Application.Current.MainWindow;
+        wnd.ShowDialog();
+        return wnd.ViewModel.PresetsChanged;
+    }
+
+    public void ShowDataLocation()
+    {
+        var wnd = Services.GetRequiredService<DataLocationView>();
+        wnd.Owner = Application.Current.MainWindow;
+        wnd.ShowDialog();
+    }
+
+    public int? PickCoverArt(int containerId, string containerName)
+    {
+        var wnd = Services.GetRequiredService<CoverArtPickerView>();
+        wnd.Owner = Application.Current.MainWindow;
+        wnd.ViewModel.Load(containerId, containerName);
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.SelectedCardId : null;
+    }
+
+    public MoveToLocationResult? PickMoveToLocation()
+    {
+        var wnd = Services.GetRequiredService<MoveToLocationView>();
+        wnd.Owner = Application.Current.MainWindow;
+        wnd.ViewModel.Load();
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.Result : null;
+    }
+
+    public SealedProductTemplate? EditSealedProductTemplate(SealedProductTemplate? existing)
+    {
+        var wnd = Services.GetRequiredService<SealedProductTemplateEditorView>();
+        wnd.Owner = Application.Current.MainWindow;
+        wnd.ViewModel.Load(existing);
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.Result : null;
+    }
+
+    public SealedProductInstance? AddSealedProduct()
+    {
+        var wnd = Services.GetRequiredService<AddSealedProductView>();
+        wnd.Owner = Application.Current.MainWindow;
+        wnd.ViewModel.Load();
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.Result : null;
+    }
+
+    public List<SealedProductInstance>? CrackSealedProduct(SealedProductInstance instance)
+    {
+        var sealedProductService = Services.GetRequiredService<ISealedProductService>();
+        var fullInstance = sealedProductService.GetInstanceWithContents(instance.Id) ?? instance;
+        var wnd = Services.GetRequiredService<CrackProductView>();
+        wnd.Owner = Application.Current.MainWindow;
+        wnd.ViewModel.Load(fullInstance);
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.Result : null;
+    }
+}

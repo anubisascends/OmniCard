@@ -1,0 +1,256 @@
+using System.Collections.ObjectModel;
+using System.IO;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using OmniCard.Data;
+using OmniCard.Models;
+using OmniCard.Services;
+
+namespace OmniCard.Tests.Services;
+
+public class CollectionSortFilterTests : IDisposable
+{
+    private readonly SqliteConnection _connection;
+    private readonly DbContextOptions<CollectionDbContext> _options;
+
+    public CollectionSortFilterTests()
+    {
+        _connection = new SqliteConnection("Data Source=:memory:");
+        _connection.Open();
+        _options = new DbContextOptionsBuilder<CollectionDbContext>()
+            .UseSqlite(_connection)
+            .Options;
+        using var ctx = new CollectionDbContext(_options);
+        ctx.Database.EnsureCreated();
+        SeedCards(ctx);
+    }
+
+    public void Dispose() => _connection.Dispose();
+
+    private static void SeedCards(CollectionDbContext ctx)
+    {
+        ctx.Cards.AddRange(
+            new CollectionCard { Game = CardGame.Mtg, GameCardId = "1", Name = "Wrath of God", Color = "W", CardType = "Sorcery", SetName = "Alpha", Rarity = "Rare" },
+            new CollectionCard { Game = CardGame.Mtg, GameCardId = "2", Name = "Counterspell", Color = "U", CardType = "Instant", SetName = "Alpha", Rarity = "Uncommon" },
+            new CollectionCard { Game = CardGame.Mtg, GameCardId = "3", Name = "Dark Ritual", Color = "B", CardType = "Instant", SetName = "Alpha", Rarity = "Common" },
+            new CollectionCard { Game = CardGame.Mtg, GameCardId = "4", Name = "Lightning Bolt", Color = "R", CardType = "Instant", SetName = "Alpha", Rarity = "Common" },
+            new CollectionCard { Game = CardGame.Mtg, GameCardId = "5", Name = "Llanowar Elves", Color = "G", CardType = "Creature", SetName = "Alpha", Rarity = "Common" },
+            new CollectionCard { Game = CardGame.Mtg, GameCardId = "6", Name = "Sol Ring", Color = "Colorless", CardType = "Artifact", SetName = "Alpha", Rarity = "Uncommon" },
+            new CollectionCard { Game = CardGame.Mtg, GameCardId = "7", Name = "Azorius Charm", Color = "WU", CardType = "Instant", SetName = "RTR", Rarity = "Uncommon" }
+        );
+        ctx.SaveChanges();
+    }
+
+    private IDbContextFactory<CollectionDbContext> CreateFactory() => new MockFactory(_options);
+
+    private CardSevice CreateService() => new(
+        new StubHashService(),
+        [],
+        CreateFactory(),
+        new StubOcrService(),
+        new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
+        NullLogger<CardSevice>.Instance,
+        new DataPathService(Path.GetTempPath()));
+
+    [Fact]
+    public void SearchCollection_WithSortPreset_CustomColorOrder()
+    {
+        var sort = new SortPreset
+        {
+            Name = "Color Sort",
+            Game = CardGame.Mtg,
+            SortLevels =
+            [
+                new SortLevel
+                {
+                    Field = "Color",
+                    Direction = SortDirection.Ascending,
+                    CustomOrder = ["W", "U", "B", "R", "G", "Multi", "Land", "Colorless"]
+                }
+            ]
+        };
+
+        var results = new ObservableCollection<CollectionCard>();
+        CreateService().SearchCollection("", CardGame.Mtg, null, sort, null, results);
+
+        Assert.Equal("W", results[0].Color);
+        Assert.Equal("U", results[1].Color);
+        Assert.Equal("B", results[2].Color);
+        Assert.Equal("R", results[3].Color);
+        Assert.Equal("G", results[4].Color);
+        // "WU" doesn't match any entry exactly → treated as "Multi"
+        Assert.Equal("WU", results[5].Color);
+        Assert.Equal("Colorless", results[6].Color);
+    }
+
+    [Fact]
+    public void SearchCollection_WithSortPreset_MultiLevel()
+    {
+        var sort = new SortPreset
+        {
+            Name = "Color then Name",
+            Game = CardGame.Mtg,
+            SortLevels =
+            [
+                new SortLevel
+                {
+                    Field = "Color",
+                    Direction = SortDirection.Ascending,
+                    CustomOrder = ["W", "U", "B", "R", "G"]
+                },
+                new SortLevel { Field = "Name", Direction = SortDirection.Ascending }
+            ]
+        };
+
+        var results = new ObservableCollection<CollectionCard>();
+        CreateService().SearchCollection("", CardGame.Mtg, null, sort, null, results);
+
+        // W comes first
+        Assert.Equal("Wrath of God", results[0].Name);
+        // U: Azorius (WU, not matched) vs Counterspell (U, matched)
+        Assert.Equal("Counterspell", results[1].Name);
+    }
+
+    [Fact]
+    public void SearchCollection_WithSortPreset_DescendingDirection()
+    {
+        var sort = new SortPreset
+        {
+            Name = "Name Desc",
+            Game = CardGame.Mtg,
+            SortLevels =
+            [
+                new SortLevel { Field = "Name", Direction = SortDirection.Descending }
+            ]
+        };
+
+        var results = new ObservableCollection<CollectionCard>();
+        CreateService().SearchCollection("", CardGame.Mtg, null, sort, null, results);
+
+        Assert.Equal("Wrath of God", results[0].Name);
+        Assert.Equal("Sol Ring", results[1].Name);
+    }
+
+    [Fact]
+    public void SearchCollection_NoPreset_FallsBackToNameSort()
+    {
+        var results = new ObservableCollection<CollectionCard>();
+        CreateService().SearchCollection("", CardGame.Mtg, null, null, null, results);
+
+        Assert.Equal("Azorius Charm", results[0].Name);
+        Assert.Equal("Counterspell", results[1].Name);
+    }
+
+    [Fact]
+    public void SearchCollection_ScryfallSyntax_ColorFilter()
+    {
+        var results = new ObservableCollection<CollectionCard>();
+        CreateService().SearchCollection("c:w", CardGame.Mtg, null, null, null, results);
+
+        Assert.Single(results);
+        Assert.Equal("Wrath of God", results[0].Name);
+    }
+
+    [Fact]
+    public void SearchCollection_ScryfallSyntax_TypeFilter()
+    {
+        var results = new ObservableCollection<CollectionCard>();
+        CreateService().SearchCollection("t:instant", CardGame.Mtg, null, null, null, results);
+
+        Assert.All(results, c => Assert.Equal("Instant", c.CardType));
+    }
+
+    [Fact]
+    public void SearchCollection_ScryfallSyntax_SetFilter()
+    {
+        var results = new ObservableCollection<CollectionCard>();
+        CreateService().SearchCollection("set:rtr", CardGame.Mtg, null, null, null, results);
+
+        Assert.Single(results);
+        Assert.Equal("Azorius Charm", results[0].Name);
+    }
+
+    [Fact]
+    public void SearchCollection_ScryfallSyntax_RarityFilter()
+    {
+        var results = new ObservableCollection<CollectionCard>();
+        CreateService().SearchCollection("r:common", CardGame.Mtg, null, null, null, results);
+
+        Assert.Equal(3, results.Count);
+        Assert.All(results, c => Assert.Equal("Common", c.Rarity));
+    }
+
+    [Fact]
+    public void SearchCollection_ScryfallSyntax_CombinedFilters()
+    {
+        var results = new ObservableCollection<CollectionCard>();
+        CreateService().SearchCollection("t:instant r:common", CardGame.Mtg, null, null, null, results);
+
+        Assert.Equal(2, results.Count);
+        Assert.All(results, c => { Assert.Equal("Instant", c.CardType); Assert.Equal("Common", c.Rarity); });
+    }
+
+    [Fact]
+    public void SearchCollection_ScryfallSyntax_NameSearch()
+    {
+        var results = new ObservableCollection<CollectionCard>();
+        CreateService().SearchCollection("lightning", CardGame.Mtg, null, null, null, results);
+
+        Assert.Single(results);
+        Assert.Equal("Lightning Bolt", results[0].Name);
+    }
+
+    [Fact]
+    public void SearchCollection_ScryfallSyntax_QuotedName()
+    {
+        var results = new ObservableCollection<CollectionCard>();
+        CreateService().SearchCollection("\"wrath of god\"", CardGame.Mtg, null, null, null, results);
+
+        Assert.Single(results);
+        Assert.Equal("Wrath of God", results[0].Name);
+    }
+
+    [Fact]
+    public void SearchCollection_FilterPresetWithQuery()
+    {
+        var filter = new FilterPreset { Name = "Blue Only", Game = CardGame.Mtg, Query = "c:u" };
+
+        var results = new ObservableCollection<CollectionCard>();
+        CreateService().SearchCollection("", CardGame.Mtg, null, null, filter, results);
+
+        Assert.Single(results);
+        Assert.Equal("Counterspell", results[0].Name);
+    }
+
+    [Fact]
+    public void SearchCollection_QueryAndFilterPresetCombined()
+    {
+        var filter = new FilterPreset { Name = "Instants", Game = CardGame.Mtg, Query = "t:instant" };
+
+        var results = new ObservableCollection<CollectionCard>();
+        CreateService().SearchCollection("r:common", CardGame.Mtg, null, null, filter, results);
+
+        // Common instants: Dark Ritual, Lightning Bolt
+        Assert.Equal(2, results.Count);
+    }
+
+    // --- Stubs (same as CardServiceCollectionTests) ---
+    private class StubHashService : IPerceptualHashService
+    {
+        public ulong ComputeHash(Stream imageStream, Action<HashStageResult>? onStage = null) => 0;
+        public ulong[] ComputeArtHash(Stream imageStream, (double X, double Y, double W, double H)[] cropRegions, Action<HashStageResult>? onStage = null) => new ulong[cropRegions.Length];
+    }
+
+    private class StubOcrService : IOcrMatchingService
+    {
+        public Dictionary<string, ulong> SymbolHashes { get; set; } = [];
+        public Task<OcrMatchResult> AnalyzeCardAsync(byte[] imageData) => Task.FromResult(new OcrMatchResult());
+        public (List<string> SetCodes, double Confidence) DetectSetSymbol(byte[] imageData) => ([], 0);
+    }
+
+    private class MockFactory(DbContextOptions<CollectionDbContext> options) : IDbContextFactory<CollectionDbContext>
+    {
+        public CollectionDbContext CreateDbContext() => new(options);
+    }
+}
