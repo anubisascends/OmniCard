@@ -55,7 +55,7 @@
 
         <!-- QR link text -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,4,0,4"
-                    Visibility="{Binding ViewModel.SelectedContainer, Converter={StaticResource BoolToVis}}">
+                    Visibility="{Binding ViewModel.SelectedContainer, Converter={StaticResource NullToCollapsed}}">
             <TextBlock Text="QR Link:" VerticalAlignment="Center" Margin="0,0,8,0"
                        Visibility="{Binding ViewModel.QrLinkText, Converter={StaticResource NullToCollapsed}}"/>
             <TextBox Text="{Binding ViewModel.QrLinkText, Mode=OneWay}" IsReadOnly="True"
