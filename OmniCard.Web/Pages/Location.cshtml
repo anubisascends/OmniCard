@@ -1,0 +1,69 @@
+@page "/location/{id:int}"
+@model OmniCard.Web.Pages.LocationModel
+@{
+    ViewData["Title"] = Model.Container.Name;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>@ViewData["Title"] — OmniCard</title>
+    <link rel="stylesheet" href="/css/site.css"/>
+</head>
+<body>
+    <a href="/" class="back-link">&larr; All Locations</a>
+    <header>
+        <h1>@Model.Container.Name</h1>
+        <p><span class="badge">@Model.TypeDisplay</span> &middot; @Model.CardCount card(s)</p>
+    </header>
+    <main>
+        @if (Model.Sets.Count > 0)
+        {
+            <h2>Sets</h2>
+            <ul class="set-list">
+                @foreach (var s in Model.Sets)
+                {
+                    <li>@s.SetName (@s.SetCode) <span class="count">&times;@s.Count</span></li>
+                }
+            </ul>
+        }
+
+        <h2>Cards</h2>
+        @if (Model.Cards.Count == 0)
+        {
+            <p class="empty">No cards in this location.</p>
+        }
+        else
+        {
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Set</th>
+                        <th>#</th>
+                        <th>Rarity</th>
+                        <th>Cond</th>
+                        <th>Foil</th>
+                        <th>Color</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var card in Model.Cards)
+                    {
+                        <tr>
+                            <td><a href="/card/@card.Id">@card.Name</a></td>
+                            <td>@card.SetCode</td>
+                            <td>@card.Number</td>
+                            <td>@card.Rarity</td>
+                            <td>@card.Condition</td>
+                            <td>@(card.IsFoil ? "Yes" : "")</td>
+                            <td>@card.Color</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </main>
+</body>
+</html>
