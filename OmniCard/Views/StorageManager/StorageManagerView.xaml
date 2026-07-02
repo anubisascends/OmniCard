@@ -19,11 +19,13 @@
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <local:NullToVisibilityConverter x:Key="NullToCollapsed"/>
     </Window.Resources>
 
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -51,8 +53,18 @@
                     IsEnabled="{Binding ViewModel.CanDelete}"/>
         </StackPanel>
 
+        <!-- QR link text -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,4,0,4"
+                    Visibility="{Binding ViewModel.SelectedContainer, Converter={StaticResource BoolToVis}}">
+            <TextBlock Text="QR Link:" VerticalAlignment="Center" Margin="0,0,8,0"
+                       Visibility="{Binding ViewModel.QrLinkText, Converter={StaticResource NullToCollapsed}}"/>
+            <TextBox Text="{Binding ViewModel.QrLinkText, Mode=OneWay}" IsReadOnly="True"
+                     Width="300" VerticalAlignment="Center" FontSize="11"
+                     Visibility="{Binding ViewModel.QrLinkText, Converter={StaticResource NullToCollapsed}}"/>
+        </StackPanel>
+
         <!-- Add panel -->
-        <Border Grid.Row="2" Background="{DynamicResource MaterialDesign.Brush.Card.Background}" CornerRadius="4" Padding="8" Margin="0,0,0,8"
+        <Border Grid.Row="3" Background="{DynamicResource MaterialDesign.Brush.Card.Background}" CornerRadius="4" Padding="8" Margin="0,0,0,8"
                 Visibility="{Binding ViewModel.IsAdding, Converter={StaticResource BoolToVis}}">
             <StackPanel>
                 <TextBlock Text="Add New Container" FontWeight="SemiBold" Margin="0,0,0,4"/>
@@ -72,7 +84,7 @@
         </Border>
 
         <!-- Edit panel -->
-        <Border Grid.Row="2" Background="{DynamicResource MaterialDesign.Brush.Card.Background}" CornerRadius="4" Padding="8" Margin="0,0,0,8"
+        <Border Grid.Row="3" Background="{DynamicResource MaterialDesign.Brush.Card.Background}" CornerRadius="4" Padding="8" Margin="0,0,0,8"
                 Visibility="{Binding ViewModel.IsEditing, Converter={StaticResource BoolToVis}}">
             <StackPanel>
                 <TextBlock Text="Rename Container" FontWeight="SemiBold" Margin="0,0,0,4"/>
@@ -88,7 +100,7 @@
         </Border>
 
         <!-- Close button -->
-        <Button Grid.Row="3" Content="Close" Command="{Binding ViewModel.CloseCommand}"
+        <Button Grid.Row="4" Content="Close" Command="{Binding ViewModel.CloseCommand}"
                 HorizontalAlignment="Right" Padding="16,4"/>
     </Grid>
 </Window>

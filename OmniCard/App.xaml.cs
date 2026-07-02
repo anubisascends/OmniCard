@@ -35,6 +35,7 @@ public partial class App : Application
         {
             config.SetBasePath(AppContext.BaseDirectory);
             config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+            config.AddUserSecrets<App>();
         })
         .UseSerilog((context, services, loggerConfig) =>
         {
@@ -54,6 +55,7 @@ public partial class App : Application
             services.Configure<DisplaySettings>(context.Configuration.GetSection("Display"));
             services.Configure<EbaySettings>(context.Configuration.GetSection("eBay"));
             services.Configure<ScryfallSettings>(context.Configuration.GetSection("Scryfall"));
+            services.Configure<WebCompanionSettings>(context.Configuration.GetSection("WebCompanion"));
             services.AddSingleton<CollectionViewModel>();
             services.AddSingleton<SealedProductViewModel>();
             services.AddSingleton<RootViewModel>();

@@ -1,12 +1,15 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Options;
 using OmniCard.Models;
 using OmniCard.Services;
 
 namespace OmniCard.Views.StorageManager;
 
-public sealed partial class StorageManagerViewModel(IStorageContainerService containerService) : ViewModel
+public sealed partial class StorageManagerViewModel(
+    IStorageContainerService containerService,
+    IOptions<WebCompanionSettings> webCompanionSettings) : ViewModel
 {
     public ObservableCollection<ContainerDisplayItem> Containers { get; } = [];
 
@@ -34,10 +37,22 @@ public sealed partial class StorageManagerViewModel(IStorageContainerService con
     {
         OnPropertyChanged(nameof(CanEdit));
         OnPropertyChanged(nameof(CanDelete));
+        OnPropertyChanged(nameof(QrLinkText));
     }
 
     public bool CanEdit => SelectedContainer is { IsSystem: false };
     public bool CanDelete => SelectedContainer is not null && !SelectedContainer.IsSystem;
+
+    public string? QrLinkText
+    {
+        get
+        {
+            var baseUrl = webCompanionSettings.Value.BaseUrl;
+            if (string.IsNullOrWhiteSpace(baseUrl) || SelectedContainer is null)
+                return null;
+            return $"{baseUrl.TrimEnd('/')}/location/{SelectedContainer.Id}";
+        }
+    }
 
     public void Load()
     {

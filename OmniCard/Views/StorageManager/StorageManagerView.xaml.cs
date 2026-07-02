@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Windows;
+using System.Windows.Data;
 using OmniCard.Models;
 
 namespace OmniCard.Views.StorageManager;
@@ -24,4 +26,13 @@ public partial class StorageManagerView : Window, IView<StorageManagerViewModel>
 
     public StorageManagerViewModel ViewModel { get; }
     IViewModel IView.ViewModel => ViewModel;
+}
+
+public class NullToVisibilityConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is not null ? Visibility.Visible : Visibility.Collapsed;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
 }
