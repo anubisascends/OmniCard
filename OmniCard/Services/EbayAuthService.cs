@@ -27,13 +27,17 @@ public partial class EbayAuthService : ObservableObject, IEbayAuthService
     private const string TokenExpiryKey = CredentialPrefix + "TokenExpiry";
     private const string RefreshTokenExpiryKey = CredentialPrefix + "RefreshTokenExpiry";
 
-    private static readonly string[] OAuthScopes =
+    private static readonly string[] OAuthScopePaths =
     [
-        "https://api.ebay.com/oauth/api_scope",
-        "https://api.ebay.com/oauth/api_scope/sell.inventory",
-        "https://api.ebay.com/oauth/api_scope/sell.account",
-        "https://api.ebay.com/oauth/api_scope/sell.fulfillment",
+        "/oauth/api_scope",
+        "/oauth/api_scope/sell.inventory",
+        "/oauth/api_scope/sell.account",
+        "/oauth/api_scope/sell.fulfillment",
     ];
+
+    private string[] OAuthScopes => OAuthScopePaths
+        .Select(p => $"{_settings.ApiBaseUrl}{p}")
+        .ToArray();
 
     private readonly EbaySettings _settings;
     private readonly IHttpClientFactory _httpClientFactory;

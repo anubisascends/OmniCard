@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using LinqExpression = System.Linq.Expressions.Expression;
 using System.Windows.Media.Imaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -40,6 +41,7 @@ public interface ICardService
     void RemoveTempFile(ScannedCard card);
     void ClearTempFiles();
     (int FlagResolutions, int MismatchLogs) ClearDiagnosticLogs();
+    (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null);
 }
 
 public sealed class CardSevice : ICardService
@@ -427,12 +429,12 @@ public sealed class CardSevice : ICardService
         var saved = 0;
         foreach (var (card, scan) in committed)
         {
-            var fileName = $"{card.Id}.png";
+            var fileName = $"{card.Id}.jpg";
             var filePath = Path.Combine(scansDir, fileName);
 
             try
             {
-                File.Copy(scan.TempImagePath, filePath, overwrite: true);
+                ConvertToJpeg(scan.TempImagePath, filePath, quality: 90);
                 card.ScanImagePath = $"scans/{fileName}";
 
                 // Delete temp file after successful copy
@@ -511,6 +513,47 @@ public sealed class CardSevice : ICardService
         return (flagCount, mismatchCount);
     }
 
+    public (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null)
+    {
+        var scansDir = _dataPathService.ScansDirectory;
+        if (!Directory.Exists(scansDir))
+            return (0, 0);
+
+        progress?.Report("Scanning for orphaned images...");
+
+        var scanFiles = Directory.GetFiles(scansDir);
+        using var context = _collectionDbContextFactory.CreateDbContext();
+        var validPaths = context.Cards
+            .AsNoTracking()
+            .Where(c => c.ScanImagePath != null)
+            .Select(c => c.ScanImagePath!)
+            .ToHashSet();
+
+        var deleted = 0;
+        var errors = 0;
+
+        foreach (var filePath in scanFiles)
+        {
+            var relativePath = $"scans/{Path.GetFileName(filePath)}";
+            if (!validPaths.Contains(relativePath))
+            {
+                try
+                {
+                    File.Delete(filePath);
+                    deleted++;
+                }
+                catch (Exception ex)
+                {
+                    errors++;
+                    _logger.LogWarning(ex, "Failed to delete orphaned scan: {Path}", filePath);
+                }
+            }
+        }
+
+        _logger.LogInformation("Orphaned scan cleanup: {Deleted} deleted, {Errors} errors", deleted, errors);
+        return (deleted, errors);
+    }
+
     public void SearchCollection(string query, CardGame? gameFilter, ObservableCollection<CollectionCard> results)
         => SearchCollection(query, gameFilter, null, null, null, results);
 
@@ -570,26 +613,255 @@ public sealed class CardSevice : ICardService
 
     private static IQueryable<CollectionCard> ApplyScryfallFilter(IQueryable<CollectionCard> cards, string query)
     {
-        var filters = ScryfallQueryParser.Parse(query);
-        foreach (var (field, value) in filters)
+        var filter = ScryfallQueryParser.ParseFilter(query);
+        if (filter is null)
+            return cards;
+
+        var param = LinqExpression.Parameter(typeof(CollectionCard), "c");
+        var expr = BuildFilterExpression(param, filter);
+        var lambda = LinqExpression.Lambda<Func<CollectionCard, bool>>(expr, param);
+        return cards.Where(lambda);
+    }
+
+    private static readonly System.Reflection.MethodInfo LikeMethod =
+        typeof(DbFunctionsExtensions).GetMethod(
+            nameof(DbFunctionsExtensions.Like),
+            [typeof(DbFunctions), typeof(string), typeof(string)])!;
+
+    private static LinqExpression CallLike(LinqExpression property, string pattern)
+    {
+        return LinqExpression.Call(
+            LikeMethod,
+            LinqExpression.Property(null, typeof(EF), nameof(EF.Functions)),
+            property,
+            LinqExpression.Constant(pattern));
+    }
+
+    private static LinqExpression BuildFilterExpression(System.Linq.Expressions.ParameterExpression param, FilterNode node)
+    {
+        return node switch
         {
-            var v = value;
-            cards = field switch
-            {
-                "name" => cards.Where(c => EF.Functions.Like(c.Name, $"%{v}%")),
-                "set" => cards.Where(c => EF.Functions.Like(c.SetCode, $"%{v}%")
-                                       || EF.Functions.Like(c.SetName, $"%{v}%")),
-                "cn" => cards.Where(c => c.Number == v),
-                "type" => cards.Where(c => c.CardType != null && EF.Functions.Like(c.CardType, $"%{v}%")),
-                "rarity" => cards.Where(c => EF.Functions.Like(c.Rarity, v)),
-                "color" => cards.Where(c => c.Color != null && c.Color == ScryfallQueryParser.ExpandColor(v)),
-                "foil" => cards.Where(c => c.IsFoil == (v.Equals("true", StringComparison.OrdinalIgnoreCase) || v.Equals("yes", StringComparison.OrdinalIgnoreCase) || v == "1")),
-                "condition" or "cond" => cards.Where(c => EF.Functions.Like(c.Condition, $"%{v}%")),
-                "location" or "loc" => cards.Where(c => c.Container != null && EF.Functions.Like(c.Container.Name, $"%{v}%")),
-                _ => cards.Where(c => EF.Functions.Like(c.Name, $"%{v}%")),
-            };
+            FieldFilter f => BuildFieldExpression(param, f),
+            AndFilter and => and.Children
+                .Select(c => BuildFilterExpression(param, c))
+                .Aggregate(LinqExpression.AndAlso),
+            OrFilter or => or.Children
+                .Select(c => BuildFilterExpression(param, c))
+                .Aggregate(LinqExpression.OrElse),
+            NotFilter not => LinqExpression.Not(BuildFilterExpression(param, not.Inner)),
+            _ => LinqExpression.Constant(true),
+        };
+    }
+
+    private static LinqExpression BuildFieldExpression(System.Linq.Expressions.ParameterExpression param, FieldFilter filter)
+    {
+        var expr = filter.Field switch
+        {
+            "name" => BuildNameExpression(param, filter.Op, filter.Value),
+            "set" => BuildSetExpression(param, filter.Op, filter.Value),
+            "cn" => BuildCnExpression(param, filter.Op, filter.Value),
+            "type" => BuildNullableStringExpression(param, nameof(CollectionCard.CardType), filter.Op, filter.Value),
+            "rarity" => BuildRarityExpression(param, filter.Op, filter.Value),
+            "color" => BuildColorExpression(param, filter.Op, filter.Value),
+            "is" => BuildIsExpression(param, filter.Value),
+            "foil" => BuildLegacyFoilExpression(param, filter.Value),
+            "condition" or "cond" => BuildStringExpression(param, nameof(CollectionCard.Condition), filter.Op, filter.Value),
+            "location" or "loc" => BuildLocationExpression(param, filter.Op, filter.Value),
+            _ => BuildNameExpression(param, filter.Op, filter.Value),
+        };
+
+        return filter.Negated ? LinqExpression.Not(expr) : expr;
+    }
+
+    private static LinqExpression BuildNameExpression(System.Linq.Expressions.ParameterExpression param, ComparisonOp op, string value)
+    {
+        var prop = LinqExpression.Property(param, nameof(CollectionCard.Name));
+        return op switch
+        {
+            ComparisonOp.Exact => CallLike(prop, value),
+            ComparisonOp.NotEqual => LinqExpression.Not(CallLike(prop, value)),
+            _ => CallLike(prop, $"%{value}%"),
+        };
+    }
+
+    private static LinqExpression BuildSetExpression(System.Linq.Expressions.ParameterExpression param, ComparisonOp op, string value)
+    {
+        var codeProp = LinqExpression.Property(param, nameof(CollectionCard.SetCode));
+        var nameProp = LinqExpression.Property(param, nameof(CollectionCard.SetName));
+
+        return op switch
+        {
+            // : matches exact set code OR substring in set name
+            ComparisonOp.Contains => LinqExpression.OrElse(
+                CallLike(codeProp, value),
+                CallLike(nameProp, $"%{value}%")),
+            ComparisonOp.Exact => CallLike(codeProp, value),
+            ComparisonOp.NotEqual => LinqExpression.Not(CallLike(codeProp, value)),
+            _ => LinqExpression.OrElse(
+                CallLike(codeProp, value),
+                CallLike(nameProp, $"%{value}%")),
+        };
+    }
+
+    private static LinqExpression BuildCnExpression(System.Linq.Expressions.ParameterExpression param, ComparisonOp op, string value)
+    {
+        var prop = LinqExpression.Property(param, nameof(CollectionCard.Number));
+        return op switch
+        {
+            ComparisonOp.NotEqual => LinqExpression.NotEqual(prop, LinqExpression.Constant(value)),
+            _ => LinqExpression.Equal(prop, LinqExpression.Constant(value)),
+        };
+    }
+
+    private static LinqExpression BuildStringExpression(System.Linq.Expressions.ParameterExpression param, string propertyName, ComparisonOp op, string value)
+    {
+        var prop = LinqExpression.Property(param, propertyName);
+        return op switch
+        {
+            ComparisonOp.Exact => CallLike(prop, value),
+            ComparisonOp.NotEqual => LinqExpression.Not(CallLike(prop, value)),
+            _ => CallLike(prop, $"%{value}%"),
+        };
+    }
+
+    private static LinqExpression BuildNullableStringExpression(System.Linq.Expressions.ParameterExpression param, string propertyName, ComparisonOp op, string value)
+    {
+        var prop = LinqExpression.Property(param, propertyName);
+        var notNull = LinqExpression.NotEqual(prop, LinqExpression.Constant(null, typeof(string)));
+
+        if (op == ComparisonOp.NotEqual)
+        {
+            return LinqExpression.OrElse(
+                LinqExpression.Equal(prop, LinqExpression.Constant(null, typeof(string))),
+                LinqExpression.Not(CallLike(prop, value)));
         }
-        return cards;
+
+        var pattern = op == ComparisonOp.Exact ? value : $"%{value}%";
+        return LinqExpression.AndAlso(notNull, CallLike(prop, pattern));
+    }
+
+    private static LinqExpression BuildRarityExpression(System.Linq.Expressions.ParameterExpression param, ComparisonOp op, string value)
+    {
+        var prop = LinqExpression.Property(param, nameof(CollectionCard.Rarity));
+
+        if (op == ComparisonOp.Contains || op == ComparisonOp.Exact)
+            return CallLike(prop, value);
+
+        var matching = ScryfallQueryParser.RaritiesMatching(op, value);
+        if (matching.Count == 0)
+            return LinqExpression.Constant(false);
+
+        return matching
+            .Select(r => CallLike(prop, r))
+            .Aggregate(LinqExpression.OrElse);
+    }
+
+    private static LinqExpression BuildColorExpression(System.Linq.Expressions.ParameterExpression param, ComparisonOp op, string value)
+    {
+        var prop = LinqExpression.Property(param, nameof(CollectionCard.Color));
+        var notNull = LinqExpression.NotEqual(prop, LinqExpression.Constant(null, typeof(string)));
+
+        // colorless: Color is null or empty
+        if (value.Equals("colorless", StringComparison.OrdinalIgnoreCase))
+        {
+            var isColorless = LinqExpression.OrElse(
+                LinqExpression.Equal(prop, LinqExpression.Constant(null, typeof(string))),
+                LinqExpression.Equal(prop, LinqExpression.Constant("")));
+            return op == ComparisonOp.NotEqual ? LinqExpression.Not(isColorless) : isColorless;
+        }
+
+        // multicolor: Color has 2+ characters
+        if (value.Equals("multicolor", StringComparison.OrdinalIgnoreCase) || value.Equals("multi", StringComparison.OrdinalIgnoreCase))
+        {
+            var lengthProp = LinqExpression.Property(prop, nameof(string.Length));
+            var isMulti = LinqExpression.AndAlso(notNull,
+                LinqExpression.GreaterThanOrEqual(lengthProp, LinqExpression.Constant(2)));
+            return op == ComparisonOp.NotEqual ? LinqExpression.Not(isMulti) : isMulti;
+        }
+
+        var normalized = ScryfallQueryParser.NormalizeColorValue(value);
+        if (normalized.Length == 0)
+            return LinqExpression.Constant(true);
+
+        return op switch
+        {
+            // : and >= mean "includes at least these colors"
+            ComparisonOp.Contains or ComparisonOp.GreaterOrEqual => BuildColorSuperset(prop, notNull, normalized),
+            // = means "exactly these colors"
+            ComparisonOp.Exact => LinqExpression.AndAlso(notNull, CallLike(prop, normalized)),
+            // != means "not exactly these colors"
+            ComparisonOp.NotEqual => LinqExpression.OrElse(
+                LinqExpression.Equal(prop, LinqExpression.Constant(null, typeof(string))),
+                LinqExpression.Not(CallLike(prop, normalized))),
+            // <= means "at most these colors" (subset)
+            ComparisonOp.LessOrEqual => BuildColorSubset(prop, notNull, normalized),
+            // < means "strict subset"
+            ComparisonOp.LessThan => LinqExpression.AndAlso(
+                BuildColorSubset(prop, notNull, normalized),
+                LinqExpression.Not(CallLike(prop, normalized))),
+            // > means "strict superset"
+            ComparisonOp.GreaterThan => LinqExpression.AndAlso(
+                BuildColorSuperset(prop, notNull, normalized),
+                LinqExpression.Not(CallLike(prop, normalized))),
+            _ => BuildColorSuperset(prop, notNull, normalized),
+        };
+    }
+
+    /// <summary>Card's colors include all of the specified colors (superset).</summary>
+    private static LinqExpression BuildColorSuperset(LinqExpression prop, LinqExpression notNull, string colors)
+    {
+        LinqExpression expr = notNull;
+        foreach (var c in colors)
+            expr = LinqExpression.AndAlso(expr, CallLike(prop, $"%{c}%"));
+        return expr;
+    }
+
+    /// <summary>Card's colors don't include any color NOT in the specified set (subset).</summary>
+    private static LinqExpression BuildColorSubset(LinqExpression prop, LinqExpression notNull, string colors)
+    {
+        const string allColors = "WUBRG";
+        LinqExpression expr = notNull;
+        foreach (var c in allColors.Where(c => !colors.Contains(c)))
+            expr = LinqExpression.AndAlso(expr, LinqExpression.Not(CallLike(prop, $"%{c}%")));
+        return expr;
+    }
+
+    private static LinqExpression BuildIsExpression(System.Linq.Expressions.ParameterExpression param, string value)
+    {
+        return value.ToLowerInvariant() switch
+        {
+            "foil" => LinqExpression.Equal(
+                LinqExpression.Property(param, nameof(CollectionCard.IsFoil)),
+                LinqExpression.Constant(true)),
+            _ => LinqExpression.Constant(true),
+        };
+    }
+
+    private static LinqExpression BuildLegacyFoilExpression(System.Linq.Expressions.ParameterExpression param, string value)
+    {
+        var isFoil = value.Equals("true", StringComparison.OrdinalIgnoreCase)
+                  || value.Equals("yes", StringComparison.OrdinalIgnoreCase)
+                  || value == "1";
+        return LinqExpression.Equal(
+            LinqExpression.Property(param, nameof(CollectionCard.IsFoil)),
+            LinqExpression.Constant(isFoil));
+    }
+
+    private static LinqExpression BuildLocationExpression(System.Linq.Expressions.ParameterExpression param, ComparisonOp op, string value)
+    {
+        var containerProp = LinqExpression.Property(param, nameof(CollectionCard.Container));
+        var notNull = LinqExpression.NotEqual(containerProp, LinqExpression.Constant(null, typeof(StorageContainer)));
+        var nameProp = LinqExpression.Property(containerProp, nameof(StorageContainer.Name));
+
+        if (op == ComparisonOp.NotEqual)
+        {
+            return LinqExpression.OrElse(
+                LinqExpression.Equal(containerProp, LinqExpression.Constant(null, typeof(StorageContainer))),
+                LinqExpression.Not(CallLike(nameProp, value)));
+        }
+
+        var pattern = op == ComparisonOp.Exact ? value : $"%{value}%";
+        return LinqExpression.AndAlso(notNull, CallLike(nameProp, pattern));
     }
 
     private static IEnumerable<CollectionCard> ApplySortPreset(IQueryable<CollectionCard> cards, SortPreset? preset)
@@ -637,6 +909,7 @@ public sealed class CardSevice : ICardService
             "Condition" => card.Condition,
             "IsFoil" => card.IsFoil.ToString(),
             "PurchasePrice" => card.PurchasePrice?.ToString("0000000000.00") ?? "",
+            "MarketPrice" => card.MarketPrice.ToString("0000000000.00"),
             "DateAdded" => card.DateAdded.ToString("o"),
             "Number" => card.Number,
             _ => ""
@@ -747,5 +1020,20 @@ public sealed class CardSevice : ICardService
             .ToList();
 
         return _gameServices[game].GetMissingCards(setCode, ownedNumbers);
+    }
+
+    private static void ConvertToJpeg(string sourcePath, string destPath, int quality)
+    {
+        var bitmap = new BitmapImage();
+        bitmap.BeginInit();
+        bitmap.UriSource = new Uri(sourcePath, UriKind.Absolute);
+        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+        bitmap.EndInit();
+
+        var encoder = new JpegBitmapEncoder { QualityLevel = quality };
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+
+        using var fs = new FileStream(destPath, FileMode.Create, FileAccess.Write);
+        encoder.Save(fs);
     }
 }

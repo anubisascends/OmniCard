@@ -155,10 +155,14 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         var exactCorrection = _correctionsCache.FirstOrDefault(c => c.ScanHash == imageHash);
         if (exactCorrection.CorrectCardId is not null && exactCorrection != default)
         {
-            _logger.LogDebug("Exact correction found for hash {Hash:X16} → {CardId}", imageHash, exactCorrection.CorrectCardId);
-            var correctedCard = LookupCard(Guid.Parse(exactCorrection.CorrectCardId), confidence: 100);
-            if (correctedCard is not null)
-                return correctedCard;
+            // Respect set filter even for exact corrections
+            if (setFilter is null || (exactCorrection.SetCode is not null && setFilter.Contains(exactCorrection.SetCode)))
+            {
+                _logger.LogDebug("Exact correction found for hash {Hash:X16} → {CardId}", imageHash, exactCorrection.CorrectCardId);
+                var correctedCard = LookupCard(Guid.Parse(exactCorrection.CorrectCardId), confidence: 100);
+                if (correctedCard is not null)
+                    return correctedCard;
+            }
         }
 
         // Phase 2: pHash matching (optionally filtered by set from symbol detection)
@@ -296,6 +300,43 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
                 .First().Id;
         }
 
+        // Phase 2b: Fuzzy correction matching — nearby confirmed hashes boost confidence
+        // If the user previously confirmed a match for a similar scan hash,
+        // that correction's card gets a trust bonus that can outweigh the pHash winner.
+        const int CorrectionTrustBonus = 5;
+        foreach (var (corrScanHash, corrCardId, corrArtHash, _, corrSetCode) in _correctionsCache!)
+        {
+            // Respect set filter — never match a correction outside the selected set(s)
+            if (setFilter is not null && corrSetCode is not null && !setFilter.Contains(corrSetCode))
+                continue;
+
+            var corrDist = PerceptualHashService.HammingDistance(imageHash, corrScanHash);
+            if (corrDist == 0 || corrDist > maxDistance) continue; // exact already handled; too far = skip
+
+            var adjustedDist = Math.Max(0, corrDist - CorrectionTrustBonus);
+
+            // Also factor in art hash if both the correction and scan have one
+            if (artHashes is not null && corrArtHash is > 0)
+            {
+                var bestArtDist = artHashes
+                    .Where(h => h != 0)
+                    .Select(h => PerceptualHashService.HammingDistance(h, corrArtHash.Value))
+                    .DefaultIfEmpty(int.MaxValue)
+                    .Min();
+                if (bestArtDist <= maxDistance)
+                    adjustedDist = Math.Max(0, adjustedDist - (maxDistance - bestArtDist) / 2);
+            }
+
+            if (adjustedDist < bestPHashDistance)
+            {
+                var corrId = Guid.Parse(corrCardId);
+                _logger.LogDebug("Fuzzy correction wins: hash distance {Raw} adjusted to {Adjusted} (pHash best was {PHashBest}) → {CardId}",
+                    corrDist, adjustedDist, bestPHashDistance, corrCardId);
+                bestPHashId = corrId;
+                bestPHashDistance = adjustedDist;
+            }
+        }
+
         // Phase 3: Confident hash — if distance is low, return immediately
         const int ConfidentHashThreshold = 6;
         if (bestPHashDistance <= ConfidentHashThreshold)
@@ -362,6 +403,14 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         if (bestPHashDistance > maxDistance)
         {
             _logger.LogDebug("Best distance {Distance} exceeds max {MaxDistance}", bestPHashDistance, maxDistance);
+            return null;
+        }
+
+        // Safety net: never return a card outside the selected set filter
+        if (setFilter is not null && _hashSetLookup!.TryGetValue(bestPHashId, out var finalSetCode)
+            && !setFilter.Contains(finalSetCode))
+        {
+            _logger.LogDebug("Best match {CardId} is in set {Set} which is outside the set filter; rejecting", bestPHashId, finalSetCode);
             return null;
         }
 

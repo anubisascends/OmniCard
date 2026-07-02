@@ -33,6 +33,9 @@ public sealed partial class CollectionViewModel : ViewModel
     /// <summary>Set by RootViewModel to report status messages.</summary>
     public Action<string>? ReportMessage { get; set; }
 
+    /// <summary>Set by RootViewModel so the home tab refreshes after collection mutations.</summary>
+    public Action? CollectionChanged { get; set; }
+
     /// <summary>The data directory path, used as converter parameter for CardPreviewImageConverter.</summary>
     public string DataDirectory => _dataPathService.DataDirectory;
 
@@ -178,7 +181,9 @@ public sealed partial class CollectionViewModel : ViewModel
     public partial LocationTileSummary? BulkSummary { get; set; }
 
     public IEnumerable<IGrouping<ContainerType, LocationTileSummary>> GroupedLocations =>
-        LocationSummaries.GroupBy(s => s.Container.ContainerType);
+        LocationSummaries
+            .OrderBy(s => s.Container.Name, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(s => s.Container.ContainerType);
 
     public void LoadOverview()
     {
@@ -367,6 +372,17 @@ public sealed partial class CollectionViewModel : ViewModel
         {
             var price = _cardService.GetGameService(card.Game).GetCurrentPrice(card.GameCardId, card.IsFoil) ?? 0;
             MarketPrices[card.Id] = price;
+            card.MarketPrice = price;
+        }
+
+        // Re-sort by MarketPrice in-memory since it's not available at DB query time
+        if (sortPreset?.SortLevels.Any(l => l.Field == "MarketPrice") == true)
+        {
+            var level = sortPreset.SortLevels.First(l => l.Field == "MarketPrice");
+            var sorted = level.Direction == SortDirection.Ascending
+                ? displayResults.OrderBy(c => c.MarketPrice)
+                : displayResults.OrderByDescending(c => c.MarketPrice);
+            displayResults = new ObservableCollection<CollectionCard>(sorted);
         }
 
         // Single property assignment — DataGrid updates once
@@ -513,6 +529,7 @@ public sealed partial class CollectionViewModel : ViewModel
             _cardService.DeleteCollectionCard(id);
         ReportMessage?.Invoke($"Deleted {ids.Count} card(s).");
         SearchCollection();
+        CollectionChanged?.Invoke();
     }
 
     [RelayCommand]

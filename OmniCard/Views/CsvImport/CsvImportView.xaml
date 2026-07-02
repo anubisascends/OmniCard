@@ -25,6 +25,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -46,11 +47,23 @@
             </StackPanel>
         </GroupBox>
 
+        <!-- Location assignment -->
+        <GroupBox Grid.Row="2" Header="Assign to Location" Margin="0,0,0,8" Padding="4">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Location:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <ComboBox ItemsSource="{Binding ViewModel.AvailableContainers}"
+                          SelectedItem="{Binding ViewModel.SelectedContainer}"
+                          DisplayMemberPath="Name"
+                          Width="250"
+                          VerticalAlignment="Center"/>
+            </StackPanel>
+        </GroupBox>
+
         <!-- Preview label -->
-        <TextBlock Grid.Row="2" Text="Preview (first 20 rows):" FontWeight="SemiBold" Margin="0,0,0,4"/>
+        <TextBlock Grid.Row="3" Text="Preview (first 20 rows):" FontWeight="SemiBold" Margin="0,0,0,4"/>
 
         <!-- Preview grid -->
-        <DataGrid Grid.Row="3" ItemsSource="{Binding ViewModel.PreviewCards}"
+        <DataGrid Grid.Row="4" ItemsSource="{Binding ViewModel.PreviewCards}"
                   AutoGenerateColumns="False" IsReadOnly="True" Margin="0,0,0,8">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
@@ -62,7 +75,7 @@
         </DataGrid>
 
         <!-- Buttons -->
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="Import" Command="{Binding ViewModel.ImportCommand}"
                     IsEnabled="{Binding ViewModel.CanImport}"
                     Padding="16,4" Margin="0,0,8,0"/>

@@ -52,12 +52,10 @@
                         HorizontalAlignment="Right"
                         VerticalAlignment="Center">
                 <Button Content="Connect"
-                        Width="65"
                         Margin="2.5"
                         IsDefault="True"
                         Command="{Binding ViewModel.OkCommand}"/>
                 <Button Content="Cancel"
-                        Width="65"
                         Margin="2.5"
                         IsCancel="True"/>
             </StackPanel>

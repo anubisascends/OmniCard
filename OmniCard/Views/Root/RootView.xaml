@@ -196,10 +196,13 @@
                           Command="{Binding ViewModel.ClearScanCacheCommand}"/>
                 <MenuItem Header="Clear _Diagnostic Logs"
                           Command="{Binding ViewModel.ClearDiagnosticLogsCommand}"/>
+                <MenuItem Header="Delete _Orphaned Scans"
+                          Command="{Binding ViewModel.DeleteOrphanedScansCommand}"/>
             </MenuItem>
         </Menu>
 
-        <ToolBarPanel Grid.Row="1">
+        <!-- Game selector hidden while focusing on MTG only -->
+        <ToolBarPanel Grid.Row="1" Visibility="Collapsed">
             <ToolBarTray>
                 <ToolBar>
                     <TextBlock Text="Game:"

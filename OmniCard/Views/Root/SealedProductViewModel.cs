@@ -49,10 +49,14 @@ public sealed partial class SealedProductViewModel : ViewModel
         var template = _sealedProductService.FindTemplateByUpc(UpcEntry.Trim());
         if (template is not null)
         {
-            _sealedProductService.AddInstance(template.Id, null);
-            ReportMessage?.Invoke($"Added {template.Name}.");
-            UpcEntry = "";
-            LoadInstances();
+            // Template found — open add dialog pre-selected so user can set a price
+            var instance = _dialogService.AddSealedProduct(template);
+            if (instance is not null)
+            {
+                ReportMessage?.Invoke($"Added {instance.Template.Name}.");
+                UpcEntry = "";
+                LoadInstances();
+            }
         }
         else
         {
@@ -64,10 +68,13 @@ public sealed partial class SealedProductViewModel : ViewModel
             });
             if (newTemplate is not null)
             {
-                _sealedProductService.AddInstance(newTemplate.Id, null);
-                ReportMessage?.Invoke($"Created and added {newTemplate.Name}.");
-                UpcEntry = "";
-                LoadInstances();
+                var instance = _dialogService.AddSealedProduct(newTemplate);
+                if (instance is not null)
+                {
+                    ReportMessage?.Invoke($"Created and added {instance.Template.Name}.");
+                    UpcEntry = "";
+                    LoadInstances();
+                }
             }
         }
     }
@@ -122,6 +129,11 @@ public sealed partial class SealedProductViewModel : ViewModel
     public void ManageTemplates()
     {
         _dialogService.EditSealedProductTemplate(null);
+    }
+
+    public void SaveInstancePrice(int instanceId, decimal? price)
+    {
+        _sealedProductService.UpdateInstancePrice(instanceId, price);
     }
 
     [RelayCommand]

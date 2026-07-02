@@ -40,6 +40,16 @@
                     <GridViewColumn Header="Name" Width="180" DisplayMemberBinding="{Binding Name}"/>
                     <GridViewColumn Header="Type" Width="100" DisplayMemberBinding="{Binding TypeDisplay}"/>
                     <GridViewColumn Header="Cards" Width="60" DisplayMemberBinding="{Binding CardCount}"/>
+                    <GridViewColumn Header="" Width="50">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <Button Content="QR" ToolTip="Copy barcode text to clipboard"
+                                        Command="{Binding DataContext.ViewModel.CopyQrTextCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding Id}"
+                                        Padding="6,1" FontSize="10"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
                 </GridView>
             </ListView.View>
         </ListView>
@@ -53,14 +63,11 @@
                     IsEnabled="{Binding ViewModel.CanDelete}"/>
         </StackPanel>
 
-        <!-- QR link text -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,4,0,4"
-                    Visibility="{Binding ViewModel.SelectedContainer, Converter={StaticResource NullToCollapsed}}">
-            <TextBlock Text="QR Link:" VerticalAlignment="Center" Margin="0,0,8,0"
-                       Visibility="{Binding ViewModel.QrLinkText, Converter={StaticResource NullToCollapsed}}"/>
-            <TextBox Text="{Binding ViewModel.QrLinkText, Mode=OneWay}" IsReadOnly="True"
-                     Width="300" VerticalAlignment="Center" FontSize="11"
-                     Visibility="{Binding ViewModel.QrLinkText, Converter={StaticResource NullToCollapsed}}"/>
+        <!-- Web app base URL -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,4,0,8">
+            <TextBlock Text="Web App URL:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <TextBox Text="{Binding ViewModel.BaseUrl, UpdateSourceTrigger=PropertyChanged}"
+                     Width="300" VerticalAlignment="Center" FontSize="11"/>
         </StackPanel>
 
         <!-- Add panel -->

@@ -13,6 +13,7 @@ public interface ISealedProductService
     void DeleteTemplate(int templateId);
     List<SealedProductInstance> GetInstances();
     SealedProductInstance AddInstance(int templateId, decimal? purchasePrice);
+    void UpdateInstancePrice(int instanceId, decimal? purchasePrice);
     void DeleteInstance(int instanceId);
     SealedProductInstance? GetInstanceWithContents(int instanceId);
     List<SealedProductInstance> CrackInstance(int instanceId);
@@ -103,7 +104,21 @@ public class SealedProductService(IDbContextFactory<SealedProductDbContext> dbCo
         };
         ctx.Instances.Add(instance);
         ctx.SaveChanges();
-        return instance;
+
+        // Reload with Template so callers can access instance.Template
+        return ctx.Instances
+            .AsNoTracking()
+            .Include(i => i.Template)
+            .First(i => i.Id == instance.Id);
+    }
+
+    public void UpdateInstancePrice(int instanceId, decimal? purchasePrice)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var instance = ctx.Instances.Find(instanceId);
+        if (instance is null) return;
+        instance.PurchasePrice = purchasePrice;
+        ctx.SaveChanges();
     }
 
     public void DeleteInstance(int instanceId)

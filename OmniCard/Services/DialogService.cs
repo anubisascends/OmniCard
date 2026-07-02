@@ -28,7 +28,7 @@ public interface IDialogService
     int? PickCoverArt(int containerId, string containerName);
     MoveToLocationResult? PickMoveToLocation();
     SealedProductTemplate? EditSealedProductTemplate(SealedProductTemplate? existing);
-    SealedProductInstance? AddSealedProduct();
+    SealedProductInstance? AddSealedProduct(SealedProductTemplate? preselectTemplate = null);
     List<SealedProductInstance>? CrackSealedProduct(SealedProductInstance instance);
 }
 
@@ -134,11 +134,13 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         return result == true ? wnd.ViewModel.Result : null;
     }
 
-    public SealedProductInstance? AddSealedProduct()
+    public SealedProductInstance? AddSealedProduct(SealedProductTemplate? preselectTemplate = null)
     {
         var wnd = Services.GetRequiredService<AddSealedProductView>();
         wnd.Owner = Application.Current.MainWindow;
         wnd.ViewModel.Load();
+        if (preselectTemplate is not null)
+            wnd.ViewModel.SelectedTemplate = preselectTemplate;
         var result = wnd.ShowDialog();
         return result == true ? wnd.ViewModel.Result : null;
     }

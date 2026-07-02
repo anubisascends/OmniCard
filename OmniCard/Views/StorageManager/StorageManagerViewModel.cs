@@ -1,4 +1,7 @@
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Options;
@@ -31,31 +34,23 @@ public sealed partial class StorageManagerViewModel(
     [ObservableProperty]
     public partial string EditName { get; set; } = "";
 
+    [ObservableProperty]
+    public partial string BaseUrl { get; set; } = "";
+
     public Action? CloseDialog { get; set; }
 
     partial void OnSelectedContainerChanged(ContainerDisplayItem? value)
     {
         OnPropertyChanged(nameof(CanEdit));
         OnPropertyChanged(nameof(CanDelete));
-        OnPropertyChanged(nameof(QrLinkText));
     }
 
     public bool CanEdit => SelectedContainer is { IsSystem: false };
     public bool CanDelete => SelectedContainer is not null && !SelectedContainer.IsSystem;
 
-    public string? QrLinkText
-    {
-        get
-        {
-            var baseUrl = webCompanionSettings.Value.BaseUrl;
-            if (string.IsNullOrWhiteSpace(baseUrl) || SelectedContainer is null)
-                return null;
-            return $"{baseUrl.TrimEnd('/')}/location/{SelectedContainer.Id}";
-        }
-    }
-
     public void Load()
     {
+        BaseUrl = webCompanionSettings.Value.BaseUrl;
         Containers.Clear();
         foreach (var c in containerService.GetAll())
         {
@@ -68,6 +63,15 @@ public sealed partial class StorageManagerViewModel(
                 CardCount = containerService.GetCardCount(c.Id),
             });
         }
+    }
+
+    [RelayCommand]
+    public void CopyQrText(int containerId)
+    {
+        if (string.IsNullOrWhiteSpace(BaseUrl))
+            return;
+        var text = $"displaybarcode \"{BaseUrl.TrimEnd('/')}/location/{containerId}\" QR \\q 3";
+        System.Windows.Clipboard.SetText(text);
     }
 
     [RelayCommand]
@@ -149,7 +153,19 @@ public sealed partial class StorageManagerViewModel(
     [RelayCommand]
     public void Close()
     {
+        SaveBaseUrl();
         CloseDialog?.Invoke();
+    }
+
+    private void SaveBaseUrl()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+        if (!File.Exists(path)) return;
+        var json = JsonNode.Parse(File.ReadAllText(path));
+        if (json is null) return;
+        json["WebCompanion"] ??= new JsonObject();
+        json["WebCompanion"]!["BaseUrl"] = BaseUrl;
+        File.WriteAllText(path, json.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
     }
 }
 

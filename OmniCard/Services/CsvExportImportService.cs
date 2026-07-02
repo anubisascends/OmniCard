@@ -16,7 +16,7 @@ public interface ICsvExportImportService
     void ExportMoxfield(string filePath, IEnumerable<CollectionCard> cards);
     void ExportManabox(string filePath, IEnumerable<CollectionCard> cards);
     CsvImportPreview PreviewImport(string filePath);
-    int ImportCards(CsvImportPreview preview, bool skipDuplicates);
+    int ImportCards(CsvImportPreview preview, bool skipDuplicates, int? targetContainerId = null);
 }
 
 public class CsvExportImportService(
@@ -275,9 +275,10 @@ public class CsvExportImportService(
         };
     }
 
-    public int ImportCards(CsvImportPreview preview, bool skipDuplicates)
+    public int ImportCards(CsvImportPreview preview, bool skipDuplicates, int? targetContainerId = null)
     {
-        logger.LogInformation("Importing {Count} cards (skipDuplicates={Skip})", preview.Cards.Count, skipDuplicates);
+        logger.LogInformation("Importing {Count} cards (skipDuplicates={Skip}, container={Container})",
+            preview.Cards.Count, skipDuplicates, targetContainerId);
         using var context = dbContextFactory!.CreateDbContext();
 
         var imported = 0;
@@ -294,8 +295,13 @@ public class CsvExportImportService(
                     continue;
             }
 
-            // Resolve container for app-native imports
-            if (card.Container is not null && card.ContainerId is null)
+            // Resolve container: use target if specified, otherwise resolve from app-native data
+            if (targetContainerId is not null && card.ContainerId is null)
+            {
+                card.ContainerId = targetContainerId.Value;
+                card.Container = null;
+            }
+            else if (card.Container is not null && card.ContainerId is null)
             {
                 var existing = containerService!.GetAll().FirstOrDefault(c => c.Name == card.Container.Name);
                 if (existing is null)

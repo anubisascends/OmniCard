@@ -74,7 +74,7 @@ public partial class CardListView : UserControl
             "Type" => "CardType",
             "Rarity" => "Rarity",
             "Finish" => "IsFoil",
-            "MarketPrice" => "PurchasePrice", // sort by purchase price as proxy
+            "MarketPrice" => "MarketPrice",
             "Condition" => "Condition",
             "PurchasePrice" => "PurchasePrice",
             "DateAdded" => "DateAdded",

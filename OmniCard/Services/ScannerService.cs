@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.Logging;
 using NTwain;
 using NTwain.Data;
+using OmniCard.Models;
 using System.Reflection;
 
 namespace OmniCard.Services;
@@ -16,6 +17,8 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
     [ObservableProperty]
     public partial DataSource DataSource { get; set; }
     public ICardService CardService { get; }
+
+    public ScanQuality ScanQuality { get; set; } = ScanQuality.Fast;
 
     public ScannerService(ICardService cardService, ILogger<ScannerService> logger)
     {
@@ -61,8 +64,66 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
             return;
         }
 
-        _logger.LogInformation("Starting scan on data source {DataSourceName}", DataSource.Name);
+        ApplyScanSettings(DataSource);
+        _logger.LogInformation("Starting scan on data source {DataSourceName} (quality={Quality})",
+            DataSource.Name, ScanQuality);
         DataSource.Enable(SourceEnableMode.NoUI, false, IntPtr.Zero);
+    }
+
+    private void ApplyScanSettings(DataSource ds)
+    {
+        var caps = ds.Capabilities;
+
+        if (ScanQuality == ScanQuality.Fast)
+        {
+            TrySetResolution(caps, 200f);
+            TryResetImageProcessing(caps);
+        }
+        else
+        {
+            // HighQuality — reset everything to scanner driver defaults
+            TryResetResolution(caps);
+            TryResetImageProcessing(caps);
+        }
+    }
+
+    private void TrySetResolution(ICapabilities caps, float dpi)
+    {
+        try { if (caps.ICapXResolution.CanSet) caps.ICapXResolution.SetValue((TWFix32)dpi); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set XResolution"); }
+
+        try { if (caps.ICapYResolution.CanSet) caps.ICapYResolution.SetValue((TWFix32)dpi); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set YResolution"); }
+    }
+
+    private void TryResetResolution(ICapabilities caps)
+    {
+        try { if (caps.ICapXResolution.CanReset) caps.ICapXResolution.Reset(); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset XResolution"); }
+
+        try { if (caps.ICapYResolution.CanReset) caps.ICapYResolution.Reset(); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset YResolution"); }
+    }
+
+    private void TryResetImageProcessing(ICapabilities caps)
+    {
+        try { if (caps.ICapAutoBright.CanReset) caps.ICapAutoBright.Reset(); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset AutoBright"); }
+
+        try { if (caps.ICapBrightness.CanReset) caps.ICapBrightness.Reset(); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset Brightness"); }
+
+        try { if (caps.ICapContrast.CanReset) caps.ICapContrast.Reset(); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset Contrast"); }
+
+        try { if (caps.ICapGamma.CanReset) caps.ICapGamma.Reset(); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset Gamma"); }
+
+        try { if (caps.ICapHighlight.CanReset) caps.ICapHighlight.Reset(); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset Highlight"); }
+
+        try { if (caps.ICapShadow.CanReset) caps.ICapShadow.Reset(); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset Shadow"); }
     }
 
     private void Session_SourceDisabled(object? sender, EventArgs e)

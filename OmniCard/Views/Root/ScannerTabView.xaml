@@ -122,6 +122,21 @@
             <ToolBarTray>
                 <ToolBar>
 
+                    <TextBlock Text="Scan Quality:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,4,0"/>
+                    <ComboBox SelectedItem="{Binding ViewModel.ScanQuality}"
+                              Width="140"
+                              VerticalAlignment="Center"
+                              Margin="0,0,8,0">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Converter={local:ScanQualityDisplayConverter}}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                        <Models:ScanQuality>Fast</Models:ScanQuality>
+                        <Models:ScanQuality>HighQuality</Models:ScanQuality>
+                    </ComboBox>
                     <Separator/>
                     <Button Command="{Binding ViewModel.ScanCommand}"
                             Content="Scan Cards..."/>
@@ -410,7 +425,7 @@
                                 <!-- Scan image on the left -->
                                 <Image Source="{Binding TempImagePath, Converter={local:ScanImageConverter}}"
                                        Width="{Binding DataContext.ViewModel.CardPreviewWidth,
-                                           RelativeSource={RelativeSource AncestorType=Window}}"
+                                           RelativeSource={RelativeSource AncestorType=ListView}}"
                                        HorizontalAlignment="Left"
                                        VerticalAlignment="Top"
                                        Stretch="Uniform"/>
@@ -423,14 +438,14 @@
                                     <TextBlock Text="{Binding Match.Name}"
                                                FontWeight="Bold"
                                                FontSize="{Binding DataContext.ViewModel.ScannerFontSize,
-                                                   RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                   RelativeSource={RelativeSource AncestorType=ListView}}"/>
 
                                     <!-- Set Name (Set Code) [symbol] -->
                                     <StackPanel Orientation="Horizontal"
                                                 Margin="0,2,0,0">
                                         <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
                                                    FontSize="{Binding DataContext.ViewModel.ScannerFontSizeSmall,
-                                                       RelativeSource={RelativeSource AncestorType=Window}}"
+                                                       RelativeSource={RelativeSource AncestorType=ListView}}"
                                                    VerticalAlignment="Center">
                                             <TextBlock.Text>
                                                 <MultiBinding StringFormat="{}{0} ({1})">
@@ -440,9 +455,9 @@
                                             </TextBlock.Text>
                                         </TextBlock>
                                         <Border Width="{Binding DataContext.ViewModel.ScannerFontSizeSmall,
-                                                    RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    RelativeSource={RelativeSource AncestorType=ListView}}"
                                                 Height="{Binding DataContext.ViewModel.ScannerFontSizeSmall,
-                                                    RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    RelativeSource={RelativeSource AncestorType=ListView}}"
                                                 Margin="6,0,0,0"
                                                 VerticalAlignment="Center"
                                                 helpers:SetSymbol.SetCode="{Binding Match.SetCode}"
@@ -452,7 +467,7 @@
                                     <!-- #: Collector Number -->
                                     <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
                                                FontSize="{Binding DataContext.ViewModel.ScannerFontSizeSmall,
-                                                   RelativeSource={RelativeSource AncestorType=Window}}"
+                                                   RelativeSource={RelativeSource AncestorType=ListView}}"
                                                Margin="0,2,0,0">
                                         <Run Text="#:"/>
                                         <Run Text="{Binding Match.CollectorNumber, Mode=OneWay}"/>
@@ -461,7 +476,7 @@
                                     <!-- Match Confidence -->
                                     <TextBlock Margin="0,2,0,0"
                                                FontSize="{Binding DataContext.ViewModel.ScannerFontSizeSmall,
-                                                   RelativeSource={RelativeSource AncestorType=Window}}"
+                                                   RelativeSource={RelativeSource AncestorType=ListView}}"
                                                Visibility="{Binding Match.Confidence, Converter={local:NullToCollapsedConverter}}">
                                         <Run Text="Match Confidence:"
                                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
@@ -475,7 +490,7 @@
                                             Margin="0,4,0,0"
                                             HorizontalAlignment="Left"
                                             Command="{Binding DataContext.ViewModel.ConfirmMatchCommand,
-                                                RelativeSource={RelativeSource AncestorType=Window}}"
+                                                RelativeSource={RelativeSource AncestorType=ListView}}"
                                             CommandParameter="{Binding}"
                                             Visibility="{Binding Match.Confidence, Converter={local:LowConfidenceToVisibleConverter}}"
                                             Style="{StaticResource MaterialDesignFlatButton}"/>
@@ -485,7 +500,7 @@
                                             Margin="8,4,0,0"
                                             HorizontalAlignment="Left"
                                             Command="{Binding DataContext.ViewModel.ToggleFlagCommand,
-                                                RelativeSource={RelativeSource AncestorType=Window}}"
+                                                RelativeSource={RelativeSource AncestorType=ListView}}"
                                             CommandParameter="{Binding}"
                                             Style="{StaticResource MaterialDesignFlatButton}">
                                         <Button.Content>

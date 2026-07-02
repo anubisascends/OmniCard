@@ -174,6 +174,15 @@ public sealed partial class RootViewModel(
 
     partial void OnDefaultScannerNameChanged(string? value) => PersistDisplaySettings();
 
+    [ObservableProperty]
+    public partial ScanQuality ScanQuality { get; set; } = displaySettings.Value.ScanQuality;
+
+    partial void OnScanQualityChanged(ScanQuality value)
+    {
+        ScannerService.ScanQuality = value;
+        PersistDisplaySettings();
+    }
+
     private void PersistDisplaySettings()
     {
         try
@@ -234,6 +243,8 @@ public sealed partial class RootViewModel(
             writer.WriteString("DefaultScannerName", DefaultScannerName);
         else
             writer.WriteNull("DefaultScannerName");
+
+        writer.WriteString("ScanQuality", ScanQuality.ToString());
 
         writer.WriteEndObject();
     }
@@ -325,8 +336,7 @@ public sealed partial class RootViewModel(
         LoadAvailableSets();
         Collection.SetGame(value);
 
-        if (SelectedTabIndex == 0)
-            _ = CalculateSetCompletionCommand.ExecuteAsync(null);
+        InvalidateHomeTab();
     }
 
     // Set filter for pHash matching — multi-select
@@ -828,9 +838,21 @@ public sealed partial class RootViewModel(
     [ObservableProperty]
     public partial int SelectedTabIndex { get; set; }
 
+    /// <summary>When true the next Home-tab activation will recalculate stats.</summary>
+    private bool _homeTabDirty = true;
+
+    /// <summary>Mark the home tab as needing a refresh. If the tab is currently
+    /// visible the refresh fires immediately; otherwise it fires on next activation.</summary>
+    private void InvalidateHomeTab()
+    {
+        _homeTabDirty = true;
+        if (SelectedTabIndex == 0)
+            _ = CalculateSetCompletionCommand.ExecuteAsync(null);
+    }
+
     partial void OnSelectedTabIndexChanged(int value)
     {
-        if (value == 0) // Home tab
+        if (value == 0 && _homeTabDirty) // Home tab — only reload when dirty
             _ = CalculateSetCompletionCommand.ExecuteAsync(null);
         else if (value == 1 && !Collection.ShowCardList) // Collection tab - refresh overview
             Collection.LoadOverview();
@@ -839,10 +861,12 @@ public sealed partial class RootViewModel(
     public void Initialize()
     {
         SelectedGame = CardService.SelectedGame;
+        ScannerService.ScanQuality = ScanQuality;
 
         // Wire Collection delegates before Initialize so PersistSettings works
         Collection.PersistSettings = PersistDisplaySettings;
         Collection.ReportMessage = msg => Message = msg;
+        Collection.CollectionChanged = InvalidateHomeTab;
 
         // Wire Sealed delegates
         Sealed.ReportMessage = msg => Message = msg;
@@ -854,7 +878,7 @@ public sealed partial class RootViewModel(
         Collection.Initialize();
 
         IsEbayConnected = ebayAuthService.IsConnected;
-        _ = CalculateSetCompletionCommand.ExecuteAsync(null);
+        InvalidateHomeTab();
     }
 
     [RelayCommand]
@@ -889,8 +913,7 @@ public sealed partial class RootViewModel(
         var sets = _allSets.Select(s => (s.SetCode, s.SetName)).ToList();
         await setSymbolCache.PreloadSymbolsAsync(sets, progress);
 
-        if (SelectedTabIndex == 0)
-            _ = CalculateSetCompletionCommand.ExecuteAsync(null);
+        InvalidateHomeTab();
     }
 
     [RelayCommand]
@@ -919,8 +942,7 @@ public sealed partial class RootViewModel(
 
         await CardService.ActiveGameService.ComputeImageHashesAsync(forceAll: true, progress);
         LoadAvailableSets();
-        if (SelectedTabIndex == 0)
-            _ = CalculateSetCompletionCommand.ExecuteAsync(null);
+        InvalidateHomeTab();
     }
 
     [RelayCommand]
@@ -937,8 +959,7 @@ public sealed partial class RootViewModel(
 
         await CardService.ActiveGameService.ComputeImageHashesAsync(forceAll: false, progress);
         LoadAvailableSets();
-        if (SelectedTabIndex == 0)
-            _ = CalculateSetCompletionCommand.ExecuteAsync(null);
+        InvalidateHomeTab();
     }
 
     [RelayCommand]
@@ -1147,6 +1168,7 @@ public sealed partial class RootViewModel(
             CardService.ScannedCards.Clear();
 
             Collection.SearchCollection();
+            InvalidateHomeTab();
             Message = $"Committed {count} cards to collection.";
         }
         catch (Exception ex)
@@ -1231,6 +1253,25 @@ public sealed partial class RootViewModel(
 
         var (flagCount, mismatchCount) = CardService.ClearDiagnosticLogs();
         Message = $"Cleared {flagCount} flag resolution(s) and {mismatchCount} mismatch log(s).";
+    }
+
+    [RelayCommand]
+    public async Task DeleteOrphanedScans()
+    {
+        var result = System.Windows.MessageBox.Show(
+            "This will permanently delete scan image files that have no corresponding card in the collection.\n\nContinue?",
+            "Delete Orphaned Scans",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning);
+
+        if (result != System.Windows.MessageBoxResult.Yes)
+            return;
+
+        var progress = new Progress<string>(msg =>
+            System.Windows.Application.Current.Dispatcher.Invoke(() => Message = msg));
+
+        var (deleted, errors) = await Task.Run(() => CardService.DeleteOrphanedScans(progress));
+        Message = $"Deleted {deleted} orphaned scan(s)" + (errors > 0 ? $" ({errors} error(s))" : "") + ".";
     }
 
     [RelayCommand]
@@ -1412,6 +1453,9 @@ public sealed partial class RootViewModel(
     }
 
     [RelayCommand]
+    public void RefreshHomeTab() => InvalidateHomeTab();
+
+    [RelayCommand]
     public async Task CalculateSetCompletion()
     {
         IsCalculatingCompletion = true;
@@ -1471,6 +1515,7 @@ public sealed partial class RootViewModel(
             StatTotalSets = SetCompletionResults.Count;
             var complete = SetCompletionResults.Count(s => s.CompletionPercent >= 100);
             CompletionStatusMessage = $"{StatTotalCards} cards across {StatTotalSets} sets — {complete} complete";
+            _homeTabDirty = false;
         }
         catch (Exception ex)
         {

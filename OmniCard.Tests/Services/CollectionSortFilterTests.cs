@@ -146,10 +146,12 @@ public class CollectionSortFilterTests : IDisposable
     public void SearchCollection_ScryfallSyntax_ColorFilter()
     {
         var results = new ObservableCollection<CollectionCard>();
+        // c:w is inclusive — matches any card containing white (W, WU, WR, etc.)
         CreateService().SearchCollection("c:w", CardGame.Mtg, null, null, null, results);
 
-        Assert.Single(results);
-        Assert.Equal("Wrath of God", results[0].Name);
+        Assert.Equal(2, results.Count);
+        Assert.Contains(results, c => c.Name == "Wrath of God");
+        Assert.Contains(results, c => c.Name == "Azorius Charm");
     }
 
     [Fact]
@@ -214,13 +216,15 @@ public class CollectionSortFilterTests : IDisposable
     [Fact]
     public void SearchCollection_FilterPresetWithQuery()
     {
-        var filter = new FilterPreset { Name = "Blue Only", Game = CardGame.Mtg, Query = "c:u" };
+        // c:u is inclusive — matches any card containing blue (U, WU, etc.)
+        var filter = new FilterPreset { Name = "Blue Cards", Game = CardGame.Mtg, Query = "c:u" };
 
         var results = new ObservableCollection<CollectionCard>();
         CreateService().SearchCollection("", CardGame.Mtg, null, null, filter, results);
 
-        Assert.Single(results);
-        Assert.Equal("Counterspell", results[0].Name);
+        Assert.Equal(2, results.Count);
+        Assert.Contains(results, c => c.Name == "Counterspell");
+        Assert.Contains(results, c => c.Name == "Azorius Charm");
     }
 
     [Fact]

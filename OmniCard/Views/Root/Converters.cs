@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Markup;
 using OmniCard.Models;
+using OmniCard.Services;
 
 namespace OmniCard.Views.Root;
 
@@ -142,6 +143,22 @@ public class CardGameDisplayConverter : MarkupExtension, IValueConverter
     public override object ProvideValue(IServiceProvider serviceProvider) => this;
 }
 
+public class ScanQualityDisplayConverter : MarkupExtension, IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value switch
+        {
+            ScanQuality.Fast => "Fast (200 DPI)",
+            ScanQuality.HighQuality => "High Quality",
+            _ => value?.ToString() ?? ""
+        };
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
+
 public class LocationDisplayConverter : MarkupExtension, IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -228,26 +245,14 @@ public class CardPreviewImageConverter : MarkupExtension, IValueConverter
     {
         if (value is not CollectionCard card) return null;
 
-        // Try scan image first
-        if (card.ScanImagePath is not null)
+        // Try scan image from cache first
+        if (card.ScanImagePath is not null && ScanImageCache.Instance is not null)
         {
             var dataDir = parameter as string ?? "";
             var fullPath = System.IO.Path.Combine(dataDir, card.ScanImagePath);
-            if (System.IO.File.Exists(fullPath))
-            {
-                try
-                {
-                    var bmp = new System.Windows.Media.Imaging.BitmapImage();
-                    bmp.BeginInit();
-                    bmp.UriSource = new Uri(fullPath, UriKind.Absolute);
-                    bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-                    bmp.DecodePixelWidth = 250;
-                    bmp.EndInit();
-                    bmp.Freeze();
-                    return bmp;
-                }
-                catch { /* fall through to API image */ }
-            }
+            var cached = ScanImageCache.Instance.GetImage(fullPath);
+            if (cached is not null)
+                return cached;
         }
 
         // Fall back to API image

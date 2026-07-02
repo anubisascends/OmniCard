@@ -17,7 +17,7 @@ public sealed class ScanImageCache
 
     public string TempScansDirectory { get; }
 
-    public ScanImageCache(IDataPathService dataPathService, ILogger<ScanImageCache> logger, int capacity = 20)
+    public ScanImageCache(IDataPathService dataPathService, ILogger<ScanImageCache> logger, int capacity = 200)
     {
         TempScansDirectory = dataPathService.TempScansDirectory;
         _logger = logger;
@@ -45,10 +45,11 @@ public sealed class ScanImageCache
         {
             var bmp = new BitmapImage();
             bmp.BeginInit();
-            bmp.UriSource = new Uri(imagePath, UriKind.Absolute);
             bmp.CacheOption = BitmapCacheOption.OnLoad;
             bmp.DecodePixelWidth = 500;
+            bmp.StreamSource = new FileStream(imagePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             bmp.EndInit();
+            bmp.StreamSource.Dispose();
             bmp.Freeze();
 
             var newNode = _order.AddFirst((imagePath, bmp));

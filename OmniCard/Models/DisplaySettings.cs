@@ -10,4 +10,5 @@ public class DisplaySettings
     public double ScannerFontSize { get; set; } = 14;
     public double ScannerListWidth { get; set; }
     public string? DefaultScannerName { get; set; }
+    public ScanQuality ScanQuality { get; set; } = ScanQuality.Fast;
 }

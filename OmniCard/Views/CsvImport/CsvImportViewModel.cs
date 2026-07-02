@@ -6,11 +6,14 @@ using OmniCard.Services;
 
 namespace OmniCard.Views.CsvImport;
 
-public sealed partial class CsvImportViewModel(ICsvExportImportService csvService) : ViewModel
+public sealed partial class CsvImportViewModel(
+    ICsvExportImportService csvService,
+    IStorageContainerService containerService) : ViewModel
 {
     private CsvImportPreview _preview = null!;
 
     public ObservableCollection<CollectionCard> PreviewCards { get; } = [];
+    public ObservableCollection<StorageContainer> AvailableContainers { get; } = [];
 
     [ObservableProperty]
     public partial string FormatLabel { get; set; } = "";
@@ -29,6 +32,9 @@ public sealed partial class CsvImportViewModel(ICsvExportImportService csvServic
 
     [ObservableProperty]
     public partial bool CanImport { get; set; }
+
+    [ObservableProperty]
+    public partial StorageContainer? SelectedContainer { get; set; }
 
     public int ImportedCount { get; private set; }
 
@@ -55,12 +61,19 @@ public sealed partial class CsvImportViewModel(ICsvExportImportService csvServic
         PreviewCards.Clear();
         foreach (var card in preview.Cards.Take(20))
             PreviewCards.Add(card);
+
+        AvailableContainers.Clear();
+        foreach (var c in containerService.GetAll())
+            AvailableContainers.Add(c);
+
+        // Default to Bulk
+        SelectedContainer = AvailableContainers.FirstOrDefault(c => c.IsSystem);
     }
 
     [RelayCommand]
     public void Import()
     {
-        ImportedCount = csvService.ImportCards(_preview, SkipDuplicates);
+        ImportedCount = csvService.ImportCards(_preview, SkipDuplicates, SelectedContainer?.Id);
         CloseDialog?.Invoke(true);
     }
 

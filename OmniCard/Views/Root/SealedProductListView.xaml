@@ -33,26 +33,28 @@
 
         <!-- Product list -->
         <DataGrid Grid.Row="1"
+                  x:Name="SealedProductGrid"
                   ItemsSource="{Binding Instances}"
                   SelectedItem="{Binding SelectedInstance}"
                   AutoGenerateColumns="False"
-                  IsReadOnly="True"
+                  IsReadOnly="False"
                   SelectionMode="Single"
                   EnableRowVirtualization="True"
                   VirtualizingPanel.IsVirtualizing="True"
-                  VirtualizingPanel.VirtualizationMode="Recycling">
+                  VirtualizingPanel.VirtualizationMode="Recycling"
+                  CellEditEnding="SealedProductGrid_CellEditEnding">
 
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Name" Binding="{Binding Template.Name}" Width="*"/>
-                <DataGridTextColumn Header="Type" Binding="{Binding Template.ProductType}" Width="120"/>
-                <DataGridTextColumn Header="Set" Binding="{Binding Template.SetCode}" Width="60"/>
-                <DataGridTextColumn Header="UPC" Binding="{Binding Template.Upc}" Width="120"/>
+                <DataGridTextColumn Header="Name" Binding="{Binding Template.Name}" Width="*" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Type" Binding="{Binding Template.ProductType}" Width="120" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Set" Binding="{Binding Template.SetCode}" Width="60" IsReadOnly="True"/>
+                <DataGridTextColumn Header="UPC" Binding="{Binding Template.Upc}" Width="120" IsReadOnly="True"/>
                 <DataGridTextColumn Header="Purchase $"
                                     Binding="{Binding PurchasePrice, StringFormat={}{0:F2}, TargetNullValue=''}"
                                     Width="80"/>
                 <DataGridTextColumn Header="Date Added"
                                     Binding="{Binding DateAdded, StringFormat={}{0:yyyy-MM-dd}}"
-                                    Width="100"/>
+                                    Width="100" IsReadOnly="True"/>
             </DataGrid.Columns>
 
             <DataGrid.ContextMenu>

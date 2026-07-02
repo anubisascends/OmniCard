@@ -27,6 +27,10 @@ public class CollectionCard
     public string? Color { get; set; }
     public string? CardType { get; set; }
 
+    /// <summary>Cached market price for display and sorting. Not persisted.</summary>
+    [NotMapped]
+    public decimal MarketPrice { get; set; }
+
     /// <summary>Display-only quantity when stacking identical cards. Not persisted.</summary>
     [NotMapped]
     public int Quantity { get; set; } = 1;
