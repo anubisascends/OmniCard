@@ -1,0 +1,63 @@
+@page "/card/{id:int}"
+@model OmniCard.Web.Pages.CardModel
+@{
+    ViewData["Title"] = Model.Card.Name;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>@ViewData["Title"] — OmniCard</title>
+    <link rel="stylesheet" href="/css/site.css"/>
+</head>
+<body>
+    @if (Model.Card.ContainerId.HasValue)
+    {
+        <a href="/location/@Model.Card.ContainerId" class="back-link">&larr; Back to @(Model.Card.Container?.Name ?? "Location")</a>
+    }
+    else
+    {
+        <a href="/" class="back-link">&larr; Home</a>
+    }
+
+    <header>
+        <h1>@Model.Card.Name</h1>
+    </header>
+
+    <main>
+        @if (Model.ImageUrl is not null)
+        {
+            <img src="@Model.ImageUrl" alt="@Model.Card.Name" class="card-image"/>
+        }
+
+        <table class="detail-table">
+            <tr><th>Set</th><td>@Model.Card.SetName (@Model.Card.SetCode)</td></tr>
+            <tr><th>Collector #</th><td>@Model.Card.Number</td></tr>
+            <tr><th>Rarity</th><td>@Model.Card.Rarity</td></tr>
+            <tr><th>Color</th><td>@(Model.Card.Color ?? "—")</td></tr>
+            <tr><th>Type</th><td>@(Model.Card.CardType ?? "—")</td></tr>
+            <tr><th>Foil</th><td>@(Model.Card.IsFoil ? "Yes" : "No")</td></tr>
+            <tr><th>Condition</th><td>@Model.Card.Condition</td></tr>
+            <tr><th>Purchase Price</th><td>@(Model.Card.PurchasePrice.HasValue ? Model.Card.PurchasePrice.Value.ToString("C") : "—")</td></tr>
+            <tr><th>Date Added</th><td>@Model.Card.DateAdded.ToString("yyyy-MM-dd")</td></tr>
+            @if (Model.Card.Container is not null)
+            {
+                <tr><th>Location</th><td>@Model.Card.Container.Name</td></tr>
+            }
+            @if (Model.Card.Page.HasValue)
+            {
+                <tr><th>Page</th><td>@Model.Card.Page</td></tr>
+            }
+            @if (Model.Card.Slot.HasValue)
+            {
+                <tr><th>Slot</th><td>@Model.Card.Slot</td></tr>
+            }
+            @if (Model.Card.Section is not null)
+            {
+                <tr><th>Section</th><td>@Model.Card.Section</td></tr>
+            }
+        </table>
+    </main>
+</body>
+</html>
