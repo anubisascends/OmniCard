@@ -1,0 +1,48 @@
+@page
+@model OmniCard.Web.Pages.IndexModel
+@{
+    ViewData["Title"] = "OmniCard Collection";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="/css/site.css"/>
+</head>
+<body>
+    <header>
+        <h1>OmniCard Collection</h1>
+    </header>
+    <main>
+        <h2>Storage Locations</h2>
+        @if (Model.Containers.Count == 0)
+        {
+            <p class="empty">No storage locations found.</p>
+        }
+        else
+        {
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Cards</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in Model.Containers)
+                    {
+                        <tr>
+                            <td><a href="/location/@c.Id">@c.Name</a></td>
+                            <td>@c.TypeDisplay</td>
+                            <td>@c.CardCount</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </main>
+</body>
+</html>
