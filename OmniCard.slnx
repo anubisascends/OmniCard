@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="OmniCard.Shared/OmniCard.Shared.csproj" />
   <Project Path="OmniCard.Tests/OmniCard.Tests.csproj" />
   <Project Path="OmniCard/OmniCard.csproj" />
 </Solution>

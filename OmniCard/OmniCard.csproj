@@ -8,10 +8,15 @@
     <UseWPF>true</UseWPF>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationIcon>Resources\Images\OmniCard_Logo.ico</ApplicationIcon>
+    <UserSecretsId>c8de53ce-799f-421d-a8e9-e4a5a678993a</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="OmniCard.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OmniCard.Shared\OmniCard.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,7 +34,6 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.9" />
