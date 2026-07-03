@@ -1,0 +1,91 @@
+<Window x:Class="OmniCard.Views.SetFilterBuilder.SetFilterBuilderView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:OmniCard.Views.SetFilterBuilder"
+        xmlns:models="clr-namespace:OmniCard.Models"
+        mc:Ignorable="d"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        d:DataContext="{d:DesignInstance {x:Type local:SetFilterBuilderView}}"
+        Title="Set Filter Builder"
+        Width="700" Height="500"
+        Background="{DynamicResource MaterialDesign.Brush.Background}"
+        TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="13"
+        FontFamily="{StaticResource AppFont}">
+
+    <Window.Resources>
+        <local:SymbolToDrawingBrushConverter x:Key="SymbolToBrush"/>
+        <DataTemplate DataType="{x:Type models:SetFilterItem}">
+            <StackPanel Orientation="Horizontal" Margin="2">
+                <Border Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"
+                        Background="#1A1A1A"
+                        OpacityMask="{Binding Symbol, Converter={StaticResource SymbolToBrush}}"/>
+                <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"/>
+            </StackPanel>
+        </DataTemplate>
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Two-panel layout -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left panel: Available Sets -->
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="Available Sets" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <TextBox DockPanel.Dock="Top"
+                         Text="{Binding ViewModel.SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="0,0,0,4"
+                         VerticalContentAlignment="Center"
+                         Tag="Search sets..."/>
+                <ListBox ItemsSource="{Binding ViewModel.AvailableSets}"
+                         SelectedItem="{Binding ViewModel.SelectedAvailableItem}"
+                         MouseDoubleClick="AvailableList_MouseDoubleClick"
+                         VirtualizingStackPanel.IsVirtualizing="True"
+                         VirtualizingStackPanel.VirtualizationMode="Recycling"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+            </DockPanel>
+
+            <!-- Center buttons -->
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0">
+                <Button Content="&gt;&gt;" Padding="12,6" Margin="0,0,0,4"
+                        Command="{Binding ViewModel.AddCommand}"
+                        ToolTip="Add selected set"/>
+                <Button Content="&lt;&lt;" Padding="12,6"
+                        Command="{Binding ViewModel.RemoveCommand}"
+                        ToolTip="Remove selected set"/>
+            </StackPanel>
+
+            <!-- Right panel: Selected Sets -->
+            <DockPanel Grid.Column="2">
+                <TextBlock DockPanel.Dock="Top" Text="{Binding ViewModel.SelectedCountText}"
+                           FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <ListBox ItemsSource="{Binding ViewModel.SelectedSets}"
+                         SelectedItem="{Binding ViewModel.SelectedSelectedItem}"
+                         MouseDoubleClick="SelectedList_MouseDoubleClick"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+            </DockPanel>
+        </Grid>
+
+        <!-- Footer: OK / Cancel -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="OK" Padding="20,6" Margin="0,0,8,0"
+                    Click="OK_Click" IsDefault="True"/>
+            <Button Content="Cancel" Padding="20,6"
+                    Click="Cancel_Click" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>
