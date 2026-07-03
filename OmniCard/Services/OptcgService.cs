@@ -312,10 +312,16 @@ public sealed class OptcgService : ICardGameService, IDisposable
         var exactCorrection = _correctionsCache.FirstOrDefault(c => c.ScanHash == imageHash);
         if (exactCorrection.CorrectCardId is not null)
         {
-            _logger.LogDebug("Exact OPTCG correction found for hash {Hash:X16} → {CardId}", imageHash, exactCorrection.CorrectCardId);
             var correctedCard = LookupOptcgCard(exactCorrection.CorrectCardId, confidence: 100);
             if (correctedCard is not null)
-                return correctedCard;
+            {
+                if (setFilter is null || setFilter.Contains(correctedCard.SetCode))
+                {
+                    _logger.LogDebug("Exact OPTCG correction found for hash {Hash:X16} → {CardId}", imageHash, exactCorrection.CorrectCardId);
+                    return correctedCard;
+                }
+                _logger.LogDebug("Exact OPTCG correction for hash {Hash:X16} → {CardId} rejected by set filter (set {Set})", imageHash, exactCorrection.CorrectCardId, correctedCard.SetCode);
+            }
         }
 
         // Phase 2: Combined fuzzy search
@@ -346,6 +352,14 @@ public sealed class OptcgService : ICardGameService, IDisposable
 
         foreach (var (scanHash, correctCardId) in _correctionsCache)
         {
+            // Resolve correction's set from hashSetLookup; skip if outside set filter
+            if (setFilter is not null)
+            {
+                var corrSet = _hashSetLookup!.GetValueOrDefault(correctCardId);
+                if (corrSet is null || !setFilter.Contains(corrSet))
+                    continue;
+            }
+
             var distance = PerceptualHashService.HammingDistance(imageHash, scanHash);
             if (distance <= maxDistance)
             {
@@ -372,6 +386,17 @@ public sealed class OptcgService : ICardGameService, IDisposable
         {
             _logger.LogDebug("Best OPTCG match distance {Distance} exceeds max {MaxDistance}, no match", bestPHashDistance, maxDistance);
             return null;
+        }
+
+        // Safety net: never return a card outside the selected set filter
+        if (setFilter is not null)
+        {
+            var bestSetCode = _hashSetLookup!.GetValueOrDefault(bestPHashId);
+            if (bestSetCode is null || !setFilter.Contains(bestSetCode))
+            {
+                _logger.LogDebug("Best OPTCG match {CardId} is in set {Set} which is outside the set filter; rejecting", bestPHashId, bestSetCode ?? "(unknown)");
+                return null;
+            }
         }
 
         var card = _readContext.Cards.AsNoTracking().FirstOrDefault(c => c.CardSetId == bestPHashId);

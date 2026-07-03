@@ -11,7 +11,7 @@
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         d:DataContext="{d:DesignInstance {x:Type local:CollectionCardEditorView}}"
-        Title="Edit Collection Card" Height="700" Width="800"
+        Title="Edit Collection Card" Height="900" Width="800"
         Background="{DynamicResource MaterialDesign.Brush.Background}"
         TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
         TextElement.FontWeight="Regular"
@@ -26,7 +26,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="1*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="1*"/>
@@ -98,7 +98,7 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel HorizontalAlignment="Center">
-                <Image Source="{Binding ViewModel.ScanImage}" MaxHeight="200" Stretch="Uniform"
+                <Image Source="{Binding ViewModel.ScanImage}" Stretch="Fill"
                        RenderOptions.BitmapScalingMode="HighQuality"/>
                 <!-- Scan flipper for stacked cards -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0"
@@ -132,7 +132,7 @@
             </StackPanel>
 
             <StackPanel Grid.Column="1" HorizontalAlignment="Center">
-                <Image Source="{Binding ViewModel.ApiImage}" MaxHeight="200" Stretch="Uniform"
+                <Image Source="{Binding ViewModel.ApiImage}" Stretch="Fill"
                        RenderOptions.BitmapScalingMode="HighQuality"/>
                 <TextBlock Text="Card Art" HorizontalAlignment="Center" FontStyle="Italic" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" Margin="0,4,0,0"/>
             </StackPanel>

@@ -384,8 +384,10 @@ public sealed partial class RootViewModel(
 
         if (validCodes.Count == 0)
         {
-            CardService.SelectedSetFilter = null;
-            _logger.LogInformation("Set filter: no valid codes in '{Text}', filter cleared", text);
+            // Text is non-empty but has no valid codes (typo or mid-typing).
+            // Preserve the current filter so partial input doesn't accidentally
+            // clear an active filter. The user can explicitly clear via the X button.
+            _logger.LogDebug("Set filter: no valid codes in '{Text}', keeping current filter", text);
         }
         else
         {

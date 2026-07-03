@@ -151,22 +151,35 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
             _logger.LogInformation("Art hash cache loaded with {Count} entries", _artHashCache.Count);
         }
 
+        // Capture local references so concurrent cache invalidation (e.g. RecordCorrection
+        // on the UI thread nulling _correctionsCache) can't cause NullReferenceException
+        // while this method runs on the scanner thread.
+        var hashCache = _hashCache;
+        var hashSetLookup = _hashSetLookup;
+        var hashCollectorNumberLookup = _hashCollectorNumberLookup;
+        var correctionsCache = _correctionsCache;
+        var artHashCache = _artHashCache;
+
         // Phase 1: Exact correction lookup (specific scan hash → known card)
-        var exactCorrection = _correctionsCache.FirstOrDefault(c => c.ScanHash == imageHash);
+        var exactCorrection = correctionsCache.FirstOrDefault(c => c.ScanHash == imageHash);
         if (exactCorrection.CorrectCardId is not null && exactCorrection != default)
         {
-            // Respect set filter even for exact corrections
-            if (setFilter is null || (exactCorrection.SetCode is not null && setFilter.Contains(exactCorrection.SetCode)))
+            // Respect set filter even for exact corrections — look up the card to get its
+            // actual SetCode so corrections with null SetCode metadata can't bypass the filter
+            var correctedCard = LookupCard(Guid.Parse(exactCorrection.CorrectCardId), confidence: 100);
+            if (correctedCard is not null)
             {
-                _logger.LogDebug("Exact correction found for hash {Hash:X16} → {CardId}", imageHash, exactCorrection.CorrectCardId);
-                var correctedCard = LookupCard(Guid.Parse(exactCorrection.CorrectCardId), confidence: 100);
-                if (correctedCard is not null)
+                if (setFilter is null || setFilter.Contains(correctedCard.SetCode))
+                {
+                    _logger.LogDebug("Exact correction found for hash {Hash:X16} → {CardId}", imageHash, exactCorrection.CorrectCardId);
                     return correctedCard;
+                }
+                _logger.LogDebug("Exact correction for hash {Hash:X16} → {CardId} rejected by set filter (set {Set})", imageHash, exactCorrection.CorrectCardId, correctedCard.SetCode);
             }
         }
 
         // Phase 2: pHash matching (optionally filtered by set from symbol detection)
-        if (_hashCache.Count == 0)
+        if (hashCache.Count == 0)
         {
             _logger.LogWarning("Hash cache is empty, no cards to match against");
             return null;
@@ -175,9 +188,9 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         const int TieZone = 4;
         int bestPHashDistance = int.MaxValue;
 
-        foreach (var (id, hash) in _hashCache)
+        foreach (var (id, hash) in hashCache)
         {
-            if (setFilter is not null && !setFilter.Contains(_hashSetLookup![id]))
+            if (setFilter is not null && !setFilter.Contains(hashSetLookup![id]))
                 continue;
 
             var distance = PerceptualHashService.HammingDistance(imageHash, hash);
@@ -192,9 +205,9 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         }
 
         var pHashCandidates = new List<(Guid Id, int Distance)>();
-        foreach (var (id, hash) in _hashCache)
+        foreach (var (id, hash) in hashCache)
         {
-            if (setFilter is not null && !setFilter.Contains(_hashSetLookup![id]))
+            if (setFilter is not null && !setFilter.Contains(hashSetLookup![id]))
                 continue;
 
             var distance = PerceptualHashService.HammingDistance(imageHash, hash);
@@ -206,12 +219,12 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         // This breaks ties among reprints with identical art without eliminating non-preferred sets.
         // Bonus of 5 ensures symbol detection can overcome small pHash differences between printings.
         const int PreferredSetBonus = 5;
-        if (preferredSets is { Count: > 0 } && _hashSetLookup is not null)
+        if (preferredSets is { Count: > 0 } && hashSetLookup is not null)
         {
             for (int i = 0; i < pHashCandidates.Count; i++)
             {
                 var (id, dist) = pHashCandidates[i];
-                if (_hashSetLookup.TryGetValue(id, out var setCode) && preferredSets.Contains(setCode))
+                if (hashSetLookup.TryGetValue(id, out var setCode) && preferredSets.Contains(setCode))
                     pHashCandidates[i] = (id, Math.Max(0, dist - PreferredSetBonus));
             }
 
@@ -221,22 +234,22 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
 
         // Penalize deprioritized sets (plst, art series, promos) — makes canonical printings win ties
         const int DeprioritizedSetPenalty = 4;
-        if (_hashSetLookup is not null)
+        if (hashSetLookup is not null)
         {
             for (int i = 0; i < pHashCandidates.Count; i++)
             {
                 var (id, dist) = pHashCandidates[i];
-                if (_hashSetLookup.TryGetValue(id, out var setCode) && DeprioritizedSets.Contains(setCode))
+                if (hashSetLookup.TryGetValue(id, out var setCode) && DeprioritizedSets.Contains(setCode))
                     pHashCandidates[i] = (id, dist + DeprioritizedSetPenalty);
             }
         }
 
         // Art hash disambiguation among tie-zone candidates
         Guid bestPHashId;
-        if (artHashes is not null && _artHashCache!.Count > 0 && pHashCandidates.Count > 1)
+        if (artHashes is not null && artHashCache.Count > 0 && pHashCandidates.Count > 1)
         {
             var artLookup = new Dictionary<Guid, ulong>();
-            foreach (var (id, artHash) in _artHashCache)
+            foreach (var (id, artHash) in artHashCache)
                 artLookup.TryAdd(id, artHash);
 
             int bestCombined = int.MaxValue;
@@ -256,8 +269,8 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
                 }
 
                 var combined = pDist + bestArtDist;
-                var candidateCollectorNum = _hashCollectorNumberLookup?.GetValueOrDefault(candidateId, int.MaxValue) ?? int.MaxValue;
-                var currentBestCollectorNum = _hashCollectorNumberLookup?.GetValueOrDefault(bestPHashId, int.MaxValue) ?? int.MaxValue;
+                var candidateCollectorNum = hashCollectorNumberLookup?.GetValueOrDefault(candidateId, int.MaxValue) ?? int.MaxValue;
+                var currentBestCollectorNum = hashCollectorNumberLookup?.GetValueOrDefault(bestPHashId, int.MaxValue) ?? int.MaxValue;
 
                 // Prefer lower combined score; tiebreak by lower collector number
                 if (combined < bestCombined || (combined == bestCombined && candidateCollectorNum < currentBestCollectorNum))
@@ -273,9 +286,9 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
                 // Art-only fallback
                 Guid bestArtOnlyId = default;
                 int bestArtOnlyDist = int.MaxValue;
-                foreach (var (id, refArtHash) in _artHashCache)
+                foreach (var (id, refArtHash) in artHashCache)
                 {
-                    if (setFilter is not null && (!_hashSetLookup!.TryGetValue(id, out var sc) || !setFilter.Contains(sc)))
+                    if (setFilter is not null && (!hashSetLookup!.TryGetValue(id, out var sc) || !setFilter.Contains(sc)))
                         continue;
                     foreach (var scanArtHash in artHashes)
                     {
@@ -296,7 +309,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
             // Tiebreak by collector number — lower numbers (regular printings) preferred over higher (extended art, showcase)
             bestPHashId = pHashCandidates
                 .OrderBy(c => c.Distance)
-                .ThenBy(c => _hashCollectorNumberLookup?.GetValueOrDefault(c.Id, int.MaxValue) ?? int.MaxValue)
+                .ThenBy(c => hashCollectorNumberLookup?.GetValueOrDefault(c.Id, int.MaxValue) ?? int.MaxValue)
                 .First().Id;
         }
 
@@ -304,11 +317,18 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         // If the user previously confirmed a match for a similar scan hash,
         // that correction's card gets a trust bonus that can outweigh the pHash winner.
         const int CorrectionTrustBonus = 5;
-        foreach (var (corrScanHash, corrCardId, corrArtHash, _, corrSetCode) in _correctionsCache!)
+        foreach (var (corrScanHash, corrCardId, corrArtHash, _, corrSetCode) in correctionsCache)
         {
-            // Respect set filter — never match a correction outside the selected set(s)
-            if (setFilter is not null && corrSetCode is not null && !setFilter.Contains(corrSetCode))
-                continue;
+            // Respect set filter — never match a correction outside the selected set(s).
+            // If correction has no SetCode metadata, resolve it from hashSetLookup;
+            // if it can't be resolved, skip it when a filter is active.
+            if (setFilter is not null)
+            {
+                var resolvedSetCode = corrSetCode
+                    ?? (Guid.TryParse(corrCardId, out var corrGuid) && hashSetLookup!.TryGetValue(corrGuid, out var looked) ? looked : null);
+                if (resolvedSetCode is null || !setFilter.Contains(resolvedSetCode))
+                    continue;
+            }
 
             var corrDist = PerceptualHashService.HammingDistance(imageHash, corrScanHash);
             if (corrDist == 0 || corrDist > maxDistance) continue; // exact already handled; too far = skip
@@ -381,7 +401,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
                 if (candidates.Any(c => c.Id == nm.Id)) continue;
                 if (setFilter is not null && !setFilter.Contains(nm.SetCode)) continue;
 
-                var nmHash = _hashCache!.FirstOrDefault(h => h.Id == nm.Id).Hash;
+                var nmHash = hashCache.FirstOrDefault(h => h.Id == nm.Id).Hash;
                 var nmDist = nmHash != 0 ? PerceptualHashService.HammingDistance(imageHash, nmHash) : 64;
                 var pScore = Math.Max(0, 1.0 - ((double)nmDist / (maxDistance * 2)));
                 var nScore = StringSimilarity(ocrResult.RecognizedName, nm.Name);
@@ -406,12 +426,15 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
             return null;
         }
 
-        // Safety net: never return a card outside the selected set filter
-        if (setFilter is not null && _hashSetLookup!.TryGetValue(bestPHashId, out var finalSetCode)
-            && !setFilter.Contains(finalSetCode))
+        // Safety net: never return a card outside the selected set filter.
+        // Also reject if the card can't be found in hashSetLookup — unknown set means not in filter.
+        if (setFilter is not null)
         {
-            _logger.LogDebug("Best match {CardId} is in set {Set} which is outside the set filter; rejecting", bestPHashId, finalSetCode);
-            return null;
+            if (!hashSetLookup!.TryGetValue(bestPHashId, out var finalSetCode) || !setFilter.Contains(finalSetCode))
+            {
+                _logger.LogDebug("Best match {CardId} is in set {Set} which is outside the set filter; rejecting", bestPHashId, finalSetCode ?? "(unknown)");
+                return null;
+            }
         }
 
         var card = _readContext.Cards.AsNoTracking().FirstOrDefault(c => c.Id == bestPHashId);
@@ -419,7 +442,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         if (card is null) return null;
 
         // Confidence is always based on pHash distance of the winning card
-        var winnerHash = _hashCache!.FirstOrDefault(h => h.Id == bestPHashId).Hash;
+        var winnerHash = hashCache.FirstOrDefault(h => h.Id == bestPHashId).Hash;
         var winnerDistance = winnerHash != 0 ? PerceptualHashService.HammingDistance(imageHash, winnerHash) : maxDistance;
         var matchConfidence = Math.Max(0, (1.0 - (double)winnerDistance / maxDistance)) * 100;
 

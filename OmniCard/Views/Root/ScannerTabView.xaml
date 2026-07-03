@@ -19,7 +19,7 @@
                                VerticalAlignment="Center"
                                Margin="8,0,4,0"/>
                     <TextBox x:Name="SetFilterTextBox"
-                             Text="{Binding ViewModel.SetFilterText, UpdateSourceTrigger=LostFocus}"
+                             Text="{Binding ViewModel.SetFilterText, UpdateSourceTrigger=PropertyChanged}"
                              MinWidth="200"
                              VerticalAlignment="Center"
                              VerticalContentAlignment="Center"
