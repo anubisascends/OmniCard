@@ -20,6 +20,7 @@ using OmniCard.Views.HashPreview;
 using OmniCard.Views.Root;
 using OmniCard.Views.EbayAuth;
 using OmniCard.Views.DataLocation;
+using OmniCard.Views.SetFilterBuilder;
 using OmniCard.Views.SortFilterBuilder;
 using OmniCard.Views.SealedProductEditor;
 using OmniCard.Views.StorageManager;
@@ -122,6 +123,8 @@ public partial class App : Application
             services.AddTransient<CsvImportViewModel>();
             services.AddTransient<SortFilterBuilderView>();
             services.AddTransient<SortFilterBuilderViewModel>();
+            services.AddTransient<SetFilterBuilderView>();
+            services.AddTransient<SetFilterBuilderViewModel>();
             services.AddTransient<DataLocationView>();
             services.AddTransient<DataLocationViewModel>();
             services.AddTransient<CoverArtPickerView>();

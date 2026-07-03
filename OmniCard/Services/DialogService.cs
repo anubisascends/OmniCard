@@ -8,6 +8,7 @@ using OmniCard.Views.CoverArtPicker;
 using OmniCard.Views.CsvImport;
 using OmniCard.Views.DataLocation;
 using OmniCard.Views.EbayAuth;
+using OmniCard.Views.SetFilterBuilder;
 using OmniCard.Views.SortFilterBuilder;
 using OmniCard.Views.MoveToLocation;
 using OmniCard.Views.SealedProductEditor;
@@ -24,6 +25,7 @@ public interface IDialogService
     void ManageStorageContainers();
     int? ShowImportPreview(CsvImportPreview preview);
     bool OpenSortFilterBuilder(CardGame game);
+    IReadOnlyList<string>? OpenSetFilterBuilder(IReadOnlyList<SetInfo> allSets, IReadOnlySet<string>? currentFilter);
     void ShowDataLocation();
     int? PickCoverArt(int containerId, string containerName);
     MoveToLocationResult? PickMoveToLocation();
@@ -98,6 +100,15 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         wnd.Owner = Application.Current.MainWindow;
         wnd.ShowDialog();
         return wnd.ViewModel.PresetsChanged;
+    }
+
+    public IReadOnlyList<string>? OpenSetFilterBuilder(IReadOnlyList<SetInfo> allSets, IReadOnlySet<string>? currentFilter)
+    {
+        var wnd = Services.GetRequiredService<SetFilterBuilderView>();
+        wnd.ViewModel.Initialize(allSets, currentFilter);
+        wnd.Owner = Application.Current.MainWindow;
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.GetSelectedCodes() : null;
     }
 
     public void ShowDataLocation()
