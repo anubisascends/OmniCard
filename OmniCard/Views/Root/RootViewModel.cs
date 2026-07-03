@@ -339,108 +339,82 @@ public sealed partial class RootViewModel(
         InvalidateHomeTab();
     }
 
-    // Set filter for pHash matching — multi-select
-    private List<CheckableSetInfo> _allSets = [];
-    public ObservableCollection<CheckableSetInfo> FilteredSets { get; } = [];
+    // Set filter — comma-separated set codes
+    private List<SetInfo> _allSets = [];
 
     [ObservableProperty]
-    public partial string SetSearchText { get; set; } = "";
+    public partial string SetFilterText { get; set; } = "";
 
-    [ObservableProperty]
-    public partial string SetFilterSummary { get; set; } = "All Sets";
-
-    [ObservableProperty]
-    public partial bool IsSetFilterOpen { get; set; }
-
-    partial void OnSetSearchTextChanged(string value)
+    [RelayCommand]
+    public void ApplySetFilterText()
     {
-        RefreshFilteredSets();
+        UpdateSetFilter();
     }
 
-    private void RefreshFilteredSets()
+    partial void OnSetFilterTextChanged(string value)
     {
-        FilteredSets.Clear();
-        var search = SetSearchText;
-        foreach (var s in _allSets)
-        {
-            if (string.IsNullOrEmpty(search)
-                || s.SetName.Contains(search, StringComparison.OrdinalIgnoreCase)
-                || s.SetCode.Contains(search, StringComparison.OrdinalIgnoreCase))
-            {
-                FilteredSets.Add(s);
-            }
-        }
+        // No-op here; filter applied on LostFocus (via binding) or Enter (via command)
+        // This is intentional — we don't want to filter on every keystroke
     }
 
     private void LoadAvailableSets()
     {
-        // Unsubscribe old items
-        foreach (var s in _allSets)
-            s.PropertyChanged -= OnCheckableSetChanged;
-
-        _allSets = [];
-        FilteredSets.Clear();
-        foreach (var set in CardService.ActiveGameService.GetAvailableSets())
-        {
-            var item = new CheckableSetInfo { SetCode = set.SetCode, SetName = set.SetName };
-            item.PropertyChanged += OnCheckableSetChanged;
-            _allSets.Add(item);
-        }
+        _allSets = CardService.ActiveGameService.GetAvailableSets().ToList();
 
         // Register set names for tooltip display on set symbols
         foreach (var set in _allSets)
             setSymbolCache.RegisterSetName(set.SetCode, set.SetName);
 
-        SetSearchText = "";
-        RefreshFilteredSets();
+        SetFilterText = "";
         UpdateSetFilter();
-    }
-
-    private void OnCheckableSetChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(CheckableSetInfo.IsChecked))
-            UpdateSetFilter();
     }
 
     private void UpdateSetFilter()
     {
-        var selected = _allSets.Where(s => s.IsChecked).ToList();
-        if (selected.Count == 0)
+        var text = SetFilterText.Trim();
+        if (string.IsNullOrEmpty(text))
         {
             CardService.SelectedSetFilter = null;
-            SetFilterSummary = "All Sets";
+            _logger.LogInformation("Set filter cleared");
+            return;
         }
-        else if (selected.Count == 1)
+
+        var codes = text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var knownCodes = _allSets.Select(s => s.SetCode).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var validCodes = codes
+            .Where(c => knownCodes.Contains(c))
+            .Select(c => _allSets.First(s => s.SetCode.Equals(c, StringComparison.OrdinalIgnoreCase)).SetCode)
+            .ToHashSet();
+
+        if (validCodes.Count == 0)
         {
-            CardService.SelectedSetFilter = new HashSet<string> { selected[0].SetCode };
-            SetFilterSummary = selected[0].DisplayName;
+            CardService.SelectedSetFilter = null;
+            _logger.LogInformation("Set filter: no valid codes in '{Text}', filter cleared", text);
         }
         else
         {
-            CardService.SelectedSetFilter = selected.Select(s => s.SetCode).ToHashSet();
-            SetFilterSummary = $"{selected.Count} sets selected";
+            CardService.SelectedSetFilter = validCodes;
+            _logger.LogInformation("Set filter changed to: {Codes}", string.Join(", ", validCodes));
         }
-        _logger.LogInformation("Set filter changed to {SetFilter}", SetFilterSummary);
     }
 
     [RelayCommand]
     public void ClearSetFilter()
     {
-        foreach (var s in _allSets)
-            s.IsChecked = false;
+        SetFilterText = "";
+        UpdateSetFilter();
     }
 
     [RelayCommand]
-    public void ClearSetSearch()
+    public void OpenSetFilterBuilder()
     {
-        SetSearchText = "";
-    }
-
-    [RelayCommand]
-    public void SelectAllVisibleSets()
-    {
-        foreach (var s in FilteredSets)
-            s.IsChecked = true;
+        var currentFilter = CardService.SelectedSetFilter;
+        var result = DialogService.OpenSetFilterBuilder(_allSets, currentFilter);
+        if (result is not null)
+        {
+            SetFilterText = string.Join(", ", result);
+            UpdateSetFilter();
+        }
     }
 
     // Scanner tab — multi-select support

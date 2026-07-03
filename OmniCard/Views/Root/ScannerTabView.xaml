@@ -15,42 +15,27 @@
         <ToolBarPanel>
             <ToolBarTray>
                 <ToolBar>
-                    <TextBlock Text="Only macth from set(s):"
+                    <TextBlock Text="Only match from set(s):"
                                VerticalAlignment="Center"
                                Margin="8,0,4,0"/>
-                    <ComboBox x:Name="SetFilterComboBox"
-                              IsEditable="True"
-                              IsTextSearchEnabled="False"
-                              Text="{Binding ViewModel.SetSearchText, UpdateSourceTrigger=PropertyChanged}"
-                              IsDropDownOpen="{Binding ViewModel.IsSetFilterOpen, Mode=TwoWay}"
-                              MinWidth="200"
-                              VerticalAlignment="Center"
-                              Margin="0,0,4,0"
-                              MaxDropDownHeight="400"
-                              ItemsSource="{Binding ViewModel.FilteredSets}"
-                              DropDownOpened="SetFilterComboBox_DropDownOpened"
-                              DropDownClosed="SetFilterComboBox_DropDownClosed">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                                <CheckBox IsChecked="{Binding IsChecked}">
-                                    <CheckBox.Content>
-                                        <TextBlock>
-                                            <Run Text="{Binding DisplayName, Mode=OneWay}"/>
-                                            <Run>-</Run>
-                                            <Run Text="{Binding SetCode, Mode=OneWay}"/>
-                                        </TextBlock>
-                                    </CheckBox.Content>
-                                </CheckBox>
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                        <ComboBox.ItemContainerStyle>
-                            <Style TargetType="ComboBoxItem"
-                                   BasedOn="{StaticResource {x:Type ComboBoxItem}}">
-                                <Setter Property="IsSelected"
-                                        Value="False"/>
-                            </Style>
-                        </ComboBox.ItemContainerStyle>
-                    </ComboBox>
+                    <TextBox x:Name="SetFilterTextBox"
+                             Text="{Binding ViewModel.SetFilterText, UpdateSourceTrigger=LostFocus}"
+                             MinWidth="200"
+                             VerticalAlignment="Center"
+                             VerticalContentAlignment="Center"
+                             Margin="0,0,4,0"
+                             ToolTip="Comma-separated set codes (e.g. vow, dmu, tla). Press Enter to apply.">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Return"
+                                        Command="{Binding ViewModel.ApplySetFilterTextCommand}"/>
+                        </TextBox.InputBindings>
+                    </TextBox>
+                    <Button Content="..."
+                            ToolTip="Open Set Filter Builder"
+                            Padding="8,2"
+                            VerticalAlignment="Center"
+                            Margin="0,0,4,0"
+                            Command="{Binding ViewModel.OpenSetFilterBuilderCommand}"/>
                     <Button Content="X"
                             ToolTip="Clear set filter"
                             FontSize="10"

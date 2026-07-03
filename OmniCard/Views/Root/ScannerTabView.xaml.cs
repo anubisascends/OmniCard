@@ -136,22 +136,4 @@ public partial class ScannerTabView : UserControl
             ViewModel?.UpdateSelection(listView.SelectedItems.Cast<ScannedCard>().ToList());
     }
 
-    private void SetFilterComboBox_DropDownOpened(object? sender, EventArgs e)
-    {
-        if (ViewModel is null) return;
-
-        ViewModel.SetSearchText = "";
-
-        var textBox = SetFilterComboBox.Template.FindName("PART_EditableTextBox", SetFilterComboBox) as System.Windows.Controls.TextBox;
-        textBox?.Focus();
-        textBox?.SelectAll();
-    }
-
-    private void SetFilterComboBox_DropDownClosed(object? sender, EventArgs e)
-    {
-        if (ViewModel is null) return;
-
-        ViewModel.SetSearchText = "";
-        SetFilterComboBox.Text = ViewModel.SetFilterSummary;
-    }
 }
