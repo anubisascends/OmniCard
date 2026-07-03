@@ -398,7 +398,6 @@ public sealed partial class RootViewModel(
     public void ClearSetFilter()
     {
         SetFilterText = "";
-        UpdateSetFilter();
     }
 
     [RelayCommand]
@@ -407,10 +406,7 @@ public sealed partial class RootViewModel(
         var currentFilter = CardService.SelectedSetFilter;
         var result = DialogService.OpenSetFilterBuilder(_allSets, currentFilter);
         if (result is not null)
-        {
             SetFilterText = string.Join(", ", result);
-            UpdateSetFilter();
-        }
     }
 
     // Scanner tab — multi-select support
