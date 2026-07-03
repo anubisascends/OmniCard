@@ -351,11 +351,7 @@ public sealed partial class RootViewModel(
         UpdateSetFilter();
     }
 
-    partial void OnSetFilterTextChanged(string value)
-    {
-        // No-op here; filter applied on LostFocus (via binding) or Enter (via command)
-        // This is intentional — we don't want to filter on every keystroke
-    }
+    partial void OnSetFilterTextChanged(string value) => UpdateSetFilter();
 
     private void LoadAvailableSets()
     {
