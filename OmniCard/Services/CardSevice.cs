@@ -30,6 +30,9 @@ public interface ICardService
     void SearchCollection(string query, CardGame? gameFilter, ObservableCollection<CollectionCard> results);
     void SearchCollection(string query, CardGame? gameFilter, int? containerFilter, ObservableCollection<CollectionCard> results);
     void SearchCollection(string query, CardGame? gameFilter, int? containerFilter, SortPreset? sortPreset, FilterPreset? filterPreset, ObservableCollection<CollectionCard> results);
+    void SearchCollection(string query, CardGame? gameFilter, int? containerFilter, SortPreset? sortPreset, FilterPreset? filterPreset, bool stacked, ObservableCollection<CollectionCard> results);
+    void SearchCollection(string query, CardGame? gameFilter, int? containerFilter, SortPreset? sortPreset, FilterPreset? filterPreset, bool stacked, int skip, int take, ObservableCollection<CollectionCard> results);
+    int GetSearchCount(string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset, bool stacked);
     void MoveCardsToContainer(IEnumerable<int> cardIds, int containerId, string? section = null);
     void BulkUpdateField(IEnumerable<int> cardIds, Action<CollectionCard> update);
     List<CollectionCard> GetCollectionCards(IEnumerable<int> cardIds);
@@ -561,11 +564,87 @@ public sealed class CardSevice : ICardService
         => SearchCollection(query, gameFilter, containerFilter, null, null, results);
 
     public void SearchCollection(string query, CardGame? gameFilter, int? containerFilter, SortPreset? sortPreset, FilterPreset? filterPreset, ObservableCollection<CollectionCard> results)
+        => SearchCollection(query, gameFilter, containerFilter, sortPreset, filterPreset, false, results);
+
+    public void SearchCollection(string query, CardGame? gameFilter, int? containerFilter, SortPreset? sortPreset, FilterPreset? filterPreset, bool stacked, ObservableCollection<CollectionCard> results)
+        => SearchCollection(query, gameFilter, containerFilter, sortPreset, filterPreset, stacked, 0, int.MaxValue, results);
+
+    public void SearchCollection(string query, CardGame? gameFilter, int? containerFilter, SortPreset? sortPreset, FilterPreset? filterPreset, bool stacked, int skip, int take, ObservableCollection<CollectionCard> results)
     {
-        _logger.LogDebug("Searching collection: query={Query}, game={Game}, container={Container}", query ?? "(all)", gameFilter?.ToString() ?? "all", containerFilter?.ToString() ?? "all");
-        results.Clear();
+        _logger.LogDebug("Searching collection: query={Query}, game={Game}, container={Container}, stacked={Stacked}, skip={Skip}, take={Take}", query ?? "(all)", gameFilter?.ToString() ?? "all", containerFilter?.ToString() ?? "all", stacked, skip, take);
+        if (skip == 0)
+            results.Clear();
 
         using var context = _collectionDbContextFactory.CreateDbContext();
+        var cards = BuildFilteredQuery(context, query, gameFilter, containerFilter, filterPreset);
+
+        if (stacked)
+        {
+            // SQL GROUP BY: get representative ID + count per group
+            var groups = cards
+                .GroupBy(c => new { c.GameCardId, c.IsFoil, c.Condition })
+                .Select(g => new
+                {
+                    g.Key,
+                    RepId = g.Min(c => c.Id),
+                    Count = g.Count(),
+                })
+                .ToList();
+
+            // Collect all IDs per group for StackedIds (lightweight: just Id + group key)
+            var allIdsByGroup = cards
+                .Select(c => new { c.Id, c.GameCardId, c.IsFoil, c.Condition })
+                .ToList()
+                .GroupBy(c => (c.GameCardId, c.IsFoil, c.Condition))
+                .ToDictionary(g => g.Key, g => g.Select(c => c.Id).ToList());
+
+            // Load only the representative cards
+            var repIds = groups.Select(g => g.RepId).ToHashSet();
+            var repCards = cards.Where(c => repIds.Contains(c.Id)).ToDictionary(c => c.Id);
+
+            // Build stacked results
+            var stackedResults = new List<CollectionCard>(groups.Count);
+            foreach (var g in groups)
+            {
+                if (!repCards.TryGetValue(g.RepId, out var rep)) continue;
+                rep.Quantity = g.Count;
+                rep.StackedIds = allIdsByGroup.GetValueOrDefault((g.Key.GameCardId, g.Key.IsFoil, g.Key.Condition));
+                stackedResults.Add(rep);
+            }
+
+            // Apply sort, then paginate
+            var sorted = ApplySortPreset(stackedResults.AsQueryable(), sortPreset);
+            foreach (var card in sorted.Skip(skip).Take(take))
+                results.Add(card);
+        }
+        else
+        {
+            // Apply sort preset (or default to Name), then paginate
+            var sorted = ApplySortPreset(cards, sortPreset);
+            foreach (var card in sorted.Skip(skip).Take(take))
+                results.Add(card);
+        }
+
+        _logger.LogDebug("Collection search returned {Count} results", results.Count);
+    }
+
+    public int GetSearchCount(string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset, bool stacked)
+    {
+        using var context = _collectionDbContextFactory.CreateDbContext();
+        var cards = BuildFilteredQuery(context, query, gameFilter, containerFilter, filterPreset);
+
+        if (stacked)
+        {
+            return cards
+                .GroupBy(c => new { c.GameCardId, c.IsFoil, c.Condition })
+                .Count();
+        }
+
+        return cards.Count();
+    }
+
+    private IQueryable<CollectionCard> BuildFilteredQuery(CollectionDbContext context, string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset)
+    {
         IQueryable<CollectionCard> cards = context.Cards.AsNoTracking().Include(c => c.Container);
 
         if (gameFilter.HasValue)
@@ -574,21 +653,13 @@ public sealed class CardSevice : ICardService
         if (containerFilter.HasValue)
             cards = cards.Where(c => c.ContainerId == containerFilter.Value);
 
-        // Apply Scryfall syntax from the search box
         if (!string.IsNullOrWhiteSpace(query))
             cards = ApplyScryfallFilter(cards, query);
 
-        // Apply Scryfall syntax from the filter preset
         if (filterPreset is not null && !string.IsNullOrWhiteSpace(filterPreset.Query))
             cards = ApplyScryfallFilter(cards, filterPreset.Query);
 
-        // Apply sort preset (or default to Name)
-        var sorted = ApplySortPreset(cards, sortPreset);
-
-        foreach (var card in sorted)
-            results.Add(card);
-
-        _logger.LogDebug("Collection search returned {Count} results", results.Count);
+        return cards;
     }
 
     public List<string> GetDistinctFieldValues(string field, CardGame game)
@@ -869,6 +940,10 @@ public sealed class CardSevice : ICardService
         if (preset is null || preset.SortLevels.Count == 0)
             return cards.OrderBy(c => c.Name);
 
+        // If no sort level uses CustomOrder, we can sort entirely in SQL
+        if (preset.SortLevels.All(l => l.CustomOrder is null))
+            return ApplySortPresetInSql(cards, preset.SortLevels);
+
         // Custom orders require in-memory sorting since SQLite can't do CASE WHEN with parameter lists
         var list = cards.ToList();
 
@@ -894,6 +969,44 @@ public sealed class CardSevice : ICardService
         }
 
         return ordered ?? list.OrderBy(c => c.Name);
+    }
+
+    private static IQueryable<CollectionCard> ApplySortPresetInSql(IQueryable<CollectionCard> cards, List<SortLevel> levels)
+    {
+        IOrderedQueryable<CollectionCard>? ordered = null;
+        foreach (var level in levels)
+        {
+            System.Linq.Expressions.Expression<Func<CollectionCard, object>> keySelector = level.Field switch
+            {
+                "Name" => c => c.Name,
+                "Color" => c => c.Color ?? "",
+                "CardType" => c => c.CardType ?? "",
+                "SetName" => c => c.SetName,
+                "SetCode" => c => c.SetCode,
+                "Rarity" => c => c.Rarity,
+                "Condition" => c => c.Condition,
+                "IsFoil" => c => c.IsFoil,
+                "PurchasePrice" => c => c.PurchasePrice ?? 0m,
+                "DateAdded" => c => c.DateAdded,
+                "Number" => c => c.Number,
+                _ => c => c.Name
+            };
+
+            if (ordered is null)
+            {
+                ordered = level.Direction == SortDirection.Ascending
+                    ? cards.OrderBy(keySelector)
+                    : cards.OrderByDescending(keySelector);
+            }
+            else
+            {
+                ordered = level.Direction == SortDirection.Ascending
+                    ? ordered.ThenBy(keySelector)
+                    : ordered.ThenByDescending(keySelector);
+            }
+        }
+
+        return ordered ?? cards.OrderBy(c => c.Name);
     }
 
     private static string GetFieldValue(CollectionCard card, string field)

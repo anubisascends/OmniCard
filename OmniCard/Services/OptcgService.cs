@@ -608,6 +608,31 @@ public sealed class OptcgService : ICardGameService, IDisposable
             .FirstOrDefault();
     }
 
+    public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil)
+    {
+        var ids = gameCardIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return [];
+
+        var result = new Dictionary<string, decimal>(ids.Count);
+
+        foreach (var chunk in ids.Chunk(500))
+        {
+            var rows = _readContext.Cards.AsNoTracking()
+                .Where(c => chunk.Contains(c.CardSetId))
+                .Select(c => new { c.CardSetId, c.MarketPrice })
+                .ToList();
+
+            foreach (var row in rows)
+            {
+                if (row.MarketPrice.HasValue)
+                    result[row.CardSetId] = row.MarketPrice.Value;
+            }
+        }
+
+        return result;
+    }
+
     public void RecordCorrection(ulong scanHash, string correctCardId, ulong? artScanHash = null)
     {
         _logger.LogInformation("Recording OPTCG correction: hash {Hash:X16} → card {CardId}", scanHash, correctCardId);

@@ -11,6 +11,7 @@ public interface ICardGameService
     List<CardMatch> SearchCards(string query, int maxResults = 20);
     List<CardMatch> GetPrintings(string cardName);
     decimal? GetCurrentPrice(string gameCardId, bool isFoil);
+    Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil);
     void RecordCorrection(ulong scanHash, string correctCardId, ulong? artScanHash = null);
     IReadOnlyList<SetInfo> GetAvailableSets();
     Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null);

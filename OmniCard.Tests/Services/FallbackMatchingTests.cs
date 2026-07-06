@@ -206,6 +206,7 @@ public class FallbackMatchingTests : IDisposable
         public CardGame Game => game;
         public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 10) => match;
         public decimal? GetCurrentPrice(string gameCardId, bool isFoil) => null;
+        public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil) => [];
         public Task DownloadBulkDataAsync(IProgress<string>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
         public Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
         public List<CardMatch> SearchCards(string query, int maxResults = 20) => [];

@@ -1,9 +1,9 @@
-using MaterialDesignThemes.Wpf;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Windows;
 using System.Windows.Controls;
 using OmniCard.Models;
+using OmniCard.Themes;
 
 namespace OmniCard.Views.Root;
 
@@ -59,11 +59,8 @@ public partial class RootView : IView<RootViewModel>, IHostedService
         _logger.LogInformation("Application window opening");
         Show();
 
-        // Apply saved theme
-        var paletteHelper = new PaletteHelper();
-        var theme = paletteHelper.GetTheme();
-        theme.SetBaseTheme(ViewModel.IsDarkTheme ? BaseTheme.Dark : BaseTheme.Light);
-        paletteHelper.SetTheme(theme);
+        // Apply saved theme with custom palette
+        OmniCardTheme.Apply(ViewModel.IsDarkTheme);
 
         ViewModel.Initialize();
         _logger.LogInformation("Application initialized and ready");

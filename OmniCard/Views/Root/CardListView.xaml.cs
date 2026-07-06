@@ -29,6 +29,36 @@ public partial class CardListView : UserControl
                 SyncColumnVisibility();
         };
         SyncColumnVisibility();
+
+        // Hook scroll detection for incremental loading
+        CollectionDataGrid.Loaded += (_, _) =>
+        {
+            var scrollViewer = FindVisualChild<ScrollViewer>(CollectionDataGrid);
+            if (scrollViewer is not null)
+                scrollViewer.ScrollChanged += ScrollViewer_ScrollChanged;
+        };
+    }
+
+    private async void ScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (sender is not ScrollViewer sv || ViewModel is null || !ViewModel.HasMoreResults)
+            return;
+
+        // Load more when scrolled within 20% of the bottom
+        if (sv.VerticalOffset >= sv.ScrollableHeight * 0.8 && sv.ScrollableHeight > 0)
+            await ViewModel.LoadMore();
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T match) return match;
+            var result = FindVisualChild<T>(child);
+            if (result is not null) return result;
+        }
+        return null;
     }
 
     private void SyncColumnVisibility()

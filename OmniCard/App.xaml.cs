@@ -18,6 +18,7 @@ using OmniCard.Views.CoverArtPicker;
 using OmniCard.Views.CsvImport;
 using OmniCard.Views.HashPreview;
 using OmniCard.Views.Root;
+using OmniCard.Views.Splash;
 using OmniCard.Views.EbayAuth;
 using OmniCard.Views.DataLocation;
 using OmniCard.Views.SetFilterBuilder;
@@ -140,9 +141,13 @@ public partial class App : Application
         })
         .Build();
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
+        var splash = new SplashWindow();
+        splash.Show();
+
         // Check data directory is reachable
+        splash.SetStatus("Checking data directory...");
         var dataDir = DataPathServiceInstance.DataDirectory;
         if (!Directory.Exists(dataDir))
         {
@@ -152,6 +157,7 @@ public partial class App : Application
             }
             catch (Exception ex)
             {
+                splash.Close();
                 var result = MessageBox.Show(
                     $"Data directory not found or not accessible:\n{dataDir}\n\n{ex.Message}\n\nRevert to default location?",
                     "OmniCard",
@@ -177,63 +183,76 @@ public partial class App : Application
             }
         }
 
-        // Run collection migration before starting the host
         var collectionDbFactory = Host.Services.GetRequiredService<IDbContextFactory<CollectionDbContext>>();
         var loggerFactory = Host.Services.GetRequiredService<ILoggerFactory>();
         var migrationLogger = loggerFactory.CreateLogger("CollectionMigration");
-        CollectionMigrationService.MigrateIfNeeded(dataDir, collectionDbFactory, migrationLogger);
 
-        // Ensure ScanImagePath column exists (added in v0.3)
-        EnsureScanImagePathColumn(dataDir, collectionDbFactory, migrationLogger);
-
-        // Ensure StorageContainer schema (added in v0.4)
-        EnsureStorageContainerSchema(dataDir, collectionDbFactory, migrationLogger);
-
-        // Ensure HashCorrections table in game databases (added in v0.5)
-        EnsureHashCorrectionsInGameDbs(dataDir, migrationLogger);
-
-        // Ensure Color/CardType columns on Cards table (added for sort/filter)
-        EnsureColorCardTypeColumns(dataDir, collectionDbFactory, migrationLogger);
-
-        // Ensure CoverCardId column on StorageContainers (added for collection redesign)
-        EnsureCoverCardIdColumn(dataDir, collectionDbFactory, migrationLogger);
-
-        // Initialize sealed products database
-        using var sealedCtx = Host.Services.GetRequiredService<IDbContextFactory<SealedProductDbContext>>().CreateDbContext();
-        sealedCtx.Database.EnsureCreated();
-
-        // Backfill Color/CardType for existing cards
-        var gameServices = Host.Services.GetRequiredService<IEnumerable<ICardGameService>>();
-        BackfillColorCardType(collectionDbFactory, gameServices, migrationLogger);
-
-        Directory.CreateDirectory(DataPathServiceInstance.ScansDirectory);
-
-        // Initialize scan image cache
-        var scanImageCache = Host.Services.GetRequiredService<ScanImageCache>();
-        ScanImageCache.Initialize(scanImageCache);
-
-        // Clean up temp scan files from previous sessions (crash recovery)
-        var tempScansDir = scanImageCache.TempScansDirectory;
-        if (Directory.Exists(tempScansDir))
+        // Run migrations and initialization on background thread
+        await Task.Run(() =>
         {
-            var tempFiles = Directory.GetFiles(tempScansDir);
-            if (tempFiles.Length > 0)
-            {
-                foreach (var file in tempFiles)
-                {
-                    try { File.Delete(file); }
-                    catch { /* best effort cleanup */ }
-                }
-                migrationLogger.LogInformation("Cleaned up {Count} temp scan file(s) from previous session", tempFiles.Length);
-            }
-        }
-        Directory.CreateDirectory(tempScansDir);
+            splash.SetStatus("Running database migrations...");
+            CollectionMigrationService.MigrateIfNeeded(dataDir, collectionDbFactory, migrationLogger);
 
+            // Ensure ScanImagePath column exists (added in v0.3)
+            EnsureScanImagePathColumn(dataDir, collectionDbFactory, migrationLogger);
+
+            // Ensure StorageContainer schema (added in v0.4)
+            EnsureStorageContainerSchema(dataDir, collectionDbFactory, migrationLogger);
+
+            // Ensure HashCorrections table in game databases (added in v0.5)
+            EnsureHashCorrectionsInGameDbs(dataDir, migrationLogger);
+
+            // Ensure Color/CardType columns on Cards table (added for sort/filter)
+            EnsureColorCardTypeColumns(dataDir, collectionDbFactory, migrationLogger);
+
+            // Ensure CoverCardId column on StorageContainers (added for collection redesign)
+            EnsureCoverCardIdColumn(dataDir, collectionDbFactory, migrationLogger);
+
+            splash.SetStatus("Initializing databases...");
+            // Initialize sealed products database
+            using (var sealedCtx = Host.Services.GetRequiredService<IDbContextFactory<SealedProductDbContext>>().CreateDbContext())
+            {
+                sealedCtx.Database.EnsureCreated();
+            }
+
+            splash.SetStatus("Loading collection data...");
+            // Backfill Color/CardType for existing cards
+            var gameServices = Host.Services.GetRequiredService<IEnumerable<ICardGameService>>();
+            BackfillColorCardType(collectionDbFactory, gameServices, migrationLogger);
+
+            splash.SetStatus("Preparing scan cache...");
+            Directory.CreateDirectory(DataPathServiceInstance.ScansDirectory);
+
+            // Initialize scan image cache
+            var scanImageCache = Host.Services.GetRequiredService<ScanImageCache>();
+            ScanImageCache.Initialize(scanImageCache);
+
+            // Clean up temp scan files from previous sessions (crash recovery)
+            var tempScansDir = scanImageCache.TempScansDirectory;
+            if (Directory.Exists(tempScansDir))
+            {
+                var tempFiles = Directory.GetFiles(tempScansDir);
+                if (tempFiles.Length > 0)
+                {
+                    foreach (var file in tempFiles)
+                    {
+                        try { File.Delete(file); }
+                        catch { /* best effort cleanup */ }
+                    }
+                    migrationLogger.LogInformation("Cleaned up {Count} temp scan file(s) from previous session", tempFiles.Length);
+                }
+            }
+            Directory.CreateDirectory(tempScansDir);
+        });
+
+        splash.SetStatus("Starting application...");
         Host.Start();
 
         // Initialize set symbol converter with cached service
         var setSymbolCache = Host.Services.GetRequiredService<SetSymbolCache>();
         SetSymbol.Initialize(setSymbolCache);
+
+        splash.Close();
     }
 
     private static void EnsureScanImagePathColumn(

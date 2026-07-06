@@ -1210,6 +1210,40 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         return decimal.TryParse(priceStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var price) ? price : null;
     }
 
+    public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil)
+    {
+        var ids = gameCardIds
+            .Where(id => Guid.TryParse(id, out _))
+            .Select(Guid.Parse)
+            .Distinct()
+            .ToList();
+
+        if (ids.Count == 0)
+            return [];
+
+        using var ctx = _dbContextFactory.CreateDbContext();
+        var result = new Dictionary<string, decimal>(ids.Count);
+
+        // Chunk to stay within SQLite parameter limits
+        foreach (var chunk in ids.Chunk(500))
+        {
+            var rows = ctx.Cards.AsNoTracking()
+                .Where(c => chunk.Contains(c.Id))
+                .Select(c => new { c.Id, c.Prices })
+                .ToList();
+
+            foreach (var row in rows)
+            {
+                if (row.Prices is null) continue;
+                var priceStr = isFoil ? row.Prices.UsdFoil : row.Prices.Usd;
+                if (decimal.TryParse(priceStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var price))
+                    result[row.Id.ToString()] = price;
+            }
+        }
+
+        return result;
+    }
+
     public object? FindCardById(string gameCardId)
     {
         if (!Guid.TryParse(gameCardId, out var guid))

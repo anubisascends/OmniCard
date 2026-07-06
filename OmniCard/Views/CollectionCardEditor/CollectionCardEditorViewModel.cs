@@ -33,6 +33,9 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
     public partial string SetInfo { get; set; } = "";
 
     [ObservableProperty]
+    public partial string SetCode { get; set; } = "";
+
+    [ObservableProperty]
     public partial string CardNumber { get; set; } = "";
 
     [ObservableProperty]
@@ -54,6 +57,10 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
     // Images
     [ObservableProperty]
     public partial BitmapImage? ScanImage { get; set; }
+
+    public bool HasScanImage => ScanImage is not null;
+
+    partial void OnScanImageChanged(BitmapImage? value) => OnPropertyChanged(nameof(HasScanImage));
 
     [ObservableProperty]
     public partial BitmapImage? ApiImage { get; set; }
@@ -176,6 +183,7 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
         _originalCard.ImageUri = value.ImageUri;
 
         SetInfo = $"{value.SetName} ({value.SetCode})";
+        SetCode = value.SetCode;
         CardNumber = value.CollectorNumber;
         Rarity = value.Rarity;
 
@@ -225,10 +233,23 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
     [ObservableProperty]
     public partial string SearchQuery { get; set; } = "";
 
+    [ObservableProperty]
+    public partial bool IsSearchVisible { get; set; }
+
+    public bool IsSearchHidden => !IsSearchVisible;
+    public bool HasSearchResults => SearchResults.Count > 0;
+
     public ObservableCollection<CardMatch> SearchResults { get; } = [];
 
     [ObservableProperty]
     public partial CardMatch? SelectedSearchResult { get; set; }
+
+    [RelayCommand]
+    public void ToggleSearch()
+    {
+        IsSearchVisible = !IsSearchVisible;
+        OnPropertyChanged(nameof(IsSearchHidden));
+    }
 
     // Dialog result
     public bool WasSaved { get; private set; }
@@ -244,6 +265,7 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
 
         CardName = card.Name;
         SetInfo = $"{card.SetName} ({card.SetCode})";
+        SetCode = card.SetCode;
         CardNumber = card.Number;
         Rarity = card.Rarity;
         GameName = card.Game.ToString();
@@ -269,14 +291,14 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
         OnPropertyChanged(nameof(CanPreviousScan));
         OnPropertyChanged(nameof(CanNextScan));
 
-        // Load API card art from URL
-        if (card.ImageUri is not null)
+        // Load API card art from URL — look up from game DB if not stored on the collection card
+        var imageUri = card.ImageUri ?? ResolveImageUri(card.Game, card.GameCardId);
+        if (imageUri is not null)
         {
             var bmp = new BitmapImage();
             bmp.BeginInit();
-            bmp.UriSource = new Uri(card.ImageUri, UriKind.Absolute);
+            bmp.UriSource = new Uri(imageUri, UriKind.Absolute);
             bmp.CacheOption = BitmapCacheOption.OnLoad;
-            bmp.DecodePixelWidth = 300;
             bmp.EndInit();
             ApiImage = bmp;
         }
@@ -299,11 +321,15 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
     {
         SearchResults.Clear();
         if (string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            OnPropertyChanged(nameof(HasSearchResults));
             return;
+        }
 
         var service = _cardService.GetGameService(_originalCard.Game);
         foreach (var match in service.SearchCards(SearchQuery))
             SearchResults.Add(match);
+        OnPropertyChanged(nameof(HasSearchResults));
     }
 
     [RelayCommand]
@@ -324,6 +350,7 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
         // Update display
         CardName = match.Name;
         SetInfo = $"{match.SetName} ({match.SetCode})";
+        SetCode = match.SetCode;
         CardNumber = match.CollectorNumber;
         Rarity = match.Rarity;
 
@@ -361,6 +388,9 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
         SearchResults.Clear();
         SearchQuery = "";
         SelectedSearchResult = null;
+        IsSearchVisible = false;
+        OnPropertyChanged(nameof(IsSearchHidden));
+        OnPropertyChanged(nameof(HasSearchResults));
 
         RefreshPrintings();
     }
@@ -438,5 +468,23 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
             _cardService.DeleteCollectionCard(id);
         WasDeleted = true;
         CloseDialog?.Invoke(false);
+    }
+
+    private string? ResolveImageUri(CardGame game, string gameCardId)
+    {
+        try
+        {
+            var source = _cardService.GetGameService(game).FindCardById(gameCardId);
+            return source switch
+            {
+                Models.Card scryfall => scryfall.ImageUris?.Normal ?? scryfall.ImageUris?.Large,
+                OptcgCard optcg => optcg.CardImageUri,
+                _ => null
+            };
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

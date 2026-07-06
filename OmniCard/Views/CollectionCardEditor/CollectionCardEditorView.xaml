@@ -4,14 +4,15 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:OmniCard.Views.CollectionCardEditor"
-        xmlns:controls="clr-namespace:OmniCard.Views.Controls"
         xmlns:helpers="clr-namespace:OmniCard.Helpers"
+        xmlns:root="clr-namespace:OmniCard.Views.Root"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
+        WindowStyle="ToolWindow"
         d:DataContext="{d:DesignInstance {x:Type local:CollectionCardEditorView}}"
-        Title="Edit Collection Card" Height="900" Width="800"
+        Title="Edit Collection Card" Height="700" Width="900"
         Background="{DynamicResource MaterialDesign.Brush.Background}"
         TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
         TextElement.FontWeight="Regular"
@@ -24,205 +25,337 @@
 
     <Grid Margin="12">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="1*"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="1*"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>  <!-- Card identity -->
+            <RowDefinition Height="*"/>     <!-- Images -->
+            <RowDefinition Height="Auto"/>  <!-- Properties / Location / Reassign -->
+            <RowDefinition Height="Auto"/>  <!-- Actions -->
         </Grid.RowDefinitions>
 
-        <!-- Card Info (read-only) -->
-        <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}" CornerRadius="4" Padding="8" Margin="0,0,0,8">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition/><RowDefinition/><RowDefinition/>
-                </Grid.RowDefinitions>
-
-                <TextBlock Text="Name:" FontWeight="SemiBold" Margin="0,2,8,2"/>
-                <TextBlock Grid.Column="1" Text="{Binding ViewModel.CardName}" Margin="0,2" Grid.ColumnSpan="3"/>
-
-                <TextBlock Grid.Row="1" Text="Set:" FontWeight="SemiBold" Margin="0,2,8,2"/>
-                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ViewModel.SetInfo}" Margin="0,2"/>
-                <TextBlock Grid.Row="1" Grid.Column="2" Text="Number:" FontWeight="SemiBold" Margin="12,2,8,2"/>
-                <TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding ViewModel.CardNumber}" Margin="0,2"/>
-
-                <TextBlock Grid.Row="2" Text="Rarity:" FontWeight="SemiBold" Margin="0,2,8,2"/>
-                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ViewModel.Rarity}" Margin="0,2"/>
-                <TextBlock Grid.Row="2" Grid.Column="2" Text="Game:" FontWeight="SemiBold" Margin="12,2,8,2"/>
-                <TextBlock Grid.Row="2" Grid.Column="3" Text="{Binding ViewModel.GameName}" Margin="0,2"/>
-            </Grid>
-        </Border>
-
-        <!-- Printing selector -->
-        <Border Grid.Row="1" Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
-                CornerRadius="4" Padding="8" Margin="0,0,0,8"
-                Visibility="{Binding ViewModel.ShowPrintingSelector, Converter={StaticResource BoolToVis}}">
-            <StackPanel>
-                <TextBlock Text="Printing" FontWeight="SemiBold" FontSize="11"
-                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" Margin="0,0,0,4"/>
-                <ComboBox ItemsSource="{Binding ViewModel.AvailablePrintings}"
-                          SelectedItem="{Binding ViewModel.SelectedPrinting}"
-                          MaxDropDownHeight="300">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal" Margin="2">
-                                <Border Width="14" Height="14" Margin="0,0,6,0"
-                                    helpers:SetSymbol.SetCode="{Binding SetCode}"
-                                    helpers:SetSymbol.Rarity="{Binding Rarity}"/>
-                                <TextBlock Text="{Binding SetName}"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,8,0"/>
-                                <TextBlock Text="{Binding CollectorNumber, StringFormat='#{0}'}"
-                                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
-                                       VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
+        <!-- Card Identity Bar -->
+        <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                CornerRadius="4" Padding="10,6" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding ViewModel.CardName}" FontWeight="SemiBold" FontSize="15"
+                           VerticalAlignment="Center" Margin="0,0,16,0"/>
+                <Border Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,4,0"
+                        helpers:SetSymbol.SetCode="{Binding ViewModel.SetCode}"
+                        helpers:SetSymbol.Rarity="{Binding ViewModel.Rarity}"/>
+                <TextBlock Text="{Binding ViewModel.SetInfo}" VerticalAlignment="Center"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" Margin="0,0,12,0"/>
+                <TextBlock Text="{Binding ViewModel.CardNumber, StringFormat='#{0}'}" VerticalAlignment="Center"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" Margin="0,0,12,0"/>
+                <TextBlock Text="{Binding ViewModel.Rarity}" VerticalAlignment="Center"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" Margin="0,0,12,0"/>
+                <TextBlock Text="{Binding ViewModel.GameName}" VerticalAlignment="Center"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
             </StackPanel>
         </Border>
 
-        <!-- Images -->
-        <Grid Grid.Row="2" Margin="0,0,0,8">
+        <!-- Image Comparison Area -->
+        <Grid Grid.Row="1" Margin="0,0,0,8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1*"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="1*"/>
             </Grid.ColumnDefinitions>
 
-            <StackPanel HorizontalAlignment="Center">
-                <Image Source="{Binding ViewModel.ScanImage}" Stretch="Fill"
-                       RenderOptions.BitmapScalingMode="HighQuality"/>
-                <!-- Scan flipper for stacked cards -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0"
-                            Visibility="{Binding ViewModel.IsStacked, Converter={StaticResource BoolToVis}}">
-                    <Button Content="&lt;" Padding="6,0"
-                            Command="{Binding ViewModel.PreviousScanCommand}"
-                            IsEnabled="{Binding ViewModel.CanPreviousScan}"
-                            Style="{StaticResource MaterialDesignFlatButton}"/>
-                    <TextBlock Text="{Binding ViewModel.ScanImageLabel}"
-                               VerticalAlignment="Center" Margin="6,0"
-                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
-                               FontStyle="Italic"/>
-                    <Button Content="&gt;" Padding="6,0"
-                            Command="{Binding ViewModel.NextScanCommand}"
-                            IsEnabled="{Binding ViewModel.CanNextScan}"
-                            Style="{StaticResource MaterialDesignFlatButton}"/>
-                </StackPanel>
-                <!-- Single card label -->
-                <TextBlock Text="Scan" HorizontalAlignment="Center" FontStyle="Italic"
-                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" Margin="0,4,0,0">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding ViewModel.IsStacked}" Value="True">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
-            </StackPanel>
+            <!-- Scan Image -->
+            <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                    CornerRadius="4" Padding="4">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-            <StackPanel Grid.Column="1" HorizontalAlignment="Center">
-                <Image Source="{Binding ViewModel.ApiImage}" Stretch="Fill"
-                       RenderOptions.BitmapScalingMode="HighQuality"/>
-                <TextBlock Text="Card Art" HorizontalAlignment="Center" FontStyle="Italic" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" Margin="0,4,0,0"/>
-            </StackPanel>
+                    <!-- Scan image (when available) -->
+                    <ScrollViewer x:Name="ScanScrollViewer"
+                                  HorizontalScrollBarVisibility="Hidden"
+                                  VerticalScrollBarVisibility="Hidden"
+                                  PreviewMouseWheel="Image_PreviewMouseWheel"
+                                  MouseLeftButtonDown="Image_MouseLeftButtonDown"
+                                  MouseLeftButtonUp="Image_MouseLeftButtonUp"
+                                  MouseMove="Image_MouseMove"
+                                  MouseDoubleClick="Image_MouseDoubleClick"
+                                  Cursor="Hand"
+                                  Tag="Scan"
+                                  Visibility="{Binding ViewModel.HasScanImage, Converter={StaticResource BoolToVis}}">
+                        <Image x:Name="ScanImageElement"
+                               Source="{Binding ViewModel.ScanImage}"
+                               Stretch="Uniform"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               RenderTransformOrigin="0,0">
+                            <Image.RenderTransform>
+                                <ScaleTransform x:Name="ScanImageScale" ScaleX="1" ScaleY="1"/>
+                            </Image.RenderTransform>
+                        </Image>
+                    </ScrollViewer>
+
+                    <!-- Placeholder when no scan image -->
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                                Margin="20">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ViewModel.HasScanImage}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="36"
+                                   HorizontalAlignment="Center" Margin="0,0,0,8"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" Opacity="0.4"/>
+                        <TextBlock Text="No scan image" FontSize="14" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" Margin="0,0,0,4"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                        <TextBlock Text="This card was imported from an external source"
+                                   FontSize="11" FontStyle="Italic" HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" Opacity="0.7"/>
+                    </StackPanel>
+
+                    <!-- Scan label / flipper -->
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,2"
+                                Visibility="{Binding ViewModel.HasScanImage, Converter={StaticResource BoolToVis}}">
+                        <Button Content="&#xE5CB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Padding="4,0"
+                                Command="{Binding ViewModel.PreviousScanCommand}"
+                                IsEnabled="{Binding ViewModel.CanPreviousScan}"
+                                Style="{StaticResource MaterialDesignFlatButton}"
+                                Visibility="{Binding ViewModel.IsStacked, Converter={StaticResource BoolToVis}}"/>
+                        <TextBlock VerticalAlignment="Center" Margin="4,0"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                   FontStyle="Italic">
+                            <TextBlock.Text>
+                                <MultiBinding StringFormat="Scan {0}">
+                                    <Binding Path="ViewModel.ScanImageLabel"/>
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+                        <Button Content="&#xE5CC;" FontFamily="Segoe MDL2 Assets" FontSize="10" Padding="4,0"
+                                Command="{Binding ViewModel.NextScanCommand}"
+                                IsEnabled="{Binding ViewModel.CanNextScan}"
+                                Style="{StaticResource MaterialDesignFlatButton}"
+                                Visibility="{Binding ViewModel.IsStacked, Converter={StaticResource BoolToVis}}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Splitter -->
+            <GridSplitter Grid.Column="1" Width="6"
+                          HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                          Background="Transparent" Cursor="SizeWE"
+                          ShowsPreview="True"/>
+
+            <!-- API Image -->
+            <Border Grid.Column="2"
+                    Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                    CornerRadius="4" Padding="4">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <ScrollViewer x:Name="ApiScrollViewer"
+                                  HorizontalScrollBarVisibility="Hidden"
+                                  VerticalScrollBarVisibility="Hidden"
+                                  PreviewMouseWheel="Image_PreviewMouseWheel"
+                                  MouseLeftButtonDown="Image_MouseLeftButtonDown"
+                                  MouseLeftButtonUp="Image_MouseLeftButtonUp"
+                                  MouseMove="Image_MouseMove"
+                                  MouseDoubleClick="Image_MouseDoubleClick"
+                                  Cursor="Hand"
+                                  Tag="Api">
+                        <Image x:Name="ApiImageElement"
+                               Source="{Binding ViewModel.ApiImage}"
+                               Stretch="Uniform"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               RenderTransformOrigin="0,0">
+                            <Image.RenderTransform>
+                                <ScaleTransform x:Name="ApiImageScale" ScaleX="1" ScaleY="1"/>
+                            </Image.RenderTransform>
+                        </Image>
+                    </ScrollViewer>
+
+                    <TextBlock Grid.Row="1" Text="Card Art" HorizontalAlignment="Center"
+                               FontStyle="Italic" Margin="0,4,0,2"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                </Grid>
+            </Border>
         </Grid>
 
-        <!-- Editable Fields -->
-        <Border Grid.Row="3" Background="{DynamicResource MaterialDesign.Brush.Card.Background}" CornerRadius="4" Padding="8" Margin="0,0,0,8">
+        <!-- Properties / Location / Reassign — compact bottom bar -->
+        <Border Grid.Row="2" Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                CornerRadius="4" Padding="10,8" Margin="0,0,0,8">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>  <!-- Properties -->
+                    <ColumnDefinition Width="Auto"/>  <!-- Separator -->
+                    <ColumnDefinition Width="Auto"/>  <!-- Location -->
+                    <ColumnDefinition Width="Auto"/>  <!-- Separator -->
+                    <ColumnDefinition Width="*"/>     <!-- Reassign -->
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Text="Condition:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                <ComboBox Grid.Column="1" SelectedItem="{Binding ViewModel.Condition}"
-                          VerticalAlignment="Center" Margin="0,0,12,0">
-                    <sys:String xmlns:sys="clr-namespace:System;assembly=System.Runtime">NM</sys:String>
-                    <sys:String xmlns:sys="clr-namespace:System;assembly=System.Runtime">LP</sys:String>
-                    <sys:String xmlns:sys="clr-namespace:System;assembly=System.Runtime">MP</sys:String>
-                    <sys:String xmlns:sys="clr-namespace:System;assembly=System.Runtime">HP</sys:String>
-                    <sys:String xmlns:sys="clr-namespace:System;assembly=System.Runtime">D</sys:String>
-                </ComboBox>
+                <!-- Card Properties -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Condition" FontSize="11"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox SelectedItem="{Binding ViewModel.Condition}"
+                              VerticalAlignment="Center" Width="60" Margin="0,0,12,0">
+                        <sys:String xmlns:sys="clr-namespace:System;assembly=System.Runtime">NM</sys:String>
+                        <sys:String xmlns:sys="clr-namespace:System;assembly=System.Runtime">LP</sys:String>
+                        <sys:String xmlns:sys="clr-namespace:System;assembly=System.Runtime">MP</sys:String>
+                        <sys:String xmlns:sys="clr-namespace:System;assembly=System.Runtime">HP</sys:String>
+                        <sys:String xmlns:sys="clr-namespace:System;assembly=System.Runtime">D</sys:String>
+                    </ComboBox>
+                    <CheckBox Content="Foil" IsChecked="{Binding ViewModel.IsFoil}"
+                              VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <TextBlock Text="$" FontSize="11"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                               VerticalAlignment="Center" Margin="0,0,4,0"/>
+                    <TextBox Width="65" VerticalAlignment="Center"
+                             Text="{Binding ViewModel.PurchasePrice, TargetNullValue='', UpdateSourceTrigger=LostFocus}"/>
+                </StackPanel>
 
-                <CheckBox Grid.Column="2" Content="Foil"
-                          IsChecked="{Binding ViewModel.IsFoil}"
-                          VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <!-- Separator -->
+                <Rectangle Grid.Column="1" Width="1" Fill="{DynamicResource MaterialDesign.Brush.TextBox.HoverBorder}"
+                           Margin="12,2" VerticalAlignment="Stretch"/>
 
-                <TextBlock Grid.Column="3" Text="Purchase $:" FontWeight="SemiBold"
-                           VerticalAlignment="Center" Margin="0,0,6,0"/>
-                <TextBox Grid.Column="4" Width="80"
-                         Text="{Binding ViewModel.PurchasePrice, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
-                         VerticalAlignment="Center"/>
+                <!-- Location -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Location" FontSize="11"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox ItemsSource="{Binding ViewModel.AvailableContainers}"
+                              SelectedItem="{Binding ViewModel.SelectedContainer}"
+                              DisplayMemberPath="Name" Width="130" VerticalAlignment="Center" Margin="0,0,8,0"/>
+
+                    <!-- Binder: Page / Slot -->
+                    <StackPanel Orientation="Horizontal"
+                                Visibility="{Binding ViewModel.ShowBinderFields, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="Pg" FontSize="11"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                   VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <TextBox Width="40" VerticalAlignment="Center" Margin="0,0,8,0"
+                                 Text="{Binding ViewModel.Page, TargetNullValue='', UpdateSourceTrigger=LostFocus}"/>
+                        <TextBlock Text="Slot" FontSize="11"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                   VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <TextBox Width="40" VerticalAlignment="Center"
+                                 Text="{Binding ViewModel.Slot, TargetNullValue='', UpdateSourceTrigger=LostFocus}"/>
+                    </StackPanel>
+
+                    <!-- Box: Section -->
+                    <StackPanel Orientation="Horizontal"
+                                Visibility="{Binding ViewModel.ShowBoxFields, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="Section" FontSize="11"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                   VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <TextBox Width="100" VerticalAlignment="Center"
+                                 Text="{Binding ViewModel.Section, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Separator -->
+                <Rectangle Grid.Column="3" Width="1" Fill="{DynamicResource MaterialDesign.Brush.TextBox.HoverBorder}"
+                           Margin="12,2" VerticalAlignment="Stretch"/>
+
+                <!-- Reassign -->
+                <StackPanel Grid.Column="4" VerticalAlignment="Center">
+                    <!-- Printing dropdown (quick switch) -->
+                    <ComboBox ItemsSource="{Binding ViewModel.AvailablePrintings}"
+                              SelectedItem="{Binding ViewModel.SelectedPrinting}"
+                              MaxDropDownHeight="300"
+                              Visibility="{Binding ViewModel.ShowPrintingSelector, Converter={StaticResource BoolToVis}}"
+                              Margin="0,0,0,0">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" Margin="1">
+                                    <Border Width="12" Height="12" Margin="0,0,4,0"
+                                            helpers:SetSymbol.SetCode="{Binding SetCode}"
+                                            helpers:SetSymbol.Rarity="{Binding Rarity}"/>
+                                    <TextBlock Text="{Binding SetName}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="{Binding CollectorNumber, StringFormat='#{0}'}"
+                                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <!-- Search toggle -->
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0"
+                                Visibility="{Binding ViewModel.IsSearchVisible, Converter={StaticResource BoolToVis}}">
+                        <TextBox Text="{Binding ViewModel.SearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                                 Width="180" VerticalAlignment="Center" Margin="0,0,4,0"
+                                 materialDesign:HintAssist.Hint="Search for card..."
+                                 KeyDown="SearchBox_KeyDown"/>
+                        <Button Content="Search" Padding="8,2" VerticalAlignment="Center"
+                                Command="{Binding ViewModel.SearchCommand}"/>
+                    </StackPanel>
+                    <Button Content="Search for different card..."
+                            Style="{StaticResource MaterialDesignFlatButton}"
+                            Padding="0" FontSize="11" HorizontalAlignment="Left"
+                            Command="{Binding ViewModel.ToggleSearchCommand}"
+                            Visibility="{Binding ViewModel.IsSearchHidden, Converter={StaticResource BoolToVis}}"/>
+
+                    <!-- Inline search results popup -->
+                    <Popup x:Name="SearchResultsPopup" StaysOpen="False"
+                           PlacementTarget="{Binding ElementName=Self}"
+                           Placement="Top"
+                           IsOpen="{Binding ViewModel.HasSearchResults, Mode=OneWay}"
+                           AllowsTransparency="True" PopupAnimation="Fade">
+                        <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                                BorderBrush="{DynamicResource MaterialDesign.Brush.TextBox.HoverBorder}"
+                                BorderThickness="1" CornerRadius="4" Padding="4"
+                                MaxHeight="250" MinWidth="350">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="8" Opacity="0.3" ShadowDepth="2"/>
+                            </Border.Effect>
+                            <ListView ItemsSource="{Binding ViewModel.SearchResults}"
+                                      SelectedItem="{Binding ViewModel.SelectedSearchResult}"
+                                      MouseDoubleClick="SearchResult_MouseDoubleClick">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" Margin="2">
+                                            <Image Source="{Binding ImageUri}" Width="36" Height="50"
+                                                   Stretch="Uniform" Margin="0,0,8,0"
+                                                   Visibility="{Binding ImageUri, Converter={root:NullToCollapsedConverter}}"/>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Margin="0,0,8,0"/>
+                                                    <TextBlock Text="{Binding CollectorNumber, StringFormat='#{0}'}"
+                                                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Border Width="12" Height="12" Margin="0,0,4,0"
+                                                            helpers:SetSymbol.SetCode="{Binding SetCode}"
+                                                            helpers:SetSymbol.Rarity="{Binding Rarity}"/>
+                                                    <TextBlock Text="{Binding SetName}"
+                                                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Border>
+                    </Popup>
+                </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Location -->
-        <GroupBox Header="Location" Grid.Row="4" Margin="0,0,0,8">
-            <StackPanel Margin="4">
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                    <TextBlock Text="Container:" VerticalAlignment="Center" Margin="0,0,8,0" Width="70"/>
-                    <ComboBox ItemsSource="{Binding ViewModel.AvailableContainers}"
-                              SelectedItem="{Binding ViewModel.SelectedContainer}"
-                              DisplayMemberPath="Name" Width="200" Margin="0,0,8,0"/>
-                    <Button Content="Move to Bulk" Command="{Binding ViewModel.MoveToBulkCommand}" Padding="8,2"/>
-                </StackPanel>
-
-                <!-- Binder position fields -->
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,4"
-                            Visibility="{Binding ViewModel.ShowBinderFields, Converter={StaticResource BoolToVis}}">
-                    <TextBlock Text="Page:" VerticalAlignment="Center" Margin="0,0,8,0" Width="70"/>
-                    <TextBox Text="{Binding ViewModel.Page, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
-                             Width="60" Margin="0,0,16,0"/>
-                    <TextBlock Text="Slot:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <TextBox Text="{Binding ViewModel.Slot, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
-                             Width="60"/>
-                </StackPanel>
-
-                <!-- Box section field -->
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,4"
-                            Visibility="{Binding ViewModel.ShowBoxFields, Converter={StaticResource BoolToVis}}">
-                    <TextBlock Text="Section:" VerticalAlignment="Center" Margin="0,0,8,0" Width="70"/>
-                    <TextBox Text="{Binding ViewModel.Section, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}"
-                             Width="200"/>
-                </StackPanel>
-            </StackPanel>
-        </GroupBox>
-
-        <!-- Reassign Card Section -->
-        <controls:CardSearchControl Grid.Row="5" Margin="0,0,0,8"
-            Header="Reassign Card"
-            SearchQuery="{Binding ViewModel.SearchQuery, Mode=TwoWay}"
-            SearchResults="{Binding ViewModel.SearchResults}"
-            SelectedResult="{Binding ViewModel.SelectedSearchResult, Mode=TwoWay}"
-            SearchCommand="{Binding ViewModel.SearchCommand}"
-            AssignCommand="{Binding ViewModel.AssignCardCommand}"
-            ResultsMaxHeight="150"/>
-
         <!-- Action Buttons -->
-        <Grid Grid.Row="6">
+        <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Apply to all checkbox (only visible for stacked cards) -->
             <CheckBox Content="Apply to all copies in stack"
                       IsChecked="{Binding ViewModel.ApplyToAll}"
                       VerticalAlignment="Center"

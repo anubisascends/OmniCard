@@ -16,6 +16,7 @@ using OmniCard.Data;
 using OmniCard.Helpers;
 using OmniCard.Models;
 using OmniCard.Services;
+using OmniCard.Themes;
 using OmniCard.Views.HashPreview;
 
 namespace OmniCard.Views.Root;
@@ -128,12 +129,7 @@ public sealed partial class RootViewModel(
 
     partial void OnIsDarkThemeChanged(bool value)
     {
-        // Apply theme
-        var paletteHelper = new PaletteHelper();
-        var theme = paletteHelper.GetTheme();
-        theme.SetBaseTheme(value ? BaseTheme.Dark : BaseTheme.Light);
-        paletteHelper.SetTheme(theme);
-
+        OmniCardTheme.Apply(value);
         PersistDisplaySettings();
     }
 
@@ -1135,7 +1131,7 @@ public sealed partial class RootViewModel(
             NotifySelectionChanged();
             CardService.ScannedCards.Clear();
 
-            Collection.SearchCollection();
+            _ = Collection.SearchCollection();
             InvalidateHomeTab();
             Message = $"Committed {count} cards to collection.";
         }
@@ -1375,7 +1371,7 @@ public sealed partial class RootViewModel(
             if (imported.HasValue)
             {
                 Message = $"Imported {imported.Value} cards";
-                Collection.SearchCollection();
+                _ = Collection.SearchCollection();
             }
         }
         catch (Exception ex)
@@ -1446,12 +1442,21 @@ public sealed partial class RootViewModel(
             // Calculate total value: use purchase price if set, otherwise look up market price
             decimal totalValue = 0;
             var gameService = CardService.ActiveGameService;
+            var cardsNeedingPrice = allCards.Where(c => !c.PurchasePrice.HasValue).ToList();
+            var batchPrices = new Dictionary<(string, bool), decimal>();
+            foreach (var foilGroup in cardsNeedingPrice.GroupBy(c => c.IsFoil))
+            {
+                var prices = gameService.GetCurrentPrices(
+                    foilGroup.Select(c => c.GameCardId).Distinct(), foilGroup.Key);
+                foreach (var kvp in prices)
+                    batchPrices.TryAdd((kvp.Key, foilGroup.Key), kvp.Value);
+            }
             foreach (var card in allCards)
             {
                 if (card.PurchasePrice.HasValue)
                     totalValue += card.PurchasePrice.Value;
                 else
-                    totalValue += gameService.GetCurrentPrice(card.GameCardId, card.IsFoil) ?? 0;
+                    totalValue += batchPrices.GetValueOrDefault((card.GameCardId, card.IsFoil));
             }
             StatTotalValue = totalValue;
 
