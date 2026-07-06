@@ -8,9 +8,10 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance {x:Type local:StorageManagerView}}"
-        Title="Manage Storage Locations" Height="450" Width="500"
+        Title="Manage Storage Locations" Height="600" Width="500"
+        MinHeight="400" MinWidth="400"
         ShowInTaskbar="False"
-        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResizeWithGrip"
         Background="{DynamicResource MaterialDesign.Brush.Background}"
         TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
         TextElement.FontWeight="Regular"
@@ -32,27 +33,55 @@
         </Grid.RowDefinitions>
 
         <!-- Container list -->
-        <ListView ItemsSource="{Binding ViewModel.Containers}"
-                  SelectedItem="{Binding ViewModel.SelectedContainer}"
-                  Margin="0,0,0,8">
-            <ListView.View>
-                <GridView>
-                    <GridViewColumn Header="Name" Width="180" DisplayMemberBinding="{Binding Name}"/>
-                    <GridViewColumn Header="Type" Width="100" DisplayMemberBinding="{Binding TypeDisplay}"/>
-                    <GridViewColumn Header="Cards" Width="60" DisplayMemberBinding="{Binding CardCount}"/>
-                    <GridViewColumn Header="" Width="50">
-                        <GridViewColumn.CellTemplate>
-                            <DataTemplate>
-                                <Button Content="QR" ToolTip="Copy barcode text to clipboard"
-                                        Command="{Binding DataContext.ViewModel.CopyQrTextCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                        CommandParameter="{Binding Id}"
-                                        Padding="6,1" FontSize="10"/>
-                            </DataTemplate>
-                        </GridViewColumn.CellTemplate>
-                    </GridViewColumn>
-                </GridView>
-            </ListView.View>
-        </ListView>
+        <ListBox ItemsSource="{Binding ViewModel.GroupedContainers}"
+                 SelectedItem="{Binding ViewModel.SelectedContainer}"
+                 Margin="0,0,0,8"
+                 VirtualizingStackPanel.IsVirtualizing="False"
+                 VirtualizingStackPanel.ScrollUnit="Pixel"
+                 ScrollViewer.CanContentScroll="False"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.GroupStyle>
+                <GroupStyle>
+                    <GroupStyle.HeaderTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Name}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                       Margin="4,8,0,4"/>
+                        </DataTemplate>
+                    </GroupStyle.HeaderTemplate>
+                    <GroupStyle.Panel>
+                        <ItemsPanelTemplate>
+                            <StackPanel/>
+                        </ItemsPanelTemplate>
+                    </GroupStyle.Panel>
+                </GroupStyle>
+            </ListBox.GroupStyle>
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel/>
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="4,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="60"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="{Binding TypeDisplay}" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="2" Text="{Binding CardCount}" VerticalAlignment="Center"/>
+                        <Button Grid.Column="3" Content="QR" ToolTip="Copy barcode text to clipboard"
+                                Command="{Binding DataContext.ViewModel.CopyQrTextCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding Id}"
+                                Padding="6,1" FontSize="10"/>
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
 
         <!-- Action buttons -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
@@ -67,7 +96,11 @@
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,4,0,8">
             <TextBlock Text="Web App URL:" VerticalAlignment="Center" Margin="0,0,8,0"/>
             <TextBox Text="{Binding ViewModel.BaseUrl, UpdateSourceTrigger=PropertyChanged}"
-                     Width="300" VerticalAlignment="Center" FontSize="11"/>
+                     Width="260" VerticalAlignment="Center" FontSize="11"/>
+            <Button Content="Use My IP" Command="{Binding ViewModel.UseMyIpCommand}"
+                    Padding="8,2" Margin="4,0,0,0" FontSize="11"
+                    ToolTip="Set URL to this computer's IP address"
+                    Style="{StaticResource MaterialDesignFlatButton}"/>
         </StackPanel>
 
         <!-- Add panel -->

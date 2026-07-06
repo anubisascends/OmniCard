@@ -46,15 +46,28 @@
                             Command="{Binding ViewModel.ClearSetFilterCommand}"
                             Style="{StaticResource MaterialDesignFlatButton}"/>
                     <Separator/>
-                    <TextBlock Text="Force Location:"
+                    <TextBlock Text="Location:"
                                VerticalAlignment="Center"
                                Margin="0,0,4,0"/>
-                    <ComboBox ItemsSource="{Binding ViewModel.AvailableContainers}"
+                    <ComboBox ItemsSource="{Binding ViewModel.GroupedContainers}"
                               SelectedItem="{Binding ViewModel.ActiveContainer}"
                               DisplayMemberPath="Name"
                               Width="150"
                               VerticalAlignment="Center"
-                              Margin="0,0,4,0"/>
+                              Margin="0,0,4,0">
+                        <ComboBox.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.HeaderTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Name}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                                   Margin="4,4,0,2"/>
+                                    </DataTemplate>
+                                </GroupStyle.HeaderTemplate>
+                            </GroupStyle>
+                        </ComboBox.GroupStyle>
+                    </ComboBox>
 
                     <!-- Binder position fields -->
                     <TextBlock Text="Page:"

@@ -1,7 +1,11 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
+using System.Net;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Options;
@@ -12,9 +16,10 @@ namespace OmniCard.Views.StorageManager;
 
 public sealed partial class StorageManagerViewModel(
     IStorageContainerService containerService,
-    IOptions<WebCompanionSettings> webCompanionSettings) : ViewModel
+    IOptionsMonitor<WebCompanionSettings> webCompanionSettings) : ViewModel
 {
     public ObservableCollection<ContainerDisplayItem> Containers { get; } = [];
+    public ListCollectionView GroupedContainers { get; private set; } = null!;
 
     [ObservableProperty]
     public partial ContainerDisplayItem? SelectedContainer { get; set; }
@@ -50,9 +55,10 @@ public sealed partial class StorageManagerViewModel(
 
     public void Load()
     {
-        BaseUrl = webCompanionSettings.Value.BaseUrl;
+        BaseUrl = webCompanionSettings.CurrentValue.BaseUrl;
+        var previousSelectedId = SelectedContainer?.Id;
         Containers.Clear();
-        foreach (var c in containerService.GetAll())
+        foreach (var c in containerService.GetAll().OrderBy(c => c.ContainerType).ThenBy(c => c.Name))
         {
             Containers.Add(new ContainerDisplayItem
             {
@@ -63,6 +69,14 @@ public sealed partial class StorageManagerViewModel(
                 CardCount = containerService.GetCardCount(c.Id),
             });
         }
+
+        GroupedContainers = new ListCollectionView(Containers);
+        GroupedContainers.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ContainerDisplayItem.TypeDisplay)));
+        OnPropertyChanged(nameof(GroupedContainers));
+
+        // Restore selection if the item still exists
+        if (previousSelectedId is not null)
+            SelectedContainer = Containers.FirstOrDefault(c => c.Id == previousSelectedId);
     }
 
     [RelayCommand]
@@ -136,18 +150,63 @@ public sealed partial class StorageManagerViewModel(
         var cardCount = containerService.GetCardCount(SelectedContainer.Id);
         if (cardCount > 0)
         {
+            // Ask user: move to Bulk or delete all items?
             var result = System.Windows.MessageBox.Show(
-                $"\"{SelectedContainer.Name}\" contains {cardCount} card(s). They will be moved to Bulk.\n\nContinue?",
+                $"\"{SelectedContainer.Name}\" contains {cardCount} card(s).\n\n" +
+                "Yes = Move cards to Bulk and delete location\n" +
+                "No = Delete all cards and location\n" +
+                "Cancel = Keep location",
                 "Delete Location",
-                System.Windows.MessageBoxButton.YesNo,
+                System.Windows.MessageBoxButton.YesNoCancel,
                 System.Windows.MessageBoxImage.Warning);
-            if (result != System.Windows.MessageBoxResult.Yes)
+
+            if (result == System.Windows.MessageBoxResult.Cancel)
                 return;
+
+            if (result == System.Windows.MessageBoxResult.No)
+            {
+                // Double-confirm before deleting all cards
+                var confirm = System.Windows.MessageBox.Show(
+                    $"Are you sure you want to permanently delete {cardCount} card(s) from \"{SelectedContainer.Name}\"?\n\nThis cannot be undone.",
+                    "Confirm Delete All Cards",
+                    System.Windows.MessageBoxButton.YesNo,
+                    System.Windows.MessageBoxImage.Exclamation);
+                if (confirm != System.Windows.MessageBoxResult.Yes)
+                    return;
+
+                containerService.Delete(SelectedContainer.Id, moveCardsToBulk: false);
+            }
+            else
+            {
+                containerService.Delete(SelectedContainer.Id, moveCardsToBulk: true);
+            }
+        }
+        else
+        {
+            containerService.Delete(SelectedContainer.Id);
         }
 
-        containerService.Delete(SelectedContainer.Id);
         SelectedContainer = null;
         Load();
+    }
+
+    [RelayCommand]
+    public void UseMyIp()
+    {
+        try
+        {
+            using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            socket.Connect("8.8.8.8", 80);
+            var localIp = ((IPEndPoint)socket.LocalEndPoint!).Address.ToString();
+            BaseUrl = $"http://{localIp}/";
+        }
+        catch
+        {
+            // Fallback: scan network interfaces
+            var host = Dns.GetHostEntry(Dns.GetHostName());
+            var ip = host.AddressList.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork);
+            BaseUrl = ip is not null ? $"http://{ip}/" : "http://localhost/";
+        }
     }
 
     [RelayCommand]

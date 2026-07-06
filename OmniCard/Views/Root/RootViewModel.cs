@@ -87,6 +87,7 @@ public sealed partial class RootViewModel(
 
     // Storage container selection
     public ObservableCollection<StorageContainer> AvailableContainers { get; } = [];
+    public ListCollectionView GroupedContainers { get; private set; } = null!;
 
     [ObservableProperty]
     public partial StorageContainer? ActiveContainer { get; set; }
@@ -116,11 +117,16 @@ public sealed partial class RootViewModel(
     {
         var previousActiveId = ActiveContainer?.Id;
         AvailableContainers.Clear();
-        foreach (var c in containerService.GetAll())
+        foreach (var c in containerService.GetAll().OrderBy(c => c.ContainerType).ThenBy(c => c.Name))
             AvailableContainers.Add(c);
+
+        GroupedContainers = new ListCollectionView(AvailableContainers);
+        GroupedContainers.GroupDescriptions.Add(new PropertyGroupDescription(nameof(StorageContainer.ContainerType)));
+        OnPropertyChanged(nameof(GroupedContainers));
+
         // Restore previous selection, or default to Bulk
         ActiveContainer = AvailableContainers.FirstOrDefault(c => c.Id == previousActiveId)
-            ?? AvailableContainers.FirstOrDefault(c => c.IsSystem);
+            ?? AvailableContainers.FirstOrDefault(c => c.ContainerType == ContainerType.Bulk);
 
         // Keep the collection VM's container list in sync
         Collection.LoadContainers();
