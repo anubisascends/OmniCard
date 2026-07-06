@@ -850,6 +850,7 @@ public sealed partial class RootViewModel(
 
         IsEbayConnected = ebayAuthService.IsConnected;
         InvalidateHomeTab();
+        RefreshDiagnosticCount();
     }
 
     [RelayCommand]
@@ -1025,7 +1026,6 @@ public sealed partial class RootViewModel(
         {
             _logger.LogWarning(ex, "Failed to record match confirmation for {Hash:X16}", card.Hash);
         }
-        try { _diagnosticService.LogUserConfirmed(card.Hash, card); } catch { }
 
         // Record fix for flagged cards
         if (card.IsFlagged)
@@ -1063,6 +1063,8 @@ public sealed partial class RootViewModel(
             Confidence = 100,
             Source = match.Source
         };
+
+        try { _diagnosticService.LogUserConfirmed(card.Hash, card); } catch { }
 
         Message = $"Confirmed match for \"{match.Name}\".";
     }
