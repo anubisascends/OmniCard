@@ -299,7 +299,7 @@ public sealed class CardSevice : ICardService
 
         var flagReason = match is null
             ? FlagReason.NoMatch
-            : match.Confidence is not null and < 20
+            : match.Confidence is not null and < 15
                 ? FlagReason.VeryLowConfidence
                 : FlagReason.None;
 
@@ -362,7 +362,7 @@ public sealed class CardSevice : ICardService
                         // Clear auto-flag if OCR improved the match above the threshold
                         if (scannedCard.FlagReason is FlagReason.NoMatch or FlagReason.VeryLowConfidence)
                         {
-                            if (ocrMatch.Confidence is null or >= 20)
+                            if (ocrMatch.Confidence is null or >= 15)
                             {
                                 scannedCard.FlagReason = FlagReason.None;
                                 _logger.LogInformation("Auto-flag cleared after OCR improvement");

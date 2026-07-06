@@ -108,7 +108,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         (0.10, 0.10, 0.80, 0.42), // Retro (pre-8th edition)
     ];
 
-    public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 10)
+    public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14)
     {
         _logger.LogDebug("Finding closest match for pHash {Hash:X16} (set filter: {SetFilter}, max distance: {MaxDistance})", imageHash, setFilter is not null ? string.Join(",", setFilter) : "none", maxDistance);
 
@@ -427,7 +427,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         }
 
         // Phase 3: Confident hash — if distance is low, return immediately
-        const int ConfidentHashThreshold = 6;
+        const int ConfidentHashThreshold = 8;
         if (bestPHashDistance <= ConfidentHashThreshold)
         {
             var confidence = Math.Max(0, (1.0 - (double)bestPHashDistance / maxDistance)) * 100;

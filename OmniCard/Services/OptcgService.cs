@@ -279,7 +279,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
         }
     }
 
-    public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 10)
+    public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14)
     {
         _logger.LogDebug("Finding closest OPTCG match for pHash {Hash:X16} (set filter: {SetFilter}, max distance: {MaxDistance})", imageHash, setFilter is not null ? string.Join(",", setFilter) : "none", maxDistance);
         LastMatchDiagnostics = new MatchDiagnostics { SetFilterActive = setFilter is not null };
