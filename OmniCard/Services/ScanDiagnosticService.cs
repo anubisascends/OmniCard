@@ -175,7 +175,7 @@ public class ScanDiagnosticService(IDbContextFactory<CollectionDbContext> dbCont
 
         try
         {
-            var payload = JsonDocument.Parse(scanEvent.Payload);
+            using var payload = JsonDocument.Parse(scanEvent.Payload);
             if (payload.RootElement.TryGetProperty("tieZoneCandidates", out var candidates))
             {
                 foreach (var candidate in candidates.EnumerateArray())

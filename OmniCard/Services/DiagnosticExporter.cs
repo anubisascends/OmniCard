@@ -56,7 +56,7 @@ public class DiagnosticExporter(List<ScanDiagnosticEvent> events)
                 if (scanEvt is null) continue;
 
                 totalScans++;
-                var scanPayload = JsonDocument.Parse(scanEvt.Payload);
+                using var scanPayload = JsonDocument.Parse(scanEvt.Payload);
 
                 sb.AppendLine($"--- CARD: scan_hash=0x{cardGroup.Key:X16} ---");
                 RenderScanResult(sb, scanEvt, scanPayload);
@@ -71,7 +71,7 @@ public class DiagnosticExporter(List<ScanDiagnosticEvent> events)
                 var userActions = cardEvents.Where(e => e.EventType != "ScanCompleted").ToList();
                 foreach (var action in userActions)
                 {
-                    var actionPayload = JsonDocument.Parse(action.Payload);
+                    using var actionPayload = JsonDocument.Parse(action.Payload);
                     RenderUserAction(sb, action, actionPayload);
                 }
 
@@ -89,7 +89,7 @@ public class DiagnosticExporter(List<ScanDiagnosticEvent> events)
                     if (confidence.HasValue) correctedConfidenceSum += confidence.Value;
 
                     var correctEvt = userActions.First(e => e.EventType == "UserCorrected");
-                    var correctPayload = JsonDocument.Parse(correctEvt.Payload);
+                    using var correctPayload = JsonDocument.Parse(correctEvt.Payload);
                     var wasInTieZone = GetBool(correctPayload, "wasInTieZone");
                     if (wasInTieZone == true) correctedInTieZone++;
                     else correctedNotInTieZone++;
