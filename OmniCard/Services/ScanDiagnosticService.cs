@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
@@ -113,8 +114,14 @@ public class ScanDiagnosticService(IDbContextFactory<CollectionDbContext> dbCont
 
     public void ExportDiagnostics(string filePath)
     {
-        // TODO: Implement using DiagnosticExporter (Task 5)
-        throw new NotImplementedException("DiagnosticExporter not yet implemented (Task 5).");
+        using var ctx = dbContextFactory.CreateDbContext();
+        var events = ctx.ScanDiagnosticEvents
+            .AsNoTracking()
+            .OrderBy(e => e.Timestamp)
+            .ToList();
+
+        var exporter = new DiagnosticExporter(events);
+        File.WriteAllText(filePath, exporter.Render());
     }
 
     public void ClearDiagnostics()
