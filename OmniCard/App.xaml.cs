@@ -67,6 +67,7 @@ public partial class App : Application
             services.AddSingleton<IOcrMatchingService, OcrMatchingService>();
             services.AddSingleton<ICardService, CardSevice>();
             services.AddSingleton<ScanImageCache>();
+            services.AddSingleton<CardArtCache>();
             services.AddHttpClient();
 
             // Register data path service
@@ -230,6 +231,10 @@ public partial class App : Application
             // Initialize scan image cache
             var scanImageCache = Host.Services.GetRequiredService<ScanImageCache>();
             ScanImageCache.Initialize(scanImageCache);
+
+            // Initialize card art cache
+            var cardArtCache = Host.Services.GetRequiredService<CardArtCache>();
+            CardArtCache.Initialize(cardArtCache);
 
             // Clean up temp scan files from previous sessions (crash recovery)
             var tempScansDir = scanImageCache.TempScansDirectory;
