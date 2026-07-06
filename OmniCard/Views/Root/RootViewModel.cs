@@ -740,8 +740,8 @@ public sealed partial class RootViewModel(
                         card.FlagReason = FlagReason.None;
                     }
 
-                    card.Match = value;
                     try { _diagnosticService.LogUserCorrected(card.Hash, card, value); } catch { }
+                    card.Match = value;
 
                     try
                     {
@@ -983,8 +983,8 @@ public sealed partial class RootViewModel(
                 card.FlagReason = FlagReason.None;
             }
 
-            card.Match = newMatch;
             try { _diagnosticService.LogUserCorrected(card.Hash, card, newMatch); } catch { }
+            card.Match = newMatch;
 
             // Record correction for each unique hash
             if (oldMatch?.GameSpecificId != newMatch.GameSpecificId)
@@ -1049,6 +1049,8 @@ public sealed partial class RootViewModel(
             card.FlagReason = FlagReason.None;
         }
 
+        try { _diagnosticService.LogUserConfirmed(card.Hash, card); } catch { }
+
         // Replace Match with 100% confidence so the UI updates
         card.Match = new CardMatch
         {
@@ -1063,8 +1065,6 @@ public sealed partial class RootViewModel(
             Confidence = 100,
             Source = match.Source
         };
-
-        try { _diagnosticService.LogUserConfirmed(card.Hash, card); } catch { }
 
         Message = $"Confirmed match for \"{match.Name}\".";
     }
