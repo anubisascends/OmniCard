@@ -230,15 +230,6 @@ public class SealedProductService(IDbContextFactory<SealedProductDbContext> dbCo
         return template.Id;
     }
 
-    private static string FormatProductType(SealedProductType type) => type switch
-    {
-        SealedProductType.Case => "Case",
-        SealedProductType.BoosterBox => "Booster Box",
-        SealedProductType.CollectorBoosterPack => "Collector Booster Pack",
-        SealedProductType.BoosterPack => "Booster Pack",
-        SealedProductType.PromoPack => "Promo Pack",
-        SealedProductType.FixedPack => "Fixed Pack",
-        SealedProductType.Card => "Card",
-        _ => type.ToString(),
-    };
+    private static string FormatProductType(SealedProductType type) =>
+        SealedProductArchetypeRegistry.GetDisplayName(type);
 }

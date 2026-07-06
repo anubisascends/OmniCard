@@ -213,6 +213,7 @@ public partial class App : Application
             using (var sealedCtx = Host.Services.GetRequiredService<IDbContextFactory<SealedProductDbContext>>().CreateDbContext())
             {
                 sealedCtx.Database.EnsureCreated();
+                MigrateSealedProductEnumValues(sealedCtx);
             }
 
             splash.SetStatus("Loading collection data...");
@@ -474,5 +475,13 @@ public partial class App : Application
             ctx.SaveChanges();
             logger.LogInformation("Backfilled Color/CardType for {Count} cards", filled);
         }
+    }
+
+    private static void MigrateSealedProductEnumValues(SealedProductDbContext ctx)
+    {
+        ctx.Database.ExecuteSqlRaw(
+            "UPDATE Templates SET ProductType = 'Bundle' WHERE ProductType = 'BundleBox'");
+        ctx.Database.ExecuteSqlRaw(
+            "UPDATE TemplateContents SET ChildProductType = 'Bundle' WHERE ChildProductType = 'BundleBox'");
     }
 }
