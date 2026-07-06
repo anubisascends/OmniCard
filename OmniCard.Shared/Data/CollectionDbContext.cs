@@ -9,6 +9,7 @@ public class CollectionDbContext : DbContext
     public DbSet<StorageContainer> StorageContainers => Set<StorageContainer>();
     public DbSet<MismatchLog> MismatchLogs => Set<MismatchLog>();
     public DbSet<FlagResolution> FlagResolutions => Set<FlagResolution>();
+    public DbSet<ScanDiagnosticEvent> ScanDiagnosticEvents => Set<ScanDiagnosticEvent>();
 
     public CollectionDbContext(DbContextOptions<CollectionDbContext> options) : base(options) { }
 
@@ -56,6 +57,15 @@ public class CollectionDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(f => f.CollectionCardId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ScanDiagnosticEvent>(e =>
+        {
+            e.HasKey(d => d.Id);
+            e.Property(d => d.Id).ValueGeneratedOnAdd();
+            e.HasIndex(d => d.ScanHash);
+            e.HasIndex(d => d.SessionId);
+            e.HasIndex(d => d.EventType);
         });
     }
 }

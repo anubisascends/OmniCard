@@ -123,6 +123,21 @@ public sealed class CardSevice : ICardService
             );
             """);
 
+        ctx.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "ScanDiagnosticEvents" (
+                "Id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                "SessionId" TEXT NOT NULL DEFAULT '',
+                "ScanHash" INTEGER NOT NULL DEFAULT 0,
+                "EventType" TEXT NOT NULL DEFAULT '',
+                "Timestamp" TEXT NOT NULL DEFAULT '',
+                "Payload" TEXT NOT NULL DEFAULT ''
+            );
+            """);
+
+        // Add indexes if they don't exist (safe to repeat)
+        ctx.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_ScanDiagnosticEvents_ScanHash ON ScanDiagnosticEvents(ScanHash)");
+        ctx.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_ScanDiagnosticEvents_SessionId ON ScanDiagnosticEvents(SessionId)");
+
         _logger.LogInformation("Collection database ready at {DbPath}", dbPath);
 
         AvailableGames = _gameServices.Keys.OrderBy(g => g).ToList();
