@@ -139,4 +139,27 @@ public class SealedProductDbContextTests : IDisposable
 
         Assert.Throws<DbUpdateException>(() => ctx.SaveChanges());
     }
+
+    [Theory]
+    [InlineData(SealedProductType.PlayBoosterBox)]
+    [InlineData(SealedProductType.CollectorBoosterBox)]
+    [InlineData(SealedProductType.Bundle)]
+    [InlineData(SealedProductType.CommanderDeck)]
+    [InlineData(SealedProductType.SecretLair)]
+    [InlineData(SealedProductType.PrereleaseKit)]
+    public void NewProductTypes_RoundTripThroughDb(SealedProductType type)
+    {
+        using var ctx = new SealedProductDbContext(_options);
+
+        var template = new SealedProductTemplate
+        {
+            Name = $"Test {type}",
+            ProductType = type,
+        };
+        ctx.Templates.Add(template);
+        ctx.SaveChanges();
+
+        var loaded = ctx.Templates.First(t => t.Name == $"Test {type}");
+        Assert.Equal(type, loaded.ProductType);
+    }
 }

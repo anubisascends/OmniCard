@@ -251,6 +251,34 @@ public class SealedProductServiceTests : IDisposable
         Assert.Equal("Generic Booster Pack", template.Name);
     }
 
+    [Fact]
+    public void CreateTemplateFromArchetype_ThenCrack_ProducesCorrectChildren()
+    {
+        var service = CreateService();
+        var template = service.CreateTemplateFromArchetype(
+            SealedProductType.PlayBoosterBox, "mh3", "Modern Horizons 3", null);
+
+        var instance = service.AddInstance(template.Id, 180m);
+        var children = service.CrackInstance(instance.Id);
+
+        Assert.Equal(36, children.Count);
+        Assert.All(children, c => Assert.Equal(5m, c.PurchasePrice)); // 180 / 36 = 5
+    }
+
+    [Fact]
+    public void CreateTemplateFromArchetype_PrereleaseKit_CracksIntoMixedTypes()
+    {
+        var service = CreateService();
+        var template = service.CreateTemplateFromArchetype(
+            SealedProductType.PrereleaseKit, "mkm", "Murders at Karlov Manor", null);
+
+        var instance = service.AddInstance(template.Id, 35m);
+        var children = service.CrackInstance(instance.Id);
+
+        Assert.Equal(7, children.Count); // 6 play boosters + 1 promo
+        Assert.All(children, c => Assert.Equal(5m, c.PurchasePrice)); // 35 / 7 = 5
+    }
+
     private class MockFactory(DbContextOptions<SealedProductDbContext> options) : IDbContextFactory<SealedProductDbContext>
     {
         public SealedProductDbContext CreateDbContext() => new(options);
