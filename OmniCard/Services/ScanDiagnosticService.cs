@@ -56,7 +56,7 @@ public class ScanDiagnosticService(IDbContextFactory<CollectionDbContext> dbCont
 
     public void LogUserFlagged(ulong scanHash, ScannedCard card)
     {
-        var sessionId = LookupSessionId(scanHash);
+        var sessionId = EnsureScanEventExists(scanHash, card);
         var payload = new Dictionary<string, object?>
         {
             ["currentCardId"] = card.Match?.GameSpecificId,
@@ -70,7 +70,7 @@ public class ScanDiagnosticService(IDbContextFactory<CollectionDbContext> dbCont
 
     public void LogUserConfirmed(ulong scanHash, ScannedCard card)
     {
-        var sessionId = LookupSessionId(scanHash);
+        var sessionId = EnsureScanEventExists(scanHash, card);
         var payload = new Dictionary<string, object?>
         {
             ["confirmedCardId"] = card.Match?.GameSpecificId,
@@ -83,7 +83,7 @@ public class ScanDiagnosticService(IDbContextFactory<CollectionDbContext> dbCont
 
     public void LogUserCorrected(ulong scanHash, ScannedCard card, CardMatch newMatch)
     {
-        var sessionId = LookupSessionId(scanHash);
+        var sessionId = EnsureScanEventExists(scanHash, card);
         var wasInTieZone = CheckWasInTieZone(scanHash, newMatch.GameSpecificId);
         var payload = new Dictionary<string, object?>
         {
@@ -102,7 +102,7 @@ public class ScanDiagnosticService(IDbContextFactory<CollectionDbContext> dbCont
 
     public void LogUserUnflagged(ulong scanHash, ScannedCard card, FlagReason previousReason)
     {
-        var sessionId = LookupSessionId(scanHash);
+        var sessionId = EnsureScanEventExists(scanHash, card);
         var payload = new Dictionary<string, object?>
         {
             ["cardId"] = card.Match?.GameSpecificId,
@@ -149,6 +149,37 @@ public class ScanDiagnosticService(IDbContextFactory<CollectionDbContext> dbCont
             Payload = JsonSerializer.Serialize(payload, JsonOpts),
         });
         ctx.SaveChanges();
+    }
+
+    private string EnsureScanEventExists(ulong scanHash, ScannedCard card)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var existing = ctx.ScanDiagnosticEvents
+            .AsNoTracking()
+            .Where(e => e.ScanHash == scanHash && e.EventType == "ScanCompleted")
+            .OrderByDescending(e => e.Timestamp)
+            .FirstOrDefault();
+
+        if (existing is not null)
+            return existing.SessionId;
+
+        // Backfill a minimal ScanCompleted event from the ScannedCard
+        var payload = new Dictionary<string, object?>
+        {
+            ["matchedCardId"] = card.Match?.GameSpecificId,
+            ["matchedName"] = card.Match?.Name,
+            ["matchedSet"] = card.Match?.SetCode,
+            ["matchedNumber"] = card.Match?.CollectorNumber,
+            ["confidence"] = card.Match?.Confidence,
+            ["decisionPhase"] = "Backfilled",
+            ["pHashDistance"] = 0,
+            ["autoFlagReason"] = card.FlagReason.ToString(),
+            ["tieZoneCandidates"] = Array.Empty<object>(),
+        };
+
+        var sessionId = "backfilled";
+        LogEvent(sessionId, scanHash, "ScanCompleted", payload);
+        return sessionId;
     }
 
     private string LookupSessionId(ulong scanHash)
