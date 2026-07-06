@@ -856,6 +856,7 @@ public sealed partial class RootViewModel(
     [RelayCommand]
     public void Scan()
     {
+        if (IsAuditComplete) return;
         if (ConnectToScanner(false) ?? false)
         {
             _logger.LogInformation("User initiated scan");
@@ -1069,6 +1070,65 @@ public sealed partial class RootViewModel(
         Message = $"Confirmed match for \"{match.Name}\".";
     }
 
+    [RelayCommand]
+    public void ToggleAuditComplete()
+    {
+        if (!IsAuditComplete)
+        {
+            // --- Perform audit ---
+            var cards = CardService.ScannedCards
+                .Where(c => c.Match is not null)
+                .ToList();
+
+            if (cards.Count == 0) return;
+
+            _preAuditConfidences = new Dictionary<ScannedCard, double?>(cards.Count);
+
+            foreach (var card in cards)
+            {
+                _preAuditConfidences[card] = card.Match!.Confidence;
+                ConfirmMatch(card);
+            }
+
+            IsAuditComplete = true;
+            Message = $"Audit complete — confirmed {cards.Count} cards.";
+            _logger.LogInformation("Audit complete: confirmed {Count} cards", cards.Count);
+        }
+        else
+        {
+            // --- Undo audit ---
+            if (_preAuditConfidences is not null)
+            {
+                foreach (var (card, originalConfidence) in _preAuditConfidences)
+                {
+                    if (card.Match is null) continue;
+                    var match = card.Match;
+                    card.Match = new CardMatch
+                    {
+                        Name = match.Name,
+                        SetCode = match.SetCode,
+                        SetName = match.SetName,
+                        CollectorNumber = match.CollectorNumber,
+                        Rarity = match.Rarity,
+                        ImageUri = match.ImageUri,
+                        GameSpecificId = match.GameSpecificId,
+                        LocalImagePath = match.LocalImagePath,
+                        Confidence = originalConfidence,
+                        Source = match.Source
+                    };
+                }
+
+                var count = _preAuditConfidences.Count;
+                _preAuditConfidences.Clear();
+                _preAuditConfidences = null;
+                Message = $"Audit undone — reverted {count} cards.";
+                _logger.LogInformation("Audit undone: reverted {Count} cards", count);
+            }
+
+            IsAuditComplete = false;
+        }
+    }
+
     private void LogMismatchIfHighConfidence(ScannedCard card, CardMatch oldMatch, CardMatch newMatch)
     {
         if (oldMatch.Confidence is not >= 80) return;
@@ -1103,6 +1163,11 @@ public sealed partial class RootViewModel(
 
     [ObservableProperty]
     public partial bool IsCommitting { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsAuditComplete { get; set; }
+
+    private Dictionary<ScannedCard, double?>? _preAuditConfidences;
 
     [RelayCommand]
     public async Task CommitScans()
@@ -1142,6 +1207,11 @@ public sealed partial class RootViewModel(
             NotifySelectionChanged();
             CardService.ScannedCards.Clear();
 
+            // Clear audit state
+            _preAuditConfidences?.Clear();
+            _preAuditConfidences = null;
+            IsAuditComplete = false;
+
             _ = Collection.SearchCollection();
             InvalidateHomeTab();
             Message = $"Committed {count} cards to collection.";
@@ -1179,6 +1249,7 @@ public sealed partial class RootViewModel(
     [RelayCommand]
     public void ClearScans()
     {
+        if (IsAuditComplete) return;
         _logger.LogInformation("Clearing {Count} scanned cards from queue", CardService.ScannedCards.Count);
         ResetScanFilterSort();
         SelectedScannedCards = [];
@@ -1421,6 +1492,7 @@ public sealed partial class RootViewModel(
     [RelayCommand]
     public void ReprocessScans()
     {
+        if (IsAuditComplete) return;
         _logger.LogInformation("User initiated reprocess of unmatched scans");
         CardService.ReprocessScans();
         var matched = CardService.ScannedCards.Count(s => s.Match is not null);
