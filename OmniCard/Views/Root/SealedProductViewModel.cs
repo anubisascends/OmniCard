@@ -25,9 +25,6 @@ public sealed partial class SealedProductViewModel : ViewModel
     [ObservableProperty]
     public partial SealedProductInstance? SelectedInstance { get; set; }
 
-    [ObservableProperty]
-    public partial string UpcEntry { get; set; } = "";
-
     /// <summary>Set by RootViewModel to report status messages.</summary>
     public Action<string>? ReportMessage { get; set; }
 
@@ -42,50 +39,12 @@ public sealed partial class SealedProductViewModel : ViewModel
     }
 
     [RelayCommand]
-    public void AddByUpc()
+    public void AddProducts()
     {
-        if (string.IsNullOrWhiteSpace(UpcEntry)) return;
-
-        var template = _sealedProductService.FindTemplateByUpc(UpcEntry.Trim());
-        if (template is not null)
+        var added = _dialogService.OpenSealedProductEntry();
+        if (added is not null && added.Count > 0)
         {
-            // Template found — open add dialog pre-selected so user can set a price
-            var instance = _dialogService.AddSealedProduct(template);
-            if (instance is not null)
-            {
-                ReportMessage?.Invoke($"Added {instance.Template.Name}.");
-                UpcEntry = "";
-                LoadInstances();
-            }
-        }
-        else
-        {
-            // UPC not found — open template editor to create one with the UPC pre-filled
-            var newTemplate = _dialogService.EditSealedProductTemplate(new SealedProductTemplate
-            {
-                Upc = UpcEntry.Trim(),
-                ProductType = SealedProductType.BoosterBox,
-            });
-            if (newTemplate is not null)
-            {
-                var instance = _dialogService.AddSealedProduct(newTemplate);
-                if (instance is not null)
-                {
-                    ReportMessage?.Invoke($"Created and added {instance.Template.Name}.");
-                    UpcEntry = "";
-                    LoadInstances();
-                }
-            }
-        }
-    }
-
-    [RelayCommand]
-    public void AddByTemplate()
-    {
-        var instance = _dialogService.AddSealedProduct();
-        if (instance is not null)
-        {
-            ReportMessage?.Invoke($"Added {instance.Template.Name}.");
+            ReportMessage?.Invoke($"Added {added.Count} sealed product(s).");
             LoadInstances();
         }
     }

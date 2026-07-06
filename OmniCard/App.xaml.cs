@@ -134,8 +134,8 @@ public partial class App : Application
             services.AddTransient<OmniCard.Views.MoveToLocation.MoveToLocationViewModel>();
             services.AddTransient<SealedProductTemplateEditorView>();
             services.AddTransient<SealedProductTemplateEditorViewModel>();
-            services.AddTransient<AddSealedProductView>();
-            services.AddTransient<AddSealedProductViewModel>();
+            services.AddTransient<SealedProductEntryView>();
+            services.AddTransient<SealedProductEntryViewModel>();
             services.AddTransient<CrackProductView>();
             services.AddTransient<CrackProductViewModel>();
         })
