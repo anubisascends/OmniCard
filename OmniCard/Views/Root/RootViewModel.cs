@@ -1093,11 +1093,11 @@ public sealed partial class RootViewModel(
 
             if (cards.Count == 0) return;
 
-            _preAuditConfidences = new Dictionary<ScannedCard, double?>(cards.Count);
+            _preAuditSnapshots = new Dictionary<ScannedCard, AuditSnapshot>(cards.Count);
 
             foreach (var card in cards)
             {
-                _preAuditConfidences[card] = card.Match!.Confidence;
+                _preAuditSnapshots[card] = new AuditSnapshot(card.Match!.Confidence, card.FlagReason, card.FlagFix);
                 ConfirmMatch(card);
             }
 
@@ -1108,9 +1108,9 @@ public sealed partial class RootViewModel(
         else
         {
             // --- Undo audit ---
-            if (_preAuditConfidences is not null)
+            if (_preAuditSnapshots is not null)
             {
-                foreach (var (card, originalConfidence) in _preAuditConfidences)
+                foreach (var (card, snapshot) in _preAuditSnapshots)
                 {
                     if (card.Match is null) continue;
                     var match = card.Match;
@@ -1124,14 +1124,16 @@ public sealed partial class RootViewModel(
                         ImageUri = match.ImageUri,
                         GameSpecificId = match.GameSpecificId,
                         LocalImagePath = match.LocalImagePath,
-                        Confidence = originalConfidence,
+                        Confidence = snapshot.Confidence,
                         Source = match.Source
                     };
+                    card.FlagReason = snapshot.FlagReason;
+                    card.FlagFix = snapshot.FlagFix;
                 }
 
-                var count = _preAuditConfidences.Count;
-                _preAuditConfidences.Clear();
-                _preAuditConfidences = null;
+                var count = _preAuditSnapshots.Count;
+                _preAuditSnapshots.Clear();
+                _preAuditSnapshots = null;
                 Message = $"Audit undone — reverted {count} cards.";
                 _logger.LogInformation("Audit undone: reverted {Count} cards", count);
             }
@@ -1178,7 +1180,8 @@ public sealed partial class RootViewModel(
     [ObservableProperty]
     public partial bool IsAuditComplete { get; set; }
 
-    private Dictionary<ScannedCard, double?>? _preAuditConfidences;
+    private record struct AuditSnapshot(double? Confidence, FlagReason FlagReason, ScanFlagFix? FlagFix);
+    private Dictionary<ScannedCard, AuditSnapshot>? _preAuditSnapshots;
 
     [RelayCommand]
     public async Task CommitScans()
@@ -1219,8 +1222,8 @@ public sealed partial class RootViewModel(
             CardService.ScannedCards.Clear();
 
             // Clear audit state
-            _preAuditConfidences?.Clear();
-            _preAuditConfidences = null;
+            _preAuditSnapshots?.Clear();
+            _preAuditSnapshots = null;
             IsAuditComplete = false;
 
             _ = Collection.SearchCollection();
