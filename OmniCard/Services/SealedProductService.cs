@@ -249,7 +249,4 @@ public class SealedProductService(IDbContextFactory<SealedProductDbContext> dbCo
         ctx.SaveChanges();
         return template.Id;
     }
-
-    private static string FormatProductType(SealedProductType type) =>
-        SealedProductArchetypeRegistry.GetDisplayName(type);
 }

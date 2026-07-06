@@ -39,7 +39,6 @@ public sealed partial class SealedProductTemplateEditorViewModel(ISealedProductS
             Name = existing.Name;
             SetCode = existing.SetCode;
             Upc = existing.Upc;
-            ProductType = existing.ProductType;
             foreach (var c in existing.Contents)
             {
                 ContentLines.Add(new ContentLineItem
@@ -50,6 +49,7 @@ public sealed partial class SealedProductTemplateEditorViewModel(ISealedProductS
                     ChildTemplateName = c.ChildTemplate?.Name,
                 });
             }
+            ProductType = existing.ProductType;
         }
     }
 
