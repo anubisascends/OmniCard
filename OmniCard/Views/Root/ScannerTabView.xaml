@@ -125,7 +125,29 @@
                     </ComboBox>
                     <Separator/>
                     <Button Command="{Binding ViewModel.ScanCommand}"
-                            Content="Scan Cards..."/>
+                            Content="Scan Cards..."
+                            IsEnabled="{Binding ViewModel.IsAuditComplete, Converter={local:InverseBoolConverter}}"/>
+                    <Separator/>
+                    <Button Command="{Binding ViewModel.ToggleAuditCompleteCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button"
+                                   BasedOn="{StaticResource {x:Type Button}}">
+                                <Setter Property="Content"
+                                        Value="Audit Complete"/>
+                                <Setter Property="IsEnabled"
+                                        Value="{Binding ViewModel.HasMatchedScans}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ViewModel.IsAuditComplete}"
+                                                 Value="True">
+                                        <Setter Property="Content"
+                                                Value="Undo Audit"/>
+                                        <Setter Property="IsEnabled"
+                                                Value="True"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                     <Separator/>
                     <Button Command="{Binding ViewModel.CommitScansCommand}">
                         <Button.Style>
@@ -147,10 +169,12 @@
                     </Button>
                     <Separator/>
                     <Button Command="{Binding ViewModel.ReprocessScansCommand}"
-                            Content="Reprocess Unmatched"/>
+                            Content="Reprocess Unmatched"
+                            IsEnabled="{Binding ViewModel.IsAuditComplete, Converter={local:InverseBoolConverter}}"/>
                     <Separator/>
                     <Button Command="{Binding ViewModel.ClearScansCommand}"
-                            Content="Clear Queue"/>
+                            Content="Clear Queue"
+                            IsEnabled="{Binding ViewModel.IsAuditComplete, Converter={local:InverseBoolConverter}}"/>
                 </ToolBar>
             </ToolBarTray>
         </ToolBarPanel>

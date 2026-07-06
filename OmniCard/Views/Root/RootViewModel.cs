@@ -523,6 +523,9 @@ public sealed partial class RootViewModel(
         {
             NotifySelectionChanged();
         }
+
+        if (e.PropertyName is nameof(ScannedCard.Match))
+            OnPropertyChanged(nameof(HasMatchedScans));
     }
 
     // Scan filter/sort state
@@ -693,6 +696,7 @@ public sealed partial class RootViewModel(
         ScanHighConfidenceCount = cards.Count(c => c.Match?.Confidence is >= 80);
         ScanLowConfidenceCount = cards.Count(c => c.Match?.Confidence is not null and < 80);
         ScanFlaggedCount = cards.Count(c => c.FlagReason != FlagReason.None);
+        OnPropertyChanged(nameof(HasMatchedScans));
     }
 
     [ObservableProperty]
@@ -829,6 +833,10 @@ public sealed partial class RootViewModel(
             Collection.LoadOverview();
     }
 
+    public bool HasMatchedScans =>
+        CardService.ScannedCards.Count > 0 &&
+        CardService.ScannedCards.All(c => c.Match is not null);
+
     public void Initialize()
     {
         SelectedGame = CardService.SelectedGame;
@@ -842,6 +850,9 @@ public sealed partial class RootViewModel(
         // Wire Sealed delegates
         Sealed.ReportMessage = msg => Message = msg;
         Sealed.LoadInstances();
+
+        // Keep HasMatchedScans in sync with the ScannedCards collection
+        CardService.ScannedCards.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasMatchedScans));
 
         LoadAvailableSets();
         LoadContainers(); // also calls Collection.LoadContainers()
