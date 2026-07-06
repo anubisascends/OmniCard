@@ -5,6 +5,7 @@ namespace OmniCard.Services;
 public interface ICardGameService
 {
     CardGame Game { get; }
+    MatchDiagnostics? LastMatchDiagnostics { get; }
     Task DownloadBulkDataAsync(IProgress<string>? progress = null, CancellationToken ct = default);
     Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default);
     CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 10);

@@ -46,6 +46,8 @@ public sealed class OptcgService : ICardGameService, IDisposable
 
     public CardGame Game => CardGame.OnePiece;
 
+    public MatchDiagnostics? LastMatchDiagnostics { get; private set; }
+
     private List<(string CardSetId, ulong Hash)>? _hashCache;
     private Dictionary<string, string>? _hashSetLookup;
     private List<(ulong ScanHash, string CorrectCardId)>? _correctionsCache;
@@ -280,6 +282,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
     public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 10)
     {
         _logger.LogDebug("Finding closest OPTCG match for pHash {Hash:X16} (set filter: {SetFilter}, max distance: {MaxDistance})", imageHash, setFilter is not null ? string.Join(",", setFilter) : "none", maxDistance);
+        LastMatchDiagnostics = new MatchDiagnostics { SetFilterActive = setFilter is not null };
 
         if (_hashCache is null)
         {
@@ -318,6 +321,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
                 if (setFilter is null || setFilter.Contains(correctedCard.SetCode))
                 {
                     _logger.LogDebug("Exact OPTCG correction found for hash {Hash:X16} → {CardId}", imageHash, exactCorrection.CorrectCardId);
+                    LastMatchDiagnostics.DecisionPhase = "ExactCorrection";
                     return correctedCard;
                 }
                 _logger.LogDebug("Exact OPTCG correction for hash {Hash:X16} → {CardId} rejected by set filter (set {Set})", imageHash, exactCorrection.CorrectCardId, correctedCard.SetCode);
@@ -328,6 +332,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
         if (_hashCache.Count == 0)
         {
             _logger.LogWarning("OPTCG hash cache is empty, no cards to match against");
+            LastMatchDiagnostics.DecisionPhase = "NoMatch";
             return null;
         }
 
@@ -378,13 +383,18 @@ public sealed class OptcgService : ICardGameService, IDisposable
             var correctionConfidence = Math.Max(0, (1.0 - (double)bestCorrectionAdjusted / maxDistance)) * 100;
             var correctedCard = LookupOptcgCard(bestCorrectionCardId, correctionConfidence);
             if (correctedCard is not null)
+            {
+                LastMatchDiagnostics.DecisionPhase = "PHashConfident";
+                LastMatchDiagnostics.PHashDistance = bestCorrectionAdjusted;
                 return correctedCard;
+            }
         }
 
         // Phase 3: Threshold check
         if (bestPHashDistance > maxDistance)
         {
             _logger.LogDebug("Best OPTCG match distance {Distance} exceeds max {MaxDistance}, no match", bestPHashDistance, maxDistance);
+            LastMatchDiagnostics.DecisionPhase = "NoMatch";
             return null;
         }
 
@@ -395,14 +405,21 @@ public sealed class OptcgService : ICardGameService, IDisposable
             if (bestSetCode is null || !setFilter.Contains(bestSetCode))
             {
                 _logger.LogDebug("Best OPTCG match {CardId} is in set {Set} which is outside the set filter; rejecting", bestPHashId, bestSetCode ?? "(unknown)");
+                LastMatchDiagnostics.DecisionPhase = "NoMatch";
                 return null;
             }
         }
 
         var card = _readContext.Cards.AsNoTracking().FirstOrDefault(c => c.CardSetId == bestPHashId);
         _logger.LogDebug("Best OPTCG match: {CardName} with Hamming distance {Distance}", card?.CardName, bestPHashDistance);
-        if (card is null) return null;
+        if (card is null)
+        {
+            LastMatchDiagnostics.DecisionPhase = "NoMatch";
+            return null;
+        }
 
+        LastMatchDiagnostics.DecisionPhase = "PHashConfident";
+        LastMatchDiagnostics.PHashDistance = bestPHashDistance;
         var confidence = Math.Max(0, (1.0 - (double)bestPHashDistance / maxDistance)) * 100;
         return new CardMatch
         {

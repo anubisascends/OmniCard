@@ -73,6 +73,9 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
 
     public IQueryable<Card> Cards => _readContext.Cards.AsNoTracking();
 
+    private MatchDiagnostics? _lastMatchDiagnostics;
+    public MatchDiagnostics? LastMatchDiagnostics => _lastMatchDiagnostics;
+
     private List<(Guid Id, ulong Hash)>? _hashCache;
     private List<(Guid Id, ulong ArtHash)>? _artHashCache;
     private Dictionary<Guid, string>? _hashSetLookup;
@@ -160,6 +163,13 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         var correctionsCache = _correctionsCache;
         var artHashCache = _artHashCache;
 
+        var diagnostics = new MatchDiagnostics
+        {
+            SetFilterActive = setFilter is not null,
+            ActiveSets = setFilter?.ToList(),
+            PreferredSets = preferredSets?.ToList(),
+        };
+
         // Phase 1: Exact correction lookup (specific scan hash → known card)
         var exactCorrection = correctionsCache.FirstOrDefault(c => c.ScanHash == imageHash);
         if (exactCorrection.CorrectCardId is not null && exactCorrection != default)
@@ -172,6 +182,19 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
                 if (setFilter is null || setFilter.Contains(correctedCard.SetCode))
                 {
                     _logger.LogDebug("Exact correction found for hash {Hash:X16} → {CardId}", imageHash, exactCorrection.CorrectCardId);
+                    diagnostics.DecisionPhase = "ExactCorrection";
+                    diagnostics.PHashDistance = 0;
+                    diagnostics.TieZoneCandidates = [new TieZoneCandidate
+                    {
+                        CardId = correctedCard.GameSpecificId,
+                        Name = correctedCard.Name,
+                        SetCode = correctedCard.SetCode,
+                        CollectorNumber = correctedCard.CollectorNumber,
+                        PHashDistance = 0,
+                        FinalScore = 0,
+                        Selected = true,
+                    }];
+                    _lastMatchDiagnostics = diagnostics;
                     return correctedCard;
                 }
                 _logger.LogDebug("Exact correction for hash {Hash:X16} → {CardId} rejected by set filter (set {Set})", imageHash, exactCorrection.CorrectCardId, correctedCard.SetCode);
@@ -182,6 +205,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         if (hashCache.Count == 0)
         {
             _logger.LogWarning("Hash cache is empty, no cards to match against");
+            _lastMatchDiagnostics = diagnostics;
             return null;
         }
 
@@ -201,6 +225,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         if (bestPHashDistance == int.MaxValue)
         {
             _logger.LogDebug("No cards matched the set filter");
+            _lastMatchDiagnostics = diagnostics;
             return null;
         }
 
@@ -214,6 +239,9 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
             if (distance <= bestPHashDistance + TieZone)
                 pHashCandidates.Add((id, distance));
         }
+
+        // Build diagnostic tie zone snapshot (before bonuses/penalties modify distances)
+        var diagnosticCandidateIds = pHashCandidates.Select(c => c.Id).ToHashSet();
 
         // Soft-weight preferred sets: apply a distance bonus to candidates from detected symbol sets.
         // This breaks ties among reprints with identical art without eliminating non-preferred sets.
@@ -313,6 +341,47 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
                 .First().Id;
         }
 
+        // Capture tie zone diagnostics with final adjusted distances
+        foreach (var (id, dist) in pHashCandidates)
+        {
+            if (!diagnosticCandidateIds.Contains(id)) continue;
+            var cardInfo = _readContext.Cards.AsNoTracking()
+                .Where(c => c.Id == id)
+                .Select(c => new { c.Name, c.SetCode, c.CollectorNumber })
+                .FirstOrDefault();
+            if (cardInfo is null) continue;
+
+            // Compute art hash distance for this candidate if available
+            int? artDist = null;
+            if (artHashes is not null && artHashCache.Count > 0)
+            {
+                var artLookup2 = artHashCache.FirstOrDefault(a => a.Id == id);
+                if (artLookup2 != default)
+                {
+                    artDist = artHashes.Where(h => h != 0)
+                        .Select(h => PerceptualHashService.HammingDistance(h, artLookup2.ArtHash))
+                        .DefaultIfEmpty(int.MaxValue)
+                        .Min();
+                    if (artDist == int.MaxValue) artDist = null;
+                }
+            }
+
+            var originalHash = hashCache.First(h => h.Id == id).Hash;
+            var rawPHash = PerceptualHashService.HammingDistance(imageHash, originalHash);
+            diagnostics.TieZoneCandidates.Add(new TieZoneCandidate
+            {
+                CardId = id.ToString(),
+                Name = cardInfo.Name,
+                SetCode = cardInfo.SetCode,
+                CollectorNumber = cardInfo.CollectorNumber,
+                PHashDistance = rawPHash,
+                ArtHashDistance = artDist,
+                SetBonus = dist - rawPHash,
+                FinalScore = dist,
+                Selected = id == bestPHashId,
+            });
+        }
+
         // Phase 2b: Fuzzy correction matching — nearby confirmed hashes boost confidence
         // If the user previously confirmed a match for a similar scan hash,
         // that correction's card gets a trust bonus that can outweigh the pHash winner.
@@ -365,7 +434,25 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
             _logger.LogDebug("Confident hash match at distance {Distance} (confidence {Confidence:F0}%)", bestPHashDistance, confidence);
             var confidentCard = LookupCard(bestPHashId, confidence);
             if (confidentCard is not null)
+            {
+                diagnostics.DecisionPhase = "PHashConfident";
+                diagnostics.PHashDistance = bestPHashDistance;
+                _lastMatchDiagnostics = diagnostics;
                 return confidentCard;
+            }
+        }
+
+        // Capture OCR diagnostics regardless of whether OCR phase runs
+        if (ocrResult is not null)
+        {
+            diagnostics.OcrRecognizedName = ocrResult.RecognizedName;
+            diagnostics.OcrNameConfidence = ocrResult.NameConfidence;
+            if (ocrResult.CandidateSetCodes is { Count: > 0 })
+            {
+                diagnostics.OcrDetectedSets = ocrResult.CandidateSetCodes
+                    .Select(s => new OcrSetDetection { SetCode = s, Confidence = ocrResult.SymbolConfidence })
+                    .ToList();
+            }
         }
 
         // Phase 4: OCR-assisted scoring (only when pHash isn't confident)
@@ -415,6 +502,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
                 {
                     bestPHashId = best.Id;
                     _logger.LogDebug("OCR scoring winner: {Id} (score {Score:F2})", best.Id, best.Score);
+                    diagnostics.DecisionPhase = "OcrAssisted";
                 }
             }
         }
@@ -423,6 +511,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         if (bestPHashDistance > maxDistance)
         {
             _logger.LogDebug("Best distance {Distance} exceeds max {MaxDistance}", bestPHashDistance, maxDistance);
+            _lastMatchDiagnostics = diagnostics;
             return null;
         }
 
@@ -433,18 +522,31 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
             if (!hashSetLookup!.TryGetValue(bestPHashId, out var finalSetCode) || !setFilter.Contains(finalSetCode))
             {
                 _logger.LogDebug("Best match {CardId} is in set {Set} which is outside the set filter; rejecting", bestPHashId, finalSetCode ?? "(unknown)");
+                _lastMatchDiagnostics = diagnostics;
                 return null;
             }
         }
 
         var card = _readContext.Cards.AsNoTracking().FirstOrDefault(c => c.Id == bestPHashId);
         _logger.LogDebug("Best match: {CardName}", card?.Name);
-        if (card is null) return null;
+        if (card is null)
+        {
+            _lastMatchDiagnostics = diagnostics;
+            return null;
+        }
 
         // Confidence is always based on pHash distance of the winning card
         var winnerHash = hashCache.FirstOrDefault(h => h.Id == bestPHashId).Hash;
         var winnerDistance = winnerHash != 0 ? PerceptualHashService.HammingDistance(imageHash, winnerHash) : maxDistance;
         var matchConfidence = Math.Max(0, (1.0 - (double)winnerDistance / maxDistance)) * 100;
+
+        if (diagnostics.DecisionPhase == "NoMatch")
+            diagnostics.DecisionPhase = bestPHashDistance <= maxDistance ? "PHashConfident" : "ArtHashFallback";
+        diagnostics.PHashDistance = winnerDistance;
+        // Mark the selected candidate
+        foreach (var tc in diagnostics.TieZoneCandidates)
+            tc.Selected = tc.CardId == bestPHashId.ToString();
+        _lastMatchDiagnostics = diagnostics;
 
         return new CardMatch
         {

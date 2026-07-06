@@ -204,6 +204,7 @@ public class FallbackMatchingTests : IDisposable
     private class StubGameService(CardGame game, CardMatch? match) : ICardGameService
     {
         public CardGame Game => game;
+        public MatchDiagnostics? LastMatchDiagnostics => null;
         public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 10) => match;
         public decimal? GetCurrentPrice(string gameCardId, bool isFoil) => null;
         public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil) => [];
