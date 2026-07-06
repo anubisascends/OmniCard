@@ -209,7 +209,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
             return null;
         }
 
-        const int TieZone = 4;
+        const int TieZone = 2;
         int bestPHashDistance = int.MaxValue;
 
         foreach (var (id, hash) in hashCache)
@@ -270,6 +270,15 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
                 if (hashSetLookup.TryGetValue(id, out var setCode) && DeprioritizedSets.Contains(setCode))
                     pHashCandidates[i] = (id, dist + DeprioritizedSetPenalty);
             }
+        }
+
+        // Cap tie zone to top 10 candidates by distance
+        if (pHashCandidates.Count > 10)
+        {
+            pHashCandidates = pHashCandidates
+                .OrderBy(c => c.Distance)
+                .Take(10)
+                .ToList();
         }
 
         // Art hash disambiguation among tie-zone candidates

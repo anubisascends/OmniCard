@@ -109,10 +109,11 @@ public class ScryfallCorrectionTests : IDisposable
         var svc = CreateService();
         var cardBId = "00000000-0000-0000-0000-000000000002";
 
-        // Record correction: hash 0x03 → Card B
-        // Scan hash 0x01: distance to Card A (0x00) = 1, which is within confident threshold (<=6)
-        // Confident hash match returns Card A, fuzzy corrections are not consulted
-        svc.RecordCorrection(0x0000000000000003UL, cardBId);
+        // Record correction: hash 0xFF → Card B
+        // Scan hash 0x01: distance to Card A (0x00) = 1 (pHash winner)
+        // Correction at 0xFF is distance 7 from scan, adjusted = 7 - CorrectionTrustBonus(5) = 2
+        // Adjusted dist 2 > pHash dist 1, so pHash match Card A still wins
+        svc.RecordCorrection(0x00000000000000FFUL, cardBId);
 
         var match = svc.FindClosestMatch(0x0000000000000001UL);
         Assert.NotNull(match);
