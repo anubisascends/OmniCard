@@ -46,7 +46,8 @@ public class CardServiceCollectionTests : IDisposable
             new StubOcrService(),
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
             NullLogger<CardSevice>.Instance,
-            new DataPathService(Path.GetTempPath()));
+            new DataPathService(Path.GetTempPath()),
+            new NullScanDiagnosticService());
 
         var results = new ObservableCollection<CollectionCard>();
         service.SearchCollection("", null, results);
@@ -71,7 +72,8 @@ public class CardServiceCollectionTests : IDisposable
             new StubOcrService(),
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
             NullLogger<CardSevice>.Instance,
-            new DataPathService(Path.GetTempPath()));
+            new DataPathService(Path.GetTempPath()),
+            new NullScanDiagnosticService());
 
         var results = new ObservableCollection<CollectionCard>();
         service.SearchCollection("", CardGame.OnePiece, results);
@@ -97,7 +99,8 @@ public class CardServiceCollectionTests : IDisposable
             new StubOcrService(),
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
             NullLogger<CardSevice>.Instance,
-            new DataPathService(Path.GetTempPath()));
+            new DataPathService(Path.GetTempPath()),
+            new NullScanDiagnosticService());
 
         var results = new ObservableCollection<CollectionCard>();
         service.SearchCollection("Lightning", null, results);
@@ -116,7 +119,8 @@ public class CardServiceCollectionTests : IDisposable
             new StubOcrService(),
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
             NullLogger<CardSevice>.Instance,
-            new DataPathService(Path.GetTempPath()));
+            new DataPathService(Path.GetTempPath()),
+            new NullScanDiagnosticService());
 
         var scans = new[]
         {
@@ -158,7 +162,8 @@ public class CardServiceCollectionTests : IDisposable
             new StubOcrService(),
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
             NullLogger<CardSevice>.Instance,
-            new DataPathService(Path.GetTempPath()));
+            new DataPathService(Path.GetTempPath()),
+            new NullScanDiagnosticService());
 
         var scans = new[]
         {
@@ -232,6 +237,18 @@ public class CardServiceCollectionTests : IDisposable
         public Dictionary<string, ulong> SymbolHashes { get; set; } = [];
         public Task<OcrMatchResult> AnalyzeCardAsync(byte[] imageData) => Task.FromResult(new OcrMatchResult());
         public (List<string> SetCodes, double Confidence) DetectSetSymbol(byte[] imageData) => ([], 0);
+    }
+
+    private class NullScanDiagnosticService : IScanDiagnosticService
+    {
+        public void LogScanCompleted(string sessionId, ulong scanHash, CardMatch? match, MatchDiagnostics? diagnostics, ulong[]? artHashes, OcrMatchResult? ocrResult, FlagReason autoFlagReason) { }
+        public void LogUserFlagged(ulong scanHash, ScannedCard card) { }
+        public void LogUserConfirmed(ulong scanHash, ScannedCard card) { }
+        public void LogUserCorrected(ulong scanHash, ScannedCard card, CardMatch newMatch) { }
+        public void LogUserUnflagged(ulong scanHash, ScannedCard card, FlagReason previousReason) { }
+        public void ExportDiagnostics(string filePath) { }
+        public void ClearDiagnostics() { }
+        public int GetEventCount() => 0;
     }
 
     private class MockCollectionDbContextFactory(DbContextOptions<CollectionDbContext> options) : IDbContextFactory<CollectionDbContext>

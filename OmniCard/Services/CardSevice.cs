@@ -43,7 +43,8 @@ public interface ICardService
     List<MissingCard> GetMissingCardsForSet(CardGame game, string setCode);
     void RemoveTempFile(ScannedCard card);
     void ClearTempFiles();
-    (int FlagResolutions, int MismatchLogs) ClearDiagnosticLogs();
+    void StartNewDiagnosticSession();
+    (int FlagResolutions, int MismatchLogs, int DiagnosticEvents) ClearDiagnosticLogs();
     (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null);
 }
 
@@ -57,6 +58,8 @@ public sealed class CardSevice : ICardService
     private readonly ILogger<CardSevice> _logger;
     private readonly string _tempScansDir;
     private readonly IDataPathService _dataPathService;
+    private readonly IScanDiagnosticService _diagnosticService;
+    private string _currentSessionId = Guid.NewGuid().ToString();
 
     public CardSevice(
         IPerceptualHashService hashService,
@@ -65,7 +68,8 @@ public sealed class CardSevice : ICardService
         IOcrMatchingService ocrService,
         ScanImageCache imageCache,
         ILogger<CardSevice> logger,
-        IDataPathService dataPathService)
+        IDataPathService dataPathService,
+        IScanDiagnosticService diagnosticService)
     {
         _hashService = hashService;
         _gameServices = gameServices.ToDictionary(s => s.Game);
@@ -75,6 +79,7 @@ public sealed class CardSevice : ICardService
         _tempScansDir = imageCache.TempScansDirectory;
         _logger = logger;
         _dataPathService = dataPathService;
+        _diagnosticService = diagnosticService;
 
         // Ensure collection DB exists
         using var ctx = _collectionDbContextFactory.CreateDbContext();
@@ -155,6 +160,8 @@ public sealed class CardSevice : ICardService
     public ulong LastComputedHash { get; private set; }
 
     public ICardGameService GetGameService(CardGame game) => _gameServices[game];
+
+    public void StartNewDiagnosticSession() => _currentSessionId = Guid.NewGuid().ToString();
 
     public (CardMatch? Match, CardGame Game) FindBestMatch(ulong hash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null)
     {
@@ -307,6 +314,17 @@ public sealed class CardSevice : ICardService
             FlagReason = flagReason,
         };
 
+        // Log diagnostic event
+        try
+        {
+            var lastDiag = _gameServices.TryGetValue(game, out var gs) ? gs.LastMatchDiagnostics : null;
+            _diagnosticService.LogScanCompleted(_currentSessionId, hash, match, lastDiag, artHashes, null, flagReason);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to log scan diagnostic event");
+        }
+
         // Use BeginInvoke (non-blocking) for ALL UI thread work.
         // Dispatcher.Invoke deadlocks because TWAIN's message pump runs on the UI thread.
         var capturedHash = hash;
@@ -349,6 +367,14 @@ public sealed class CardSevice : ICardService
                                 _logger.LogInformation("Auto-flag cleared after OCR improvement");
                             }
                         }
+
+                        // Update diagnostic with OCR-improved match
+                        try
+                        {
+                            var ocrDiag = _gameServices.TryGetValue(ocrGame, out var gs2) ? gs2.LastMatchDiagnostics : null;
+                            _diagnosticService.LogScanCompleted(_currentSessionId, capturedHash, ocrMatch, ocrDiag, scannedCard.ArtHashes, ocrResult, scannedCard.FlagReason);
+                        }
+                        catch { }
                     }
                 }
             }
@@ -517,18 +543,20 @@ public sealed class CardSevice : ICardService
         _logger.LogInformation("Cleared temp scan files and image cache");
     }
 
-    public (int FlagResolutions, int MismatchLogs) ClearDiagnosticLogs()
+    public (int FlagResolutions, int MismatchLogs, int DiagnosticEvents) ClearDiagnosticLogs()
     {
         using var context = _collectionDbContextFactory.CreateDbContext();
         var flagCount = context.FlagResolutions.Count();
         var mismatchCount = context.MismatchLogs.Count();
+        var diagnosticCount = context.ScanDiagnosticEvents.Count();
 
         context.FlagResolutions.RemoveRange(context.FlagResolutions);
         context.MismatchLogs.RemoveRange(context.MismatchLogs);
+        context.ScanDiagnosticEvents.RemoveRange(context.ScanDiagnosticEvents);
         context.SaveChanges();
 
-        _logger.LogInformation("Cleared diagnostic logs: {FlagResolutions} flag resolutions, {MismatchLogs} mismatch logs", flagCount, mismatchCount);
-        return (flagCount, mismatchCount);
+        _logger.LogInformation("Cleared diagnostic logs: {FlagResolutions} flag resolutions, {MismatchLogs} mismatch logs, {DiagnosticEvents} diagnostic events", flagCount, mismatchCount, diagnosticCount);
+        return (flagCount, mismatchCount, diagnosticCount);
     }
 
     public (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null)

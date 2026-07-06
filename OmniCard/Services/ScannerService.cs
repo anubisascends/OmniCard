@@ -64,6 +64,7 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
             return;
         }
 
+        CardService.StartNewDiagnosticSession();
         ApplyScanSettings(DataSource);
         _logger.LogInformation("Starting scan on data source {DataSourceName} (quality={Quality})",
             DataSource.Name, ScanQuality);

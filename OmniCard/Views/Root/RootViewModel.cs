@@ -33,9 +33,11 @@ public sealed partial class RootViewModel(
     SealedProductViewModel sealedVm,
     IDbContextFactory<CollectionDbContext> collectionDbContextFactory,
     SetSymbolCache setSymbolCache,
+    IScanDiagnosticService diagnosticService,
     ILogger<RootViewModel> logger) : ViewModel
 {
     private readonly ILogger<RootViewModel> _logger = logger;
+    private readonly IScanDiagnosticService _diagnosticService = diagnosticService;
 
     /// <summary>The nested CollectionViewModel that owns all collection-specific state.</summary>
     public CollectionViewModel Collection { get; } = collection;
@@ -614,6 +616,7 @@ public sealed partial class RootViewModel(
             _scanSessionResetDone = true;
         }
         RefreshScanStats();
+        RefreshDiagnosticCount();
     }
 
     private static string SerializeMatchData(CardMatch? match)
@@ -639,6 +642,7 @@ public sealed partial class RootViewModel(
         if (card.FlagReason != FlagReason.None)
         {
             // Unflagging — record fix if no other fix was already recorded
+            var previousReason = card.FlagReason;
             if (card.FlagFix is null)
             {
                 card.FlagFix = new ScanFlagFix
@@ -650,10 +654,12 @@ public sealed partial class RootViewModel(
                 };
             }
             card.FlagReason = FlagReason.None;
+            try { _diagnosticService.LogUserUnflagged(card.Hash, card, card.FlagFix?.OriginalFlagReason ?? previousReason); } catch { }
         }
         else
         {
             card.FlagReason = FlagReason.Manual;
+            try { _diagnosticService.LogUserFlagged(card.Hash, card); } catch { }
         }
         ApplyScanView();
     }
@@ -735,6 +741,7 @@ public sealed partial class RootViewModel(
                     }
 
                     card.Match = value;
+                    try { _diagnosticService.LogUserCorrected(card.Hash, card, value); } catch { }
 
                     try
                     {
@@ -976,6 +983,7 @@ public sealed partial class RootViewModel(
             }
 
             card.Match = newMatch;
+            try { _diagnosticService.LogUserCorrected(card.Hash, card, newMatch); } catch { }
 
             // Record correction for each unique hash
             if (oldMatch?.GameSpecificId != newMatch.GameSpecificId)
@@ -1017,6 +1025,7 @@ public sealed partial class RootViewModel(
         {
             _logger.LogWarning(ex, "Failed to record match confirmation for {Hash:X16}", card.Hash);
         }
+        try { _diagnosticService.LogUserConfirmed(card.Hash, card); } catch { }
 
         // Record fix for flagged cards
         if (card.IsFlagged)
@@ -1207,7 +1216,7 @@ public sealed partial class RootViewModel(
     public void ClearDiagnosticLogs()
     {
         var result = System.Windows.MessageBox.Show(
-            "This will permanently delete all Flag Resolution and Mismatch Log records.\n\nContinue?",
+            "This will permanently delete all Flag Resolution, Mismatch Log, and Diagnostic Event records.\n\nContinue?",
             "Clear Diagnostic Logs",
             System.Windows.MessageBoxButton.YesNo,
             System.Windows.MessageBoxImage.Warning);
@@ -1215,8 +1224,9 @@ public sealed partial class RootViewModel(
         if (result != System.Windows.MessageBoxResult.Yes)
             return;
 
-        var (flagCount, mismatchCount) = CardService.ClearDiagnosticLogs();
-        Message = $"Cleared {flagCount} flag resolution(s) and {mismatchCount} mismatch log(s).";
+        var (flagCount, mismatchCount, diagnosticCount) = CardService.ClearDiagnosticLogs();
+        Message = $"Cleared {flagCount} flag resolution(s), {mismatchCount} mismatch log(s), and {diagnosticCount} diagnostic event(s).";
+        RefreshDiagnosticCount();
     }
 
     [RelayCommand]
@@ -1527,6 +1537,38 @@ public sealed partial class RootViewModel(
     {
         DefaultScannerName = null;
         Message = "Default scanner cleared.";
+    }
+
+    [ObservableProperty]
+    public partial int DiagnosticEventCount { get; set; }
+
+    public void RefreshDiagnosticCount()
+    {
+        try { DiagnosticEventCount = _diagnosticService.GetEventCount(); } catch { }
+    }
+
+    [RelayCommand]
+    public void ExportDiagnostics()
+    {
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = "Text files (*.txt)|*.txt",
+            DefaultExt = ".txt",
+            FileName = $"omnicard-diagnostics-{DateTime.Now:yyyy-MM-dd}",
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            try
+            {
+                _diagnosticService.ExportDiagnostics(dialog.FileName);
+                Message = $"Diagnostics exported to {Path.GetFileName(dialog.FileName)}.";
+            }
+            catch (Exception ex)
+            {
+                Message = $"Export failed: {ex.Message}";
+            }
+        }
     }
 
     private bool? ConnectToScanner(bool force)

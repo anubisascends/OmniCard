@@ -196,6 +196,8 @@
                           Command="{Binding ViewModel.ClearScanCacheCommand}"/>
                 <MenuItem Header="Clear _Diagnostic Logs"
                           Command="{Binding ViewModel.ClearDiagnosticLogsCommand}"/>
+                <MenuItem Header="Export _Diagnostics..."
+                          Command="{Binding ViewModel.ExportDiagnosticsCommand}"/>
                 <MenuItem Header="Delete _Orphaned Scans"
                           Command="{Binding ViewModel.DeleteOrphanedScansCommand}"/>
             </MenuItem>
@@ -248,8 +250,14 @@
             <StatusBarItem>v0.2</StatusBarItem>
             <StatusBarItem Content="{Binding ViewModel.Message}"/>
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock Text="{Binding ViewModel.IsEbayConnected, Converter={local:BoolToEbayStatusConverter}}"
-                           Foreground="{Binding ViewModel.IsEbayConnected, Converter={local:BoolToConnectionColorConverter}}"/>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding ViewModel.DiagnosticEventCount, StringFormat='{}{0} diagnostic events'}"
+                               FontSize="11" FontStyle="Italic"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                               Margin="0,0,12,0"/>
+                    <TextBlock Text="{Binding ViewModel.IsEbayConnected, Converter={local:BoolToEbayStatusConverter}}"
+                               Foreground="{Binding ViewModel.IsEbayConnected, Converter={local:BoolToConnectionColorConverter}}"/>
+                </StackPanel>
             </StatusBarItem>
         </StatusBar>
     </Grid>

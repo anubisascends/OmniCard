@@ -101,6 +101,9 @@ public partial class App : Application
             // CSV export/import
             services.AddSingleton<ICsvExportImportService, CsvExportImportService>();
 
+            // Scan diagnostics
+            services.AddSingleton<IScanDiagnosticService, ScanDiagnosticService>();
+
             // eBay OAuth
             services.AddSingleton<ICredentialStore, CredentialStore>();
             services.AddSingleton<IEbayAuthService, EbayAuthService>();
