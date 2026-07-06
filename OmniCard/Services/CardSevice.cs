@@ -273,7 +273,11 @@ public sealed class CardSevice : ICardService
         // Ensure OCR service has current symbol hashes
         if (_ocrService.SymbolHashes.Count == 0 && _gameServices.TryGetValue(CardGame.Mtg, out var mtgService) && mtgService is ScryfallService scryfall)
         {
-            try { _ocrService.SymbolHashes = scryfall.GetSymbolHashes(); }
+            try
+            {
+                _ocrService.SymbolHashes = scryfall.GetSymbolHashes();
+                _logger.LogInformation("Loaded {Count} symbol hashes into OCR service", _ocrService.SymbolHashes.Count);
+            }
             catch (Exception ex) { _logger.LogWarning(ex, "Failed to load symbol hashes into OCR service"); }
         }
 

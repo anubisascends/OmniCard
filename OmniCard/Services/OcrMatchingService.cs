@@ -53,6 +53,9 @@ public sealed class OcrMatchingService : IOcrMatchingService
         var candidateSetCodes = new List<string>();
         double symbolConfidence = 0;
 
+        if (SymbolHashes.Count == 0)
+            _logger.LogWarning("AnalyzeCardAsync: SymbolHashes is empty — symbol detection will be skipped");
+
         try
         {
             using var bitmap = new Bitmap(new MemoryStream(imageData));
@@ -105,7 +108,10 @@ public sealed class OcrMatchingService : IOcrMatchingService
     public (List<string> SetCodes, double Confidence) DetectSetSymbol(byte[] imageData)
     {
         if (SymbolHashes.Count == 0)
+        {
+            _logger.LogWarning("DetectSetSymbol called with empty SymbolHashes dictionary — no set detection possible");
             return ([], 0);
+        }
 
         try
         {
