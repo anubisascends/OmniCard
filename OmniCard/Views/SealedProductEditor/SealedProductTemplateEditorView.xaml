@@ -12,6 +12,10 @@
         TextElement.FontSize="13"
         FontFamily="{StaticResource AppFont}">
 
+    <Window.Resources>
+        <local:ProductTypeDisplayConverter x:Key="ProductTypeDisplayConverter"/>
+    </Window.Resources>
+
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -41,15 +45,13 @@
 
                 <TextBlock Grid.Row="1" Text="Type:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
                 <ComboBox Grid.Row="1" Grid.Column="1"
+                          ItemsSource="{Binding ViewModel.AllProductTypes}"
                           SelectedItem="{Binding ViewModel.ProductType}" Margin="0,2,8,2">
-                    <models:SealedProductType>Case</models:SealedProductType>
-                    <models:SealedProductType>BoosterBox</models:SealedProductType>
-                    <models:SealedProductType>BundleBox</models:SealedProductType>
-                    <models:SealedProductType>CollectorBoosterPack</models:SealedProductType>
-                    <models:SealedProductType>BoosterPack</models:SealedProductType>
-                    <models:SealedProductType>PromoPack</models:SealedProductType>
-                    <models:SealedProductType>FixedPack</models:SealedProductType>
-                    <models:SealedProductType>Card</models:SealedProductType>
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Converter={StaticResource ProductTypeDisplayConverter}}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
                 </ComboBox>
 
                 <TextBlock Grid.Row="1" Grid.Column="2" Text="Set:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,4,8,4"/>
@@ -83,15 +85,14 @@
                                 <TextBox Text="{Binding Quantity, UpdateSourceTrigger=LostFocus}"
                                          Width="50" Margin="0,0,8,0" VerticalContentAlignment="Center"/>
                                 <TextBlock Text="x" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <ComboBox SelectedItem="{Binding ChildProductType}" Width="160" Margin="0,0,8,0">
-                                    <models:SealedProductType>Case</models:SealedProductType>
-                                    <models:SealedProductType>BoosterBox</models:SealedProductType>
-                                    <models:SealedProductType>BundleBox</models:SealedProductType>
-                                    <models:SealedProductType>CollectorBoosterPack</models:SealedProductType>
-                                    <models:SealedProductType>BoosterPack</models:SealedProductType>
-                                    <models:SealedProductType>PromoPack</models:SealedProductType>
-                                    <models:SealedProductType>FixedPack</models:SealedProductType>
-                                    <models:SealedProductType>Card</models:SealedProductType>
+                                <ComboBox SelectedItem="{Binding ChildProductType}" Width="200" Margin="0,0,8,0"
+                                          ItemsSource="{Binding DataContext.ViewModel.AllProductTypes,
+                                              RelativeSource={RelativeSource AncestorType=Window}}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Converter={StaticResource ProductTypeDisplayConverter}}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
                                 </ComboBox>
                                 <TextBlock Text="{Binding ChildTemplateName, TargetNullValue='(pick at crack time)'}"
                                            VerticalAlignment="Center" FontStyle="Italic"

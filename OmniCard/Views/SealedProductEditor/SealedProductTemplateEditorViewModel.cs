@@ -22,6 +22,9 @@ public sealed partial class SealedProductTemplateEditorViewModel(ISealedProductS
     [ObservableProperty]
     public partial SealedProductType ProductType { get; set; } = SealedProductType.BoosterBox;
 
+    public IReadOnlyList<SealedProductType> AllProductTypes { get; } =
+        Enum.GetValues<SealedProductType>().ToList();
+
     public ObservableCollection<ContentLineItem> ContentLines { get; } = [];
 
     public SealedProductTemplate? Result { get; private set; }
@@ -50,10 +53,27 @@ public sealed partial class SealedProductTemplateEditorViewModel(ISealedProductS
         }
     }
 
+    partial void OnProductTypeChanged(SealedProductType value)
+    {
+        if (ContentLines.Count == 0)
+        {
+            // Auto-fill contents from archetype when contents are empty
+            var archetype = SealedProductArchetypeRegistry.GetArchetype(value);
+            foreach (var content in archetype.DefaultContents)
+            {
+                ContentLines.Add(new ContentLineItem
+                {
+                    Quantity = content.Quantity,
+                    ChildProductType = content.ChildType,
+                });
+            }
+        }
+    }
+
     [RelayCommand]
     public void AddContentLine()
     {
-        ContentLines.Add(new ContentLineItem { Quantity = 1, ChildProductType = SealedProductType.BoosterPack });
+        ContentLines.Add(new ContentLineItem { Quantity = 1, ChildProductType = SealedProductType.PlayBoosterPack });
     }
 
     [RelayCommand]
