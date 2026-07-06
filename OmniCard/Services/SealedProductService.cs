@@ -234,7 +234,6 @@ public class SealedProductService(IDbContextFactory<SealedProductDbContext> dbCo
     {
         SealedProductType.Case => "Case",
         SealedProductType.BoosterBox => "Booster Box",
-        SealedProductType.BundleBox => "Bundle Box",
         SealedProductType.CollectorBoosterPack => "Collector Booster Pack",
         SealedProductType.BoosterPack => "Booster Pack",
         SealedProductType.PromoPack => "Promo Pack",

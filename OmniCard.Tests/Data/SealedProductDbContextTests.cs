@@ -101,7 +101,7 @@ public class SealedProductDbContextTests : IDisposable
         var bundle = new SealedProductTemplate
         {
             Name = "Test Bundle",
-            ProductType = SealedProductType.BundleBox,
+            ProductType = SealedProductType.Bundle,
             Contents =
             [
                 new SealedProductContents { Quantity = 8, ChildProductType = SealedProductType.BoosterPack },

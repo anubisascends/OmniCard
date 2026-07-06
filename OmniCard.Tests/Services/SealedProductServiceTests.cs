@@ -128,7 +128,7 @@ public class SealedProductServiceTests : IDisposable
         var bundle = service.CreateTemplate(new SealedProductTemplate
         {
             Name = "Bundle",
-            ProductType = SealedProductType.BundleBox,
+            ProductType = SealedProductType.Bundle,
             Contents =
             [
                 new SealedProductContents { Quantity = 8, ChildProductType = SealedProductType.BoosterPack },
@@ -177,7 +177,7 @@ public class SealedProductServiceTests : IDisposable
         var bundle = service.CreateTemplate(new SealedProductTemplate
         {
             Name = "Bundle",
-            ProductType = SealedProductType.BundleBox,
+            ProductType = SealedProductType.Bundle,
             Contents =
             [
                 new SealedProductContents { Quantity = 8, ChildProductType = SealedProductType.BoosterPack },
