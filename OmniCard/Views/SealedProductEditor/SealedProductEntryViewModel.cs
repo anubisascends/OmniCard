@@ -172,6 +172,8 @@ public sealed partial class SealedProductEntryViewModel(
     [RelayCommand]
     public void AddProduct()
     {
+        if (MatchedTemplate is null && !ShowNewProductFields) return;
+
         decimal? price = decimal.TryParse(PriceEntry, out var parsed) ? parsed : null;
 
         SealedProductTemplate template;
