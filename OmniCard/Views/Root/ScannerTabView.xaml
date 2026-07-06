@@ -440,23 +440,44 @@
                     <ListView.ItemTemplate>
                         <DataTemplate>
                             <Grid Margin="4">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <!-- Scan image on the left -->
-                                <Image Source="{Binding TempImagePath, Converter={local:ScanImageConverter}}"
+                                <!-- Scanned image (top left) -->
+                                <Image Grid.Row="0" Grid.Column="0"
+                                       Source="{Binding TempImagePath, Converter={local:ScanImageConverter}}"
                                        Width="{Binding DataContext.ViewModel.CardPreviewWidth,
                                            RelativeSource={RelativeSource AncestorType=ListView}}"
                                        HorizontalAlignment="Left"
                                        VerticalAlignment="Top"
-                                       Stretch="Uniform"/>
+                                       Stretch="Uniform"
+                                       Margin="0,0,4,0"/>
 
-                                <!-- Card data to the right, vertically centered -->
-                                <StackPanel Grid.Column="1"
-                                            Margin="12,0,0,0"
-                                            VerticalAlignment="Center">
+                                <!-- Matched card art (top right) -->
+                                <Image Grid.Row="0" Grid.Column="1"
+                                       Width="{Binding DataContext.ViewModel.CardPreviewWidth,
+                                           RelativeSource={RelativeSource AncestorType=ListView}}"
+                                       HorizontalAlignment="Left"
+                                       VerticalAlignment="Top"
+                                       Stretch="Uniform"
+                                       Margin="4,0,0,0">
+                                    <Image.Source>
+                                        <MultiBinding Converter="{local:MatchedArtConverter}">
+                                            <Binding Path="Match.LocalImagePath"/>
+                                            <Binding Path="Match.ImageUri"/>
+                                        </MultiBinding>
+                                    </Image.Source>
+                                </Image>
+
+                                <!-- Card info below both images -->
+                                <StackPanel Grid.Row="1" Grid.ColumnSpan="2"
+                                            Margin="0,4,0,0">
                                     <!-- Card Name -->
                                     <TextBlock Text="{Binding Match.Name}"
                                                FontWeight="Bold"
@@ -507,43 +528,46 @@
                                              Foreground="{Binding Match.Confidence, Converter={local:ConfidenceToColorConverter}}"/>
                                     </TextBlock>
 
-                                    <!-- Match button (low confidence only) -->
-                                    <Button Content="Match"
-                                            Padding="8,2"
-                                            Margin="0,4,0,0"
-                                            HorizontalAlignment="Left"
-                                            Command="{Binding DataContext.ViewModel.ConfirmMatchCommand,
-                                                RelativeSource={RelativeSource AncestorType=ListView}}"
-                                            CommandParameter="{Binding}"
-                                            Visibility="{Binding Match.Confidence, Converter={local:LowConfidenceToVisibleConverter}}"
-                                            Style="{StaticResource MaterialDesignFlatButton}"/>
+                                    <!-- Match and Flag buttons side by side -->
+                                    <StackPanel Orientation="Horizontal"
+                                                Margin="0,4,0,0">
+                                        <!-- Match button (low confidence only) -->
+                                        <Button Content="Match"
+                                                Padding="8,2"
+                                                HorizontalAlignment="Left"
+                                                Command="{Binding DataContext.ViewModel.ConfirmMatchCommand,
+                                                    RelativeSource={RelativeSource AncestorType=ListView}}"
+                                                CommandParameter="{Binding}"
+                                                Visibility="{Binding Match.Confidence, Converter={local:LowConfidenceToVisibleConverter}}"
+                                                Style="{StaticResource MaterialDesignFlatButton}"/>
 
-                                    <!-- Flag button -->
-                                    <Button Padding="8,2"
-                                            Margin="8,4,0,0"
-                                            HorizontalAlignment="Left"
-                                            Command="{Binding DataContext.ViewModel.ToggleFlagCommand,
-                                                RelativeSource={RelativeSource AncestorType=ListView}}"
-                                            CommandParameter="{Binding}"
-                                            Style="{StaticResource MaterialDesignFlatButton}">
-                                        <Button.Content>
-                                            <TextBlock>
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock">
-                                                        <Setter Property="Text"
-                                                                Value="Flag"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsFlagged}"
-                                                                    Value="True">
-                                                                <Setter Property="Text"
-                                                                        Value="Unflag"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
-                                        </Button.Content>
-                                    </Button>
+                                        <!-- Flag button -->
+                                        <Button Padding="8,2"
+                                                Margin="4,0,0,0"
+                                                HorizontalAlignment="Left"
+                                                Command="{Binding DataContext.ViewModel.ToggleFlagCommand,
+                                                    RelativeSource={RelativeSource AncestorType=ListView}}"
+                                                CommandParameter="{Binding}"
+                                                Style="{StaticResource MaterialDesignFlatButton}">
+                                            <Button.Content>
+                                                <TextBlock>
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Text"
+                                                                    Value="Flag"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsFlagged}"
+                                                                        Value="True">
+                                                                    <Setter Property="Text"
+                                                                            Value="Unflag"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Button.Content>
+                                        </Button>
+                                    </StackPanel>
                                 </StackPanel>
                             </Grid>
                         </DataTemplate>
