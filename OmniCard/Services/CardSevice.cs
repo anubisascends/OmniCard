@@ -335,9 +335,10 @@ public sealed class CardSevice : ICardService
             ScannedCards.Add(scannedCard);
 
             // Run OCR after card is in the queue
+            OcrMatchResult? ocrResult = null;
             try
             {
-                var ocrResult = await _ocrService.AnalyzeCardAsync(rawBytes);
+                ocrResult = await _ocrService.AnalyzeCardAsync(rawBytes);
                 if (ocrResult?.RecognizedName is not null)
                 {
                     _logger.LogInformation("OCR recognized: \"{Name}\" (confidence: {Conf:F2})", ocrResult.RecognizedName, ocrResult.NameConfidence);
@@ -368,14 +369,6 @@ public sealed class CardSevice : ICardService
                                 _logger.LogInformation("Auto-flag cleared after OCR improvement");
                             }
                         }
-
-                        // Update diagnostic with OCR-improved match
-                        try
-                        {
-                            var ocrDiag = _gameServices.TryGetValue(ocrGame, out var gs2) ? gs2.LastMatchDiagnostics : null;
-                            _diagnosticService.LogScanCompleted(_currentSessionId, capturedHash, ocrMatch, ocrDiag, scannedCard.ArtHashes, ocrResult, scannedCard.FlagReason);
-                        }
-                        catch { }
                     }
                 }
             }
@@ -383,6 +376,15 @@ public sealed class CardSevice : ICardService
             {
                 _logger.LogWarning(ex, "OCR analysis failed");
             }
+
+            // Always log OCR results to diagnostics (even if OCR didn't change the match)
+            try
+            {
+                var currentGame = scannedCard.Game;
+                var ocrDiag = _gameServices.TryGetValue(currentGame, out var gs2) ? gs2.LastMatchDiagnostics : null;
+                _diagnosticService.LogScanCompleted(_currentSessionId, capturedHash, scannedCard.Match, ocrDiag, scannedCard.ArtHashes, ocrResult, scannedCard.FlagReason);
+            }
+            catch { }
         });
 
         sw.Stop();
