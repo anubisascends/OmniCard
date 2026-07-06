@@ -459,7 +459,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
             }
             _logger.LogDebug("Confident hash match at distance {Distance} (confidence {Confidence:F0}%)", bestPHashDistance, confidence);
             var confidentCard = LookupCard(bestPHashId, confidence);
-            if (confidentCard is not null)
+            if (confidentCard is not null && confidence >= 50)
             {
                 diagnostics.DecisionPhase = "PHashConfident";
                 diagnostics.PHashDistance = bestPHashDistance;
