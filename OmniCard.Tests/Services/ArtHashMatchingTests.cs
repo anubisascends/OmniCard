@@ -122,6 +122,63 @@ public class ArtHashMatchingTests : IDisposable
         Assert.Equal("Shock", match.Name);
     }
 
+    [Fact]
+    public void BlendedConfidence_WithArtHash_HigherThanPHashAlone()
+    {
+        // Seed a card with a distinctive hash so we control distances precisely
+        // Use Guid 4 with ImageHash = 0x8000_0000_0000_0000
+        // Flip exactly 8 bits of ImageHash to get pHash distance = 8
+        // Flip exactly 4 bits of ArtHash to get art hash distance = 4
+        //
+        // With maxDistance=14:
+        //   pHashConfidence = (1 - 8/14) * 100 ≈ 42.9%
+        //   artConfidence   = (1 - 4/20) * 100  = 80%
+        //   blended         = 0.5 * 42.9 + 0.5 * 80 ≈ 61.4%
+        //   pHashOnly       ≈ 42.9%
+        //
+        // Test asserts blended confidence > pHash-only confidence.
+
+        using var ctx = _factory.CreateDbContext();
+        ctx.Cards.Add(new Card
+        {
+            Id = Guid.Parse("00000000-0000-0000-0000-000000000004"),
+            OracleId = Guid.NewGuid(),
+            Name = "Counterspell",
+            Lang = "en",
+            Layout = "normal",
+            TypeLine = "Instant",
+            SetCode = "lea",
+            SetName = "LEA",
+            CollectorNumber = "055",
+            Rarity = "common",
+            // Distinctly far from all existing seed hashes (which start 0x1000...)
+            ImageHash = 0x8000_0000_0000_0000UL,
+            ArtHash  = 0xDEAD_BEEF_0000_0000UL,
+        });
+        ctx.SaveChanges();
+
+        var service = CreateService();
+
+        // Scan pHash: flip 8 bits from card 4's ImageHash (bits 0-7)
+        ulong scanImageHash = 0x8000_0000_0000_0000UL ^ 0x0000_0000_0000_00FFUL;
+
+        // Scan artHash: flip 4 bits from card 4's ArtHash (bits 0-3)
+        ulong scanArtHash = 0xDEAD_BEEF_0000_0000UL ^ 0x0000_0000_0000_000FUL;
+
+        var match = service.FindClosestMatch(scanImageHash, new ulong[] { scanArtHash, 0, 0 });
+
+        Assert.NotNull(match);
+        Assert.Equal("Counterspell", match.Name);
+
+        // pHash-only confidence would be (1 - 8/14) * 100 ≈ 42.86%
+        // Blended with art hash distance 4: (1 - 4/20) * 100 = 80% → blended ≈ 61.43%
+        double pHashOnly = Math.Max(0, (1.0 - 8.0 / 14.0)) * 100;
+        Assert.True(match.Confidence > pHashOnly,
+            $"Blended confidence {match.Confidence:F2} should exceed pHash-only {pHashOnly:F2}");
+        Assert.True(match.Confidence > 50,
+            $"Blended confidence {match.Confidence:F2} should be above 50%");
+    }
+
     private ScryfallService CreateService()
     {
         return new ScryfallService(

@@ -439,7 +439,24 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         const int ConfidentHashThreshold = 8;
         if (bestPHashDistance <= ConfidentHashThreshold)
         {
-            var confidence = Math.Max(0, (1.0 - (double)bestPHashDistance / maxDistance)) * 100;
+            var pHashConf = Math.Max(0, (1.0 - (double)bestPHashDistance / maxDistance)) * 100;
+            double confidence = pHashConf;
+            if (artHashes is not null && artHashCache.Count > 0)
+            {
+                var winnerArt = artHashCache.FirstOrDefault(a => a.Id == bestPHashId);
+                if (winnerArt != default)
+                {
+                    var bestArtDist = artHashes.Where(h => h != 0)
+                        .Select(h => PerceptualHashService.HammingDistance(h, winnerArt.ArtHash))
+                        .DefaultIfEmpty(int.MaxValue)
+                        .Min();
+                    if (bestArtDist < int.MaxValue)
+                    {
+                        var artConf = Math.Max(0, (1.0 - (double)bestArtDist / 20.0)) * 100;
+                        confidence = 0.5 * pHashConf + 0.5 * artConf;
+                    }
+                }
+            }
             _logger.LogDebug("Confident hash match at distance {Distance} (confidence {Confidence:F0}%)", bestPHashDistance, confidence);
             var confidentCard = LookupCard(bestPHashId, confidence);
             if (confidentCard is not null)
@@ -544,10 +561,28 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
             return null;
         }
 
-        // Confidence is always based on pHash distance of the winning card
+        // Blended confidence: pHash + art hash when available
         var winnerHash = hashCache.FirstOrDefault(h => h.Id == bestPHashId).Hash;
         var winnerDistance = winnerHash != 0 ? PerceptualHashService.HammingDistance(imageHash, winnerHash) : maxDistance;
-        var matchConfidence = Math.Max(0, (1.0 - (double)winnerDistance / maxDistance)) * 100;
+        var pHashConfidence = Math.Max(0, (1.0 - (double)winnerDistance / maxDistance)) * 100;
+
+        double matchConfidence = pHashConfidence;
+        if (artHashes is not null && artHashCache.Count > 0)
+        {
+            var winnerArtHash = artHashCache.FirstOrDefault(a => a.Id == bestPHashId);
+            if (winnerArtHash != default)
+            {
+                var bestArtDist = artHashes.Where(h => h != 0)
+                    .Select(h => PerceptualHashService.HammingDistance(h, winnerArtHash.ArtHash))
+                    .DefaultIfEmpty(int.MaxValue)
+                    .Min();
+                if (bestArtDist < int.MaxValue)
+                {
+                    var artConfidence = Math.Max(0, (1.0 - (double)bestArtDist / 20.0)) * 100;
+                    matchConfidence = 0.5 * pHashConfidence + 0.5 * artConfidence;
+                }
+            }
+        }
 
         if (diagnostics.DecisionPhase == "NoMatch")
             diagnostics.DecisionPhase = bestPHashDistance <= maxDistance ? "PHashConfident" : "ArtHashFallback";
