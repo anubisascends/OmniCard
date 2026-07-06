@@ -201,6 +201,56 @@ public class SealedProductServiceTests : IDisposable
         Assert.Equal(5m, promoChild.PurchasePrice); // 45 / 9 = 5
     }
 
+    [Fact]
+    public void CreateTemplateFromArchetype_GeneratesCorrectTemplate()
+    {
+        var service = CreateService();
+        var template = service.CreateTemplateFromArchetype(
+            SealedProductType.PlayBoosterBox, "mh3", "Modern Horizons 3", null);
+
+        Assert.Equal("Modern Horizons 3 Play Booster Box", template.Name);
+        Assert.Equal("mh3", template.SetCode);
+        Assert.Equal(SealedProductType.PlayBoosterBox, template.ProductType);
+        Assert.Null(template.Upc);
+        Assert.Single(template.Contents);
+        Assert.Equal(36, template.Contents[0].Quantity);
+        Assert.Equal(SealedProductType.PlayBoosterPack, template.Contents[0].ChildProductType);
+    }
+
+    [Fact]
+    public void CreateTemplateFromArchetype_WithUpc_StoresUpc()
+    {
+        var service = CreateService();
+        var template = service.CreateTemplateFromArchetype(
+            SealedProductType.Bundle, "blb", "Bloomburrow", "195166253077");
+
+        Assert.Equal("Bloomburrow Bundle", template.Name);
+        Assert.Equal("195166253077", template.Upc);
+    }
+
+    [Fact]
+    public void CreateTemplateFromArchetype_MultipleContents_AllPersisted()
+    {
+        var service = CreateService();
+        var template = service.CreateTemplateFromArchetype(
+            SealedProductType.PrereleaseKit, "mkm", "Murders at Karlov Manor", null);
+
+        Assert.Equal("Murders at Karlov Manor Prerelease Kit", template.Name);
+        Assert.Equal(2, template.Contents.Count);
+        Assert.Contains(template.Contents, c => c.Quantity == 6 && c.ChildProductType == SealedProductType.PlayBoosterPack);
+        Assert.Contains(template.Contents, c => c.Quantity == 1 && c.ChildProductType == SealedProductType.PromoPack);
+    }
+
+    [Fact]
+    public void CreateTemplateFromArchetype_NullSetName_UsesGeneric()
+    {
+        var service = CreateService();
+        var template = service.CreateTemplateFromArchetype(
+            SealedProductType.BoosterPack, null, null, null);
+
+        Assert.Equal("Generic Booster Pack", template.Name);
+    }
+
     private class MockFactory(DbContextOptions<SealedProductDbContext> options) : IDbContextFactory<SealedProductDbContext>
     {
         public SealedProductDbContext CreateDbContext() => new(options);

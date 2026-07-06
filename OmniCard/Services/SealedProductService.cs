@@ -9,6 +9,7 @@ public interface ISealedProductService
     List<SealedProductTemplate> GetTemplates();
     SealedProductTemplate? FindTemplateByUpc(string upc);
     SealedProductTemplate CreateTemplate(SealedProductTemplate template);
+    SealedProductTemplate CreateTemplateFromArchetype(SealedProductType type, string? setCode, string? setName, string? upc);
     void UpdateTemplate(SealedProductTemplate template);
     void DeleteTemplate(int templateId);
     List<SealedProductInstance> GetInstances();
@@ -48,6 +49,25 @@ public class SealedProductService(IDbContextFactory<SealedProductDbContext> dbCo
         ctx.Templates.Add(template);
         ctx.SaveChanges();
         return template;
+    }
+
+    public SealedProductTemplate CreateTemplateFromArchetype(SealedProductType type, string? setCode, string? setName, string? upc)
+    {
+        var archetype = SealedProductArchetypeRegistry.GetArchetype(type);
+        var template = new SealedProductTemplate
+        {
+            Name = SealedProductArchetypeRegistry.GenerateTemplateName(type, setName),
+            SetCode = setCode,
+            Upc = string.IsNullOrWhiteSpace(upc) ? null : upc.Trim(),
+            ProductType = type,
+            Contents = archetype.DefaultContents.Select(c => new SealedProductContents
+            {
+                Quantity = c.Quantity,
+                ChildProductType = c.ChildType,
+            }).ToList(),
+        };
+
+        return CreateTemplate(template);
     }
 
     public void UpdateTemplate(SealedProductTemplate template)
@@ -221,7 +241,7 @@ public class SealedProductService(IDbContextFactory<SealedProductDbContext> dbCo
 
         var template = new SealedProductTemplate
         {
-            Name = $"{setCode ?? "Generic"} {FormatProductType(productType)}",
+            Name = SealedProductArchetypeRegistry.GenerateTemplateName(productType, setCode),
             SetCode = setCode,
             ProductType = productType,
         };
