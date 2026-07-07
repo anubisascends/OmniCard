@@ -277,6 +277,8 @@ public sealed partial class RootViewModel(
     [RelayCommand]
     public void DisconnectEbay()
     {
+        _ebaySyncTimer?.Stop();
+        _ebaySyncTimer = null;
         ebayAuthService.Disconnect();
         IsEbayConnected = false;
         Message = "Disconnected from eBay.";

@@ -56,7 +56,7 @@ public class EbayCatalogService : IEbayCatalogService
         }
 
         var json = await response.Content.ReadAsStringAsync();
-        var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json);
 
         var results = new List<EbayCatalogMatch>();
         if (!doc.RootElement.TryGetProperty("itemSummaries", out var summaries))
@@ -72,7 +72,7 @@ public class EbayCatalogService : IEbayCatalogService
 
             if (item.TryGetProperty("price", out var price))
             {
-                if (decimal.TryParse(price.GetProperty("value").GetString(), out var priceValue))
+                if (decimal.TryParse(price.GetProperty("value").GetString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var priceValue))
                     match.Price = priceValue;
                 match.Currency = price.TryGetProperty("currency", out var curr) ? curr.GetString() : null;
             }
@@ -126,7 +126,7 @@ public class EbayCatalogService : IEbayCatalogService
         }
 
         var json = await response.Content.ReadAsStringAsync();
-        var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json);
 
         if (!doc.RootElement.TryGetProperty("itemSummaries", out var summaries))
             return null;
@@ -135,7 +135,7 @@ public class EbayCatalogService : IEbayCatalogService
         foreach (var item in summaries.EnumerateArray())
         {
             if (item.TryGetProperty("price", out var price)
-                && decimal.TryParse(price.GetProperty("value").GetString(), out var val))
+                && decimal.TryParse(price.GetProperty("value").GetString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var val))
             {
                 prices.Add(val);
             }

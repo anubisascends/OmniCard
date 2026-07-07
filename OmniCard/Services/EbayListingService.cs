@@ -97,7 +97,7 @@ public class EbayListingService : IEbayListingService
             }
 
             var offerResponseJson = await offerResponse.Content.ReadAsStringAsync();
-            var offerDoc = JsonDocument.Parse(offerResponseJson);
+            using var offerDoc = JsonDocument.Parse(offerResponseJson);
 
             // If the offer response already contains listingId, treat as published
             if (offerDoc.RootElement.TryGetProperty("listingId", out var directListingId))
@@ -122,7 +122,7 @@ public class EbayListingService : IEbayListingService
             if (publishResponse.IsSuccessStatusCode)
             {
                 var publishJson = await publishResponse.Content.ReadAsStringAsync();
-                var publishDoc = JsonDocument.Parse(publishJson);
+                using var publishDoc = JsonDocument.Parse(publishJson);
                 ebayItemId = publishDoc.RootElement.TryGetProperty("listingId", out var listingIdEl)
                     ? listingIdEl.GetString() ?? ""
                     : "";
@@ -255,7 +255,7 @@ public class EbayListingService : IEbayListingService
             }
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             var results = new List<EbaySellerPolicy>();
             var arrayProp = $"{policyType}Policies";
@@ -349,16 +349,32 @@ public class EbayListingService : IEbayListingService
     private async Task SaveActiveListing(int cardId, EbayListingOptions options, string ebayItemId)
     {
         using var ctx = _dbContextFactory.CreateDbContext();
-        ctx.EbayListings.Add(new EbayListing
+        var existing = await ctx.EbayListings.FirstOrDefaultAsync(l => l.CollectionCardId == cardId);
+        if (existing is not null)
         {
-            CollectionCardId = cardId,
-            EbayItemId = ebayItemId,
-            Status = EbayListingStatus.Active,
-            ListingType = options.ListingType,
-            ListedPrice = options.Price,
-            StartTime = DateTime.UtcNow,
-            AuctionDuration = options.AuctionDuration,
-        });
+            existing.EbayItemId = ebayItemId;
+            existing.Status = EbayListingStatus.Active;
+            existing.ListingType = options.ListingType;
+            existing.ListedPrice = options.Price;
+            existing.StartTime = DateTime.UtcNow;
+            existing.EndTime = null;
+            existing.AuctionDuration = options.AuctionDuration;
+            existing.ErrorMessage = null;
+            existing.LastSyncedAt = null;
+        }
+        else
+        {
+            ctx.EbayListings.Add(new EbayListing
+            {
+                CollectionCardId = cardId,
+                EbayItemId = ebayItemId,
+                Status = EbayListingStatus.Active,
+                ListingType = options.ListingType,
+                ListedPrice = options.Price,
+                StartTime = DateTime.UtcNow,
+                AuctionDuration = options.AuctionDuration,
+            });
+        }
         await ctx.SaveChangesAsync();
     }
 

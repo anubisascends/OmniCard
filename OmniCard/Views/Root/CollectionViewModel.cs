@@ -22,7 +22,7 @@ public sealed partial class CollectionViewModel : ViewModel
     private readonly IDataPathService _dataPathService;
     private readonly ILogger<CollectionViewModel> _logger;
     private readonly IEbayListingService _ebayListingService;
-    private readonly IEbaySyncService _ebaySyncService;
+    private readonly EbaySettings _ebaySettings;
 
     /// <summary>Set by RootViewModel to delegate settings persistence.</summary>
     public Action? PersistSettings { get; set; }
@@ -52,7 +52,7 @@ public sealed partial class CollectionViewModel : ViewModel
         IDataPathService dataPathService,
         ILogger<CollectionViewModel> logger,
         IEbayListingService ebayListingService,
-        IEbaySyncService ebaySyncService)
+        IOptions<EbaySettings> ebaySettings)
     {
         _cardService = cardService;
         _containerService = containerService;
@@ -62,7 +62,7 @@ public sealed partial class CollectionViewModel : ViewModel
         _dataPathService = dataPathService;
         _logger = logger;
         _ebayListingService = ebayListingService;
-        _ebaySyncService = ebaySyncService;
+        _ebaySettings = ebaySettings.Value;
 
         // Initialize column visibility from settings
         var saved = displaySettings.Value.CollectionColumnVisibility;
@@ -772,9 +772,13 @@ public sealed partial class CollectionViewModel : ViewModel
         var listing = selected[0].EbayListing;
         if (listing is null || string.IsNullOrEmpty(listing.EbayItemId)) return;
 
+        var viewBaseUrl = _ebaySettings.Environment == "production"
+            ? "https://www.ebay.com"
+            : "https://www.sandbox.ebay.com";
+
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
         {
-            FileName = $"https://www.ebay.com/itm/{listing.EbayItemId}",
+            FileName = $"{viewBaseUrl}/itm/{listing.EbayItemId}",
             UseShellExecute = true,
         });
     }

@@ -122,7 +122,7 @@ public class EbaySyncService : IEbaySyncService
             }
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             if (!doc.RootElement.TryGetProperty("orders", out var orders))
                 return result;
@@ -149,7 +149,7 @@ public class EbaySyncService : IEbaySyncService
                         decimal? soldPrice = null;
                         if (lineItem.TryGetProperty("total", out var total)
                             && total.TryGetProperty("value", out var val)
-                            && decimal.TryParse(val.GetString(), out var price))
+                            && decimal.TryParse(val.GetString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var price))
                         {
                             soldPrice = price;
                         }
