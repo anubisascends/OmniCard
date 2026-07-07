@@ -224,6 +224,74 @@ public class CardServiceCollectionTests : IDisposable
         };
     }
 
+    [Fact]
+    public void GetMatchingContainerIds_ReturnsOnlyContainersWithMatchingCards()
+    {
+        using (var ctx = new CollectionDbContext(_options))
+        {
+            var binder = new StorageContainer { Name = "Binder", ContainerType = ContainerType.Binder };
+            var box = new StorageContainer { Name = "Box", ContainerType = ContainerType.Box };
+            ctx.StorageContainers.AddRange(binder, box);
+            ctx.SaveChanges();
+
+            ctx.Cards.AddRange(
+                new CollectionCard { Game = CardGame.Mtg, GameCardId = "id1", Name = "Lightning Bolt", SetCode = "LEA", ContainerId = binder.Id },
+                new CollectionCard { Game = CardGame.Mtg, GameCardId = "id2", Name = "Counterspell", SetCode = "LEA", ContainerId = box.Id }
+            );
+            ctx.SaveChanges();
+        }
+
+        var service = new CardSevice(
+            new StubHashService(),
+            [],
+            CreateFactory(),
+            new StubOcrService(),
+            new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
+            NullLogger<CardSevice>.Instance,
+            new DataPathService(Path.GetTempPath()),
+            new NullScanDiagnosticService());
+
+        var result = service.GetMatchingContainerIds("Lightning Bolt", CardGame.Mtg);
+
+        Assert.Single(result);
+        // The binder has "Lightning Bolt", the box does not
+        using var ctx2 = new CollectionDbContext(_options);
+        var binderId = ctx2.StorageContainers.First(c => c.Name == "Binder").Id;
+        Assert.Contains(binderId, result);
+    }
+
+    [Fact]
+    public void GetMatchingContainerIds_EmptyQuery_ReturnsAllContainers()
+    {
+        using (var ctx = new CollectionDbContext(_options))
+        {
+            var binder = new StorageContainer { Name = "Binder2", ContainerType = ContainerType.Binder };
+            var box = new StorageContainer { Name = "Box2", ContainerType = ContainerType.Box };
+            ctx.StorageContainers.AddRange(binder, box);
+            ctx.SaveChanges();
+
+            ctx.Cards.AddRange(
+                new CollectionCard { Game = CardGame.Mtg, GameCardId = "id10", Name = "Card A", ContainerId = binder.Id },
+                new CollectionCard { Game = CardGame.Mtg, GameCardId = "id11", Name = "Card B", ContainerId = box.Id }
+            );
+            ctx.SaveChanges();
+        }
+
+        var service = new CardSevice(
+            new StubHashService(),
+            [],
+            CreateFactory(),
+            new StubOcrService(),
+            new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
+            NullLogger<CardSevice>.Instance,
+            new DataPathService(Path.GetTempPath()),
+            new NullScanDiagnosticService());
+
+        var result = service.GetMatchingContainerIds("", CardGame.Mtg);
+
+        Assert.True(result.Count >= 2);
+    }
+
     // --- Helpers ---
 
     private class StubHashService : IPerceptualHashService

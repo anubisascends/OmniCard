@@ -33,6 +33,7 @@ public interface ICardService
     void SearchCollection(string query, CardGame? gameFilter, int? containerFilter, SortPreset? sortPreset, FilterPreset? filterPreset, bool stacked, ObservableCollection<CollectionCard> results);
     void SearchCollection(string query, CardGame? gameFilter, int? containerFilter, SortPreset? sortPreset, FilterPreset? filterPreset, bool stacked, int skip, int take, ObservableCollection<CollectionCard> results);
     int GetSearchCount(string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset, bool stacked);
+    HashSet<int> GetMatchingContainerIds(string query, CardGame? gameFilter);
     void MoveCardsToContainer(IEnumerable<int> cardIds, int containerId, string? section = null);
     void BulkUpdateField(IEnumerable<int> cardIds, Action<CollectionCard> update);
     List<CollectionCard> GetCollectionCards(IEnumerable<int> cardIds);
@@ -691,6 +692,17 @@ public sealed class CardSevice : ICardService
         }
 
         return cards.Count();
+    }
+
+    public HashSet<int> GetMatchingContainerIds(string query, CardGame? gameFilter)
+    {
+        using var context = _collectionDbContextFactory.CreateDbContext();
+        var cards = BuildFilteredQuery(context, query, gameFilter, containerFilter: null, filterPreset: null);
+        return cards
+            .Where(c => c.ContainerId != null)
+            .Select(c => c.ContainerId!.Value)
+            .Distinct()
+            .ToHashSet();
     }
 
     private IQueryable<CollectionCard> BuildFilteredQuery(CollectionDbContext context, string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset)
