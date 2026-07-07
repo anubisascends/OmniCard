@@ -8,6 +8,7 @@ using System.Linq;
 using OmniCard.Data;
 using OmniCard.Models;
 using OmniCard.Services;
+using System.Threading.Tasks;
 
 namespace OmniCard.Views.Root;
 
@@ -20,6 +21,8 @@ public sealed partial class CollectionViewModel : ViewModel
     private readonly IDbContextFactory<CollectionDbContext> _dbContextFactory;
     private readonly IDataPathService _dataPathService;
     private readonly ILogger<CollectionViewModel> _logger;
+    private readonly IEbayListingService _ebayListingService;
+    private readonly IEbaySyncService _ebaySyncService;
 
     /// <summary>Set by RootViewModel to delegate settings persistence.</summary>
     public Action? PersistSettings { get; set; }
@@ -47,7 +50,9 @@ public sealed partial class CollectionViewModel : ViewModel
         IDbContextFactory<CollectionDbContext> dbContextFactory,
         IOptions<DisplaySettings> displaySettings,
         IDataPathService dataPathService,
-        ILogger<CollectionViewModel> logger)
+        ILogger<CollectionViewModel> logger,
+        IEbayListingService ebayListingService,
+        IEbaySyncService ebaySyncService)
     {
         _cardService = cardService;
         _containerService = containerService;
@@ -56,6 +61,8 @@ public sealed partial class CollectionViewModel : ViewModel
         _dbContextFactory = dbContextFactory;
         _dataPathService = dataPathService;
         _logger = logger;
+        _ebayListingService = ebayListingService;
+        _ebaySyncService = ebaySyncService;
 
         // Initialize column visibility from settings
         var saved = displaySettings.Value.CollectionColumnVisibility;
@@ -82,6 +89,7 @@ public sealed partial class CollectionViewModel : ViewModel
         ["DateAdded"] = false,
         ["Location"] = false,
         ["SetCode"] = false,
+        ["EbayStatus"] = false,
     };
 
     private readonly Dictionary<string, bool> _columnVisibility = new();
@@ -191,8 +199,8 @@ public sealed partial class CollectionViewModel : ViewModel
     public bool IsOverviewSearchActive => _matchingContainerIds is not null;
 
     public bool IsBulkVisible =>
-        _matchingContainerIds is null ||
-        (BulkSummary is not null && _matchingContainerIds.Contains(BulkSummary.Container.Id));
+        BulkSummary is not null && BulkSummary.CardCount > 0 &&
+        (_matchingContainerIds is null || _matchingContainerIds.Contains(BulkSummary.Container.Id));
 
     public bool HasVisibleLocations =>
         IsBulkVisible || GroupedLocations.Any();
@@ -206,6 +214,7 @@ public sealed partial class CollectionViewModel : ViewModel
                 : LocationSummaries;
 
             return source
+                .Where(s => s.CardCount > 0)
                 .OrderBy(s => s.Container.Name, StringComparer.OrdinalIgnoreCase)
                 .GroupBy(s => s.Container.ContainerType);
         }
@@ -735,6 +744,67 @@ public sealed partial class CollectionViewModel : ViewModel
 
         SelectedSortPreset = _presetService.GetActiveSortPreset(_selectedGame);
         SelectedFilterPreset = _presetService.GetActiveFilterPreset(_selectedGame);
+    }
+
+    // --- eBay commands ---
+
+    [RelayCommand]
+    public void ListOnEbay()
+    {
+        var selected = GetSelectedCards?.Invoke();
+        if (selected is null || selected.Count != 1) return;
+        var card = selected[0];
+        if (card.EbayListing?.Status == EbayListingStatus.Active) return;
+
+        var result = _dialogService.OpenEbayListingDialog(card);
+        if (result == true)
+        {
+            ReportMessage?.Invoke($"Listed \"{card.Name}\" on eBay.");
+            _ = SearchCollection();
+        }
+    }
+
+    [RelayCommand]
+    public void ViewOnEbay()
+    {
+        var selected = GetSelectedCards?.Invoke();
+        if (selected is null || selected.Count != 1) return;
+        var listing = selected[0].EbayListing;
+        if (listing is null || string.IsNullOrEmpty(listing.EbayItemId)) return;
+
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = $"https://www.ebay.com/itm/{listing.EbayItemId}",
+            UseShellExecute = true,
+        });
+    }
+
+    [RelayCommand]
+    public async Task EndEbayListing()
+    {
+        var selected = GetSelectedCards?.Invoke();
+        if (selected is null || selected.Count != 1) return;
+        var listing = selected[0].EbayListing;
+        if (listing is null || listing.Status != EbayListingStatus.Active) return;
+
+        var result = System.Windows.MessageBox.Show(
+            $"End the eBay listing for \"{selected[0].Name}\"?",
+            "End Listing",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Question);
+
+        if (result != System.Windows.MessageBoxResult.Yes) return;
+
+        var success = await _ebayListingService.EndListingAsync(listing);
+        if (success)
+        {
+            ReportMessage?.Invoke($"Ended eBay listing for \"{selected[0].Name}\".");
+            _ = SearchCollection();
+        }
+        else
+        {
+            ReportMessage?.Invoke("Failed to end eBay listing.");
+        }
     }
 
     public void Initialize()

@@ -41,6 +41,7 @@ public sealed partial class RootViewModel(
     private readonly ILogger<RootViewModel> _logger = logger;
     private readonly IScanDiagnosticService _diagnosticService = diagnosticService;
     private NotifyCollectionChangedEventHandler? _scannedCardsHandler;
+    private System.Windows.Threading.DispatcherTimer? _ebaySyncTimer;
 
     /// <summary>The nested CollectionViewModel that owns all collection-specific state.</summary>
     public CollectionViewModel Collection { get; } = collection;
@@ -874,6 +875,39 @@ public sealed partial class RootViewModel(
         IsEbayConnected = ebayAuthService.IsConnected;
         InvalidateHomeTab();
         RefreshDiagnosticCount();
+
+        // Start eBay listing sync timer (every 5 minutes)
+        if (ebayAuthService.IsConnected)
+        {
+            _ebaySyncTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMinutes(5),
+            };
+            _ebaySyncTimer.Tick += async (_, _) => await SyncEbayListings();
+            _ebaySyncTimer.Start();
+
+            // Initial sync
+            _ = SyncEbayListings();
+        }
+    }
+
+    private IEbaySyncService EbaySyncService => App.Host.Services.GetRequiredService<IEbaySyncService>();
+
+    private async Task SyncEbayListings()
+    {
+        try
+        {
+            var synced = await EbaySyncService.SyncAllActiveAsync();
+            if (synced > 0)
+            {
+                Message = $"eBay sync: {synced} listing(s) updated.";
+                _ = Collection.SearchCollection();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "eBay sync failed");
+        }
     }
 
     [RelayCommand]

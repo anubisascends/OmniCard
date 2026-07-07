@@ -136,6 +136,11 @@
                                 Binding="{Binding SetCode}"
                                 Width="60"
                                 CanUserSort="False"/>
+            <DataGridTextColumn Header="eBay"
+                                local:ColumnTag.Key="EbayStatus"
+                                Binding="{Binding EbayListing.Status}"
+                                Width="70"
+                                CanUserSort="False"/>
         </DataGrid.Columns>
 
         <DataGrid.ContextMenu>
@@ -161,6 +166,13 @@
                 <MenuItem Header="Set Non-Foil"
                           Command="{Binding BulkSetCollectionFoilCommand}"
                           CommandParameter="False"/>
+                <Separator/>
+                <MenuItem Header="List on eBay"
+                          Command="{Binding ListOnEbayCommand}"/>
+                <MenuItem Header="View on eBay"
+                          Command="{Binding ViewOnEbayCommand}"/>
+                <MenuItem Header="End eBay Listing"
+                          Command="{Binding EndEbayListingCommand}"/>
                 <Separator/>
                 <MenuItem Header="Delete Selected"
                           Command="{Binding BulkDeleteCollectionCommand}"/>

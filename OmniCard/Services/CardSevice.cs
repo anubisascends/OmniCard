@@ -735,7 +735,7 @@ public sealed class CardSevice : ICardService
 
     private IQueryable<CollectionCard> BuildFilteredQuery(CollectionDbContext context, string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset)
     {
-        IQueryable<CollectionCard> cards = context.Cards.AsNoTracking().Include(c => c.Container);
+        IQueryable<CollectionCard> cards = context.Cards.AsNoTracking().Include(c => c.Container).Include(c => c.EbayListing);
 
         if (gameFilter.HasValue)
             cards = cards.Where(c => c.Game == gameFilter.Value);
