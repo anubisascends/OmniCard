@@ -60,6 +60,7 @@ public sealed class CardSevice : ICardService
     private readonly string _tempScansDir;
     private readonly IDataPathService _dataPathService;
     private readonly IScanDiagnosticService _diagnosticService;
+    private readonly IAuditService _auditService;
     private string _currentSessionId = Guid.NewGuid().ToString();
 
     public CardSevice(
@@ -70,7 +71,8 @@ public sealed class CardSevice : ICardService
         ScanImageCache imageCache,
         ILogger<CardSevice> logger,
         IDataPathService dataPathService,
-        IScanDiagnosticService diagnosticService)
+        IScanDiagnosticService diagnosticService,
+        IAuditService auditService)
     {
         _hashService = hashService;
         _gameServices = gameServices.ToDictionary(s => s.Game);
@@ -81,6 +83,7 @@ public sealed class CardSevice : ICardService
         _logger = logger;
         _dataPathService = dataPathService;
         _diagnosticService = diagnosticService;
+        _auditService = auditService;
 
         // Ensure collection DB exists
         using var ctx = _collectionDbContextFactory.CreateDbContext();
@@ -294,9 +297,19 @@ public sealed class CardSevice : ICardService
             }
         }
 
-        // pHash match with user set filter (hard) and detected sets (soft preference)
-        var (match, matchedGame) = FindBestMatch(hash, artHashes, null, SelectedSetFilter, detectedSets);
-        game = matchedGame;
+        // pHash match — branch on audit mode
+        CardMatch? match;
+        if (_auditService.IsAuditActive)
+        {
+            match = _auditService.FindScopedMatch(hash, artHashes);
+            // Skip set symbol detection and OCR re-matching in audit mode
+        }
+        else
+        {
+            var (bestMatch, matchedGame) = FindBestMatch(hash, artHashes, null, SelectedSetFilter, detectedSets);
+            match = bestMatch;
+            game = matchedGame;
+        }
         if (match is not null)
             _logger.LogInformation("Matched scanned card to \"{CardName}\" ({SetCode} #{Number}) in {Game}", match.Name, match.SetCode, match.CollectorNumber, game);
         else
@@ -339,57 +352,60 @@ public sealed class CardSevice : ICardService
         {
             ScannedCards.Add(scannedCard);
 
-            // Run OCR after card is in the queue
-            OcrMatchResult? ocrResult = null;
-            try
+            if (!_auditService.IsAuditActive)
             {
-                ocrResult = await _ocrService.AnalyzeCardAsync(rawBytes);
-                if (ocrResult?.RecognizedName is not null)
+                // Run OCR after card is in the queue
+                OcrMatchResult? ocrResult = null;
+                try
                 {
-                    _logger.LogInformation("OCR recognized: \"{Name}\" (confidence: {Conf:F2})", ocrResult.RecognizedName, ocrResult.NameConfidence);
-
-                    // Merge set preferences from initial symbol detection and async OCR
-                    var mergedPreferredSets = detectedSets;
-                    if (ocrResult.SymbolConfidence >= 0.5 && ocrResult.CandidateSetCodes is { Count: > 0 })
+                    ocrResult = await _ocrService.AnalyzeCardAsync(rawBytes);
+                    if (ocrResult?.RecognizedName is not null)
                     {
-                        mergedPreferredSets ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                        foreach (var code in ocrResult.CandidateSetCodes)
-                            mergedPreferredSets.Add(code);
-                    }
+                        _logger.LogInformation("OCR recognized: \"{Name}\" (confidence: {Conf:F2})", ocrResult.RecognizedName, ocrResult.NameConfidence);
 
-                    // Re-match with combined scoring and set preferences
-                    var (ocrMatch, ocrGame) = FindBestMatch(capturedHash, scannedCard.ArtHashes, ocrResult, capturedSetFilter, mergedPreferredSets);
-                    if (ocrMatch is not null && (scannedCard.Match is null || ocrMatch.GameSpecificId != scannedCard.Match?.GameSpecificId))
-                    {
-                        scannedCard.Match = ocrMatch;
-                        scannedCard.Game = ocrGame;
-                        _logger.LogInformation("OCR improved match to \"{CardName}\" ({SetCode} #{Number})", ocrMatch.Name, ocrMatch.SetCode, ocrMatch.CollectorNumber);
-
-                        // Clear auto-flag if OCR improved the match above the threshold
-                        if (scannedCard.FlagReason is FlagReason.NoMatch or FlagReason.VeryLowConfidence)
+                        // Merge set preferences from initial symbol detection and async OCR
+                        var mergedPreferredSets = detectedSets;
+                        if (ocrResult.SymbolConfidence >= 0.5 && ocrResult.CandidateSetCodes is { Count: > 0 })
                         {
-                            if (ocrMatch.Confidence is null or >= 15)
+                            mergedPreferredSets ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                            foreach (var code in ocrResult.CandidateSetCodes)
+                                mergedPreferredSets.Add(code);
+                        }
+
+                        // Re-match with combined scoring and set preferences
+                        var (ocrMatch, ocrGame) = FindBestMatch(capturedHash, scannedCard.ArtHashes, ocrResult, capturedSetFilter, mergedPreferredSets);
+                        if (ocrMatch is not null && (scannedCard.Match is null || ocrMatch.GameSpecificId != scannedCard.Match?.GameSpecificId))
+                        {
+                            scannedCard.Match = ocrMatch;
+                            scannedCard.Game = ocrGame;
+                            _logger.LogInformation("OCR improved match to \"{CardName}\" ({SetCode} #{Number})", ocrMatch.Name, ocrMatch.SetCode, ocrMatch.CollectorNumber);
+
+                            // Clear auto-flag if OCR improved the match above the threshold
+                            if (scannedCard.FlagReason is FlagReason.NoMatch or FlagReason.VeryLowConfidence)
                             {
-                                scannedCard.FlagReason = FlagReason.None;
-                                _logger.LogInformation("Auto-flag cleared after OCR improvement");
+                                if (ocrMatch.Confidence is null or >= 15)
+                                {
+                                    scannedCard.FlagReason = FlagReason.None;
+                                    _logger.LogInformation("Auto-flag cleared after OCR improvement");
+                                }
                             }
                         }
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "OCR analysis failed");
-            }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "OCR analysis failed");
+                }
 
-            // Always log OCR results to diagnostics (even if OCR didn't change the match)
-            try
-            {
-                var currentGame = scannedCard.Game;
-                var ocrDiag = _gameServices.TryGetValue(currentGame, out var gs2) ? gs2.LastMatchDiagnostics : null;
-                _diagnosticService.LogScanCompleted(_currentSessionId, capturedHash, scannedCard.Match, ocrDiag, scannedCard.ArtHashes, ocrResult, scannedCard.FlagReason);
+                // Always log OCR results to diagnostics (even if OCR didn't change the match)
+                try
+                {
+                    var currentGame = scannedCard.Game;
+                    var ocrDiag = _gameServices.TryGetValue(currentGame, out var gs2) ? gs2.LastMatchDiagnostics : null;
+                    _diagnosticService.LogScanCompleted(_currentSessionId, capturedHash, scannedCard.Match, ocrDiag, scannedCard.ArtHashes, ocrResult, scannedCard.FlagReason);
+                }
+                catch { }
             }
-            catch { }
         });
 
         sw.Stop();

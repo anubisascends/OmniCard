@@ -47,7 +47,8 @@ public class CardServiceCollectionTests : IDisposable
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
             NullLogger<CardSevice>.Instance,
             new DataPathService(Path.GetTempPath()),
-            new NullScanDiagnosticService());
+            new NullScanDiagnosticService(),
+            new NullAuditService());
 
         var results = new ObservableCollection<CollectionCard>();
         service.SearchCollection("", null, results);
@@ -73,7 +74,8 @@ public class CardServiceCollectionTests : IDisposable
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
             NullLogger<CardSevice>.Instance,
             new DataPathService(Path.GetTempPath()),
-            new NullScanDiagnosticService());
+            new NullScanDiagnosticService(),
+            new NullAuditService());
 
         var results = new ObservableCollection<CollectionCard>();
         service.SearchCollection("", CardGame.OnePiece, results);
@@ -100,7 +102,8 @@ public class CardServiceCollectionTests : IDisposable
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
             NullLogger<CardSevice>.Instance,
             new DataPathService(Path.GetTempPath()),
-            new NullScanDiagnosticService());
+            new NullScanDiagnosticService(),
+            new NullAuditService());
 
         var results = new ObservableCollection<CollectionCard>();
         service.SearchCollection("Lightning", null, results);
@@ -120,7 +123,8 @@ public class CardServiceCollectionTests : IDisposable
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
             NullLogger<CardSevice>.Instance,
             new DataPathService(Path.GetTempPath()),
-            new NullScanDiagnosticService());
+            new NullScanDiagnosticService(),
+            new NullAuditService());
 
         var scans = new[]
         {
@@ -163,7 +167,8 @@ public class CardServiceCollectionTests : IDisposable
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
             NullLogger<CardSevice>.Instance,
             new DataPathService(Path.GetTempPath()),
-            new NullScanDiagnosticService());
+            new NullScanDiagnosticService(),
+            new NullAuditService());
 
         var scans = new[]
         {
@@ -249,7 +254,8 @@ public class CardServiceCollectionTests : IDisposable
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
             NullLogger<CardSevice>.Instance,
             new DataPathService(Path.GetTempPath()),
-            new NullScanDiagnosticService());
+            new NullScanDiagnosticService(),
+            new NullAuditService());
 
         var result = service.GetMatchingContainerIds("Lightning Bolt", CardGame.Mtg);
 
@@ -285,7 +291,8 @@ public class CardServiceCollectionTests : IDisposable
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
             NullLogger<CardSevice>.Instance,
             new DataPathService(Path.GetTempPath()),
-            new NullScanDiagnosticService());
+            new NullScanDiagnosticService(),
+            new NullAuditService());
 
         var result = service.GetMatchingContainerIds("", CardGame.Mtg);
 
@@ -322,5 +329,16 @@ public class CardServiceCollectionTests : IDisposable
     private class MockCollectionDbContextFactory(DbContextOptions<CollectionDbContext> options) : IDbContextFactory<CollectionDbContext>
     {
         public CollectionDbContext CreateDbContext() => new(options);
+    }
+
+    private class NullAuditService : IAuditService
+    {
+        public bool IsAuditActive => false;
+        public int? AuditLocationId => null;
+        public string? AuditLocationName => null;
+        public void StartAudit(int containerId) { }
+        public void EndAudit() { }
+        public CardMatch? FindScopedMatch(ulong hash, ulong[]? artHashes) => null;
+        public AuditReport GenerateReport(IEnumerable<ScannedCard> scannedCards) => throw new NotImplementedException();
     }
 }

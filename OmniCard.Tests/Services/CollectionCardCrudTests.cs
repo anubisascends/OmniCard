@@ -159,7 +159,8 @@ public class CollectionCardCrudTests : IDisposable
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
             NullLogger<CardSevice>.Instance,
             new DataPathService(Path.GetTempPath()),
-            new NullScanDiagnosticService());
+            new NullScanDiagnosticService(),
+            new NullAuditService());
     }
 
     private class StubHashService : IPerceptualHashService
@@ -190,5 +191,16 @@ public class CollectionCardCrudTests : IDisposable
     private class MockCollectionDbContextFactory(DbContextOptions<CollectionDbContext> options) : IDbContextFactory<CollectionDbContext>
     {
         public CollectionDbContext CreateDbContext() => new(options);
+    }
+
+    private class NullAuditService : IAuditService
+    {
+        public bool IsAuditActive => false;
+        public int? AuditLocationId => null;
+        public string? AuditLocationName => null;
+        public void StartAudit(int containerId) { }
+        public void EndAudit() { }
+        public CardMatch? FindScopedMatch(ulong hash, ulong[]? artHashes) => null;
+        public AuditReport GenerateReport(IEnumerable<ScannedCard> scannedCards) => throw new NotImplementedException();
     }
 }

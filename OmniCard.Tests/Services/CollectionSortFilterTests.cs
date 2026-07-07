@@ -52,7 +52,8 @@ public class CollectionSortFilterTests : IDisposable
         new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
         NullLogger<CardSevice>.Instance,
         new DataPathService(Path.GetTempPath()),
-        new NullScanDiagnosticService());
+        new NullScanDiagnosticService(),
+        new NullAuditService());
 
     [Fact]
     public void SearchCollection_WithSortPreset_CustomColorOrder()
@@ -269,5 +270,16 @@ public class CollectionSortFilterTests : IDisposable
     private class MockFactory(DbContextOptions<CollectionDbContext> options) : IDbContextFactory<CollectionDbContext>
     {
         public CollectionDbContext CreateDbContext() => new(options);
+    }
+
+    private class NullAuditService : IAuditService
+    {
+        public bool IsAuditActive => false;
+        public int? AuditLocationId => null;
+        public string? AuditLocationName => null;
+        public void StartAudit(int containerId) { }
+        public void EndAudit() { }
+        public CardMatch? FindScopedMatch(ulong hash, ulong[]? artHashes) => null;
+        public AuditReport GenerateReport(IEnumerable<ScannedCard> scannedCards) => throw new NotImplementedException();
     }
 }
