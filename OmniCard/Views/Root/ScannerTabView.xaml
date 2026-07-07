@@ -213,11 +213,11 @@
                             </Style>
                         </Button.Style>
                     </Button>
-                    <Separator/>
+                    <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={StaticResource BoolToVis}}"/>
                     <Button Command="{Binding ViewModel.GenerateAuditReportCommand}"
                             Content="Generate Audit Report"
                             Visibility="{Binding ViewModel.IsAuditMode, Converter={StaticResource BoolToVis}}"/>
-                    <Separator/>
+                    <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={StaticResource BoolToVis}}"/>
                     <Button Command="{Binding ViewModel.ReprocessScansCommand}"
                             Content="Reprocess Unmatched"
                             IsEnabled="{Binding ViewModel.IsAuditComplete, Converter={local:InverseBoolConverter}}"/>
