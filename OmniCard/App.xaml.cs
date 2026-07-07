@@ -113,6 +113,7 @@ public partial class App : Application
             // eBay OAuth
             services.AddSingleton<ICredentialStore, CredentialStore>();
             services.AddSingleton<IEbayAuthService, EbayAuthService>();
+            services.AddSingleton<IEbayCatalogService, EbayCatalogService>();
 
         })
         .ConfigureServices((_, services) =>
