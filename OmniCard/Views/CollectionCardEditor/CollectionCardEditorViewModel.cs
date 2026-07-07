@@ -251,6 +251,20 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
         OnPropertyChanged(nameof(IsSearchHidden));
     }
 
+    // eBay listing info (read-only display)
+    [ObservableProperty] public partial EbayListingStatus? EbayStatus { get; set; }
+    [ObservableProperty] public partial string? EbayItemId { get; set; }
+    [ObservableProperty] public partial decimal? EbayListedPrice { get; set; }
+    [ObservableProperty] public partial decimal? EbaySoldPrice { get; set; }
+    [ObservableProperty] public partial string? EbayBuyerUsername { get; set; }
+
+    public bool HasEbayListing => EbayStatus.HasValue;
+    public bool IsEbayActive => EbayStatus == EbayListingStatus.Active;
+    public bool IsEbaySold => EbayStatus == EbayListingStatus.Sold;
+    public bool CanListOnEbay => !IsEbayActive;
+
+    public string EbayStatusDisplay => EbayStatus?.ToString() ?? "Not Listed";
+
     // Dialog result
     public bool WasSaved { get; private set; }
     public bool WasDeleted { get; private set; }
@@ -314,6 +328,18 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
         Section = card.Section;
 
         RefreshPrintings();
+
+        // eBay listing info
+        EbayStatus = card.EbayListing?.Status;
+        EbayItemId = card.EbayListing?.EbayItemId;
+        EbayListedPrice = card.EbayListing?.ListedPrice;
+        EbaySoldPrice = card.EbayListing?.SoldPrice;
+        EbayBuyerUsername = card.EbayListing?.BuyerUsername;
+        OnPropertyChanged(nameof(HasEbayListing));
+        OnPropertyChanged(nameof(IsEbayActive));
+        OnPropertyChanged(nameof(IsEbaySold));
+        OnPropertyChanged(nameof(CanListOnEbay));
+        OnPropertyChanged(nameof(EbayStatusDisplay));
     }
 
     [RelayCommand]

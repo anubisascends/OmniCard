@@ -28,6 +28,7 @@
             <RowDefinition Height="Auto"/>  <!-- Card identity -->
             <RowDefinition Height="*"/>     <!-- Images -->
             <RowDefinition Height="Auto"/>  <!-- Properties / Location / Reassign -->
+            <RowDefinition Height="Auto"/>  <!-- eBay Status -->
             <RowDefinition Height="Auto"/>  <!-- Actions -->
         </Grid.RowDefinitions>
 
@@ -348,8 +349,30 @@
             </Grid>
         </Border>
 
+        <!-- eBay Status -->
+        <Border Grid.Row="3" Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                CornerRadius="4" Padding="10,8" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="eBay" FontSize="11" FontWeight="SemiBold"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                           VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <TextBlock Text="{Binding ViewModel.EbayStatusDisplay}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+
+                <TextBlock VerticalAlignment="Center" Margin="0,0,12,0"
+                           Visibility="{Binding ViewModel.IsEbayActive, Converter={StaticResource BoolToVis}}">
+                    <Run Text="$"/><Run Text="{Binding ViewModel.EbayListedPrice, Mode=OneWay, StringFormat=F2}"/>
+                </TextBlock>
+
+                <TextBlock VerticalAlignment="Center" Margin="0,0,12,0"
+                           Visibility="{Binding ViewModel.IsEbaySold, Converter={StaticResource BoolToVis}}">
+                    <Run Text="Sold $"/><Run Text="{Binding ViewModel.EbaySoldPrice, Mode=OneWay, StringFormat=F2}"/>
+                    <Run Text=" to "/><Run Text="{Binding ViewModel.EbayBuyerUsername, Mode=OneWay}"/>
+                </TextBlock>
+            </StackPanel>
+        </Border>
+
         <!-- Action Buttons -->
-        <Grid Grid.Row="3">
+        <Grid Grid.Row="4">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
