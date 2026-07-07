@@ -5,6 +5,21 @@ using OmniCard.Models;
 
 namespace OmniCard.Services;
 
+/// <summary>Exports an AuditReport to a PDF file. Implemented in Task 7.</summary>
+public interface IAuditPdfExporter
+{
+    void Export(AuditReport report, string filePath);
+}
+
+/// <summary>Placeholder stub until Task 7 implements the real PDF exporter.</summary>
+public sealed class StubAuditPdfExporter : IAuditPdfExporter
+{
+    public void Export(AuditReport report, string filePath)
+    {
+        // No-op stub — real implementation in Task 7
+    }
+}
+
 public interface IAuditService
 {
     bool IsAuditActive { get; }

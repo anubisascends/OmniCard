@@ -23,6 +23,7 @@ using OmniCard.Views.EbayAuth;
 using OmniCard.Views.DataLocation;
 using OmniCard.Views.SetFilterBuilder;
 using OmniCard.Views.SortFilterBuilder;
+using OmniCard.Views.AuditReport;
 using OmniCard.Views.SealedProductEditor;
 using OmniCard.Views.StorageManager;
 
@@ -107,6 +108,7 @@ public partial class App : Application
 
             // Location audit
             services.AddSingleton<IAuditService, AuditService>();
+            services.AddSingleton<IAuditPdfExporter, StubAuditPdfExporter>();
 
             // eBay OAuth
             services.AddSingleton<ICredentialStore, CredentialStore>();
@@ -145,6 +147,8 @@ public partial class App : Application
             services.AddTransient<SealedProductEntryViewModel>();
             services.AddTransient<CrackProductView>();
             services.AddTransient<CrackProductViewModel>();
+            services.AddTransient<AuditReportView>();
+            services.AddTransient<AuditReportViewModel>();
         })
         .Build();
 

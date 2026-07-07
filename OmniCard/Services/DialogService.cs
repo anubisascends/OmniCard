@@ -12,6 +12,7 @@ using OmniCard.Views.SetFilterBuilder;
 using OmniCard.Views.SortFilterBuilder;
 using OmniCard.Views.MoveToLocation;
 using OmniCard.Views.SealedProductEditor;
+using OmniCard.Views.AuditReport;
 using OmniCard.Views.StorageManager;
 
 namespace OmniCard.Services;
@@ -166,11 +167,11 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         return result == true ? wnd.ViewModel.Result : null;
     }
 
-    // Stub implementation — replaced in Task 6 with a real dialog
     public void ShowAuditReport(AuditReport report)
     {
-        MessageBox.Show(
-            $"Audit Report: {report.Matched.Count} matched, {report.Missing.Count} missing, {report.Extra.Count} extra",
-            $"Audit — {report.LocationName}");
+        var wnd = Services.GetRequiredService<AuditReportView>();
+        wnd.Owner = Application.Current.MainWindow;
+        wnd.ViewModel.Load(report);
+        wnd.ShowDialog();
     }
 }

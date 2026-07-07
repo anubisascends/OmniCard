@@ -1,0 +1,375 @@
+<Window x:Class="OmniCard.Views.AuditReport.AuditReportView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:OmniCard.Views.AuditReport"
+        xmlns:root="clr-namespace:OmniCard.Views.Root"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Title="{Binding Report.LocationName, StringFormat='Audit Report — {0}', FallbackValue='Audit Report'}"
+        Height="680" Width="820"
+        MinHeight="500" MinWidth="640"
+        Background="{DynamicResource MaterialDesign.Brush.Background}"
+        TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="13"
+        FontFamily="{StaticResource AppFont}">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <root:NullToCollapsedConverter x:Key="NullToCollapsed"/>
+        <root:NullToVisibleConverter x:Key="NullToVisible"/>
+
+        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+
+        <Style x:Key="CountBadgeStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+        </Style>
+
+        <DataTemplate x:Key="MatchedItemTemplate">
+            <Grid Margin="2,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="60"/>
+                    <ColumnDefinition Width="80"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"/>
+                <TextBlock Grid.Column="1" Text="{Binding SetCode}" VerticalAlignment="Center"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                <TextBlock Grid.Column="2" Text="{Binding CollectorNumber, StringFormat='#{0}'}"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                <TextBlock Grid.Column="3" Text="{Binding Confidence, StringFormat='{}{0:F0}%'}"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                           Visibility="{Binding Confidence, Converter={StaticResource NullToCollapsed}}"/>
+            </Grid>
+        </DataTemplate>
+
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="1*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Summary header -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                Padding="16,10" Margin="0,0,0,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Report.LocationName, FallbackValue='Location'}"
+                               FontSize="16" FontWeight="Bold"/>
+                    <TextBlock Text="{Binding Report.GeneratedAt, StringFormat='Generated: {0:yyyy-MM-dd HH:mm}'}"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                               FontSize="11"/>
+                </StackPanel>
+                <UniformGrid Grid.Column="1" Rows="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <StackPanel Margin="12,0" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding Report.ExpectedCount}" FontSize="20" FontWeight="Bold"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="Expected" FontSize="10"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel Margin="12,0" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding Report.ActualCount}" FontSize="20" FontWeight="Bold"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="Scanned" FontSize="10"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel Margin="12,0" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding Report.Matched.Count}" FontSize="20" FontWeight="Bold"
+                                   Foreground="Green" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Matched" FontSize="10"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel Margin="12,0" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding Report.Missing.Count}" FontSize="20" FontWeight="Bold"
+                                   Foreground="OrangeRed" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Missing" FontSize="10"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel Margin="12,0" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding Report.Extra.Count}" FontSize="20" FontWeight="Bold"
+                                   Foreground="DodgerBlue" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Extra" FontSize="10"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </UniformGrid>
+            </Grid>
+        </Border>
+
+        <!-- Main content: Expanders + Assignment panel -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1*"/>
+                <ColumnDefinition Width="Auto"
+                                  MinWidth="0"
+                                  MaxWidth="280"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Three Expanders -->
+            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="8,0,4,0">
+                <StackPanel>
+
+                    <!-- Matched -->
+                    <Expander IsExpanded="True" Margin="0,0,0,6">
+                        <Expander.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Matched" Style="{StaticResource SectionHeaderStyle}"/>
+                                <TextBlock Text="{Binding Report.Matched.Count, StringFormat='({0})'}"
+                                           Style="{StaticResource CountBadgeStyle}"/>
+                            </StackPanel>
+                        </Expander.Header>
+                        <ListView ItemsSource="{Binding Report.Matched}"
+                                  ItemTemplate="{StaticResource MatchedItemTemplate}"
+                                  MaxHeight="200"
+                                  SelectionMode="Single">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Name" Width="220"
+                                                    DisplayMemberBinding="{Binding Name}"/>
+                                    <GridViewColumn Header="Set" Width="70"
+                                                    DisplayMemberBinding="{Binding SetCode}"/>
+                                    <GridViewColumn Header="#" Width="55"
+                                                    DisplayMemberBinding="{Binding CollectorNumber}"/>
+                                    <GridViewColumn Header="Confidence" Width="80"
+                                                    DisplayMemberBinding="{Binding Confidence, StringFormat='{}{0:F0}%'}"/>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Expander>
+
+                    <!-- Missing -->
+                    <Expander IsExpanded="True" Margin="0,0,0,6">
+                        <Expander.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Missing" Style="{StaticResource SectionHeaderStyle}"
+                                           Foreground="OrangeRed"/>
+                                <TextBlock Text="{Binding Report.Missing.Count, StringFormat='({0})'}"
+                                           Style="{StaticResource CountBadgeStyle}"/>
+                            </StackPanel>
+                        </Expander.Header>
+                        <ListView ItemsSource="{Binding Report.Missing}"
+                                  MaxHeight="200"
+                                  SelectionMode="Single">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Name" Width="200">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Name, FallbackValue='(unmatched)'}"
+                                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                               Width="130"/>
+                                                    <TextBlock Text=" [Manual]"
+                                                               FontSize="10"
+                                                               Foreground="{DynamicResource MaterialDesign.Brush.Secondary}"
+                                                               VerticalAlignment="Center"
+                                                               Visibility="{Binding IsManuallyAssigned, Converter={StaticResource BoolToVis}}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="Set" Width="60"
+                                                    DisplayMemberBinding="{Binding SetCode}"/>
+                                    <GridViewColumn Header="#" Width="50"
+                                                    DisplayMemberBinding="{Binding CollectorNumber}"/>
+                                    <GridViewColumn Header="" Width="80">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Content="Assign..."
+                                                        Padding="6,2" FontSize="11"
+                                                        Command="{Binding DataContext.BeginAssignmentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Expander>
+
+                    <!-- Extra -->
+                    <Expander IsExpanded="True" Margin="0,0,0,6">
+                        <Expander.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Extra" Style="{StaticResource SectionHeaderStyle}"
+                                           Foreground="DodgerBlue"/>
+                                <TextBlock Text="{Binding Report.Extra.Count, StringFormat='({0})'}"
+                                           Style="{StaticResource CountBadgeStyle}"/>
+                            </StackPanel>
+                        </Expander.Header>
+                        <ListView ItemsSource="{Binding Report.Extra}"
+                                  MaxHeight="200"
+                                  SelectionMode="Single">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Name" Width="200">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Name, FallbackValue='(unmatched)'}"
+                                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                               Width="130"/>
+                                                    <TextBlock Text=" [Manual]"
+                                                               FontSize="10"
+                                                               Foreground="{DynamicResource MaterialDesign.Brush.Secondary}"
+                                                               VerticalAlignment="Center"
+                                                               Visibility="{Binding IsManuallyAssigned, Converter={StaticResource BoolToVis}}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="Set" Width="60"
+                                                    DisplayMemberBinding="{Binding SetCode}"/>
+                                    <GridViewColumn Header="#" Width="50"
+                                                    DisplayMemberBinding="{Binding CollectorNumber}"/>
+                                    <GridViewColumn Header="" Width="80">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Content="Assign..."
+                                                        Padding="6,2" FontSize="11"
+                                                        Command="{Binding DataContext.BeginAssignmentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Expander>
+
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Assignment panel — visible when SelectedItemForAssignment is not null -->
+            <Border Grid.Column="1"
+                    Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                    BorderBrush="{DynamicResource MaterialDesign.Brush.Primary}"
+                    BorderThickness="1,0,0,0"
+                    Padding="10,8"
+                    Margin="4,0,0,0"
+                    Visibility="{Binding SelectedItemForAssignment, Converter={StaticResource NullToCollapsed}}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="1*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="Assign Card" FontWeight="SemiBold" Margin="0,0,0,6"/>
+
+                    <TextBlock Grid.Row="1"
+                               Text="{Binding SelectedItemForAssignment.Name, StringFormat='Assigning: {0}', FallbackValue='Assigning item'}"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                               FontSize="11" Margin="0,0,0,8"/>
+
+                    <!-- Search row -->
+                    <Grid Grid.Row="2" Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding ManualSearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                                 Tag="Search cards..."
+                                 VerticalContentAlignment="Center">
+                            <TextBox.InputBindings>
+                                <KeyBinding Key="Return" Command="{Binding SearchForAssignmentCommand}"/>
+                            </TextBox.InputBindings>
+                        </TextBox>
+                        <Button Grid.Column="1" Content="Go"
+                                Padding="8,4" Margin="4,0,0,0"
+                                Command="{Binding SearchForAssignmentCommand}"/>
+                    </Grid>
+
+                    <!-- Search results -->
+                    <ListView Grid.Row="3"
+                              ItemsSource="{Binding SearchResults}"
+                              Visibility="{Binding SearchResults, Converter={StaticResource NullToCollapsed}}"
+                              SelectionMode="Single">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Row="0" Grid.Column="0"
+                                               Text="{Binding Name}"
+                                               FontWeight="SemiBold" FontSize="11"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="0"
+                                               FontSize="10"
+                                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}">
+                                        <Run Text="{Binding SetCode}"/>
+                                        <Run Text="{Binding CollectorNumber, StringFormat='#{0}'}"/>
+                                    </TextBlock>
+                                    <Button Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
+                                            Content="Select"
+                                            Padding="6,2" FontSize="10"
+                                            VerticalAlignment="Center"
+                                            Command="{Binding DataContext.AssignCardCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+
+                    <!-- Cancel assignment -->
+                    <Button Grid.Row="3"
+                            Content="Cancel"
+                            Padding="8,4"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Bottom"
+                            Margin="0,8,0,0"
+                            Command="{Binding CancelAssignmentCommand}"/>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Separator -->
+        <Separator Grid.Row="2" Margin="0,4"/>
+
+        <!-- Footer -->
+        <StackPanel Grid.Row="3"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="8,0,8,8">
+            <Button Content="Export to PDF"
+                    Command="{Binding ExportToPdfCommand}"
+                    Padding="16,6"
+                    Margin="0,0,8,0"/>
+            <Button Content="Close"
+                    IsCancel="True"
+                    Padding="16,6"
+                    FontWeight="SemiBold"
+                    Click="CloseButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
