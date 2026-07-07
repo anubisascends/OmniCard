@@ -312,3 +312,25 @@ public class FoilToFinishConverter : MarkupExtension, IValueConverter
 
     public override object ProvideValue(IServiceProvider serviceProvider) => this;
 }
+
+/// <summary>
+/// Compares an enum value to the ConverterParameter string.
+/// Returns true when they match; sets the enum value on ConvertBack.
+/// Used to bind RadioButton.IsChecked to an enum property.
+/// </summary>
+public class EnumBoolConverter : MarkupExtension, IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is null || parameter is null) return false;
+        return value.ToString() == parameter.ToString();
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is not true || parameter is null) return Binding.DoNothing;
+        return Enum.Parse(targetType, parameter.ToString()!);
+    }
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}

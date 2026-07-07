@@ -154,6 +154,7 @@ public partial class App : Application
             services.AddTransient<AuditReportView>();
             services.AddTransient<AuditReportViewModel>();
             services.AddTransient<EbayListingViewModel>();
+            services.AddTransient<EbayListingView>();
         })
         .Build();
 
