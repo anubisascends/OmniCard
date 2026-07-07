@@ -166,6 +166,7 @@ public sealed partial class CollectionViewModel : ViewModel
         OnPropertyChanged(nameof(GroupedLocations));
         OnPropertyChanged(nameof(IsBulkVisible));
         OnPropertyChanged(nameof(IsOverviewSearchActive));
+        OnPropertyChanged(nameof(HasVisibleLocations));
     }
 
     private void ResetSearchState()
@@ -192,6 +193,9 @@ public sealed partial class CollectionViewModel : ViewModel
     public bool IsBulkVisible =>
         _matchingContainerIds is null ||
         (BulkSummary is not null && _matchingContainerIds.Contains(BulkSummary.Container.Id));
+
+    public bool HasVisibleLocations =>
+        IsBulkVisible || GroupedLocations.Any();
 
     public IEnumerable<IGrouping<ContainerType, LocationTileSummary>> GroupedLocations
     {
@@ -418,6 +422,7 @@ public sealed partial class CollectionViewModel : ViewModel
             OnPropertyChanged(nameof(GroupedLocations));
             OnPropertyChanged(nameof(IsBulkVisible));
             OnPropertyChanged(nameof(IsOverviewSearchActive));
+            OnPropertyChanged(nameof(HasVisibleLocations));
             return;
         }
 

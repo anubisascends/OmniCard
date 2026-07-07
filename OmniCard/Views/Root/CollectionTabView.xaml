@@ -32,9 +32,7 @@
         <ToolBarPanel Grid.Row="1">
             <ToolBarPanel.Style>
                 <Style TargetType="ToolBarPanel">
-                    <Setter Property="Visibility" Value="{Binding DataContext.ViewModel.Collection.ShowCardList,
-                        RelativeSource={RelativeSource AncestorType=Window},
-                        Converter={local:BoolToVisibilityConverter}}"/>
+                    <Setter Property="Visibility" Value="Visible"/>
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding DataContext.ViewModel.Sealed.ShowSealed,
                             RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
@@ -50,16 +48,26 @@
                             Command="{Binding DataContext.ViewModel.Collection.NavigateBackCommand,
                                 RelativeSource={RelativeSource AncestorType=Window}}"
                             Padding="8,4"
-                            Margin="0,0,8,0"/>
-                    <Separator/>
+                            Margin="0,0,8,0"
+                            Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                                RelativeSource={RelativeSource AncestorType=Window},
+                                Converter={local:BoolToVisibilityConverter}}"/>
+                    <Separator Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                        RelativeSource={RelativeSource AncestorType=Window},
+                        Converter={local:BoolToVisibilityConverter}}"/>
 
                     <!-- Location name -->
                     <TextBlock Text="{Binding DataContext.ViewModel.Collection.CurrentLocationName,
                                    RelativeSource={RelativeSource AncestorType=Window}}"
                                FontWeight="SemiBold"
                                VerticalAlignment="Center"
-                               Margin="0,0,12,0"/>
-                    <Separator/>
+                               Margin="0,0,12,0"
+                               Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                                   RelativeSource={RelativeSource AncestorType=Window},
+                                   Converter={local:BoolToVisibilityConverter}}"/>
+                    <Separator Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                        RelativeSource={RelativeSource AncestorType=Window},
+                        Converter={local:BoolToVisibilityConverter}}"/>
 
                     <!-- Search -->
                     <TextBox x:Name="CollectionSearchBox"
@@ -79,52 +87,79 @@
                             Command="{Binding DataContext.ViewModel.Collection.SearchCollectionCommand,
                                 RelativeSource={RelativeSource AncestorType=Window}}"
                             Padding="8,4"/>
-                    <Separator/>
+                    <Separator Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                        RelativeSource={RelativeSource AncestorType=Window},
+                        Converter={local:BoolToVisibilityConverter}}"/>
 
                     <!-- Sort/Filter presets -->
                     <TextBlock Text="Sort:"
                             VerticalAlignment="Center"
-                            Margin="4,0,4,0"/>
+                            Margin="4,0,4,0"
+                            Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                                RelativeSource={RelativeSource AncestorType=Window},
+                                Converter={local:BoolToVisibilityConverter}}"/>
                     <ComboBox ItemsSource="{Binding DataContext.ViewModel.Collection.AvailableSortPresets,
                                   RelativeSource={RelativeSource AncestorType=Window}}"
                               SelectedItem="{Binding DataContext.ViewModel.Collection.SelectedSortPreset,
                                   RelativeSource={RelativeSource AncestorType=Window}}"
                               DisplayMemberPath="Name"
                               Width="120"
-                              VerticalAlignment="Center"/>
+                              VerticalAlignment="Center"
+                              Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                                  RelativeSource={RelativeSource AncestorType=Window},
+                                  Converter={local:BoolToVisibilityConverter}}"/>
                     <Button Content="X"
                             FontSize="10"
                             Padding="4,2"
                             Command="{Binding DataContext.ViewModel.Collection.ResetSelectedSortPresetCommand,
                                 RelativeSource={RelativeSource AncestorType=Window}}"
-                            Style="{StaticResource MaterialDesignFlatButton}"/>
+                            Style="{StaticResource MaterialDesignFlatButton}"
+                            Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                                RelativeSource={RelativeSource AncestorType=Window},
+                                Converter={local:BoolToVisibilityConverter}}"/>
 
                     <TextBlock Text="Filter:"
                             VerticalAlignment="Center"
-                            Margin="4,0,4,0"/>
+                            Margin="4,0,4,0"
+                            Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                                RelativeSource={RelativeSource AncestorType=Window},
+                                Converter={local:BoolToVisibilityConverter}}"/>
                     <ComboBox ItemsSource="{Binding DataContext.ViewModel.Collection.AvailableFilterPresets,
                                   RelativeSource={RelativeSource AncestorType=Window}}"
                               SelectedItem="{Binding DataContext.ViewModel.Collection.SelectedFilterPreset,
                                   RelativeSource={RelativeSource AncestorType=Window}}"
                               DisplayMemberPath="Name"
                               Width="120"
-                              VerticalAlignment="Center"/>
+                              VerticalAlignment="Center"
+                              Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                                  RelativeSource={RelativeSource AncestorType=Window},
+                                  Converter={local:BoolToVisibilityConverter}}"/>
                     <Button Content="X"
                             FontSize="10"
                             Padding="4,2"
                             Command="{Binding DataContext.ViewModel.Collection.ResetSelectedFilterPresetCommand,
                                 RelativeSource={RelativeSource AncestorType=Window}}"
-                            Style="{StaticResource MaterialDesignFlatButton}"/>
+                            Style="{StaticResource MaterialDesignFlatButton}"
+                            Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                                RelativeSource={RelativeSource AncestorType=Window},
+                                Converter={local:BoolToVisibilityConverter}}"/>
 
-                    <Separator/>
+                    <Separator Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                        RelativeSource={RelativeSource AncestorType=Window},
+                        Converter={local:BoolToVisibilityConverter}}"/>
 
                     <!-- Stack duplicates toggle -->
                     <CheckBox Content="Stack Duplicates"
                               IsChecked="{Binding DataContext.ViewModel.Collection.IsStacked,
                                       RelativeSource={RelativeSource AncestorType=Window}}"
-                              Padding="8,4"/>
+                              Padding="8,4"
+                              Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                                  RelativeSource={RelativeSource AncestorType=Window},
+                                  Converter={local:BoolToVisibilityConverter}}"/>
 
-                    <Separator/>
+                    <Separator Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                        RelativeSource={RelativeSource AncestorType=Window},
+                        Converter={local:BoolToVisibilityConverter}}"/>
 
                     <!-- Column chooser -->
                     <Button x:Name="ColumnChooserLink"
@@ -133,7 +168,10 @@
                             Margin="4,0"
                             Cursor="Hand"
                             Style="{StaticResource MaterialDesignFlatButton}"
-                            Padding="4,2">
+                            Padding="4,2"
+                            Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                                RelativeSource={RelativeSource AncestorType=Window},
+                                Converter={local:BoolToVisibilityConverter}}">
                         <TextBlock TextDecorations="Underline"
                                    Text="Columns"
                                    Foreground="{DynamicResource MaterialDesign.Brush.Primary}"/>
@@ -142,7 +180,10 @@
                            PlacementTarget="{Binding ElementName=ColumnChooserLink}"
                            Placement="Bottom"
                            StaysOpen="False"
-                           AllowsTransparency="True">
+                           AllowsTransparency="True"
+                           Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                               RelativeSource={RelativeSource AncestorType=Window},
+                               Converter={local:BoolToVisibilityConverter}}">
                         <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
                                 CornerRadius="4"
                                 Padding="8"

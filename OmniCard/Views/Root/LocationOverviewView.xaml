@@ -123,7 +123,10 @@
                     Style="{StaticResource MaterialDesignFlatButton}"/>
 
             <!-- Bulk container (same tile size as others, in a 3-column grid) -->
-            <UniformGrid Columns="3" Margin="0,0,0,12">
+            <UniformGrid Columns="3" Margin="0,0,0,12"
+                         Visibility="{Binding DataContext.ViewModel.Collection.IsBulkVisible,
+                             RelativeSource={RelativeSource AncestorType=Window},
+                             Converter={local:BoolToVisibilityConverter}}">
                 <ContentControl Content="{Binding DataContext.ViewModel.Collection.BulkSummary,
                                     RelativeSource={RelativeSource AncestorType=Window}}"
                                 ContentTemplate="{StaticResource LocationTileTemplate}"/>
@@ -151,6 +154,31 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+
+            <!-- No matching locations placeholder -->
+            <TextBlock Text="No matching locations"
+                       HorizontalAlignment="Center"
+                       Margin="0,40,0,0"
+                       FontSize="18"
+                       FontStyle="Italic"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding DataContext.ViewModel.Collection.IsOverviewSearchActive,
+                                        RelativeSource={RelativeSource AncestorType=Window}}" Value="True"/>
+                                    <Condition Binding="{Binding DataContext.ViewModel.Collection.HasVisibleLocations,
+                                        RelativeSource={RelativeSource AncestorType=Window}}" Value="False"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </MultiDataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
 
         </StackPanel>
     </ScrollViewer>
