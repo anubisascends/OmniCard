@@ -163,6 +163,9 @@ public sealed partial class CollectionViewModel : ViewModel
         MarketPrices.Clear();
         TotalCardCount = 0;
         LoadOverview();
+        OnPropertyChanged(nameof(GroupedLocations));
+        OnPropertyChanged(nameof(IsBulkVisible));
+        OnPropertyChanged(nameof(IsOverviewSearchActive));
     }
 
     private void ResetSearchState()
@@ -172,6 +175,7 @@ public sealed partial class CollectionViewModel : ViewModel
         SelectedFilterPreset = null;
         _adHocSortLevels.Clear();
         IsAdHocSortActive = false;
+        _matchingContainerIds = null;
     }
 
     // --- Overview ---
@@ -181,10 +185,27 @@ public sealed partial class CollectionViewModel : ViewModel
     [ObservableProperty]
     public partial LocationTileSummary? BulkSummary { get; set; }
 
-    public IEnumerable<IGrouping<ContainerType, LocationTileSummary>> GroupedLocations =>
-        LocationSummaries
-            .OrderBy(s => s.Container.Name, StringComparer.OrdinalIgnoreCase)
-            .GroupBy(s => s.Container.ContainerType);
+    private HashSet<int>? _matchingContainerIds;
+
+    public bool IsOverviewSearchActive => _matchingContainerIds is not null;
+
+    public bool IsBulkVisible =>
+        _matchingContainerIds is null ||
+        (BulkSummary is not null && _matchingContainerIds.Contains(BulkSummary.Container.Id));
+
+    public IEnumerable<IGrouping<ContainerType, LocationTileSummary>> GroupedLocations
+    {
+        get
+        {
+            var source = _matchingContainerIds is not null
+                ? LocationSummaries.Where(s => _matchingContainerIds.Contains(s.Container.Id))
+                : LocationSummaries;
+
+            return source
+                .OrderBy(s => s.Container.Name, StringComparer.OrdinalIgnoreCase)
+                .GroupBy(s => s.Container.ContainerType);
+        }
+    }
 
     public void LoadOverview()
     {
@@ -381,6 +402,26 @@ public sealed partial class CollectionViewModel : ViewModel
     [RelayCommand]
     public async Task SearchCollection()
     {
+        // Overview mode: filter location tiles instead of searching cards
+        if (!ShowCardList)
+        {
+            var overviewQuery = CollectionSearchQuery;
+            if (string.IsNullOrWhiteSpace(overviewQuery))
+            {
+                _matchingContainerIds = null;
+            }
+            else
+            {
+                _matchingContainerIds = await Task.Run(() =>
+                    _cardService.GetMatchingContainerIds(overviewQuery, _selectedGame));
+            }
+            OnPropertyChanged(nameof(GroupedLocations));
+            OnPropertyChanged(nameof(IsBulkVisible));
+            OnPropertyChanged(nameof(IsOverviewSearchActive));
+            return;
+        }
+
+        // --- existing card-list search code below (unchanged) ---
         var sortPreset = IsAdHocSortActive
             ? new SortPreset { Name = "Ad-hoc", Game = _selectedGame, SortLevels = _adHocSortLevels }
             : SelectedSortPreset;
