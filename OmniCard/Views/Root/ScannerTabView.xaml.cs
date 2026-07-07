@@ -23,6 +23,9 @@ public partial class ScannerTabView : UserControl
     public void WireUpAutoScroll()
     {
         if (ViewModel is null) return;
+
+        // Unsubscribe first to prevent accumulation if called multiple times
+        ViewModel.CardService.ScannedCards.CollectionChanged -= ScannedCards_CollectionChanged;
         ViewModel.CardService.ScannedCards.CollectionChanged += ScannedCards_CollectionChanged;
 
         // Restore persisted scanner list width

@@ -17,7 +17,7 @@ public sealed class ScanImageCache
 
     public string TempScansDirectory { get; }
 
-    public ScanImageCache(IDataPathService dataPathService, ILogger<ScanImageCache> logger, int capacity = 200)
+    public ScanImageCache(IDataPathService dataPathService, ILogger<ScanImageCache> logger, int capacity = 100)
     {
         TempScansDirectory = dataPathService.TempScansDirectory;
         _logger = logger;

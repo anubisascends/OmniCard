@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using OmniCard.Models;
@@ -7,6 +8,8 @@ namespace OmniCard.Views.Root;
 public partial class CollectionTabView : UserControl
 {
     public RootViewModel? ViewModel { get; set; }
+    private CollectionViewModel? _wiredVm;
+    private PropertyChangedEventHandler? _vmHandler;
 
     public CollectionTabView()
     {
@@ -15,13 +18,18 @@ public partial class CollectionTabView : UserControl
 
     public void WireUp(CollectionViewModel vm)
     {
+        if (_wiredVm is not null && _vmHandler is not null)
+            _wiredVm.PropertyChanged -= _vmHandler;
+
+        _wiredVm = vm;
         CardList.WireUp(vm);
         BuildColumnChooser(vm);
-        vm.PropertyChanged += (_, e) =>
+        _vmHandler = (_, e) =>
         {
             if (e.PropertyName == nameof(CollectionViewModel.ColumnVisibility))
                 BuildColumnChooser(vm);
         };
+        vm.PropertyChanged += _vmHandler;
     }
 
     private void BuildColumnChooser(CollectionViewModel vm)

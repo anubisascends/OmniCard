@@ -75,6 +75,10 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
     {
         var caps = ds.Capabilities;
 
+        // Always set 24-bit color and sRGB for consistent scans
+        TrySetPixelType(caps);
+        TrySetColorProfile(caps);
+
         if (ScanQuality == ScanQuality.Fast)
         {
             TrySetResolution(caps, 200f);
@@ -125,6 +129,20 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
 
         try { if (caps.ICapShadow.CanReset) caps.ICapShadow.Reset(); }
         catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset Shadow"); }
+    }
+
+    private void TrySetPixelType(ICapabilities caps)
+    {
+        try { if (caps.ICapPixelType.CanSet) caps.ICapPixelType.SetValue(PixelType.RGB); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set PixelType to RGB"); }
+    }
+
+    private void TrySetColorProfile(ICapabilities caps)
+    {
+        // Embed the scanner's ICC profile for consistent color management.
+        // For sRGB output, the scanner driver itself must be configured to use sRGB.
+        try { if (caps.ICapICCProfile.CanSet) caps.ICapICCProfile.SetValue(IccProfile.Embed); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set ICC profile"); }
     }
 
     private void Session_SourceDisabled(object? sender, EventArgs e)

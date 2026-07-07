@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Text.Json;
@@ -38,6 +39,7 @@ public sealed partial class RootViewModel(
 {
     private readonly ILogger<RootViewModel> _logger = logger;
     private readonly IScanDiagnosticService _diagnosticService = diagnosticService;
+    private NotifyCollectionChangedEventHandler? _scannedCardsHandler;
 
     /// <summary>The nested CollectionViewModel that owns all collection-specific state.</summary>
     public CollectionViewModel Collection { get; } = collection;
@@ -858,7 +860,10 @@ public sealed partial class RootViewModel(
         Sealed.LoadInstances();
 
         // Keep HasMatchedScans in sync with the ScannedCards collection
-        CardService.ScannedCards.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasMatchedScans));
+        if (_scannedCardsHandler is not null)
+            CardService.ScannedCards.CollectionChanged -= _scannedCardsHandler;
+        _scannedCardsHandler = (_, _) => OnPropertyChanged(nameof(HasMatchedScans));
+        CardService.ScannedCards.CollectionChanged += _scannedCardsHandler;
 
         LoadAvailableSets();
         LoadContainers(); // also calls Collection.LoadContainers()

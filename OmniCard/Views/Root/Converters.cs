@@ -255,18 +255,9 @@ public class CardPreviewImageConverter : MarkupExtension, IValueConverter
                 return cached;
         }
 
-        // Fall back to API image
+        // Fall back to API image via cache
         if (card.ImageUri is not null)
-        {
-            var bmp = new System.Windows.Media.Imaging.BitmapImage();
-            bmp.BeginInit();
-            bmp.UriSource = new Uri(card.ImageUri);
-            bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-            bmp.DecodePixelWidth = 250;
-            bmp.EndInit();
-            bmp.Freeze();
-            return bmp;
-        }
+            return CardArtCache.Instance?.GetImage(null, card.ImageUri);
 
         return null;
     }

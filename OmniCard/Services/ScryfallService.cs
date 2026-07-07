@@ -211,6 +211,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
 
         const int TieZone = 2;
         int bestPHashDistance = int.MaxValue;
+        int originalBestPHashDistance = int.MaxValue;
 
         foreach (var (id, hash) in hashCache)
         {
@@ -221,6 +222,8 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
             if (distance < bestPHashDistance)
                 bestPHashDistance = distance;
         }
+
+        originalBestPHashDistance = bestPHashDistance;
 
         if (bestPHashDistance == int.MaxValue)
         {
@@ -290,7 +293,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
                 artLookup.TryAdd(id, artHash);
 
             int bestCombined = int.MaxValue;
-            bestPHashId = pHashCandidates[0].Id;
+            bestPHashId = pHashCandidates.OrderBy(c => c.Distance).First().Id;
 
             foreach (var (candidateId, pDist) in pHashCandidates)
             {
@@ -318,9 +321,9 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
                 }
             }
 
-            if (bestPHashDistance > maxDistance)
+            if (originalBestPHashDistance > maxDistance)
             {
-                // Art-only fallback
+                // Art-only fallback — only when NO pHash candidate was within maxDistance
                 Guid bestArtOnlyId = default;
                 int bestArtOnlyDist = int.MaxValue;
                 foreach (var (id, refArtHash) in artHashCache)
@@ -578,6 +581,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
                     .Min();
                 if (bestArtDist < int.MaxValue)
                 {
+                    diagnostics.ArtHashDistance = bestArtDist;
                     var artConfidence = Math.Max(0, (1.0 - (double)bestArtDist / 20.0)) * 100;
                     matchConfidence = 0.5 * pHashConfidence + 0.5 * artConfidence;
                 }

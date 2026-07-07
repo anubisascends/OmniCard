@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
@@ -12,6 +13,8 @@ namespace OmniCard.Views.Root;
 public partial class CardListView : UserControl
 {
     public CollectionViewModel? ViewModel { get; set; }
+    private PropertyChangedEventHandler? _vmHandler;
+    private ScrollViewer? _scrollViewer;
 
     public CardListView()
     {
@@ -20,22 +23,29 @@ public partial class CardListView : UserControl
 
     public void WireUp(CollectionViewModel vm)
     {
+        if (ViewModel is not null && _vmHandler is not null)
+            ViewModel.PropertyChanged -= _vmHandler;
+
         ViewModel = vm;
         DataContext = vm;
-        vm.PropertyChanged += (_, e) =>
+        _vmHandler = (_, e) =>
         {
             if (e.PropertyName is nameof(CollectionViewModel.ColumnVisibility)
                 or nameof(CollectionViewModel.IsStacked))
                 SyncColumnVisibility();
         };
+        vm.PropertyChanged += _vmHandler;
         SyncColumnVisibility();
 
         // Hook scroll detection for incremental loading
         CollectionDataGrid.Loaded += (_, _) =>
         {
-            var scrollViewer = FindVisualChild<ScrollViewer>(CollectionDataGrid);
-            if (scrollViewer is not null)
-                scrollViewer.ScrollChanged += ScrollViewer_ScrollChanged;
+            if (_scrollViewer is not null)
+                _scrollViewer.ScrollChanged -= ScrollViewer_ScrollChanged;
+
+            _scrollViewer = FindVisualChild<ScrollViewer>(CollectionDataGrid);
+            if (_scrollViewer is not null)
+                _scrollViewer.ScrollChanged += ScrollViewer_ScrollChanged;
         };
     }
 
@@ -151,21 +161,7 @@ public partial class CardListView : UserControl
         ImageSource? imageSource;
         if (ViewModel.IsStacked && card.ImageUri is not null)
         {
-            try
-            {
-                var bmp = new BitmapImage();
-                bmp.BeginInit();
-                bmp.UriSource = new Uri(card.ImageUri);
-                bmp.CacheOption = BitmapCacheOption.OnLoad;
-                bmp.DecodePixelWidth = 250;
-                bmp.EndInit();
-                bmp.Freeze();
-                imageSource = bmp;
-            }
-            catch
-            {
-                imageSource = null;
-            }
+            imageSource = Services.CardArtCache.Instance?.GetImage(null, card.ImageUri);
         }
         else
         {
