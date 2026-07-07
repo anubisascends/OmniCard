@@ -26,6 +26,7 @@ using OmniCard.Views.SortFilterBuilder;
 using OmniCard.Views.AuditReport;
 using OmniCard.Views.SealedProductEditor;
 using OmniCard.Views.StorageManager;
+using OmniCard.Views.EbayListing;
 
 namespace OmniCard;
 
@@ -152,6 +153,7 @@ public partial class App : Application
             services.AddTransient<CrackProductViewModel>();
             services.AddTransient<AuditReportView>();
             services.AddTransient<AuditReportViewModel>();
+            services.AddTransient<EbayListingViewModel>();
         })
         .Build();
 
