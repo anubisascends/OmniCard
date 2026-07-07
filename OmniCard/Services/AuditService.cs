@@ -63,20 +63,19 @@ public sealed class AuditService : IAuditService
             .Where(c => c.ContainerId == containerId)
             .ToList();
 
-        // Get distinct GameCardIds to build scoped hash index
-        var gameCardIds = _expectedCards
-            .Select(c => c.GameCardId)
+        // Get distinct GameCardIds (as Guids) to build scoped hash index — filter server-side
+        var gameCardGuids = _expectedCards
+            .Select(c => { Guid.TryParse(c.GameCardId, out var g); return g; })
+            .Where(g => g != Guid.Empty)
             .Distinct()
-            .ToHashSet();
+            .ToList();
 
         // Build scoped hash index from Scryfall DB (Card model — Id is Guid PK)
         using var scryfallCtx = _scryfallDbFactory.CreateDbContext();
         var scryfallCards = scryfallCtx.Cards
             .AsNoTracking()
-            .Where(c => c.ImageHash != null)
+            .Where(c => c.ImageHash != null && gameCardGuids.Contains(c.Id))
             .Select(c => new { c.Id, Hash = c.ImageHash!.Value, c.Name, c.SetCode, c.CollectorNumber, c.ArtHash })
-            .AsEnumerable()
-            .Where(c => gameCardIds.Contains(c.Id.ToString()))
             .ToList();
 
         _scopedHashIndex = scryfallCards

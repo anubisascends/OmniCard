@@ -208,6 +208,17 @@
                                   SelectionMode="Single">
                             <ListView.View>
                                 <GridView>
+                                    <GridViewColumn Header="" Width="40">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Image Source="{Binding ScanImagePath}"
+                                                       Width="30" Height="40"
+                                                       Stretch="Uniform"
+                                                       RenderOptions.BitmapScalingMode="HighQuality"
+                                                       Visibility="{Binding ScanImagePath, Converter={StaticResource NullToCollapsed}}"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
                                     <GridViewColumn Header="Name" Width="200">
                                         <GridViewColumn.CellTemplate>
                                             <DataTemplate>

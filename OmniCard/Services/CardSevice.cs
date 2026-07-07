@@ -212,12 +212,24 @@ public sealed class CardSevice : ICardService
             if (scan.Match is not null)
                 continue;
 
-            var (match, game) = FindBestMatch(scan.Hash, scan.ArtHashes, null, SelectedSetFilter);
-            if (match is not null)
+            if (_auditService.IsAuditActive)
             {
-                scan.Match = match;
-                scan.Game = game;
-                _logger.LogInformation("Reprocess matched \"{CardName}\" in {Game}", match.Name, game);
+                var scopedMatch = _auditService.FindScopedMatch(scan.Hash, scan.ArtHashes);
+                if (scopedMatch is not null)
+                {
+                    scan.Match = scopedMatch;
+                    _logger.LogInformation("Reprocess (audit) matched \"{CardName}\"", scopedMatch.Name);
+                }
+            }
+            else
+            {
+                var (match, game) = FindBestMatch(scan.Hash, scan.ArtHashes, null, SelectedSetFilter);
+                if (match is not null)
+                {
+                    scan.Match = match;
+                    scan.Game = game;
+                    _logger.LogInformation("Reprocess matched \"{CardName}\" in {Game}", match.Name, game);
+                }
             }
         }
     }
