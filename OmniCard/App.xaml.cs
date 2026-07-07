@@ -115,6 +115,7 @@ public partial class App : Application
             services.AddSingleton<IEbayAuthService, EbayAuthService>();
             services.AddSingleton<IEbayCatalogService, EbayCatalogService>();
             services.AddSingleton<IEbayListingService, EbayListingService>();
+            services.AddSingleton<IEbaySyncService, EbaySyncService>();
 
         })
         .ConfigureServices((_, services) =>
