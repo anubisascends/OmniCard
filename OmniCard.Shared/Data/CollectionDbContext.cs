@@ -10,6 +10,7 @@ public class CollectionDbContext : DbContext
     public DbSet<MismatchLog> MismatchLogs => Set<MismatchLog>();
     public DbSet<FlagResolution> FlagResolutions => Set<FlagResolution>();
     public DbSet<ScanDiagnosticEvent> ScanDiagnosticEvents => Set<ScanDiagnosticEvent>();
+    public DbSet<EbayListing> EbayListings => Set<EbayListing>();
 
     public CollectionDbContext(DbContextOptions<CollectionDbContext> options) : base(options) { }
 
@@ -66,6 +67,22 @@ public class CollectionDbContext : DbContext
             e.HasIndex(d => d.ScanHash);
             e.HasIndex(d => d.SessionId);
             e.HasIndex(d => d.EventType);
+        });
+
+        modelBuilder.Entity<EbayListing>(e =>
+        {
+            e.HasKey(l => l.Id);
+            e.Property(l => l.Id).ValueGeneratedOnAdd();
+            e.Property(l => l.Status).HasConversion<string>();
+            e.Property(l => l.ListingType).HasConversion<string>();
+            e.HasIndex(l => l.CollectionCardId).IsUnique();
+            e.HasIndex(l => l.Status);
+            e.HasIndex(l => l.EbayItemId);
+
+            e.HasOne(l => l.CollectionCard)
+                .WithOne(c => c.EbayListing)
+                .HasForeignKey<EbayListing>(l => l.CollectionCardId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

@@ -219,6 +219,9 @@ public partial class App : Application
             // Ensure CoverCardId column on StorageContainers (added for collection redesign)
             EnsureCoverCardIdColumn(dataDir, collectionDbFactory, migrationLogger);
 
+            // Ensure EbayListings table (added for eBay listing integration)
+            EnsureEbayListingsTable(dataDir, migrationLogger);
+
             splash.SetStatus("Initializing databases...");
             // Initialize sealed products database
             using (var sealedCtx = Host.Services.GetRequiredService<IDbContextFactory<SealedProductDbContext>>().CreateDbContext())
@@ -436,6 +439,56 @@ public partial class App : Application
         conn.Open();
         EnsureCoverCardIdColumn(conn);
         logger.LogInformation("Added CoverCardId column to StorageContainers table");
+    }
+
+    private static void EnsureEbayListingsTable(
+        string dataDirectory,
+        Microsoft.Extensions.Logging.ILogger logger)
+    {
+        var dbPath = Path.Combine(dataDirectory, "collection.db");
+        if (!File.Exists(dbPath))
+            return;
+
+        using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+
+        // Check if table exists
+        cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='EbayListings'";
+        var exists = cmd.ExecuteScalar() is long count && count > 0;
+
+        if (!exists)
+        {
+            cmd.CommandText = """
+                CREATE TABLE EbayListings (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    CollectionCardId INTEGER NOT NULL UNIQUE,
+                    EbayItemId TEXT NOT NULL DEFAULT '',
+                    EbayCatalogProductId TEXT,
+                    Status TEXT NOT NULL DEFAULT 'Draft',
+                    ListingType TEXT NOT NULL DEFAULT 'FixedPrice',
+                    ListedPrice REAL NOT NULL DEFAULT 0,
+                    SoldPrice REAL,
+                    StartTime TEXT,
+                    EndTime TEXT,
+                    AuctionDuration INTEGER,
+                    BuyerUsername TEXT,
+                    LastSyncedAt TEXT,
+                    CreatedAt TEXT NOT NULL,
+                    ErrorMessage TEXT,
+                    FOREIGN KEY (CollectionCardId) REFERENCES Cards(Id) ON DELETE CASCADE
+                )
+                """;
+            cmd.ExecuteNonQuery();
+
+            cmd.CommandText = "CREATE INDEX IX_EbayListings_Status ON EbayListings(Status)";
+            cmd.ExecuteNonQuery();
+
+            cmd.CommandText = "CREATE INDEX IX_EbayListings_EbayItemId ON EbayListings(EbayItemId)";
+            cmd.ExecuteNonQuery();
+
+            logger.LogInformation("Created EbayListings table");
+        }
     }
 
     private static void BackfillColorCardType(
