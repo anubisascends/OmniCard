@@ -108,7 +108,7 @@ public partial class App : Application
 
             // Location audit
             services.AddSingleton<IAuditService, AuditService>();
-            services.AddSingleton<IAuditPdfExporter, StubAuditPdfExporter>();
+            services.AddSingleton<IAuditPdfExporter, AuditPdfExporter>();
 
             // eBay OAuth
             services.AddSingleton<ICredentialStore, CredentialStore>();
