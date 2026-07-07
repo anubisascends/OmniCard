@@ -69,6 +69,29 @@
                         RelativeSource={RelativeSource AncestorType=Window},
                         Converter={local:BoolToVisibilityConverter}}"/>
 
+                    <!-- Audit button (single location only) -->
+                    <Button Content="Audit"
+                            Command="{Binding DataContext.ViewModel.StartAuditCommand,
+                                RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding DataContext.ViewModel.Collection.CurrentLocationId,
+                                RelativeSource={RelativeSource AncestorType=Window}}"
+                            Padding="8,4"
+                            Margin="4,0,0,0">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                <Setter Property="Visibility" Value="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                                    RelativeSource={RelativeSource AncestorType=Window},
+                                    Converter={local:BoolToVisibilityConverter}}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DataContext.ViewModel.Collection.ShowAllCards,
+                                        RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+
                     <!-- Search -->
                     <TextBox x:Name="CollectionSearchBox"
                              Text="{Binding DataContext.ViewModel.Collection.CollectionSearchQuery,

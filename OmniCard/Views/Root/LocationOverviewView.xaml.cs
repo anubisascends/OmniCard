@@ -11,6 +11,15 @@ public partial class LocationOverviewView : UserControl
         InitializeComponent();
     }
 
+    private void AuditLocation_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem) return;
+        if (menuItem.DataContext is not LocationTileSummary summary) return;
+
+        var rootView = (RootView)Window.GetWindow(this)!;
+        rootView.ViewModel.StartAudit(summary.Container.Id);
+    }
+
     private void ChangeCoverArt_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem menuItem) return;
