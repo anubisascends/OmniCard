@@ -105,6 +105,9 @@ public partial class App : Application
             // Scan diagnostics
             services.AddSingleton<IScanDiagnosticService, ScanDiagnosticService>();
 
+            // Location audit
+            services.AddSingleton<IAuditService, AuditService>();
+
             // eBay OAuth
             services.AddSingleton<ICredentialStore, CredentialStore>();
             services.AddSingleton<IEbayAuthService, EbayAuthService>();
