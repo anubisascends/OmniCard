@@ -232,18 +232,6 @@ public sealed partial class CollectionViewModel : ViewModel
                 g => g.Key,
                 g => g.Sum(c => allPrices.GetValueOrDefault((c.GameCardId, c.IsFoil))));
 
-        // Set symbols per container (SQL distinct)
-        var setsByContainer = cardsQuery
-            .Select(c => new { c.ContainerId, c.SetCode })
-            .Distinct()
-            .ToList()
-            .GroupBy(c => c.ContainerId)
-            .ToDictionary(
-                g => g.Key,
-                g => g.OrderBy(c => c.SetCode)
-                      .Select(c => new SetCodeRarity { SetCode = c.SetCode, Rarity = "uncommon" })
-                      .ToList());
-
         // Cover images: only fetch the specific cards needed
         var coverCardIds = containers
             .Where(c => c.CoverCardId.HasValue)
@@ -286,7 +274,6 @@ public sealed partial class CollectionViewModel : ViewModel
                 PriceDelta = delta,
                 PriceDeltaPercent = deltaPercent,
                 CoverImageUri = coverUri,
-                SetSymbols = setsByContainer.GetValueOrDefault(container.Id, []),
             };
 
             if (container.IsSystem)
