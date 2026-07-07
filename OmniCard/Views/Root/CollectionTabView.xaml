@@ -28,7 +28,7 @@
             </StackPanel>
         </Border>
 
-        <!-- Toolbar (visible in card list mode, hidden when showing sealed) -->
+        <!-- Toolbar (hidden when showing sealed; card-list-only controls hidden in overview mode) -->
         <ToolBarPanel Grid.Row="1">
             <ToolBarPanel.Style>
                 <Style TargetType="ToolBarPanel">
