@@ -29,27 +29,6 @@
             <Setter Property="Margin" Value="6,0,0,0"/>
         </Style>
 
-        <DataTemplate x:Key="MatchedItemTemplate">
-            <Grid Margin="2,2">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1*"/>
-                    <ColumnDefinition Width="80"/>
-                    <ColumnDefinition Width="60"/>
-                    <ColumnDefinition Width="80"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis"/>
-                <TextBlock Grid.Column="1" Text="{Binding SetCode}" VerticalAlignment="Center"
-                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
-                <TextBlock Grid.Column="2" Text="{Binding CollectorNumber, StringFormat='#{0}'}"
-                           VerticalAlignment="Center"
-                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
-                <TextBlock Grid.Column="3" Text="{Binding Confidence, StringFormat='{}{0:F0}%'}"
-                           VerticalAlignment="Center"
-                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
-                           Visibility="{Binding Confidence, Converter={StaticResource NullToCollapsed}}"/>
-            </Grid>
-        </DataTemplate>
 
     </Window.Resources>
 
@@ -113,6 +92,13 @@
                                    Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
                                    HorizontalAlignment="Center"/>
                     </StackPanel>
+                    <StackPanel Margin="12,0" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding MatchRateText, Mode=OneWay}" FontSize="20" FontWeight="Bold"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="Match Rate" FontSize="10"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
                 </UniformGrid>
             </Grid>
         </Border>
@@ -140,7 +126,6 @@
                             </StackPanel>
                         </Expander.Header>
                         <ListView ItemsSource="{Binding Report.Matched}"
-                                  ItemTemplate="{StaticResource MatchedItemTemplate}"
                                   MaxHeight="200"
                                   SelectionMode="Single">
                             <ListView.View>
@@ -275,6 +260,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="1*"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <TextBlock Grid.Row="0" Text="Assign Card" FontWeight="SemiBold" Margin="0,0,0,6"/>
@@ -342,7 +328,7 @@
                     </ListView>
 
                     <!-- Cancel assignment -->
-                    <Button Grid.Row="3"
+                    <Button Grid.Row="4"
                             Content="Cancel"
                             Padding="8,4"
                             HorizontalAlignment="Right"

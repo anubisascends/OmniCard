@@ -23,7 +23,15 @@ public sealed partial class AuditReportViewModel(ICardService cardService) : Obs
     [ObservableProperty]
     public partial AuditReportItemModel? SelectedItemForAssignment { get; set; }
 
-    public void Load(AuditReportModel report) => Report = report;
+    public string MatchRateText => Report is not null && Report.ExpectedCount > 0
+        ? $"{(double)Report.Matched.Count / Report.ExpectedCount * 100:F1}%"
+        : "N/A";
+
+    public void Load(AuditReportModel report)
+    {
+        Report = report;
+        OnPropertyChanged(nameof(MatchRateText));
+    }
 
     [RelayCommand]
     public void SearchForAssignment()
