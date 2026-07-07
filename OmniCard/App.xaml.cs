@@ -114,6 +114,7 @@ public partial class App : Application
             services.AddSingleton<ICredentialStore, CredentialStore>();
             services.AddSingleton<IEbayAuthService, EbayAuthService>();
             services.AddSingleton<IEbayCatalogService, EbayCatalogService>();
+            services.AddSingleton<IEbayListingService, EbayListingService>();
 
         })
         .ConfigureServices((_, services) =>
