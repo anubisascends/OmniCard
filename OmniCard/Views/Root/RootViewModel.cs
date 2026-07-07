@@ -35,6 +35,7 @@ public sealed partial class RootViewModel(
     IDbContextFactory<CollectionDbContext> collectionDbContextFactory,
     SetSymbolCache setSymbolCache,
     IScanDiagnosticService diagnosticService,
+    IAuditService auditService,
     ILogger<RootViewModel> logger) : ViewModel
 {
     private readonly ILogger<RootViewModel> _logger = logger;
@@ -1194,9 +1195,56 @@ public sealed partial class RootViewModel(
     private record struct AuditSnapshot(double? Confidence, FlagReason FlagReason, ScanFlagFix? FlagFix);
     private Dictionary<ScannedCard, AuditSnapshot>? _preAuditSnapshots;
 
+    // --- Audit Mode ---
+
+    [ObservableProperty]
+    public partial bool IsAuditMode { get; set; }
+
+    public string AuditLocationName => auditService.AuditLocationName ?? "";
+
+    [RelayCommand]
+    public void StartAudit(int containerId)
+    {
+        if (IsAuditMode) return;
+
+        // Clear any existing scans
+        CardService.ScannedCards.Clear();
+
+        auditService.StartAudit(containerId);
+        IsAuditMode = true;
+        OnPropertyChanged(nameof(AuditLocationName));
+
+        // Switch to scanner tab (index 2)
+        SelectedTabIndex = 2;
+        _logger.LogInformation("Audit mode started for location {Id}", containerId);
+    }
+
+    [RelayCommand]
+    public void EndAudit()
+    {
+        if (!IsAuditMode) return;
+
+        CardService.ScannedCards.Clear();
+        auditService.EndAudit();
+        IsAuditMode = false;
+        OnPropertyChanged(nameof(AuditLocationName));
+        _logger.LogInformation("Audit mode ended");
+    }
+
+    [RelayCommand]
+    public void GenerateAuditReport()
+    {
+        if (!IsAuditMode) return;
+
+        var report = auditService.GenerateReport(CardService.ScannedCards);
+        dialogService.ShowAuditReport(report);
+    }
+
     [RelayCommand]
     public async Task CommitScans()
     {
+        if (IsAuditMode) return; // Cannot commit in audit mode
+
         var count = CardService.ScannedCards.Count;
         if (count == 0) return;
 

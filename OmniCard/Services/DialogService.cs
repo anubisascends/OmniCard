@@ -32,6 +32,7 @@ public interface IDialogService
     SealedProductTemplate? EditSealedProductTemplate(SealedProductTemplate? existing);
     List<SealedProductInstance>? OpenSealedProductEntry();
     List<SealedProductInstance>? CrackSealedProduct(SealedProductInstance instance);
+    void ShowAuditReport(AuditReport report);
 }
 
 public sealed class DialogService(IServiceProvider services) : IDialogService
@@ -163,5 +164,13 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         wnd.ViewModel.Load(fullInstance);
         var result = wnd.ShowDialog();
         return result == true ? wnd.ViewModel.Result : null;
+    }
+
+    // Stub implementation — replaced in Task 6 with a real dialog
+    public void ShowAuditReport(AuditReport report)
+    {
+        MessageBox.Show(
+            $"Audit Report: {report.Matched.Count} matched, {report.Missing.Count} missing, {report.Extra.Count} extra",
+            $"Audit — {report.LocationName}");
     }
 }
