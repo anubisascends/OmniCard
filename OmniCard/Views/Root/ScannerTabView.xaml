@@ -8,11 +8,30 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="1*"/>
         </Grid.RowDefinitions>
 
-        <ToolBarPanel>
+        <!-- Audit mode banner -->
+        <Border Grid.Row="0"
+                Background="#FF1565C0"
+                Padding="12,8"
+                Visibility="{Binding ViewModel.IsAuditMode, Converter={StaticResource BoolToVis}}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right"
+                        Content="Cancel Audit"
+                        Command="{Binding ViewModel.EndAuditCommand}"
+                        Margin="12,0,0,0"
+                        Padding="12,4"/>
+                <TextBlock Foreground="White" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center">
+                    <Run Text="Auditing: "/>
+                    <Run Text="{Binding ViewModel.AuditLocationName, Mode=OneWay}"/>
+                </TextBlock>
+            </DockPanel>
+        </Border>
+
+        <ToolBarPanel Grid.Row="1">
             <ToolBarTray>
                 <ToolBar>
                     <TextBlock Text="Only match from set(s):"
@@ -45,16 +64,18 @@
                             Margin="0,0,8,0"
                             Command="{Binding ViewModel.ClearSetFilterCommand}"
                             Style="{StaticResource MaterialDesignFlatButton}"/>
-                    <Separator/>
+                    <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
                     <TextBlock Text="Location:"
                                VerticalAlignment="Center"
-                               Margin="0,0,4,0"/>
+                               Margin="0,0,4,0"
+                               Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
                     <ComboBox ItemsSource="{Binding ViewModel.GroupedContainers}"
                               SelectedItem="{Binding ViewModel.ActiveContainer}"
                               DisplayMemberPath="Name"
                               Width="150"
                               VerticalAlignment="Center"
-                              Margin="0,0,4,0">
+                              Margin="0,0,4,0"
+                              Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}">
                         <ComboBox.GroupStyle>
                             <GroupStyle>
                                 <GroupStyle.HeaderTemplate>
@@ -69,53 +90,63 @@
                         </ComboBox.GroupStyle>
                     </ComboBox>
 
-                    <!-- Binder position fields -->
-                    <TextBlock Text="Page:"
-                               VerticalAlignment="Center"
-                               Margin="4,0,4,0"
-                               Visibility="{Binding ViewModel.ShowBinderFields, Converter={StaticResource BoolToVis}}"/>
-                    <TextBox Text="{Binding ViewModel.ActivePage, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
-                             Width="40"
-                             VerticalAlignment="Center"
-                             Margin="0,0,4,0"
-                             Visibility="{Binding ViewModel.ShowBinderFields, Converter={StaticResource BoolToVis}}"/>
-                    <TextBlock Text="Slot:"
-                               VerticalAlignment="Center"
-                               Margin="0,0,4,0"
-                               Visibility="{Binding ViewModel.ShowBinderFields, Converter={StaticResource BoolToVis}}"/>
-                    <TextBox Text="{Binding ViewModel.ActiveSlot, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
-                             Width="40"
-                             VerticalAlignment="Center"
-                             Margin="0,0,4,0"
-                             Visibility="{Binding ViewModel.ShowBinderFields, Converter={StaticResource BoolToVis}}"/>
+                    <!-- Binder position fields (hidden in audit mode) -->
+                    <StackPanel Orientation="Horizontal"
+                                Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}">
+                        <TextBlock Text="Page:"
+                                   VerticalAlignment="Center"
+                                   Margin="4,0,4,0"
+                                   Visibility="{Binding ViewModel.ShowBinderFields, Converter={StaticResource BoolToVis}}"/>
+                        <TextBox Text="{Binding ViewModel.ActivePage, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
+                                 Width="40"
+                                 VerticalAlignment="Center"
+                                 Margin="0,0,4,0"
+                                 Visibility="{Binding ViewModel.ShowBinderFields, Converter={StaticResource BoolToVis}}"/>
+                        <TextBlock Text="Slot:"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,4,0"
+                                   Visibility="{Binding ViewModel.ShowBinderFields, Converter={StaticResource BoolToVis}}"/>
+                        <TextBox Text="{Binding ViewModel.ActiveSlot, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
+                                 Width="40"
+                                 VerticalAlignment="Center"
+                                 Margin="0,0,4,0"
+                                 Visibility="{Binding ViewModel.ShowBinderFields, Converter={StaticResource BoolToVis}}"/>
+                    </StackPanel>
 
-                    <!-- Box section field -->
-                    <TextBlock Text="Section:"
-                               VerticalAlignment="Center"
-                               Margin="4,0,4,0"
-                               Visibility="{Binding ViewModel.ShowBoxFields, Converter={StaticResource BoolToVis}}"/>
-                    <TextBox Text="{Binding ViewModel.ActiveSection, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}"
-                             Width="100"
-                             VerticalAlignment="Center"
-                             Margin="0,0,4,0"
-                             Visibility="{Binding ViewModel.ShowBoxFields, Converter={StaticResource BoolToVis}}"/>
+                    <!-- Box section field (hidden in audit mode) -->
+                    <StackPanel Orientation="Horizontal"
+                                Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}">
+                        <TextBlock Text="Section:"
+                                   VerticalAlignment="Center"
+                                   Margin="4,0,4,0"
+                                   Visibility="{Binding ViewModel.ShowBoxFields, Converter={StaticResource BoolToVis}}"/>
+                        <TextBox Text="{Binding ViewModel.ActiveSection, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}"
+                                 Width="100"
+                                 VerticalAlignment="Center"
+                                 Margin="0,0,4,0"
+                                 Visibility="{Binding ViewModel.ShowBoxFields, Converter={StaticResource BoolToVis}}"/>
+                    </StackPanel>
 
-                    <!-- Other Defaults -->
-                    <Separator/>
+                    <!-- Other Defaults (hidden in audit mode) -->
+                    <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
                     <TextBlock VerticalAlignment="Center"
                                Text="Is Foil"
-                               Margin="4,0,4,0"/>
+                               Margin="4,0,4,0"
+                               Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
                     <CheckBox IsChecked="{Binding ViewModel.DefaultIsFoil}"
                               VerticalAlignment="Center"
-                              Margin="0,0,8,0"/>
-                    <Separator/>
+                              Margin="0,0,8,0"
+                              Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
+                    <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
                     <TextBlock Text="Purchase Price $:"
                                VerticalAlignment="Center"
-                               Margin="0,0,4,0"/>
+                               Margin="0,0,4,0"
+                               Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
                     <TextBox Text="{Binding ViewModel.DefaultPurchasePrice, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
                              Width="60"
                              VerticalAlignment="Center"
-                             Margin="0,0,8,0"/>
+                             Margin="0,0,8,0"
+                             Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
                 </ToolBar>
             </ToolBarTray>
             <ToolBarTray>
@@ -140,20 +171,21 @@
                     <Button Command="{Binding ViewModel.ScanCommand}"
                             Content="Scan Cards..."
                             IsEnabled="{Binding ViewModel.IsAuditComplete, Converter={local:InverseBoolConverter}}"/>
-                    <Separator/>
-                    <Button Command="{Binding ViewModel.ToggleAuditCompleteCommand}">
+                    <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
+                    <Button Command="{Binding ViewModel.ToggleAuditCompleteCommand}"
+                            Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}">
                         <Button.Style>
                             <Style TargetType="Button"
                                    BasedOn="{StaticResource {x:Type Button}}">
                                 <Setter Property="Content"
-                                        Value="Audit Complete"/>
+                                        Value="Scans Verified"/>
                                 <Setter Property="IsEnabled"
                                         Value="{Binding ViewModel.HasMatchedScans}"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding ViewModel.IsAuditComplete}"
                                                  Value="True">
                                         <Setter Property="Content"
-                                                Value="Undo Audit"/>
+                                                Value="Undo Verification"/>
                                         <Setter Property="IsEnabled"
                                                 Value="True"/>
                                     </DataTrigger>
@@ -161,8 +193,9 @@
                             </Style>
                         </Button.Style>
                     </Button>
-                    <Separator/>
-                    <Button Command="{Binding ViewModel.CommitScansCommand}">
+                    <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
+                    <Button Command="{Binding ViewModel.CommitScansCommand}"
+                            Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}">
                         <Button.Style>
                             <Style TargetType="Button"
                                    BasedOn="{StaticResource {x:Type Button}}">
@@ -181,6 +214,10 @@
                         </Button.Style>
                     </Button>
                     <Separator/>
+                    <Button Command="{Binding ViewModel.GenerateAuditReportCommand}"
+                            Content="Generate Audit Report"
+                            Visibility="{Binding ViewModel.IsAuditMode, Converter={StaticResource BoolToVis}}"/>
+                    <Separator/>
                     <Button Command="{Binding ViewModel.ReprocessScansCommand}"
                             Content="Reprocess Unmatched"
                             IsEnabled="{Binding ViewModel.IsAuditComplete, Converter={local:InverseBoolConverter}}"/>
@@ -192,7 +229,7 @@
             </ToolBarTray>
         </ToolBarPanel>
 
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="ScannerListColumn"
                                   Width=".35*"/>
