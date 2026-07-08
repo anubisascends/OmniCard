@@ -25,13 +25,21 @@ jobs:
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: Publish
-        run: dotnet publish OmniCard/OmniCard.csproj -c Release -r win-x64 /p:Version=${{ steps.version.outputs.VERSION }}
+        run: dotnet publish OmniCard/OmniCard.csproj -c Release -r win-x64 -p:Version=${{ steps.version.outputs.VERSION }}
 
-      - name: Rename artifact
+      - name: Package release
         shell: bash
-        run: mv OmniCard/bin/Release/net10.0-windows10.0.22621.0/win-x64/publish/OmniCard.exe "OmniCard-v${{ steps.version.outputs.VERSION }}-win-x64.exe"
+        run: |
+          PUBLISH_DIR="OmniCard/bin/Release/net10.0-windows10.0.22621.0/win-x64/publish"
+          ARTIFACT="OmniCard-v${{ steps.version.outputs.VERSION }}-win-x64.zip"
+          # Remove PDB files — not needed for end users
+          rm -f "$PUBLISH_DIR"/*.pdb
+          rm -f "$PUBLISH_DIR"/*.xml
+          cd "$PUBLISH_DIR"
+          7z a -tzip "../../../../../$ARTIFACT" ./*
+          cd -
 
       - name: Upload to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload ${{ github.event.release.tag_name }} "OmniCard-v${{ steps.version.outputs.VERSION }}-win-x64.exe"
+        run: gh release upload ${{ github.event.release.tag_name }} "OmniCard-v${{ steps.version.outputs.VERSION }}-win-x64.zip"
