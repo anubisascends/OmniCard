@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 using OmniCard.Interfaces;
 using Serilog;
 
-namespace OmniCard.Services;
+namespace OmniCard.Data;
 
 public sealed class DataMigrationService(
     IDataPathService dataPathService,

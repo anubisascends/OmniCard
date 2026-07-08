@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows.Media.Imaging;
 using Microsoft.Extensions.Logging.Abstractions;
+using OmniCard.Data;
 using OmniCard.Services;
 using Xunit;
 

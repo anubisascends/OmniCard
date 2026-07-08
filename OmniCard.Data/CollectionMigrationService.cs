@@ -3,10 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
 using System.IO;
-using OmniCard.Data;
 using OmniCard.Models;
 
-namespace OmniCard.Services;
+namespace OmniCard.Data;
 
 public static class CollectionMigrationService
 {
