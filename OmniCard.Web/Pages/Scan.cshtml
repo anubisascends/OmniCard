@@ -1,0 +1,196 @@
+@page
+@{
+    ViewData["Title"] = "Phone Scanner";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+    <title>OmniCard Scanner</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; overflow: hidden; background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+
+        .container { display: flex; flex-direction: column; height: 100%; position: relative; }
+
+        /* Viewfinder */
+        .viewfinder { flex: 1; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        .viewfinder video { width: 100%; height: 100%; object-fit: cover; }
+        .viewfinder canvas { display: none; }
+
+        /* Card outline guide */
+        .card-guide {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 65%; aspect-ratio: 63/88; /* Standard card ratio */
+            border: 2px solid rgba(255,255,255,0.5);
+            border-radius: 12px;
+            pointer-events: none;
+        }
+
+        /* Flash overlay */
+        .flash {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: #fff; opacity: 0; pointer-events: none;
+            transition: opacity 0.1s;
+        }
+        .flash.active { opacity: 0.7; transition: none; }
+
+        /* Controls */
+        .controls {
+            padding: 20px; display: flex; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.8);
+        }
+        .capture-btn {
+            width: 72px; height: 72px; border-radius: 50%;
+            border: 4px solid #fff; background: transparent;
+            cursor: pointer; position: relative;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .capture-btn::after {
+            content: ''; position: absolute;
+            top: 4px; left: 4px; right: 4px; bottom: 4px;
+            border-radius: 50%; background: #fff;
+        }
+        .capture-btn:active::after { background: #ccc; }
+        .capture-btn:disabled { opacity: 0.4; }
+
+        /* Status bar */
+        .status {
+            padding: 10px 16px; background: rgba(0,0,0,0.9);
+            font-size: 14px; text-align: center; min-height: 44px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .status.success { color: #4caf50; }
+        .status.error { color: #f44336; }
+        .status.uploading { color: #ffeb3b; }
+
+        /* Error state */
+        .error-screen {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            padding: 24px; text-align: center;
+        }
+        .error-screen p { margin-top: 12px; color: #aaa; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <div class="status" id="status">Initializing camera...</div>
+        <div class="viewfinder" id="viewfinder">
+            <video id="video" autoplay playsinline muted></video>
+            <canvas id="canvas"></canvas>
+            <div class="card-guide"></div>
+            <div class="flash" id="flash"></div>
+        </div>
+        <div class="controls">
+            <button class="capture-btn" id="captureBtn" disabled></button>
+        </div>
+    </div>
+
+    <div class="container" id="errorScreen" style="display:none">
+        <div class="error-screen">
+            <h2>Camera Not Available</h2>
+            <p id="errorMessage"></p>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const captureBtn = document.getElementById('captureBtn');
+        const status = document.getElementById('status');
+        const flash = document.getElementById('flash');
+        let isUploading = false;
+
+        async function initCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
+                    audio: false
+                });
+                video.srcObject = stream;
+                await video.play();
+                captureBtn.disabled = false;
+                setStatus('Ready — tap to scan', '');
+            } catch (err) {
+                showError(err.message || 'Could not access camera');
+            }
+        }
+
+        function setStatus(text, className) {
+            status.textContent = text;
+            status.className = 'status ' + (className || '');
+        }
+
+        function showError(msg) {
+            document.getElementById('app').style.display = 'none';
+            document.getElementById('errorScreen').style.display = '';
+            document.getElementById('errorMessage').textContent = msg;
+        }
+
+        function flashEffect() {
+            flash.classList.add('active');
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    flash.classList.remove('active');
+                });
+            });
+        }
+
+        async function capture() {
+            if (isUploading) return;
+            isUploading = true;
+            captureBtn.disabled = true;
+
+            flashEffect();
+
+            // Draw video frame to canvas
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+
+            setStatus('Uploading...', 'uploading');
+
+            try {
+                const blob = await new Promise(resolve =>
+                    canvas.toBlob(resolve, 'image/jpeg', 0.9)
+                );
+
+                const formData = new FormData();
+                formData.append('image', blob, 'scan.jpg');
+
+                const response = await fetch('/api/scan', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    setStatus('Sent! Ready for next card.', 'success');
+                } else {
+                    const err = await response.json().catch(() => ({}));
+                    setStatus(err.error || 'Upload failed', 'error');
+                }
+            } catch (err) {
+                setStatus('Network error — is the server running?', 'error');
+            }
+
+            isUploading = false;
+            captureBtn.disabled = false;
+        }
+
+        captureBtn.addEventListener('click', capture);
+
+        // Prevent zoom on double-tap
+        document.addEventListener('dblclick', e => e.preventDefault());
+
+        initCamera();
+    </script>
+</body>
+</html>
