@@ -24,6 +24,8 @@ if (!File.Exists(dbPath))
 var scansDir = Path.Combine(dataDir, "scans");
 
 builder.Services.AddRazorPages();
+builder.Services.AddSignalR();
+builder.Services.AddControllers();
 builder.Services.AddDbContextFactory<CollectionDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath};Mode=ReadOnly"));
 
@@ -42,6 +44,8 @@ if (Directory.Exists(scansDir))
 }
 
 app.MapRazorPages();
+app.MapControllers();
+app.MapHub<OmniCard.Web.Hubs.ScanHub>("/hubs/scan");
 
 Console.WriteLine($"Serving collection from: {dataDir}");
 app.Run();
