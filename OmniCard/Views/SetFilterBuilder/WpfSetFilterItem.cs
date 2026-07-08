@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using OmniCard.Models;
@@ -8,12 +9,27 @@ namespace OmniCard.Views.SetFilterBuilder;
 /// WPF-specific extension of SetFilterItem that adds an observable DrawingImage Symbol property
 /// for displaying set symbols in the SetFilterBuilder UI.
 /// </summary>
-public partial class WpfSetFilterItem : ObservableObject
+public partial class WpfSetFilterItem : SetFilterItem, INotifyPropertyChanged
 {
-    public string SetCode { get; init; } = "";
-    public string SetName { get; init; } = "";
-    public string DisplayName => $"{SetName} ({SetCode})";
+    private DrawingImage? _symbol;
 
-    [ObservableProperty]
-    public partial DrawingImage? Symbol { get; set; }
+    public DrawingImage? Symbol
+    {
+        get => _symbol;
+        set
+        {
+            if (_symbol != value)
+            {
+                _symbol = value;
+                OnPropertyChanged(nameof(Symbol));
+            }
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    protected void OnPropertyChanged(string propertyName)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 }
