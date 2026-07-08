@@ -2,7 +2,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OmniCard.Interfaces;
 using OmniCard.Models;
-using OmniCard.Services;
 
 // Alias the model types to avoid collision with the OmniCard.Views.AuditReport namespace
 using AuditReportModel = OmniCard.Models.AuditReport;

@@ -3,7 +3,6 @@ using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
 using OmniCard.Interfaces;
 using OmniCard.Models;
-using OmniCard.Services;
 
 namespace OmniCard.Views.CoverArtPicker;
 

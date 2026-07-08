@@ -17,7 +17,6 @@ using OmniCard.Controls.Themes;
 using OmniCard.Imaging;
 using OmniCard.Interfaces;
 using OmniCard.Models;
-using OmniCard.Services;
 using NTwain;
 using OmniCard.Scanner;
 using OmniCard.Views.HashPreview;

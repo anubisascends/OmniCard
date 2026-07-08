@@ -1,7 +1,6 @@
 using System.Windows;
 using Microsoft.Win32;
 using OmniCard.Interfaces;
-using OmniCard.Services;
 
 namespace OmniCard.Views.AuditReport;
 

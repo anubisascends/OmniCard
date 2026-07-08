@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OmniCard.Interfaces;
 using OmniCard.Models;
-using OmniCard.Services;
 
 namespace OmniCard.Views.EbayAuth;
 

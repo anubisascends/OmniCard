@@ -4,7 +4,6 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using OmniCard.Interfaces;
 using OmniCard.Models;
-using OmniCard.Services;
 
 namespace OmniCard.Views.EbayListing;
 

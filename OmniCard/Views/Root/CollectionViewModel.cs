@@ -6,7 +6,6 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using OmniCard.Interfaces;
 using OmniCard.Models;
-using OmniCard.Services;
 using System.Threading.Tasks;
 
 namespace OmniCard.Views.Root;

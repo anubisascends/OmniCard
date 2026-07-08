@@ -11,7 +11,6 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Options;
 using OmniCard.Interfaces;
 using OmniCard.Models;
-using OmniCard.Services;
 
 namespace OmniCard.Views.StorageManager;
 
