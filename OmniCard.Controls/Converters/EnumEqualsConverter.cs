@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Windows.Data;
 
-namespace OmniCard.Helpers;
+namespace OmniCard.Controls.Converters;
 
 /// <summary>
 /// Converts an enum value to bool by comparing it to the ConverterParameter string.

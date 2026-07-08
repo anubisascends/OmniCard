@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace OmniCard.Helpers;
+namespace OmniCard.Controls;
 
 public abstract record MtgTextSegment;
 public record TextSegment(string Text) : MtgTextSegment;

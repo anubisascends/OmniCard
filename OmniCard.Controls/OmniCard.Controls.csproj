@@ -13,5 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OmniCard.Shared\OmniCard.Shared.csproj" />
+    <ProjectReference Include="..\OmniCard.Imaging\OmniCard.Imaging.csproj" />
+    <ProjectReference Include="..\OmniCard.CardMatching\OmniCard.CardMatching.csproj" />
   </ItemGroup>
 </Project>

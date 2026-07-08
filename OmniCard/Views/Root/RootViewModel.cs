@@ -14,13 +14,14 @@ using System.Windows;
 using System.Windows.Data;
 using NTwain;
 using OmniCard.Data;
+using OmniCard.Controls.Converters;
+using OmniCard.Controls.Themes;
 using OmniCard.Helpers;
 using OmniCard.Imaging;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 using OmniCard.Services;
 using OmniCard.Scanner;
-using OmniCard.Themes;
 using OmniCard.Views.HashPreview;
 
 namespace OmniCard.Views.Root;

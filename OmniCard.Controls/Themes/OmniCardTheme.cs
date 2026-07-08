@@ -2,7 +2,7 @@ using System.Windows;
 using System.Windows.Media;
 using MaterialDesignThemes.Wpf;
 
-namespace OmniCard.Themes;
+namespace OmniCard.Controls.Themes;
 
 public static class OmniCardTheme
 {

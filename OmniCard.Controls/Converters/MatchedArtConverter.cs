@@ -3,7 +3,7 @@ using System.Windows.Data;
 using System.Windows.Markup;
 using OmniCard.Imaging;
 
-namespace OmniCard.Views.Root;
+namespace OmniCard.Controls.Converters;
 
 public class MatchedArtConverter : MarkupExtension, IMultiValueConverter
 {

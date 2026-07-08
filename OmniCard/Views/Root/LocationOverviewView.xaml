@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:OmniCard.Views.Root"
+             xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
              xmlns:models="clr-namespace:OmniCard.Models;assembly=OmniCard.Shared">
 
     <UserControl.Resources>
@@ -73,7 +74,7 @@
                                     <TextBlock Grid.Row="1" Grid.Column="1"
                                                HorizontalAlignment="Right"
                                                FontSize="12"
-                                               Foreground="{Binding PriceDelta, Converter={local:PriceDeltaColorConverter}}">
+                                               Foreground="{Binding PriceDelta, Converter={conv:PriceDeltaColorConverter}}">
                                         <TextBlock.Text>
                                             <MultiBinding StringFormat="{}{0:+$#,##0.00;-$#,##0.00;$0.00} ({1:+0.0;-0.0;0.0}%)">
                                                 <Binding Path="PriceDelta"/>
@@ -100,10 +101,10 @@
                     <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
                         <MenuItem Header="Change Cover Art..."
                                   Click="ChangeCoverArt_Click"/>
-                        <Separator Visibility="{Binding Container.IsSystem, Converter={local:InverseBoolToVisibilityConverter}}"/>
+                        <Separator Visibility="{Binding Container.IsSystem, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                         <MenuItem Header="Delete Location..."
                                   Click="DeleteLocation_Click"
-                                  Visibility="{Binding Container.IsSystem, Converter={local:InverseBoolToVisibilityConverter}}"/>
+                                  Visibility="{Binding Container.IsSystem, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                         <Separator/>
                         <MenuItem Header="Audit Location..."
                                   Click="AuditLocation_Click"/>
@@ -129,7 +130,7 @@
             <UniformGrid Columns="3" Margin="0,0,0,12"
                          Visibility="{Binding DataContext.ViewModel.Collection.IsBulkVisible,
                              RelativeSource={RelativeSource AncestorType=Window},
-                             Converter={local:BoolToVisibilityConverter}}">
+                             Converter={conv:BoolToVisibilityConverter}}">
                 <ContentControl Content="{Binding DataContext.ViewModel.Collection.BulkSummary,
                                     RelativeSource={RelativeSource AncestorType=Window}}"
                                 ContentTemplate="{StaticResource LocationTileTemplate}"/>
@@ -140,7 +141,7 @@
                                 RelativeSource={RelativeSource AncestorType=Window}}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Expander Header="{Binding Key, Converter={local:ContainerTypeDisplayConverter}}"
+                        <Expander Header="{Binding Key, Converter={conv:ContainerTypeDisplayConverter}}"
                                   IsExpanded="True"
                                   Margin="0,0,0,8">
                             <ItemsControl ItemsSource="{Binding}">

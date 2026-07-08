@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Windows.Data;
 
-namespace OmniCard.Helpers;
+namespace OmniCard.Controls.Converters;
 
 public class ListToCommaSeparatedConverter : IValueConverter
 {

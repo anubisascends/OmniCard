@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:OmniCard.Views.SortFilterBuilder"
         xmlns:models="clr-namespace:OmniCard.Models;assembly=OmniCard.Shared"
-        xmlns:helpers="clr-namespace:OmniCard.Helpers"
+        xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
         mc:Ignorable="d"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
@@ -19,7 +19,7 @@
         FontFamily="{StaticResource AppFont}">
 
     <Window.Resources>
-        <helpers:ListToCommaSeparatedConverter x:Key="ListToCommaSeparatedConverter"/>
+        <conv:ListToCommaSeparatedConverter x:Key="ListToCommaSeparatedConverter"/>
     </Window.Resources>
 
     <Grid>

@@ -4,8 +4,8 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:OmniCard.Views.EbayListing"
-        xmlns:helpers="clr-namespace:OmniCard.Helpers"
-        xmlns:root="clr-namespace:OmniCard.Views.Root"
+        xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
+        xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         mc:Ignorable="d"
@@ -58,10 +58,10 @@
                     </TextBlock>
                     <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" Margin="0,0,0,2">
                         <Run Text="Condition: "/><Run Text="{Binding ViewModel.Condition, Mode=OneWay}" FontWeight="SemiBold"/>
-                        <Run Text="{Binding ViewModel.IsFoil, Mode=OneWay, StringFormat=' {0}', Converter={root:FoilToFinishConverter}}"/>
+                        <Run Text="{Binding ViewModel.IsFoil, Mode=OneWay, StringFormat=' {0}', Converter={conv:FoilToFinishConverter}}"/>
                     </TextBlock>
                     <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
-                               Visibility="{Binding ViewModel.PurchasePrice, Converter={root:NullToCollapsedConverter}}">
+                               Visibility="{Binding ViewModel.PurchasePrice, Converter={conv:NullToCollapsedConverter}}">
                         <Run Text="Purchase: $"/><Run Text="{Binding ViewModel.PurchasePrice, Mode=OneWay, StringFormat=F2}"/>
                     </TextBlock>
                 </StackPanel>
@@ -81,7 +81,7 @@
                                          Visibility="{Binding ViewModel.IsSearchingCatalog, Converter={StaticResource BoolToVis}}"
                                          Margin="0,0,0,8"/>
 
-                            <StackPanel Visibility="{Binding ViewModel.MarketPrice, Converter={root:NullToCollapsedConverter}}">
+                            <StackPanel Visibility="{Binding ViewModel.MarketPrice, Converter={conv:NullToCollapsedConverter}}">
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                     <TextBlock Text="Median:" Width="80"
                                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
@@ -118,10 +118,10 @@
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <RadioButton Content="Buy It Now" GroupName="ListingType"
-                                             IsChecked="{Binding ViewModel.ListingType, Converter={root:EnumBoolConverter}, ConverterParameter=FixedPrice}"
+                                             IsChecked="{Binding ViewModel.ListingType, Converter={conv:EnumBoolConverter}, ConverterParameter=FixedPrice}"
                                              Margin="0,0,16,0"/>
                                 <RadioButton Content="Auction" GroupName="ListingType"
-                                             IsChecked="{Binding ViewModel.ListingType, Converter={root:EnumBoolConverter}, ConverterParameter=Auction}"/>
+                                             IsChecked="{Binding ViewModel.ListingType, Converter={conv:EnumBoolConverter}, ConverterParameter=Auction}"/>
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
@@ -201,7 +201,7 @@
 
                     <!-- Error -->
                     <TextBlock Text="{Binding ViewModel.ErrorMessage}" Foreground="Red" TextWrapping="Wrap"
-                               Visibility="{Binding ViewModel.ErrorMessage, Converter={root:NullToCollapsedConverter}}"
+                               Visibility="{Binding ViewModel.ErrorMessage, Converter={conv:NullToCollapsedConverter}}"
                                Margin="0,0,0,8"/>
                 </StackPanel>
             </ScrollViewer>

@@ -5,7 +5,7 @@ using System.Windows.Media;
 using SharpVectors.Converters;
 using SharpVectors.Renderers.Wpf;
 
-namespace OmniCard.Helpers;
+namespace OmniCard.Controls;
 
 public static class MtgText
 {

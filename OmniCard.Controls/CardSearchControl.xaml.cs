@@ -4,7 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using OmniCard.Models;
 
-namespace OmniCard.Views.Controls;
+namespace OmniCard.Controls;
 
 public partial class CardSearchControl : UserControl
 {

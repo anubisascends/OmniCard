@@ -3,8 +3,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              xmlns:local="clr-namespace:OmniCard.Views.Root"
-             xmlns:controls="clr-namespace:OmniCard.Views.Controls"
-             xmlns:helpers="clr-namespace:OmniCard.Helpers">
+             xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
+             xmlns:controls="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
+             xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="12"
@@ -239,7 +240,7 @@
             <!-- Single-select: game-specific card detail -->
             <ContentControl Content="{Binding ViewModel.SharedMatchSource}"
                         Visibility="{Binding ViewModel.SharedMatchSource,
-                            Converter={local:NullToCollapsedConverter}}"/>
+                            Converter={conv:NullToCollapsedConverter}}"/>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

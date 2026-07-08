@@ -10,6 +10,8 @@ using OmniCard.Models;
 using System.IO;
 using System.Windows;
 using OmniCard.Data;
+using OmniCard.Controls;
+using OmniCard.Controls.Converters;
 using OmniCard.Helpers;
 using OmniCard.Imaging;
 using OmniCard.CardMatching;

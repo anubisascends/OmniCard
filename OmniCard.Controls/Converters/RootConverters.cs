@@ -6,9 +6,8 @@ using System.Windows.Data;
 using System.Windows.Markup;
 using OmniCard.Imaging;
 using OmniCard.Models;
-using OmniCard.Services;
 
-namespace OmniCard.Views.Root;
+namespace OmniCard.Controls.Converters;
 
 /// <summary>
 /// Attached property that stores a string tag on any DependencyObject,

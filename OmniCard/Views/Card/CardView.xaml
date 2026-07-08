@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:OmniCard.Views.Card"
-        xmlns:root="clr-namespace:OmniCard.Views.Root"
+        xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
         ShowInTaskbar="False"
@@ -27,7 +27,7 @@
                 <Grid.LayoutTransform>
                     <ScaleTransform ScaleX="{Binding ViewModel.Zoom}" ScaleY="{Binding ViewModel.Zoom}"/>
                 </Grid.LayoutTransform>
-                <Image Source="{Binding ViewModel.Card.TempImagePath, Converter={root:ScanImageConverter}}"
+                <Image Source="{Binding ViewModel.Card.TempImagePath, Converter={conv:ScanImageConverter}}"
                        Stretch="Uniform"/>
             </Grid>
         </ScrollViewer>
