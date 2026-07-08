@@ -2,7 +2,6 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Imaging;
-using OmniCard.Services;
 
 namespace OmniCard.Tests.Services;
 

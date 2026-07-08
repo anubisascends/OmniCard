@@ -3,7 +3,6 @@ using System.Windows.Media.Imaging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Services;
 using Xunit;
 
 namespace OmniCard.Tests.Services;

@@ -6,7 +6,6 @@ using OmniCard.Data;
 using OmniCard.Imaging;
 using OmniCard.Models;
 using OmniCard.Interfaces;
-using OmniCard.Services;
 using OmniCard.Collection;
 
 namespace OmniCard.Tests.Services;

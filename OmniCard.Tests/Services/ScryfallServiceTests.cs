@@ -7,11 +7,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OmniCard.Data;
-using OmniCard.Helpers;
 using OmniCard.Imaging;
 using OmniCard.Models;
 using OmniCard.CardMatching;
-using OmniCard.Services;
 
 namespace OmniCard.Tests.Services;
 
