@@ -6,7 +6,7 @@ using OmniCard.Data;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 
-namespace OmniCard.Services;
+namespace OmniCard.Scanner;
 
 public class ScanDiagnosticService(IDbContextFactory<CollectionDbContext> dbContextFactory) : IScanDiagnosticService
 {

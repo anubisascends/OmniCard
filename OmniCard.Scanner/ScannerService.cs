@@ -6,7 +6,7 @@ using OmniCard.Interfaces;
 using OmniCard.Models;
 using System.Reflection;
 
-namespace OmniCard.Services;
+namespace OmniCard.Scanner;
 
 public sealed partial class ScannerService : ObservableObject, IDisposable
 {

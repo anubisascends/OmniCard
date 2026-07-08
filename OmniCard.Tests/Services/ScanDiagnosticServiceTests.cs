@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
 using OmniCard.Models;
 using OmniCard.Interfaces;
-using OmniCard.Services;
+using OmniCard.Scanner;
 
 namespace OmniCard.Tests.Services;
 

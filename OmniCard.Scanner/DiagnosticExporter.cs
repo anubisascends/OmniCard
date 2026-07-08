@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using OmniCard.Models;
 
-namespace OmniCard.Services;
+namespace OmniCard.Scanner;
 
 public class DiagnosticExporter(List<ScanDiagnosticEvent> events)
 {
