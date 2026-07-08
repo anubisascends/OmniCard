@@ -4,7 +4,6 @@
              xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              xmlns:local="clr-namespace:OmniCard.Views.Root"
              xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
-             xmlns:controls="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
              xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -36,7 +35,7 @@
             </TextBlock>
 
             <!-- Manual search to reassign -->
-            <controls:CardSearchControl x:Name="CardSearch"
+            <helpers:CardSearchControl x:Name="CardSearch"
                 Margin="0,0,0,8"
                 SearchQuery="{Binding ViewModel.ManualSearchQuery, Mode=TwoWay}"
                 SearchResults="{Binding ViewModel.ManualSearchResults}"
