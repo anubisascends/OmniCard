@@ -1,5 +1,5 @@
 using OmniCard.Models;
-using OmniCard.Services;
+using OmniCard.Audit;
 
 namespace OmniCard.Tests.Services;
 
@@ -8,8 +8,8 @@ public class DiagnosticExportTests
     [Fact]
     public void EmptyExport_HasHeaderAndZeroCounts()
     {
-        var exporter = new DiagnosticExporter([]);
-        var output = exporter.Render();
+        var exporter = new DiagnosticExporter();
+        var output = exporter.Render([]);
 
         Assert.Contains("=== SCAN DIAGNOSTIC EXPORT ===", output);
         Assert.Contains("Total Sessions: 0", output);
@@ -31,7 +31,8 @@ public class DiagnosticExportTests
                 Payload = """{"matchedName":"Lightning Bolt","matchedSet":"m21","matchedNumber":"199","confidence":87.5,"decisionPhase":"PHashConfident","pHashDistance":3,"autoFlagReason":"None","tieZoneCandidates":[{"cardId":"abc","name":"Lightning Bolt","set":"m21","number":"199","pHashDist":3,"finalScore":-2,"selected":true}]}""",
             }
         };
-        var output = new DiagnosticExporter(events).Render();
+        var exporter = new DiagnosticExporter();
+        var output = exporter.Render(events);
 
         Assert.Contains("SESSION: session-1", output);
         Assert.Contains("scan_hash=0x00000000AABBCCDD", output);
@@ -67,7 +68,8 @@ public class DiagnosticExportTests
                 Payload = """{"originalName":"Wrong Card","originalSet":"m21","originalConfidence":90,"correctedName":"Right Card","correctedSet":"2xm","correctedNumber":"42","wasInTieZone":false}""",
             },
         };
-        var output = new DiagnosticExporter(events).Render();
+        var exporter = new DiagnosticExporter();
+        var output = exporter.Render(events);
 
         Assert.Contains("USER FLAGGED", output);
         Assert.Contains("USER CORRECTED", output);
@@ -89,7 +91,8 @@ public class DiagnosticExportTests
             MakeScanEvent("s1", 0x3333, "Card C", 85, "PHashConfident"),
             new() { SessionId = "s1", ScanHash = 0x3333, EventType = "UserCorrected", Timestamp = DateTime.UtcNow, Payload = """{"originalConfidence":85,"correctedName":"Card D","wasInTieZone":true}""" },
         };
-        var output = new DiagnosticExporter(events).Render();
+        var exporter = new DiagnosticExporter();
+        var output = exporter.Render(events);
 
         Assert.Contains("Total Scans: 3", output);
         Assert.Contains("Auto-Accepted (no user action): 1", output);

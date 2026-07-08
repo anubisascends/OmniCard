@@ -2,9 +2,10 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:OmniCard.Views.Root"
-             xmlns:helpers="clr-namespace:OmniCard.Helpers"
+             xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
+             xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
              xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
-             xmlns:Models="clr-namespace:OmniCard.Models">
+             xmlns:Models="clr-namespace:OmniCard.Models;assembly=OmniCard.Shared">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -64,18 +65,18 @@
                             Margin="0,0,8,0"
                             Command="{Binding ViewModel.ClearSetFilterCommand}"
                             Style="{StaticResource MaterialDesignFlatButton}"/>
-                    <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
+                    <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                     <TextBlock Text="Location:"
                                VerticalAlignment="Center"
                                Margin="0,0,4,0"
-                               Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
+                               Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                     <ComboBox ItemsSource="{Binding ViewModel.GroupedContainers}"
                               SelectedItem="{Binding ViewModel.ActiveContainer}"
                               DisplayMemberPath="Name"
                               Width="150"
                               VerticalAlignment="Center"
                               Margin="0,0,4,0"
-                              Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}">
+                              Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}">
                         <ComboBox.GroupStyle>
                             <GroupStyle>
                                 <GroupStyle.HeaderTemplate>
@@ -92,7 +93,7 @@
 
                     <!-- Binder position fields (hidden in audit mode) -->
                     <StackPanel Orientation="Horizontal"
-                                Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}">
+                                Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}">
                         <TextBlock Text="Page:"
                                    VerticalAlignment="Center"
                                    Margin="4,0,4,0"
@@ -115,7 +116,7 @@
 
                     <!-- Box section field (hidden in audit mode) -->
                     <StackPanel Orientation="Horizontal"
-                                Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}">
+                                Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}">
                         <TextBlock Text="Section:"
                                    VerticalAlignment="Center"
                                    Margin="4,0,4,0"
@@ -128,25 +129,25 @@
                     </StackPanel>
 
                     <!-- Other Defaults (hidden in audit mode) -->
-                    <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
+                    <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                     <TextBlock VerticalAlignment="Center"
                                Text="Is Foil"
                                Margin="4,0,4,0"
-                               Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
+                               Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                     <CheckBox IsChecked="{Binding ViewModel.DefaultIsFoil}"
                               VerticalAlignment="Center"
                               Margin="0,0,8,0"
-                              Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
-                    <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
+                              Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
+                    <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                     <TextBlock Text="Purchase Price $:"
                                VerticalAlignment="Center"
                                Margin="0,0,4,0"
-                               Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
+                               Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                     <TextBox Text="{Binding ViewModel.DefaultPurchasePrice, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
                              Width="60"
                              VerticalAlignment="Center"
                              Margin="0,0,8,0"
-                             Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
+                             Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                 </ToolBar>
             </ToolBarTray>
             <ToolBarTray>
@@ -161,7 +162,7 @@
                               Margin="0,0,8,0">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding Converter={local:ScanQualityDisplayConverter}}"/>
+                                <TextBlock Text="{Binding Converter={conv:ScanQualityDisplayConverter}}"/>
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
                         <Models:ScanQuality>Fast</Models:ScanQuality>
@@ -170,10 +171,10 @@
                     <Separator/>
                     <Button Command="{Binding ViewModel.ScanCommand}"
                             Content="Scan Cards..."
-                            IsEnabled="{Binding ViewModel.IsAuditComplete, Converter={local:InverseBoolConverter}}"/>
-                    <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
+                            IsEnabled="{Binding ViewModel.IsAuditComplete, Converter={conv:InverseBoolConverter}}"/>
+                    <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                     <Button Command="{Binding ViewModel.ToggleAuditCompleteCommand}"
-                            Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}">
+                            Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}">
                         <Button.Style>
                             <Style TargetType="Button"
                                    BasedOn="{StaticResource {x:Type Button}}">
@@ -193,9 +194,9 @@
                             </Style>
                         </Button.Style>
                     </Button>
-                    <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}"/>
+                    <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                     <Button Command="{Binding ViewModel.CommitScansCommand}"
-                            Visibility="{Binding ViewModel.IsAuditMode, Converter={local:InverseBoolToVisibilityConverter}}">
+                            Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}">
                         <Button.Style>
                             <Style TargetType="Button"
                                    BasedOn="{StaticResource {x:Type Button}}">
@@ -220,11 +221,11 @@
                     <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={StaticResource BoolToVis}}"/>
                     <Button Command="{Binding ViewModel.ReprocessScansCommand}"
                             Content="Reprocess Unmatched"
-                            IsEnabled="{Binding ViewModel.IsAuditComplete, Converter={local:InverseBoolConverter}}"/>
+                            IsEnabled="{Binding ViewModel.IsAuditComplete, Converter={conv:InverseBoolConverter}}"/>
                     <Separator/>
                     <Button Command="{Binding ViewModel.ClearScansCommand}"
                             Content="Clear Queue"
-                            IsEnabled="{Binding ViewModel.IsAuditComplete, Converter={local:InverseBoolConverter}}"/>
+                            IsEnabled="{Binding ViewModel.IsAuditComplete, Converter={conv:InverseBoolConverter}}"/>
                 </ToolBar>
             </ToolBarTray>
         </ToolBarPanel>
@@ -488,7 +489,7 @@
 
                                 <!-- Scanned image (top left) -->
                                 <Image Grid.Row="0" Grid.Column="0"
-                                       Source="{Binding TempImagePath, Converter={local:ScanImageConverter}}"
+                                       Source="{Binding TempImagePath, Converter={conv:ScanImageConverter}}"
                                        Width="{Binding DataContext.ViewModel.CardPreviewWidth,
                                            RelativeSource={RelativeSource AncestorType=ListView}}"
                                        HorizontalAlignment="Left"
@@ -505,7 +506,7 @@
                                        Stretch="Uniform"
                                        Margin="4,0,0,0">
                                     <Image.Source>
-                                        <MultiBinding Converter="{local:MatchedArtConverter}">
+                                        <MultiBinding Converter="{conv:MatchedArtConverter}">
                                             <Binding Path="Match.LocalImagePath"/>
                                             <Binding Path="Match.ImageUri"/>
                                         </MultiBinding>
@@ -558,11 +559,11 @@
                                     <TextBlock Margin="0,2,0,0"
                                                FontSize="{Binding DataContext.ViewModel.ScannerFontSizeSmall,
                                                    RelativeSource={RelativeSource AncestorType=ListView}}"
-                                               Visibility="{Binding Match.Confidence, Converter={local:NullToCollapsedConverter}}">
+                                               Visibility="{Binding Match.Confidence, Converter={conv:NullToCollapsedConverter}}">
                                         <Run Text="Match Confidence:"
                                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
                                         <Run Text="{Binding Match.Confidence, StringFormat='{}{0:F0}%', Mode=OneWay}"
-                                             Foreground="{Binding Match.Confidence, Converter={local:ConfidenceToColorConverter}}"/>
+                                             Foreground="{Binding Match.Confidence, Converter={conv:ConfidenceToColorConverter}}"/>
                                     </TextBlock>
 
                                     <!-- Match and Flag buttons side by side -->
@@ -575,7 +576,7 @@
                                                 Command="{Binding DataContext.ViewModel.ConfirmMatchCommand,
                                                     RelativeSource={RelativeSource AncestorType=ListView}}"
                                                 CommandParameter="{Binding}"
-                                                Visibility="{Binding Match.Confidence, Converter={local:LowConfidenceToVisibleConverter}}"
+                                                Visibility="{Binding Match.Confidence, Converter={conv:LowConfidenceToVisibleConverter}}"
                                                 Style="{StaticResource MaterialDesignFlatButton}"/>
 
                                         <!-- Flag button -->

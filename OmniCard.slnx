@@ -1,6 +1,14 @@
 <Solution>
   <Project Path="OmniCard.Shared/OmniCard.Shared.csproj" />
+  <Project Path="OmniCard.Data/OmniCard.Data.csproj" />
+  <Project Path="OmniCard.Imaging/OmniCard.Imaging.csproj" />
+  <Project Path="OmniCard.CardMatching/OmniCard.CardMatching.csproj" />
+  <Project Path="OmniCard.Collection/OmniCard.Collection.csproj" />
+  <Project Path="OmniCard.eBay/OmniCard.eBay.csproj" />
+  <Project Path="OmniCard.Scanner/OmniCard.Scanner.csproj" />
+  <Project Path="OmniCard.Audit/OmniCard.Audit.csproj" />
+  <Project Path="OmniCard.Controls/OmniCard.Controls.csproj" />
+  <Project Path="OmniCard/OmniCard.csproj" />
   <Project Path="OmniCard.Tests/OmniCard.Tests.csproj" />
   <Project Path="OmniCard.Web/OmniCard.Web.csproj" />
-  <Project Path="OmniCard/OmniCard.csproj" />
 </Solution>

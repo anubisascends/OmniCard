@@ -1,5 +1,5 @@
 using System.Drawing;
-using OmniCard.Services;
+using OmniCard.Imaging;
 
 namespace OmniCard.Tests.Services;
 

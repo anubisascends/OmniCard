@@ -3,7 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Data;
 using OmniCard.Models;
-using OmniCard.Services;
+using OmniCard.Interfaces;
+using OmniCard.Audit;
 
 namespace OmniCard.Tests.Services;
 

@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using System.Windows;
 using System.Windows.Controls;
 using OmniCard.Models;
-using OmniCard.Themes;
+using OmniCard.Controls.Themes;
 
 namespace OmniCard.Views.Root;
 

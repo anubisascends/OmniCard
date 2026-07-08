@@ -5,12 +5,20 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Serilog;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 using System.IO;
 using System.Windows;
 using OmniCard.Data;
-using OmniCard.Helpers;
+using OmniCard.Controls;
+using OmniCard.Controls.Converters;
+using OmniCard.Imaging;
+using OmniCard.CardMatching;
 using OmniCard.Services;
+using OmniCard.Audit;
+using OmniCard.Scanner;
+using OmniCard.eBay;
+using OmniCard.Collection;
 using OmniCard.Views.Card;
 using OmniCard.Views.CollectionCardEditor;
 using OmniCard.Views.Connection;
@@ -67,7 +75,9 @@ public partial class App : Application
             services.AddSingleton<IDialogService, DialogService>();
             services.AddSingleton<IPerceptualHashService, PerceptualHashService>();
             services.AddSingleton<IOcrMatchingService, OcrMatchingService>();
-            services.AddSingleton<ICardService, CardSevice>();
+            services.AddSingleton<ICardService, CardService>();
+            services.AddSingleton<ICollectionQueryService, CollectionQueryService>();
+            services.AddSingleton<IMismatchLogService, MismatchLogService>();
             services.AddSingleton<ScanImageCache>();
             services.AddSingleton<CardArtCache>();
             services.AddHttpClient();
@@ -105,6 +115,7 @@ public partial class App : Application
             services.AddSingleton<ICsvExportImportService, CsvExportImportService>();
 
             // Scan diagnostics
+            services.AddSingleton<IDiagnosticExporter, DiagnosticExporter>();
             services.AddSingleton<IScanDiagnosticService, ScanDiagnosticService>();
 
             // Location audit

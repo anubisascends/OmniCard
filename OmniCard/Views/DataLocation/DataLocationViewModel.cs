@@ -1,7 +1,7 @@
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using OmniCard.Services;
+using OmniCard.Interfaces;
 
 namespace OmniCard.Views.DataLocation;
 

@@ -4,8 +4,10 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Data;
+using OmniCard.Imaging;
 using OmniCard.Models;
-using OmniCard.Services;
+using OmniCard.Interfaces;
+using OmniCard.Collection;
 
 namespace OmniCard.Tests.Services;
 
@@ -31,26 +33,26 @@ public class CollectionSortFilterTests : IDisposable
     private static void SeedCards(CollectionDbContext ctx)
     {
         ctx.Cards.AddRange(
-            new CollectionCard { Game = CardGame.Mtg, GameCardId = "1", Name = "Wrath of God", Color = "W", CardType = "Sorcery", SetName = "Alpha", Rarity = "Rare" },
-            new CollectionCard { Game = CardGame.Mtg, GameCardId = "2", Name = "Counterspell", Color = "U", CardType = "Instant", SetName = "Alpha", Rarity = "Uncommon" },
-            new CollectionCard { Game = CardGame.Mtg, GameCardId = "3", Name = "Dark Ritual", Color = "B", CardType = "Instant", SetName = "Alpha", Rarity = "Common" },
-            new CollectionCard { Game = CardGame.Mtg, GameCardId = "4", Name = "Lightning Bolt", Color = "R", CardType = "Instant", SetName = "Alpha", Rarity = "Common" },
-            new CollectionCard { Game = CardGame.Mtg, GameCardId = "5", Name = "Llanowar Elves", Color = "G", CardType = "Creature", SetName = "Alpha", Rarity = "Common" },
-            new CollectionCard { Game = CardGame.Mtg, GameCardId = "6", Name = "Sol Ring", Color = "Colorless", CardType = "Artifact", SetName = "Alpha", Rarity = "Uncommon" },
-            new CollectionCard { Game = CardGame.Mtg, GameCardId = "7", Name = "Azorius Charm", Color = "WU", CardType = "Instant", SetName = "RTR", Rarity = "Uncommon" }
+            new CollectionCard { Game = CardGame.Mtg, GameCardId = "1", Name = "Wrath of God", Color = "W", CardType = "Sorcery", SetCode = "lea", SetName = "Alpha", Rarity = "Rare" },
+            new CollectionCard { Game = CardGame.Mtg, GameCardId = "2", Name = "Counterspell", Color = "U", CardType = "Instant", SetCode = "lea", SetName = "Alpha", Rarity = "Uncommon" },
+            new CollectionCard { Game = CardGame.Mtg, GameCardId = "3", Name = "Dark Ritual", Color = "B", CardType = "Instant", SetCode = "lea", SetName = "Alpha", Rarity = "Common" },
+            new CollectionCard { Game = CardGame.Mtg, GameCardId = "4", Name = "Lightning Bolt", Color = "R", CardType = "Instant", SetCode = "lea", SetName = "Alpha", Rarity = "Common" },
+            new CollectionCard { Game = CardGame.Mtg, GameCardId = "5", Name = "Llanowar Elves", Color = "G", CardType = "Creature", SetCode = "lea", SetName = "Alpha", Rarity = "Common" },
+            new CollectionCard { Game = CardGame.Mtg, GameCardId = "6", Name = "Sol Ring", Color = "Colorless", CardType = "Artifact", SetCode = "lea", SetName = "Alpha", Rarity = "Uncommon" },
+            new CollectionCard { Game = CardGame.Mtg, GameCardId = "7", Name = "Azorius Charm", Color = "WU", CardType = "Instant", SetCode = "rtr", SetName = "RTR", Rarity = "Uncommon" }
         );
         ctx.SaveChanges();
     }
 
     private IDbContextFactory<CollectionDbContext> CreateFactory() => new MockFactory(_options);
 
-    private CardSevice CreateService() => new(
+    private CardService CreateService() => new(
         new StubHashService(),
         [],
         CreateFactory(),
         new StubOcrService(),
         new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-        NullLogger<CardSevice>.Instance,
+        NullLogger<CardService>.Instance,
         new DataPathService(Path.GetTempPath()),
         new NullScanDiagnosticService(),
         new NullAuditService());

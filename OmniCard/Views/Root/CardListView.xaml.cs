@@ -6,6 +6,8 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using OmniCard.Controls.Converters;
+using OmniCard.Imaging;
 using OmniCard.Models;
 
 namespace OmniCard.Views.Root;
@@ -161,7 +163,7 @@ public partial class CardListView : UserControl
         ImageSource? imageSource;
         if (ViewModel.IsStacked && card.ImageUri is not null)
         {
-            imageSource = Services.CardArtCache.Instance?.GetImage(null, card.ImageUri);
+            imageSource = CardArtCache.Instance?.GetImage(null, card.ImageUri);
         }
         else
         {

@@ -1,7 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MaterialDesignThemes.Wpf;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,12 +11,14 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Data;
-using NTwain;
-using OmniCard.Data;
-using OmniCard.Helpers;
+using OmniCard.CardMatching;
+using OmniCard.Controls.Converters;
+using OmniCard.Controls.Themes;
+using OmniCard.Imaging;
+using OmniCard.Interfaces;
 using OmniCard.Models;
-using OmniCard.Services;
-using OmniCard.Themes;
+using NTwain;
+using OmniCard.Scanner;
 using OmniCard.Views.HashPreview;
 
 namespace OmniCard.Views.Root;
@@ -32,7 +33,7 @@ public sealed partial class RootViewModel(
     ICsvExportImportService csvService,
     CollectionViewModel collection,
     SealedProductViewModel sealedVm,
-    IDbContextFactory<CollectionDbContext> collectionDbContextFactory,
+    IMismatchLogService mismatchLogService,
     SetSymbolCache setSymbolCache,
     IScanDiagnosticService diagnosticService,
     IAuditService auditService,
@@ -1192,29 +1193,19 @@ public sealed partial class RootViewModel(
 
     private void LogMismatchIfHighConfidence(ScannedCard card, CardMatch oldMatch, CardMatch newMatch)
     {
-        if (oldMatch.Confidence is not >= 80) return;
-        if (oldMatch.GameSpecificId == newMatch.GameSpecificId) return;
+        _ = LogMismatchIfHighConfidenceAsync(card, oldMatch, newMatch);
+    }
 
+    private async Task LogMismatchIfHighConfidenceAsync(ScannedCard card, CardMatch oldMatch, CardMatch newMatch)
+    {
         try
         {
-            using var ctx = collectionDbContextFactory.CreateDbContext();
-            ctx.MismatchLogs.Add(new MismatchLog
+            await mismatchLogService.LogMismatchAsync(oldMatch, newMatch, card);
+            if (oldMatch.Confidence is >= 80 && oldMatch.GameSpecificId != newMatch.GameSpecificId)
             {
-                ScanHash = card.Hash,
-                ScanImagePath = card.TempImagePath,
-                OriginalCardId = oldMatch.GameSpecificId,
-                OriginalName = oldMatch.Name,
-                OriginalSetCode = oldMatch.SetCode,
-                OriginalNumber = oldMatch.CollectorNumber,
-                OriginalConfidence = oldMatch.Confidence ?? 0,
-                CorrectedCardId = newMatch.GameSpecificId,
-                CorrectedName = newMatch.Name,
-                CorrectedSetCode = newMatch.SetCode,
-                CorrectedNumber = newMatch.CollectorNumber,
-            });
-            ctx.SaveChanges();
-            _logger.LogInformation("Logged high-confidence mismatch: {OldName} ({OldSet}) -> {NewName} ({NewSet}) at {Confidence:F0}%",
-                oldMatch.Name, oldMatch.SetCode, newMatch.Name, newMatch.SetCode, oldMatch.Confidence);
+                _logger.LogInformation("Logged high-confidence mismatch: {OldName} ({OldSet}) -> {NewName} ({NewSet}) at {Confidence:F0}%",
+                    oldMatch.Name, oldMatch.SetCode, newMatch.Name, newMatch.SetCode, oldMatch.Confidence);
+            }
         }
         catch (Exception ex)
         {

@@ -4,8 +4,8 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:OmniCard.Views.CollectionCardEditor"
-        xmlns:helpers="clr-namespace:OmniCard.Helpers"
-        xmlns:root="clr-namespace:OmniCard.Views.Root"
+        xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
+        xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
         ShowInTaskbar="False"
@@ -323,7 +323,7 @@
                                         <StackPanel Orientation="Horizontal" Margin="2">
                                             <Image Source="{Binding ImageUri}" Width="36" Height="50"
                                                    Stretch="Uniform" Margin="0,0,8,0"
-                                                   Visibility="{Binding ImageUri, Converter={root:NullToCollapsedConverter}}"/>
+                                                   Visibility="{Binding ImageUri, Converter={conv:NullToCollapsedConverter}}"/>
                                             <StackPanel VerticalAlignment="Center">
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Margin="0,0,8,0"/>

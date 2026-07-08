@@ -1,8 +1,8 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:helpers="clr-namespace:OmniCard.Helpers"
-                    xmlns:models="clr-namespace:OmniCard.Models"
-                    xmlns:local="clr-namespace:OmniCard.Views.Root">
+                    xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
+                    xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
+                    xmlns:models="clr-namespace:OmniCard.Models;assembly=OmniCard.Shared">
 
     <!-- MTG detail template -->
     <DataTemplate DataType="{x:Type models:Card}">
@@ -108,7 +108,7 @@
                            Margin="0,2,8,2"/>
                 <TextBlock Grid.Row="5"
                            Grid.Column="1"
-                           Text="{Binding ColorIdentity, Converter={local:ListToStringConverter}}"
+                           Text="{Binding ColorIdentity, Converter={conv:ListToStringConverter}}"
                            Margin="0,2"/>
 
                 <TextBlock Grid.Row="6"

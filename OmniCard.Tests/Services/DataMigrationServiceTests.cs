@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using OmniCard.Services;
+using OmniCard.Interfaces;
+using OmniCard.Data;
 
 namespace OmniCard.Tests.Services;
 

@@ -2,7 +2,7 @@
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using System.Windows;
-using OmniCard.Services;
+using OmniCard.Scanner;
 
 namespace OmniCard.Views.Connection;
 

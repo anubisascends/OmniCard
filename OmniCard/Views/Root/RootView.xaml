@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:OmniCard.Views.Root"
+        xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance {x:Type local:RootView}}"
         Title="TCG Card Scanner"
@@ -187,10 +188,10 @@
             <MenuItem Header="_Tools">
                 <MenuItem Header="Connect to _eBay..."
                           Command="{Binding ViewModel.ConnectToEbayCommand}"
-                          Visibility="{Binding ViewModel.IsEbayConnected, Converter={local:InverseBoolToVisibilityConverter}}"/>
+                          Visibility="{Binding ViewModel.IsEbayConnected, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                 <MenuItem Header="Disconnect from eBay"
                           Command="{Binding ViewModel.DisconnectEbayCommand}"
-                          Visibility="{Binding ViewModel.IsEbayConnected, Converter={local:BoolToVisibilityConverter}}"/>
+                          Visibility="{Binding ViewModel.IsEbayConnected, Converter={conv:BoolToVisibilityConverter}}"/>
                 <Separator/>
                 <MenuItem Header="Clear Scan _Cache"
                           Command="{Binding ViewModel.ClearScanCacheCommand}"/>
@@ -217,7 +218,7 @@
                               Margin="0,0,8,0">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding Converter={local:CardGameDisplayConverter}}"/>
+                                <TextBlock Text="{Binding Converter={conv:CardGameDisplayConverter}}"/>
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
                     </ComboBox>
@@ -255,8 +256,8 @@
                                FontSize="11" FontStyle="Italic"
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
                                Margin="0,0,12,0"/>
-                    <TextBlock Text="{Binding ViewModel.IsEbayConnected, Converter={local:BoolToEbayStatusConverter}}"
-                               Foreground="{Binding ViewModel.IsEbayConnected, Converter={local:BoolToConnectionColorConverter}}"/>
+                    <TextBlock Text="{Binding ViewModel.IsEbayConnected, Converter={conv:BoolToEbayStatusConverter}}"
+                               Foreground="{Binding ViewModel.IsEbayConnected, Converter={conv:BoolToConnectionColorConverter}}"/>
                 </StackPanel>
             </StatusBarItem>
         </StatusBar>

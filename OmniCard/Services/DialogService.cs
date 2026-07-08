@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System.Windows;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 using OmniCard.Views.Card;
 using OmniCard.Views.CollectionCardEditor;
@@ -17,26 +18,6 @@ using OmniCard.Views.StorageManager;
 using OmniCard.Views.EbayListing;
 
 namespace OmniCard.Services;
-
-public interface IDialogService
-{
-    (bool Connected, bool SetAsDefault) ConnectToScanner();
-    bool? ConnectToEbay();
-    void ShowCard(ScannedCard card);
-    bool? EditCollectionCard(CollectionCard card);
-    void ManageStorageContainers();
-    int? ShowImportPreview(CsvImportPreview preview);
-    bool OpenSortFilterBuilder(CardGame game);
-    IReadOnlyList<string>? OpenSetFilterBuilder(IReadOnlyList<SetInfo> allSets, IReadOnlySet<string>? currentFilter);
-    void ShowDataLocation();
-    int? PickCoverArt(int containerId, string containerName);
-    MoveToLocationResult? PickMoveToLocation();
-    SealedProductTemplate? EditSealedProductTemplate(SealedProductTemplate? existing);
-    List<SealedProductInstance>? OpenSealedProductEntry();
-    List<SealedProductInstance>? CrackSealedProduct(SealedProductInstance instance);
-    void ShowAuditReport(AuditReport report);
-    bool? OpenEbayListingDialog(CollectionCard card);
-}
 
 public sealed class DialogService(IServiceProvider services) : IDialogService
 {

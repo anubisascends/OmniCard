@@ -1,5 +1,5 @@
 using System.Text.Json;
-using OmniCard.Services;
+using OmniCard.Data;
 
 namespace OmniCard.Tests.Services;
 

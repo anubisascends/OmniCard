@@ -4,8 +4,10 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Data;
+using OmniCard.Imaging;
 using OmniCard.Models;
-using OmniCard.Services;
+using OmniCard.Interfaces;
+using OmniCard.Collection;
 
 namespace OmniCard.Tests.Services;
 
@@ -175,16 +177,16 @@ public class FallbackMatchingTests : IDisposable
         Assert.Equal(CardGame.OnePiece, matched.Game);
     }
 
-    private CardSevice CreateCardService(ICardGameService[] gameServices)
+    private CardService CreateCardService(ICardGameService[] gameServices)
     {
         var factory = new MockCollectionDbContextFactory(_collectionOptions);
-        return new CardSevice(
+        return new CardService(
             new StubHashService(),
             gameServices,
             factory,
             new StubOcrService(),
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-            NullLogger<CardSevice>.Instance,
+            NullLogger<CardService>.Instance,
             new DataPathService(Path.GetTempPath()),
             new NullScanDiagnosticService(),
             new NullAuditService());
