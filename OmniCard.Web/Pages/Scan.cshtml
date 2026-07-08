@@ -19,13 +19,9 @@
         .viewfinder video { width: 100%; height: 100%; object-fit: cover; }
         .viewfinder canvas { display: none; }
 
-        /* Card outline guide */
-        .card-guide {
-            position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 65%; aspect-ratio: 63/88; /* Standard card ratio */
-            border: 2px solid rgba(255,255,255,0.5);
-            border-radius: 12px;
+        /* Card detection overlay */
+        .detect-canvas {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none;
         }
 
@@ -96,7 +92,7 @@
         <div class="viewfinder" id="viewfinder">
             <video id="video" autoplay playsinline muted></video>
             <canvas id="canvas"></canvas>
-            <div class="card-guide"></div>
+            <canvas id="detectCanvas" class="detect-canvas"></canvas>
             <div class="flash" id="flash"></div>
         </div>
         <div class="controls">
@@ -123,12 +119,14 @@
     <script>
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
+        const detectCanvas = document.getElementById('detectCanvas');
         const captureBtn = document.getElementById('captureBtn');
         const status = document.getElementById('status');
         const flash = document.getElementById('flash');
         let isUploading = false;
+        let detectedCard = null; // {x, y, w, h} in video pixel coords
+        let detectAnimId = null;
 
-        // Check if we can use getUserMedia (requires secure context)
         const canUseLiveCamera = window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
 
         async function uploadImage(blob) {
@@ -147,6 +145,145 @@
             return await response.json();
         }
 
+        // ── Card edge detection ──
+        // Scans inward from edges looking for non-background pixels.
+        // Same approach as the desktop AutoCropScan: brightness threshold.
+
+        function detectCardBounds(ctx, w, h) {
+            // Sample at reduced resolution for speed
+            const sampleW = 160;
+            const sampleH = Math.round(sampleW * h / w);
+            const sampleCanvas = document.createElement('canvas');
+            sampleCanvas.width = sampleW;
+            sampleCanvas.height = sampleH;
+            const sCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+            sCtx.drawImage(video, 0, 0, sampleW, sampleH);
+            const data = sCtx.getImageData(0, 0, sampleW, sampleH).data;
+
+            const THRESHOLD = 60; // pixels darker than this are "card"
+            const MIN_EDGE_RATIO = 0.10; // 10% of row/col must be dark
+
+            function brightness(i) {
+                return (data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114);
+            }
+
+            function countDarkInRow(y) {
+                let count = 0;
+                for (let x = 0; x < sampleW; x++) {
+                    if (brightness((y * sampleW + x) * 4) < 200) count++;
+                }
+                return count;
+            }
+
+            function countDarkInCol(x) {
+                let count = 0;
+                for (let y = 0; y < sampleH; y++) {
+                    if (brightness((y * sampleW + x) * 4) < 200) count++;
+                }
+                return count;
+            }
+
+            // Find edges
+            let top = 0, bottom = sampleH - 1, left = 0, right = sampleW - 1;
+
+            for (let y = 0; y < sampleH; y++) {
+                if (countDarkInRow(y) > sampleW * MIN_EDGE_RATIO) { top = y; break; }
+            }
+            for (let y = sampleH - 1; y >= 0; y--) {
+                if (countDarkInRow(y) > sampleW * MIN_EDGE_RATIO) { bottom = y; break; }
+            }
+            for (let x = 0; x < sampleW; x++) {
+                if (countDarkInCol(x) > sampleH * MIN_EDGE_RATIO) { left = x; break; }
+            }
+            for (let x = sampleW - 1; x >= 0; x--) {
+                if (countDarkInCol(x) > sampleH * MIN_EDGE_RATIO) { right = x; break; }
+            }
+
+            const cropW = right - left;
+            const cropH = bottom - top;
+
+            // Reject if detected region is too small (<20%) or too large (>95% = no card visible)
+            if (cropW < sampleW * 0.2 || cropH < sampleH * 0.2) return null;
+            if (cropW > sampleW * 0.95 && cropH > sampleH * 0.95) return null;
+
+            // Scale back to video coordinates with small margin
+            const scaleX = w / sampleW;
+            const scaleY = h / sampleH;
+            const margin = 8;
+            return {
+                x: Math.max(0, Math.round(left * scaleX) - margin),
+                y: Math.max(0, Math.round(top * scaleY) - margin),
+                w: Math.min(w, Math.round(cropW * scaleX) + margin * 2),
+                h: Math.min(h, Math.round(cropH * scaleY) + margin * 2)
+            };
+        }
+
+        function drawDetectionOverlay() {
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            if (!vw || !vh) { detectAnimId = requestAnimationFrame(drawDetectionOverlay); return; }
+
+            // Match canvas to display size
+            const rect = video.getBoundingClientRect();
+            detectCanvas.width = rect.width;
+            detectCanvas.height = rect.height;
+            const dCtx = detectCanvas.getContext('2d');
+            dCtx.clearRect(0, 0, rect.width, rect.height);
+
+            // Detect card
+            canvas.width = vw;
+            canvas.height = vh;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            detectedCard = detectCardBounds(ctx, vw, vh);
+
+            if (detectedCard) {
+                // Map video coords to display coords
+                // video uses object-fit:cover, so we need to account for cropping
+                const videoAspect = vw / vh;
+                const displayAspect = rect.width / rect.height;
+                let sx, sy, sw, sh;
+                if (videoAspect > displayAspect) {
+                    // Video wider than display — cropped on sides
+                    sh = vh;
+                    sw = vh * displayAspect;
+                    sx = (vw - sw) / 2;
+                    sy = 0;
+                } else {
+                    // Video taller than display — cropped top/bottom
+                    sw = vw;
+                    sh = vw / displayAspect;
+                    sx = 0;
+                    sy = (vh - sh) / 2;
+                }
+
+                const dx = (detectedCard.x - sx) / sw * rect.width;
+                const dy = (detectedCard.y - sy) / sh * rect.height;
+                const dw = detectedCard.w / sw * rect.width;
+                const dh = detectedCard.h / sh * rect.height;
+
+                dCtx.strokeStyle = '#4caf50';
+                dCtx.lineWidth = 3;
+                dCtx.setLineDash([]);
+                dCtx.strokeRect(dx, dy, dw, dh);
+
+                // Corner accents
+                const corner = 20;
+                dCtx.lineWidth = 4;
+                dCtx.strokeStyle = '#4caf50';
+                // Top-left
+                dCtx.beginPath(); dCtx.moveTo(dx, dy + corner); dCtx.lineTo(dx, dy); dCtx.lineTo(dx + corner, dy); dCtx.stroke();
+                // Top-right
+                dCtx.beginPath(); dCtx.moveTo(dx + dw - corner, dy); dCtx.lineTo(dx + dw, dy); dCtx.lineTo(dx + dw, dy + corner); dCtx.stroke();
+                // Bottom-left
+                dCtx.beginPath(); dCtx.moveTo(dx, dy + dh - corner); dCtx.lineTo(dx, dy + dh); dCtx.lineTo(dx + corner, dy + dh); dCtx.stroke();
+                // Bottom-right
+                dCtx.beginPath(); dCtx.moveTo(dx + dw - corner, dy + dh); dCtx.lineTo(dx + dw, dy + dh); dCtx.lineTo(dx + dw, dy + dh - corner); dCtx.stroke();
+            }
+
+            detectAnimId = requestAnimationFrame(drawDetectionOverlay);
+        }
+
         // ── Live viewfinder mode (HTTPS) ──
 
         async function initCamera() {
@@ -162,7 +299,8 @@
                 video.srcObject = stream;
                 await video.play();
                 captureBtn.disabled = false;
-                setStatus('Ready — tap to scan', '');
+                setStatus('Ready — position card in frame', '');
+                detectAnimId = requestAnimationFrame(drawDetectionOverlay);
             } catch (err) {
                 showError(err.message || 'Could not access camera');
             }
@@ -201,19 +339,32 @@
 
             flashEffect();
 
+            // Capture full frame
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(video, 0, 0);
 
+            // If card detected, crop to just the card
+            let cropCanvas = canvas;
+            if (detectedCard) {
+                cropCanvas = document.createElement('canvas');
+                cropCanvas.width = detectedCard.w;
+                cropCanvas.height = detectedCard.h;
+                const cropCtx = cropCanvas.getContext('2d');
+                cropCtx.drawImage(canvas,
+                    detectedCard.x, detectedCard.y, detectedCard.w, detectedCard.h,
+                    0, 0, detectedCard.w, detectedCard.h);
+            }
+
             setStatus('Uploading...', 'uploading');
 
             try {
                 const blob = await new Promise(resolve =>
-                    canvas.toBlob(resolve, 'image/jpeg', 0.9)
+                    cropCanvas.toBlob(resolve, 'image/jpeg', 0.92)
                 );
                 await uploadImage(blob);
-                setStatus('Sent! Ready for next card.', 'success');
+                setStatus(detectedCard ? 'Sent (cropped)! Ready for next.' : 'Sent! Ready for next card.', 'success');
             } catch (err) {
                 setStatus(err.message || 'Network error', 'error');
             }
