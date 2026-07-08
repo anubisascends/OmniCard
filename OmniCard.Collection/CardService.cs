@@ -14,29 +14,29 @@ using OmniCard.Imaging;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 
-namespace OmniCard.Services;
+namespace OmniCard.Collection;
 
-public sealed class CardSevice : ICardService
+public sealed class CardService : ICardService
 {
     private readonly IPerceptualHashService _hashService;
     private readonly Dictionary<CardGame, ICardGameService> _gameServices;
     private readonly IDbContextFactory<CollectionDbContext> _collectionDbContextFactory;
     private readonly IOcrMatchingService _ocrService;
     private readonly ScanImageCache _imageCache;
-    private readonly ILogger<CardSevice> _logger;
+    private readonly ILogger<CardService> _logger;
     private readonly string _tempScansDir;
     private readonly IDataPathService _dataPathService;
     private readonly IScanDiagnosticService _diagnosticService;
     private readonly IAuditService _auditService;
     private string _currentSessionId = Guid.NewGuid().ToString();
 
-    public CardSevice(
+    public CardService(
         IPerceptualHashService hashService,
         IEnumerable<ICardGameService> gameServices,
         IDbContextFactory<CollectionDbContext> collectionDbContextFactory,
         IOcrMatchingService ocrService,
         ScanImageCache imageCache,
-        ILogger<CardSevice> logger,
+        ILogger<CardService> logger,
         IDataPathService dataPathService,
         IScanDiagnosticService diagnosticService,
         IAuditService auditService)

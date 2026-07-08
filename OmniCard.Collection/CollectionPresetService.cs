@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 
-namespace OmniCard.Services;
+namespace OmniCard.Collection;
 
 public class CollectionPresetService : ICollectionPresetService
 {

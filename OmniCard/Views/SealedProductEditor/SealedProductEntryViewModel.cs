@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 using OmniCard.Services;
+using OmniCard.Collection;
 
 namespace OmniCard.Views.SealedProductEditor;
 

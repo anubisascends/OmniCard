@@ -7,6 +7,7 @@ using OmniCard.Imaging;
 using OmniCard.Models;
 using OmniCard.Interfaces;
 using OmniCard.Services;
+using OmniCard.Collection;
 
 namespace OmniCard.Tests.Services;
 
@@ -151,15 +152,15 @@ public class CollectionCardCrudTests : IDisposable
         // Should not throw
     }
 
-    private CardSevice CreateService()
+    private CardService CreateService()
     {
-        return new CardSevice(
+        return new CardService(
             new StubHashService(),
             [],
             new MockCollectionDbContextFactory(_options),
             new StubOcrService(),
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-            NullLogger<CardSevice>.Instance,
+            NullLogger<CardService>.Instance,
             new DataPathService(Path.GetTempPath()),
             new NullScanDiagnosticService(),
             new NullAuditService());

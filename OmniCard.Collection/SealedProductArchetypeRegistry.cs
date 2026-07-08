@@ -1,6 +1,6 @@
 using OmniCard.Models;
 
-namespace OmniCard.Services;
+namespace OmniCard.Collection;
 
 public static class SealedProductArchetypeRegistry
 {

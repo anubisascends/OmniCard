@@ -8,6 +8,7 @@ using OmniCard.Imaging;
 using OmniCard.Models;
 using OmniCard.Interfaces;
 using OmniCard.Services;
+using OmniCard.Collection;
 
 namespace OmniCard.Tests.Services;
 
@@ -41,13 +42,13 @@ public class CardServiceCollectionTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var service = new CardSevice(
+        var service = new CardService(
             new StubHashService(),
             [],
             CreateFactory(),
             new StubOcrService(),
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-            NullLogger<CardSevice>.Instance,
+            NullLogger<CardService>.Instance,
             new DataPathService(Path.GetTempPath()),
             new NullScanDiagnosticService(),
             new NullAuditService());
@@ -68,13 +69,13 @@ public class CardServiceCollectionTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var service = new CardSevice(
+        var service = new CardService(
             new StubHashService(),
             [],
             CreateFactory(),
             new StubOcrService(),
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-            NullLogger<CardSevice>.Instance,
+            NullLogger<CardService>.Instance,
             new DataPathService(Path.GetTempPath()),
             new NullScanDiagnosticService(),
             new NullAuditService());
@@ -96,13 +97,13 @@ public class CardServiceCollectionTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var service = new CardSevice(
+        var service = new CardService(
             new StubHashService(),
             [],
             CreateFactory(),
             new StubOcrService(),
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-            NullLogger<CardSevice>.Instance,
+            NullLogger<CardService>.Instance,
             new DataPathService(Path.GetTempPath()),
             new NullScanDiagnosticService(),
             new NullAuditService());
@@ -117,13 +118,13 @@ public class CardServiceCollectionTests : IDisposable
     [Fact]
     public void CommitScans_WritesToCollectionDb()
     {
-        var service = new CardSevice(
+        var service = new CardService(
             new StubHashService(),
             [],
             CreateFactory(),
             new StubOcrService(),
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-            NullLogger<CardSevice>.Instance,
+            NullLogger<CardService>.Instance,
             new DataPathService(Path.GetTempPath()),
             new NullScanDiagnosticService(),
             new NullAuditService());
@@ -161,13 +162,13 @@ public class CardServiceCollectionTests : IDisposable
     [Fact]
     public void CommitScans_PopulatesColorAndCardType()
     {
-        var service = new CardSevice(
+        var service = new CardService(
             new StubHashService(),
             [],
             CreateFactory(),
             new StubOcrService(),
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-            NullLogger<CardSevice>.Instance,
+            NullLogger<CardService>.Instance,
             new DataPathService(Path.GetTempPath()),
             new NullScanDiagnosticService(),
             new NullAuditService());
@@ -248,13 +249,13 @@ public class CardServiceCollectionTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var service = new CardSevice(
+        var service = new CardService(
             new StubHashService(),
             [],
             CreateFactory(),
             new StubOcrService(),
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-            NullLogger<CardSevice>.Instance,
+            NullLogger<CardService>.Instance,
             new DataPathService(Path.GetTempPath()),
             new NullScanDiagnosticService(),
             new NullAuditService());
@@ -285,13 +286,13 @@ public class CardServiceCollectionTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var service = new CardSevice(
+        var service = new CardService(
             new StubHashService(),
             [],
             CreateFactory(),
             new StubOcrService(),
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-            NullLogger<CardSevice>.Instance,
+            NullLogger<CardService>.Instance,
             new DataPathService(Path.GetTempPath()),
             new NullScanDiagnosticService(),
             new NullAuditService());

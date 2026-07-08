@@ -14,6 +14,7 @@ using OmniCard.Helpers;
 using OmniCard.Imaging;
 using OmniCard.CardMatching;
 using OmniCard.Services;
+using OmniCard.Collection;
 using OmniCard.Views.Card;
 using OmniCard.Views.CollectionCardEditor;
 using OmniCard.Views.Connection;
@@ -70,7 +71,9 @@ public partial class App : Application
             services.AddSingleton<IDialogService, DialogService>();
             services.AddSingleton<IPerceptualHashService, PerceptualHashService>();
             services.AddSingleton<IOcrMatchingService, OcrMatchingService>();
-            services.AddSingleton<ICardService, CardSevice>();
+            services.AddSingleton<ICardService, CardService>();
+            services.AddSingleton<ICollectionQueryService, CollectionQueryService>();
+            services.AddSingleton<IMismatchLogService, MismatchLogService>();
             services.AddSingleton<ScanImageCache>();
             services.AddSingleton<CardArtCache>();
             services.AddHttpClient();

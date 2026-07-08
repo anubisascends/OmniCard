@@ -8,6 +8,7 @@ using OmniCard.Imaging;
 using OmniCard.Models;
 using OmniCard.Interfaces;
 using OmniCard.Services;
+using OmniCard.Collection;
 
 namespace OmniCard.Tests.Services;
 
@@ -46,13 +47,13 @@ public class CollectionSortFilterTests : IDisposable
 
     private IDbContextFactory<CollectionDbContext> CreateFactory() => new MockFactory(_options);
 
-    private CardSevice CreateService() => new(
+    private CardService CreateService() => new(
         new StubHashService(),
         [],
         CreateFactory(),
         new StubOcrService(),
         new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-        NullLogger<CardSevice>.Instance,
+        NullLogger<CardService>.Instance,
         new DataPathService(Path.GetTempPath()),
         new NullScanDiagnosticService(),
         new NullAuditService());

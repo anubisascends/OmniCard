@@ -8,7 +8,7 @@ using OmniCard.Data;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 
-namespace OmniCard.Services;
+namespace OmniCard.Collection;
 
 public class CsvExportImportService(
     IDbContextFactory<CollectionDbContext>? dbContextFactory,
