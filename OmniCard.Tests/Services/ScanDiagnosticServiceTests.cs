@@ -5,6 +5,7 @@ using OmniCard.Data;
 using OmniCard.Models;
 using OmniCard.Interfaces;
 using OmniCard.Scanner;
+using OmniCard.Services;
 
 namespace OmniCard.Tests.Services;
 
@@ -27,7 +28,7 @@ public class ScanDiagnosticServiceTests : IDisposable
     public void Dispose() => _connection.Dispose();
 
     private IScanDiagnosticService CreateService() =>
-        new ScanDiagnosticService(new MockFactory(_options));
+        new ScanDiagnosticService(new MockFactory(_options), new DiagnosticExporter());
 
     [Fact]
     public void LogScanCompleted_CreatesEvent()

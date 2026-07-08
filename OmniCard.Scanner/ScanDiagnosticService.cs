@@ -8,7 +8,7 @@ using OmniCard.Models;
 
 namespace OmniCard.Scanner;
 
-public class ScanDiagnosticService(IDbContextFactory<CollectionDbContext> dbContextFactory) : IScanDiagnosticService
+public class ScanDiagnosticService(IDbContextFactory<CollectionDbContext> dbContextFactory, IDiagnosticExporter diagnosticExporter) : IScanDiagnosticService
 {
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
@@ -109,8 +109,8 @@ public class ScanDiagnosticService(IDbContextFactory<CollectionDbContext> dbCont
             .OrderBy(e => e.Timestamp)
             .ToList();
 
-        var exporter = new DiagnosticExporter(events);
-        File.WriteAllText(filePath, exporter.Render());
+        var output = diagnosticExporter.Render(events);
+        File.WriteAllText(filePath, output);
     }
 
     public void ClearDiagnostics()

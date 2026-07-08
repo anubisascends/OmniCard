@@ -1,13 +1,14 @@
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
-namespace OmniCard.Scanner;
+namespace OmniCard.Services;
 
-public class DiagnosticExporter(List<ScanDiagnosticEvent> events)
+public class DiagnosticExporter : IDiagnosticExporter
 {
-    public string Render()
+    public string Render(List<ScanDiagnosticEvent> events)
     {
         var sb = new StringBuilder();
         var version = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown";

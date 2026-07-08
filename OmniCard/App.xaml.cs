@@ -113,6 +113,7 @@ public partial class App : Application
             services.AddSingleton<ICsvExportImportService, CsvExportImportService>();
 
             // Scan diagnostics
+            services.AddSingleton<IDiagnosticExporter, DiagnosticExporter>();
             services.AddSingleton<IScanDiagnosticService, ScanDiagnosticService>();
 
             // Location audit
