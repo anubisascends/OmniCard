@@ -8,10 +8,10 @@ namespace OmniCard.Collection;
 public sealed class MismatchLogService(
     IDbContextFactory<CollectionDbContext> dbContextFactory) : IMismatchLogService
 {
-    public Task LogMismatchAsync(CardMatch oldMatch, CardMatch newMatch, ScannedCard scannedCard)
+    public async Task LogMismatchAsync(CardMatch oldMatch, CardMatch newMatch, ScannedCard scannedCard)
     {
-        if (oldMatch.Confidence is not >= 80) return Task.CompletedTask;
-        if (oldMatch.GameSpecificId == newMatch.GameSpecificId) return Task.CompletedTask;
+        if (oldMatch.Confidence is not >= 80) return;
+        if (oldMatch.GameSpecificId == newMatch.GameSpecificId) return;
 
         using var ctx = dbContextFactory.CreateDbContext();
         ctx.MismatchLogs.Add(new MismatchLog
@@ -28,7 +28,6 @@ public sealed class MismatchLogService(
             CorrectedSetCode = newMatch.SetCode,
             CorrectedNumber = newMatch.CollectorNumber,
         });
-        ctx.SaveChanges();
-        return Task.CompletedTask;
+        await ctx.SaveChangesAsync();
     }
 }
