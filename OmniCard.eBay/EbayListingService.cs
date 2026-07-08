@@ -9,7 +9,7 @@ using OmniCard.Data;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 
-namespace OmniCard.Services;
+namespace OmniCard.eBay;
 
 public class EbayListingService : IEbayListingService
 {

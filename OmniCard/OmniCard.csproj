@@ -26,6 +26,7 @@
     <ProjectReference Include="..\OmniCard.Imaging\OmniCard.Imaging.csproj" />
     <ProjectReference Include="..\OmniCard.CardMatching\OmniCard.CardMatching.csproj" />
     <ProjectReference Include="..\OmniCard.Collection\OmniCard.Collection.csproj" />
+    <ProjectReference Include="..\OmniCard.eBay\OmniCard.eBay.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OmniCard.Models;
 using OmniCard.Interfaces;
-using OmniCard.Services;
+using OmniCard.eBay;
 using System.Net;
 using System.Text.Json;
 

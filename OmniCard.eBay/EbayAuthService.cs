@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 
-namespace OmniCard.Services;
+namespace OmniCard.eBay;
 
 public partial class EbayAuthService : ObservableObject, IEbayAuthService
 {

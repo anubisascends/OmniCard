@@ -1,7 +1,7 @@
 using AdysTech.CredentialManager;
 using OmniCard.Interfaces;
 
-namespace OmniCard.Services;
+namespace OmniCard.eBay;
 
 public class CredentialStore : ICredentialStore
 {
