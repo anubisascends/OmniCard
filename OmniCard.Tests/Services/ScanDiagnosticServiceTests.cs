@@ -6,6 +6,7 @@ using OmniCard.Models;
 using OmniCard.Interfaces;
 using OmniCard.Scanner;
 using OmniCard.Services;
+using OmniCard.Audit;
 
 namespace OmniCard.Tests.Services;
 

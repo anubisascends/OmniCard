@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Data;
 using OmniCard.Models;
 using OmniCard.Interfaces;
-using OmniCard.Services;
+using OmniCard.Audit;
 
 namespace OmniCard.Tests.Services;
 

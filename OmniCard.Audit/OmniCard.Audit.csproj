@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -11,5 +11,6 @@
   <ItemGroup>
     <ProjectReference Include="..\OmniCard.Shared\OmniCard.Shared.csproj" />
     <ProjectReference Include="..\OmniCard.Data\OmniCard.Data.csproj" />
+    <ProjectReference Include="..\OmniCard.Imaging\OmniCard.Imaging.csproj" />
   </ItemGroup>
 </Project>

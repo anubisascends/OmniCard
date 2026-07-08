@@ -5,7 +5,7 @@ using OmniCard.Imaging;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 
-namespace OmniCard.Services;
+namespace OmniCard.Audit;
 
 public sealed class AuditService : IAuditService
 {

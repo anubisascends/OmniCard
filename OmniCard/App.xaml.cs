@@ -14,6 +14,7 @@ using OmniCard.Helpers;
 using OmniCard.Imaging;
 using OmniCard.CardMatching;
 using OmniCard.Services;
+using OmniCard.Audit;
 using OmniCard.Scanner;
 using OmniCard.eBay;
 using OmniCard.Collection;

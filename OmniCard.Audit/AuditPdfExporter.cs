@@ -4,7 +4,7 @@ using QuestPDF.Infrastructure;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 
-namespace OmniCard.Services;
+namespace OmniCard.Audit;
 
 public sealed class AuditPdfExporter : IAuditPdfExporter
 {
