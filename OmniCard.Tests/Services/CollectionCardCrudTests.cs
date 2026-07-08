@@ -3,6 +3,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Data;
+using OmniCard.Imaging;
 using OmniCard.Models;
 using OmniCard.Interfaces;
 using OmniCard.Services;

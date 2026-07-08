@@ -3,7 +3,7 @@ using System.Net.Http;
 using System.Windows.Media.Imaging;
 using Microsoft.Extensions.Logging;
 
-namespace OmniCard.Services;
+namespace OmniCard.Imaging;
 
 public sealed class CardArtCache
 {

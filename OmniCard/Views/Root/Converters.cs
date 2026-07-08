@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Markup;
+using OmniCard.Imaging;
 using OmniCard.Models;
 using OmniCard.Services;
 

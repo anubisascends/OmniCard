@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Windows.Data;
 using System.Windows.Markup;
-using OmniCard.Services;
+using OmniCard.Imaging;
 
 namespace OmniCard.Views.Root;
 

@@ -7,7 +7,7 @@ using System.Numerics;
 using Microsoft.Extensions.Logging;
 using OmniCard.Interfaces;
 using OmniCard.Models;
-namespace OmniCard.Services;
+namespace OmniCard.Imaging;
 
 /// <summary>
 /// Computes perceptual hashes (pHash) for card images using a pipeline inspired by

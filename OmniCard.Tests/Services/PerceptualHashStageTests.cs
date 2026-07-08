@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Drawing.Imaging;
 using Microsoft.Extensions.Logging.Abstractions;
+using OmniCard.Imaging;
 using OmniCard.Models;
 using OmniCard.Services;
 

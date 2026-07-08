@@ -9,6 +9,7 @@ using System.Windows.Media.Imaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OmniCard.Data;
+using OmniCard.Imaging;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 

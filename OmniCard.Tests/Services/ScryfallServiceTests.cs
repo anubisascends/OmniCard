@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OmniCard.Data;
 using OmniCard.Helpers;
+using OmniCard.Imaging;
 using OmniCard.Models;
 using OmniCard.Services;
 

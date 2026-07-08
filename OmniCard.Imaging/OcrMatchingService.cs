@@ -8,7 +8,7 @@ using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
 using Windows.Storage.Streams;
 
-namespace OmniCard.Services;
+namespace OmniCard.Imaging;
 
 public sealed class OcrMatchingService : IOcrMatchingService
 {
