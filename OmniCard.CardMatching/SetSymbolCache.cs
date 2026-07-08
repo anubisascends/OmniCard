@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using SharpVectors.Converters;
 using SharpVectors.Renderers.Wpf;
 using OmniCard.Interfaces;
-using OmniCard.Services;
 
 namespace OmniCard.Helpers;
 

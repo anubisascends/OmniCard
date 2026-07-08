@@ -12,6 +12,7 @@ using System.Windows;
 using OmniCard.Data;
 using OmniCard.Helpers;
 using OmniCard.Imaging;
+using OmniCard.CardMatching;
 using OmniCard.Services;
 using OmniCard.Views.Card;
 using OmniCard.Views.CollectionCardEditor;

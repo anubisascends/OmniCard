@@ -8,6 +8,7 @@ using LinqExpression = System.Linq.Expressions.Expression;
 using System.Windows.Media.Imaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using OmniCard.CardMatching;
 using OmniCard.Data;
 using OmniCard.Imaging;
 using OmniCard.Interfaces;

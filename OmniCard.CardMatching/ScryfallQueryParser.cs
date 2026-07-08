@@ -1,4 +1,4 @@
-namespace OmniCard.Services;
+namespace OmniCard.CardMatching;
 
 public enum ComparisonOp { Contains, Exact, NotEqual, LessThan, GreaterThan, LessOrEqual, GreaterOrEqual }
 

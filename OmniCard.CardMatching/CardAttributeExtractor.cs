@@ -1,6 +1,6 @@
 using OmniCard.Models;
 
-namespace OmniCard.Services;
+namespace OmniCard.CardMatching;
 
 public static class CardAttributeExtractor
 {

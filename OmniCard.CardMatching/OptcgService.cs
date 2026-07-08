@@ -11,7 +11,7 @@ using OmniCard.Imaging;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 
-namespace OmniCard.Services;
+namespace OmniCard.CardMatching;
 
 public sealed class OptcgService : ICardGameService, IDisposable
 {
