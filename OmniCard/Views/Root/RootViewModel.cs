@@ -15,6 +15,7 @@ using System.Windows.Data;
 using NTwain;
 using OmniCard.Data;
 using OmniCard.Helpers;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 using OmniCard.Services;
 using OmniCard.Themes;

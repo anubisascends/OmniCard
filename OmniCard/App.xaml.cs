@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Serilog;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 using System.IO;
 using System.Windows;

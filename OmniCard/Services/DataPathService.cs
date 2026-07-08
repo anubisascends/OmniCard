@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using OmniCard.Interfaces;
 
 namespace OmniCard.Services;
 

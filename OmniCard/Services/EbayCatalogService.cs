@@ -3,15 +3,10 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Services;
-
-public interface IEbayCatalogService
-{
-    Task<List<EbayCatalogMatch>> SearchCatalogAsync(string cardName, string setName, string? collectorNumber);
-    Task<EbayMarketPrice?> GetMarketPriceAsync(string searchQuery, string condition, bool isFoil);
-}
 
 public class EbayCatalogService : IEbayCatalogService
 {

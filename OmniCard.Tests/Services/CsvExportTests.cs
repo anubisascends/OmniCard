@@ -2,6 +2,7 @@ using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
 using OmniCard.Models;
+using OmniCard.Interfaces;
 using OmniCard.Services;
 
 namespace OmniCard.Tests.Services;

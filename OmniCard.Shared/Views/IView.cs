@@ -1,6 +1,3 @@
-﻿using System.ComponentModel;
-using System.Net.Http.Headers;
-
 namespace OmniCard.Views;
 
 public interface IView

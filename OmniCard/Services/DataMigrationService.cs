@@ -2,6 +2,7 @@ using System.IO;
 using System.Security.Cryptography;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
+using OmniCard.Interfaces;
 using Serilog;
 
 namespace OmniCard.Services;

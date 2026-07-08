@@ -1,6 +1,6 @@
 using OmniCard.Models;
 
-namespace OmniCard.Services;
+namespace OmniCard.Interfaces;
 
 public interface ICardGameService
 {

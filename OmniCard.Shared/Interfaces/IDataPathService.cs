@@ -1,4 +1,4 @@
-namespace OmniCard.Services;
+namespace OmniCard.Interfaces;
 
 public interface IDataPathService
 {

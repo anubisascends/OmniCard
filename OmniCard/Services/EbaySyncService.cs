@@ -5,15 +5,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Services;
-
-public interface IEbaySyncService
-{
-    Task<int> SyncAllActiveAsync();
-    Task SyncSingleAsync(EbayListing listing);
-}
 
 public class EbaySyncService : IEbaySyncService
 {

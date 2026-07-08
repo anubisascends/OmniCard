@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows.Media.Imaging;
 using Microsoft.Extensions.Logging;
+using OmniCard.Interfaces;
 
 namespace OmniCard.Services;
 

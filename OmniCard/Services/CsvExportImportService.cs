@@ -5,19 +5,10 @@ using CsvHelper.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Services;
-
-public interface ICsvExportImportService
-{
-    void ExportAppNative(string filePath, IEnumerable<CollectionCard> cards);
-    void ExportTcgPlayer(string filePath, IEnumerable<CollectionCard> cards);
-    void ExportMoxfield(string filePath, IEnumerable<CollectionCard> cards);
-    void ExportManabox(string filePath, IEnumerable<CollectionCard> cards);
-    CsvImportPreview PreviewImport(string filePath);
-    int ImportCards(CsvImportPreview preview, bool skipDuplicates, int? targetContainerId = null);
-}
 
 public class CsvExportImportService(
     IDbContextFactory<CollectionDbContext>? dbContextFactory,

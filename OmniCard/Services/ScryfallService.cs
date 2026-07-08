@@ -9,20 +9,10 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OmniCard.Data;
 using OmniCard.Helpers;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Services;
-
-public interface IScryfallService
-{
-    Task DownloadBulkDataAsync(IProgress<string>? progress = null, CancellationToken ct = default);
-    Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default);
-    CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 10);
-    List<CardMatch> SearchCards(string query, int maxResults = 20);
-    IQueryable<Card> Cards { get; }
-    Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null);
-    List<MissingCard> GetMissingCards(string setCode, IEnumerable<string> ownedCollectorNumbers);
-}
 
 public sealed class ScryfallService : IScryfallService, ICardGameService, IDisposable
 {

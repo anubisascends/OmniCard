@@ -5,14 +5,9 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Numerics;
 using Microsoft.Extensions.Logging;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 namespace OmniCard.Services;
-
-public interface IPerceptualHashService
-{
-    ulong ComputeHash(Stream imageStream, Action<HashStageResult>? onStage = null);
-    ulong[] ComputeArtHash(Stream imageStream, (double X, double Y, double W, double H)[] cropRegions, Action<HashStageResult>? onStage = null);
-}
 
 /// <summary>
 /// Computes perceptual hashes (pHash) for card images using a pipeline inspired by

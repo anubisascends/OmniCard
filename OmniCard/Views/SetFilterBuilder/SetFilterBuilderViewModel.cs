@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OmniCard.Helpers;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Views.SetFilterBuilder;
@@ -9,16 +10,16 @@ namespace OmniCard.Views.SetFilterBuilder;
 public partial class SetFilterBuilderViewModel : ObservableObject
 {
     private readonly SetSymbolCache _symbolCache;
-    private List<SetFilterItem> _allAvailable = [];
+    private List<WpfSetFilterItem> _allAvailable = [];
 
-    public ObservableCollection<SetFilterItem> AvailableSets { get; } = [];
-    public ObservableCollection<SetFilterItem> SelectedSets { get; } = [];
-
-    [ObservableProperty]
-    public partial SetFilterItem? SelectedAvailableItem { get; set; }
+    public ObservableCollection<WpfSetFilterItem> AvailableSets { get; } = [];
+    public ObservableCollection<WpfSetFilterItem> SelectedSets { get; } = [];
 
     [ObservableProperty]
-    public partial SetFilterItem? SelectedSelectedItem { get; set; }
+    public partial WpfSetFilterItem? SelectedAvailableItem { get; set; }
+
+    [ObservableProperty]
+    public partial WpfSetFilterItem? SelectedSelectedItem { get; set; }
 
     [ObservableProperty]
     public partial string SearchText { get; set; } = "";
@@ -44,7 +45,7 @@ public partial class SetFilterBuilderViewModel : ObservableObject
 
         foreach (var set in allSets)
         {
-            var item = new SetFilterItem { SetCode = set.SetCode, SetName = set.SetName };
+            var item = new WpfSetFilterItem { SetCode = set.SetCode, SetName = set.SetName };
 
             if (selectedCodes.Contains(set.SetCode))
                 SelectedSets.Add(item);
@@ -60,7 +61,7 @@ public partial class SetFilterBuilderViewModel : ObservableObject
         _ = LoadSymbolsAsync([.._allAvailable, ..SelectedSets]);
     }
 
-    private async Task LoadSymbolsAsync(List<SetFilterItem> items)
+    private async Task LoadSymbolsAsync(List<WpfSetFilterItem> items)
     {
         foreach (var item in items)
         {

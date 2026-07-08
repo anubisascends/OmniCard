@@ -1,21 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Services;
-
-
-public interface IAuditService
-{
-    bool IsAuditActive { get; }
-    int? AuditLocationId { get; }
-    string? AuditLocationName { get; }
-    void StartAudit(int containerId);
-    void EndAudit();
-    CardMatch? FindScopedMatch(ulong hash, ulong[]? artHashes);
-    AuditReport GenerateReport(IEnumerable<ScannedCard> scannedCards);
-}
 
 public sealed class AuditService : IAuditService
 {

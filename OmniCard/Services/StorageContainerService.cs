@@ -1,20 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Services;
-
-public interface IStorageContainerService
-{
-    List<StorageContainer> GetAll();
-    StorageContainer GetBulk();
-    StorageContainer Create(string name, ContainerType type);
-    void Rename(int id, string newName);
-    void Delete(int id, bool moveCardsToBulk = true);
-    int GetCardCount(int containerId);
-    void SetCoverCard(int containerId, int? cardId);
-    List<CollectionCard> GetCardsInContainer(int containerId);
-}
 
 public sealed class StorageContainerService(IDbContextFactory<CollectionDbContext> dbContextFactory)
     : IStorageContainerService

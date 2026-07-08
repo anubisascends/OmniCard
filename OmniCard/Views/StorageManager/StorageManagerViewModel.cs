@@ -9,6 +9,7 @@ using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Options;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 using OmniCard.Services;
 

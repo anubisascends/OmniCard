@@ -4,7 +4,7 @@
              xmlns:local="clr-namespace:OmniCard.Views.Root"
              xmlns:helpers="clr-namespace:OmniCard.Helpers"
              xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
-             xmlns:Models="clr-namespace:OmniCard.Models">
+             xmlns:Models="clr-namespace:OmniCard.Models;assembly=OmniCard.Shared">
 
     <Grid>
         <Grid.RowDefinitions>

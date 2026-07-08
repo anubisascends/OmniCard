@@ -19,7 +19,7 @@
 
     <Window.Resources>
         <local:SymbolToDrawingBrushConverter x:Key="SymbolToBrush"/>
-        <DataTemplate DataType="{x:Type models:SetFilterItem}">
+        <DataTemplate DataType="{x:Type local:WpfSetFilterItem}">
             <StackPanel Orientation="Horizontal" Margin="2">
                 <Border Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"
                         Background="#1A1A1A"

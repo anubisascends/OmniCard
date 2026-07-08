@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.Logging;
 using NTwain;
 using NTwain.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 using System.Reflection;
 

@@ -1,23 +1,10 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Services;
-
-public interface ICollectionPresetService
-{
-    List<SortPreset> GetSortPresets(CardGame game);
-    void SaveSortPreset(SortPreset preset);
-    void DeleteSortPreset(string name, CardGame game);
-    List<FilterPreset> GetFilterPresets(CardGame game);
-    void SaveFilterPreset(FilterPreset preset);
-    void DeleteFilterPreset(string name, CardGame game);
-    void SetActiveSortPreset(CardGame game, string? name);
-    void SetActiveFilterPreset(CardGame game, string? name);
-    SortPreset? GetActiveSortPreset(CardGame game);
-    FilterPreset? GetActiveFilterPreset(CardGame game);
-}
 
 public class CollectionPresetService : ICollectionPresetService
 {

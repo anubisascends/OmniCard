@@ -1,15 +1,10 @@
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Services;
-
-/// <summary>Exports an AuditReport to a PDF file using QuestPDF.</summary>
-public interface IAuditPdfExporter
-{
-    void Export(AuditReport report, string filePath);
-}
 
 public sealed class AuditPdfExporter : IAuditPdfExporter
 {

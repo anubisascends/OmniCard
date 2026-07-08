@@ -6,17 +6,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Services;
-
-public interface IEbayListingService
-{
-    Task<bool> CreateListingAsync(CollectionCard card, EbayListingOptions options);
-    Task<bool> ReviseListingAsync(EbayListing listing, EbayListingOptions options);
-    Task<bool> EndListingAsync(EbayListing listing);
-    Task<List<EbaySellerPolicy>> GetSellerPoliciesAsync(string policyType);
-}
 
 public class EbayListingService : IEbayListingService
 {

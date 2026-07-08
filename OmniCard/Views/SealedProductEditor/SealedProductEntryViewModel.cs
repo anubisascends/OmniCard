@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 using OmniCard.Services;
 

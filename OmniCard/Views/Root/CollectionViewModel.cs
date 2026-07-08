@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using System.Collections.ObjectModel;
 using System.Linq;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 using OmniCard.Services;
 using System.Threading.Tasks;

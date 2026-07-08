@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -6,18 +5,10 @@ using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Services;
-
-public interface IEbayAuthService : INotifyPropertyChanged
-{
-    bool IsConnected { get; }
-    Task<string?> GetAccessTokenAsync();
-    Task<bool> ExchangeCodeForTokensAsync(string authCode);
-    void Disconnect();
-    string GetAuthorizationUrl();
-}
 
 public partial class EbayAuthService : ObservableObject, IEbayAuthService
 {

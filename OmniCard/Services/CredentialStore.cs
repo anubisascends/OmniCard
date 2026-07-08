@@ -1,14 +1,7 @@
 using AdysTech.CredentialManager;
+using OmniCard.Interfaces;
 
 namespace OmniCard.Services;
-
-public interface ICredentialStore
-{
-    string? Get(string target);
-    void Set(string target, string value);
-    void Delete(string target);
-    bool Exists(string target);
-}
 
 public class CredentialStore : ICredentialStore
 {
