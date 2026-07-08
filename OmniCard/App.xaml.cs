@@ -72,6 +72,7 @@ public partial class App : Application
             services.AddSingleton<SealedProductViewModel>();
             services.AddSingleton<RootViewModel>();
             services.AddSingleton<ScannerService>();
+            services.AddSingleton<WebScannerService>();
             services.AddSingleton<IDialogService, DialogService>();
             services.AddSingleton<IPerceptualHashService, PerceptualHashService>();
             services.AddSingleton<IOcrMatchingService, OcrMatchingService>();
@@ -283,6 +284,10 @@ public partial class App : Application
 
         splash.SetStatus("Starting application...");
         Host.Start();
+
+        // Start phone scanner connection (non-blocking)
+        var webScanner = Host.Services.GetRequiredService<WebScannerService>();
+        _ = webScanner.StartAsync();
 
         // Initialize set symbol converter with cached service
         var setSymbolCache = Host.Services.GetRequiredService<SetSymbolCache>();
