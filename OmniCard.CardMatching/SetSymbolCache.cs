@@ -7,7 +7,7 @@ using SharpVectors.Converters;
 using SharpVectors.Renderers.Wpf;
 using OmniCard.Interfaces;
 
-namespace OmniCard.Helpers;
+namespace OmniCard.CardMatching;
 
 public class SetSymbolCache(IHttpClientFactory httpClientFactory, IDataPathService dataPathService, ILogger<SetSymbolCache> logger)
 {

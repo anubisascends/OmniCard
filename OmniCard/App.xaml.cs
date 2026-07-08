@@ -12,7 +12,6 @@ using System.Windows;
 using OmniCard.Data;
 using OmniCard.Controls;
 using OmniCard.Controls.Converters;
-using OmniCard.Helpers;
 using OmniCard.Imaging;
 using OmniCard.CardMatching;
 using OmniCard.Services;

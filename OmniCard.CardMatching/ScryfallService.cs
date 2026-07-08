@@ -8,7 +8,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OmniCard.Data;
-using OmniCard.Helpers;
 using OmniCard.Imaging;
 using OmniCard.Interfaces;
 using OmniCard.Models;

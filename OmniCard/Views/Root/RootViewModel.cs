@@ -11,14 +11,14 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Data;
-using NTwain;
+using OmniCard.CardMatching;
 using OmniCard.Controls.Converters;
 using OmniCard.Controls.Themes;
-using OmniCard.Helpers;
 using OmniCard.Imaging;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 using OmniCard.Services;
+using NTwain;
 using OmniCard.Scanner;
 using OmniCard.Views.HashPreview;
 

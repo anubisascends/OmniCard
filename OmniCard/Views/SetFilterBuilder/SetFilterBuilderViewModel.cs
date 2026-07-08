@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using OmniCard.Helpers;
+using OmniCard.CardMatching;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 
