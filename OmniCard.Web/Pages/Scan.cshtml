@@ -66,6 +66,22 @@
         .status.error { color: #f44336; }
         .status.uploading { color: #ffeb3b; }
 
+        /* Fallback file input mode */
+        .fallback {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 24px; text-align: center; gap: 20px;
+        }
+        .fallback p { color: #aaa; font-size: 14px; }
+        .fallback-btn {
+            display: inline-block; padding: 16px 32px;
+            background: #fff; color: #000; border: none; border-radius: 8px;
+            font-size: 18px; font-weight: 600; cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .fallback-btn:active { background: #ccc; }
+        .fallback input[type="file"] { display: none; }
+
         /* Error state */
         .error-screen {
             flex: 1; display: flex; align-items: center; justify-content: center;
@@ -88,6 +104,15 @@
         </div>
     </div>
 
+    <div class="container" id="fallbackScreen" style="display:none">
+        <div class="status" id="fallbackStatus">Tap the button to take a photo</div>
+        <div class="fallback">
+            <p>Live viewfinder requires HTTPS.<br/>Using camera app instead.</p>
+            <button class="fallback-btn" id="fallbackBtn">Open Camera</button>
+            <input type="file" id="fileInput" accept="image/*" capture="environment" />
+        </div>
+    </div>
+
     <div class="container" id="errorScreen" style="display:none">
         <div class="error-screen">
             <h2>Camera Not Available</h2>
@@ -102,6 +127,27 @@
         const status = document.getElementById('status');
         const flash = document.getElementById('flash');
         let isUploading = false;
+
+        // Check if we can use getUserMedia (requires secure context)
+        const canUseLiveCamera = window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+
+        async function uploadImage(blob) {
+            const formData = new FormData();
+            formData.append('image', blob, 'scan.jpg');
+
+            const response = await fetch('/api/scan', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || 'Upload failed');
+            }
+            return await response.json();
+        }
+
+        // ── Live viewfinder mode (HTTPS) ──
 
         async function initCamera() {
             try {
@@ -127,6 +173,12 @@
             status.className = 'status ' + (className || '');
         }
 
+        function setFallbackStatus(text, className) {
+            const el = document.getElementById('fallbackStatus');
+            el.textContent = text;
+            el.className = 'status ' + (className || '');
+        }
+
         function showError(msg) {
             document.getElementById('app').style.display = 'none';
             document.getElementById('errorScreen').style.display = '';
@@ -149,7 +201,6 @@
 
             flashEffect();
 
-            // Draw video frame to canvas
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             const ctx = canvas.getContext('2d');
@@ -161,24 +212,10 @@
                 const blob = await new Promise(resolve =>
                     canvas.toBlob(resolve, 'image/jpeg', 0.9)
                 );
-
-                const formData = new FormData();
-                formData.append('image', blob, 'scan.jpg');
-
-                const response = await fetch('/api/scan', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    setStatus('Sent! Ready for next card.', 'success');
-                } else {
-                    const err = await response.json().catch(() => ({}));
-                    setStatus(err.error || 'Upload failed', 'error');
-                }
+                await uploadImage(blob);
+                setStatus('Sent! Ready for next card.', 'success');
             } catch (err) {
-                setStatus('Network error — is the server running?', 'error');
+                setStatus(err.message || 'Network error', 'error');
             }
 
             isUploading = false;
@@ -187,10 +224,44 @@
 
         captureBtn.addEventListener('click', capture);
 
-        // Prevent zoom on double-tap
+        // ── Fallback mode (HTTP — uses native camera app) ──
+
+        function initFallback() {
+            document.getElementById('app').style.display = 'none';
+            document.getElementById('fallbackScreen').style.display = '';
+
+            const fileInput = document.getElementById('fileInput');
+            const fallbackBtn = document.getElementById('fallbackBtn');
+
+            fallbackBtn.addEventListener('click', () => fileInput.click());
+
+            fileInput.addEventListener('change', async () => {
+                const file = fileInput.files[0];
+                if (!file) return;
+
+                setFallbackStatus('Uploading...', 'uploading');
+
+                try {
+                    await uploadImage(file);
+                    setFallbackStatus('Sent! Tap to scan another.', 'success');
+                } catch (err) {
+                    setFallbackStatus(err.message || 'Network error', 'error');
+                }
+
+                // Reset input so the same file can be re-selected
+                fileInput.value = '';
+            });
+        }
+
+        // ── Init ──
+
         document.addEventListener('dblclick', e => e.preventDefault());
 
-        initCamera();
+        if (canUseLiveCamera) {
+            initCamera();
+        } else {
+            initFallback();
+        }
     </script>
 </body>
 </html>
