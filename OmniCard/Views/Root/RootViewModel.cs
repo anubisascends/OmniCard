@@ -37,12 +37,88 @@ public sealed partial class RootViewModel(
     SetSymbolCache setSymbolCache,
     IScanDiagnosticService diagnosticService,
     IAuditService auditService,
+    IOptionsMonitor<WebCompanionSettings> webCompanionSettings,
     ILogger<RootViewModel> logger) : ViewModel
 {
     private readonly ILogger<RootViewModel> _logger = logger;
     private readonly IScanDiagnosticService _diagnosticService = diagnosticService;
     private NotifyCollectionChangedEventHandler? _scannedCardsHandler;
     private System.Windows.Threading.DispatcherTimer? _ebaySyncTimer;
+
+    public string PhoneScanUrl
+    {
+        get
+        {
+            var baseUrl = webCompanionSettings.CurrentValue.BaseUrl;
+            if (string.IsNullOrWhiteSpace(baseUrl)) return "";
+            return $"{baseUrl.TrimEnd('/')}/scan";
+        }
+    }
+
+    [RelayCommand]
+    public void ShowPhoneScanQr()
+    {
+        var url = PhoneScanUrl;
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            Message = "Set the WebCompanion BaseUrl in Settings first.";
+            return;
+        }
+
+        using var qrGenerator = new QRCoder.QRCodeGenerator();
+        using var qrData = qrGenerator.CreateQrCode(url, QRCoder.QRCodeGenerator.ECCLevel.M);
+        using var qrCode = new QRCoder.PngByteQRCode(qrData);
+        var pngBytes = qrCode.GetGraphic(10, new byte[] { 255, 255, 255 }, new byte[] { 30, 30, 46 });
+
+        var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+        bitmap.BeginInit();
+        bitmap.StreamSource = new MemoryStream(pngBytes);
+        bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+        bitmap.EndInit();
+        bitmap.Freeze();
+
+        var window = new Window
+        {
+            Title = "Phone Scanner",
+            Width = 380,
+            Height = 460,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = Application.Current.MainWindow,
+            ResizeMode = ResizeMode.NoResize,
+            Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(30, 30, 46)),
+            Content = new System.Windows.Controls.StackPanel
+            {
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Children =
+                {
+                    new System.Windows.Controls.Image
+                    {
+                        Source = bitmap,
+                        Width = 300,
+                        Height = 300,
+                        Margin = new Thickness(0, 0, 0, 16)
+                    },
+                    new System.Windows.Controls.TextBlock
+                    {
+                        Text = "Scan this QR code with your phone",
+                        Foreground = System.Windows.Media.Brushes.White,
+                        FontSize = 14,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Margin = new Thickness(0, 0, 0, 8)
+                    },
+                    new System.Windows.Controls.TextBlock
+                    {
+                        Text = url,
+                        Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(170, 170, 170)),
+                        FontSize = 12,
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    }
+                }
+            }
+        };
+        window.ShowDialog();
+    }
 
     /// <summary>The nested CollectionViewModel that owns all collection-specific state.</summary>
     public CollectionViewModel Collection { get; } = collection;
