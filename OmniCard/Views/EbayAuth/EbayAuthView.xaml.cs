@@ -41,9 +41,9 @@ public partial class EbayAuthView : Window, IView<EbayAuthViewModel>
 
     private async void WebView_NavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs e)
     {
-        // Check if navigating to the redirect URI
-        if (!string.IsNullOrEmpty(ViewModel.RedirectUri)
-            && e.Uri.StartsWith(ViewModel.RedirectUri, StringComparison.OrdinalIgnoreCase))
+        // Check if navigating to the Accept URL configured in the eBay developer portal
+        if (!string.IsNullOrEmpty(ViewModel.AcceptUrl)
+            && e.Uri.StartsWith(ViewModel.AcceptUrl, StringComparison.OrdinalIgnoreCase))
         {
             e.Cancel = true; // Don't actually navigate to the redirect URI
             await ViewModel.HandleRedirectAsync(new Uri(e.Uri));

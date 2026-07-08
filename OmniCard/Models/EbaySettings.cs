@@ -6,6 +6,7 @@ public class EbaySettings
     public string CertId { get; set; } = "";
     public string DevId { get; set; } = "";
     public string RuName { get; set; } = "";
+    public string AcceptUrl { get; set; } = "";
     public string Environment { get; set; } = "sandbox";
 
     public string AuthBaseUrl => Environment == "production"

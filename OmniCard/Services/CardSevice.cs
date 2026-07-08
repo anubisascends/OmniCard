@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Windows;
 using LinqExpression = System.Linq.Expressions.Expression;
@@ -254,6 +256,10 @@ public sealed class CardSevice : ICardService
         var buffer = new MemoryStream();
         stream.CopyTo(buffer);
         _logger.LogDebug("Buffered {Bytes} bytes from scanner stream", buffer.Length);
+
+        // Auto-crop oversized scans. Foil cards confuse the RS40's internal
+        // edge detection, producing images much larger than the card itself.
+        buffer = AutoCropScan(buffer);
 
         buffer.Position = 0;
         var hash = _hashService.ComputeHash(buffer, OnHashStage);
@@ -733,6 +739,141 @@ public sealed class CardSevice : ICardService
             .ToHashSet();
     }
 
+    /// <summary>
+    /// Detects the card region in a scanned image and crops to it. When the
+    /// scanner's internal edge detection fails (common with foil cards), the
+    /// raw image is much larger than the card. This scans inward from each
+    /// edge looking for non-background content.
+    /// </summary>
+    private MemoryStream AutoCropScan(MemoryStream input)
+    {
+        const int margin = 8;
+        const int brightnessThreshold = 225;
+        const double minCardFraction = 0.20;
+
+        try
+        {
+            input.Position = 0;
+            using var bmp = new Bitmap(input);
+
+            var w = bmp.Width;
+            var h = bmp.Height;
+
+            // Lock pixels for fast access
+            var data = bmp.LockBits(
+                new Rectangle(0, 0, w, h),
+                ImageLockMode.ReadOnly,
+                System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            int stride = data.Stride;
+            var pixels = new byte[stride * h];
+            System.Runtime.InteropServices.Marshal.Copy(data.Scan0, pixels, 0, pixels.Length);
+            bmp.UnlockBits(data);
+
+            // A row/column counts as "card" when at least 10% of its pixels
+            // are darker than the background threshold.
+            int rowThreshold = (int)(w * 0.10);
+            int colThreshold = (int)(h * 0.10);
+
+            int top = 0, bottom = h - 1, left = 0, right = w - 1;
+
+            for (int y = 0; y < h; y++)
+            {
+                if (CountDarkPixelsInRow(pixels, y, w, stride, brightnessThreshold) >= rowThreshold)
+                { top = y; break; }
+            }
+
+            for (int y = h - 1; y >= top; y--)
+            {
+                if (CountDarkPixelsInRow(pixels, y, w, stride, brightnessThreshold) >= rowThreshold)
+                { bottom = y; break; }
+            }
+
+            for (int x = 0; x < w; x++)
+            {
+                if (CountDarkPixelsInCol(pixels, x, top, bottom, stride, brightnessThreshold) >= colThreshold)
+                { left = x; break; }
+            }
+
+            for (int x = w - 1; x >= left; x--)
+            {
+                if (CountDarkPixelsInCol(pixels, x, top, bottom, stride, brightnessThreshold) >= colThreshold)
+                { right = x; break; }
+            }
+
+            // Add margin
+            top = Math.Max(0, top - margin);
+            left = Math.Max(0, left - margin);
+            bottom = Math.Min(h - 1, bottom + margin);
+            right = Math.Min(w - 1, right + margin);
+
+            int cropW = right - left + 1;
+            int cropH = bottom - top + 1;
+
+            // Skip if the card already fills the frame (no crop needed)
+            if (cropW >= w * 0.95 && cropH >= h * 0.95)
+            {
+                _logger.LogDebug("Auto-crop: card fills frame ({W}x{H}), no crop needed", w, h);
+                input.Position = 0;
+                return input;
+            }
+
+            // Skip if detected region is too small (noise, not a card)
+            if (cropW < w * minCardFraction || cropH < h * minCardFraction)
+            {
+                _logger.LogWarning("Auto-crop: detected region too small ({CropW}x{CropH} in {W}x{H}), skipping",
+                    cropW, cropH, w, h);
+                input.Position = 0;
+                return input;
+            }
+
+            var cropRect = new Rectangle(left, top, cropW, cropH);
+            using var cropped = bmp.Clone(cropRect, bmp.PixelFormat);
+
+            var output = new MemoryStream();
+            cropped.Save(output, System.Drawing.Imaging.ImageFormat.Png);
+            output.Position = 0;
+
+            _logger.LogInformation(
+                "Auto-crop: {OrigW}x{OrigH} -> {CropW}x{CropH} (removed {Pct:F0}% border)",
+                w, h, cropW, cropH,
+                100.0 * (1.0 - (double)(cropW * cropH) / (w * h)));
+
+            input.Dispose();
+            return output;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Auto-crop failed, using original image");
+            input.Position = 0;
+            return input;
+        }
+    }
+
+    private static int CountDarkPixelsInRow(byte[] pixels, int y, int w, int stride, int threshold)
+    {
+        int count = 0;
+        int rowStart = y * stride;
+        for (int x = 0; x < w; x++)
+        {
+            int offset = rowStart + x * 3;
+            int brightness = (pixels[offset] + pixels[offset + 1] + pixels[offset + 2]) / 3;
+            if (brightness < threshold) count++;
+        }
+        return count;
+    }
+
+    private static int CountDarkPixelsInCol(byte[] pixels, int x, int yStart, int yEnd, int stride, int threshold)
+    {
+        int count = 0;
+        for (int y = yStart; y <= yEnd; y++)
+        {
+            int offset = y * stride + x * 3;
+            int brightness = (pixels[offset] + pixels[offset + 1] + pixels[offset + 2]) / 3;
+            if (brightness < threshold) count++;
+        }
+        return count;
+    }
+
     private IQueryable<CollectionCard> BuildFilteredQuery(CollectionDbContext context, string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset)
     {
         IQueryable<CollectionCard> cards = context.Cards.AsNoTracking().Include(c => c.Container).Include(c => c.EbayListing);
@@ -852,15 +993,11 @@ public sealed class CardSevice : ICardService
 
         return op switch
         {
-            // : matches exact set code OR substring in set name
-            ComparisonOp.Contains => LinqExpression.OrElse(
-                CallLike(codeProp, value),
-                CallLike(nameProp, $"%{value}%")),
+            // set:xyz → exact match on set code (case-insensitive via LIKE)
+            ComparisonOp.Contains => CallLike(codeProp, value),
             ComparisonOp.Exact => CallLike(codeProp, value),
             ComparisonOp.NotEqual => LinqExpression.Not(CallLike(codeProp, value)),
-            _ => LinqExpression.OrElse(
-                CallLike(codeProp, value),
-                CallLike(nameProp, $"%{value}%")),
+            _ => CallLike(codeProp, value),
         };
     }
 

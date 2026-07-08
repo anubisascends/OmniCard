@@ -14,7 +14,7 @@ public sealed partial class EbayAuthViewModel(
     private readonly ILogger<EbayAuthViewModel> _logger = logger;
 
     public string AuthUrl => ebayAuthService.GetAuthorizationUrl();
-    public string RedirectUri => settings.Value.RuName;
+    public string AcceptUrl => settings.Value.AcceptUrl;
 
     [ObservableProperty]
     public partial bool IsLoading { get; set; } = true;

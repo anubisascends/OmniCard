@@ -65,10 +65,76 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         }
 
         CardService.StartNewDiagnosticSession();
+        LogCapabilities(DataSource);
         ApplyScanSettings(DataSource);
         _logger.LogInformation("Starting scan on data source {DataSourceName} (quality={Quality})",
             DataSource.Name, ScanQuality);
         DataSource.Enable(SourceEnableMode.NoUI, false, IntPtr.Zero);
+    }
+
+    private void LogCapabilities(DataSource ds)
+    {
+        var caps = ds.Capabilities;
+
+        void LogCap(string name, Func<object?> getCurrent, Func<object?> getDefault, Func<object?> getRange, Func<bool> canSet)
+        {
+            try
+            {
+                _logger.LogInformation("CAP {Name}: current={Current}, default={Default}, range={Range}, canSet={CanSet}",
+                    name, getCurrent(), getDefault(), getRange(), canSet());
+            }
+            catch (Exception ex) { _logger.LogDebug("CAP {Name}: not supported ({Error})", name, ex.Message); }
+        }
+
+        LogCap("Brightness", () => caps.ICapBrightness.GetCurrent(), () => caps.ICapBrightness.GetDefault(),
+            () => { try { var r = caps.ICapBrightness.GetValues(); return r is not null ? string.Join(",", r.Take(10)) : "null"; } catch { return "N/A"; } },
+            () => caps.ICapBrightness.CanSet);
+
+        LogCap("Contrast", () => caps.ICapContrast.GetCurrent(), () => caps.ICapContrast.GetDefault(),
+            () => { try { var r = caps.ICapContrast.GetValues(); return r is not null ? string.Join(",", r.Take(10)) : "null"; } catch { return "N/A"; } },
+            () => caps.ICapContrast.CanSet);
+
+        LogCap("Gamma", () => caps.ICapGamma.GetCurrent(), () => caps.ICapGamma.GetDefault(),
+            () => { try { var r = caps.ICapGamma.GetValues(); return r is not null ? string.Join(",", r.Take(10)) : "null"; } catch { return "N/A"; } },
+            () => caps.ICapGamma.CanSet);
+
+        LogCap("Highlight", () => caps.ICapHighlight.GetCurrent(), () => caps.ICapHighlight.GetDefault(),
+            () => "N/A", () => caps.ICapHighlight.CanSet);
+
+        LogCap("Shadow", () => caps.ICapShadow.GetCurrent(), () => caps.ICapShadow.GetDefault(),
+            () => "N/A", () => caps.ICapShadow.CanSet);
+
+        LogCap("AutoBright", () => caps.ICapAutoBright.GetCurrent(), () => caps.ICapAutoBright.GetDefault(),
+            () => "N/A", () => caps.ICapAutoBright.CanSet);
+
+        LogCap("XResolution", () => caps.ICapXResolution.GetCurrent(), () => caps.ICapXResolution.GetDefault(),
+            () => { try { var r = caps.ICapXResolution.GetValues(); return r is not null ? string.Join(",", r.Take(10)) : "null"; } catch { return "N/A"; } },
+            () => caps.ICapXResolution.CanSet);
+
+        // Log any exposure-related caps
+        try
+        {
+            _logger.LogInformation("CAP ExposureTime: canSet={CanSet}", caps.ICapExposureTime.CanSet);
+            if (caps.ICapExposureTime.CanSet)
+                _logger.LogInformation("CAP ExposureTime: current={Current}, default={Default}",
+                    caps.ICapExposureTime.GetCurrent(), caps.ICapExposureTime.GetDefault());
+        }
+        catch (Exception ex) { _logger.LogDebug("CAP ExposureTime: not supported ({Error})", ex.Message); }
+
+        try
+        {
+            _logger.LogInformation("CAP LightSource: canSet={CanSet}", caps.ICapLightSource.CanSet);
+            if (caps.ICapLightSource.CanSet)
+                _logger.LogInformation("CAP LightSource: current={Current}, default={Default}",
+                    caps.ICapLightSource.GetCurrent(), caps.ICapLightSource.GetDefault());
+        }
+        catch (Exception ex) { _logger.LogDebug("CAP LightSource: not supported ({Error})", ex.Message); }
+
+        try
+        {
+            _logger.LogInformation("CAP NoiseFilter: canSet={CanSet}", caps.ICapNoiseFilter.CanSet);
+        }
+        catch (Exception ex) { _logger.LogDebug("CAP NoiseFilter: not supported ({Error})", ex.Message); }
     }
 
     private void ApplyScanSettings(DataSource ds)
@@ -90,6 +156,17 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
             TryResetResolution(caps);
             TryResetImageProcessing(caps);
         }
+
+        // Foil cards over-reflect the scanner light source, causing washed-out
+        // images and confusing the scanner's automatic edge detection.
+        // Reduce brightness and disable auto-brightness to tame the reflection.
+        if (CardService.DefaultIsFoil)
+        {
+            TrySetAutoBright(caps, false);
+            TrySetBrightness(caps, -200f);
+            TrySetContrast(caps, 333.3333f);
+            _logger.LogInformation("Foil mode: brightness reduced, auto-bright disabled, contrast boosted");
+        }
     }
 
     private void TrySetResolution(ICapabilities caps, float dpi)
@@ -108,6 +185,24 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
 
         try { if (caps.ICapYResolution.CanReset) caps.ICapYResolution.Reset(); }
         catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset YResolution"); }
+    }
+
+    private void TrySetBrightness(ICapabilities caps, float value)
+    {
+        try { if (caps.ICapBrightness.CanSet) caps.ICapBrightness.SetValue((TWFix32)value); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set Brightness to {Value}", value); }
+    }
+
+    private void TrySetContrast(ICapabilities caps, float value)
+    {
+        try { if (caps.ICapContrast.CanSet) caps.ICapContrast.SetValue((TWFix32)value); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set Contrast to {Value}", value); }
+    }
+
+    private void TrySetAutoBright(ICapabilities caps, bool enabled)
+    {
+        try { if (caps.ICapAutoBright.CanSet) caps.ICapAutoBright.SetValue(enabled ? BoolType.True : BoolType.False); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set AutoBright to {Enabled}", enabled); }
     }
 
     private void TryResetImageProcessing(ICapabilities caps)
