@@ -26,10 +26,17 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
 
     private CardView? _cardWindow;
 
+    private static void SetOwner(Window wnd)
+    {
+        var main = Application.Current.MainWindow;
+        if (main is not null && main != wnd && main.IsLoaded)
+            wnd.Owner = main;
+    }
+
     public (bool Connected, bool SetAsDefault) ConnectToScanner()
     {
         var wnd = Services.GetRequiredService<ConnectionView>();
-        wnd.Owner = Application.Current.MainWindow;
+        SetOwner(wnd);
         var result = wnd.ShowDialog() == true;
         return (result, result && wnd.ViewModel.SetAsDefault);
     }
@@ -37,7 +44,7 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
     public bool? ConnectToEbay()
     {
         var wnd = Services.GetRequiredService<EbayAuthView>();
-        wnd.Owner = Application.Current.MainWindow;
+        SetOwner(wnd);
         return wnd.ShowDialog();
     }
 
@@ -46,7 +53,7 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         if (_cardWindow is null)
         {
             _cardWindow = Services.GetRequiredService<CardView>();
-            _cardWindow.Owner = Application.Current.MainWindow;
+            SetOwner(_cardWindow);
             _cardWindow.Closed += (_, _) => _cardWindow = null;
         }
 
@@ -58,7 +65,7 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
     public bool? EditCollectionCard(CollectionCard card)
     {
         var wnd = Services.GetRequiredService<CollectionCardEditorView>();
-        wnd.Owner = Application.Current.MainWindow;
+        SetOwner(wnd);
         wnd.ViewModel.LoadCard(card);
         return wnd.ShowDialog();
     }
@@ -66,14 +73,14 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
     public void ManageStorageContainers()
     {
         var wnd = Services.GetRequiredService<StorageManagerView>();
-        wnd.Owner = Application.Current.MainWindow;
+        SetOwner(wnd);
         wnd.ShowDialog();
     }
 
     public int? ShowImportPreview(CsvImportPreview preview)
     {
         var wnd = Services.GetRequiredService<CsvImportView>();
-        wnd.Owner = Application.Current.MainWindow;
+        SetOwner(wnd);
         wnd.ViewModel.LoadPreview(preview);
         var result = wnd.ShowDialog();
         return result == true ? wnd.ViewModel.ImportedCount : null;
@@ -83,7 +90,7 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
     {
         var wnd = Services.GetRequiredService<SortFilterBuilderView>();
         wnd.ViewModel.Initialize(game);
-        wnd.Owner = Application.Current.MainWindow;
+        SetOwner(wnd);
         wnd.ShowDialog();
         return wnd.ViewModel.PresetsChanged;
     }
@@ -92,7 +99,7 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
     {
         var wnd = Services.GetRequiredService<SetFilterBuilderView>();
         wnd.ViewModel.Initialize(allSets, currentFilter);
-        wnd.Owner = Application.Current.MainWindow;
+        SetOwner(wnd);
         var result = wnd.ShowDialog();
         return result == true ? wnd.ViewModel.GetSelectedCodes() : null;
     }
@@ -100,14 +107,14 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
     public void ShowDataLocation()
     {
         var wnd = Services.GetRequiredService<DataLocationView>();
-        wnd.Owner = Application.Current.MainWindow;
+        SetOwner(wnd);
         wnd.ShowDialog();
     }
 
     public int? PickCoverArt(int containerId, string containerName)
     {
         var wnd = Services.GetRequiredService<CoverArtPickerView>();
-        wnd.Owner = Application.Current.MainWindow;
+        SetOwner(wnd);
         wnd.ViewModel.Load(containerId, containerName);
         var result = wnd.ShowDialog();
         return result == true ? wnd.ViewModel.SelectedCardId : null;
@@ -116,7 +123,7 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
     public MoveToLocationResult? PickMoveToLocation()
     {
         var wnd = Services.GetRequiredService<MoveToLocationView>();
-        wnd.Owner = Application.Current.MainWindow;
+        SetOwner(wnd);
         wnd.ViewModel.Load();
         var result = wnd.ShowDialog();
         return result == true ? wnd.ViewModel.Result : null;
@@ -125,7 +132,7 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
     public SealedProductTemplate? EditSealedProductTemplate(SealedProductTemplate? existing)
     {
         var wnd = Services.GetRequiredService<SealedProductTemplateEditorView>();
-        wnd.Owner = Application.Current.MainWindow;
+        SetOwner(wnd);
         wnd.ViewModel.Load(existing);
         var result = wnd.ShowDialog();
         return result == true ? wnd.ViewModel.Result : null;
@@ -134,7 +141,7 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
     public List<SealedProductInstance>? OpenSealedProductEntry()
     {
         var wnd = Services.GetRequiredService<SealedProductEntryView>();
-        wnd.Owner = Application.Current.MainWindow;
+        SetOwner(wnd);
         wnd.ViewModel.Load();
         var result = wnd.ShowDialog();
         return result == true ? wnd.ViewModel.Result : null;
@@ -145,7 +152,7 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         var sealedProductService = Services.GetRequiredService<ISealedProductService>();
         var fullInstance = sealedProductService.GetInstanceWithContents(instance.Id) ?? instance;
         var wnd = Services.GetRequiredService<CrackProductView>();
-        wnd.Owner = Application.Current.MainWindow;
+        SetOwner(wnd);
         wnd.ViewModel.Load(fullInstance);
         var result = wnd.ShowDialog();
         return result == true ? wnd.ViewModel.Result : null;
@@ -154,7 +161,7 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
     public void ShowAuditReport(AuditReport report)
     {
         var wnd = Services.GetRequiredService<AuditReportView>();
-        wnd.Owner = Application.Current.MainWindow;
+        SetOwner(wnd);
         wnd.ViewModel.Load(report);
         wnd.ShowDialog();
     }
@@ -162,7 +169,7 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
     public bool? OpenEbayListingDialog(CollectionCard card)
     {
         var wnd = Services.GetRequiredService<EbayListingView>();
-        wnd.Owner = Application.Current.MainWindow;
+        SetOwner(wnd);
         wnd.ViewModel.LoadCard(card);
         return wnd.ShowDialog();
     }
@@ -170,7 +177,7 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
     public bool? OpenManualAdd(StorageContainer? defaultContainer = null)
     {
         var wnd = Services.GetRequiredService<ManualAddView>();
-        wnd.Owner = Application.Current.MainWindow;
+        SetOwner(wnd);
         wnd.ViewModel.Load(defaultContainer);
         return wnd.ShowDialog();
     }
