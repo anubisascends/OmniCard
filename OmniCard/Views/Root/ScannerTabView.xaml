@@ -169,6 +169,10 @@
                         <Models:ScanQuality>HighQuality</Models:ScanQuality>
                     </ComboBox>
                     <Separator/>
+                    <Button Command="{Binding ViewModel.ShowPhoneScanQrCommand}"
+                            Content="Phone Scanner"
+                            ToolTip="Show QR code to open the camera scanner on your phone"/>
+                    <Separator/>
                     <Button Command="{Binding ViewModel.ScanCommand}"
                             Content="Scan Cards..."
                             IsEnabled="{Binding ViewModel.IsAuditComplete, Converter={conv:InverseBoolConverter}}"/>

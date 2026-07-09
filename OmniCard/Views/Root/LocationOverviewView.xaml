@@ -106,6 +106,9 @@
                                   Click="DeleteLocation_Click"
                                   Visibility="{Binding Container.IsSystem, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                         <Separator/>
+                        <MenuItem Header="Add Card..."
+                                  Click="AddCard_Click"/>
+                        <Separator/>
                         <MenuItem Header="Audit Location..."
                                   Click="AuditLocation_Click"/>
                     </ContextMenu>

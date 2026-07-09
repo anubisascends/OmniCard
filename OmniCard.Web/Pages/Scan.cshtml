@@ -1,0 +1,579 @@
+@page
+@{
+    ViewData["Title"] = "Phone Scanner";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+    <title>OmniCard Scanner</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; overflow: hidden; background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+
+        .container { display: flex; flex-direction: column; height: 100%; position: relative; }
+
+        /* Viewfinder */
+        .viewfinder { flex: 1; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        .viewfinder video { width: 100%; height: 100%; object-fit: cover; }
+        .viewfinder #canvas { display: none; }
+
+        /* Card detection overlay */
+        .detect-canvas {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+        }
+
+        /* Zoom indicator */
+        .zoom-indicator {
+            position: absolute; top: 12px; right: 12px;
+            background: rgba(0,0,0,0.6); color: #fff;
+            padding: 4px 10px; border-radius: 12px;
+            font-size: 14px; font-weight: 600;
+            opacity: 0; transition: opacity 0.3s;
+            pointer-events: none; z-index: 1;
+        }
+
+        /* Flash overlay */
+        .flash {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: #fff; opacity: 0; pointer-events: none;
+            transition: opacity 0.1s;
+        }
+        .flash.active { opacity: 0.7; transition: none; }
+
+        /* Controls */
+        .controls {
+            padding: 20px; display: flex; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.8);
+        }
+        .capture-btn {
+            width: 72px; height: 72px; border-radius: 50%;
+            border: 4px solid #fff; background: transparent;
+            cursor: pointer; position: relative;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .capture-btn::after {
+            content: ''; position: absolute;
+            top: 4px; left: 4px; right: 4px; bottom: 4px;
+            border-radius: 50%; background: #fff;
+        }
+        .capture-btn:active::after { background: #ccc; }
+        .capture-btn:disabled { opacity: 0.4; }
+
+        /* Status bar */
+        .status {
+            padding: 10px 16px; background: rgba(0,0,0,0.9);
+            font-size: 14px; text-align: center; min-height: 44px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .status.success { color: #4caf50; }
+        .status.error { color: #f44336; }
+        .status.uploading { color: #ffeb3b; }
+
+        /* Fallback file input mode */
+        .fallback {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 24px; text-align: center; gap: 20px;
+        }
+        .fallback p { color: #aaa; font-size: 14px; }
+        .fallback-btn {
+            display: inline-block; padding: 16px 32px;
+            background: #fff; color: #000; border: none; border-radius: 8px;
+            font-size: 18px; font-weight: 600; cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .fallback-btn:active { background: #ccc; }
+        .fallback input[type="file"] { display: none; }
+
+        /* Error state */
+        .error-screen {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            padding: 24px; text-align: center;
+        }
+        .error-screen p { margin-top: 12px; color: #aaa; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <div class="status" id="status">Initializing camera...</div>
+        <div class="viewfinder" id="viewfinder">
+            <video id="video" autoplay playsinline muted></video>
+            <canvas id="canvas"></canvas>
+            <canvas id="detectCanvas" class="detect-canvas"></canvas>
+            <div class="zoom-indicator" id="zoomIndicator">1.0x</div>
+            <div class="flash" id="flash"></div>
+        </div>
+        <div class="controls">
+            <button class="capture-btn" id="captureBtn" disabled></button>
+        </div>
+    </div>
+
+    <div class="container" id="fallbackScreen" style="display:none">
+        <div class="status" id="fallbackStatus">Tap the button to take a photo</div>
+        <div class="fallback">
+            <p>Live viewfinder requires HTTPS.<br/>Using camera app instead.</p>
+            <button class="fallback-btn" id="fallbackBtn">Open Camera</button>
+            <input type="file" id="fileInput" accept="image/*" capture="environment" />
+        </div>
+    </div>
+
+    <div class="container" id="errorScreen" style="display:none">
+        <div class="error-screen">
+            <h2>Camera Not Available</h2>
+            <p id="errorMessage"></p>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const detectCanvas = document.getElementById('detectCanvas');
+        const captureBtn = document.getElementById('captureBtn');
+        const status = document.getElementById('status');
+        const flash = document.getElementById('flash');
+        let isUploading = false;
+        let detectedCard = null; // {x, y, w, h} in video pixel coords
+        let detectAnimId = null;
+
+        // Zoom state
+        let zoomTrack = null;
+        let zoomMin = 1, zoomMax = 1, zoomCurrent = 1;
+        let pinchStartDist = 0;
+        let pinchStartZoom = 1;
+        let zoomIndicatorTimeout = null;
+
+        const canUseLiveCamera = window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+
+        async function uploadImage(blob) {
+            const formData = new FormData();
+            formData.append('image', blob, 'scan.jpg');
+
+            const response = await fetch('/api/scan', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || 'Upload failed');
+            }
+            return await response.json();
+        }
+
+        // ── Card edge detection ──
+        // Scans inward from edges looking for non-background pixels.
+        // Same approach as the desktop AutoCropScan: brightness threshold.
+
+        function detectCardBounds(ctx, w, h) {
+            // Sample at reduced resolution for speed
+            const sampleW = 120;
+            const sampleH = Math.round(sampleW * h / w);
+            const sampleCanvas = document.createElement('canvas');
+            sampleCanvas.width = sampleW;
+            sampleCanvas.height = sampleH;
+            const sCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+            sCtx.drawImage(video, 0, 0, sampleW, sampleH);
+            const data = sCtx.getImageData(0, 0, sampleW, sampleH).data;
+
+            // Gradient-based edge detection: compute per-row and per-column
+            // average brightness, then find the steepest transitions (largest
+            // gradient) scanning inward from each edge. This works regardless
+            // of background color or whether the card fills most of the frame.
+
+            function brightness(x, y) {
+                const i = (y * sampleW + x) * 4;
+                return data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
+            }
+
+            // Compute average brightness per row and per column
+            const rowAvg = new Float32Array(sampleH);
+            for (let y = 0; y < sampleH; y++) {
+                let sum = 0;
+                for (let x = 0; x < sampleW; x++) sum += brightness(x, y);
+                rowAvg[y] = sum / sampleW;
+            }
+
+            const colAvg = new Float32Array(sampleW);
+            for (let x = 0; x < sampleW; x++) {
+                let sum = 0;
+                for (let y = 0; y < sampleH; y++) sum += brightness(x, y);
+                colAvg[x] = sum / sampleH;
+            }
+
+            // Also compute per-row and per-column edge density (number of
+            // sharp brightness transitions). Card interiors are more complex
+            // than plain backgrounds.
+            const rowEdges = new Float32Array(sampleH);
+            for (let y = 0; y < sampleH; y++) {
+                let count = 0;
+                for (let x = 1; x < sampleW; x++) {
+                    if (Math.abs(brightness(x, y) - brightness(x - 1, y)) > 20) count++;
+                }
+                rowEdges[y] = count;
+            }
+
+            const colEdges = new Float32Array(sampleW);
+            for (let x = 0; x < sampleW; x++) {
+                let count = 0;
+                for (let y = 1; y < sampleH; y++) {
+                    if (Math.abs(brightness(x, y) - brightness(x, y - 1)) > 20) count++;
+                }
+                colEdges[x] = count;
+            }
+
+            // Find card edges by looking for the steepest gradient in either
+            // brightness average or edge density, scanning inward from each side.
+            // Use a smoothing window to avoid noise triggering false edges.
+            const SMOOTH = 3;
+
+            function smoothed(arr, i) {
+                let sum = 0, count = 0;
+                for (let j = Math.max(0, i - SMOOTH); j <= Math.min(arr.length - 1, i + SMOOTH); j++) {
+                    sum += arr[j]; count++;
+                }
+                return sum / count;
+            }
+
+            // Combined score: sum of absolute brightness gradient + edge density gradient
+            function rowGradient(y) {
+                if (y <= 0 || y >= sampleH - 1) return 0;
+                const bGrad = Math.abs(smoothed(rowAvg, y) - smoothed(rowAvg, y - 1));
+                const eGrad = Math.abs(smoothed(rowEdges, y) - smoothed(rowEdges, y - 1));
+                return bGrad + eGrad * 2;
+            }
+
+            function colGradient(x) {
+                if (x <= 0 || x >= sampleW - 1) return 0;
+                const bGrad = Math.abs(smoothed(colAvg, x) - smoothed(colAvg, x - 1));
+                const eGrad = Math.abs(smoothed(colEdges, x) - smoothed(colEdges, x - 1));
+                return bGrad + eGrad * 2;
+            }
+
+            // Scan inward from each edge, find the position with the strongest gradient
+            const searchLimit = 0.4; // don't search past 40% of frame
+            const MIN_GRADIENT = 4;
+
+            let top = 0, topScore = 0;
+            for (let y = 1; y < sampleH * searchLimit; y++) {
+                const g = rowGradient(y);
+                if (g > topScore) { topScore = g; top = y; }
+            }
+
+            let bottom = sampleH - 1, bottomScore = 0;
+            for (let y = sampleH - 2; y > sampleH * (1 - searchLimit); y--) {
+                const g = rowGradient(y);
+                if (g > bottomScore) { bottomScore = g; bottom = y; }
+            }
+
+            let left = 0, leftScore = 0;
+            for (let x = 1; x < sampleW * searchLimit; x++) {
+                const g = colGradient(x);
+                if (g > leftScore) { leftScore = g; left = x; }
+            }
+
+            let right = sampleW - 1, rightScore = 0;
+            for (let x = sampleW - 2; x > sampleW * (1 - searchLimit); x--) {
+                const g = colGradient(x);
+                if (g > rightScore) { rightScore = g; right = x; }
+            }
+
+            // Reject if gradients are too weak (no card boundary found)
+            if (topScore < MIN_GRADIENT || bottomScore < MIN_GRADIENT ||
+                leftScore < MIN_GRADIENT || rightScore < MIN_GRADIENT) return null;
+
+            const cropW = right - left;
+            const cropH = bottom - top;
+
+            // Reject if too small (<15%) or edges are inverted
+            if (cropW < sampleW * 0.15 || cropH < sampleH * 0.15) return null;
+            if (cropW <= 0 || cropH <= 0) return null;
+
+            // Check aspect ratio is roughly card-shaped
+            const aspect = Math.min(cropW, cropH) / Math.max(cropW, cropH);
+            if (aspect < 0.5 || aspect > 0.95) return null;
+
+            // Scale back to video coordinates with margin
+            const scaleX = w / sampleW;
+            const scaleY = h / sampleH;
+            const margin = 10;
+            return {
+                x: Math.max(0, Math.round(left * scaleX) - margin),
+                y: Math.max(0, Math.round(top * scaleY) - margin),
+                w: Math.min(w, Math.round(cropW * scaleX) + margin * 2),
+                h: Math.min(h, Math.round(cropH * scaleY) + margin * 2)
+            };
+        }
+
+        function drawDetectionOverlay() {
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            if (!vw || !vh) { detectAnimId = requestAnimationFrame(drawDetectionOverlay); return; }
+
+            // Match canvas to display size
+            const rect = video.getBoundingClientRect();
+            detectCanvas.width = rect.width;
+            detectCanvas.height = rect.height;
+            const dCtx = detectCanvas.getContext('2d');
+            dCtx.clearRect(0, 0, rect.width, rect.height);
+
+            // Detect card
+            canvas.width = vw;
+            canvas.height = vh;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            detectedCard = detectCardBounds(ctx, vw, vh);
+
+            // Guide frame — card aspect ratio (63:88) centered in viewfinder
+            const CARD_ASPECT = 63 / 88;
+            const guideH = rect.height * 0.65;
+            const guideW = guideH * CARD_ASPECT;
+            const guideX = (rect.width - guideW) / 2;
+            const guideY = (rect.height - guideH) / 2;
+            const guideRadius = 12;
+            const cardAligned = detectedCard != null;
+
+            // Dimmed area outside guide (with rounded cutout)
+            dCtx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+            dCtx.beginPath();
+            dCtx.rect(0, 0, rect.width, rect.height);
+            dCtx.roundRect(guideX, guideY, guideW, guideH, guideRadius);
+            dCtx.fill('evenodd');
+
+            // Guide border
+            dCtx.strokeStyle = cardAligned ? '#4caf50' : 'rgba(255, 255, 255, 0.5)';
+            dCtx.lineWidth = cardAligned ? 3 : 2;
+            dCtx.setLineDash([]);
+            dCtx.beginPath();
+            dCtx.roundRect(guideX, guideY, guideW, guideH, guideRadius);
+            dCtx.stroke();
+
+            // Corner accents on guide frame
+            const corner = 24;
+            dCtx.lineWidth = cardAligned ? 4 : 3;
+            dCtx.strokeStyle = cardAligned ? '#4caf50' : 'rgba(255, 255, 255, 0.8)';
+            dCtx.lineCap = 'round';
+            // Top-left
+            dCtx.beginPath(); dCtx.moveTo(guideX, guideY + corner); dCtx.lineTo(guideX, guideY); dCtx.lineTo(guideX + corner, guideY); dCtx.stroke();
+            // Top-right
+            dCtx.beginPath(); dCtx.moveTo(guideX + guideW - corner, guideY); dCtx.lineTo(guideX + guideW, guideY); dCtx.lineTo(guideX + guideW, guideY + corner); dCtx.stroke();
+            // Bottom-left
+            dCtx.beginPath(); dCtx.moveTo(guideX, guideY + guideH - corner); dCtx.lineTo(guideX, guideY + guideH); dCtx.lineTo(guideX + corner, guideY + guideH); dCtx.stroke();
+            // Bottom-right
+            dCtx.beginPath(); dCtx.moveTo(guideX + guideW - corner, guideY + guideH); dCtx.lineTo(guideX + guideW, guideY + guideH); dCtx.lineTo(guideX + guideW, guideY + guideH - corner); dCtx.stroke();
+            dCtx.lineCap = 'butt';
+
+            detectAnimId = requestAnimationFrame(drawDetectionOverlay);
+        }
+
+        // ── Live viewfinder mode (HTTPS) ──
+
+        async function initCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
+                    audio: false
+                });
+                video.srcObject = stream;
+                await video.play();
+                captureBtn.disabled = false;
+                setStatus('Ready — position card in guide', '');
+                detectAnimId = requestAnimationFrame(drawDetectionOverlay);
+
+                // Set up hardware zoom if supported
+                const track = stream.getVideoTracks()[0];
+                const capabilities = track.getCapabilities();
+                if (capabilities.zoom) {
+                    zoomTrack = track;
+                    zoomMin = capabilities.zoom.min;
+                    zoomMax = capabilities.zoom.max;
+                    zoomCurrent = track.getSettings().zoom || zoomMin;
+                    initPinchZoom();
+                }
+            } catch (err) {
+                showError(err.message || 'Could not access camera');
+            }
+        }
+
+        // ── Pinch-to-zoom ──
+
+        function getPinchDistance(touches) {
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function showZoomLevel(level) {
+            const indicator = document.getElementById('zoomIndicator');
+            indicator.textContent = level.toFixed(1) + 'x';
+            indicator.style.opacity = '1';
+            clearTimeout(zoomIndicatorTimeout);
+            zoomIndicatorTimeout = setTimeout(() => {
+                indicator.style.opacity = '0';
+            }, 1000);
+        }
+
+        function initPinchZoom() {
+            const viewfinder = document.getElementById('viewfinder');
+
+            viewfinder.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    pinchStartDist = getPinchDistance(e.touches);
+                    pinchStartZoom = zoomCurrent;
+                }
+            }, { passive: false });
+
+            viewfinder.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 2 && zoomTrack) {
+                    e.preventDefault();
+                    const dist = getPinchDistance(e.touches);
+                    const scale = dist / pinchStartDist;
+                    const newZoom = Math.max(zoomMin, Math.min(zoomMax, pinchStartZoom * scale));
+                    zoomCurrent = newZoom;
+                    zoomTrack.applyConstraints({ advanced: [{ zoom: newZoom }] });
+                    showZoomLevel(newZoom);
+                }
+            }, { passive: false });
+        }
+
+        function setStatus(text, className) {
+            status.textContent = text;
+            status.className = 'status ' + (className || '');
+        }
+
+        function setFallbackStatus(text, className) {
+            const el = document.getElementById('fallbackStatus');
+            el.textContent = text;
+            el.className = 'status ' + (className || '');
+        }
+
+        function showError(msg) {
+            document.getElementById('app').style.display = 'none';
+            document.getElementById('errorScreen').style.display = '';
+            document.getElementById('errorMessage').textContent = msg;
+        }
+
+        function flashEffect() {
+            flash.classList.add('active');
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    flash.classList.remove('active');
+                });
+            });
+        }
+
+        async function capture() {
+            if (isUploading) return;
+            isUploading = true;
+            captureBtn.disabled = true;
+
+            flashEffect();
+
+            // Capture frame — prefer ImageCapture API (honors hardware zoom)
+            let captureCanvas = null;
+            if (zoomTrack && typeof ImageCapture !== 'undefined') {
+                try {
+                    const ic = new ImageCapture(zoomTrack);
+                    const bitmap = await ic.grabFrame();
+                    captureCanvas = document.createElement('canvas');
+                    captureCanvas.width = bitmap.width;
+                    captureCanvas.height = bitmap.height;
+                    captureCanvas.getContext('2d').drawImage(bitmap, 0, 0);
+                    bitmap.close();
+                } catch (_) {
+                    captureCanvas = null;
+                }
+            }
+
+            if (!captureCanvas) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                captureCanvas = canvas;
+            }
+
+            // If card detected, crop to just the card
+            let outputCanvas = captureCanvas;
+            if (detectedCard) {
+                // Scale detection coords if capture resolution differs from video
+                const sx = captureCanvas.width / video.videoWidth;
+                const sy = captureCanvas.height / video.videoHeight;
+                const cx = Math.round(detectedCard.x * sx);
+                const cy = Math.round(detectedCard.y * sy);
+                const cw = Math.round(detectedCard.w * sx);
+                const ch = Math.round(detectedCard.h * sy);
+
+                outputCanvas = document.createElement('canvas');
+                outputCanvas.width = cw;
+                outputCanvas.height = ch;
+                outputCanvas.getContext('2d').drawImage(captureCanvas,
+                    cx, cy, cw, ch,
+                    0, 0, cw, ch);
+            }
+
+            setStatus('Uploading...', 'uploading');
+
+            try {
+                const blob = await new Promise(resolve =>
+                    outputCanvas.toBlob(resolve, 'image/jpeg', 0.92)
+                );
+                await uploadImage(blob);
+                setStatus(detectedCard ? 'Sent (cropped)! Ready for next.' : 'Sent! Ready for next card.', 'success');
+            } catch (err) {
+                setStatus(err.message || 'Network error', 'error');
+            }
+
+            isUploading = false;
+            captureBtn.disabled = false;
+        }
+
+        captureBtn.addEventListener('click', capture);
+
+        // ── Fallback mode (HTTP — uses native camera app) ──
+
+        function initFallback() {
+            document.getElementById('app').style.display = 'none';
+            document.getElementById('fallbackScreen').style.display = '';
+
+            const fileInput = document.getElementById('fileInput');
+            const fallbackBtn = document.getElementById('fallbackBtn');
+
+            fallbackBtn.addEventListener('click', () => fileInput.click());
+
+            fileInput.addEventListener('change', async () => {
+                const file = fileInput.files[0];
+                if (!file) return;
+
+                setFallbackStatus('Uploading...', 'uploading');
+
+                try {
+                    await uploadImage(file);
+                    setFallbackStatus('Sent! Tap to scan another.', 'success');
+                } catch (err) {
+                    setFallbackStatus(err.message || 'Network error', 'error');
+                }
+
+                // Reset input so the same file can be re-selected
+                fileInput.value = '';
+            });
+        }
+
+        // ── Init ──
+
+        document.addEventListener('dblclick', e => e.preventDefault());
+
+        if (canUseLiveCamera) {
+            initCamera();
+        } else {
+            initFallback();
+        }
+    </script>
+</body>
+</html>

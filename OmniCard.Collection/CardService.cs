@@ -607,6 +607,48 @@ public sealed class CardService : ICardService
         return (deleted, errors);
     }
 
+    public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section)
+    {
+        using var context = _collectionDbContextFactory.CreateDbContext();
+
+        for (var i = 0; i < quantity; i++)
+        {
+            var card = new CollectionCard
+            {
+                Game = game,
+                Name = match.Name,
+                SetCode = match.SetCode,
+                SetName = match.SetName,
+                Number = match.CollectorNumber,
+                Rarity = match.Rarity,
+                ImageUri = match.ImageUri,
+                GameCardId = match.GameSpecificId,
+                Condition = condition,
+                IsFoil = isFoil,
+                PurchasePrice = purchasePrice,
+                ContainerId = container?.Id,
+            };
+
+            card.Color = CardAttributeExtractor.ExtractColor(match, game);
+            card.CardType = CardAttributeExtractor.ExtractCardType(match, game);
+
+            if (container?.ContainerType == ContainerType.Binder)
+            {
+                card.Page = page;
+                card.Slot = slot;
+            }
+            else if (container?.ContainerType == ContainerType.Box)
+            {
+                card.Section = section;
+            }
+
+            context.Cards.Add(card);
+        }
+
+        context.SaveChanges();
+        _logger.LogInformation("Manually added {Quantity}x {Name} ({SetCode}) to collection", quantity, match.Name, match.SetCode);
+    }
+
     public void SearchCollection(string query, CardGame? gameFilter, ObservableCollection<CollectionCard> results)
         => SearchCollection(query, gameFilter, null, null, null, results);
 

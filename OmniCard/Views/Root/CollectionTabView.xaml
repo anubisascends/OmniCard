@@ -93,6 +93,15 @@
                         </Button.Style>
                     </Button>
 
+                    <!-- Add card manually -->
+                    <Button Content="Add Card"
+                            Command="{Binding DataContext.ViewModel.Collection.OpenManualAddCommand,
+                                RelativeSource={RelativeSource AncestorType=Window}}"
+                            Padding="8,4"
+                            Margin="4,0,0,0"
+                            ToolTip="Search and add a card without scanning"/>
+                    <Separator/>
+
                     <!-- Search -->
                     <TextBox x:Name="CollectionSearchBox"
                              Text="{Binding DataContext.ViewModel.Collection.CollectionSearchQuery,
