@@ -151,7 +151,7 @@
 
         function detectCardBounds(ctx, w, h) {
             // Sample at reduced resolution for speed
-            const sampleW = 160;
+            const sampleW = 120;
             const sampleH = Math.round(sampleW * h / w);
             const sampleCanvas = document.createElement('canvas');
             sampleCanvas.width = sampleW;
@@ -160,70 +160,84 @@
             sCtx.drawImage(video, 0, 0, sampleW, sampleH);
             const data = sCtx.getImageData(0, 0, sampleW, sampleH).data;
 
-            // Edge detection approach: find rows/columns with high contrast
-            // transitions. Works regardless of whether the background is
-            // lighter or darker than the card.
+            // Color-difference approach: compute the average color of a border
+            // strip (top/bottom/left/right ~5% of the frame = background) vs the
+            // average color of the center region. Then find the rows/columns
+            // where the color shifts from background to foreground.
 
-            function brightness(x, y) {
+            function rgb(x, y) {
                 const i = (y * sampleW + x) * 4;
-                return data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
+                return [data[i], data[i+1], data[i+2]];
             }
 
-            // Count sharp brightness transitions (edges) in a row
-            function edgesInRow(y) {
-                let count = 0;
-                for (let x = 1; x < sampleW; x++) {
-                    if (Math.abs(brightness(x, y) - brightness(x - 1, y)) > 30) count++;
+            // Sample background color from the outer 5% ring
+            const bw = Math.max(3, Math.round(sampleW * 0.05));
+            const bh = Math.max(3, Math.round(sampleH * 0.05));
+            let bgR = 0, bgG = 0, bgB = 0, bgCount = 0;
+            for (let y = 0; y < sampleH; y++) {
+                for (let x = 0; x < sampleW; x++) {
+                    if (x < bw || x >= sampleW - bw || y < bh || y >= sampleH - bh) {
+                        const [r, g, b] = rgb(x, y);
+                        bgR += r; bgG += g; bgB += b; bgCount++;
+                    }
                 }
-                return count;
+            }
+            bgR /= bgCount; bgG /= bgCount; bgB /= bgCount;
+
+            // Distance from background color for each pixel
+            function bgDist(x, y) {
+                const [r, g, b] = rgb(x, y);
+                return Math.sqrt((r-bgR)**2 + (g-bgG)**2 + (b-bgB)**2);
             }
 
-            // Count sharp brightness transitions in a column
-            function edgesInCol(x) {
-                let count = 0;
-                for (let y = 1; y < sampleH; y++) {
-                    if (Math.abs(brightness(x, y) - brightness(x, y - 1)) > 30) count++;
-                }
-                return count;
+            // For each row, compute avg distance from background
+            const BG_THRESHOLD = 35;
+            const rowScores = new Float32Array(sampleH);
+            for (let y = 0; y < sampleH; y++) {
+                let sum = 0;
+                for (let x = 0; x < sampleW; x++) sum += bgDist(x, y);
+                rowScores[y] = sum / sampleW;
             }
 
-            // A row/col at the card border has a sudden spike in edge count
-            // compared to the uniform background outside.
-            // Scan inward: the first row with significant edges is the card edge.
-            const MIN_ROW_EDGES = sampleW * 0.08;
-            const MIN_COL_EDGES = sampleH * 0.08;
+            // For each column, compute avg distance from background
+            const colScores = new Float32Array(sampleW);
+            for (let x = 0; x < sampleW; x++) {
+                let sum = 0;
+                for (let y = 0; y < sampleH; y++) sum += bgDist(x, y);
+                colScores[x] = sum / sampleH;
+            }
 
+            // Find edges: scan inward until score exceeds threshold
             let top = 0, bottom = sampleH - 1, left = 0, right = sampleW - 1;
 
             for (let y = 0; y < sampleH; y++) {
-                if (edgesInRow(y) >= MIN_ROW_EDGES) { top = y; break; }
+                if (rowScores[y] > BG_THRESHOLD) { top = y; break; }
             }
             for (let y = sampleH - 1; y >= 0; y--) {
-                if (edgesInRow(y) >= MIN_ROW_EDGES) { bottom = y; break; }
+                if (rowScores[y] > BG_THRESHOLD) { bottom = y; break; }
             }
             for (let x = 0; x < sampleW; x++) {
-                if (edgesInCol(x) >= MIN_COL_EDGES) { left = x; break; }
+                if (colScores[x] > BG_THRESHOLD) { left = x; break; }
             }
             for (let x = sampleW - 1; x >= 0; x--) {
-                if (edgesInCol(x) >= MIN_COL_EDGES) { right = x; break; }
+                if (colScores[x] > BG_THRESHOLD) { right = x; break; }
             }
 
             const cropW = right - left;
             const cropH = bottom - top;
 
-            // Reject if detected region is too small (<15%) or fills the whole frame (>95%)
+            // Reject if too small (<15%) or fills the whole frame (>95%)
             if (cropW < sampleW * 0.15 || cropH < sampleH * 0.15) return null;
             if (cropW > sampleW * 0.95 && cropH > sampleH * 0.95) return null;
 
-            // Check aspect ratio is roughly card-shaped (between 0.5 and 0.9 w:h or inverted for landscape)
-            const aspect = cropW / cropH;
-            const cardAspect = 63 / 88; // ~0.716
-            if (aspect < 0.4 || (aspect > 1.0 && aspect < 1.1) || aspect > 2.5) return null;
+            // Check aspect ratio is roughly card-shaped
+            const aspect = Math.min(cropW, cropH) / Math.max(cropW, cropH);
+            if (aspect < 0.5 || aspect > 0.95) return null;
 
             // Scale back to video coordinates with margin
             const scaleX = w / sampleW;
             const scaleY = h / sampleH;
-            const margin = 12;
+            const margin = 10;
             return {
                 x: Math.max(0, Math.round(left * scaleX) - margin),
                 y: Math.max(0, Math.round(top * scaleY) - margin),
