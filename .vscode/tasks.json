@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Publish to LocalHost",
+            "type": "shell",
+            "command": "Start-Process",
+            "args": [
+                "powershell",
+                "-ArgumentList",
+                "'-NoProfile -Command \"cd ${workspaceFolder}; dotnet publish OmniCard.Web/OmniCard.Web.csproj -c Release /p:PublishProfile=localhos; Read-Host Press_Enter_to_close\"'",
+                "-Verb",
+                "RunAs"
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        }
+    ]
+}

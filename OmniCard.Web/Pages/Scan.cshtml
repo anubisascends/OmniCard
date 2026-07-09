@@ -17,12 +17,22 @@
         /* Viewfinder */
         .viewfinder { flex: 1; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
         .viewfinder video { width: 100%; height: 100%; object-fit: cover; }
-        .viewfinder canvas { display: none; }
+        .viewfinder #canvas { display: none; }
 
         /* Card detection overlay */
         .detect-canvas {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none;
+        }
+
+        /* Zoom indicator */
+        .zoom-indicator {
+            position: absolute; top: 12px; right: 12px;
+            background: rgba(0,0,0,0.6); color: #fff;
+            padding: 4px 10px; border-radius: 12px;
+            font-size: 14px; font-weight: 600;
+            opacity: 0; transition: opacity 0.3s;
+            pointer-events: none; z-index: 1;
         }
 
         /* Flash overlay */
@@ -93,6 +103,7 @@
             <video id="video" autoplay playsinline muted></video>
             <canvas id="canvas"></canvas>
             <canvas id="detectCanvas" class="detect-canvas"></canvas>
+            <div class="zoom-indicator" id="zoomIndicator">1.0x</div>
             <div class="flash" id="flash"></div>
         </div>
         <div class="controls">
@@ -127,6 +138,13 @@
         let detectedCard = null; // {x, y, w, h} in video pixel coords
         let detectAnimId = null;
 
+        // Zoom state
+        let zoomTrack = null;
+        let zoomMin = 1, zoomMax = 1, zoomCurrent = 1;
+        let pinchStartDist = 0;
+        let pinchStartZoom = 1;
+        let zoomIndicatorTimeout = null;
+
         const canUseLiveCamera = window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
 
         async function uploadImage(blob) {
@@ -160,75 +178,118 @@
             sCtx.drawImage(video, 0, 0, sampleW, sampleH);
             const data = sCtx.getImageData(0, 0, sampleW, sampleH).data;
 
-            // Color-difference approach: compute the average color of a border
-            // strip (top/bottom/left/right ~5% of the frame = background) vs the
-            // average color of the center region. Then find the rows/columns
-            // where the color shifts from background to foreground.
+            // Gradient-based edge detection: compute per-row and per-column
+            // average brightness, then find the steepest transitions (largest
+            // gradient) scanning inward from each edge. This works regardless
+            // of background color or whether the card fills most of the frame.
 
-            function rgb(x, y) {
+            function brightness(x, y) {
                 const i = (y * sampleW + x) * 4;
-                return [data[i], data[i+1], data[i+2]];
+                return data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
             }
 
-            // Sample background color from the outer 5% ring
-            const bw = Math.max(3, Math.round(sampleW * 0.05));
-            const bh = Math.max(3, Math.round(sampleH * 0.05));
-            let bgR = 0, bgG = 0, bgB = 0, bgCount = 0;
+            // Compute average brightness per row and per column
+            const rowAvg = new Float32Array(sampleH);
             for (let y = 0; y < sampleH; y++) {
-                for (let x = 0; x < sampleW; x++) {
-                    if (x < bw || x >= sampleW - bw || y < bh || y >= sampleH - bh) {
-                        const [r, g, b] = rgb(x, y);
-                        bgR += r; bgG += g; bgB += b; bgCount++;
-                    }
+                let sum = 0;
+                for (let x = 0; x < sampleW; x++) sum += brightness(x, y);
+                rowAvg[y] = sum / sampleW;
+            }
+
+            const colAvg = new Float32Array(sampleW);
+            for (let x = 0; x < sampleW; x++) {
+                let sum = 0;
+                for (let y = 0; y < sampleH; y++) sum += brightness(x, y);
+                colAvg[x] = sum / sampleH;
+            }
+
+            // Also compute per-row and per-column edge density (number of
+            // sharp brightness transitions). Card interiors are more complex
+            // than plain backgrounds.
+            const rowEdges = new Float32Array(sampleH);
+            for (let y = 0; y < sampleH; y++) {
+                let count = 0;
+                for (let x = 1; x < sampleW; x++) {
+                    if (Math.abs(brightness(x, y) - brightness(x - 1, y)) > 20) count++;
                 }
-            }
-            bgR /= bgCount; bgG /= bgCount; bgB /= bgCount;
-
-            // Distance from background color for each pixel
-            function bgDist(x, y) {
-                const [r, g, b] = rgb(x, y);
-                return Math.sqrt((r-bgR)**2 + (g-bgG)**2 + (b-bgB)**2);
+                rowEdges[y] = count;
             }
 
-            // For each row, compute avg distance from background
-            const BG_THRESHOLD = 35;
-            const rowScores = new Float32Array(sampleH);
-            for (let y = 0; y < sampleH; y++) {
-                let sum = 0;
-                for (let x = 0; x < sampleW; x++) sum += bgDist(x, y);
-                rowScores[y] = sum / sampleW;
-            }
-
-            // For each column, compute avg distance from background
-            const colScores = new Float32Array(sampleW);
+            const colEdges = new Float32Array(sampleW);
             for (let x = 0; x < sampleW; x++) {
-                let sum = 0;
-                for (let y = 0; y < sampleH; y++) sum += bgDist(x, y);
-                colScores[x] = sum / sampleH;
+                let count = 0;
+                for (let y = 1; y < sampleH; y++) {
+                    if (Math.abs(brightness(x, y) - brightness(x, y - 1)) > 20) count++;
+                }
+                colEdges[x] = count;
             }
 
-            // Find edges: scan inward until score exceeds threshold
-            let top = 0, bottom = sampleH - 1, left = 0, right = sampleW - 1;
+            // Find card edges by looking for the steepest gradient in either
+            // brightness average or edge density, scanning inward from each side.
+            // Use a smoothing window to avoid noise triggering false edges.
+            const SMOOTH = 3;
 
-            for (let y = 0; y < sampleH; y++) {
-                if (rowScores[y] > BG_THRESHOLD) { top = y; break; }
+            function smoothed(arr, i) {
+                let sum = 0, count = 0;
+                for (let j = Math.max(0, i - SMOOTH); j <= Math.min(arr.length - 1, i + SMOOTH); j++) {
+                    sum += arr[j]; count++;
+                }
+                return sum / count;
             }
-            for (let y = sampleH - 1; y >= 0; y--) {
-                if (rowScores[y] > BG_THRESHOLD) { bottom = y; break; }
+
+            // Combined score: sum of absolute brightness gradient + edge density gradient
+            function rowGradient(y) {
+                if (y <= 0 || y >= sampleH - 1) return 0;
+                const bGrad = Math.abs(smoothed(rowAvg, y) - smoothed(rowAvg, y - 1));
+                const eGrad = Math.abs(smoothed(rowEdges, y) - smoothed(rowEdges, y - 1));
+                return bGrad + eGrad * 2;
             }
-            for (let x = 0; x < sampleW; x++) {
-                if (colScores[x] > BG_THRESHOLD) { left = x; break; }
+
+            function colGradient(x) {
+                if (x <= 0 || x >= sampleW - 1) return 0;
+                const bGrad = Math.abs(smoothed(colAvg, x) - smoothed(colAvg, x - 1));
+                const eGrad = Math.abs(smoothed(colEdges, x) - smoothed(colEdges, x - 1));
+                return bGrad + eGrad * 2;
             }
-            for (let x = sampleW - 1; x >= 0; x--) {
-                if (colScores[x] > BG_THRESHOLD) { right = x; break; }
+
+            // Scan inward from each edge, find the position with the strongest gradient
+            const searchLimit = 0.4; // don't search past 40% of frame
+            const MIN_GRADIENT = 4;
+
+            let top = 0, topScore = 0;
+            for (let y = 1; y < sampleH * searchLimit; y++) {
+                const g = rowGradient(y);
+                if (g > topScore) { topScore = g; top = y; }
             }
+
+            let bottom = sampleH - 1, bottomScore = 0;
+            for (let y = sampleH - 2; y > sampleH * (1 - searchLimit); y--) {
+                const g = rowGradient(y);
+                if (g > bottomScore) { bottomScore = g; bottom = y; }
+            }
+
+            let left = 0, leftScore = 0;
+            for (let x = 1; x < sampleW * searchLimit; x++) {
+                const g = colGradient(x);
+                if (g > leftScore) { leftScore = g; left = x; }
+            }
+
+            let right = sampleW - 1, rightScore = 0;
+            for (let x = sampleW - 2; x > sampleW * (1 - searchLimit); x--) {
+                const g = colGradient(x);
+                if (g > rightScore) { rightScore = g; right = x; }
+            }
+
+            // Reject if gradients are too weak (no card boundary found)
+            if (topScore < MIN_GRADIENT || bottomScore < MIN_GRADIENT ||
+                leftScore < MIN_GRADIENT || rightScore < MIN_GRADIENT) return null;
 
             const cropW = right - left;
             const cropH = bottom - top;
 
-            // Reject if too small (<15%) or fills the whole frame (>95%)
+            // Reject if too small (<15%) or edges are inverted
             if (cropW < sampleW * 0.15 || cropH < sampleH * 0.15) return null;
-            if (cropW > sampleW * 0.95 && cropH > sampleH * 0.95) return null;
+            if (cropW <= 0 || cropH <= 0) return null;
 
             // Check aspect ratio is roughly card-shaped
             const aspect = Math.min(cropW, cropH) / Math.max(cropW, cropH);
@@ -265,49 +326,44 @@
             ctx.drawImage(video, 0, 0);
             detectedCard = detectCardBounds(ctx, vw, vh);
 
-            if (detectedCard) {
-                // Map video coords to display coords
-                // video uses object-fit:cover, so we need to account for cropping
-                const videoAspect = vw / vh;
-                const displayAspect = rect.width / rect.height;
-                let sx, sy, sw, sh;
-                if (videoAspect > displayAspect) {
-                    // Video wider than display — cropped on sides
-                    sh = vh;
-                    sw = vh * displayAspect;
-                    sx = (vw - sw) / 2;
-                    sy = 0;
-                } else {
-                    // Video taller than display — cropped top/bottom
-                    sw = vw;
-                    sh = vw / displayAspect;
-                    sx = 0;
-                    sy = (vh - sh) / 2;
-                }
+            // Guide frame — card aspect ratio (63:88) centered in viewfinder
+            const CARD_ASPECT = 63 / 88;
+            const guideH = rect.height * 0.65;
+            const guideW = guideH * CARD_ASPECT;
+            const guideX = (rect.width - guideW) / 2;
+            const guideY = (rect.height - guideH) / 2;
+            const guideRadius = 12;
+            const cardAligned = detectedCard != null;
 
-                const dx = (detectedCard.x - sx) / sw * rect.width;
-                const dy = (detectedCard.y - sy) / sh * rect.height;
-                const dw = detectedCard.w / sw * rect.width;
-                const dh = detectedCard.h / sh * rect.height;
+            // Dimmed area outside guide (with rounded cutout)
+            dCtx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+            dCtx.beginPath();
+            dCtx.rect(0, 0, rect.width, rect.height);
+            dCtx.roundRect(guideX, guideY, guideW, guideH, guideRadius);
+            dCtx.fill('evenodd');
 
-                dCtx.strokeStyle = '#4caf50';
-                dCtx.lineWidth = 3;
-                dCtx.setLineDash([]);
-                dCtx.strokeRect(dx, dy, dw, dh);
+            // Guide border
+            dCtx.strokeStyle = cardAligned ? '#4caf50' : 'rgba(255, 255, 255, 0.5)';
+            dCtx.lineWidth = cardAligned ? 3 : 2;
+            dCtx.setLineDash([]);
+            dCtx.beginPath();
+            dCtx.roundRect(guideX, guideY, guideW, guideH, guideRadius);
+            dCtx.stroke();
 
-                // Corner accents
-                const corner = 20;
-                dCtx.lineWidth = 4;
-                dCtx.strokeStyle = '#4caf50';
-                // Top-left
-                dCtx.beginPath(); dCtx.moveTo(dx, dy + corner); dCtx.lineTo(dx, dy); dCtx.lineTo(dx + corner, dy); dCtx.stroke();
-                // Top-right
-                dCtx.beginPath(); dCtx.moveTo(dx + dw - corner, dy); dCtx.lineTo(dx + dw, dy); dCtx.lineTo(dx + dw, dy + corner); dCtx.stroke();
-                // Bottom-left
-                dCtx.beginPath(); dCtx.moveTo(dx, dy + dh - corner); dCtx.lineTo(dx, dy + dh); dCtx.lineTo(dx + corner, dy + dh); dCtx.stroke();
-                // Bottom-right
-                dCtx.beginPath(); dCtx.moveTo(dx + dw - corner, dy + dh); dCtx.lineTo(dx + dw, dy + dh); dCtx.lineTo(dx + dw, dy + dh - corner); dCtx.stroke();
-            }
+            // Corner accents on guide frame
+            const corner = 24;
+            dCtx.lineWidth = cardAligned ? 4 : 3;
+            dCtx.strokeStyle = cardAligned ? '#4caf50' : 'rgba(255, 255, 255, 0.8)';
+            dCtx.lineCap = 'round';
+            // Top-left
+            dCtx.beginPath(); dCtx.moveTo(guideX, guideY + corner); dCtx.lineTo(guideX, guideY); dCtx.lineTo(guideX + corner, guideY); dCtx.stroke();
+            // Top-right
+            dCtx.beginPath(); dCtx.moveTo(guideX + guideW - corner, guideY); dCtx.lineTo(guideX + guideW, guideY); dCtx.lineTo(guideX + guideW, guideY + corner); dCtx.stroke();
+            // Bottom-left
+            dCtx.beginPath(); dCtx.moveTo(guideX, guideY + guideH - corner); dCtx.lineTo(guideX, guideY + guideH); dCtx.lineTo(guideX + corner, guideY + guideH); dCtx.stroke();
+            // Bottom-right
+            dCtx.beginPath(); dCtx.moveTo(guideX + guideW - corner, guideY + guideH); dCtx.lineTo(guideX + guideW, guideY + guideH); dCtx.lineTo(guideX + guideW, guideY + guideH - corner); dCtx.stroke();
+            dCtx.lineCap = 'butt';
 
             detectAnimId = requestAnimationFrame(drawDetectionOverlay);
         }
@@ -327,11 +383,64 @@
                 video.srcObject = stream;
                 await video.play();
                 captureBtn.disabled = false;
-                setStatus('Ready — position card in frame', '');
+                setStatus('Ready — position card in guide', '');
                 detectAnimId = requestAnimationFrame(drawDetectionOverlay);
+
+                // Set up hardware zoom if supported
+                const track = stream.getVideoTracks()[0];
+                const capabilities = track.getCapabilities();
+                if (capabilities.zoom) {
+                    zoomTrack = track;
+                    zoomMin = capabilities.zoom.min;
+                    zoomMax = capabilities.zoom.max;
+                    zoomCurrent = track.getSettings().zoom || zoomMin;
+                    initPinchZoom();
+                }
             } catch (err) {
                 showError(err.message || 'Could not access camera');
             }
+        }
+
+        // ── Pinch-to-zoom ──
+
+        function getPinchDistance(touches) {
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function showZoomLevel(level) {
+            const indicator = document.getElementById('zoomIndicator');
+            indicator.textContent = level.toFixed(1) + 'x';
+            indicator.style.opacity = '1';
+            clearTimeout(zoomIndicatorTimeout);
+            zoomIndicatorTimeout = setTimeout(() => {
+                indicator.style.opacity = '0';
+            }, 1000);
+        }
+
+        function initPinchZoom() {
+            const viewfinder = document.getElementById('viewfinder');
+
+            viewfinder.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    pinchStartDist = getPinchDistance(e.touches);
+                    pinchStartZoom = zoomCurrent;
+                }
+            }, { passive: false });
+
+            viewfinder.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 2 && zoomTrack) {
+                    e.preventDefault();
+                    const dist = getPinchDistance(e.touches);
+                    const scale = dist / pinchStartDist;
+                    const newZoom = Math.max(zoomMin, Math.min(zoomMax, pinchStartZoom * scale));
+                    zoomCurrent = newZoom;
+                    zoomTrack.applyConstraints({ advanced: [{ zoom: newZoom }] });
+                    showZoomLevel(newZoom);
+                }
+            }, { passive: false });
         }
 
         function setStatus(text, className) {
@@ -367,29 +476,53 @@
 
             flashEffect();
 
-            // Capture full frame
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0);
+            // Capture frame — prefer ImageCapture API (honors hardware zoom)
+            let captureCanvas = null;
+            if (zoomTrack && typeof ImageCapture !== 'undefined') {
+                try {
+                    const ic = new ImageCapture(zoomTrack);
+                    const bitmap = await ic.grabFrame();
+                    captureCanvas = document.createElement('canvas');
+                    captureCanvas.width = bitmap.width;
+                    captureCanvas.height = bitmap.height;
+                    captureCanvas.getContext('2d').drawImage(bitmap, 0, 0);
+                    bitmap.close();
+                } catch (_) {
+                    captureCanvas = null;
+                }
+            }
+
+            if (!captureCanvas) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                captureCanvas = canvas;
+            }
 
             // If card detected, crop to just the card
-            let cropCanvas = canvas;
+            let outputCanvas = captureCanvas;
             if (detectedCard) {
-                cropCanvas = document.createElement('canvas');
-                cropCanvas.width = detectedCard.w;
-                cropCanvas.height = detectedCard.h;
-                const cropCtx = cropCanvas.getContext('2d');
-                cropCtx.drawImage(canvas,
-                    detectedCard.x, detectedCard.y, detectedCard.w, detectedCard.h,
-                    0, 0, detectedCard.w, detectedCard.h);
+                // Scale detection coords if capture resolution differs from video
+                const sx = captureCanvas.width / video.videoWidth;
+                const sy = captureCanvas.height / video.videoHeight;
+                const cx = Math.round(detectedCard.x * sx);
+                const cy = Math.round(detectedCard.y * sy);
+                const cw = Math.round(detectedCard.w * sx);
+                const ch = Math.round(detectedCard.h * sy);
+
+                outputCanvas = document.createElement('canvas');
+                outputCanvas.width = cw;
+                outputCanvas.height = ch;
+                outputCanvas.getContext('2d').drawImage(captureCanvas,
+                    cx, cy, cw, ch,
+                    0, 0, cw, ch);
             }
 
             setStatus('Uploading...', 'uploading');
 
             try {
                 const blob = await new Promise(resolve =>
-                    cropCanvas.toBlob(resolve, 'image/jpeg', 0.92)
+                    outputCanvas.toBlob(resolve, 'image/jpeg', 0.92)
                 );
                 await uploadImage(blob);
                 setStatus(detectedCard ? 'Sent (cropped)! Ready for next.' : 'Sent! Ready for next card.', 'success');
