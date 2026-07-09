@@ -112,8 +112,7 @@ public sealed partial class RootViewModel(
             Title = "Phone Scanner",
             Width = 380,
             Height = 460,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Owner = Application.Current.MainWindow,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen,
             ResizeMode = ResizeMode.NoResize,
             Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(30, 30, 46)),
             Content = new System.Windows.Controls.StackPanel
