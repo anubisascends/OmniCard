@@ -16,6 +16,7 @@ using OmniCard.Views.SealedProductEditor;
 using OmniCard.Views.AuditReport;
 using OmniCard.Views.StorageManager;
 using OmniCard.Views.EbayListing;
+using OmniCard.Views.ManualAdd;
 
 namespace OmniCard.Services;
 
@@ -163,6 +164,14 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         var wnd = Services.GetRequiredService<EbayListingView>();
         wnd.Owner = Application.Current.MainWindow;
         wnd.ViewModel.LoadCard(card);
+        return wnd.ShowDialog();
+    }
+
+    public bool? OpenManualAdd(StorageContainer? defaultContainer = null)
+    {
+        var wnd = Services.GetRequiredService<ManualAddView>();
+        wnd.Owner = Application.Current.MainWindow;
+        wnd.ViewModel.Load(defaultContainer);
         return wnd.ShowDialog();
     }
 }

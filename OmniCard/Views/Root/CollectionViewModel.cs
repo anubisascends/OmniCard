@@ -108,6 +108,31 @@ public sealed partial class CollectionViewModel : ViewModel
 
     public Dictionary<string, bool> GetColumnVisibilityForPersistence() => new(_columnVisibility);
 
+    // --- Manual Add ---
+
+    [RelayCommand]
+    public void OpenManualAdd()
+    {
+        // Use current location filter as default container, if viewing a single location
+        StorageContainer? defaultContainer = null;
+        if (CurrentLocationId is int id)
+            defaultContainer = _containerService.GetAll().FirstOrDefault(c => c.Id == id);
+
+        OpenManualAdd(defaultContainer);
+    }
+
+    public void OpenManualAdd(StorageContainer? defaultContainer)
+    {
+        var result = _dialogService.OpenManualAdd(defaultContainer);
+        if (result == true)
+        {
+            if (ShowCardList)
+                _ = SearchCollection();
+            else
+                LoadOverview();
+        }
+    }
+
     // --- Navigation ---
 
     [ObservableProperty]

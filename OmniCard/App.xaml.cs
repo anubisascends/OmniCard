@@ -35,6 +35,7 @@ using OmniCard.Views.AuditReport;
 using OmniCard.Views.SealedProductEditor;
 using OmniCard.Views.StorageManager;
 using OmniCard.Views.EbayListing;
+using OmniCard.Views.ManualAdd;
 
 namespace OmniCard;
 
@@ -167,6 +168,8 @@ public partial class App : Application
             services.AddTransient<AuditReportViewModel>();
             services.AddTransient<EbayListingViewModel>();
             services.AddTransient<EbayListingView>();
+            services.AddTransient<ManualAddView>();
+            services.AddTransient<ManualAddViewModel>();
         })
         .Build();
 

@@ -1,0 +1,104 @@
+<Window x:Class="OmniCard.Views.ManualAdd.ManualAddView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:OmniCard.Views.ManualAdd"
+        xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
+        xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="ToolWindow"
+        Title="Add Cards" Height="620" Width="520"
+        Background="{DynamicResource MaterialDesign.Brush.Background}"
+        TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="13"
+        FontFamily="{StaticResource AppFont}">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Card search -->
+        <helpers:CardSearchControl
+            Grid.Row="0"
+            Header="Search for a card"
+            SearchQuery="{Binding ViewModel.SearchQuery, Mode=TwoWay}"
+            SearchResults="{Binding ViewModel.SearchResults}"
+            SelectedResult="{Binding ViewModel.SelectedResult, Mode=TwoWay}"
+            SearchCommand="{Binding ViewModel.SearchCommand}"
+            AssignCommand="{Binding ViewModel.AddToCollectionCommand}"
+            AssignButtonText="Add to Collection"
+            ResultsMaxHeight="200"/>
+
+        <!-- Card properties -->
+        <GroupBox Grid.Row="1" Header="Card Properties" Margin="0,12,0,0" Padding="8">
+            <WrapPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,16,4">
+                    <TextBlock Text="Condition:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox SelectedItem="{Binding ViewModel.Condition}"
+                              Width="80" VerticalAlignment="Center">
+                        <ComboBoxItem Content="NM"/>
+                        <ComboBoxItem Content="LP"/>
+                        <ComboBoxItem Content="MP"/>
+                        <ComboBoxItem Content="HP"/>
+                        <ComboBoxItem Content="D"/>
+                    </ComboBox>
+                </StackPanel>
+                <CheckBox Content="Foil"
+                          IsChecked="{Binding ViewModel.IsFoil}"
+                          VerticalAlignment="Center" Margin="0,0,16,4"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,16,4">
+                    <TextBlock Text="Price:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox Text="{Binding ViewModel.PurchasePrice, StringFormat={}{0:F2}, TargetNullValue=''}"
+                             Width="70" VerticalAlignment="Center" VerticalContentAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Qty:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox Text="{Binding ViewModel.Quantity}" Width="40"
+                             VerticalAlignment="Center" VerticalContentAlignment="Center"/>
+                </StackPanel>
+            </WrapPanel>
+        </GroupBox>
+
+        <!-- Location -->
+        <GroupBox Grid.Row="2" Header="Location" Margin="0,12,0,0" Padding="8">
+            <WrapPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,16,4">
+                    <TextBlock Text="Container:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox ItemsSource="{Binding ViewModel.Containers}"
+                              SelectedItem="{Binding ViewModel.SelectedContainer}"
+                              DisplayMemberPath="Name"
+                              Width="160" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,8,4">
+                    <TextBlock Text="Page:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox Text="{Binding ViewModel.Page, TargetNullValue=''}"
+                             Width="40" VerticalAlignment="Center" VerticalContentAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,8,4">
+                    <TextBlock Text="Slot:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox Text="{Binding ViewModel.Slot, TargetNullValue=''}"
+                             Width="40" VerticalAlignment="Center" VerticalContentAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Section:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox Text="{Binding ViewModel.Section, TargetNullValue=''}"
+                             Width="100" VerticalAlignment="Center" VerticalContentAlignment="Center"/>
+                </StackPanel>
+            </WrapPanel>
+        </GroupBox>
+
+        <!-- Status -->
+        <DockPanel Grid.Row="3" Margin="0,16,0,0">
+            <Button DockPanel.Dock="Right" Content="Close" Click="OnClose" Padding="16,6"/>
+            <TextBlock Text="{Binding ViewModel.StatusMessage}"
+                       VerticalAlignment="Center"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Primary}"/>
+        </DockPanel>
+    </Grid>
+</Window>

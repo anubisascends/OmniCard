@@ -20,4 +20,5 @@ public interface IDialogService
     List<SealedProductInstance>? CrackSealedProduct(SealedProductInstance instance);
     void ShowAuditReport(AuditReport report);
     bool? OpenEbayListingDialog(CollectionCard card);
+    bool? OpenManualAdd(StorageContainer? defaultContainer = null);
 }
