@@ -51,7 +51,37 @@ public sealed partial class RootViewModel(
         {
             var baseUrl = webCompanionSettings.CurrentValue.BaseUrl;
             if (string.IsNullOrWhiteSpace(baseUrl)) return "";
+
+            // Replace localhost with the machine's LAN IP so the phone can reach it
+            var uri = new Uri(baseUrl.TrimEnd('/'));
+            if (uri.Host is "localhost" or "127.0.0.1")
+            {
+                var lanIp = GetLanIp();
+                if (lanIp is not null)
+                {
+                    var builder = new UriBuilder(uri) { Host = lanIp };
+                    return $"{builder.Uri.ToString().TrimEnd('/')}/scan";
+                }
+            }
+
             return $"{baseUrl.TrimEnd('/')}/scan";
+        }
+    }
+
+    private static string? GetLanIp()
+    {
+        try
+        {
+            using var socket = new System.Net.Sockets.Socket(
+                System.Net.Sockets.AddressFamily.InterNetwork,
+                System.Net.Sockets.SocketType.Stream,
+                System.Net.Sockets.ProtocolType.Tcp);
+            socket.Connect("8.8.8.8", 53);
+            return ((System.Net.IPEndPoint)socket.LocalEndPoint!).Address.ToString();
+        }
+        catch
+        {
+            return null;
         }
     }
 
