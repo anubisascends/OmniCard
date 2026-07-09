@@ -160,56 +160,70 @@
             sCtx.drawImage(video, 0, 0, sampleW, sampleH);
             const data = sCtx.getImageData(0, 0, sampleW, sampleH).data;
 
-            const THRESHOLD = 60; // pixels darker than this are "card"
-            const MIN_EDGE_RATIO = 0.10; // 10% of row/col must be dark
+            // Edge detection approach: find rows/columns with high contrast
+            // transitions. Works regardless of whether the background is
+            // lighter or darker than the card.
 
-            function brightness(i) {
-                return (data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114);
+            function brightness(x, y) {
+                const i = (y * sampleW + x) * 4;
+                return data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
             }
 
-            function countDarkInRow(y) {
+            // Count sharp brightness transitions (edges) in a row
+            function edgesInRow(y) {
                 let count = 0;
-                for (let x = 0; x < sampleW; x++) {
-                    if (brightness((y * sampleW + x) * 4) < 200) count++;
+                for (let x = 1; x < sampleW; x++) {
+                    if (Math.abs(brightness(x, y) - brightness(x - 1, y)) > 30) count++;
                 }
                 return count;
             }
 
-            function countDarkInCol(x) {
+            // Count sharp brightness transitions in a column
+            function edgesInCol(x) {
                 let count = 0;
-                for (let y = 0; y < sampleH; y++) {
-                    if (brightness((y * sampleW + x) * 4) < 200) count++;
+                for (let y = 1; y < sampleH; y++) {
+                    if (Math.abs(brightness(x, y) - brightness(x, y - 1)) > 30) count++;
                 }
                 return count;
             }
 
-            // Find edges
+            // A row/col at the card border has a sudden spike in edge count
+            // compared to the uniform background outside.
+            // Scan inward: the first row with significant edges is the card edge.
+            const MIN_ROW_EDGES = sampleW * 0.08;
+            const MIN_COL_EDGES = sampleH * 0.08;
+
             let top = 0, bottom = sampleH - 1, left = 0, right = sampleW - 1;
 
             for (let y = 0; y < sampleH; y++) {
-                if (countDarkInRow(y) > sampleW * MIN_EDGE_RATIO) { top = y; break; }
+                if (edgesInRow(y) >= MIN_ROW_EDGES) { top = y; break; }
             }
             for (let y = sampleH - 1; y >= 0; y--) {
-                if (countDarkInRow(y) > sampleW * MIN_EDGE_RATIO) { bottom = y; break; }
+                if (edgesInRow(y) >= MIN_ROW_EDGES) { bottom = y; break; }
             }
             for (let x = 0; x < sampleW; x++) {
-                if (countDarkInCol(x) > sampleH * MIN_EDGE_RATIO) { left = x; break; }
+                if (edgesInCol(x) >= MIN_COL_EDGES) { left = x; break; }
             }
             for (let x = sampleW - 1; x >= 0; x--) {
-                if (countDarkInCol(x) > sampleH * MIN_EDGE_RATIO) { right = x; break; }
+                if (edgesInCol(x) >= MIN_COL_EDGES) { right = x; break; }
             }
 
             const cropW = right - left;
             const cropH = bottom - top;
 
-            // Reject if detected region is too small (<20%) or too large (>95% = no card visible)
-            if (cropW < sampleW * 0.2 || cropH < sampleH * 0.2) return null;
+            // Reject if detected region is too small (<15%) or fills the whole frame (>95%)
+            if (cropW < sampleW * 0.15 || cropH < sampleH * 0.15) return null;
             if (cropW > sampleW * 0.95 && cropH > sampleH * 0.95) return null;
 
-            // Scale back to video coordinates with small margin
+            // Check aspect ratio is roughly card-shaped (between 0.5 and 0.9 w:h or inverted for landscape)
+            const aspect = cropW / cropH;
+            const cardAspect = 63 / 88; // ~0.716
+            if (aspect < 0.4 || (aspect > 1.0 && aspect < 1.1) || aspect > 2.5) return null;
+
+            // Scale back to video coordinates with margin
             const scaleX = w / sampleW;
             const scaleY = h / sampleH;
-            const margin = 8;
+            const margin = 12;
             return {
                 x: Math.max(0, Math.round(left * scaleX) - margin),
                 y: Math.max(0, Math.round(top * scaleY) - margin),
