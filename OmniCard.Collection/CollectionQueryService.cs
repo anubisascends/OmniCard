@@ -10,13 +10,16 @@ public sealed class CollectionQueryService(
     IStorageContainerService containerService,
     ICardService cardService) : ICollectionQueryService
 {
-    public async Task<List<LocationTileSummary>> GetLocationOverviewsAsync()
+    public async Task<List<LocationTileSummary>> GetLocationOverviewsAsync(CardGame? gameFilter = null)
     {
         var summaries = await Task.Run(() =>
         {
             var containers = containerService.GetAll();
             using var context = dbContextFactory.CreateDbContext();
-            var cardsQuery = context.Cards.AsNoTracking();
+            IQueryable<CollectionCard> cardsQuery = context.Cards.AsNoTracking();
+
+            if (gameFilter.HasValue)
+                cardsQuery = cardsQuery.Where(c => c.Game == gameFilter.Value);
 
             // SQL aggregate: count + purchase total per container
             var aggregates = cardsQuery

@@ -253,7 +253,7 @@ public sealed partial class CollectionViewModel : ViewModel
         LocationSummaries.Clear();
         BulkSummary = null;
 
-        var overviews = await _collectionQueryService.GetLocationOverviewsAsync();
+        var overviews = await _collectionQueryService.GetLocationOverviewsAsync(_selectedGame);
 
         foreach (var summary in overviews)
         {
