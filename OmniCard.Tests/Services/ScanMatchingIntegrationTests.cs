@@ -70,20 +70,19 @@ public class ScanMatchingIntegrationTests : IDisposable
     }
 
     /// <summary>
-    /// Cards where the scan pHash exceeds the max Hamming distance from the DB hash.
-    /// These are known pipeline limitations — the Scryfall reference image and the physical
-    /// scan diverge beyond the matching threshold. Filed as issues for investigation.
-    /// Key: "{setCode}:{collectorNumber}" (lowercase set code)
+    /// Known pipeline limitations — scans that exceed the Hamming distance threshold.
+    /// Key: (setCode lowercase, collectorNumber)
     /// </summary>
-    private static readonly HashSet<string> KnownMismatches = new(StringComparer.OrdinalIgnoreCase)
-    {
+    private static readonly HashSet<(string Set, string Num)> KnownMismatchCards =
+    [
         // Vulshok Battlegear [CMM] #418: scan hashes 0x29A2F3DA0B0BDCC9 / 0x29A2F3FA090BDCC9,
         // DB hash 0x18FCF2FE092B5E01 — Hamming distances 18 and 16 exceed threshold of 14.
-        "cmm:418",
-    };
+        ("cmm", "418"),
+    ];
 
     /// <summary>
-    /// Auto-discovers all scan images in TestData/scans/ and yields test cases.
+    /// Auto-discovers all scan images in TestData/scans/ and yields test cases,
+    /// excluding known mismatch cards.
     /// Each PNG filename is parsed for expected set code and collector number.
     /// </summary>
     public static IEnumerable<object[]> ScanImageFiles()
@@ -99,8 +98,34 @@ public class ScanMatchingIntegrationTests : IDisposable
 
             var setCode = match.Groups["set"].Value.ToLowerInvariant();
             var collectorNumber = match.Groups["num"].Value;
-            var relativePath = Path.GetRelativePath(AppContext.BaseDirectory, file);
 
+            if (KnownMismatchCards.Contains((setCode, collectorNumber))) continue;
+
+            var relativePath = Path.GetRelativePath(AppContext.BaseDirectory, file);
+            yield return [relativePath, setCode, collectorNumber];
+        }
+    }
+
+    /// <summary>
+    /// Yields only the known mismatch scan images.
+    /// </summary>
+    public static IEnumerable<object[]> KnownMismatchFiles()
+    {
+        var scansDir = Path.Combine(AppContext.BaseDirectory, "TestData", "scans");
+        if (!Directory.Exists(scansDir))
+            yield break;
+
+        foreach (var file in Directory.GetFiles(scansDir, "*.png", SearchOption.AllDirectories))
+        {
+            var match = FilenameRegex.Match(Path.GetFileName(file));
+            if (!match.Success) continue;
+
+            var setCode = match.Groups["set"].Value.ToLowerInvariant();
+            var collectorNumber = match.Groups["num"].Value;
+
+            if (!KnownMismatchCards.Contains((setCode, collectorNumber))) continue;
+
+            var relativePath = Path.GetRelativePath(AppContext.BaseDirectory, file);
             yield return [relativePath, setCode, collectorNumber];
         }
     }
@@ -122,20 +147,37 @@ public class ScanMatchingIntegrationTests : IDisposable
         // Find the closest match in the test DB
         var match = _scryfallService.FindClosestMatch(hash);
 
-        // Check if this is a known pipeline limitation before asserting
-        var key = $"{expectedSet}:{expectedNumber}";
-        if (KnownMismatches.Contains(key))
-        {
-            _output.WriteLine($"[KnownMismatch] {Path.GetFileName(fullPath)}: no match found (Hamming distance exceeds threshold). Skipping assertion.");
-            return;
-        }
-
         Assert.NotNull(match);
         _output.WriteLine($"Matched: {match.Name} [{match.SetCode}] #{match.CollectorNumber}");
         _output.WriteLine($"Confidence: {match.Confidence:F1}%");
 
         Assert.Equal(expectedSet, match.SetCode, ignoreCase: true);
         Assert.Equal(expectedNumber, match.CollectorNumber);
+    }
+
+    /// <summary>
+    /// Known pipeline limitations — these scans exceed the Hamming distance threshold.
+    /// If this test starts FAILING (match is no longer null), the pipeline has improved
+    /// and the card should be moved back to ScanImageFiles().
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(KnownMismatchFiles))]
+    [Trait("Category", "KnownMismatch")]
+    public void ScanImage_KnownMismatch_ReturnsNull(string relativePath, string expectedSet, string expectedNumber)
+    {
+        var fullPath = Path.Combine(AppContext.BaseDirectory, relativePath);
+        using var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        var hash = _hashService.ComputeHash(stream);
+
+        _output.WriteLine($"File: {Path.GetFileName(fullPath)}");
+        _output.WriteLine($"pHash: {hash:X16}");
+
+        var match = _scryfallService.FindClosestMatch(hash);
+
+        // If this starts failing, the pipeline has improved — move this case to ScanImageFiles()
+        Assert.Null(match);
+
+        _output.WriteLine($"Confirmed: no match within threshold (expected for {expectedSet} #{expectedNumber})");
     }
 
     // --- Test infrastructure ---
