@@ -1641,6 +1641,81 @@ public sealed partial class RootViewModel(
     }
 
     [RelayCommand]
+    public void ExportScansManaboxCsv()
+    {
+        if (IsAuditMode) return;
+
+        var scans = CardService.ScannedCards.ToList();
+        if (scans.Count == 0) return;
+
+        if (!ExportToFile("scans-manabox.csv", out var path)) return;
+
+        csvService.ExportManaboxScans(path, scans);
+
+        ResetScanFilterSort();
+        SelectedScannedCards = [];
+        SelectedScannedCard = null;
+        NotifySelectionChanged();
+        CardService.ClearTempFiles();
+        CardService.ScannedCards.Clear();
+        _preAuditSnapshots?.Clear();
+        _preAuditSnapshots = null;
+        IsAuditComplete = false;
+        var exported = scans.Count(s => s.Match is not null);
+        Message = $"Exported {exported} cards to {Path.GetFileName(path)}. Scan queue cleared.";
+    }
+
+    [RelayCommand]
+    public void ExportScansManaboxCollectionCsv()
+    {
+        if (IsAuditMode) return;
+
+        var scans = CardService.ScannedCards.ToList();
+        if (scans.Count == 0) return;
+
+        if (!ExportToFile("scans-manabox-collection.csv", out var path)) return;
+
+        csvService.ExportManaboxScansCollection(path, scans);
+
+        ResetScanFilterSort();
+        SelectedScannedCards = [];
+        SelectedScannedCard = null;
+        NotifySelectionChanged();
+        CardService.ClearTempFiles();
+        CardService.ScannedCards.Clear();
+        _preAuditSnapshots?.Clear();
+        _preAuditSnapshots = null;
+        IsAuditComplete = false;
+        var exported = scans.Count(s => s.Match is not null);
+        Message = $"Exported {exported} cards to {Path.GetFileName(path)}. Scan queue cleared.";
+    }
+
+    [RelayCommand]
+    public void ExportScansManaboxText()
+    {
+        if (IsAuditMode) return;
+
+        var scans = CardService.ScannedCards.ToList();
+        if (scans.Count == 0) return;
+
+        if (!ExportToFile("scans-manabox.txt", "Text files (*.txt)|*.txt", out var path)) return;
+
+        csvService.ExportManaboxScansText(path, scans);
+
+        ResetScanFilterSort();
+        SelectedScannedCards = [];
+        SelectedScannedCard = null;
+        NotifySelectionChanged();
+        CardService.ClearTempFiles();
+        CardService.ScannedCards.Clear();
+        _preAuditSnapshots?.Clear();
+        _preAuditSnapshots = null;
+        IsAuditComplete = false;
+        var exported = scans.Count(s => s.Match is not null);
+        Message = $"Exported {exported} cards to {Path.GetFileName(path)}. Scan queue cleared.";
+    }
+
+    [RelayCommand]
     public void ImportCollection()
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
@@ -1678,12 +1753,15 @@ public sealed partial class RootViewModel(
     }
 
     private static bool ExportToFile(string defaultFileName, out string path)
+        => ExportToFile(defaultFileName, "CSV files (*.csv)|*.csv", out path);
+
+    private static bool ExportToFile(string defaultFileName, string filter, out string path)
     {
         path = "";
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
             FileName = defaultFileName,
-            Filter = "CSV files (*.csv)|*.csv",
+            Filter = filter,
             Title = "Export Collection",
         };
 

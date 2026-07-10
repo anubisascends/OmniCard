@@ -28,6 +28,18 @@ public class CsvExportImportService(
     private static readonly Dictionary<string, string> TcgPlayerToCondition =
         ConditionToTcgPlayer.ToDictionary(kvp => kvp.Value, kvp => kvp.Key, StringComparer.OrdinalIgnoreCase);
 
+    private static readonly Dictionary<string, string> ConditionToManabox = new()
+    {
+        ["NM"] = "near_mint",
+        ["LP"] = "lightly_played",
+        ["MP"] = "moderately_played",
+        ["HP"] = "heavily_played",
+        ["D"] = "damaged",
+    };
+
+    private static readonly Dictionary<string, string> ManaboxToCondition =
+        ConditionToManabox.ToDictionary(kvp => kvp.Value, kvp => kvp.Key, StringComparer.OrdinalIgnoreCase);
+
     // ── App-Native Export ──
 
     public void ExportAppNative(string filePath, IEnumerable<CollectionCard> cards)
@@ -143,30 +155,26 @@ public class CsvExportImportService(
 
     public void ExportManabox(string filePath, IEnumerable<CollectionCard> cards)
     {
+        logger.LogInformation("Exporting collection to ManaBox CSV: {FilePath}", filePath);
         using var writer = new StreamWriter(filePath);
-        using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+        using var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture));
 
-        csv.WriteField("Card Name");
-        csv.WriteField("Set Code");
-        csv.WriteField("Set Name");
-        csv.WriteField("Collector Number");
+        // Header
+        csv.WriteField("Name");
+        csv.WriteField("Set code");
+        csv.WriteField("Set name");
+        csv.WriteField("Collector number");
+        csv.WriteField("Foil");
         csv.WriteField("Rarity");
-        csv.WriteField("Language");
         csv.WriteField("Quantity");
-        csv.WriteField("Condition");
-        csv.WriteField("Finish");
-        csv.WriteField("Altered");
-        csv.WriteField("Signed");
-        csv.WriteField("Misprint");
-        csv.WriteField("Price (USD)");
-        csv.WriteField("Price (EUR)");
-        csv.WriteField("Price (USD Foil)");
-        csv.WriteField("Price (EUR Foil)");
-        csv.WriteField("Price (USD Etched)");
-        csv.WriteField("Price (EUR Etched)");
         csv.WriteField("Scryfall ID");
-        csv.WriteField("Container Type");
-        csv.WriteField("Container Name");
+        csv.WriteField("Purchase price");
+        csv.WriteField("Misprint");
+        csv.WriteField("Altered");
+        csv.WriteField("Condition");
+        csv.WriteField("Language");
+        csv.WriteField("Purchase price currency");
+        csv.WriteField("Added");
         csv.NextRecord();
 
         foreach (var card in cards)
@@ -175,27 +183,141 @@ public class CsvExportImportService(
             csv.WriteField(card.SetCode);
             csv.WriteField(card.SetName);
             csv.WriteField(card.Number);
+            csv.WriteField(card.IsFoil ? "foil" : "normal");
             csv.WriteField(card.Rarity);
-            csv.WriteField("en");
             csv.WriteField(1);
-            csv.WriteField(card.Condition);
-            csv.WriteField(card.IsFoil ? "foil" : "nonfoil");
-            csv.WriteField(false);
-            csv.WriteField(false);
-            csv.WriteField(false);
-            csv.WriteField(""); // Price (USD)
-            csv.WriteField(""); // Price (EUR)
-            csv.WriteField(""); // Price (USD Foil)
-            csv.WriteField(""); // Price (EUR Foil)
-            csv.WriteField(""); // Price (USD Etched)
-            csv.WriteField(""); // Price (EUR Etched)
             csv.WriteField(card.GameCardId);
-            csv.WriteField("list");
-            csv.WriteField(card.Container?.Name ?? "recent");
+            csv.WriteField(card.PurchasePrice?.ToString(CultureInfo.InvariantCulture) ?? "");
+            csv.WriteField(false);
+            csv.WriteField(false);
+            csv.WriteField(ConditionToManabox.GetValueOrDefault(card.Condition, "near_mint"));
+            csv.WriteField("en");
+            csv.WriteField("USD");
+            csv.WriteField(card.DateAdded.ToString("o"));
             csv.NextRecord();
         }
 
-        logger.LogInformation("Exported {Count} cards in Manabox format to {Path}", cards.Count(), filePath);
+        logger.LogInformation("ManaBox CSV export complete");
+    }
+
+    public void ExportManaboxScans(string filePath, IEnumerable<ScannedCard> scans)
+    {
+        logger.LogInformation("Exporting scan queue to ManaBox CSV: {FilePath}", filePath);
+        using var writer = new StreamWriter(filePath);
+        using var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture));
+
+        csv.WriteField("Name");
+        csv.WriteField("Set code");
+        csv.WriteField("Set name");
+        csv.WriteField("Collector number");
+        csv.WriteField("Foil");
+        csv.WriteField("Rarity");
+        csv.WriteField("Quantity");
+        csv.WriteField("Scryfall ID");
+        csv.WriteField("Purchase price");
+        csv.WriteField("Misprint");
+        csv.WriteField("Altered");
+        csv.WriteField("Condition");
+        csv.WriteField("Language");
+        csv.WriteField("Purchase price currency");
+        csv.WriteField("Added");
+        csv.NextRecord();
+
+        var now = DateTime.UtcNow.ToString("o");
+        foreach (var scan in scans)
+        {
+            if (scan.Match is null) continue;
+
+            csv.WriteField(scan.Match.Name);
+            csv.WriteField(scan.Match.SetCode);
+            csv.WriteField(scan.Match.SetName);
+            csv.WriteField(scan.Match.CollectorNumber);
+            csv.WriteField(scan.IsFoil ? "foil" : "normal");
+            csv.WriteField(scan.Match.Rarity);
+            csv.WriteField(1);
+            csv.WriteField(scan.Match.GameSpecificId);
+            csv.WriteField(scan.PurchasePrice?.ToString(CultureInfo.InvariantCulture) ?? "");
+            csv.WriteField(false);
+            csv.WriteField(false);
+            csv.WriteField(ConditionToManabox.GetValueOrDefault(scan.Condition, "near_mint"));
+            csv.WriteField("en");
+            csv.WriteField("USD");
+            csv.WriteField(now);
+            csv.NextRecord();
+        }
+
+        logger.LogInformation("ManaBox scan CSV export complete");
+    }
+
+    public void ExportManaboxScansCollection(string filePath, IEnumerable<ScannedCard> scans)
+    {
+        logger.LogInformation("Exporting scan queue to ManaBox collection CSV: {FilePath}", filePath);
+        using var writer = new StreamWriter(filePath);
+        using var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture));
+
+        csv.WriteField("Binder Name");
+        csv.WriteField("Binder Type");
+        csv.WriteField("Name");
+        csv.WriteField("Set code");
+        csv.WriteField("Set name");
+        csv.WriteField("Collector number");
+        csv.WriteField("Foil");
+        csv.WriteField("Rarity");
+        csv.WriteField("Quantity");
+        csv.WriteField("Scryfall ID");
+        csv.WriteField("Purchase price");
+        csv.WriteField("Misprint");
+        csv.WriteField("Altered");
+        csv.WriteField("Condition");
+        csv.WriteField("Language");
+        csv.WriteField("Purchase price currency");
+        csv.WriteField("Added");
+        csv.NextRecord();
+
+        var now = DateTime.UtcNow.ToString("o");
+        foreach (var scan in scans)
+        {
+            if (scan.Match is null) continue;
+
+            csv.WriteField(scan.OverrideContainer?.Name ?? "Scans");
+            csv.WriteField(scan.OverrideContainer?.ContainerType.ToString().ToLowerInvariant() ?? "list");
+            csv.WriteField(scan.Match.Name);
+            csv.WriteField(scan.Match.SetCode);
+            csv.WriteField(scan.Match.SetName);
+            csv.WriteField(scan.Match.CollectorNumber);
+            csv.WriteField(scan.IsFoil ? "foil" : "normal");
+            csv.WriteField(scan.Match.Rarity);
+            csv.WriteField(1);
+            csv.WriteField(scan.Match.GameSpecificId);
+            csv.WriteField(scan.PurchasePrice?.ToString(CultureInfo.InvariantCulture) ?? "");
+            csv.WriteField(false);
+            csv.WriteField(false);
+            csv.WriteField(ConditionToManabox.GetValueOrDefault(scan.Condition, "near_mint"));
+            csv.WriteField("en");
+            csv.WriteField("USD");
+            csv.WriteField(now);
+            csv.NextRecord();
+        }
+
+        logger.LogInformation("ManaBox scan collection CSV export complete");
+    }
+
+    public void ExportManaboxScansText(string filePath, IEnumerable<ScannedCard> scans)
+    {
+        logger.LogInformation("Exporting scan queue to ManaBox text: {FilePath}", filePath);
+        using var writer = new StreamWriter(filePath);
+
+        foreach (var scan in scans)
+        {
+            if (scan.Match is null) continue;
+
+            var line = $"1 {scan.Match.Name} ({scan.Match.SetCode}) {scan.Match.CollectorNumber}";
+            if (scan.IsFoil)
+                line += " *F*";
+            writer.WriteLine(line);
+        }
+
+        logger.LogInformation("ManaBox scan text export complete");
     }
 
     // ── Import ──
@@ -322,7 +444,7 @@ public class CsvExportImportService(
             return CsvFormat.TcgPlayer;
         if (headers.Contains("Edition"))
             return CsvFormat.Moxfield;
-        if (headers.Contains("Finish") && headers.Contains("Card Name"))
+        if (headers.Contains("Foil") && headers.Contains("Scryfall ID") && headers.Contains("Purchase price currency"))
             return CsvFormat.Manabox;
         return null;
     }
@@ -402,19 +524,20 @@ public class CsvExportImportService(
     private static CollectionCard ParseManaboxRow(CsvReader csv)
     {
         var scryfallId = csv.GetField("Scryfall ID");
+        var manaboxCondition = csv.GetField("Condition") ?? "near_mint";
 
         return new CollectionCard
         {
             Game = CardGame.Mtg,
             GameCardId = !string.IsNullOrEmpty(scryfallId) ? scryfallId : "",
-            Name = csv.GetField("Card Name") ?? "",
-            SetName = csv.GetField("Set Name") ?? "",
-            SetCode = csv.GetField("Set Code") ?? "",
-            Number = csv.GetField("Collector Number") ?? "",
+            Name = csv.GetField("Name") ?? "",
+            SetName = csv.GetField("Set name") ?? "",
+            SetCode = csv.GetField("Set code") ?? "",
+            Number = csv.GetField("Collector number") ?? "",
             Rarity = csv.GetField("Rarity") ?? "",
-            Condition = csv.GetField("Condition") ?? "NM",
-            IsFoil = csv.GetField("Finish") == "foil",
-            PurchasePrice = decimal.TryParse(csv.GetField("Price (USD)"), CultureInfo.InvariantCulture, out var price) ? price : null,
+            Condition = ManaboxToCondition.GetValueOrDefault(manaboxCondition, "NM"),
+            IsFoil = csv.GetField("Foil") == "foil",
+            PurchasePrice = decimal.TryParse(csv.GetField("Purchase price"), CultureInfo.InvariantCulture, out var price) ? price : null,
             DateAdded = DateTime.UtcNow,
         };
     }

@@ -139,21 +139,30 @@ public class CsvExportTests : IDisposable
     [Fact]
     public void ExportManabox_WritesAllManaboxColumns()
     {
+        var cards = CreateTestCards();
         var path = Path.Combine(_tempDir, "manabox.csv");
-        _service.ExportManabox(path, CreateTestCards());
+        _service.ExportManabox(path, cards);
 
         var lines = File.ReadAllLines(path);
-        Assert.Contains("Card Name", lines[0]);
-        Assert.Contains("Finish", lines[0]);
-        Assert.Contains("Scryfall ID", lines[0]);
-        Assert.Contains("Price (USD)", lines[0]);
+        Assert.True(lines.Length >= 3);
 
-        // Finish mapping
-        Assert.Contains("nonfoil", lines[1]);
-        Assert.Contains("foil", lines[2]);
+        var header = lines[0];
+        Assert.Contains("Name", header);
+        Assert.Contains("Foil", header);
+        Assert.Contains("Scryfall ID", header);
+        Assert.Contains("Purchase price currency", header);
+        Assert.DoesNotContain("Card Name", header);
+        Assert.DoesNotContain("Finish", header);
+        Assert.DoesNotContain("ManaBox ID", header);
 
-        // Scryfall ID
+        // Row 1: Lightning Bolt (NM, non-foil)
+        Assert.Contains("normal", lines[1]);
+        Assert.Contains("near_mint", lines[1]);
         Assert.Contains("abc-123", lines[1]);
+
+        // Row 2: Ach! Hans, Run! (LP, foil)
+        Assert.Contains("foil", lines[2]);
+        Assert.Contains("lightly_played", lines[2]);
     }
 
     [Fact]
@@ -165,5 +174,212 @@ public class CsvExportTests : IDisposable
         var lines = File.ReadAllLines(path);
         Assert.Single(lines); // header only
         Assert.Contains("GameCardId", lines[0]);
+    }
+
+    private static List<ScannedCard> CreateTestScannedCards()
+    {
+        return
+        [
+            new ScannedCard
+            {
+                TempImagePath = "/tmp/scan1.png",
+                Hash = 0x1234UL,
+                Condition = "NM",
+                IsFoil = false,
+                PurchasePrice = 5.99m,
+                Match = new CardMatch
+                {
+                    Name = "Lightning Bolt",
+                    SetCode = "LEA",
+                    SetName = "Alpha",
+                    CollectorNumber = "161",
+                    Rarity = "common",
+                    GameSpecificId = "abc-123",
+                    Source = new object(),
+                },
+            },
+            new ScannedCard
+            {
+                TempImagePath = "/tmp/scan2.png",
+                Hash = 0x5678UL,
+                Condition = "LP",
+                IsFoil = true,
+                Match = new CardMatch
+                {
+                    Name = "Ach! Hans, Run!",
+                    SetCode = "UNH",
+                    SetName = "Unhinged",
+                    CollectorNumber = "116",
+                    Rarity = "rare",
+                    GameSpecificId = "def-456",
+                    Source = new object(),
+                },
+            },
+        ];
+    }
+
+    // --- ExportManaboxScans ---
+
+    [Fact]
+    public void ExportManaboxScans_WritesCorrectColumns()
+    {
+        var scans = CreateTestScannedCards();
+        var path = Path.Combine(_tempDir, "scans.csv");
+        _service.ExportManaboxScans(path, scans);
+
+        var lines = File.ReadAllLines(path);
+        Assert.Equal(3, lines.Length); // header + 2 cards
+
+        var header = lines[0];
+        Assert.Contains("Name", header);
+        Assert.Contains("Set code", header);
+        Assert.Contains("Scryfall ID", header);
+        Assert.DoesNotContain("Binder Name", header);
+
+        Assert.Contains("Lightning Bolt", lines[1]);
+        Assert.Contains("abc-123", lines[1]);
+    }
+
+    [Fact]
+    public void ExportManaboxScans_SkipsUnmatchedCards()
+    {
+        var scans = new List<ScannedCard>
+        {
+            new() { TempImagePath = "/tmp/a.png", Hash = 1, Match = null },
+            new()
+            {
+                TempImagePath = "/tmp/b.png", Hash = 2,
+                Match = new CardMatch { Name = "Test", SetCode = "TST", SetName = "Test Set",
+                    CollectorNumber = "1", Rarity = "common", GameSpecificId = "id1", Source = new object() },
+            },
+        };
+        var path = Path.Combine(_tempDir, "scans.csv");
+        _service.ExportManaboxScans(path, scans);
+
+        var lines = File.ReadAllLines(path);
+        Assert.Equal(2, lines.Length); // header + 1 matched card
+    }
+
+    [Fact]
+    public void ExportManaboxScans_MapsFoilCorrectly()
+    {
+        var scans = CreateTestScannedCards();
+        var path = Path.Combine(_tempDir, "foil.csv");
+        _service.ExportManaboxScans(path, scans);
+
+        var lines = File.ReadAllLines(path);
+        Assert.Contains(",normal,", lines[1]);
+        Assert.Contains(",foil,", lines[2]);
+    }
+
+    [Fact]
+    public void ExportManaboxScans_MapsConditionCorrectly()
+    {
+        var scans = CreateTestScannedCards();
+        var path = Path.Combine(_tempDir, "condition.csv");
+        _service.ExportManaboxScans(path, scans);
+
+        var lines = File.ReadAllLines(path);
+        Assert.Contains("near_mint", lines[1]);
+        Assert.Contains("lightly_played", lines[2]);
+    }
+
+    [Fact]
+    public void ExportManaboxScans_EmptyQueue_WritesHeaderOnly()
+    {
+        var path = Path.Combine(_tempDir, "empty.csv");
+        _service.ExportManaboxScans(path, []);
+
+        var lines = File.ReadAllLines(path);
+        Assert.Single(lines);
+        Assert.Contains("Name", lines[0]);
+    }
+
+    // --- ExportManaboxScansCollection ---
+
+    [Fact]
+    public void ExportManaboxScansCollection_IncludesBinderColumns()
+    {
+        var scans = CreateTestScannedCards();
+        var path = Path.Combine(_tempDir, "collection.csv");
+        _service.ExportManaboxScansCollection(path, scans);
+
+        var lines = File.ReadAllLines(path);
+        Assert.StartsWith("Binder Name,Binder Type,", lines[0]);
+    }
+
+    [Fact]
+    public void ExportManaboxScansCollection_DefaultsToScansForUnassigned()
+    {
+        var scans = CreateTestScannedCards(); // no OverrideContainer set
+        var path = Path.Combine(_tempDir, "collection.csv");
+        _service.ExportManaboxScansCollection(path, scans);
+
+        var lines = File.ReadAllLines(path);
+        Assert.StartsWith("Scans,list,", lines[1]);
+    }
+
+    [Fact]
+    public void ExportManaboxScansCollection_UsesOverrideContainer()
+    {
+        var scans = CreateTestScannedCards();
+        scans[0].OverrideContainer = new StorageContainer
+        {
+            Name = "My Binder",
+            ContainerType = ContainerType.Binder,
+        };
+        var path = Path.Combine(_tempDir, "collection.csv");
+        _service.ExportManaboxScansCollection(path, scans);
+
+        var lines = File.ReadAllLines(path);
+        Assert.StartsWith("My Binder,binder,", lines[1]);
+        Assert.StartsWith("Scans,list,", lines[2]); // second card has no override
+    }
+
+    // --- ExportManaboxScansText ---
+
+    [Fact]
+    public void ExportManaboxScansText_WritesCorrectFormat()
+    {
+        var scans = CreateTestScannedCards();
+        var path = Path.Combine(_tempDir, "scans.txt");
+        _service.ExportManaboxScansText(path, scans);
+
+        var lines = File.ReadAllLines(path);
+        Assert.Equal(2, lines.Length);
+        Assert.Equal("1 Lightning Bolt (LEA) 161", lines[0]);
+    }
+
+    [Fact]
+    public void ExportManaboxScansText_AppendsFoilMarker()
+    {
+        var scans = CreateTestScannedCards();
+        var path = Path.Combine(_tempDir, "foil.txt");
+        _service.ExportManaboxScansText(path, scans);
+
+        var lines = File.ReadAllLines(path);
+        Assert.DoesNotContain("*F*", lines[0]); // non-foil
+        Assert.EndsWith("*F*", lines[1]);        // foil
+    }
+
+    [Fact]
+    public void ExportManaboxScansText_SkipsUnmatchedCards()
+    {
+        var scans = new List<ScannedCard>
+        {
+            new() { TempImagePath = "/tmp/a.png", Hash = 1, Match = null },
+            new()
+            {
+                TempImagePath = "/tmp/b.png", Hash = 2,
+                Match = new CardMatch { Name = "Test", SetCode = "TST", SetName = "Test Set",
+                    CollectorNumber = "1", Rarity = "common", GameSpecificId = "id1", Source = new object() },
+            },
+        };
+        var path = Path.Combine(_tempDir, "scans.txt");
+        _service.ExportManaboxScansText(path, scans);
+
+        var lines = File.ReadAllLines(path);
+        Assert.Single(lines);
+        Assert.StartsWith("1 Test (TST) 1", lines[0]);
     }
 }

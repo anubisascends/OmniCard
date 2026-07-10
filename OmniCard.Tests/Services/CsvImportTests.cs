@@ -100,14 +100,17 @@ public class CsvImportTests : IDisposable
     [Fact]
     public void PreviewImport_DetectsManaboxFormat()
     {
-        var path = WriteCsv("manabox.csv",
-            "Card Name,Set Code,Set Name,Collector Number,Rarity,Language,Quantity,Condition,Finish,Altered,Signed,Misprint,Price (USD),Price (EUR),Price (USD Foil),Price (EUR Foil),Price (USD Etched),Price (EUR Etched),Scryfall ID,Container Type,Container Name\n" +
-            "Lightning Bolt,LEA,Alpha,161,common,en,1,NM,nonfoil,false,false,false,5.99,,,,,,abc-123,list,recent\n");
+        var csv = "Name,Set code,Set name,Collector number,Foil,Rarity,Quantity,Scryfall ID,Purchase price,Misprint,Altered,Condition,Language,Purchase price currency,Added\n"
+                + "Lightning Bolt,lea,Alpha,1,normal,common,1,abc-123,5.99,false,false,near_mint,en,USD,2026-01-01T00:00:00.0000000Z\n";
+        var path = WriteCsv("manabox.csv", csv);
+        var svc = CreateService();
 
-        var preview = CreateService().PreviewImport(path);
+        var preview = svc.PreviewImport(path);
+
         Assert.Equal(CsvFormat.Manabox, preview.DetectedFormat);
         Assert.Single(preview.Cards);
         Assert.Equal("abc-123", preview.Cards[0].GameCardId);
+        Assert.Equal("NM", preview.Cards[0].Condition);
     }
 
     [Fact]
@@ -211,13 +214,15 @@ public class CsvImportTests : IDisposable
     }
 
     [Fact]
-    public void PreviewImport_ManaboxFinish_MapsFoilCorrectly()
+    public void PreviewImport_ManaboxFoil_MapsFoilCorrectly()
     {
-        var path = WriteCsv("foil.csv",
-            "Card Name,Set Code,Set Name,Collector Number,Rarity,Language,Quantity,Condition,Finish,Altered,Signed,Misprint,Price (USD),Price (EUR),Price (USD Foil),Price (EUR Foil),Price (USD Etched),Price (EUR Etched),Scryfall ID,Container Type,Container Name\n" +
-            "Lightning Bolt,LEA,Alpha,161,common,en,1,NM,foil,false,false,false,,,,,,,abc-123,list,recent\n");
+        var csv = "Name,Set code,Set name,Collector number,Foil,Rarity,Quantity,Scryfall ID,Purchase price,Misprint,Altered,Condition,Language,Purchase price currency,Added\n"
+                + "Lightning Bolt,lea,Alpha,1,foil,common,1,abc-123,,false,false,near_mint,en,USD,2026-01-01T00:00:00.0000000Z\n";
+        var path = WriteCsv("foil.csv", csv);
+        var svc = CreateService();
 
-        var preview = CreateService().PreviewImport(path);
+        var preview = svc.PreviewImport(path);
+
         Assert.True(preview.Cards[0].IsFoil);
     }
 
