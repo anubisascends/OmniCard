@@ -139,21 +139,30 @@ public class CsvExportTests : IDisposable
     [Fact]
     public void ExportManabox_WritesAllManaboxColumns()
     {
+        var cards = CreateTestCards();
         var path = Path.Combine(_tempDir, "manabox.csv");
-        _service.ExportManabox(path, CreateTestCards());
+        _service.ExportManabox(path, cards);
 
         var lines = File.ReadAllLines(path);
-        Assert.Contains("Card Name", lines[0]);
-        Assert.Contains("Finish", lines[0]);
-        Assert.Contains("Scryfall ID", lines[0]);
-        Assert.Contains("Price (USD)", lines[0]);
+        Assert.True(lines.Length >= 3);
 
-        // Finish mapping
-        Assert.Contains("nonfoil", lines[1]);
-        Assert.Contains("foil", lines[2]);
+        var header = lines[0];
+        Assert.Contains("Name", header);
+        Assert.Contains("Foil", header);
+        Assert.Contains("Scryfall ID", header);
+        Assert.Contains("Purchase price currency", header);
+        Assert.DoesNotContain("Card Name", header);
+        Assert.DoesNotContain("Finish", header);
+        Assert.DoesNotContain("ManaBox ID", header);
 
-        // Scryfall ID
+        // Row 1: Lightning Bolt (NM, non-foil)
+        Assert.Contains("normal", lines[1]);
+        Assert.Contains("near_mint", lines[1]);
         Assert.Contains("abc-123", lines[1]);
+
+        // Row 2: Ach! Hans, Run! (LP, foil)
+        Assert.Contains("foil", lines[2]);
+        Assert.Contains("lightly_played", lines[2]);
     }
 
     [Fact]
