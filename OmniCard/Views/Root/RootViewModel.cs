@@ -1644,12 +1644,12 @@ public sealed partial class RootViewModel(
     public void ExportScansManaboxCsv()
     {
         if (IsAuditMode) return;
-        var count = CardService.ScannedCards.Count;
-        if (count == 0) return;
+
+        var scans = CardService.ScannedCards.ToList();
+        if (scans.Count == 0) return;
 
         if (!ExportToFile("scans-manabox.csv", out var path)) return;
 
-        var scans = CardService.ScannedCards.ToList();
         csvService.ExportManaboxScans(path, scans);
 
         ResetScanFilterSort();
@@ -1658,19 +1658,23 @@ public sealed partial class RootViewModel(
         NotifySelectionChanged();
         CardService.ClearTempFiles();
         CardService.ScannedCards.Clear();
-        Message = $"Exported {count} cards to {Path.GetFileName(path)}. Scan queue cleared.";
+        _preAuditSnapshots?.Clear();
+        _preAuditSnapshots = null;
+        IsAuditComplete = false;
+        var exported = scans.Count(s => s.Match is not null);
+        Message = $"Exported {exported} cards to {Path.GetFileName(path)}. Scan queue cleared.";
     }
 
     [RelayCommand]
     public void ExportScansManaboxCollectionCsv()
     {
         if (IsAuditMode) return;
-        var count = CardService.ScannedCards.Count;
-        if (count == 0) return;
+
+        var scans = CardService.ScannedCards.ToList();
+        if (scans.Count == 0) return;
 
         if (!ExportToFile("scans-manabox-collection.csv", out var path)) return;
 
-        var scans = CardService.ScannedCards.ToList();
         csvService.ExportManaboxScansCollection(path, scans);
 
         ResetScanFilterSort();
@@ -1679,19 +1683,23 @@ public sealed partial class RootViewModel(
         NotifySelectionChanged();
         CardService.ClearTempFiles();
         CardService.ScannedCards.Clear();
-        Message = $"Exported {count} cards to {Path.GetFileName(path)}. Scan queue cleared.";
+        _preAuditSnapshots?.Clear();
+        _preAuditSnapshots = null;
+        IsAuditComplete = false;
+        var exported = scans.Count(s => s.Match is not null);
+        Message = $"Exported {exported} cards to {Path.GetFileName(path)}. Scan queue cleared.";
     }
 
     [RelayCommand]
     public void ExportScansManaboxText()
     {
         if (IsAuditMode) return;
-        var count = CardService.ScannedCards.Count;
-        if (count == 0) return;
+
+        var scans = CardService.ScannedCards.ToList();
+        if (scans.Count == 0) return;
 
         if (!ExportToFile("scans-manabox.txt", "Text files (*.txt)|*.txt", out var path)) return;
 
-        var scans = CardService.ScannedCards.ToList();
         csvService.ExportManaboxScansText(path, scans);
 
         ResetScanFilterSort();
@@ -1700,7 +1708,11 @@ public sealed partial class RootViewModel(
         NotifySelectionChanged();
         CardService.ClearTempFiles();
         CardService.ScannedCards.Clear();
-        Message = $"Exported {count} cards to {Path.GetFileName(path)}. Scan queue cleared.";
+        _preAuditSnapshots?.Clear();
+        _preAuditSnapshots = null;
+        IsAuditComplete = false;
+        var exported = scans.Count(s => s.Match is not null);
+        Message = $"Exported {exported} cards to {Path.GetFileName(path)}. Scan queue cleared.";
     }
 
     [RelayCommand]
