@@ -32,4 +32,10 @@
     <ProjectReference Include="..\OmniCard.Web\OmniCard.Web.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="TestData\**" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Exclude the Tools subdirectory from implicit compile to avoid picking up SyncTestData obj/*.cs files -->
+    <Compile Remove="Tools\**" />
+  </ItemGroup>
+
 </Project>
