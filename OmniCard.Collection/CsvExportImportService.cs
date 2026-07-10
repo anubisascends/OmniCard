@@ -200,6 +200,126 @@ public class CsvExportImportService(
         logger.LogInformation("ManaBox CSV export complete");
     }
 
+    public void ExportManaboxScans(string filePath, IEnumerable<ScannedCard> scans)
+    {
+        logger.LogInformation("Exporting scan queue to ManaBox CSV: {FilePath}", filePath);
+        using var writer = new StreamWriter(filePath);
+        using var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture));
+
+        csv.WriteField("Name");
+        csv.WriteField("Set code");
+        csv.WriteField("Set name");
+        csv.WriteField("Collector number");
+        csv.WriteField("Foil");
+        csv.WriteField("Rarity");
+        csv.WriteField("Quantity");
+        csv.WriteField("Scryfall ID");
+        csv.WriteField("Purchase price");
+        csv.WriteField("Misprint");
+        csv.WriteField("Altered");
+        csv.WriteField("Condition");
+        csv.WriteField("Language");
+        csv.WriteField("Purchase price currency");
+        csv.WriteField("Added");
+        csv.NextRecord();
+
+        var now = DateTime.UtcNow.ToString("o");
+        foreach (var scan in scans)
+        {
+            if (scan.Match is null) continue;
+
+            csv.WriteField(scan.Match.Name);
+            csv.WriteField(scan.Match.SetCode);
+            csv.WriteField(scan.Match.SetName);
+            csv.WriteField(scan.Match.CollectorNumber);
+            csv.WriteField(scan.IsFoil ? "foil" : "normal");
+            csv.WriteField(scan.Match.Rarity);
+            csv.WriteField(1);
+            csv.WriteField(scan.Match.GameSpecificId);
+            csv.WriteField(scan.PurchasePrice?.ToString(CultureInfo.InvariantCulture) ?? "");
+            csv.WriteField(false);
+            csv.WriteField(false);
+            csv.WriteField(ConditionToManabox.GetValueOrDefault(scan.Condition, "near_mint"));
+            csv.WriteField("en");
+            csv.WriteField("USD");
+            csv.WriteField(now);
+            csv.NextRecord();
+        }
+
+        logger.LogInformation("ManaBox scan CSV export complete");
+    }
+
+    public void ExportManaboxScansCollection(string filePath, IEnumerable<ScannedCard> scans)
+    {
+        logger.LogInformation("Exporting scan queue to ManaBox collection CSV: {FilePath}", filePath);
+        using var writer = new StreamWriter(filePath);
+        using var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture));
+
+        csv.WriteField("Binder Name");
+        csv.WriteField("Binder Type");
+        csv.WriteField("Name");
+        csv.WriteField("Set code");
+        csv.WriteField("Set name");
+        csv.WriteField("Collector number");
+        csv.WriteField("Foil");
+        csv.WriteField("Rarity");
+        csv.WriteField("Quantity");
+        csv.WriteField("Scryfall ID");
+        csv.WriteField("Purchase price");
+        csv.WriteField("Misprint");
+        csv.WriteField("Altered");
+        csv.WriteField("Condition");
+        csv.WriteField("Language");
+        csv.WriteField("Purchase price currency");
+        csv.WriteField("Added");
+        csv.NextRecord();
+
+        var now = DateTime.UtcNow.ToString("o");
+        foreach (var scan in scans)
+        {
+            if (scan.Match is null) continue;
+
+            csv.WriteField(scan.OverrideContainer?.Name ?? "Scans");
+            csv.WriteField(scan.OverrideContainer?.ContainerType.ToString().ToLowerInvariant() ?? "list");
+            csv.WriteField(scan.Match.Name);
+            csv.WriteField(scan.Match.SetCode);
+            csv.WriteField(scan.Match.SetName);
+            csv.WriteField(scan.Match.CollectorNumber);
+            csv.WriteField(scan.IsFoil ? "foil" : "normal");
+            csv.WriteField(scan.Match.Rarity);
+            csv.WriteField(1);
+            csv.WriteField(scan.Match.GameSpecificId);
+            csv.WriteField(scan.PurchasePrice?.ToString(CultureInfo.InvariantCulture) ?? "");
+            csv.WriteField(false);
+            csv.WriteField(false);
+            csv.WriteField(ConditionToManabox.GetValueOrDefault(scan.Condition, "near_mint"));
+            csv.WriteField("en");
+            csv.WriteField("USD");
+            csv.WriteField(now);
+            csv.NextRecord();
+        }
+
+        logger.LogInformation("ManaBox scan collection CSV export complete");
+    }
+
+    public void ExportManaboxScansText(string filePath, IEnumerable<ScannedCard> scans)
+    {
+        logger.LogInformation("Exporting scan queue to ManaBox text: {FilePath}", filePath);
+        using var writer = new StreamWriter(filePath);
+
+        foreach (var scan in scans)
+        {
+            if (scan.Match is null) continue;
+
+            var line = $"1 {scan.Match.Name} ({scan.Match.SetCode}) {scan.Match.CollectorNumber}";
+            if (scan.IsFoil)
+                line += " *F*";
+            writer.WriteLine(line);
+        }
+
+        logger.LogInformation("ManaBox scan text export complete");
+    }
+
     // ── Import ──
 
     public CsvImportPreview PreviewImport(string filePath)
