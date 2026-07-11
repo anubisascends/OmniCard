@@ -1640,6 +1640,26 @@ public sealed partial class RootViewModel(
         }
     }
 
+    public void ExportLocationManabox(int containerId, string containerName)
+    {
+        var results = new System.Collections.ObjectModel.ObservableCollection<CollectionCard>();
+        CardService.SearchCollection("", null, containerId, results);
+        var cards = results.ToList();
+
+        if (cards.Count == 0)
+        {
+            Message = $"No cards in \"{containerName}\" to export.";
+            return;
+        }
+
+        var safeName = string.Join("_", containerName.Split(System.IO.Path.GetInvalidFileNameChars()));
+        if (ExportToFile($"{safeName}-manabox.csv", out var path))
+        {
+            csvService.ExportManabox(path, cards);
+            Message = $"Exported {cards.Count} cards from \"{containerName}\" to {System.IO.Path.GetFileName(path)}";
+        }
+    }
+
     [RelayCommand]
     public void ExportScansManaboxCsv()
     {
