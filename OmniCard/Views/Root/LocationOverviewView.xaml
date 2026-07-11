@@ -111,6 +111,9 @@
                         <Separator/>
                         <MenuItem Header="Audit Location..."
                                   Click="AuditLocation_Click"/>
+                        <Separator/>
+                        <MenuItem Header="Export to Manabox..."
+                                  Click="ExportLocationManabox_Click"/>
                     </ContextMenu>
                 </Button.ContextMenu>
             </Button>

@@ -38,6 +38,15 @@ public partial class LocationOverviewView : UserControl
         rootView.ViewModel.Collection.OpenManualAdd(summary.Container);
     }
 
+    private void ExportLocationManabox_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem) return;
+        if (menuItem.DataContext is not LocationTileSummary summary) return;
+
+        var rootView = (RootView)Window.GetWindow(this)!;
+        rootView.ViewModel.ExportLocationManabox(summary.Container.Id, summary.Container.Name);
+    }
+
     private void DeleteLocation_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem menuItem) return;
