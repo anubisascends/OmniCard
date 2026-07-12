@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using OmniCard.Models;
@@ -83,6 +84,13 @@ public partial class RootView : IView<RootViewModel>, IHostedService
                 ViewModel.RemoveScannedCard();
                 break;
         }
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        base.OnClosing(e);
+        if (!e.Cancel)
+            Application.Current.Shutdown();
     }
 
     public Task StopAsync(CancellationToken cancellationToken)

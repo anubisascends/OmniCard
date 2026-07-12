@@ -136,6 +136,20 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
             _logger.LogInformation("CAP NoiseFilter: canSet={CanSet}", caps.ICapNoiseFilter.CanSet);
         }
         catch (Exception ex) { _logger.LogDebug("CAP NoiseFilter: not supported ({Error})", ex.Message); }
+
+        try
+        {
+            _logger.LogInformation("CAP Duplex: mode={Mode}", caps.CapDuplex.GetCurrent());
+        }
+        catch (Exception ex) { _logger.LogDebug("CAP Duplex: not supported ({Error})", ex.Message); }
+
+        try
+        {
+            _logger.LogInformation("CAP DuplexEnabled: current={Current}, canSet={CanSet}",
+                caps.CapDuplexEnabled.GetCurrent(), caps.CapDuplexEnabled.CanSet);
+        }
+        catch (Exception ex) { _logger.LogDebug("CAP DuplexEnabled: not supported ({Error})", ex.Message); }
+
     }
 
     private void ApplyScanSettings(DataSource ds)
@@ -145,6 +159,7 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         // Always set 24-bit color and sRGB for consistent scans
         TrySetPixelType(caps);
         TrySetColorProfile(caps);
+        TryDisableDuplex(caps);
 
         if (ScanQuality == ScanQuality.Fast)
         {
@@ -239,6 +254,23 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         // For sRGB output, the scanner driver itself must be configured to use sRGB.
         try { if (caps.ICapICCProfile.CanSet) caps.ICapICCProfile.SetValue(IccProfile.Embed); }
         catch (Exception ex) { _logger.LogDebug(ex, "Cannot set ICC profile"); }
+    }
+
+    private void TryDisableDuplex(ICapabilities caps)
+    {
+        try
+        {
+            if (caps.CapDuplexEnabled.CanSet)
+            {
+                caps.CapDuplexEnabled.SetValue(BoolType.False);
+                _logger.LogInformation("Duplex scanning disabled (single-sided)");
+            }
+            else
+            {
+                _logger.LogDebug("Scanner does not support setting duplex mode");
+            }
+        }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot disable duplex"); }
     }
 
     private void Session_SourceDisabled(object? sender, EventArgs e)
