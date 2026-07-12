@@ -30,6 +30,10 @@
     <ProjectReference Include="..\OmniCard.eBay\OmniCard.eBay.csproj" />
     <ProjectReference Include="..\OmniCard.Scanner\OmniCard.Scanner.csproj" />
     <ProjectReference Include="..\OmniCard.Audit\OmniCard.Audit.csproj" />
+    <ProjectReference Include="..\OmniCard.ScannerHost\OmniCard.ScannerHost.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>
@@ -74,5 +78,18 @@
     <Resource Include="Resources\Symbols\Mana\*.svg" />
     <Resource Include="Resources\Fonts\*.ttf" />
   </ItemGroup>
+
+  <Target Name="CopyScannerHost" AfterTargets="Build">
+    <PropertyGroup>
+      <ScannerHostOutputDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\OmniCard.ScannerHost\bin\$(Configuration)\net10.0-windows\win-x64\'))</ScannerHostOutputDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <ScannerHostFiles Include="$(ScannerHostOutputDir)OmniCard.ScannerHost.*" />
+      <ScannerHostFiles Include="$(ScannerHostOutputDir)NTwain.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ScannerHostFiles)"
+          DestinationFolder="$(OutputPath)"
+          SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

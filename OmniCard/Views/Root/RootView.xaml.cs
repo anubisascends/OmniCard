@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using OmniCard.Models;
 using OmniCard.Controls.Themes;
 
@@ -59,6 +60,12 @@ public partial class RootView : IView<RootViewModel>, IHostedService
     {
         _logger.LogInformation("Application window opening");
         Show();
+
+        // Provide the window handle to the scanner service so TWAIN drivers
+        // that require a valid HWND for message pumping (e.g., network scanners)
+        // don't crash with STATUS_STACK_BUFFER_OVERRUN.
+        var hwnd = new WindowInteropHelper(this).Handle;
+        ViewModel.ScannerService.WindowHandle = hwnd;
 
         // Apply saved theme with custom palette
         OmniCardTheme.Apply(ViewModel.IsDarkTheme);

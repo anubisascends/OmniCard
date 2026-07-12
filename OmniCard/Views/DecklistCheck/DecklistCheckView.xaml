@@ -1,0 +1,119 @@
+<Window x:Class="OmniCard.Views.DecklistCheck.DecklistCheckView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Title="Check Decklist" Height="550" Width="600"
+        Background="{DynamicResource MaterialDesign.Brush.Background}"
+        TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="13"
+        FontFamily="{StaticResource AppFont}">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- URL input -->
+        <GroupBox Grid.Row="0" Header="Decklist URL" Padding="8">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Fetch" Padding="16,6" Margin="8,0,0,0"
+                        Command="{Binding ViewModel.FetchCommand}"/>
+                <TextBox Text="{Binding ViewModel.Url, UpdateSourceTrigger=PropertyChanged}"
+                         VerticalContentAlignment="Center"/>
+            </DockPanel>
+        </GroupBox>
+
+        <!-- Options -->
+        <CheckBox Grid.Row="1" Content="Ignore basic lands (Plains, Island, Swamp, Mountain, Forest)"
+                  IsChecked="{Binding ViewModel.IgnoreBasicLands}"
+                  Margin="4,8,0,0"/>
+
+        <!-- Fallback text input -->
+        <GroupBox Grid.Row="2" Header="Paste Decklist" Padding="8" Margin="0,8,0,0"
+                  Visibility="{Binding ViewModel.ShowFallback, Converter={conv:BoolToVisibilityConverter}}">
+            <DockPanel>
+                <Button DockPanel.Dock="Bottom" Content="Parse" Padding="16,6" Margin="0,8,0,0"
+                        HorizontalAlignment="Left"
+                        Command="{Binding ViewModel.ParseTextCommand}"/>
+                <TextBox Text="{Binding ViewModel.FallbackText, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                         Height="120" TextWrapping="Wrap"/>
+            </DockPanel>
+        </GroupBox>
+
+        <!-- Results summary -->
+        <GroupBox Grid.Row="3" Header="Results" Padding="8" Margin="0,8,0,0"
+                  Visibility="{Binding ViewModel.Result, Converter={conv:NullToVisibilityConverter}}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="{Binding ViewModel.Result.DeckName}" FontSize="16" FontWeight="Bold"/>
+
+                <ScrollViewer Grid.Row="1" Margin="0,8,0,0" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <!-- Owned cards -->
+                        <TextBlock FontWeight="Bold" Margin="0,0,0,4">
+                            <Run Text="Cards You Own: "/>
+                            <Run Text="{Binding ViewModel.Result.TotalOwned, Mode=OneWay}"
+                                 Foreground="{DynamicResource MaterialDesign.Brush.Primary}"/>
+                        </TextBlock>
+                        <ItemsControl ItemsSource="{Binding ViewModel.Result.OwnedEntries}" Margin="8,0,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock TextWrapping="Wrap" Margin="0,1">
+                                        <Run Text="{Binding QuantityNeeded, StringFormat='{}{0}x ', Mode=OneWay}"/>
+                                        <Run Text="{Binding CardName, Mode=OneWay}" FontWeight="SemiBold"/>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Missing cards -->
+                        <TextBlock FontWeight="Bold" Margin="0,12,0,4" Foreground="#E53935">
+                            <Run Text="Cards to Buy: "/>
+                            <Run Text="{Binding ViewModel.Result.TotalMissing, Mode=OneWay}"/>
+                        </TextBlock>
+                        <ItemsControl ItemsSource="{Binding ViewModel.Result.MissingEntries}" Margin="8,0,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock TextWrapping="Wrap" Margin="0,1">
+                                        <Run Text="{Binding QuantityNeeded, StringFormat='{}{0}x ', Mode=OneWay}"/>
+                                        <Run Text="{Binding CardName, Mode=OneWay}" FontWeight="SemiBold"/>
+                                        <Run Text="{Binding MarketPrice, StringFormat=' (${0:N2})', Mode=OneWay, TargetNullValue=''}"
+                                             Foreground="#E53935"/>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </GroupBox>
+
+        <!-- Status bar and buttons -->
+        <DockPanel Grid.Row="4" Margin="0,12,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Content="Summary Report" Padding="16,6" Margin="0,0,8,0"
+                        Command="{Binding ViewModel.GenerateReportCommand}"
+                        IsEnabled="{Binding ViewModel.Result, Converter={conv:NullToBoolConverter}}"/>
+                <Button Content="Detailed Report" Padding="16,6" Margin="0,0,8,0"
+                        Command="{Binding ViewModel.GenerateDetailedReportCommand}"
+                        IsEnabled="{Binding ViewModel.Result, Converter={conv:NullToBoolConverter}}"/>
+                <Button Content="Close" Padding="16,6" Click="OnClose"/>
+            </StackPanel>
+            <TextBlock Text="{Binding ViewModel.StatusMessage}"
+                       VerticalAlignment="Center" TextWrapping="Wrap"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Primary}"/>
+        </DockPanel>
+    </Grid>
+</Window>

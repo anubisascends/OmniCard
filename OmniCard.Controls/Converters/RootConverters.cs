@@ -101,6 +101,28 @@ public class NullToCollapsedConverter : MarkupExtension, IValueConverter
     public override object ProvideValue(IServiceProvider serviceProvider) => this;
 }
 
+public class NullToVisibilityConverter : MarkupExtension, IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is not null ? Visibility.Visible : Visibility.Collapsed;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
+
+public class NullToBoolConverter : MarkupExtension, IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is not null;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
+
 public class NullToVisibleConverter : MarkupExtension, IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)

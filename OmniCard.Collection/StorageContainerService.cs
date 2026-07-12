@@ -110,4 +110,13 @@ public sealed class StorageContainerService(IDbContextFactory<CollectionDbContex
             .OrderBy(c => c.Name)
             .ToList();
     }
+
+    public void SetExcludeFromDeckCheck(int containerId, bool exclude)
+    {
+        using var context = dbContextFactory.CreateDbContext();
+        var container = context.StorageContainers.Find(containerId)
+            ?? throw new InvalidOperationException($"Container {containerId} not found");
+        container.ExcludeFromDeckCheck = exclude;
+        context.SaveChanges();
+    }
 }

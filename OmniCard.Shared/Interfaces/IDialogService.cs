@@ -21,4 +21,5 @@ public interface IDialogService
     void ShowAuditReport(AuditReport report);
     bool? OpenEbayListingDialog(CollectionCard card);
     bool? OpenManualAdd(StorageContainer? defaultContainer = null);
+    void ShowDecklistCheck();
 }

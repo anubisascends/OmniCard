@@ -12,5 +12,6 @@
     <ProjectReference Include="..\OmniCard.Shared\OmniCard.Shared.csproj" />
     <ProjectReference Include="..\OmniCard.Data\OmniCard.Data.csproj" />
     <ProjectReference Include="..\OmniCard.Imaging\OmniCard.Imaging.csproj" />
+    <ProjectReference Include="..\OmniCard.Collection\OmniCard.Collection.csproj" />
   </ItemGroup>
 </Project>

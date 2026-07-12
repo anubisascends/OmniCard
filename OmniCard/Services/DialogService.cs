@@ -17,6 +17,7 @@ using OmniCard.Views.AuditReport;
 using OmniCard.Views.StorageManager;
 using OmniCard.Views.EbayListing;
 using OmniCard.Views.ManualAdd;
+using OmniCard.Views.DecklistCheck;
 
 namespace OmniCard.Services;
 
@@ -181,5 +182,12 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         SetOwner(wnd);
         wnd.ViewModel.Load(defaultContainer);
         return wnd.ShowDialog();
+    }
+
+    public void ShowDecklistCheck()
+    {
+        var wnd = Services.GetRequiredService<DecklistCheckView>();
+        SetOwner(wnd);
+        wnd.ShowDialog();
     }
 }

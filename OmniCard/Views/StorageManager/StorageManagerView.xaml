@@ -70,6 +70,7 @@
                             <ColumnDefinition Width="100"/>
                             <ColumnDefinition Width="60"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center"/>
                         <TextBlock Grid.Column="1" Text="{Binding TypeDisplay}" VerticalAlignment="Center"/>
@@ -78,6 +79,12 @@
                                 Command="{Binding DataContext.ViewModel.CopyQrTextCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                 CommandParameter="{Binding Id}"
                                 Padding="6,1" FontSize="10"/>
+                        <CheckBox Grid.Column="4" ToolTip="Exclude from deck check"
+                                  IsChecked="{Binding ExcludeFromDeckCheck, Mode=OneWay}"
+                                  Command="{Binding DataContext.ViewModel.ToggleDeckCheckExclusionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                  CommandParameter="{Binding}"
+                                  Margin="8,0,0,0" VerticalAlignment="Center"
+                                  Content="Exclude"/>
                     </Grid>
                 </DataTemplate>
             </ListBox.ItemTemplate>

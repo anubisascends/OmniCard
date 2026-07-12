@@ -36,6 +36,7 @@ using OmniCard.Views.SealedProductEditor;
 using OmniCard.Views.StorageManager;
 using OmniCard.Views.EbayListing;
 using OmniCard.Views.ManualAdd;
+using OmniCard.Views.DecklistCheck;
 
 namespace OmniCard;
 
@@ -124,6 +125,10 @@ public partial class App : Application
             services.AddSingleton<IAuditService, AuditService>();
             services.AddSingleton<IAuditPdfExporter, AuditPdfExporter>();
 
+            // Decklist check
+            services.AddSingleton<IDecklistService, DecklistService>();
+            services.AddSingleton<IDecklistPdfExporter, DecklistPdfExporter>();
+
             // eBay OAuth
             services.AddSingleton<ICredentialStore, CredentialStore>();
             services.AddSingleton<IEbayAuthService, EbayAuthService>();
@@ -170,6 +175,8 @@ public partial class App : Application
             services.AddTransient<EbayListingView>();
             services.AddTransient<ManualAddView>();
             services.AddTransient<ManualAddViewModel>();
+            services.AddTransient<DecklistCheckView>();
+            services.AddTransient<DecklistCheckViewModel>();
         })
         .Build();
 
@@ -239,6 +246,9 @@ public partial class App : Application
 
             // Ensure CoverCardId column on StorageContainers (added for collection redesign)
             EnsureCoverCardIdColumn(dataDir, collectionDbFactory, migrationLogger);
+
+            // Ensure ExcludeFromDeckCheck column on StorageContainers
+            EnsureExcludeFromDeckCheckColumn(dataDir, collectionDbFactory, migrationLogger);
 
             // Ensure EbayListings table (added for eBay listing integration)
             EnsureEbayListingsTable(dataDir, migrationLogger);
@@ -464,6 +474,32 @@ public partial class App : Application
         conn.Open();
         EnsureCoverCardIdColumn(conn);
         logger.LogInformation("Added CoverCardId column to StorageContainers table");
+    }
+
+    internal static void EnsureExcludeFromDeckCheckColumn(Microsoft.Data.Sqlite.SqliteConnection conn)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('StorageContainers') WHERE name = 'ExcludeFromDeckCheck'";
+        if ((long)cmd.ExecuteScalar()! == 0)
+        {
+            cmd.CommandText = "ALTER TABLE StorageContainers ADD COLUMN ExcludeFromDeckCheck INTEGER NOT NULL DEFAULT 0";
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    private static void EnsureExcludeFromDeckCheckColumn(
+        string dataDirectory,
+        IDbContextFactory<CollectionDbContext> factory,
+        Microsoft.Extensions.Logging.ILogger logger)
+    {
+        var dbPath = Path.Combine(dataDirectory, "collection.db");
+        if (!File.Exists(dbPath))
+            return;
+
+        using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath}");
+        conn.Open();
+        EnsureExcludeFromDeckCheckColumn(conn);
+        logger.LogInformation("ExcludeFromDeckCheck column migration complete");
     }
 
     private static void EnsureEbayListingsTable(

@@ -67,6 +67,7 @@ public sealed partial class StorageManagerViewModel(
                 ContainerType = c.ContainerType,
                 IsSystem = c.IsSystem,
                 CardCount = containerService.GetCardCount(c.Id),
+                ExcludeFromDeckCheck = c.ExcludeFromDeckCheck,
             });
         }
 
@@ -191,6 +192,15 @@ public sealed partial class StorageManagerViewModel(
     }
 
     [RelayCommand]
+    public void ToggleDeckCheckExclusion(ContainerDisplayItem? item)
+    {
+        if (item is null) return;
+        var newValue = !item.ExcludeFromDeckCheck;
+        containerService.SetExcludeFromDeckCheck(item.Id, newValue);
+        Load();
+    }
+
+    [RelayCommand]
     public void UseMyIp()
     {
         try
@@ -235,6 +245,7 @@ public class ContainerDisplayItem
     public ContainerType ContainerType { get; init; }
     public bool IsSystem { get; init; }
     public int CardCount { get; init; }
+    public bool ExcludeFromDeckCheck { get; init; }
 
     public string TypeDisplay => ContainerType switch
     {

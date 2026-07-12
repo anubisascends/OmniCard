@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.Logging;
 using NTwain;
@@ -20,6 +21,7 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
     public ICardService CardService { get; }
 
     public ScanQuality ScanQuality { get; set; } = ScanQuality.Fast;
+    public IntPtr WindowHandle { get; set; }
 
     public ScannerService(ICardService cardService, ILogger<ScannerService> logger)
     {
@@ -34,8 +36,6 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         Session.TransferError += Session_TransferError;
         Session.SourceDisabled += Session_SourceDisabled;
 
-        // Defer TWAIN session open — it can hang if the scanner driver is locked
-        // or not installed. The session is opened lazily on first Scan() call.
         _logger.LogInformation("TWAIN session created (will open on first use)");
         CardService = cardService;
     }
@@ -57,7 +57,9 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         }
     }
 
-    public void Scan()
+    public string? LastScanError { get; private set; }
+
+    public async Task ScanAsync(bool showUI = false)
     {
         if (DataSource is null)
         {
@@ -65,12 +67,133 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
             return;
         }
 
+        LastScanError = null;
         CardService.StartNewDiagnosticSession();
+
+        if (showUI)
+        {
+            // Out-of-process scan: isolates native driver crashes from the main app.
+            // Used for network scanners whose TWAIN drivers crash in NoUI mode.
+            await ScanOutOfProcessAsync();
+        }
+        else
+        {
+            // In-process scan: direct TWAIN call, works reliably for USB scanners.
+            ScanInProcess();
+        }
+    }
+
+    private void ScanInProcess()
+    {
         LogCapabilities(DataSource);
         ApplyScanSettings(DataSource);
-        _logger.LogInformation("Starting scan on data source {DataSourceName} (quality={Quality})",
+        _logger.LogInformation("Starting in-process scan on {DataSourceName} (quality={Quality})",
             DataSource.Name, ScanQuality);
-        DataSource.Enable(SourceEnableMode.NoUI, false, IntPtr.Zero);
+
+        try
+        {
+            DataSource.Enable(SourceEnableMode.NoUI, false, WindowHandle);
+        }
+        catch (Exception ex)
+        {
+            LastScanError = $"Scanner driver error: {ex.Message}\n\nTry enabling 'Show Scanner UI' or use 'Import from Folder'.";
+            _logger.LogError(ex, "Scanner driver threw an exception during Enable");
+        }
+    }
+
+    private async Task ScanOutOfProcessAsync()
+    {
+        var hostPath = Path.Combine(AppContext.BaseDirectory, "OmniCard.ScannerHost.exe");
+        if (!File.Exists(hostPath))
+        {
+            LastScanError = "Scanner host not found. Please reinstall the application.";
+            _logger.LogError("Scanner host not found at {Path}", hostPath);
+            return;
+        }
+
+        var outputPath = Path.Combine(Path.GetTempPath(), $"omnicard_scan_{Guid.NewGuid()}.bmp");
+        var dpi = ScanQuality == ScanQuality.Fast ? 200 : 300;
+
+        var args = $"--scanner \"{DataSource.Name}\" --output \"{outputPath}\" --dpi {dpi} --show-ui";
+        if (CardService.DefaultIsFoil) args += " --foil";
+
+        _logger.LogInformation("Launching scanner host: {Args}", args);
+
+        // Close the data source and session so the host process can access
+        // the scanner exclusively.
+        var scannerName = DataSource.Name;
+        DataSource.Close();
+        if (_sessionOpened)
+        {
+            Session.Close();
+            _sessionOpened = false;
+        }
+
+        try
+        {
+            using var process = new Process();
+            process.StartInfo = new ProcessStartInfo
+            {
+                FileName = hostPath,
+                Arguments = args,
+                UseShellExecute = false,
+                RedirectStandardError = true,
+                CreateNoWindow = false,
+            };
+
+            process.Start();
+            var stderr = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+
+            _logger.LogInformation("Scanner host exited with code {ExitCode}", process.ExitCode);
+
+            if (process.ExitCode == 0 && File.Exists(outputPath))
+            {
+                _logger.LogInformation("Scan complete, processing image from {Path}", outputPath);
+                using var stream = File.OpenRead(outputPath);
+                CardService.AddFromStream(stream);
+            }
+            else
+            {
+                var reason = process.ExitCode switch
+                {
+                    1 => "Scanner not found.",
+                    2 => $"Scanner driver error. {stderr}",
+                    3 => "No image was received from the scanner.",
+                    _ => $"Scanner process crashed (exit code {process.ExitCode})."
+                };
+                LastScanError = $"{reason}\n\nTry 'Import from Folder' as an alternative.";
+                _logger.LogWarning("Scanner host failed: {Reason} stderr={StdErr}", reason, stderr);
+            }
+        }
+        catch (Exception ex)
+        {
+            LastScanError = $"Failed to launch scanner: {ex.Message}\n\nTry 'Import from Folder' as an alternative.";
+            _logger.LogError(ex, "Failed to launch scanner host process");
+        }
+        finally
+        {
+            try { if (File.Exists(outputPath)) File.Delete(outputPath); }
+            catch { }
+
+            // Reopen session and data source for future scans / discovery
+            try
+            {
+                EnsureSessionOpen();
+                var source = Session.OfType<DataSource>()
+                    .FirstOrDefault(s => string.Equals(s.Name, scannerName, StringComparison.OrdinalIgnoreCase));
+                if (source is not null)
+                {
+                    source.Open();
+                    DataSource = source;
+                    _logger.LogDebug("Reopened scanner data source: {Name}", scannerName);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to reopen scanner after host scan");
+            }
+        }
     }
 
     private void LogCapabilities(DataSource ds)
@@ -112,7 +235,6 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
             () => { try { var r = caps.ICapXResolution.GetValues(); return r is not null ? string.Join(",", r.Take(10)) : "null"; } catch { return "N/A"; } },
             () => caps.ICapXResolution.CanSet);
 
-        // Log any exposure-related caps
         try
         {
             _logger.LogInformation("CAP ExposureTime: canSet={CanSet}", caps.ICapExposureTime.CanSet);
@@ -150,13 +272,24 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         }
         catch (Exception ex) { _logger.LogDebug("CAP DuplexEnabled: not supported ({Error})", ex.Message); }
 
+        try
+        {
+            _logger.LogInformation("CAP XferMech: current={Current}, canSet={CanSet}",
+                caps.ICapXferMech.GetCurrent(), caps.ICapXferMech.CanSet);
+            if (caps.ICapXferMech.CanSet)
+            {
+                var values = caps.ICapXferMech.GetValues();
+                if (values is not null)
+                    _logger.LogInformation("CAP XferMech: available={Available}", string.Join(",", values));
+            }
+        }
+        catch (Exception ex) { _logger.LogDebug("CAP XferMech: not supported ({Error})", ex.Message); }
     }
 
     private void ApplyScanSettings(DataSource ds)
     {
         var caps = ds.Capabilities;
 
-        // Always set 24-bit color and sRGB for consistent scans
         TrySetPixelType(caps);
         TrySetColorProfile(caps);
         TryDisableDuplex(caps);
@@ -168,14 +301,10 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         }
         else
         {
-            // HighQuality — reset everything to scanner driver defaults
             TryResetResolution(caps);
             TryResetImageProcessing(caps);
         }
 
-        // Foil cards over-reflect the scanner light source, causing washed-out
-        // images and confusing the scanner's automatic edge detection.
-        // Reduce brightness and disable auto-brightness to tame the reflection.
         if (CardService.DefaultIsFoil)
         {
             TrySetAutoBright(caps, false);
@@ -250,8 +379,6 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
 
     private void TrySetColorProfile(ICapabilities caps)
     {
-        // Embed the scanner's ICC profile for consistent color management.
-        // For sRGB output, the scanner driver itself must be configured to use sRGB.
         try { if (caps.ICapICCProfile.CanSet) caps.ICapICCProfile.SetValue(IccProfile.Embed); }
         catch (Exception ex) { _logger.LogDebug(ex, "Cannot set ICC profile"); }
     }
@@ -264,10 +391,6 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
             {
                 caps.CapDuplexEnabled.SetValue(BoolType.False);
                 _logger.LogInformation("Duplex scanning disabled (single-sided)");
-            }
-            else
-            {
-                _logger.LogDebug("Scanner does not support setting duplex mode");
             }
         }
         catch (Exception ex) { _logger.LogDebug(ex, "Cannot disable duplex"); }
@@ -296,13 +419,13 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
 
     partial void OnDataSourceChanged(DataSource oldValue, DataSource newValue)
     {
-        if(oldValue is not null)
+        if (oldValue is not null)
         {
             _logger.LogInformation("Disconnecting from scanner: {OldSource}", oldValue.Name);
             oldValue.Close();
         }
 
-        if(newValue is not null)
+        if (newValue is not null)
         {
             _logger.LogInformation("Connecting to scanner: {NewSource}", newValue.Name);
             newValue.Open();
