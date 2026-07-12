@@ -12,6 +12,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Data;
 using OmniCard.CardMatching;
+using OmniCard.Helpers;
 using OmniCard.Controls.Converters;
 using OmniCard.Controls.Themes;
 using OmniCard.Imaging;
@@ -1148,11 +1149,13 @@ public sealed partial class RootViewModel(
 
         if (RefreshCooldownHelper.IsCooldownActive(dataPathService.DataDirectory, SelectedGame, out var nextAvailable))
         {
-            var lastRefresh = RefreshCooldownHelper.GetLastRefresh(dataPathService.DataDirectory, SelectedGame)!.Value;
-            var timeAgo = DateTime.UtcNow - lastRefresh;
+            var lastRefresh = RefreshCooldownHelper.GetLastRefresh(dataPathService.DataDirectory, SelectedGame);
+            var timeAgo = DateTime.UtcNow - lastRefresh.GetValueOrDefault(DateTime.UtcNow);
             var timeAgoText = timeAgo.TotalHours >= 1
                 ? $"{(int)timeAgo.TotalHours}h {timeAgo.Minutes}m ago"
-                : $"{timeAgo.Minutes}m ago";
+                : timeAgo.Minutes < 1
+                    ? "less than a minute ago"
+                    : $"{timeAgo.Minutes}m ago";
 
             _logger.LogInformation("Refresh cooldown active for {Game}, last refresh {TimeAgo}", SelectedGame, timeAgoText);
 

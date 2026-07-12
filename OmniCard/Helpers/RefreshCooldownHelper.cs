@@ -2,7 +2,7 @@ using System.IO;
 using System.Text.Json;
 using OmniCard.Models;
 
-namespace OmniCard.Views.Root;
+namespace OmniCard.Helpers;
 
 public static class RefreshCooldownHelper
 {
@@ -15,9 +15,16 @@ public static class RefreshCooldownHelper
         if (!File.Exists(path))
             return null;
 
-        var json = File.ReadAllText(path);
-        var data = JsonSerializer.Deserialize<Dictionary<string, DateTime>>(json);
-        return data?.TryGetValue(game.ToString(), out var ts) == true ? ts : null;
+        try
+        {
+            var json = File.ReadAllText(path);
+            var data = JsonSerializer.Deserialize<Dictionary<string, DateTime>>(json);
+            return data?.TryGetValue(game.ToString(), out var ts) == true ? ts : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     public static void RecordRefresh(string dataDirectory, CardGame game)
@@ -27,8 +34,15 @@ public static class RefreshCooldownHelper
 
         if (File.Exists(path))
         {
-            var json = File.ReadAllText(path);
-            data = JsonSerializer.Deserialize<Dictionary<string, DateTime>>(json) ?? new();
+            try
+            {
+                var json = File.ReadAllText(path);
+                data = JsonSerializer.Deserialize<Dictionary<string, DateTime>>(json) ?? new();
+            }
+            catch (JsonException)
+            {
+                data = new();
+            }
         }
         else
         {
