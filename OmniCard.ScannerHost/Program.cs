@@ -9,6 +9,7 @@ static class Program
     private static string? _outputPath;
     private static bool _imageReceived;
     private static int _exitCode = 3; // default: no image
+    private static Form? _hiddenForm;
 
     [STAThread]
     static int Main(string[] args)
@@ -57,11 +58,11 @@ static class Program
             {
                 Console.Error.WriteLine($"Transfer error: {e.ReturnCode}");
                 _exitCode = 2;
-                Application.ExitThread();
+                _hiddenForm?.Close();
             };
             session.SourceDisabled += (_, _) =>
             {
-                Application.ExitThread();
+                _hiddenForm?.Close();
             };
 
             session.Open();
@@ -79,11 +80,17 @@ static class Program
             source.Open();
             ApplySettings(source, dpi, foil);
 
+            // Create a hidden form to provide a proper window handle and
+            // message pump for the TWAIN driver. Some drivers (e.g., Canon RS40)
+            // crash without a valid HWND for message routing.
+            _hiddenForm = new Form { Visible = false, ShowInTaskbar = false };
+            var hwnd = _hiddenForm.Handle; // force handle creation
+
             var mode = showUI ? SourceEnableMode.ShowUI : SourceEnableMode.NoUI;
-            source.Enable(mode, showUI, IntPtr.Zero);
+            source.Enable(mode, showUI, hwnd);
 
             // Run message loop until scan completes or fails
-            Application.Run();
+            Application.Run(_hiddenForm);
 
             source.Close();
             session.Close();

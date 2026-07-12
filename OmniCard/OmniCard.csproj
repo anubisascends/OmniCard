@@ -80,10 +80,16 @@
   </ItemGroup>
 
   <Target Name="CopyScannerHost" AfterTargets="Build">
-    <Copy SourceFiles="$(OutputPath)..\OmniCard.ScannerHost\net10.0-windows\OmniCard.ScannerHost.exe"
+    <PropertyGroup>
+      <ScannerHostOutputDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\OmniCard.ScannerHost\bin\$(Configuration)\net10.0-windows\win-x64\'))</ScannerHostOutputDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <ScannerHostFiles Include="$(ScannerHostOutputDir)OmniCard.ScannerHost.*" />
+      <ScannerHostFiles Include="$(ScannerHostOutputDir)NTwain.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ScannerHostFiles)"
           DestinationFolder="$(OutputPath)"
-          SkipUnchangedFiles="true"
-          Condition="Exists('$(OutputPath)..\OmniCard.ScannerHost\net10.0-windows\OmniCard.ScannerHost.exe')" />
+          SkipUnchangedFiles="true" />
   </Target>
 
 </Project>
