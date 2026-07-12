@@ -44,6 +44,7 @@ public sealed partial class RootViewModel(
     private readonly IScanDiagnosticService _diagnosticService = diagnosticService;
     private NotifyCollectionChangedEventHandler? _scannedCardsHandler;
     private System.Windows.Threading.DispatcherTimer? _ebaySyncTimer;
+    private bool _suppressGameChangeHandler;
 
     public string PhoneScanUrl
     {
@@ -453,13 +454,34 @@ public sealed partial class RootViewModel(
     [ObservableProperty]
     public partial CardGame SelectedGame { get; set; }
 
-    partial void OnSelectedGameChanged(CardGame value)
+    partial void OnSelectedGameChanged(CardGame oldValue, CardGame newValue)
     {
-        _logger.LogInformation("Switched active game to {Game}", value);
-        CardService.SelectedGame = value;
-        LoadAvailableSets();
-        Collection.SetGame(value);
+        if (_suppressGameChangeHandler)
+            return;
 
+        if (CardService.ScannedCards.Count > 0)
+        {
+            _logger.LogWarning("Blocked game switch from {Old} to {New}: {Count} pending scan(s)",
+                oldValue, newValue, CardService.ScannedCards.Count);
+
+            MessageBox.Show(
+                $"You have {CardService.ScannedCards.Count} unconfirmed scan(s). " +
+                "Please commit or discard them before switching games.",
+                "Game Switch Blocked",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+
+            _suppressGameChangeHandler = true;
+            SelectedGame = oldValue;
+            _suppressGameChangeHandler = false;
+            return;
+        }
+
+        _logger.LogInformation("Switched active game to {Game}", newValue);
+        CardService.SelectedGame = newValue;
+        SetFilterText = "";
+        LoadAvailableSets();
+        Collection.SetGame(newValue);
         InvalidateHomeTab();
     }
 
