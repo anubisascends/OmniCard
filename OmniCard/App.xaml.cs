@@ -36,6 +36,7 @@ using OmniCard.Views.SealedProductEditor;
 using OmniCard.Views.StorageManager;
 using OmniCard.Views.EbayListing;
 using OmniCard.Views.ManualAdd;
+using OmniCard.Views.DecklistCheck;
 
 namespace OmniCard;
 
@@ -124,6 +125,10 @@ public partial class App : Application
             services.AddSingleton<IAuditService, AuditService>();
             services.AddSingleton<IAuditPdfExporter, AuditPdfExporter>();
 
+            // Decklist check
+            services.AddSingleton<IDecklistService, DecklistService>();
+            services.AddSingleton<IDecklistPdfExporter, DecklistPdfExporter>();
+
             // eBay OAuth
             services.AddSingleton<ICredentialStore, CredentialStore>();
             services.AddSingleton<IEbayAuthService, EbayAuthService>();
@@ -170,6 +175,8 @@ public partial class App : Application
             services.AddTransient<EbayListingView>();
             services.AddTransient<ManualAddView>();
             services.AddTransient<ManualAddViewModel>();
+            services.AddTransient<DecklistCheckView>();
+            services.AddTransient<DecklistCheckViewModel>();
         })
         .Build();
 

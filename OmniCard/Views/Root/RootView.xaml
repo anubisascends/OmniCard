@@ -201,6 +201,9 @@
                           Command="{Binding ViewModel.ExportDiagnosticsCommand}"/>
                 <MenuItem Header="Delete _Orphaned Scans"
                           Command="{Binding ViewModel.DeleteOrphanedScansCommand}"/>
+                <Separator/>
+                <MenuItem Header="Check _Decklist..."
+                          Command="{Binding ViewModel.CheckDecklistCommand}"/>
             </MenuItem>
         </Menu>
 

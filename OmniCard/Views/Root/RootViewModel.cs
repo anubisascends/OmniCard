@@ -400,7 +400,9 @@ public sealed partial class RootViewModel(
         if (value)
         {
             _hashPreviewWindow = App.Host.Services.GetRequiredService<HashPreviewView>();
-            _hashPreviewWindow.Owner = Application.Current.MainWindow;
+            var main = Application.Current.MainWindow;
+            if (main is not null && main != _hashPreviewWindow && main.IsLoaded)
+                _hashPreviewWindow.Owner = main;
             _hashPreviewWindow.Closed += (_, _) =>
             {
                 _hashPreviewWindow = null;
@@ -1443,6 +1445,9 @@ public sealed partial class RootViewModel(
 
     [RelayCommand]
     public void ShowDataLocation() => dialogService.ShowDataLocation();
+
+    [RelayCommand]
+    public void CheckDecklist() => DialogService.ShowDecklistCheck();
 
     [RelayCommand]
     public void CardDoubleClick()
