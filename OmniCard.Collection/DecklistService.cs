@@ -174,6 +174,84 @@ public sealed partial class DecklistService(
 
     public DecklistCheckResult CheckAgainstCollection(string deckName, string deckSource, List<DecklistEntry> entries)
     {
-        throw new NotImplementedException(); // Implemented in Task 3
+        using var ctx = dbContextFactory.CreateDbContext();
+        var allCards = ctx.Cards
+            .Include(c => c.Container)
+            .AsNoTracking()
+            .ToList();
+
+        var ownedEntries = new List<OwnedDecklistEntry>();
+        var missingEntries = new List<MissingDecklistEntry>();
+
+        foreach (var entry in entries)
+        {
+            // Find all owned copies by name (case-insensitive)
+            var ownedCopies = allCards
+                .Where(c => string.Equals(c.Name, entry.CardName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            // Sort: exact set matches first, then others
+            if (entry.SetCode is not null)
+            {
+                ownedCopies = ownedCopies
+                    .OrderByDescending(c => string.Equals(c.SetCode, entry.SetCode, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            var locations = ownedCopies.Select(c => new DecklistCardLocation(
+                ContainerName: c.Container?.Name ?? "Unknown",
+                Page: c.Page,
+                Slot: c.Slot,
+                Section: c.Section,
+                SetCode: c.SetCode,
+                IsFoil: c.IsFoil,
+                IsExactSetMatch: entry.SetCode is not null &&
+                    string.Equals(c.SetCode, entry.SetCode, StringComparison.OrdinalIgnoreCase)
+            )).ToList();
+
+            var ownedCount = Math.Min(ownedCopies.Count, entry.Quantity);
+            var missingCount = entry.Quantity - ownedCount;
+
+            if (ownedCount > 0)
+            {
+                ownedEntries.Add(new OwnedDecklistEntry(
+                    entry.CardName, entry.SetCode, entry.CollectorNumber,
+                    ownedCount, locations));
+            }
+
+            if (missingCount > 0)
+            {
+                // Look up market price
+                decimal? price = null;
+                var gameService = cardService.GetGameService(CardGame.Mtg);
+                var searchResults = gameService.SearchCards($"name:{entry.CardName}", 1);
+
+                if (searchResults.Count > 0)
+                {
+                    // Prefer exact set match for price if available
+                    var priceCard = entry.SetCode is not null
+                        ? searchResults.FirstOrDefault(r =>
+                            string.Equals(r.SetCode, entry.SetCode, StringComparison.OrdinalIgnoreCase))
+                          ?? searchResults[0]
+                        : searchResults[0];
+
+                    price = gameService.GetCurrentPrice(priceCard.GameSpecificId, false);
+                }
+
+                missingEntries.Add(new MissingDecklistEntry(
+                    entry.CardName, entry.SetCode, entry.CollectorNumber,
+                    missingCount, price));
+            }
+        }
+
+        return new DecklistCheckResult
+        {
+            DeckName = deckName,
+            DeckSource = deckSource,
+            OwnedEntries = ownedEntries.OrderBy(e => e.CardName, StringComparer.OrdinalIgnoreCase).ToList(),
+            MissingEntries = missingEntries
+                .OrderByDescending(e => (e.MarketPrice ?? 0) * e.QuantityNeeded)
+                .ToList(),
+        };
     }
 }
