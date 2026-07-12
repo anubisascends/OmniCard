@@ -37,6 +37,7 @@ public sealed partial class RootViewModel(
     SetSymbolCache setSymbolCache,
     IScanDiagnosticService diagnosticService,
     IAuditService auditService,
+    IDataPathService dataPathService,
     IOptionsMonitor<WebCompanionSettings> webCompanionSettings,
     ILogger<RootViewModel> logger) : ViewModel
 {
@@ -1144,6 +1145,32 @@ public sealed partial class RootViewModel(
     public async Task RefreshCardData()
     {
         _logger.LogInformation("User initiated card data refresh for {Game}", SelectedGame);
+
+        if (RefreshCooldownHelper.IsCooldownActive(dataPathService.DataDirectory, SelectedGame, out var nextAvailable))
+        {
+            var lastRefresh = RefreshCooldownHelper.GetLastRefresh(dataPathService.DataDirectory, SelectedGame)!.Value;
+            var timeAgo = DateTime.UtcNow - lastRefresh;
+            var timeAgoText = timeAgo.TotalHours >= 1
+                ? $"{(int)timeAgo.TotalHours}h {timeAgo.Minutes}m ago"
+                : $"{timeAgo.Minutes}m ago";
+
+            _logger.LogInformation("Refresh cooldown active for {Game}, last refresh {TimeAgo}", SelectedGame, timeAgoText);
+
+            var result = MessageBox.Show(
+                $"Card data for {SelectedGame} was last refreshed {timeAgoText}.\n\n" +
+                $"Refresh is available once every 24 hours to minimize API load.\n" +
+                $"Next refresh available at {nextAvailable.ToLocalTime():g}.\n\n" +
+                "Click Yes to refresh anyway, or No to cancel.",
+                "Refresh Cooldown",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Information);
+
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            _logger.LogInformation("User forced refresh for {Game} despite cooldown", SelectedGame);
+        }
+
         var progress = new Progress<string>((str) =>
         {
             Application.Current.Dispatcher.Invoke(() =>
@@ -1153,11 +1180,14 @@ public sealed partial class RootViewModel(
         });
 
         await CardService.ActiveGameService.DownloadBulkDataAsync(progress);
+        RefreshCooldownHelper.RecordRefresh(dataPathService.DataDirectory, SelectedGame);
         LoadAvailableSets();
 
-        // Pre-download set symbol SVGs for all known sets
-        var sets = _allSets.Select(s => (s.SetCode, s.SetName)).ToList();
-        await setSymbolCache.PreloadSymbolsAsync(sets, progress);
+        if (SelectedGame == CardGame.Mtg)
+        {
+            var sets = _allSets.Select(s => (s.SetCode, s.SetName)).ToList();
+            await setSymbolCache.PreloadSymbolsAsync(sets, progress);
+        }
 
         InvalidateHomeTab();
     }
