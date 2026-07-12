@@ -24,6 +24,25 @@ public sealed partial class DecklistService(
         "Main", "Mainboard", "Main Deck", "Tokens", "Attractions", "Stickers", "Contraptions"
     };
 
+    public static readonly string[] TypeCategoryOrder =
+        ["Planeswalker", "Creature", "Instant", "Sorcery", "Artifact", "Enchantment", "Land", "Other"];
+
+    public static string GetTypeCategory(string? typeLine)
+    {
+        if (string.IsNullOrWhiteSpace(typeLine))
+            return "Other";
+
+        // Check in priority order — "Artifact Creature" should be "Creature"
+        if (typeLine.Contains("Planeswalker", StringComparison.OrdinalIgnoreCase)) return "Planeswalker";
+        if (typeLine.Contains("Creature", StringComparison.OrdinalIgnoreCase)) return "Creature";
+        if (typeLine.Contains("Instant", StringComparison.OrdinalIgnoreCase)) return "Instant";
+        if (typeLine.Contains("Sorcery", StringComparison.OrdinalIgnoreCase)) return "Sorcery";
+        if (typeLine.Contains("Artifact", StringComparison.OrdinalIgnoreCase)) return "Artifact";
+        if (typeLine.Contains("Enchantment", StringComparison.OrdinalIgnoreCase)) return "Enchantment";
+        if (typeLine.Contains("Land", StringComparison.OrdinalIgnoreCase)) return "Land";
+        return "Other";
+    }
+
     public (string DeckName, List<DecklistEntry> Entries) ParseDecklistText(string text)
     {
         var entries = new Dictionary<string, DecklistEntry>(StringComparer.OrdinalIgnoreCase);
@@ -171,6 +190,7 @@ public sealed partial class DecklistService(
         var allCards = ctx.Cards
             .Include(c => c.Container)
             .AsNoTracking()
+            .Where(c => c.Container == null || !c.Container.ExcludeFromDeckCheck)
             .ToList();
 
         var ownedEntries = new List<OwnedDecklistEntry>();
@@ -205,35 +225,56 @@ public sealed partial class DecklistService(
             var ownedCount = Math.Min(ownedCopies.Count, entry.Quantity);
             var missingCount = entry.Quantity - ownedCount;
 
+            // Look up card details from Scryfall DB for type/image/detail info
+            var gameService = cardService.GetGameService(CardGame.Mtg);
+            var searchResults = gameService.SearchCards($"name:{entry.CardName}");
+            CardMatch? cardInfo = null;
+            if (searchResults.Count > 0)
+            {
+                cardInfo = entry.SetCode is not null
+                    ? searchResults.FirstOrDefault(r =>
+                        string.Equals(r.SetCode, entry.SetCode, StringComparison.OrdinalIgnoreCase))
+                      ?? searchResults[0]
+                    : searchResults[0];
+            }
+
+            // Extract detail fields from the Card source object
+            string? typeLine = null, manaCost = null, oracleText = null;
+            string? power = null, toughness = null, rarity = null;
+            string? imageUri = null, localImagePath = null;
+            if (cardInfo?.Source is Card card)
+            {
+                typeLine = card.TypeLine;
+                manaCost = card.ManaCost;
+                oracleText = card.OracleText;
+                power = card.Power;
+                toughness = card.Toughness;
+                rarity = card.Rarity;
+                imageUri = card.ImageUris?.Normal ?? card.ImageUris?.Small;
+                localImagePath = card.LocalImagePath;
+            }
+            var typeCategory = GetTypeCategory(typeLine);
+
             if (ownedCount > 0)
             {
                 ownedEntries.Add(new OwnedDecklistEntry(
                     entry.CardName, entry.SetCode, entry.CollectorNumber,
-                    ownedCount, locations));
+                    ownedCount, locations,
+                    typeCategory, typeLine, manaCost, oracleText,
+                    power, toughness, rarity, imageUri, localImagePath));
             }
 
             if (missingCount > 0)
             {
-                // Look up market price
-                decimal? price = null;
-                var gameService = cardService.GetGameService(CardGame.Mtg);
-                var searchResults = gameService.SearchCards($"name:{entry.CardName}");
-
-                if (searchResults.Count > 0)
-                {
-                    // Prefer exact set match for price if available
-                    var priceCard = entry.SetCode is not null
-                        ? searchResults.FirstOrDefault(r =>
-                            string.Equals(r.SetCode, entry.SetCode, StringComparison.OrdinalIgnoreCase))
-                          ?? searchResults[0]
-                        : searchResults[0];
-
-                    price = gameService.GetCurrentPrice(priceCard.GameSpecificId, false);
-                }
+                decimal? price = cardInfo is not null
+                    ? gameService.GetCurrentPrice(cardInfo.GameSpecificId, false)
+                    : null;
 
                 missingEntries.Add(new MissingDecklistEntry(
                     entry.CardName, entry.SetCode, entry.CollectorNumber,
-                    missingCount, price));
+                    missingCount, price,
+                    typeCategory, typeLine, manaCost, oracleText,
+                    power, toughness, rarity, imageUri, localImagePath));
             }
         }
 

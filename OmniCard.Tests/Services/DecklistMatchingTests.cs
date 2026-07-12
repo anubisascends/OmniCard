@@ -207,3 +207,24 @@ public class DecklistMatchingTests : IDisposable
         public object? FindCardById(string gameCardId) => null;
     }
 }
+
+public class TypeCategoryTests
+{
+    [Theory]
+    [InlineData("Creature — Human Pirate", "Creature")]
+    [InlineData("Artifact Creature — Construct", "Creature")]
+    [InlineData("Legendary Planeswalker — Jace", "Planeswalker")]
+    [InlineData("Instant", "Instant")]
+    [InlineData("Sorcery", "Sorcery")]
+    [InlineData("Artifact", "Artifact")]
+    [InlineData("Legendary Enchantment", "Enchantment")]
+    [InlineData("Basic Land — Mountain", "Land")]
+    [InlineData("Enchantment Creature — God", "Creature")]
+    [InlineData("Tribal Instant — Goblin", "Instant")]
+    [InlineData(null, "Other")]
+    [InlineData("", "Other")]
+    public void GetTypeCategory_ReturnsCorrectCategory(string? typeLine, string expected)
+    {
+        Assert.Equal(expected, DecklistService.GetTypeCategory(typeLine));
+    }
+}

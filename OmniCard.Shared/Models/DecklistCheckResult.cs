@@ -14,14 +14,32 @@ public record OwnedDecklistEntry(
     string? SetCode,
     string? CollectorNumber,
     int QuantityNeeded,
-    List<DecklistCardLocation> Locations);
+    List<DecklistCardLocation> Locations,
+    string? TypeCategory = null,
+    string? TypeLine = null,
+    string? ManaCost = null,
+    string? OracleText = null,
+    string? Power = null,
+    string? Toughness = null,
+    string? Rarity = null,
+    string? ImageUri = null,
+    string? LocalImagePath = null);
 
 public record MissingDecklistEntry(
     string CardName,
     string? SetCode,
     string? CollectorNumber,
     int QuantityNeeded,
-    decimal? MarketPrice);
+    decimal? MarketPrice,
+    string? TypeCategory = null,
+    string? TypeLine = null,
+    string? ManaCost = null,
+    string? OracleText = null,
+    string? Power = null,
+    string? Toughness = null,
+    string? Rarity = null,
+    string? ImageUri = null,
+    string? LocalImagePath = null);
 
 public class DecklistCheckResult
 {
