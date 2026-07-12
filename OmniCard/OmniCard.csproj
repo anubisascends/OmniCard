@@ -30,6 +30,10 @@
     <ProjectReference Include="..\OmniCard.eBay\OmniCard.eBay.csproj" />
     <ProjectReference Include="..\OmniCard.Scanner\OmniCard.Scanner.csproj" />
     <ProjectReference Include="..\OmniCard.Audit\OmniCard.Audit.csproj" />
+    <ProjectReference Include="..\OmniCard.ScannerHost\OmniCard.ScannerHost.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>
@@ -74,5 +78,12 @@
     <Resource Include="Resources\Symbols\Mana\*.svg" />
     <Resource Include="Resources\Fonts\*.ttf" />
   </ItemGroup>
+
+  <Target Name="CopyScannerHost" AfterTargets="Build">
+    <Copy SourceFiles="$(OutputPath)..\OmniCard.ScannerHost\net10.0-windows\OmniCard.ScannerHost.exe"
+          DestinationFolder="$(OutputPath)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(OutputPath)..\OmniCard.ScannerHost\net10.0-windows\OmniCard.ScannerHost.exe')" />
+  </Target>
 
 </Project>

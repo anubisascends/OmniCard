@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.Logging;
 using NTwain;
@@ -20,6 +21,7 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
     public ICardService CardService { get; }
 
     public ScanQuality ScanQuality { get; set; } = ScanQuality.Fast;
+    public IntPtr WindowHandle { get; set; }
 
     public ScannerService(ICardService cardService, ILogger<ScannerService> logger)
     {
@@ -29,13 +31,6 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         AppID = TWIdentity.CreateFromAssembly(DataGroups.Image, Assembly.GetExecutingAssembly());
         Session = new TwainSession(AppID);
 
-        Session.TransferReady += Session_TransferReady;
-        Session.DataTransferred += Session_DataTransferred;
-        Session.TransferError += Session_TransferError;
-        Session.SourceDisabled += Session_SourceDisabled;
-
-        // Defer TWAIN session open — it can hang if the scanner driver is locked
-        // or not installed. The session is opened lazily on first Scan() call.
         _logger.LogInformation("TWAIN session created (will open on first use)");
         CardService = cardService;
     }
@@ -57,7 +52,9 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         }
     }
 
-    public void Scan()
+    public string? LastScanError { get; private set; }
+
+    public async Task ScanAsync(bool showUI = false)
     {
         if (DataSource is null)
         {
@@ -65,244 +62,84 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
             return;
         }
 
+        LastScanError = null;
         CardService.StartNewDiagnosticSession();
-        LogCapabilities(DataSource);
-        ApplyScanSettings(DataSource);
-        _logger.LogInformation("Starting scan on data source {DataSourceName} (quality={Quality})",
-            DataSource.Name, ScanQuality);
-        DataSource.Enable(SourceEnableMode.NoUI, false, IntPtr.Zero);
-    }
 
-    private void LogCapabilities(DataSource ds)
-    {
-        var caps = ds.Capabilities;
-
-        void LogCap(string name, Func<object?> getCurrent, Func<object?> getDefault, Func<object?> getRange, Func<bool> canSet)
+        var hostPath = Path.Combine(AppContext.BaseDirectory, "OmniCard.ScannerHost.exe");
+        if (!File.Exists(hostPath))
         {
-            try
+            LastScanError = "Scanner host not found. Please reinstall the application.";
+            _logger.LogError("Scanner host not found at {Path}", hostPath);
+            return;
+        }
+
+        var outputPath = Path.Combine(Path.GetTempPath(), $"omnicard_scan_{Guid.NewGuid()}.bmp");
+        var dpi = ScanQuality == ScanQuality.Fast ? 200 : 300;
+
+        var args = $"--scanner \"{DataSource.Name}\" --output \"{outputPath}\" --dpi {dpi}";
+        if (showUI) args += " --show-ui";
+        if (CardService.DefaultIsFoil) args += " --foil";
+
+        _logger.LogInformation("Launching scanner host: {Args}", args);
+
+        try
+        {
+            using var process = new Process();
+            process.StartInfo = new ProcessStartInfo
             {
-                _logger.LogInformation("CAP {Name}: current={Current}, default={Default}, range={Range}, canSet={CanSet}",
-                    name, getCurrent(), getDefault(), getRange(), canSet());
-            }
-            catch (Exception ex) { _logger.LogDebug("CAP {Name}: not supported ({Error})", name, ex.Message); }
-        }
+                FileName = hostPath,
+                Arguments = args,
+                UseShellExecute = false,
+                RedirectStandardError = true,
+                CreateNoWindow = !showUI,
+            };
 
-        LogCap("Brightness", () => caps.ICapBrightness.GetCurrent(), () => caps.ICapBrightness.GetDefault(),
-            () => { try { var r = caps.ICapBrightness.GetValues(); return r is not null ? string.Join(",", r.Take(10)) : "null"; } catch { return "N/A"; } },
-            () => caps.ICapBrightness.CanSet);
+            process.Start();
+            var stderr = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
 
-        LogCap("Contrast", () => caps.ICapContrast.GetCurrent(), () => caps.ICapContrast.GetDefault(),
-            () => { try { var r = caps.ICapContrast.GetValues(); return r is not null ? string.Join(",", r.Take(10)) : "null"; } catch { return "N/A"; } },
-            () => caps.ICapContrast.CanSet);
+            _logger.LogInformation("Scanner host exited with code {ExitCode}", process.ExitCode);
 
-        LogCap("Gamma", () => caps.ICapGamma.GetCurrent(), () => caps.ICapGamma.GetDefault(),
-            () => { try { var r = caps.ICapGamma.GetValues(); return r is not null ? string.Join(",", r.Take(10)) : "null"; } catch { return "N/A"; } },
-            () => caps.ICapGamma.CanSet);
-
-        LogCap("Highlight", () => caps.ICapHighlight.GetCurrent(), () => caps.ICapHighlight.GetDefault(),
-            () => "N/A", () => caps.ICapHighlight.CanSet);
-
-        LogCap("Shadow", () => caps.ICapShadow.GetCurrent(), () => caps.ICapShadow.GetDefault(),
-            () => "N/A", () => caps.ICapShadow.CanSet);
-
-        LogCap("AutoBright", () => caps.ICapAutoBright.GetCurrent(), () => caps.ICapAutoBright.GetDefault(),
-            () => "N/A", () => caps.ICapAutoBright.CanSet);
-
-        LogCap("XResolution", () => caps.ICapXResolution.GetCurrent(), () => caps.ICapXResolution.GetDefault(),
-            () => { try { var r = caps.ICapXResolution.GetValues(); return r is not null ? string.Join(",", r.Take(10)) : "null"; } catch { return "N/A"; } },
-            () => caps.ICapXResolution.CanSet);
-
-        // Log any exposure-related caps
-        try
-        {
-            _logger.LogInformation("CAP ExposureTime: canSet={CanSet}", caps.ICapExposureTime.CanSet);
-            if (caps.ICapExposureTime.CanSet)
-                _logger.LogInformation("CAP ExposureTime: current={Current}, default={Default}",
-                    caps.ICapExposureTime.GetCurrent(), caps.ICapExposureTime.GetDefault());
-        }
-        catch (Exception ex) { _logger.LogDebug("CAP ExposureTime: not supported ({Error})", ex.Message); }
-
-        try
-        {
-            _logger.LogInformation("CAP LightSource: canSet={CanSet}", caps.ICapLightSource.CanSet);
-            if (caps.ICapLightSource.CanSet)
-                _logger.LogInformation("CAP LightSource: current={Current}, default={Default}",
-                    caps.ICapLightSource.GetCurrent(), caps.ICapLightSource.GetDefault());
-        }
-        catch (Exception ex) { _logger.LogDebug("CAP LightSource: not supported ({Error})", ex.Message); }
-
-        try
-        {
-            _logger.LogInformation("CAP NoiseFilter: canSet={CanSet}", caps.ICapNoiseFilter.CanSet);
-        }
-        catch (Exception ex) { _logger.LogDebug("CAP NoiseFilter: not supported ({Error})", ex.Message); }
-
-        try
-        {
-            _logger.LogInformation("CAP Duplex: mode={Mode}", caps.CapDuplex.GetCurrent());
-        }
-        catch (Exception ex) { _logger.LogDebug("CAP Duplex: not supported ({Error})", ex.Message); }
-
-        try
-        {
-            _logger.LogInformation("CAP DuplexEnabled: current={Current}, canSet={CanSet}",
-                caps.CapDuplexEnabled.GetCurrent(), caps.CapDuplexEnabled.CanSet);
-        }
-        catch (Exception ex) { _logger.LogDebug("CAP DuplexEnabled: not supported ({Error})", ex.Message); }
-
-    }
-
-    private void ApplyScanSettings(DataSource ds)
-    {
-        var caps = ds.Capabilities;
-
-        // Always set 24-bit color and sRGB for consistent scans
-        TrySetPixelType(caps);
-        TrySetColorProfile(caps);
-        TryDisableDuplex(caps);
-
-        if (ScanQuality == ScanQuality.Fast)
-        {
-            TrySetResolution(caps, 200f);
-            TryResetImageProcessing(caps);
-        }
-        else
-        {
-            // HighQuality — reset everything to scanner driver defaults
-            TryResetResolution(caps);
-            TryResetImageProcessing(caps);
-        }
-
-        // Foil cards over-reflect the scanner light source, causing washed-out
-        // images and confusing the scanner's automatic edge detection.
-        // Reduce brightness and disable auto-brightness to tame the reflection.
-        if (CardService.DefaultIsFoil)
-        {
-            TrySetAutoBright(caps, false);
-            TrySetBrightness(caps, -200f);
-            TrySetContrast(caps, 333.3333f);
-            _logger.LogInformation("Foil mode: brightness reduced, auto-bright disabled, contrast boosted");
-        }
-    }
-
-    private void TrySetResolution(ICapabilities caps, float dpi)
-    {
-        try { if (caps.ICapXResolution.CanSet) caps.ICapXResolution.SetValue((TWFix32)dpi); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set XResolution"); }
-
-        try { if (caps.ICapYResolution.CanSet) caps.ICapYResolution.SetValue((TWFix32)dpi); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set YResolution"); }
-    }
-
-    private void TryResetResolution(ICapabilities caps)
-    {
-        try { if (caps.ICapXResolution.CanReset) caps.ICapXResolution.Reset(); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset XResolution"); }
-
-        try { if (caps.ICapYResolution.CanReset) caps.ICapYResolution.Reset(); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset YResolution"); }
-    }
-
-    private void TrySetBrightness(ICapabilities caps, float value)
-    {
-        try { if (caps.ICapBrightness.CanSet) caps.ICapBrightness.SetValue((TWFix32)value); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set Brightness to {Value}", value); }
-    }
-
-    private void TrySetContrast(ICapabilities caps, float value)
-    {
-        try { if (caps.ICapContrast.CanSet) caps.ICapContrast.SetValue((TWFix32)value); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set Contrast to {Value}", value); }
-    }
-
-    private void TrySetAutoBright(ICapabilities caps, bool enabled)
-    {
-        try { if (caps.ICapAutoBright.CanSet) caps.ICapAutoBright.SetValue(enabled ? BoolType.True : BoolType.False); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set AutoBright to {Enabled}", enabled); }
-    }
-
-    private void TryResetImageProcessing(ICapabilities caps)
-    {
-        try { if (caps.ICapAutoBright.CanReset) caps.ICapAutoBright.Reset(); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset AutoBright"); }
-
-        try { if (caps.ICapBrightness.CanReset) caps.ICapBrightness.Reset(); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset Brightness"); }
-
-        try { if (caps.ICapContrast.CanReset) caps.ICapContrast.Reset(); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset Contrast"); }
-
-        try { if (caps.ICapGamma.CanReset) caps.ICapGamma.Reset(); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset Gamma"); }
-
-        try { if (caps.ICapHighlight.CanReset) caps.ICapHighlight.Reset(); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset Highlight"); }
-
-        try { if (caps.ICapShadow.CanReset) caps.ICapShadow.Reset(); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset Shadow"); }
-    }
-
-    private void TrySetPixelType(ICapabilities caps)
-    {
-        try { if (caps.ICapPixelType.CanSet) caps.ICapPixelType.SetValue(PixelType.RGB); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set PixelType to RGB"); }
-    }
-
-    private void TrySetColorProfile(ICapabilities caps)
-    {
-        // Embed the scanner's ICC profile for consistent color management.
-        // For sRGB output, the scanner driver itself must be configured to use sRGB.
-        try { if (caps.ICapICCProfile.CanSet) caps.ICapICCProfile.SetValue(IccProfile.Embed); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set ICC profile"); }
-    }
-
-    private void TryDisableDuplex(ICapabilities caps)
-    {
-        try
-        {
-            if (caps.CapDuplexEnabled.CanSet)
+            if (process.ExitCode == 0 && File.Exists(outputPath))
             {
-                caps.CapDuplexEnabled.SetValue(BoolType.False);
-                _logger.LogInformation("Duplex scanning disabled (single-sided)");
+                _logger.LogInformation("Scan complete, processing image from {Path}", outputPath);
+                using var stream = File.OpenRead(outputPath);
+                CardService.AddFromStream(stream);
             }
             else
             {
-                _logger.LogDebug("Scanner does not support setting duplex mode");
+                var reason = process.ExitCode switch
+                {
+                    1 => "Scanner not found.",
+                    2 => $"Scanner driver error. {stderr}",
+                    3 => "No image was received from the scanner.",
+                    _ => $"Scanner process crashed (exit code {process.ExitCode})."
+                };
+                LastScanError = $"{reason}\n\nTry 'Import from Folder' as an alternative.";
+                _logger.LogWarning("Scanner host failed: {Reason} stderr={StdErr}", reason, stderr);
             }
         }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot disable duplex"); }
-    }
-
-    private void Session_SourceDisabled(object? sender, EventArgs e)
-    {
-        _logger.LogDebug("Scanner source disabled");
-    }
-
-    private void Session_TransferError(object? sender, TransferErrorEventArgs e)
-    {
-        _logger.LogError("Scanner transfer error: {ErrorCode}", e.ReturnCode);
-    }
-
-    private void Session_DataTransferred(object? sender, DataTransferredEventArgs e)
-    {
-        _logger.LogInformation("Image data transferred from scanner, processing card");
-        CardService.AddFromStream(e.GetNativeImageStream());
-    }
-
-    private void Session_TransferReady(object? sender, TransferReadyEventArgs e)
-    {
-        _logger.LogDebug("Scanner transfer ready");
+        catch (Exception ex)
+        {
+            LastScanError = $"Failed to launch scanner: {ex.Message}\n\nTry 'Import from Folder' as an alternative.";
+            _logger.LogError(ex, "Failed to launch scanner host process");
+        }
+        finally
+        {
+            try { if (File.Exists(outputPath)) File.Delete(outputPath); }
+            catch { }
+        }
     }
 
     partial void OnDataSourceChanged(DataSource oldValue, DataSource newValue)
     {
-        if(oldValue is not null)
+        if (oldValue is not null)
         {
             _logger.LogInformation("Disconnecting from scanner: {OldSource}", oldValue.Name);
             oldValue.Close();
         }
 
-        if(newValue is not null)
+        if (newValue is not null)
         {
             _logger.LogInformation("Connecting to scanner: {NewSource}", newValue.Name);
             newValue.Open();
@@ -312,11 +149,6 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
 
     public void Dispose()
     {
-        Session.TransferReady -= Session_TransferReady;
-        Session.DataTransferred -= Session_DataTransferred;
-        Session.TransferError -= Session_TransferError;
-        Session.SourceDisabled -= Session_SourceDisabled;
-
         if (DataSource is not null && DataSource.IsOpen)
             DataSource.Close();
 

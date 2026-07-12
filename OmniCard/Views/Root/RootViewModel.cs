@@ -297,6 +297,11 @@ public sealed partial class RootViewModel(
         PersistDisplaySettings();
     }
 
+    [ObservableProperty]
+    public partial bool ShowScannerUI { get; set; } = displaySettings.Value.ShowScannerUI;
+
+    partial void OnShowScannerUIChanged(bool value) => PersistDisplaySettings();
+
     private void PersistDisplaySettings()
     {
         try
@@ -359,6 +364,7 @@ public sealed partial class RootViewModel(
             writer.WriteNull("DefaultScannerName");
 
         writer.WriteString("ScanQuality", ScanQuality.ToString());
+        writer.WriteBoolean("ShowScannerUI", ShowScannerUI);
 
         writer.WriteEndObject();
     }
@@ -1021,14 +1027,92 @@ public sealed partial class RootViewModel(
     }
 
     [RelayCommand]
-    public void Scan()
+    public async Task Scan()
     {
         if (IsAuditComplete) return;
         if (ConnectToScanner(false) ?? false)
         {
             _logger.LogInformation("User initiated scan");
-            ScannerService.Scan();
+            await ScannerService.ScanAsync(ShowScannerUI);
+            if (ScannerService.LastScanError is not null)
+            {
+                Message = ScannerService.LastScanError;
+                _logger.LogWarning("Scan failed: {Error}", ScannerService.LastScanError);
+            }
         }
+    }
+
+    [RelayCommand]
+    public void ImportFromFolder()
+    {
+        var dlg = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "Select Folder with Scanned Card Images"
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        var folder = dlg.FolderName;
+        var extensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif"
+        };
+
+        var imageFiles = Directory.GetFiles(folder)
+            .Where(f => extensions.Contains(Path.GetExtension(f)))
+            .OrderBy(f => f)
+            .ToList();
+
+        if (imageFiles.Count == 0)
+        {
+            Message = "No image files found in the selected folder.";
+            return;
+        }
+
+        var tempDir = ScanImageCache.Instance?.TempScansDirectory ?? string.Empty;
+        if (string.IsNullOrEmpty(tempDir))
+        {
+            Message = "Scan cache not initialized.";
+            return;
+        }
+        Directory.CreateDirectory(tempDir);
+
+        _logger.LogInformation("Importing {Count} image(s) from {Folder}", imageFiles.Count, folder);
+        CardService.StartNewDiagnosticSession();
+
+        for (int i = 0; i < imageFiles.Count; i++)
+        {
+            var sourceFile = imageFiles[i];
+            Message = $"Importing {i + 1}/{imageFiles.Count}...";
+
+            try
+            {
+                var destFile = Path.Combine(tempDir, $"{Guid.NewGuid()}{Path.GetExtension(sourceFile)}");
+                File.Copy(sourceFile, destFile);
+
+                // Verify copy
+                var sourceInfo = new FileInfo(sourceFile);
+                var destInfo = new FileInfo(destFile);
+                if (destInfo.Exists && destInfo.Length == sourceInfo.Length)
+                {
+                    File.Delete(sourceFile);
+                    _logger.LogDebug("Copied and deleted source: {Source} -> {Dest}", sourceFile, destFile);
+                }
+                else
+                {
+                    _logger.LogWarning("Copy verification failed for {Source}, keeping original", sourceFile);
+                }
+
+                using var stream = File.OpenRead(destFile);
+                CardService.AddFromStream(stream);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to import {File}", sourceFile);
+            }
+        }
+
+        Message = $"Imported {imageFiles.Count} image(s) from folder.";
+        _logger.LogInformation("Folder import complete: {Count} images", imageFiles.Count);
     }
 
     [RelayCommand]
