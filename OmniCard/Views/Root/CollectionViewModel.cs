@@ -222,7 +222,7 @@ public sealed partial class CollectionViewModel : ViewModel
     public bool IsOverviewSearchActive => _matchingContainerIds is not null;
 
     public bool IsBulkVisible =>
-        BulkSummary is not null && BulkSummary.CardCount > 0 &&
+        BulkSummary is not null &&
         (_matchingContainerIds is null || _matchingContainerIds.Contains(BulkSummary.Container.Id));
 
     public bool HasVisibleLocations =>

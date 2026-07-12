@@ -54,6 +54,7 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         {
             _cardWindow = Services.GetRequiredService<CardView>();
             SetOwner(_cardWindow);
+            _cardWindow.Topmost = true;
             _cardWindow.Closed += (_, _) => _cardWindow = null;
         }
 
