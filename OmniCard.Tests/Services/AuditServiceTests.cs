@@ -237,5 +237,6 @@ public class AuditServiceTests : IDisposable
         public int GetCardCount(int containerId) => throw new NotImplementedException();
         public void SetCoverCard(int containerId, int? cardId) => throw new NotImplementedException();
         public List<CollectionCard> GetCardsInContainer(int containerId) => throw new NotImplementedException();
+        public void SetExcludeFromDeckCheck(int containerId, bool exclude) => throw new NotImplementedException();
     }
 }

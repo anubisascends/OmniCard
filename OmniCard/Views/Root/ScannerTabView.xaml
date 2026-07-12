@@ -169,6 +169,11 @@
                         <Models:ScanQuality>HighQuality</Models:ScanQuality>
                     </ComboBox>
                     <Separator/>
+                    <CheckBox Content="Show Scanner UI"
+                              IsChecked="{Binding ViewModel.ShowScannerUI}"
+                              VerticalAlignment="Center"
+                              ToolTip="Show the scanner driver's own dialog (required for some network scanners)"/>
+                    <Separator/>
                     <Button Command="{Binding ViewModel.ShowPhoneScanQrCommand}"
                             Content="Phone Scanner"
                             ToolTip="Show QR code to open the camera scanner on your phone"/>
@@ -176,6 +181,10 @@
                     <Button Command="{Binding ViewModel.ScanCommand}"
                             Content="Scan Cards..."
                             IsEnabled="{Binding ViewModel.IsAuditComplete, Converter={conv:InverseBoolConverter}}"/>
+                    <Separator/>
+                    <Button Command="{Binding ViewModel.ImportFromFolderCommand}"
+                            Content="Import from Folder..."
+                            ToolTip="Import pre-scanned card images from a folder"/>
                     <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                     <Button Command="{Binding ViewModel.ToggleAuditCompleteCommand}"
                             Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}">

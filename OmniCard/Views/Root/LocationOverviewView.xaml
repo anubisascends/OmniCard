@@ -114,6 +114,11 @@
                         <Separator/>
                         <MenuItem Header="Export to Manabox..."
                                   Click="ExportLocationManabox_Click"/>
+                        <Separator/>
+                        <MenuItem Header="Exclude from Deck Check"
+                                  IsCheckable="True"
+                                  IsChecked="{Binding Container.ExcludeFromDeckCheck, Mode=OneWay}"
+                                  Click="ToggleDeckCheckExclusion_Click"/>
                     </ContextMenu>
                 </Button.ContextMenu>
             </Button>

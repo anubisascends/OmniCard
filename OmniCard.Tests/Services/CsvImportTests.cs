@@ -266,5 +266,6 @@ public class CsvImportTests : IDisposable
         public int GetCardCount(int containerId) => 0;
         public void SetCoverCard(int containerId, int? cardId) { }
         public List<CollectionCard> GetCardsInContainer(int containerId) => [];
+        public void SetExcludeFromDeckCheck(int containerId, bool exclude) { }
     }
 }

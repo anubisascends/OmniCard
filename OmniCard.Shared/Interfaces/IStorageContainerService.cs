@@ -12,4 +12,5 @@ public interface IStorageContainerService
     int GetCardCount(int containerId);
     void SetCoverCard(int containerId, int? cardId);
     List<CollectionCard> GetCardsInContainer(int containerId);
+    void SetExcludeFromDeckCheck(int containerId, bool exclude);
 }

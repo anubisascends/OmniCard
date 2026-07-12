@@ -11,4 +11,5 @@ public class DisplaySettings
     public double ScannerListWidth { get; set; }
     public string? DefaultScannerName { get; set; }
     public ScanQuality ScanQuality { get; set; } = ScanQuality.Fast;
+    public bool ShowScannerUI { get; set; }
 }

@@ -8,6 +8,7 @@ public class StorageContainer
     public bool IsSystem { get; set; }
     public int SortOrder { get; set; }
     public int? CoverCardId { get; set; }
+    public bool ExcludeFromDeckCheck { get; set; }
 
     public ICollection<CollectionCard> Cards { get; set; } = [];
 }

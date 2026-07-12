@@ -264,6 +264,8 @@ public sealed partial class CollectionViewModel : ViewModel
         }
 
         OnPropertyChanged(nameof(GroupedLocations));
+        OnPropertyChanged(nameof(IsBulkVisible));
+        OnPropertyChanged(nameof(HasVisibleLocations));
     }
 
     public void DeleteLocationWithOptions(int containerId, bool moveCardsToBulk)
@@ -277,6 +279,14 @@ public sealed partial class CollectionViewModel : ViewModel
     public void SetCoverCard(int containerId, int? cardId)
     {
         _containerService.SetCoverCard(containerId, cardId);
+        LoadOverview();
+    }
+
+    public void ToggleDeckCheckExclusion(int containerId)
+    {
+        var container = _containerService.GetAll().FirstOrDefault(c => c.Id == containerId);
+        if (container is null) return;
+        _containerService.SetExcludeFromDeckCheck(containerId, !container.ExcludeFromDeckCheck);
         LoadOverview();
     }
 
