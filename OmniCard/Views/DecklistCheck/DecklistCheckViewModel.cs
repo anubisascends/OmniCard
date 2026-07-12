@@ -26,9 +26,25 @@ public sealed partial class DecklistCheckViewModel(
     public partial bool IsBusy { get; set; }
 
     [ObservableProperty]
+    public partial bool IgnoreBasicLands { get; set; } = true;
+
+    [ObservableProperty]
     public partial DecklistCheckResult? Result { get; set; }
 
     public Action<DecklistCheckResult>? ExportPdf { get; set; }
+
+    public Action<DecklistCheckResult>? ExportDetailedPdf { get; set; }
+
+    private static readonly HashSet<string> BasicLandNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Plains", "Island", "Swamp", "Mountain", "Forest"
+    };
+
+    private List<DecklistEntry> FilterBasicLands(List<DecklistEntry> entries)
+    {
+        if (!IgnoreBasicLands) return entries;
+        return entries.Where(e => !BasicLandNames.Contains(e.CardName)).ToList();
+    }
 
     [RelayCommand]
     public async Task Fetch()
@@ -56,6 +72,7 @@ public sealed partial class DecklistCheckViewModel(
             }
 
             var (deckName, entries) = fetched.Value;
+            entries = FilterBasicLands(entries);
             StatusMessage = $"Fetched \"{deckName}\" ({entries.Count} cards). Checking collection...";
 
             var source = Url.Contains("moxfield", StringComparison.OrdinalIgnoreCase) ? "Moxfield" : "Archidekt";
@@ -86,6 +103,7 @@ public sealed partial class DecklistCheckViewModel(
         }
 
         var (deckName, entries) = decklistService.ParseDecklistText(FallbackText);
+        entries = FilterBasicLands(entries);
         if (entries.Count == 0)
         {
             StatusMessage = "No cards found in the pasted text.";
@@ -102,5 +120,12 @@ public sealed partial class DecklistCheckViewModel(
     {
         if (Result is null) return;
         ExportPdf?.Invoke(Result);
+    }
+
+    [RelayCommand]
+    public void GenerateDetailedReport()
+    {
+        if (Result is null) return;
+        ExportDetailedPdf?.Invoke(Result);
     }
 }

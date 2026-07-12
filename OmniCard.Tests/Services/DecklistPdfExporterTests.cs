@@ -76,4 +76,42 @@ public class DecklistPdfExporterTests : IDisposable
 
         Assert.True(File.Exists(path));
     }
+
+    [Fact]
+    public void ExportDetailed_CreatesValidPdfFile()
+    {
+        var result = new DecklistCheckResult
+        {
+            DeckName = "Detail Test",
+            DeckSource = "Archidekt",
+            OwnedEntries =
+            [
+                new OwnedDecklistEntry("Lightning Bolt", "M11", "149", 1,
+                [
+                    new DecklistCardLocation("Binder A", 3, 2, null, "M11", false, true)
+                ],
+                TypeCategory: "Instant", TypeLine: "Instant",
+                ManaCost: "{R}", OracleText: "Lightning Bolt deals 3 damage to any target.",
+                Rarity: "common")
+            ],
+            MissingEntries =
+            [
+                new MissingDecklistEntry("Ragavan, Nimble Pilferer", "MH2", "138", 1, 55.00m,
+                    TypeCategory: "Creature",
+                    TypeLine: "Legendary Creature \u2014 Monkey Pirate",
+                    ManaCost: "{R}",
+                    OracleText: "Whenever Ragavan, Nimble Pilferer deals combat damage to a player, create a Treasure token and exile the top card of that player's library. Until end of turn, you may cast that card.",
+                    Power: "2", Toughness: "1", Rarity: "mythic")
+            ],
+        };
+
+        var exporter = new DecklistPdfExporter();
+        var path = Path.Combine(_tempDir, "detail_report.pdf");
+        exporter.ExportDetailed(result, path, null!);
+
+        Assert.True(File.Exists(path));
+        var bytes = File.ReadAllBytes(path);
+        Assert.Equal((byte)'%', bytes[0]);
+        Assert.Equal((byte)'P', bytes[1]);
+    }
 }

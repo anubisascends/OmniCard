@@ -15,6 +15,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -29,8 +30,13 @@
             </DockPanel>
         </GroupBox>
 
+        <!-- Options -->
+        <CheckBox Grid.Row="1" Content="Ignore basic lands (Plains, Island, Swamp, Mountain, Forest)"
+                  IsChecked="{Binding ViewModel.IgnoreBasicLands}"
+                  Margin="4,8,0,0"/>
+
         <!-- Fallback text input -->
-        <GroupBox Grid.Row="1" Header="Paste Decklist" Padding="8" Margin="0,8,0,0"
+        <GroupBox Grid.Row="2" Header="Paste Decklist" Padding="8" Margin="0,8,0,0"
                   Visibility="{Binding ViewModel.ShowFallback, Converter={conv:BoolToVisibilityConverter}}">
             <DockPanel>
                 <Button DockPanel.Dock="Bottom" Content="Parse" Padding="16,6" Margin="0,8,0,0"
@@ -43,7 +49,7 @@
         </GroupBox>
 
         <!-- Results summary -->
-        <GroupBox Grid.Row="2" Header="Results" Padding="8" Margin="0,8,0,0"
+        <GroupBox Grid.Row="3" Header="Results" Padding="8" Margin="0,8,0,0"
                   Visibility="{Binding ViewModel.Result, Converter={conv:NullToVisibilityConverter}}">
             <Grid>
                 <Grid.RowDefinitions>
@@ -95,10 +101,13 @@
         </GroupBox>
 
         <!-- Status bar and buttons -->
-        <DockPanel Grid.Row="3" Margin="0,12,0,0">
+        <DockPanel Grid.Row="4" Margin="0,12,0,0">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                <Button Content="Generate Report" Padding="16,6" Margin="0,0,8,0"
+                <Button Content="Summary Report" Padding="16,6" Margin="0,0,8,0"
                         Command="{Binding ViewModel.GenerateReportCommand}"
+                        IsEnabled="{Binding ViewModel.Result, Converter={conv:NullToBoolConverter}}"/>
+                <Button Content="Detailed Report" Padding="16,6" Margin="0,0,8,0"
+                        Command="{Binding ViewModel.GenerateDetailedReportCommand}"
                         IsEnabled="{Binding ViewModel.Result, Converter={conv:NullToBoolConverter}}"/>
                 <Button Content="Close" Padding="16,6" Click="OnClose"/>
             </StackPanel>
