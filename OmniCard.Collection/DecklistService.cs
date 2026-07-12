@@ -2,7 +2,6 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using OmniCard.Data;
 using OmniCard.Interfaces;
 using OmniCard.Models;
@@ -14,12 +13,6 @@ public sealed partial class DecklistService(
     IHttpClientFactory httpClientFactory,
     ICardService cardService) : IDecklistService
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-    };
-
     // Regex: "1 Card Name" or "1 Card Name (SET) 123" or "1x Card Name"
     [GeneratedRegex(@"^(\d+)x?\s+(.+?)(?:\s+\(([A-Za-z0-9]+)\)\s+(\S+))?$")]
     private static partial Regex DecklistLineRegex();
@@ -224,7 +217,7 @@ public sealed partial class DecklistService(
                 // Look up market price
                 decimal? price = null;
                 var gameService = cardService.GetGameService(CardGame.Mtg);
-                var searchResults = gameService.SearchCards($"name:{entry.CardName}", 1);
+                var searchResults = gameService.SearchCards($"name:{entry.CardName}");
 
                 if (searchResults.Count > 0)
                 {
