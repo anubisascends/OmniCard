@@ -46,7 +46,7 @@ public class DecklistPdfExporterTests : IDisposable
             ],
         };
 
-        var exporter = new DecklistPdfExporter();
+        var exporter = new DecklistPdfExporter(null!);
         var path = Path.Combine(_tempDir, "test_report.pdf");
         exporter.Export(result, path);
 
@@ -70,7 +70,7 @@ public class DecklistPdfExporterTests : IDisposable
             MissingEntries = [],
         };
 
-        var exporter = new DecklistPdfExporter();
+        var exporter = new DecklistPdfExporter(null!);
         var path = Path.Combine(_tempDir, "empty_report.pdf");
         exporter.Export(result, path);
 
@@ -105,9 +105,9 @@ public class DecklistPdfExporterTests : IDisposable
             ],
         };
 
-        var exporter = new DecklistPdfExporter();
+        var exporter = new DecklistPdfExporter(null!);
         var path = Path.Combine(_tempDir, "detail_report.pdf");
-        exporter.ExportDetailed(result, path, null!);
+        exporter.ExportDetailed(result, path);
 
         Assert.True(File.Exists(path));
         var bytes = File.ReadAllBytes(path);

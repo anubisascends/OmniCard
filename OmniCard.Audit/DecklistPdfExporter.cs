@@ -8,7 +8,7 @@ using OmniCard.Models;
 
 namespace OmniCard.Audit;
 
-public sealed class DecklistPdfExporter : IDecklistPdfExporter
+public sealed class DecklistPdfExporter(IHttpClientFactory httpClientFactory) : IDecklistPdfExporter
 {
     public void Export(DecklistCheckResult result, string filePath)
     {
@@ -185,7 +185,7 @@ public sealed class DecklistPdfExporter : IDecklistPdfExporter
         }));
     }
 
-    public void ExportDetailed(DecklistCheckResult result, string filePath, IHttpClientFactory httpClientFactory)
+    public void ExportDetailed(DecklistCheckResult result, string filePath)
     {
         QuestPDF.Settings.License = LicenseType.Community;
 
@@ -238,7 +238,7 @@ public sealed class DecklistPdfExporter : IDecklistPdfExporter
                                     // Card image
                                     row.ConstantItem(75).Padding(2).Element(c =>
                                     {
-                                        var imageBytes = LoadImage(entry.LocalImagePath, entry.ImageUri, httpClientFactory);
+                                        var imageBytes = LoadImage(entry.LocalImagePath, entry.ImageUri);
                                         if (imageBytes is not null)
                                             c.Image(imageBytes).FitWidth();
                                         else
@@ -301,7 +301,7 @@ public sealed class DecklistPdfExporter : IDecklistPdfExporter
                                 {
                                     row.ConstantItem(75).Padding(2).Element(c =>
                                     {
-                                        var imageBytes = LoadImage(entry.LocalImagePath, entry.ImageUri, httpClientFactory);
+                                        var imageBytes = LoadImage(entry.LocalImagePath, entry.ImageUri);
                                         if (imageBytes is not null)
                                             c.Image(imageBytes).FitWidth();
                                         else
@@ -361,7 +361,7 @@ public sealed class DecklistPdfExporter : IDecklistPdfExporter
         }).GeneratePdf(filePath);
     }
 
-    private static byte[]? LoadImage(string? localPath, string? imageUri, IHttpClientFactory? httpClientFactory)
+    private byte[]? LoadImage(string? localPath, string? imageUri)
     {
         // Try local file first
         if (localPath is not null && File.Exists(localPath))

@@ -1,8 +1,6 @@
-using System.Net.Http;
 using System.Windows;
 using Microsoft.Win32;
 using OmniCard.Interfaces;
-using OmniCard.Models;
 
 namespace OmniCard.Views.DecklistCheck;
 
@@ -10,8 +8,7 @@ public partial class DecklistCheckView : Window
 {
     public DecklistCheckViewModel ViewModel { get; }
 
-    public DecklistCheckView(DecklistCheckViewModel viewModel, IDecklistPdfExporter pdfExporter,
-        IHttpClientFactory httpClientFactory)
+    public DecklistCheckView(DecklistCheckViewModel viewModel, IDecklistPdfExporter pdfExporter)
     {
         ViewModel = viewModel;
         DataContext = this;
@@ -40,7 +37,7 @@ public partial class DecklistCheckView : Window
             };
             if (dlg.ShowDialog() == true)
             {
-                pdfExporter.ExportDetailed(result, dlg.FileName, httpClientFactory);
+                pdfExporter.ExportDetailed(result, dlg.FileName);
                 MessageBox.Show("Detailed PDF exported successfully.", "Export",
                     MessageBoxButton.OK, MessageBoxImage.Information);
             }
