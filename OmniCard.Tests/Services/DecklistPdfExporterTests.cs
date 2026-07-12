@@ -31,11 +31,18 @@ public class DecklistPdfExporterTests : IDisposable
                 new OwnedDecklistEntry("Lightning Bolt", "M11", "149", 1,
                 [
                     new DecklistCardLocation("Binder A", 3, 2, null, "M11", false, true)
-                ])
+                ], TypeCategory: "Instant"),
+                new OwnedDecklistEntry("Ragavan, Nimble Pilferer", "MH2", "138", 1,
+                [
+                    new DecklistCardLocation("Bulk", null, null, null, "MH2", false, true)
+                ], TypeCategory: "Creature")
             ],
             MissingEntries =
             [
-                new MissingDecklistEntry("Ragavan, Nimble Pilferer", "MH2", "138", 1, 55.00m)
+                new MissingDecklistEntry("Counterspell", "MH2", "267", 2, 1.50m,
+                    TypeCategory: "Instant"),
+                new MissingDecklistEntry("Tarmogoyf", "MH2", "187", 1, 55.00m,
+                    TypeCategory: "Creature")
             ],
         };
 
@@ -46,7 +53,6 @@ public class DecklistPdfExporterTests : IDisposable
         Assert.True(File.Exists(path));
         var bytes = File.ReadAllBytes(path);
         Assert.True(bytes.Length > 100);
-        // PDF magic bytes
         Assert.Equal((byte)'%', bytes[0]);
         Assert.Equal((byte)'P', bytes[1]);
         Assert.Equal((byte)'D', bytes[2]);

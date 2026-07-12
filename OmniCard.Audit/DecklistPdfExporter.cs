@@ -44,89 +44,103 @@ public sealed class DecklistPdfExporter : IDecklistPdfExporter
 
                 page.Content().Column(col =>
                 {
-                    // Cards You Own
+                    // Cards You Own — grouped by type
                     if (result.OwnedEntries.Count > 0)
                     {
                         col.Item().Text("Cards You Own").FontSize(13).Bold();
-                        col.Item().PaddingTop(4).Table(table =>
+
+                        foreach (var typeGroup in GroupByType(result.OwnedEntries, e => e.TypeCategory))
                         {
-                            table.ColumnsDefinition(columns =>
-                            {
-                                columns.RelativeColumn(2.5f); // Name
-                                columns.RelativeColumn(0.7f); // Set
-                                columns.RelativeColumn(0.5f); // Qty
-                                columns.RelativeColumn(4);    // Location(s)
-                            });
+                            col.Item().PaddingTop(8).Text($"{typeGroup.Key} ({typeGroup.Count()})")
+                                .FontSize(11).Bold().FontColor(Colors.Grey.Darken1);
 
-                            table.Header(header =>
+                            col.Item().PaddingTop(2).Table(table =>
                             {
-                                header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Card Name").Bold();
-                                header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Set").Bold();
-                                header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Qty").Bold();
-                                header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Location(s)").Bold();
-                            });
+                                table.ColumnsDefinition(columns =>
+                                {
+                                    columns.RelativeColumn(2.5f);
+                                    columns.RelativeColumn(0.7f);
+                                    columns.RelativeColumn(0.5f);
+                                    columns.RelativeColumn(4);
+                                });
 
-                            foreach (var entry in result.OwnedEntries)
-                            {
-                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
-                                    .Text(entry.CardName);
-                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
-                                    .Text(entry.SetCode ?? "");
-                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
-                                    .Text($"{entry.QuantityNeeded}");
-                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
-                                    .Text(FormatLocations(entry.Locations));
-                            }
-                        });
+                                table.Header(header =>
+                                {
+                                    header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Card Name").Bold();
+                                    header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Set").Bold();
+                                    header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Qty").Bold();
+                                    header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Location(s)").Bold();
+                                });
+
+                                foreach (var entry in typeGroup.OrderBy(e => e.CardName, StringComparer.OrdinalIgnoreCase))
+                                {
+                                    table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
+                                        .Text(entry.CardName);
+                                    table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
+                                        .Text(entry.SetCode ?? "");
+                                    table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
+                                        .Text($"{entry.QuantityNeeded}");
+                                    table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
+                                        .Text(FormatLocations(entry.Locations));
+                                }
+                            });
+                        }
                     }
 
-                    // Cards to Buy
+                    // Cards to Buy — grouped by type
                     if (result.MissingEntries.Count > 0)
                     {
                         col.Item().PaddingTop(16).Text("Cards to Buy").FontSize(13).Bold()
                             .FontColor(Colors.Red.Medium);
-                        col.Item().PaddingTop(4).Table(table =>
+
+                        foreach (var typeGroup in GroupByType(result.MissingEntries, e => e.TypeCategory))
                         {
-                            table.ColumnsDefinition(columns =>
+                            col.Item().PaddingTop(8).Text($"{typeGroup.Key} ({typeGroup.Count()})")
+                                .FontSize(11).Bold().FontColor(Colors.Grey.Darken1);
+
+                            col.Item().PaddingTop(2).Table(table =>
                             {
-                                columns.RelativeColumn(3);   // Name
-                                columns.RelativeColumn(0.7f); // Set
-                                columns.RelativeColumn(0.5f); // Qty
-                                columns.RelativeColumn(1);   // Market Price
-                                columns.RelativeColumn(1);   // Subtotal
+                                table.ColumnsDefinition(columns =>
+                                {
+                                    columns.RelativeColumn(3);
+                                    columns.RelativeColumn(0.7f);
+                                    columns.RelativeColumn(0.5f);
+                                    columns.RelativeColumn(1);
+                                    columns.RelativeColumn(1);
+                                });
+
+                                table.Header(header =>
+                                {
+                                    header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Card Name").Bold();
+                                    header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Set").Bold();
+                                    header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Qty").Bold();
+                                    header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Price").Bold();
+                                    header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Subtotal").Bold();
+                                });
+
+                                foreach (var entry in typeGroup.OrderBy(e => e.CardName, StringComparer.OrdinalIgnoreCase))
+                                {
+                                    var priceStr = entry.MarketPrice.HasValue ? $"${entry.MarketPrice:N2}" : "N/A";
+                                    var subtotalStr = entry.MarketPrice.HasValue
+                                        ? $"${entry.MarketPrice.Value * entry.QuantityNeeded:N2}" : "N/A";
+
+                                    table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
+                                        .Text(entry.CardName);
+                                    table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
+                                        .Text(entry.SetCode ?? "");
+                                    table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
+                                        .Text($"{entry.QuantityNeeded}");
+                                    table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
+                                        .Text(priceStr);
+                                    table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
+                                        .Text(subtotalStr);
+                                }
                             });
+                        }
 
-                            table.Header(header =>
-                            {
-                                header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Card Name").Bold();
-                                header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Set").Bold();
-                                header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Qty").Bold();
-                                header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Price").Bold();
-                                header.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text("Subtotal").Bold();
-                            });
-
-                            foreach (var entry in result.MissingEntries)
-                            {
-                                var priceStr = entry.MarketPrice.HasValue ? $"${entry.MarketPrice:N2}" : "N/A";
-                                var subtotalStr = entry.MarketPrice.HasValue
-                                    ? $"${entry.MarketPrice.Value * entry.QuantityNeeded:N2}" : "N/A";
-
-                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
-                                    .Text(entry.CardName);
-                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
-                                    .Text(entry.SetCode ?? "");
-                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
-                                    .Text($"{entry.QuantityNeeded}");
-                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
-                                    .Text(priceStr);
-                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
-                                    .Text(subtotalStr);
-                            }
-
-                            // Total row
-                            table.Cell().ColumnSpan(4).Padding(4).AlignRight().Text("Total:").Bold();
-                            table.Cell().Padding(4).Text($"${result.EstimatedCost:N2}").Bold();
-                        });
+                        // Total row
+                        col.Item().PaddingTop(8).AlignRight().Text($"Total: ${result.EstimatedCost:N2}")
+                            .FontSize(12).Bold();
                     }
                 });
 
@@ -139,6 +153,15 @@ public sealed class DecklistPdfExporter : IDecklistPdfExporter
                 });
             });
         }).GeneratePdf(filePath);
+    }
+
+    private static IEnumerable<IGrouping<string, T>> GroupByType<T>(
+        IEnumerable<T> entries, Func<T, string?> typeSelector)
+    {
+        var order = OmniCard.Collection.DecklistService.TypeCategoryOrder;
+        return entries
+            .GroupBy(e => typeSelector(e) ?? "Other")
+            .OrderBy(g => Array.IndexOf(order, g.Key) is var i && i >= 0 ? i : order.Length);
     }
 
     private static string FormatLocations(List<DecklistCardLocation> locations)
