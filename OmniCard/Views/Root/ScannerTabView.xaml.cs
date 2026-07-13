@@ -98,6 +98,12 @@ public partial class ScannerTabView : UserControl
             ViewModel?.RefreshScanStats();
     }
 
+    public void ScrollToSelected()
+    {
+        if (ScannedCardsListView.SelectedItem is not null)
+            ScannedCardsListView.ScrollIntoView(ScannedCardsListView.SelectedItem);
+    }
+
     private static bool IsScrolledToBottom(ListView listView)
     {
         var scrollViewer = FindVisualChild<ScrollViewer>(listView);
@@ -137,6 +143,7 @@ public partial class ScannerTabView : UserControl
     {
         if (sender is ListView listView)
             ViewModel?.UpdateSelection(listView.SelectedItems.Cast<ScannedCard>().ToList());
+        ScrollToSelected();
     }
 
 }

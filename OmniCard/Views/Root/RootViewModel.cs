@@ -855,6 +855,52 @@ public sealed partial class RootViewModel(
         OnPropertyChanged(nameof(HasMatchedScans));
     }
 
+    [RelayCommand]
+    public void NavigateToNextFlag()
+    {
+        var cards = CardService.ScannedCards;
+        if (cards.Count == 0) return;
+
+        var startIndex = SelectedScannedCard is not null
+            ? cards.IndexOf(SelectedScannedCard) + 1
+            : 0;
+
+        // Search forward, wrapping around
+        for (var i = 0; i < cards.Count; i++)
+        {
+            var idx = (startIndex + i) % cards.Count;
+            if (cards[idx].IsFlagged)
+            {
+                SelectedScannedCard = cards[idx];
+                OnPropertyChanged(nameof(SelectedScannedCard));
+                return;
+            }
+        }
+    }
+
+    [RelayCommand]
+    public void NavigateToPreviousFlag()
+    {
+        var cards = CardService.ScannedCards;
+        if (cards.Count == 0) return;
+
+        var startIndex = SelectedScannedCard is not null
+            ? cards.IndexOf(SelectedScannedCard) - 1
+            : cards.Count - 1;
+
+        // Search backward, wrapping around
+        for (var i = 0; i < cards.Count; i++)
+        {
+            var idx = (startIndex - i + cards.Count) % cards.Count;
+            if (cards[idx].IsFlagged)
+            {
+                SelectedScannedCard = cards[idx];
+                OnPropertyChanged(nameof(SelectedScannedCard));
+                return;
+            }
+        }
+    }
+
     [ObservableProperty]
     public partial string ManualSearchQuery { get; set; } = "";
 
