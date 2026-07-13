@@ -1,0 +1,123 @@
+@page
+@model OmniCard.Web.Pages.DecklistModel
+@{
+    ViewData["Title"] = "Decklist Check";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>@ViewData["Title"] — OmniCard</title>
+    <link rel="stylesheet" href="/css/site.css"/>
+</head>
+<body>
+    <a href="/" class="back-link">&larr; Home</a>
+    <header>
+        <h1>Decklist Check</h1>
+    </header>
+    <main>
+        <form method="post" class="decklist-form">
+            <input type="text" asp-for="DeckUrl"
+                   placeholder="Paste Moxfield or Archidekt deck URL..."
+                   autocomplete="off"/>
+            <button type="submit">Check</button>
+        </form>
+
+        @if (Model.ErrorMessage is not null)
+        {
+            <p class="error-message">@Model.ErrorMessage</p>
+        }
+
+        @if (Model.Result is not null)
+        {
+            var r = Model.Result;
+            <div class="decklist-summary">
+                <h2>@r.DeckName <span class="badge">@r.DeckSource</span></h2>
+                <div class="stats-row">
+                    <span>Total: <strong>@r.TotalCards</strong></span>
+                    <span class="stat-owned">Owned: <strong>@r.TotalOwned</strong></span>
+                    <span class="stat-missing">Missing: <strong>@r.TotalMissing</strong></span>
+                    @if (r.EstimatedCost > 0)
+                    {
+                        <span>Est. Cost: <strong>@r.EstimatedCost.ToString("C")</strong></span>
+                    }
+                </div>
+            </div>
+
+            @if (r.TotalOwned > 0)
+            {
+                <h2>Owned (@r.TotalOwned)</h2>
+                @foreach (var group in Model.OwnedByType)
+                {
+                    <h3 class="type-header">@group.Key (@group.Sum(e => e.QuantityNeeded))</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Qty</th>
+                                <th>Card</th>
+                                <th>Set</th>
+                                <th>Location(s)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entry in group)
+                            {
+                                <tr>
+                                    <td>@entry.QuantityNeeded</td>
+                                    <td>@entry.CardName</td>
+                                    <td>@(entry.SetCode ?? "")</td>
+                                    <td>
+                                        @foreach (var loc in entry.Locations.Take(3))
+                                        {
+                                            <span class="location-tag@(loc.IsExactSetMatch ? " exact" : "")">
+                                                @loc.ContainerName@(loc.Page.HasValue ? $" p{loc.Page}" : "")@(loc.Slot.HasValue ? $" s{loc.Slot}" : "")
+                                            </span>
+                                        }
+                                        @if (entry.Locations.Count > 3)
+                                        {
+                                            <span class="location-tag">+@(entry.Locations.Count - 3) more</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            }
+
+            @if (r.TotalMissing > 0)
+            {
+                <h2>Missing (@r.TotalMissing)</h2>
+                @foreach (var group in Model.MissingByType)
+                {
+                    <h3 class="type-header">@group.Key (@group.Sum(e => e.QuantityNeeded))</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Qty</th>
+                                <th>Card</th>
+                                <th>Set</th>
+                                <th>Price</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entry in group)
+                            {
+                                <tr>
+                                    <td>@entry.QuantityNeeded</td>
+                                    <td>@entry.CardName</td>
+                                    <td>@(entry.SetCode ?? "")</td>
+                                    <td>@(entry.MarketPrice.HasValue ? entry.MarketPrice.Value.ToString("C") : "—")</td>
+                                    <td>@(entry.MarketPrice.HasValue ? (entry.MarketPrice.Value * entry.QuantityNeeded).ToString("C") : "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            }
+        }
+    </main>
+</body>
+</html>
