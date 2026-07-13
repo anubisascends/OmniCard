@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using OmniCard.Models;
@@ -151,6 +152,30 @@ public partial class ScannerTabView : UserControl
         if (sender is ListView listView)
             ViewModel?.UpdateSelection(listView.SelectedItems.Cast<ScannedCard>().ToList());
         ScrollToSelected();
+    }
+
+    private void ScannedCardsListView_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (ViewModel is null) return;
+
+        if (e.Key == Key.C && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            // Ctrl+Shift+C: copy card name
+            var name = ViewModel.SharedMatchName;
+            if (name is not null)
+                Clipboard.SetText(name);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            // Ctrl+C: copy card identifier (CardSetId for OPTCG, SetCode for MTG)
+            var value = ViewModel.SelectedGame == CardGame.OnePiece
+                ? ViewModel.SharedCollectorNumber  // OPTCG CardSetId (e.g. OP15-041)
+                : ViewModel.SharedSetCode;
+            if (value is not null)
+                Clipboard.SetText(value);
+            e.Handled = true;
+        }
     }
 
 }

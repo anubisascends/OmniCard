@@ -442,6 +442,7 @@
                           ItemsSource="{Binding ViewModel.ScanView}"
                           SelectionMode="Extended"
                           SelectionChanged="ScannedCardsListView_SelectionChanged"
+                          PreviewKeyDown="ScannedCardsListView_PreviewKeyDown"
                           VirtualizingStackPanel.IsVirtualizing="True"
                           VirtualizingStackPanel.VirtualizationMode="Recycling"
                           ScrollViewer.IsDeferredScrollingEnabled="True">

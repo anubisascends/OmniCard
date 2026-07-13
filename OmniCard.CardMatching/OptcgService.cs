@@ -587,7 +587,12 @@ public sealed class OptcgService : ICardGameService, IDisposable
         foreach (var term in terms)
         {
             var t = term;
-            if (t.StartsWith("set:", StringComparison.OrdinalIgnoreCase))
+            if (t.StartsWith("cn:", StringComparison.OrdinalIgnoreCase))
+            {
+                var upper = t[3..].ToUpperInvariant();
+                cards = cards.Where(c => c.CardSetId.ToUpper() == upper);
+            }
+            else if (t.StartsWith("set:", StringComparison.OrdinalIgnoreCase))
             {
                 var val = t[4..];
                 cards = cards.Where(c => EF.Functions.Like(c.SetId, $"%{val}%")

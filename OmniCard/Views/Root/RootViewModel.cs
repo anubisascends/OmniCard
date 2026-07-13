@@ -9,6 +9,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Data;
 using OmniCard.CardMatching;
@@ -1360,23 +1361,39 @@ public sealed partial class RootViewModel(
         InvalidateHomeTab();
     }
 
+    // Matches SET-NUM patterns like TMT-002, OP15-041, BRC-85a
+    [GeneratedRegex(@"^([A-Za-z0-9]+)-(\d+[A-Za-z]*)$")]
+    private static partial Regex SetCollectorNumberRegex();
+
     [RelayCommand]
     public void ManualSearch()
     {
         _logger.LogDebug("Manual search: {Query}", ManualSearchQuery);
         ManualSearchResults.Clear();
 
-        var query = ManualSearchQuery;
+        var query = ManualSearchQuery.Trim();
         var setFilter = CardService.SelectedSetFilter;
 
+        // Detect SET-NUM pattern (e.g. TMT-002, OP15-041) and rewrite to filter syntax
+        var setNumMatch = SetCollectorNumberRegex().Match(query);
+        if (setNumMatch.Success)
+        {
+            var set = setNumMatch.Groups[1].Value;
+            var num = setNumMatch.Groups[2].Value;
+
+            query = SelectedGame == CardGame.OnePiece
+                ? $"cn:{set}-{num}"       // OPTCG CardSetId is the full code
+                : $"set:{set} cn:{num}";  // MTG uses separate set + collector number
+        }
+
         // Single set: use the set: prefix for efficient DB-level filtering
-        if (setFilter is { Count: 1 })
+        if (setFilter is { Count: 1 } && !setNumMatch.Success)
             query = $"set:{setFilter.First()} {query}";
 
         var results = CardService.ActiveGameService.SearchCards(query, maxResults: int.MaxValue);
 
         // Multiple sets: post-filter since SearchCards doesn't support multi-set queries
-        if (setFilter is { Count: > 1 })
+        if (setFilter is { Count: > 1 } && !setNumMatch.Success)
             results = results.Where(m => setFilter.Contains(m.SetCode)).ToList();
 
         foreach (var match in results)
