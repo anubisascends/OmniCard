@@ -414,6 +414,57 @@ public sealed class CardService : ICardService
                     _logger.LogWarning(ex, "OCR analysis failed");
                 }
 
+                // Auto-rotate 180° and retry if still no match
+                if (scannedCard.Match is null)
+                {
+                    try
+                    {
+                        _logger.LogInformation("No match found, attempting 180° rotation for hash {Hash:X16}", scannedCard.Hash);
+                        using var bmp = new System.Drawing.Bitmap(new MemoryStream(rawBytes));
+                        bmp.RotateFlip(System.Drawing.RotateFlipType.Rotate180FlipNone);
+
+                        using var rotatedStream = new MemoryStream();
+                        bmp.Save(rotatedStream, System.Drawing.Imaging.ImageFormat.Png);
+                        rotatedStream.Position = 0;
+                        var rotatedHash = _hashService.ComputeHash(rotatedStream);
+                        rotatedStream.Position = 0;
+                        var rotatedBytes = rotatedStream.ToArray();
+
+                        // Try OCR on rotated image for One Piece
+                        OcrMatchResult? rotatedOcr = null;
+                        if (game == CardGame.OnePiece)
+                        {
+                            var (cn, cnConf) = await _ocrService.DetectOptcgCollectorNumberAsync(rotatedBytes);
+                            if (cn is not null && cnConf >= 0.5)
+                                rotatedOcr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = cnConf };
+                        }
+
+                        var (rotatedMatch, rotatedGame) = FindBestMatch(rotatedHash, null, rotatedOcr, capturedSetFilter, null);
+                        if (rotatedMatch is not null)
+                        {
+                            scannedCard.Match = rotatedMatch;
+                            scannedCard.Game = rotatedGame;
+                            scannedCard.Hash = rotatedHash;
+                            scannedCard.FlagReason = FlagReason.None;
+
+                            // Overwrite temp file with rotated image
+                            try { File.WriteAllBytes(scannedCard.TempImagePath, rotatedBytes); }
+                            catch (Exception ex) { _logger.LogWarning(ex, "Failed to save rotated image"); }
+
+                            _logger.LogInformation("180° rotation matched to \"{CardName}\" ({SetCode} #{Number})",
+                                rotatedMatch.Name, rotatedMatch.SetCode, rotatedMatch.CollectorNumber);
+                        }
+                        else
+                        {
+                            _logger.LogDebug("180° rotation did not produce a match");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Auto-rotation failed");
+                    }
+                }
+
                 // Upgrade NoMatch to MissingFromDatabase after all matching attempts exhausted
                 if (scannedCard.Match is null && scannedCard.FlagReason == FlagReason.NoMatch)
                 {
