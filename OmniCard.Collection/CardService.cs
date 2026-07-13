@@ -115,6 +115,16 @@ public sealed class CardService : ICardService
         ctx.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_ScanDiagnosticEvents_SessionId ON ScanDiagnosticEvents(SessionId)");
         ctx.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_ScanDiagnosticEvents_EventType ON ScanDiagnosticEvents(EventType)");
 
+        // Add IsMissing column for cards not found in card database
+        try
+        {
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Cards ADD COLUMN IsMissing INTEGER NOT NULL DEFAULT 0");
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.Message.Contains("duplicate column name"))
+        {
+            // Column already exists
+        }
+
         _logger.LogInformation("Collection database ready at {DbPath}", dbPath);
 
         AvailableGames = _gameServices.Keys.OrderBy(g => g).ToList();
@@ -404,6 +414,13 @@ public sealed class CardService : ICardService
                     _logger.LogWarning(ex, "OCR analysis failed");
                 }
 
+                // Upgrade NoMatch to MissingFromDatabase after all matching attempts exhausted
+                if (scannedCard.Match is null && scannedCard.FlagReason == FlagReason.NoMatch)
+                {
+                    scannedCard.FlagReason = FlagReason.MissingFromDatabase;
+                    _logger.LogInformation("Card flagged as missing from database (pHash + OCR exhausted)");
+                }
+
                 // Always log OCR results to diagnostics (even if OCR didn't change the match)
                 try
                 {
@@ -432,33 +449,56 @@ public sealed class CardService : ICardService
         progress?.Report("Preparing cards for collection...");
         foreach (var scan in scannedCards)
         {
-            if (scan.Match is null)
-            {
-                skipped++;
-                continue;
-            }
-
             // Use per-card override if set, otherwise use toolbar defaults
             var container = scan.OverrideContainer ?? activeContainer;
 
-            var card = new CollectionCard
+            CollectionCard card;
+            if (scan.Match is null)
             {
-                Game = scan.Game,
-                Name = scan.Match.Name,
-                SetCode = scan.Match.SetCode,
-                SetName = scan.Match.SetName,
-                Number = scan.Match.CollectorNumber,
-                Rarity = scan.Match.Rarity,
-                ImageUri = scan.Match.ImageUri,
-                GameCardId = scan.Match.GameSpecificId,
-                Condition = scan.Condition,
-                IsFoil = scan.IsFoil,
-                PurchasePrice = scan.PurchasePrice,
-                ContainerId = container?.Id,
-            };
+                // Commit as missing card if flagged MissingFromDatabase
+                if (scan.FlagReason != FlagReason.MissingFromDatabase)
+                {
+                    skipped++;
+                    continue;
+                }
 
-            card.Color = CardAttributeExtractor.ExtractColor(scan.Match, scan.Game);
-            card.CardType = CardAttributeExtractor.ExtractCardType(scan.Match, scan.Game);
+                card = new CollectionCard
+                {
+                    Game = scan.Game,
+                    Name = "Unknown Card",
+                    GameCardId = "",
+                    SetCode = "",
+                    SetName = "",
+                    Number = "",
+                    Rarity = "",
+                    Condition = scan.Condition,
+                    IsFoil = scan.IsFoil,
+                    PurchasePrice = scan.PurchasePrice,
+                    ContainerId = container?.Id,
+                    IsMissing = true,
+                };
+            }
+            else
+            {
+                card = new CollectionCard
+                {
+                    Game = scan.Game,
+                    Name = scan.Match.Name,
+                    SetCode = scan.Match.SetCode,
+                    SetName = scan.Match.SetName,
+                    Number = scan.Match.CollectorNumber,
+                    Rarity = scan.Match.Rarity,
+                    ImageUri = scan.Match.ImageUri,
+                    GameCardId = scan.Match.GameSpecificId,
+                    Condition = scan.Condition,
+                    IsFoil = scan.IsFoil,
+                    PurchasePrice = scan.PurchasePrice,
+                    ContainerId = container?.Id,
+                };
+
+                card.Color = CardAttributeExtractor.ExtractColor(scan.Match, scan.Game);
+                card.CardType = CardAttributeExtractor.ExtractCardType(scan.Match, scan.Game);
+            }
 
             if (container?.ContainerType == ContainerType.Binder)
             {
@@ -1161,6 +1201,9 @@ public sealed class CardService : ICardService
         {
             "foil" => LinqExpression.Equal(
                 LinqExpression.Property(param, nameof(CollectionCard.IsFoil)),
+                LinqExpression.Constant(true)),
+            "missing" => LinqExpression.Equal(
+                LinqExpression.Property(param, nameof(CollectionCard.IsMissing)),
                 LinqExpression.Constant(true)),
             _ => LinqExpression.Constant(true),
         };
