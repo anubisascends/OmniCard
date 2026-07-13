@@ -54,9 +54,9 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Qty</th>
-                                <th>Card</th>
-                                <th>Set</th>
+                                <th class="sortable" data-sort-numeric>Qty</th>
+                                <th class="sortable">Card</th>
+                                <th class="sortable">Set</th>
                                 <th>Location(s)</th>
                             </tr>
                         </thead>
@@ -95,11 +95,11 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Qty</th>
-                                <th>Card</th>
-                                <th>Set</th>
-                                <th>Price</th>
-                                <th>Total</th>
+                                <th class="sortable" data-sort-numeric>Qty</th>
+                                <th class="sortable">Card</th>
+                                <th class="sortable">Set</th>
+                                <th class="sortable" data-sort-numeric>Price</th>
+                                <th class="sortable" data-sort-numeric>Total</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -119,5 +119,6 @@
             }
         }
     </main>
+    <script src="/js/table-sort.js"></script>
 </body>
 </html>

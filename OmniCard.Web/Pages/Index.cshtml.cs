@@ -25,6 +25,10 @@ public class IndexModel : PageModel
     public List<CardSearchResult> SearchResults { get; set; } = [];
     public bool IsSearchActive => !string.IsNullOrWhiteSpace(Q);
 
+    public IEnumerable<IGrouping<ContainerType, ContainerSummary>> ContainersByType =>
+        Containers.GroupBy(c => c.ContainerType)
+            .OrderBy(g => g.Key);
+
     public void OnGet()
     {
         if (IsSearchActive)

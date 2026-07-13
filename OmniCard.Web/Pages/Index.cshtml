@@ -20,9 +20,9 @@
         </div>
     </header>
     <main>
-        <form method="get" class="search-bar">
-            <input type="text" name="q" value="@Model.Q" placeholder="Search cards... (e.g. lightning, set:tmt, cn:002)" />
-            <select name="game">
+        <form method="get" class="search-bar" id="searchForm">
+            <input type="text" name="q" id="searchInput" value="@Model.Q" placeholder="Search cards... (e.g. lightning, set:tmt, cn:002)" />
+            <select name="game" id="gameFilter" onchange="this.form.submit()">
                 <option value="">All Games</option>
                 <option value="mtg" selected="@(Model.Game == "mtg" ? "selected" : null)">Magic: The Gathering</option>
                 <option value="optcg" selected="@(Model.Game == "optcg" ? "selected" : null)">One Piece</option>
@@ -30,7 +30,7 @@
             <button type="submit">Search</button>
             @if (Model.IsSearchActive || !string.IsNullOrWhiteSpace(Model.Game))
             {
-                <a href="/" class="clear-link">Clear</a>
+                <a href="/" class="clear-link" id="clearLink">Clear</a>
             }
         </form>
 
@@ -46,12 +46,12 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Qty</th>
-                            <th>Name</th>
-                            <th>Set</th>
-                            <th>#</th>
-                            <th>Rarity</th>
-                            <th>Color</th>
+                            <th class="sortable" data-sort-numeric>Qty</th>
+                            <th class="sortable">Name</th>
+                            <th class="sortable">Set</th>
+                            <th class="sortable">#</th>
+                            <th class="sortable">Rarity</th>
+                            <th class="sortable">Color</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -79,27 +79,111 @@
             }
             else
             {
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Type</th>
-                            <th>Cards</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var c in Model.Containers)
-                        {
-                            <tr>
-                                <td><a href="/location/@c.Id">@c.Name</a></td>
-                                <td>@c.TypeDisplay</td>
-                                <td>@c.CardCount</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                @foreach (var group in Model.ContainersByType)
+                {
+                    var sectionKey = group.Key.ToString();
+                    var totalCards = group.Sum(c => c.CardCount);
+                    <details class="location-section" data-section="@sectionKey">
+                        <summary>
+                            @(group.First().TypeDisplay) <span class="count">&times;@group.Count() (@totalCards cards)</span>
+                        </summary>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="sortable">Name</th>
+                                    <th class="sortable" data-sort-numeric>Cards</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var c in group)
+                                {
+                                    <tr>
+                                        <td><a href="/location/@c.Id">@c.Name</a></td>
+                                        <td>@c.CardCount</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </details>
+                }
             }
         }
     </main>
+
+    <script src="/js/table-sort.js"></script>
+    <script>
+        (function() {
+            var STORE_KEY = 'omnicard_prefs';
+
+            function loadPrefs() {
+                try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; }
+                catch { return {}; }
+            }
+
+            function savePrefs(prefs) {
+                localStorage.setItem(STORE_KEY, JSON.stringify(prefs));
+            }
+
+            var prefs = loadPrefs();
+
+            // Restore section open/closed state
+            document.querySelectorAll('details.location-section').forEach(function(el) {
+                var key = el.dataset.section;
+                if (prefs.sections && prefs.sections[key] === false) {
+                    el.removeAttribute('open');
+                } else {
+                    el.setAttribute('open', '');
+                }
+                el.addEventListener('toggle', function() {
+                    var p = loadPrefs();
+                    if (!p.sections) p.sections = {};
+                    p.sections[key] = el.open;
+                    savePrefs(p);
+                });
+            });
+
+            // Save search and game filter on form submit
+            var form = document.getElementById('searchForm');
+            if (form) {
+                form.addEventListener('submit', function() {
+                    var p = loadPrefs();
+                    p.game = document.getElementById('gameFilter').value;
+                    p.q = document.getElementById('searchInput').value;
+                    savePrefs(p);
+                });
+
+                // Also save on game filter change (auto-submit)
+                document.getElementById('gameFilter').addEventListener('change', function() {
+                    var p = loadPrefs();
+                    p.game = this.value;
+                    p.q = document.getElementById('searchInput').value;
+                    savePrefs(p);
+                });
+            }
+
+            // Clear prefs when Clear link is clicked
+            var clearLink = document.getElementById('clearLink');
+            if (clearLink) {
+                clearLink.addEventListener('click', function() {
+                    var p = loadPrefs();
+                    delete p.game;
+                    delete p.q;
+                    savePrefs(p);
+                });
+            }
+
+            // On first load with no query params, restore from prefs
+            var params = new URLSearchParams(window.location.search);
+            if (!params.has('q') && !params.has('game') && (prefs.game || prefs.q)) {
+                var url = '/?';
+                var parts = [];
+                if (prefs.q) parts.push('q=' + encodeURIComponent(prefs.q));
+                if (prefs.game) parts.push('game=' + encodeURIComponent(prefs.game));
+                if (parts.length > 0) {
+                    window.location.replace('/?' + parts.join('&'));
+                }
+            }
+        })();
+    </script>
 </body>
 </html>
