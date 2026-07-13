@@ -4,7 +4,9 @@ namespace OmniCard.Models;
 
 public partial class ScannedCard : ObservableObject
 {
-    public required string TempImagePath { get; init; }
+    [ObservableProperty]
+    public partial string TempImagePath { get; set; } = "";
+
     public required ulong Hash { get; set; }
     public ulong[]? ArtHashes { get; init; }
 

@@ -764,6 +764,10 @@ public sealed class CardService : ICardService
         _logger.LogInformation("Manually added {Quantity}x {Name} ({SetCode}) to collection", quantity, match.Name, match.SetCode);
     }
 
+    public ulong ComputeHashFromStream(Stream stream) => _hashService.ComputeHash(stream);
+
+    public IOcrMatchingService OcrService => _ocrService;
+
     public void SearchCollection(string query, CardGame? gameFilter, ObservableCollection<CollectionCard> results)
         => SearchCollection(query, gameFilter, null, null, null, results);
 

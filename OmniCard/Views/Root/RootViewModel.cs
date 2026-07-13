@@ -901,6 +901,72 @@ public sealed partial class RootViewModel(
         }
     }
 
+    [RelayCommand]
+    public async Task RotateLeft()
+    {
+        if (SelectedScannedCard is null) return;
+        await RotateScan(SelectedScannedCard, System.Drawing.RotateFlipType.Rotate270FlipNone);
+    }
+
+    [RelayCommand]
+    public async Task RotateRight()
+    {
+        if (SelectedScannedCard is null) return;
+        await RotateScan(SelectedScannedCard, System.Drawing.RotateFlipType.Rotate90FlipNone);
+    }
+
+    private async Task RotateScan(ScannedCard scan, System.Drawing.RotateFlipType rotation)
+    {
+        try
+        {
+            // Read, rotate, save
+            var imageBytes = File.ReadAllBytes(scan.TempImagePath);
+            using var bmp = new System.Drawing.Bitmap(new MemoryStream(imageBytes));
+            bmp.RotateFlip(rotation);
+
+            using var rotatedStream = new MemoryStream();
+            bmp.Save(rotatedStream, System.Drawing.Imaging.ImageFormat.Png);
+            var rotatedBytes = rotatedStream.ToArray();
+
+            File.WriteAllBytes(scan.TempImagePath, rotatedBytes);
+
+            // Recompute hash
+            rotatedStream.Position = 0;
+            var newHash = CardService.ComputeHashFromStream(rotatedStream);
+            scan.Hash = newHash;
+
+            // Re-run matching
+            OcrMatchResult? ocrResult = null;
+            if (scan.Game == CardGame.OnePiece)
+            {
+                var (cn, conf) = await CardService.OcrService.DetectOptcgCollectorNumberAsync(rotatedBytes);
+                if (cn is not null && conf >= 0.5)
+                    ocrResult = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
+            }
+
+            var (match, matchedGame) = CardService.FindBestMatch(newHash, null, ocrResult, CardService.SelectedSetFilter, null);
+            scan.Match = match;
+            scan.Game = matchedGame;
+
+            if (match is not null && scan.FlagReason is FlagReason.NoMatch or FlagReason.VeryLowConfidence or FlagReason.MissingFromDatabase)
+                scan.FlagReason = FlagReason.None;
+
+            // Force image refresh by toggling path
+            var path = scan.TempImagePath;
+            scan.TempImagePath = "";
+            scan.TempImagePath = path;
+
+            _logger.LogInformation("Manually rotated scan {Path}, new hash {Hash:X16}, match: {Match}",
+                path, newHash, match?.Name ?? "(none)");
+
+            RefreshScanStats();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Manual rotation failed");
+        }
+    }
+
     [ObservableProperty]
     public partial string ManualSearchQuery { get; set; } = "";
 
