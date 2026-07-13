@@ -855,6 +855,9 @@ public sealed partial class RootViewModel(
         OnPropertyChanged(nameof(HasMatchedScans));
     }
 
+    /// <summary>Callback for the view to programmatically select and scroll to a card.</summary>
+    public Action<ScannedCard>? RequestScrollToCard { get; set; }
+
     [RelayCommand]
     public void NavigateToNextFlag()
     {
@@ -865,14 +868,13 @@ public sealed partial class RootViewModel(
             ? cards.IndexOf(SelectedScannedCard) + 1
             : 0;
 
-        // Search forward, wrapping around
         for (var i = 0; i < cards.Count; i++)
         {
             var idx = (startIndex + i) % cards.Count;
             if (cards[idx].IsFlagged)
             {
                 SelectedScannedCard = cards[idx];
-                OnPropertyChanged(nameof(SelectedScannedCard));
+                RequestScrollToCard?.Invoke(cards[idx]);
                 return;
             }
         }
@@ -888,14 +890,13 @@ public sealed partial class RootViewModel(
             ? cards.IndexOf(SelectedScannedCard) - 1
             : cards.Count - 1;
 
-        // Search backward, wrapping around
         for (var i = 0; i < cards.Count; i++)
         {
             var idx = (startIndex - i + cards.Count) % cards.Count;
             if (cards[idx].IsFlagged)
             {
                 SelectedScannedCard = cards[idx];
-                OnPropertyChanged(nameof(SelectedScannedCard));
+                RequestScrollToCard?.Invoke(cards[idx]);
                 return;
             }
         }
