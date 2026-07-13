@@ -18,7 +18,7 @@ public class LocationModel : PageModel
     public StorageContainer Container { get; set; } = null!;
     public int CardCount { get; set; }
     public List<SetSummary> Sets { get; set; } = [];
-    public List<CollectionCard> Cards { get; set; } = [];
+    public List<StackedCard> Cards { get; set; } = [];
 
     public IActionResult OnGet(int id)
     {
@@ -33,15 +33,32 @@ public class LocationModel : PageModel
 
         Container = container;
 
-        Cards = db.Cards
+        var rawCards = db.Cards
             .AsNoTracking()
             .Where(c => c.ContainerId == id)
             .OrderBy(c => c.Name)
             .ToList();
 
-        CardCount = Cards.Count;
+        CardCount = rawCards.Count;
 
-        Sets = Cards
+        Cards = rawCards
+            .GroupBy(c => new { c.Name, c.SetCode })
+            .Select(g =>
+            {
+                var first = g.First();
+                return new StackedCard(
+                    first.Id,
+                    first.Name,
+                    first.SetCode,
+                    first.Number,
+                    first.Rarity,
+                    first.Color,
+                    g.Count());
+            })
+            .OrderBy(c => c.Name)
+            .ToList();
+
+        Sets = rawCards
             .GroupBy(c => new { c.SetCode, c.SetName })
             .Select(g => new SetSummary
             {
@@ -71,4 +88,13 @@ public class LocationModel : PageModel
         public string SetName { get; init; } = "";
         public int Count { get; init; }
     }
+
+    public record StackedCard(
+        int Id,
+        string Name,
+        string SetCode,
+        string Number,
+        string Rarity,
+        string? Color,
+        int Quantity);
 }

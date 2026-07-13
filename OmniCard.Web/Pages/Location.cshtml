@@ -39,25 +39,23 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Set</th>
-                        <th>#</th>
-                        <th>Rarity</th>
-                        <th>Cond</th>
-                        <th>Foil</th>
-                        <th>Color</th>
+                        <th class="sortable" data-sort-numeric>Qty</th>
+                        <th class="sortable">Name</th>
+                        <th class="sortable">Set</th>
+                        <th class="sortable">#</th>
+                        <th class="sortable">Rarity</th>
+                        <th class="sortable">Color</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var card in Model.Cards)
                     {
                         <tr>
+                            <td>@card.Quantity</td>
                             <td><a href="/card/@card.Id">@card.Name</a></td>
                             <td>@card.SetCode</td>
                             <td>@card.Number</td>
                             <td>@card.Rarity</td>
-                            <td>@card.Condition</td>
-                            <td>@(card.IsFoil ? "Yes" : "")</td>
                             <td>@card.Color</td>
                         </tr>
                     }
@@ -65,5 +63,6 @@
             </table>
         }
     </main>
+    <script src="/js/table-sort.js"></script>
 </body>
 </html>
