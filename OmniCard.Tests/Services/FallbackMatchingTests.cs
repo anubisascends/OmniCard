@@ -234,6 +234,7 @@ public class FallbackMatchingTests : IDisposable
         public Dictionary<string, ulong> SymbolHashes { get; set; } = [];
         public Task<OcrMatchResult> AnalyzeCardAsync(byte[] imageData) => Task.FromResult(new OcrMatchResult());
         public (List<string> SetCodes, double Confidence) DetectSetSymbol(byte[] imageData) => ([], 0);
+        public Task<(string? CollectorNumber, double Confidence)> DetectOptcgCollectorNumberAsync(byte[] imageData) => Task.FromResult<(string?, double)>((null, 0));
     }
 
     private class NullScanDiagnosticService : IScanDiagnosticService

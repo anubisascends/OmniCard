@@ -115,6 +115,16 @@ public sealed class CardService : ICardService
         ctx.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_ScanDiagnosticEvents_SessionId ON ScanDiagnosticEvents(SessionId)");
         ctx.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_ScanDiagnosticEvents_EventType ON ScanDiagnosticEvents(EventType)");
 
+        // Add IsMissing column for cards not found in card database
+        try
+        {
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Cards ADD COLUMN IsMissing INTEGER NOT NULL DEFAULT 0");
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.Message.Contains("duplicate column name"))
+        {
+            // Column already exists
+        }
+
         _logger.LogInformation("Collection database ready at {DbPath}", dbPath);
 
         AvailableGames = _gameServices.Keys.OrderBy(g => g).ToList();
@@ -268,10 +278,12 @@ public sealed class CardService : ICardService
             catch (Exception ex) { _logger.LogWarning(ex, "Failed to load symbol hashes into OCR service"); }
         }
 
-        // Detect set symbol synchronously — use as a soft preference to break ties among reprints
+        // Game-specific detection (synchronous portion only — async OCR runs after card is queued)
         HashSet<string>? detectedSets = null;
+
         if (SelectedGame == CardGame.Mtg)
         {
+            // Detect set symbol synchronously — use as a soft preference to break ties among reprints
             var (symbolSets, symbolConf) = _ocrService.DetectSetSymbol(rawBytes);
             if (symbolConf >= 0.5 && symbolSets.Count > 0)
             {
@@ -337,39 +349,61 @@ public sealed class CardService : ICardService
 
             if (!_auditService.IsAuditActive)
             {
-                // Run OCR after card is in the queue
+                // Run async OCR after card is in the queue
                 OcrMatchResult? ocrResult = null;
                 try
                 {
-                    ocrResult = await _ocrService.AnalyzeCardAsync(rawBytes);
-                    if (ocrResult?.RecognizedName is not null)
+                    if (game == CardGame.OnePiece)
                     {
-                        _logger.LogInformation("OCR recognized: \"{Name}\" (confidence: {Conf:F2})", ocrResult.RecognizedName, ocrResult.NameConfidence);
-
-                        // Merge set preferences from initial symbol detection and async OCR
-                        var mergedPreferredSets = detectedSets;
-                        if (ocrResult.SymbolConfidence >= 0.5 && ocrResult.CandidateSetCodes is { Count: > 0 })
+                        // OPTCG: detect collector number for direct lookup
+                        var (collectorNumber, conf) = await _ocrService.DetectOptcgCollectorNumberAsync(rawBytes);
+                        if (collectorNumber is not null && conf >= 0.5)
                         {
-                            mergedPreferredSets ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                            foreach (var code in ocrResult.CandidateSetCodes)
-                                mergedPreferredSets.Add(code);
-                        }
+                            ocrResult = new OcrMatchResult { CollectorNumber = collectorNumber, CollectorNumberConfidence = conf };
+                            _logger.LogInformation("OPTCG collector number detected: {Number} (confidence {Conf:F2})", collectorNumber, conf);
 
-                        // Re-match with combined scoring and set preferences
-                        var (ocrMatch, ocrGame) = FindBestMatch(capturedHash, scannedCard.ArtHashes, ocrResult, capturedSetFilter, mergedPreferredSets);
-                        if (ocrMatch is not null && (scannedCard.Match is null || ocrMatch.GameSpecificId != scannedCard.Match?.GameSpecificId))
-                        {
-                            scannedCard.Match = ocrMatch;
-                            scannedCard.Game = ocrGame;
-                            _logger.LogInformation("OCR improved match to \"{CardName}\" ({SetCode} #{Number})", ocrMatch.Name, ocrMatch.SetCode, ocrMatch.CollectorNumber);
-
-                            // Clear auto-flag if OCR improved the match above the threshold
-                            if (scannedCard.FlagReason is FlagReason.NoMatch or FlagReason.VeryLowConfidence)
+                            var (ocrMatch, ocrGame) = FindBestMatch(capturedHash, scannedCard.ArtHashes, ocrResult, capturedSetFilter, null);
+                            if (ocrMatch is not null && (scannedCard.Match is null || ocrMatch.GameSpecificId != scannedCard.Match?.GameSpecificId))
                             {
-                                if (ocrMatch.Confidence is null or >= 15)
+                                scannedCard.Match = ocrMatch;
+                                scannedCard.Game = ocrGame;
+                                scannedCard.FlagReason = FlagReason.None;
+                                _logger.LogInformation("OCR matched to \"{CardName}\" ({SetCode} #{Number})", ocrMatch.Name, ocrMatch.SetCode, ocrMatch.CollectorNumber);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // MTG: name recognition + symbol detection
+                        ocrResult = await _ocrService.AnalyzeCardAsync(rawBytes);
+                        if (ocrResult?.RecognizedName is not null)
+                        {
+                            _logger.LogInformation("OCR recognized: \"{Name}\" (confidence: {Conf:F2})", ocrResult.RecognizedName, ocrResult.NameConfidence);
+
+                            // Merge set preferences from initial symbol detection and async OCR
+                            var mergedPreferredSets = detectedSets;
+                            if (ocrResult.SymbolConfidence >= 0.5 && ocrResult.CandidateSetCodes is { Count: > 0 })
+                            {
+                                mergedPreferredSets ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                                foreach (var code in ocrResult.CandidateSetCodes)
+                                    mergedPreferredSets.Add(code);
+                            }
+
+                            // Re-match with combined scoring and set preferences
+                            var (ocrMatch, ocrGame) = FindBestMatch(capturedHash, scannedCard.ArtHashes, ocrResult, capturedSetFilter, mergedPreferredSets);
+                            if (ocrMatch is not null && (scannedCard.Match is null || ocrMatch.GameSpecificId != scannedCard.Match?.GameSpecificId))
+                            {
+                                scannedCard.Match = ocrMatch;
+                                scannedCard.Game = ocrGame;
+                                _logger.LogInformation("OCR improved match to \"{CardName}\" ({SetCode} #{Number})", ocrMatch.Name, ocrMatch.SetCode, ocrMatch.CollectorNumber);
+
+                                if (scannedCard.FlagReason is FlagReason.NoMatch or FlagReason.VeryLowConfidence)
                                 {
-                                    scannedCard.FlagReason = FlagReason.None;
-                                    _logger.LogInformation("Auto-flag cleared after OCR improvement");
+                                    if (ocrMatch.Confidence is null or >= 15)
+                                    {
+                                        scannedCard.FlagReason = FlagReason.None;
+                                        _logger.LogInformation("Auto-flag cleared after OCR improvement");
+                                    }
                                 }
                             }
                         }
@@ -378,6 +412,64 @@ public sealed class CardService : ICardService
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "OCR analysis failed");
+                }
+
+                // Auto-rotate 180° and retry if still no match
+                if (scannedCard.Match is null)
+                {
+                    try
+                    {
+                        _logger.LogInformation("No match found, attempting 180° rotation for hash {Hash:X16}", scannedCard.Hash);
+                        using var bmp = new System.Drawing.Bitmap(new MemoryStream(rawBytes));
+                        bmp.RotateFlip(System.Drawing.RotateFlipType.Rotate180FlipNone);
+
+                        using var rotatedStream = new MemoryStream();
+                        bmp.Save(rotatedStream, System.Drawing.Imaging.ImageFormat.Png);
+                        rotatedStream.Position = 0;
+                        var rotatedHash = _hashService.ComputeHash(rotatedStream);
+                        rotatedStream.Position = 0;
+                        var rotatedBytes = rotatedStream.ToArray();
+
+                        // Try OCR on rotated image for One Piece
+                        OcrMatchResult? rotatedOcr = null;
+                        if (game == CardGame.OnePiece)
+                        {
+                            var (cn, cnConf) = await _ocrService.DetectOptcgCollectorNumberAsync(rotatedBytes);
+                            if (cn is not null && cnConf >= 0.5)
+                                rotatedOcr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = cnConf };
+                        }
+
+                        var (rotatedMatch, rotatedGame) = FindBestMatch(rotatedHash, null, rotatedOcr, capturedSetFilter, null);
+                        if (rotatedMatch is not null)
+                        {
+                            scannedCard.Match = rotatedMatch;
+                            scannedCard.Game = rotatedGame;
+                            scannedCard.Hash = rotatedHash;
+                            scannedCard.FlagReason = FlagReason.None;
+
+                            // Overwrite temp file with rotated image
+                            try { File.WriteAllBytes(scannedCard.TempImagePath, rotatedBytes); }
+                            catch (Exception ex) { _logger.LogWarning(ex, "Failed to save rotated image"); }
+
+                            _logger.LogInformation("180° rotation matched to \"{CardName}\" ({SetCode} #{Number})",
+                                rotatedMatch.Name, rotatedMatch.SetCode, rotatedMatch.CollectorNumber);
+                        }
+                        else
+                        {
+                            _logger.LogDebug("180° rotation did not produce a match");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Auto-rotation failed");
+                    }
+                }
+
+                // Upgrade NoMatch to MissingFromDatabase after all matching attempts exhausted
+                if (scannedCard.Match is null && scannedCard.FlagReason == FlagReason.NoMatch)
+                {
+                    scannedCard.FlagReason = FlagReason.MissingFromDatabase;
+                    _logger.LogInformation("Card flagged as missing from database (pHash + OCR exhausted)");
                 }
 
                 // Always log OCR results to diagnostics (even if OCR didn't change the match)
@@ -408,33 +500,56 @@ public sealed class CardService : ICardService
         progress?.Report("Preparing cards for collection...");
         foreach (var scan in scannedCards)
         {
-            if (scan.Match is null)
-            {
-                skipped++;
-                continue;
-            }
-
             // Use per-card override if set, otherwise use toolbar defaults
             var container = scan.OverrideContainer ?? activeContainer;
 
-            var card = new CollectionCard
+            CollectionCard card;
+            if (scan.Match is null)
             {
-                Game = scan.Game,
-                Name = scan.Match.Name,
-                SetCode = scan.Match.SetCode,
-                SetName = scan.Match.SetName,
-                Number = scan.Match.CollectorNumber,
-                Rarity = scan.Match.Rarity,
-                ImageUri = scan.Match.ImageUri,
-                GameCardId = scan.Match.GameSpecificId,
-                Condition = scan.Condition,
-                IsFoil = scan.IsFoil,
-                PurchasePrice = scan.PurchasePrice,
-                ContainerId = container?.Id,
-            };
+                // Commit as missing card if flagged MissingFromDatabase
+                if (scan.FlagReason != FlagReason.MissingFromDatabase)
+                {
+                    skipped++;
+                    continue;
+                }
 
-            card.Color = CardAttributeExtractor.ExtractColor(scan.Match, scan.Game);
-            card.CardType = CardAttributeExtractor.ExtractCardType(scan.Match, scan.Game);
+                card = new CollectionCard
+                {
+                    Game = scan.Game,
+                    Name = "Unknown Card",
+                    GameCardId = "",
+                    SetCode = "",
+                    SetName = "",
+                    Number = "",
+                    Rarity = "",
+                    Condition = scan.Condition,
+                    IsFoil = scan.IsFoil,
+                    PurchasePrice = scan.PurchasePrice,
+                    ContainerId = container?.Id,
+                    IsMissing = true,
+                };
+            }
+            else
+            {
+                card = new CollectionCard
+                {
+                    Game = scan.Game,
+                    Name = scan.Match.Name,
+                    SetCode = scan.Match.SetCode,
+                    SetName = scan.Match.SetName,
+                    Number = scan.Match.CollectorNumber,
+                    Rarity = scan.Match.Rarity,
+                    ImageUri = scan.Match.ImageUri,
+                    GameCardId = scan.Match.GameSpecificId,
+                    Condition = scan.Condition,
+                    IsFoil = scan.IsFoil,
+                    PurchasePrice = scan.PurchasePrice,
+                    ContainerId = container?.Id,
+                };
+
+                card.Color = CardAttributeExtractor.ExtractColor(scan.Match, scan.Game);
+                card.CardType = CardAttributeExtractor.ExtractCardType(scan.Match, scan.Game);
+            }
 
             if (container?.ContainerType == ContainerType.Binder)
             {
@@ -648,6 +763,10 @@ public sealed class CardService : ICardService
         context.SaveChanges();
         _logger.LogInformation("Manually added {Quantity}x {Name} ({SetCode}) to collection", quantity, match.Name, match.SetCode);
     }
+
+    public ulong ComputeHashFromStream(Stream stream) => _hashService.ComputeHash(stream);
+
+    public IOcrMatchingService OcrService => _ocrService;
 
     public void SearchCollection(string query, CardGame? gameFilter, ObservableCollection<CollectionCard> results)
         => SearchCollection(query, gameFilter, null, null, null, results);
@@ -1137,6 +1256,9 @@ public sealed class CardService : ICardService
         {
             "foil" => LinqExpression.Equal(
                 LinqExpression.Property(param, nameof(CollectionCard.IsFoil)),
+                LinqExpression.Constant(true)),
+            "missing" => LinqExpression.Equal(
+                LinqExpression.Property(param, nameof(CollectionCard.IsMissing)),
                 LinqExpression.Constant(true)),
             _ => LinqExpression.Constant(true),
         };

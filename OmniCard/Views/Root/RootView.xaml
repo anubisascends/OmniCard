@@ -207,8 +207,7 @@
             </MenuItem>
         </Menu>
 
-        <!-- Game selector hidden while focusing on MTG only -->
-        <ToolBarPanel Grid.Row="1" Visibility="Collapsed">
+        <ToolBarPanel Grid.Row="1">
             <ToolBarTray>
                 <ToolBar>
                     <TextBlock Text="Game:"

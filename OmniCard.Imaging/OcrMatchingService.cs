@@ -24,9 +24,13 @@ public sealed class OcrMatchingService : IOcrMatchingService
         (0.10, 0.05, 0.70, 0.07), // Retro (pre-8th edition)
     ];
 
-    // Set symbol crop region
+    // Set symbol crop region (MTG)
     internal static readonly (double X, double Y, double W, double H) SymbolCropRegion =
         (0.82, 0.43, 0.12, 0.07);
+
+    // OPTCG collector number crop region — bottom-right of the card (e.g., "OP15-043")
+    internal static readonly (double X, double Y, double W, double H) OptcgCollectorNumberRegion =
+        (0.40, 0.93, 0.45, 0.06);
 
     public Dictionary<string, ulong> SymbolHashes { get; set; } = [];
 
@@ -196,6 +200,45 @@ public sealed class OcrMatchingService : IOcrMatchingService
         finally
         {
             if (needsDispose) toOcr.Dispose();
+        }
+    }
+
+    public async Task<(string? CollectorNumber, double Confidence)> DetectOptcgCollectorNumberAsync(byte[] imageData)
+    {
+        if (_ocrEngine is null)
+            return (null, 0);
+
+        try
+        {
+            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            var rect = ToPixelRect(OptcgCollectorNumberRegion, bitmap.Width, bitmap.Height);
+            if (rect.Width < 10 || rect.Height < 5)
+                return (null, 0);
+
+            var (text, confidence) = await OcrCroppedRegionAsync(bitmap, rect);
+            if (string.IsNullOrWhiteSpace(text))
+                return (null, 0);
+
+            // Extract collector number pattern: 2-4 letters + 2 digits + dash + 3 digits
+            // e.g., OP15-043, EB01-021, ST01-001
+            var match = System.Text.RegularExpressions.Regex.Match(
+                text, @"([A-Za-z]{2,4}\d{2})\s*[-—]\s*(\d{2,3})",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            if (match.Success)
+            {
+                var collectorNumber = $"{match.Groups[1].Value.ToUpperInvariant()}-{match.Groups[2].Value}";
+                _logger.LogInformation("OPTCG collector number detected: {Number} (raw: {Raw})", collectorNumber, text);
+                return (collectorNumber, 0.95);
+            }
+
+            _logger.LogDebug("OPTCG collector number OCR text did not match pattern: {Text}", text);
+            return (null, 0);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "OPTCG collector number detection failed");
+            return (null, 0);
         }
     }
 

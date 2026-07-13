@@ -34,6 +34,22 @@
                 </TextBlock.Style>
             </TextBlock>
 
+            <!-- Rotation controls (single selection only) -->
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,0,0,8"
+                        Visibility="{Binding ViewModel.HasSingleSelection, Converter={StaticResource BoolToVis}}">
+                <Button Command="{Binding ViewModel.RotateLeftCommand}"
+                        ToolTip="Rotate 90° left"
+                        Padding="8,4" Margin="0,0,4,0"
+                        Style="{StaticResource MaterialDesignFlatButton}"
+                        Content="↶ Rotate Left"/>
+                <Button Command="{Binding ViewModel.RotateRightCommand}"
+                        ToolTip="Rotate 90° right"
+                        Padding="8,4"
+                        Style="{StaticResource MaterialDesignFlatButton}"
+                        Content="↷ Rotate Right"/>
+            </StackPanel>
+
             <!-- Manual search to reassign -->
             <helpers:CardSearchControl x:Name="CardSearch"
                 Margin="0,0,0,8"

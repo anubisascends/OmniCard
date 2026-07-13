@@ -421,6 +421,19 @@
                                 <Run Text="{Binding ViewModel.ScanFlaggedCount, Mode=OneWay}" FontWeight="SemiBold"/>
                             </TextBlock>
                         </Button>
+                        <!-- Flag navigation -->
+                        <TextBlock Text="|" VerticalAlignment="Center" Margin="2,0"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" FontSize="11"/>
+                        <Button Command="{Binding ViewModel.NavigateToPreviousFlagCommand}"
+                                ToolTip="Previous flagged card"
+                                Padding="4,2" Margin="0"
+                                Style="{StaticResource MaterialDesignFlatButton}"
+                                FontSize="11" Content="◄"/>
+                        <Button Command="{Binding ViewModel.NavigateToNextFlagCommand}"
+                                ToolTip="Next flagged card"
+                                Padding="4,2" Margin="0"
+                                Style="{StaticResource MaterialDesignFlatButton}"
+                                FontSize="11" Content="►"/>
                     </StackPanel>
                 </Border>
 

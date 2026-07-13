@@ -151,6 +151,67 @@ public class CollectionCardCrudTests : IDisposable
         // Should not throw
     }
 
+    [Fact]
+    public void CommitScans_MissingFromDatabase_CommitsAsUnknownCard()
+    {
+        var service = CreateService();
+
+        var scan = new ScannedCard
+        {
+            TempImagePath = Path.GetTempFileName(),
+            Hash = 0,
+            Game = CardGame.Mtg,
+            Match = null,
+            FlagReason = FlagReason.MissingFromDatabase,
+            Condition = "NM",
+            IsFoil = false,
+        };
+
+        try
+        {
+            service.CommitScans([scan]);
+
+            using var ctx = new CollectionDbContext(_options);
+            var card = ctx.Cards.AsNoTracking().Single();
+            Assert.Equal("Unknown Card", card.Name);
+            Assert.True(card.IsMissing);
+            Assert.Equal(CardGame.Mtg, card.Game);
+            Assert.Equal("", card.GameCardId);
+        }
+        finally
+        {
+            File.Delete(scan.TempImagePath);
+        }
+    }
+
+    [Fact]
+    public void CommitScans_NoMatchWithoutMissingFlag_IsSkipped()
+    {
+        var service = CreateService();
+
+        var scan = new ScannedCard
+        {
+            TempImagePath = Path.GetTempFileName(),
+            Hash = 0,
+            Game = CardGame.Mtg,
+            Match = null,
+            FlagReason = FlagReason.NoMatch,
+            Condition = "NM",
+        };
+
+        try
+        {
+            service.CommitScans([scan]);
+
+            using var ctx = new CollectionDbContext(_options);
+            Assert.Empty(ctx.Cards.ToList());
+        }
+        finally
+        {
+            File.Delete(scan.TempImagePath);
+        }
+    }
+
     private CardService CreateService()
     {
         return new CardService(
@@ -176,6 +237,7 @@ public class CollectionCardCrudTests : IDisposable
         public Dictionary<string, ulong> SymbolHashes { get; set; } = [];
         public Task<OcrMatchResult> AnalyzeCardAsync(byte[] imageData) => Task.FromResult(new OcrMatchResult());
         public (List<string> SetCodes, double Confidence) DetectSetSymbol(byte[] imageData) => ([], 0);
+        public Task<(string? CollectorNumber, double Confidence)> DetectOptcgCollectorNumberAsync(byte[] imageData) => Task.FromResult<(string?, double)>((null, 0));
     }
 
     private class NullScanDiagnosticService : IScanDiagnosticService

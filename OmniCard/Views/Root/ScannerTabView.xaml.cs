@@ -28,6 +28,13 @@ public partial class ScannerTabView : UserControl
         ViewModel.CardService.ScannedCards.CollectionChanged -= ScannedCards_CollectionChanged;
         ViewModel.CardService.ScannedCards.CollectionChanged += ScannedCards_CollectionChanged;
 
+        // Wire up flag navigation scroll callback
+        ViewModel.RequestScrollToCard = card =>
+        {
+            ScannedCardsListView.SelectedItem = card;
+            ScannedCardsListView.ScrollIntoView(card);
+        };
+
         // Restore persisted scanner list width
         if (ViewModel.ScannerListWidth > 0)
             ScannerListColumn.Width = new GridLength(ViewModel.ScannerListWidth, GridUnitType.Pixel);
@@ -98,6 +105,12 @@ public partial class ScannerTabView : UserControl
             ViewModel?.RefreshScanStats();
     }
 
+    public void ScrollToSelected()
+    {
+        if (ScannedCardsListView.SelectedItem is not null)
+            ScannedCardsListView.ScrollIntoView(ScannedCardsListView.SelectedItem);
+    }
+
     private static bool IsScrolledToBottom(ListView listView)
     {
         var scrollViewer = FindVisualChild<ScrollViewer>(listView);
@@ -137,6 +150,7 @@ public partial class ScannerTabView : UserControl
     {
         if (sender is ListView listView)
             ViewModel?.UpdateSelection(listView.SelectedItems.Cast<ScannedCard>().ToList());
+        ScrollToSelected();
     }
 
 }

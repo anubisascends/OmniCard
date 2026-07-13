@@ -5,5 +5,6 @@ public enum FlagReason
     None,
     NoMatch,
     VeryLowConfidence,
-    Manual
+    Manual,
+    MissingFromDatabase
 }

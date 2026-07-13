@@ -12,6 +12,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Data;
 using OmniCard.CardMatching;
+using OmniCard.Helpers;
 using OmniCard.Controls.Converters;
 using OmniCard.Controls.Themes;
 using OmniCard.Imaging;
@@ -37,6 +38,7 @@ public sealed partial class RootViewModel(
     SetSymbolCache setSymbolCache,
     IScanDiagnosticService diagnosticService,
     IAuditService auditService,
+    IDataPathService dataPathService,
     IOptionsMonitor<WebCompanionSettings> webCompanionSettings,
     ILogger<RootViewModel> logger) : ViewModel
 {
@@ -44,6 +46,8 @@ public sealed partial class RootViewModel(
     private readonly IScanDiagnosticService _diagnosticService = diagnosticService;
     private NotifyCollectionChangedEventHandler? _scannedCardsHandler;
     private System.Windows.Threading.DispatcherTimer? _ebaySyncTimer;
+    private bool _suppressGameChangeHandler;
+    private CardGame _previousGame;
 
     public string PhoneScanUrl
     {
@@ -453,13 +457,39 @@ public sealed partial class RootViewModel(
     [ObservableProperty]
     public partial CardGame SelectedGame { get; set; }
 
+    partial void OnSelectedGameChanging(CardGame value)
+    {
+        _previousGame = SelectedGame;
+    }
+
     partial void OnSelectedGameChanged(CardGame value)
     {
+        if (_suppressGameChangeHandler)
+            return;
+
+        if (CardService.ScannedCards.Count > 0)
+        {
+            _logger.LogWarning("Blocked game switch from {Old} to {New}: {Count} pending scan(s)",
+                _previousGame, value, CardService.ScannedCards.Count);
+
+            MessageBox.Show(
+                $"You have {CardService.ScannedCards.Count} unconfirmed scan(s). " +
+                "Please commit or discard them before switching games.",
+                "Game Switch Blocked",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+
+            _suppressGameChangeHandler = true;
+            SelectedGame = _previousGame;
+            _suppressGameChangeHandler = false;
+            return;
+        }
+
         _logger.LogInformation("Switched active game to {Game}", value);
         CardService.SelectedGame = value;
+        SetFilterText = "";
         LoadAvailableSets();
         Collection.SetGame(value);
-
         InvalidateHomeTab();
     }
 
@@ -825,6 +855,119 @@ public sealed partial class RootViewModel(
         OnPropertyChanged(nameof(HasMatchedScans));
     }
 
+    /// <summary>Callback for the view to programmatically select and scroll to a card.</summary>
+    public Action<ScannedCard>? RequestScrollToCard { get; set; }
+
+    [RelayCommand]
+    public void NavigateToNextFlag()
+    {
+        var cards = CardService.ScannedCards;
+        if (cards.Count == 0) return;
+
+        var startIndex = SelectedScannedCard is not null
+            ? cards.IndexOf(SelectedScannedCard) + 1
+            : 0;
+
+        for (var i = 0; i < cards.Count; i++)
+        {
+            var idx = (startIndex + i) % cards.Count;
+            if (cards[idx].IsFlagged)
+            {
+                SelectedScannedCard = cards[idx];
+                RequestScrollToCard?.Invoke(cards[idx]);
+                return;
+            }
+        }
+    }
+
+    [RelayCommand]
+    public void NavigateToPreviousFlag()
+    {
+        var cards = CardService.ScannedCards;
+        if (cards.Count == 0) return;
+
+        var startIndex = SelectedScannedCard is not null
+            ? cards.IndexOf(SelectedScannedCard) - 1
+            : cards.Count - 1;
+
+        for (var i = 0; i < cards.Count; i++)
+        {
+            var idx = (startIndex - i + cards.Count) % cards.Count;
+            if (cards[idx].IsFlagged)
+            {
+                SelectedScannedCard = cards[idx];
+                RequestScrollToCard?.Invoke(cards[idx]);
+                return;
+            }
+        }
+    }
+
+    [RelayCommand]
+    public async Task RotateLeft()
+    {
+        if (SelectedScannedCard is null) return;
+        await RotateScan(SelectedScannedCard, System.Drawing.RotateFlipType.Rotate270FlipNone);
+    }
+
+    [RelayCommand]
+    public async Task RotateRight()
+    {
+        if (SelectedScannedCard is null) return;
+        await RotateScan(SelectedScannedCard, System.Drawing.RotateFlipType.Rotate90FlipNone);
+    }
+
+    private async Task RotateScan(ScannedCard scan, System.Drawing.RotateFlipType rotation)
+    {
+        try
+        {
+            // Read, rotate, save
+            var imageBytes = File.ReadAllBytes(scan.TempImagePath);
+            using var bmp = new System.Drawing.Bitmap(new MemoryStream(imageBytes));
+            bmp.RotateFlip(rotation);
+
+            using var rotatedStream = new MemoryStream();
+            bmp.Save(rotatedStream, System.Drawing.Imaging.ImageFormat.Png);
+            var rotatedBytes = rotatedStream.ToArray();
+
+            File.WriteAllBytes(scan.TempImagePath, rotatedBytes);
+
+            // Recompute hash
+            rotatedStream.Position = 0;
+            var newHash = CardService.ComputeHashFromStream(rotatedStream);
+            scan.Hash = newHash;
+
+            // Re-run matching
+            OcrMatchResult? ocrResult = null;
+            if (scan.Game == CardGame.OnePiece)
+            {
+                var (cn, conf) = await CardService.OcrService.DetectOptcgCollectorNumberAsync(rotatedBytes);
+                if (cn is not null && conf >= 0.5)
+                    ocrResult = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
+            }
+
+            var (match, matchedGame) = CardService.FindBestMatch(newHash, null, ocrResult, CardService.SelectedSetFilter, null);
+            scan.Match = match;
+            scan.Game = matchedGame;
+
+            if (match is not null && scan.FlagReason is FlagReason.NoMatch or FlagReason.VeryLowConfidence or FlagReason.MissingFromDatabase)
+                scan.FlagReason = FlagReason.None;
+
+            // Force image refresh by toggling path
+            var path = scan.TempImagePath;
+            scan.TempImagePath = "";
+            scan.TempImagePath = path;
+
+            _logger.LogInformation("Manually rotated scan {Path}, new hash {Hash:X16}, match: {Match}",
+                path, newHash, match?.Name ?? "(none)");
+
+            RefreshScanStats();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Manual rotation failed");
+        }
+    }
+
     [ObservableProperty]
     public partial string ManualSearchQuery { get; set; } = "";
 
@@ -1122,6 +1265,34 @@ public sealed partial class RootViewModel(
     public async Task RefreshCardData()
     {
         _logger.LogInformation("User initiated card data refresh for {Game}", SelectedGame);
+
+        if (RefreshCooldownHelper.IsCooldownActive(dataPathService.DataDirectory, SelectedGame, out var nextAvailable))
+        {
+            var lastRefresh = RefreshCooldownHelper.GetLastRefresh(dataPathService.DataDirectory, SelectedGame);
+            var timeAgo = DateTime.UtcNow - lastRefresh.GetValueOrDefault(DateTime.UtcNow);
+            var timeAgoText = timeAgo.TotalHours >= 1
+                ? $"{(int)timeAgo.TotalHours}h {timeAgo.Minutes}m ago"
+                : timeAgo.Minutes < 1
+                    ? "less than a minute ago"
+                    : $"{timeAgo.Minutes}m ago";
+
+            _logger.LogInformation("Refresh cooldown active for {Game}, last refresh {TimeAgo}", SelectedGame, timeAgoText);
+
+            var result = MessageBox.Show(
+                $"Card data for {SelectedGame} was last refreshed {timeAgoText}.\n\n" +
+                $"Refresh is available once every 24 hours to minimize API load.\n" +
+                $"Next refresh available at {nextAvailable.ToLocalTime():g}.\n\n" +
+                "Click Yes to refresh anyway, or No to cancel.",
+                "Refresh Cooldown",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Information);
+
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            _logger.LogInformation("User forced refresh for {Game} despite cooldown", SelectedGame);
+        }
+
         var progress = new Progress<string>((str) =>
         {
             Application.Current.Dispatcher.Invoke(() =>
@@ -1131,11 +1302,14 @@ public sealed partial class RootViewModel(
         });
 
         await CardService.ActiveGameService.DownloadBulkDataAsync(progress);
+        RefreshCooldownHelper.RecordRefresh(dataPathService.DataDirectory, SelectedGame);
         LoadAvailableSets();
 
-        // Pre-download set symbol SVGs for all known sets
-        var sets = _allSets.Select(s => (s.SetCode, s.SetName)).ToList();
-        await setSymbolCache.PreloadSymbolsAsync(sets, progress);
+        if (SelectedGame == CardGame.Mtg)
+        {
+            var sets = _allSets.Select(s => (s.SetCode, s.SetName)).ToList();
+            await setSymbolCache.PreloadSymbolsAsync(sets, progress);
+        }
 
         InvalidateHomeTab();
     }

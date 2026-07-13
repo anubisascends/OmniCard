@@ -185,10 +185,13 @@ public class OptcgSetCompletionTests : IDisposable
 
     private OptcgService CreateService()
     {
+        var dataPath = new Moq.Mock<OmniCard.Interfaces.IDataPathService>();
+        dataPath.Setup(d => d.DataDirectory).Returns(Path.GetTempPath());
         return new OptcgService(
             new StubHttpClientFactory(),
             _factory,
             new PerceptualHashService(Microsoft.Extensions.Logging.Abstractions.NullLogger<PerceptualHashService>.Instance),
+            dataPath.Object,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<OptcgService>.Instance);
     }
 

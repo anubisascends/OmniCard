@@ -94,10 +94,13 @@ public class PriceResolutionTests : IDisposable
         }
 
         var dbFactory = new MockOptcgDbContextFactory(_optcgOptions);
+        var dataPath = new Moq.Mock<OmniCard.Interfaces.IDataPathService>();
+        dataPath.Setup(d => d.DataDirectory).Returns(Path.GetTempPath());
         var service = new OptcgService(
             new MockHttpClientFactory(new MockNoOpHandler()),
             dbFactory,
             new PerceptualHashService(NullLogger<PerceptualHashService>.Instance),
+            dataPath.Object,
             NullLogger<OptcgService>.Instance);
 
         Assert.Equal(5.99m, service.GetCurrentPrice("OP01-001", isFoil: false));
