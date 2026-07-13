@@ -47,6 +47,7 @@ public sealed partial class RootViewModel(
     private NotifyCollectionChangedEventHandler? _scannedCardsHandler;
     private System.Windows.Threading.DispatcherTimer? _ebaySyncTimer;
     private bool _suppressGameChangeHandler;
+    private CardGame _previousGame;
 
     public string PhoneScanUrl
     {
@@ -456,7 +457,12 @@ public sealed partial class RootViewModel(
     [ObservableProperty]
     public partial CardGame SelectedGame { get; set; }
 
-    partial void OnSelectedGameChanged(CardGame oldValue, CardGame newValue)
+    partial void OnSelectedGameChanging(CardGame value)
+    {
+        _previousGame = SelectedGame;
+    }
+
+    partial void OnSelectedGameChanged(CardGame value)
     {
         if (_suppressGameChangeHandler)
             return;
@@ -464,7 +470,7 @@ public sealed partial class RootViewModel(
         if (CardService.ScannedCards.Count > 0)
         {
             _logger.LogWarning("Blocked game switch from {Old} to {New}: {Count} pending scan(s)",
-                oldValue, newValue, CardService.ScannedCards.Count);
+                _previousGame, value, CardService.ScannedCards.Count);
 
             MessageBox.Show(
                 $"You have {CardService.ScannedCards.Count} unconfirmed scan(s). " +
@@ -474,16 +480,16 @@ public sealed partial class RootViewModel(
                 MessageBoxImage.Warning);
 
             _suppressGameChangeHandler = true;
-            SelectedGame = oldValue;
+            SelectedGame = _previousGame;
             _suppressGameChangeHandler = false;
             return;
         }
 
-        _logger.LogInformation("Switched active game to {Game}", newValue);
-        CardService.SelectedGame = newValue;
+        _logger.LogInformation("Switched active game to {Game}", value);
+        CardService.SelectedGame = value;
         SetFilterText = "";
         LoadAvailableSets();
-        Collection.SetGame(newValue);
+        Collection.SetGame(value);
         InvalidateHomeTab();
     }
 

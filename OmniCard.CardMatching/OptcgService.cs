@@ -19,17 +19,20 @@ public sealed class OptcgService : ICardGameService, IDisposable
     private readonly IDbContextFactory<OptcgDbContext> _dbContextFactory;
     private readonly IPerceptualHashService _hashService;
     private readonly ILogger<OptcgService> _logger;
+    private readonly string _dataDirectory;
     private OptcgDbContext _readContext;
 
     public OptcgService(
         IHttpClientFactory httpClientFactory,
         IDbContextFactory<OptcgDbContext> dbContextFactory,
         IPerceptualHashService hashService,
+        IDataPathService dataPathService,
         ILogger<OptcgService> logger)
     {
         _httpClientFactory = httpClientFactory;
         _dbContextFactory = dbContextFactory;
         _hashService = hashService;
+        _dataDirectory = dataPathService.DataDirectory;
         _logger = logger;
 
         _logger.LogInformation("Initializing OPTCG service");
@@ -43,6 +46,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
                 Directory.CreateDirectory(dir);
         }
         _readContext.Database.EnsureCreated();
+        _readContext.ApplySchemaUpgrades();
         _logger.LogInformation("OPTCG database ready at {DbPath}", dbPath);
     }
 
@@ -211,13 +215,25 @@ public sealed class OptcgService : ICardGameService, IDisposable
                 await throttle.WaitAsync(token);
                 try
                 {
-                    using var response = await client.GetAsync(card.CardImageUri, token);
-                    response.EnsureSuccessStatusCode();
-                    using var imageStream = await response.Content.ReadAsStreamAsync(token);
-                    using var buffer = new MemoryStream();
-                    await imageStream.CopyToAsync(buffer, token);
-                    buffer.Position = 0;
+                    var artFullPath = GetLocalArtFullPath(card.CardSetId);
+                    byte[] imageBytes;
 
+                    if (File.Exists(artFullPath))
+                    {
+                        imageBytes = await File.ReadAllBytesAsync(artFullPath, token);
+                    }
+                    else
+                    {
+                        using var response = await client.GetAsync(card.CardImageUri, token);
+                        response.EnsureSuccessStatusCode();
+                        imageBytes = await response.Content.ReadAsByteArrayAsync(token);
+
+                        var artDir = Path.GetDirectoryName(artFullPath)!;
+                        Directory.CreateDirectory(artDir);
+                        await File.WriteAllBytesAsync(artFullPath, imageBytes, token);
+                    }
+
+                    using var buffer = new MemoryStream(imageBytes);
                     var hash = _hashService.ComputeHash(buffer);
 
                     lock (saveLock)
@@ -274,10 +290,12 @@ public sealed class OptcgService : ICardGameService, IDisposable
         await using var context = _dbContextFactory.CreateDbContext();
         foreach (var (cardSetId, hash) in batch)
         {
+            var artRelativePath = GetLocalArtRelativePath(cardSetId);
             await context.Cards
                 .Where(c => c.CardSetId == cardSetId)
                 .ExecuteUpdateAsync(s => s
-                    .SetProperty(c => c.ImageHash, hash), ct);
+                    .SetProperty(c => c.ImageHash, hash)
+                    .SetProperty(c => c.LocalImagePath, artRelativePath), ct);
         }
     }
 
@@ -285,6 +303,26 @@ public sealed class OptcgService : ICardGameService, IDisposable
     {
         _logger.LogDebug("Finding closest OPTCG match for pHash {Hash:X16} (set filter: {SetFilter}, max distance: {MaxDistance})", imageHash, setFilter is not null ? string.Join(",", setFilter) : "none", maxDistance);
         LastMatchDiagnostics = new MatchDiagnostics { SetFilterActive = setFilter is not null };
+
+        // Phase 0: Direct lookup via OCR collector number (most reliable for OPTCG)
+        if (ocrResult?.CollectorNumber is not null && ocrResult.CollectorNumberConfidence >= 0.5)
+        {
+            var ocrMatch = LookupOptcgCard(ocrResult.CollectorNumber, confidence: 100);
+            if (ocrMatch is not null)
+            {
+                if (setFilter is null || setFilter.Contains(ocrMatch.SetCode))
+                {
+                    _logger.LogInformation("OPTCG OCR direct match: {CardName} ({CardSetId})", ocrMatch.Name, ocrMatch.CollectorNumber);
+                    LastMatchDiagnostics.DecisionPhase = "OcrCollectorNumber";
+                    return ocrMatch;
+                }
+                _logger.LogDebug("OPTCG OCR match {CardSetId} rejected by set filter", ocrResult.CollectorNumber);
+            }
+            else
+            {
+                _logger.LogDebug("OPTCG OCR collector number {Number} not found in database", ocrResult.CollectorNumber);
+            }
+        }
 
         if (_hashCache is null)
         {
@@ -432,6 +470,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
             Rarity = card.Rarity,
             ImageUri = card.CardImageUri,
             GameSpecificId = card.CardSetId,
+            LocalImagePath = ResolveLocalArtPath(card.LocalImagePath),
             Confidence = confidence,
             Source = card
         };
@@ -529,6 +568,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
             Rarity = card.Rarity,
             ImageUri = card.CardImageUri,
             GameSpecificId = card.CardSetId,
+            LocalImagePath = ResolveLocalArtPath(card.LocalImagePath),
             Confidence = confidence,
             Source = card
         };
@@ -590,6 +630,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
             Rarity = c.Rarity,
             ImageUri = c.CardImageUri,
             GameSpecificId = c.CardSetId,
+            LocalImagePath = ResolveLocalArtPath(c.LocalImagePath),
             Source = c
         }).ToList();
     }
@@ -615,6 +656,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
             Rarity = c.Rarity,
             ImageUri = c.CardImageUri,
             GameSpecificId = c.CardSetId,
+            LocalImagePath = ResolveLocalArtPath(c.LocalImagePath),
             Source = c
         }).ToList();
     }
@@ -668,6 +710,23 @@ public sealed class OptcgService : ICardGameService, IDisposable
     {
         using var ctx = _dbContextFactory.CreateDbContext();
         return ctx.Cards.AsNoTracking().FirstOrDefault(c => c.CardSetId == gameCardId);
+    }
+
+    private static string GetLocalArtRelativePath(string cardSetId)
+    {
+        return $"optcg-art/{cardSetId}.jpg";
+    }
+
+    private string GetLocalArtFullPath(string cardSetId)
+    {
+        return Path.Combine(_dataDirectory, "optcg-art", $"{cardSetId}.jpg");
+    }
+
+    private string? ResolveLocalArtPath(string? relativePath)
+    {
+        if (relativePath is null) return null;
+        var full = Path.Combine(_dataDirectory, relativePath);
+        return File.Exists(full) ? full : null;
     }
 
     public void Dispose() => _readContext.Dispose();

@@ -68,10 +68,13 @@ public class OptcgServiceTests : IDisposable
 
     private OptcgService CreateService()
     {
+        var dataPath = new Moq.Mock<IDataPathService>();
+        dataPath.Setup(d => d.DataDirectory).Returns(Path.GetTempPath());
         return new OptcgService(
             new StubHttpClientFactory(),
             _factory,
             new PerceptualHashService(NullLogger<PerceptualHashService>.Instance),
+            dataPath.Object,
             NullLogger<OptcgService>.Instance);
     }
 

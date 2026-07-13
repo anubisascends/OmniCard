@@ -64,4 +64,7 @@ public class OptcgCard
     // Computed locally, not from API
     [JsonIgnore]
     public ulong? ImageHash { get; set; }
+
+    [JsonIgnore]
+    public string? LocalImagePath { get; set; }
 }

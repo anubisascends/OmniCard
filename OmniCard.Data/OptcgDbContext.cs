@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Models;
 
@@ -9,6 +10,23 @@ public class OptcgDbContext : DbContext
     public DbSet<HashCorrection> HashCorrections => Set<HashCorrection>();
 
     public OptcgDbContext(DbContextOptions<OptcgDbContext> options) : base(options) { }
+
+    public void ApplySchemaUpgrades()
+    {
+        var conn = Database.GetDbConnection();
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+
+        try
+        {
+            cmd.CommandText = "ALTER TABLE Cards ADD COLUMN LocalImagePath TEXT";
+            cmd.ExecuteNonQuery();
+        }
+        catch (SqliteException ex) when (ex.Message.Contains("duplicate column name"))
+        {
+            // Column already exists
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
