@@ -129,8 +129,8 @@ public sealed class OptcgService : ICardGameService, IDisposable
 
         _logger.LogInformation("Discovered {Count} OPTCG sets", setList.Data.Count);
 
-        // Fetch each set's detail (cards + variants), throttled.
-        using var throttle = new SemaphoreSlim(4);
+        // Fetch each set's detail (cards + variants), throttled to 4 concurrent
+        // requests via Parallel.ForEachAsync's MaxDegreeOfParallelism.
         var allCards = new List<OptcgCard>();
         var cardsLock = new object();
         var fetchedSets = 0;
@@ -141,7 +141,6 @@ public sealed class OptcgService : ICardGameService, IDisposable
             CancellationToken = ct
         }, async (set, token) =>
         {
-            await throttle.WaitAsync(token);
             try
             {
                 var detail = await client.GetFromJsonAsync<OptcgSetDetailResponse>(
@@ -165,7 +164,6 @@ public sealed class OptcgService : ICardGameService, IDisposable
             }
             finally
             {
-                throttle.Release();
                 var done = Interlocked.Increment(ref fetchedSets);
                 progress?.Report($"Fetched {done}/{setList.Data.Count} sets...");
             }
@@ -461,6 +459,8 @@ public sealed class OptcgService : ICardGameService, IDisposable
         // Phase 0: Direct lookup via OCR collector number (most reliable for OPTCG)
         if (ocrResult?.CollectorNumber is not null && ocrResult.CollectorNumberConfidence >= 0.5)
         {
+            // OCR reads only the shared printed number, so this resolves to the base
+            // (index-0) variant by design — alt-art disambiguation falls to pHash below.
             var ocrMatch = LookupOptcgCard(ocrResult.CollectorNumber, confidence: 100);
             if (ocrMatch is not null)
             {
