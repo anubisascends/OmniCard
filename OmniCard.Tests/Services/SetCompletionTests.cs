@@ -179,6 +179,7 @@ public class OptcgSetCompletionTests : IDisposable
             new OptcgCard { CardSetId = "OP02-002", CardName = "Marco", SetId = "OP02", SetName = "Paramount War", Rarity = "R", CardColor = "Blue", CardType = "Character", CardCost = "3", CardPower = "4000", CardText = "Heal", CardImageUri = "https://example.com/op02-002.jpg" }
         );
         ctx.SaveChanges();
+        ctx.MarkMigrationComplete();
     }
 
     public void Dispose() => _connection.Dispose();

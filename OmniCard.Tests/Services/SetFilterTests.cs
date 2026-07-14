@@ -174,6 +174,7 @@ public class OptcgSetFilterTests : IDisposable
             ImageHash = 0x0000000000000003UL,
         });
         ctx.SaveChanges();
+        ctx.MarkMigrationComplete();
     }
 
     public void Dispose() => _connection.Dispose();

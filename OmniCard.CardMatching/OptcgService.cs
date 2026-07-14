@@ -47,7 +47,46 @@ public sealed class OptcgService : ICardGameService, IDisposable
         }
         _readContext.Database.EnsureCreated();
         _readContext.ApplySchemaUpgrades();
+
+        if (_readContext.GetSchemaVersion() < OptcgDbContext.PoneglyphSchemaVersion)
+        {
+            _logger.LogWarning("OPTCG database predates api.poneglyph.one; wiping for migration");
+            WipeForMigration();
+        }
+
         _logger.LogInformation("OPTCG database ready at {DbPath}", dbPath);
+    }
+
+    private void WipeForMigration()
+    {
+        using (var ctx = _dbContextFactory.CreateDbContext())
+        {
+            ctx.Database.ExecuteSqlRaw("DELETE FROM Cards");
+            ctx.Database.ExecuteSqlRaw("DELETE FROM HashCorrections");
+        }
+
+        var artDir = Path.Combine(_dataDirectory, "optcg-art");
+        if (Directory.Exists(artDir))
+        {
+            try
+            {
+                Directory.Delete(artDir, recursive: true);
+            }
+            catch (IOException ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete OPTCG art directory during migration wipe");
+            }
+        }
+
+        // Refresh the read context and drop in-memory caches so nothing stale survives.
+        var oldContext = _readContext;
+        _readContext = _dbContextFactory.CreateDbContext();
+        _hashCache = null;
+        _hashSetLookup = null;
+        _correctionsCache = null;
+        oldContext.Dispose();
+
+        _logger.LogInformation("OPTCG migration wipe complete");
     }
 
     public CardGame Game => CardGame.OnePiece;

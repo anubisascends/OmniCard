@@ -91,6 +91,7 @@ public class PriceResolutionTests : IDisposable
                 MarketPrice = 5.99m,
             });
             ctx.SaveChanges();
+            ctx.MarkMigrationComplete();
         }
 
         var dbFactory = new MockOptcgDbContextFactory(_optcgOptions);

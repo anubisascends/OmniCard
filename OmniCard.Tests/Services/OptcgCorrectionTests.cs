@@ -47,6 +47,7 @@ public class OptcgCorrectionTests : IDisposable
             ImageHash = 0x00000000000000FFUL,
         });
         ctx.SaveChanges();
+        ctx.MarkMigrationComplete();
     }
 
     public void Dispose() => _connection.Dispose();

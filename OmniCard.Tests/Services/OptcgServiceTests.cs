@@ -62,6 +62,7 @@ public class OptcgServiceTests : IDisposable
             MarketPrice = 0.50m,
         });
         ctx.SaveChanges();
+        ctx.MarkMigrationComplete();
     }
 
     public void Dispose() => _connection.Dispose();
