@@ -15,11 +15,20 @@ public class OptcgDbContext : DbContext
     {
         var conn = Database.GetDbConnection();
         conn.Open();
-        using var cmd = conn.CreateCommand();
 
+        AddColumnIfMissing(conn, "LocalImagePath TEXT");
+        AddColumnIfMissing(conn, "CardNumber TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(conn, "VariantIndex INTEGER NOT NULL DEFAULT 0");
+        AddColumnIfMissing(conn, "VariantLabel TEXT");
+        AddColumnIfMissing(conn, "Artist TEXT");
+    }
+
+    private static void AddColumnIfMissing(System.Data.Common.DbConnection conn, string columnDef)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"ALTER TABLE Cards ADD COLUMN {columnDef}";
         try
         {
-            cmd.CommandText = "ALTER TABLE Cards ADD COLUMN LocalImagePath TEXT";
             cmd.ExecuteNonQuery();
         }
         catch (SqliteException ex) when (ex.Message.Contains("duplicate column name"))
@@ -36,6 +45,7 @@ public class OptcgDbContext : DbContext
 
         card.HasIndex(c => c.CardName);
         card.HasIndex(c => c.SetId);
+        card.HasIndex(c => c.CardNumber);
         card.HasIndex(c => c.CardColor);
         card.HasIndex(c => c.ImageHash);
 

@@ -1,70 +1,40 @@
-using System.Text.Json.Serialization;
-
 namespace OmniCard.Models;
 
+// Persistence entity for OPTCG cards. One row per card variant (printing).
+// Populated by OptcgService from api.poneglyph.one DTOs (see OptcgApiModels).
 public class OptcgCard
 {
-    [JsonPropertyName("card_set_id")]
+    // Variant uid: bare card number for the base printing (index 0),
+    // "{CardNumber}_p{index}" for alternate arts.
     public string CardSetId { get; set; } = "";
 
-    [JsonPropertyName("card_name")]
+    // Printed collector number, e.g. "OP01-001" (shared across variants).
+    public string CardNumber { get; set; } = "";
+
+    public int VariantIndex { get; set; }
+    public string? VariantLabel { get; set; }
+    public string? Artist { get; set; }
+
     public string CardName { get; set; } = "";
-
-    [JsonPropertyName("set_id")]
     public string SetId { get; set; } = "";
-
-    [JsonPropertyName("set_name")]
     public string SetName { get; set; } = "";
-
-    [JsonPropertyName("rarity")]
     public string Rarity { get; set; } = "";
-
-    [JsonPropertyName("card_color")]
     public string CardColor { get; set; } = "";
-
-    [JsonPropertyName("card_type")]
     public string CardType { get; set; } = "";
-
-    [JsonPropertyName("card_cost")]
     public string? CardCost { get; set; }
-
-    [JsonPropertyName("card_power")]
     public string? CardPower { get; set; }
-
-    [JsonPropertyName("life")]
     public string? Life { get; set; }
-
-    [JsonPropertyName("card_text")]
     public string? CardText { get; set; }
-
-    [JsonPropertyName("sub_types")]
     public string? SubTypes { get; set; }
-
-    [JsonPropertyName("attribute")]
     public string? Attribute { get; set; }
-
-    [JsonPropertyName("counter_amount")]
     public int? CounterAmount { get; set; }
-
-    [JsonPropertyName("inventory_price")]
     public decimal? InventoryPrice { get; set; }
-
-    [JsonPropertyName("market_price")]
     public decimal? MarketPrice { get; set; }
-
-    [JsonPropertyName("card_image_id")]
     public string? CardImageId { get; set; }
-
-    [JsonPropertyName("card_image")]
     public string? CardImageUri { get; set; }
-
-    [JsonPropertyName("date_scraped")]
     public string? DateScraped { get; set; }
 
     // Computed locally, not from API
-    [JsonIgnore]
     public ulong? ImageHash { get; set; }
-
-    [JsonIgnore]
     public string? LocalImagePath { get; set; }
 }
