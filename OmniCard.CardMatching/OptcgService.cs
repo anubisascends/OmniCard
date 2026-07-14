@@ -638,9 +638,13 @@ public sealed class OptcgService : ICardGameService, IDisposable
     {
         _logger.LogInformation("Calculating set completion for OPTCG");
 
-        // Total cards per set (OPTCG uses CardSetId as unique key, SetId as set code)
+        // Total cards per set (counted by distinct printed CardNumber, so alt-art
+        // variant rows do not inflate totals; OPTCG uses CardSetId as unique key, SetId as set code)
         var setTotals = _readContext.Cards
             .AsNoTracking()
+            .Select(c => new { c.SetId, c.SetName, c.CardNumber })
+            .Distinct()
+            .AsEnumerable()
             .GroupBy(c => new { c.SetId, c.SetName })
             .Select(g => new { g.Key.SetId, g.Key.SetName, Total = g.Count() })
             .ToDictionary(s => s.SetId, s => (s.SetName, s.Total));
@@ -682,7 +686,9 @@ public sealed class OptcgService : ICardGameService, IDisposable
             .AsNoTracking()
             .Where(c => c.SetId == setCode)
             .AsEnumerable()
-            .Where(c => !ownedSet.Contains(c.CardSetId))
+            .Where(c => !ownedSet.Contains(c.CardNumber))
+            .GroupBy(c => c.CardNumber)
+            .Select(g => g.OrderBy(c => c.VariantIndex).First())
             .Select(c => new MissingCard
             {
                 Name = c.CardName,
