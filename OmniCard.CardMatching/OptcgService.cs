@@ -252,7 +252,10 @@ public sealed class OptcgService : ICardGameService, IDisposable
         }
 
         // Migration complete: stamp the version so future launches skip the wipe.
-        importContext.MarkMigrationComplete();
+        // Only stamp when we actually imported data, so a total per-set fetch
+        // failure leaves the DB unmigrated and eligible for re-download.
+        if (deduped.Count > 0)
+            importContext.MarkMigrationComplete();
 
         var oldContext = _readContext;
         _readContext = _dbContextFactory.CreateDbContext();
