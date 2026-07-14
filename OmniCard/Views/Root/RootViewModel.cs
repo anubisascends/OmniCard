@@ -1488,6 +1488,45 @@ public sealed partial class RootViewModel(
         SelectedManualSearchResult = null;
     }
 
+    /// <summary>
+    /// Ctrl+V in the scanned queue: assign a card to the selected scanned card(s) from
+    /// clipboard text. A collector-number code is looked up and assigned directly; any
+    /// other text prefills and focuses the manual search box to pick a printing.
+    /// </summary>
+    public void PasteAssign(string? clipboardText)
+    {
+        var kind = PasteClassifier.Classify(clipboardText);
+        if (kind == PasteClassifier.PasteKind.Empty)
+            return;
+
+        if (SelectedScannedCards.Count == 0)
+        {
+            Message = "Select one or more cards first.";
+            return;
+        }
+
+        var text = clipboardText!.Trim();
+        ManualSearchQuery = text;
+        ManualSearch();
+
+        if (PasteClassifier.ShouldAssignDirectly(kind, ManualSearchResults.Count))
+        {
+            SelectedManualSearchResult = ManualSearchResults[0];
+            var name = SelectedManualSearchResult.Name;
+            var count = SelectedScannedCards.Count;
+            AssignMatch(); // assigns to all selected, records corrections, clears search
+            Message = $"Assigned {name} to {count} card(s).";
+            return;
+        }
+
+        // Name paste, or a code with no/many matches (e.g. outside the set filter):
+        // let the user pick a printing from the prefilled search results.
+        FocusManualSearchBox();
+        Message = kind == PasteClassifier.PasteKind.Code
+            ? $"No exact match for {text} — pick a printing."
+            : $"Search results for \"{text}\" — pick a printing.";
+    }
+
     [RelayCommand]
     public void ConfirmMatch(ScannedCard card)
     {

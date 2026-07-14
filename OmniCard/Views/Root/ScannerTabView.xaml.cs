@@ -176,6 +176,23 @@ public partial class ScannerTabView : UserControl
                 Clipboard.SetText(value);
             e.Handled = true;
         }
+        else if (e.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            // Ctrl+V: assign a card to the selected scanned card(s) from the clipboard.
+            string text;
+            try
+            {
+                text = Clipboard.GetText();
+            }
+            catch (Exception)
+            {
+                ViewModel.Message = "Couldn't read clipboard.";
+                e.Handled = true;
+                return;
+            }
+            ViewModel.PasteAssign(text);
+            e.Handled = true;
+        }
     }
 
 }
