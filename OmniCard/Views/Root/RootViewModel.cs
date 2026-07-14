@@ -636,6 +636,8 @@ public sealed partial class RootViewModel(
         OnPropertyChanged(nameof(ShowOverrideBinderFields));
         OnPropertyChanged(nameof(ShowOverrideBoxFields));
         OnPropertyChanged(nameof(ShowPrintingSelector));
+        ConfirmMatchCommand.NotifyCanExecuteChanged();
+        ClearMatchCommand.NotifyCanExecuteChanged();
         RefreshAvailablePrintings();
     }
 
@@ -682,7 +684,11 @@ public sealed partial class RootViewModel(
         }
 
         if (e.PropertyName is nameof(ScannedCard.Match))
+        {
             OnPropertyChanged(nameof(HasMatchedScans));
+            ConfirmMatchCommand.NotifyCanExecuteChanged();
+            ClearMatchCommand.NotifyCanExecuteChanged();
+        }
     }
 
     // Scan filter/sort state
@@ -823,6 +829,32 @@ public sealed partial class RootViewModel(
         }
         ApplyScanView();
     }
+
+    [RelayCommand(CanExecute = nameof(CanClearMatch))]
+    public void ClearMatch(ScannedCard card)
+    {
+        if (card.Match is null) return;
+
+        var originalFlagReason = card.FlagReason;
+
+        card.FlagFix = new ScanFlagFix
+        {
+            FixType = "ClearMatch",
+            OriginalFlagReason = originalFlagReason,
+            OriginalData = SerializeMatchData(card.Match),
+            ResolvedData = "",
+        };
+
+        card.Match = null;
+        card.FlagReason = FlagReason.MissingFromDatabase;
+
+        try { _diagnosticService.LogUserFlagged(card.Hash, card); } catch { }
+
+        ApplyScanView();
+        Message = "Match cleared — marked as missing from database.";
+    }
+
+    public bool CanClearMatch(ScannedCard card) => card?.Match is not null;
 
     // Scan statistics
     [ObservableProperty]

@@ -152,6 +152,17 @@
                    Margin="0,0,0,8"
                    Visibility="{Binding ViewModel.AnyUnmatched, Converter={StaticResource BoolToVis}}"/>
 
+            <!-- Clear Match button (single selection with match) -->
+            <Button Content="Clear Match (Missing from DB)"
+                    Command="{Binding ViewModel.ClearMatchCommand}"
+                    CommandParameter="{Binding ViewModel.SelectedScannedCard}"
+                    Padding="12,4"
+                    Margin="0,0,0,8"
+                    Foreground="White"
+                    Background="#E65100"
+                    Style="{StaticResource MaterialDesignFlatMidBgButton}"
+                    Visibility="{Binding ViewModel.HasSingleSelection, Converter={StaticResource BoolToVis}}"/>
+
             <!-- Single-select: editable per-scan fields -->
             <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
                 CornerRadius="4"
