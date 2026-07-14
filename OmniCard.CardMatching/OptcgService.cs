@@ -72,7 +72,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
             {
                 Directory.Delete(artDir, recursive: true);
             }
-            catch (IOException ex)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 _logger.LogWarning(ex, "Failed to delete OPTCG art directory during migration wipe");
             }
