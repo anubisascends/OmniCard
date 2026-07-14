@@ -42,13 +42,15 @@ namespace OmniCard;
 
 public partial class App : Application
 {
-    private static readonly DataPathService DataPathServiceInstance = new(AppContext.BaseDirectory);
+    private static readonly string SettingsDirectory = InitSettingsDirectory();
+
+    private static readonly DataPathService DataPathServiceInstance = new(SettingsDirectory);
 
     public static IHost Host { get; } = new HostBuilder()
         .ConfigureAppConfiguration((_, config) =>
         {
-            config.SetBasePath(AppContext.BaseDirectory);
-            config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+            config.SetBasePath(SettingsDirectory);
+            config.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
             config.AddUserSecrets<App>();
         })
         .UseSerilog((context, services, loggerConfig) =>
@@ -612,5 +614,61 @@ public partial class App : Application
             "UPDATE Templates SET ProductType = 'Bundle' WHERE ProductType = 'BundleBox'");
         ctx.Database.ExecuteSqlRaw(
             "UPDATE TemplateContents SET ChildProductType = 'Bundle' WHERE ChildProductType = 'BundleBox'");
+    }
+
+    private static string InitSettingsDirectory()
+    {
+        var dir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "OmniCard");
+        Directory.CreateDirectory(dir);
+
+        var appsettingsPath = Path.Combine(dir, "appsettings.json");
+        if (!File.Exists(appsettingsPath))
+        {
+            File.WriteAllText(appsettingsPath, """
+                {
+                  "Serilog": {
+                    "MinimumLevel": {
+                      "Default": "Debug",
+                      "Override": {
+                        "Microsoft.EntityFrameworkCore": "Warning"
+                      }
+                    },
+                    "WriteTo": [
+                      {
+                        "Name": "Console",
+                        "Args": {
+                          "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}"
+                        }
+                      }
+                    ],
+                    "Enrich": [
+                      "FromLogContext"
+                    ]
+                  },
+                  "Display": {
+                    "CardDetailFontSize": 14,
+                    "Theme": "Dark"
+                  },
+                  "eBay": {
+                    "AppId": "",
+                    "CertId": "",
+                    "DevId": "",
+                    "RuName": "",
+                    "AcceptUrl": "",
+                    "Environment": "sandbox"
+                  },
+                  "Scryfall": {
+                    "Languages": ["en"]
+                  },
+                  "WebCompanion": {
+                    "BaseUrl": "https://localhost:8081"
+                  }
+                }
+                """);
+        }
+
+        return dir;
     }
 }

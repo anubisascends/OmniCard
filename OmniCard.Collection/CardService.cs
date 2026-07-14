@@ -125,6 +125,16 @@ public sealed class CardService : ICardService
             // Column already exists
         }
 
+        // Add FlagReason column for cards marked as missing from database
+        try
+        {
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Cards ADD COLUMN FlagReason TEXT");
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.Message.Contains("duplicate column name"))
+        {
+            // Column already exists
+        }
+
         _logger.LogInformation("Collection database ready at {DbPath}", dbPath);
 
         AvailableGames = _gameServices.Keys.OrderBy(g => g).ToList();
@@ -151,30 +161,12 @@ public sealed class CardService : ICardService
         if (setFilter is { Count: 0 })
             setFilter = null;
 
-        // Try selected game first
+        // Match only within the selected game — never fall back to other games
         if (_gameServices.TryGetValue(SelectedGame, out var primaryService))
         {
             var primaryMatch = primaryService.FindClosestMatch(hash, artHashes, ocrResult, setFilter, preferredSets);
             if (primaryMatch is not null)
                 return (primaryMatch, SelectedGame);
-        }
-
-        // When a set filter is active, do not fall back to other games
-        if (setFilter is not null)
-            return (null, SelectedGame);
-
-        // Fallback: try all other games (only accept high-confidence matches)
-        foreach (var (game, service) in _gameServices)
-        {
-            if (game == SelectedGame)
-                continue;
-
-            var match = service.FindClosestMatch(hash, artHashes, ocrResult);
-            if (match is not null && match.Confidence is null or >= 50)
-            {
-                _logger.LogInformation("Fallback match found in {Game} for hash {Hash:X16} (confidence {Confidence:F0}%)", game, hash, match.Confidence);
-                return (match, game);
-            }
         }
 
         return (null, SelectedGame);
@@ -527,6 +519,7 @@ public sealed class CardService : ICardService
                     PurchasePrice = scan.PurchasePrice,
                     ContainerId = container?.Id,
                     IsMissing = true,
+                    FlagReason = FlagReason.MissingFromDatabase,
                 };
             }
             else
@@ -545,6 +538,7 @@ public sealed class CardService : ICardService
                     IsFoil = scan.IsFoil,
                     PurchasePrice = scan.PurchasePrice,
                     ContainerId = container?.Id,
+                    FlagReason = scan.FlagReason != FlagReason.None ? scan.FlagReason : null,
                 };
 
                 card.Color = CardAttributeExtractor.ExtractColor(scan.Match, scan.Game);
@@ -1260,6 +1254,9 @@ public sealed class CardService : ICardService
             "missing" => LinqExpression.Equal(
                 LinqExpression.Property(param, nameof(CollectionCard.IsMissing)),
                 LinqExpression.Constant(true)),
+            "missingdb" => LinqExpression.Equal(
+                LinqExpression.Property(param, nameof(CollectionCard.FlagReason)),
+                LinqExpression.Constant((FlagReason?)FlagReason.MissingFromDatabase, typeof(FlagReason?))),
             _ => LinqExpression.Constant(true),
         };
     }

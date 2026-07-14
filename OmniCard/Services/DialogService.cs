@@ -64,6 +64,21 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         _cardWindow.Activate();
     }
 
+    public bool IsCardPreviewOpen => _cardWindow is not null;
+
+    public void UpdateCardPreview(ScannedCard? card)
+    {
+        if (_cardWindow is null) return;
+
+        if (card is null)
+        {
+            _cardWindow.ViewModel.Card = null;
+            return;
+        }
+
+        _cardWindow.ViewModel.Card = card;
+    }
+
     public bool? EditCollectionCard(CollectionCard card)
     {
         var wnd = Services.GetRequiredService<CollectionCardEditorView>();

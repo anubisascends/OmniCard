@@ -39,7 +39,8 @@ public class CollectionSortFilterTests : IDisposable
             new CollectionCard { Game = CardGame.Mtg, GameCardId = "4", Name = "Lightning Bolt", Color = "R", CardType = "Instant", SetCode = "lea", SetName = "Alpha", Rarity = "Common" },
             new CollectionCard { Game = CardGame.Mtg, GameCardId = "5", Name = "Llanowar Elves", Color = "G", CardType = "Creature", SetCode = "lea", SetName = "Alpha", Rarity = "Common" },
             new CollectionCard { Game = CardGame.Mtg, GameCardId = "6", Name = "Sol Ring", Color = "Colorless", CardType = "Artifact", SetCode = "lea", SetName = "Alpha", Rarity = "Uncommon" },
-            new CollectionCard { Game = CardGame.Mtg, GameCardId = "7", Name = "Azorius Charm", Color = "WU", CardType = "Instant", SetCode = "rtr", SetName = "RTR", Rarity = "Uncommon" }
+            new CollectionCard { Game = CardGame.Mtg, GameCardId = "7", Name = "Azorius Charm", Color = "WU", CardType = "Instant", SetCode = "rtr", SetName = "RTR", Rarity = "Uncommon" },
+            new CollectionCard { Game = CardGame.Mtg, GameCardId = "8", Name = "Unknown Card", SetCode = "", SetName = "", Rarity = "", FlagReason = FlagReason.MissingFromDatabase }
         );
         ctx.SaveChanges();
     }
@@ -133,7 +134,7 @@ public class CollectionSortFilterTests : IDisposable
         CreateService().SearchCollection("", CardGame.Mtg, null, sort, null, results);
 
         Assert.Equal("Wrath of God", results[0].Name);
-        Assert.Equal("Sol Ring", results[1].Name);
+        Assert.Equal("Unknown Card", results[1].Name);
     }
 
     [Fact]
@@ -241,6 +242,18 @@ public class CollectionSortFilterTests : IDisposable
 
         // Common instants: Dark Ritual, Lightning Bolt
         Assert.Equal(2, results.Count);
+    }
+
+    [Fact]
+    public void SearchCollection_IsMissingDb_FiltersToMissingFromDatabase()
+    {
+        var results = new ObservableCollection<CollectionCard>();
+        var filter = new FilterPreset { Name = "Missing", Game = CardGame.Mtg, Query = "is:missingdb" };
+        CreateService().SearchCollection("", CardGame.Mtg, null, null, filter, results);
+
+        Assert.Single(results);
+        Assert.Equal("Unknown Card", results[0].Name);
+        Assert.Equal(FlagReason.MissingFromDatabase, results[0].FlagReason);
     }
 
     // --- Stubs (same as CardServiceCollectionTests) ---

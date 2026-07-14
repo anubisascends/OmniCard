@@ -8,10 +8,18 @@ using OmniCard.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --db command-line argument overrides config
+// Load shared settings from %localappdata%/OmniCard (same as desktop app)
+var sharedSettingsDir = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+    "OmniCard");
+var sharedAppsettings = Path.Combine(sharedSettingsDir, "appsettings.json");
+if (File.Exists(sharedAppsettings))
+    builder.Configuration.AddJsonFile(sharedAppsettings, optional: true, reloadOnChange: true);
+
+// --db command-line argument overrides config; fall back to DataPathService's resolved directory
 var dataDir = builder.Configuration.GetValue<string>("db")
     ?? builder.Configuration.GetValue<string>("DataDirectory")
-    ?? "";
+    ?? new DataPathService(sharedSettingsDir).DataDirectory;
 
 if (string.IsNullOrWhiteSpace(dataDir))
 {
