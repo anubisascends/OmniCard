@@ -28,9 +28,12 @@ public sealed class OcrMatchingService : IOcrMatchingService
     internal static readonly (double X, double Y, double W, double H) SymbolCropRegion =
         (0.82, 0.43, 0.12, 0.07);
 
-    // OPTCG collector number crop region — bottom-right of the card (e.g., "OP15-043")
+    // OPTCG collector number crop region — bottom-right of the card (e.g., "OP15-043").
+    // Kept to the right of center so it isolates the collector number and excludes the
+    // centered subtype banner (e.g., "Straw Hat Crew") that shares the same row; a wider
+    // region caused OCR to read the subtype instead and never match the number pattern.
     internal static readonly (double X, double Y, double W, double H) OptcgCollectorNumberRegion =
-        (0.40, 0.93, 0.45, 0.06);
+        (0.68, 0.925, 0.24, 0.055);
 
     public Dictionary<string, ulong> SymbolHashes { get; set; } = [];
 
