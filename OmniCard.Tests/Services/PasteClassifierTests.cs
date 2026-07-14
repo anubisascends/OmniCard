@@ -41,13 +41,19 @@ public class PasteClassifierTests
         Assert.True(PasteClassifier.ShouldAssignDirectly(PasteClassifier.PasteKind.Code, 1));
     }
 
-    [Theory]
-    [InlineData(PasteClassifier.PasteKind.Code, 0)]
-    [InlineData(PasteClassifier.PasteKind.Code, 2)]
-    [InlineData(PasteClassifier.PasteKind.Name, 1)]
-    [InlineData(PasteClassifier.PasteKind.Empty, 1)]
-    public void ShouldAssignDirectly_OtherwiseFalse(PasteClassifier.PasteKind kind, int count)
-    {
-        Assert.False(PasteClassifier.ShouldAssignDirectly(kind, count));
-    }
+    [Fact]
+    public void ShouldAssignDirectly_CodeWithZeroResults_False()
+        => Assert.False(PasteClassifier.ShouldAssignDirectly(PasteClassifier.PasteKind.Code, 0));
+
+    [Fact]
+    public void ShouldAssignDirectly_CodeWithMultipleResults_False()
+        => Assert.False(PasteClassifier.ShouldAssignDirectly(PasteClassifier.PasteKind.Code, 2));
+
+    [Fact]
+    public void ShouldAssignDirectly_Name_False()
+        => Assert.False(PasteClassifier.ShouldAssignDirectly(PasteClassifier.PasteKind.Name, 1));
+
+    [Fact]
+    public void ShouldAssignDirectly_Empty_False()
+        => Assert.False(PasteClassifier.ShouldAssignDirectly(PasteClassifier.PasteKind.Empty, 1));
 }

@@ -4,9 +4,9 @@ namespace OmniCard.Views.Root;
 
 // Pure decision logic for Ctrl+V paste-to-assign in the scanned queue.
 // Kept separate from RootViewModel so it can be unit-tested without the view-model.
-public static partial class PasteClassifier
+internal static partial class PasteClassifier
 {
-    public enum PasteKind { Empty, Code, Name }
+    internal enum PasteKind { Empty, Code, Name }
 
     // Same pattern RootViewModel.ManualSearch uses to detect SET-NUM codes.
     [GeneratedRegex(@"^([A-Za-z0-9]+)-(\d+[A-Za-z]*)$")]
