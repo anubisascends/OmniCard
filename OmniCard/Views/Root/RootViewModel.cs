@@ -639,6 +639,9 @@ public sealed partial class RootViewModel(
         ConfirmMatchCommand.NotifyCanExecuteChanged();
         ClearMatchCommand.NotifyCanExecuteChanged();
         RefreshAvailablePrintings();
+
+        if (DialogService.IsCardPreviewOpen)
+            DialogService.UpdateCardPreview(SelectedScannedCard);
     }
 
     private void RefreshAvailablePrintings()
@@ -1137,7 +1140,7 @@ public sealed partial class RootViewModel(
 
     public bool HasMatchedScans =>
         CardService.ScannedCards.Count > 0 &&
-        CardService.ScannedCards.All(c => c.Match is not null);
+        CardService.ScannedCards.All(c => c.Match is not null || c.FlagReason == FlagReason.MissingFromDatabase);
 
     public void Initialize()
     {

@@ -7,6 +7,8 @@ public interface IDialogService
     (bool Connected, bool SetAsDefault) ConnectToScanner();
     bool? ConnectToEbay();
     void ShowCard(ScannedCard card);
+    bool IsCardPreviewOpen { get; }
+    void UpdateCardPreview(ScannedCard? card);
     bool? EditCollectionCard(CollectionCard card);
     void ManageStorageContainers();
     int? ShowImportPreview(CsvImportPreview preview);
