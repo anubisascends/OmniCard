@@ -8,8 +8,11 @@ internal static partial class PasteClassifier
 {
     internal enum PasteKind { Empty, Code, Name }
 
-    // Same pattern RootViewModel.ManualSearch uses to detect SET-NUM codes.
-    [GeneratedRegex(@"^([A-Za-z0-9]+)-(\d+[A-Za-z]*)$")]
+    // Single source of truth for the SET-NUM code pattern, shared with
+    // RootViewModel.SetCollectorNumberRegex().
+    internal const string CodePattern = @"^([A-Za-z0-9]+)-(\d+[A-Za-z]*)$";
+
+    [GeneratedRegex(CodePattern)]
     private static partial Regex CodeRegex();
 
     internal static PasteKind Classify(string? clipboardText)
