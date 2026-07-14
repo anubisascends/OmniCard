@@ -112,6 +112,45 @@ public class OptcgDownloadTests : IDisposable
         Assert.Equal(OptcgDbContext.PoneglyphSchemaVersion, ctx.GetSchemaVersion());
     }
 
+    [Fact]
+    public async Task DownloadBulkData_ExistingRow_RefreshesMetadata_PreservesHashAndImagePath()
+    {
+        using (var seedCtx = _factory.CreateDbContext())
+        {
+            seedCtx.Cards.Add(new OptcgCard
+            {
+                CardSetId = "OP01-001",
+                CardNumber = "OP01-001",
+                VariantIndex = 0,
+                CardName = "Stale Name",
+                SetId = "OP01",
+                SetName = "Romance Dawn (stale)",
+                Rarity = "L",
+                CardColor = "Red/Green",
+                MarketPrice = 1.00m,
+                DateScraped = "2020-01-01T00:00:00Z",
+                ImageHash = 12345UL,
+                LocalImagePath = "optcg-art/OP01-001.jpg",
+            });
+            seedCtx.SaveChanges();
+        }
+
+        var svc = CreateService();
+        await svc.DownloadBulkDataAsync();
+
+        using var ctx = _factory.CreateDbContext();
+        var row = ctx.Cards.Single(c => c.CardSetId == "OP01-001");
+
+        // Metadata refreshed from the API.
+        Assert.Equal("Zoro", row.CardName);
+        Assert.Equal(6.00m, row.MarketPrice);
+        Assert.Equal(1.46m, row.InventoryPrice);
+
+        // Computed/backfilled fields preserved, not nulled by the update.
+        Assert.Equal(12345UL, row.ImageHash);
+        Assert.Equal("optcg-art/OP01-001.jpg", row.LocalImagePath);
+    }
+
     private class RoutingHandler(Func<string, string?> route) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
