@@ -42,23 +42,15 @@ namespace OmniCard;
 
 public partial class App : Application
 {
-    private static readonly string SettingsDirectory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "OmniCard");
+    private static readonly string SettingsDirectory = InitSettingsDirectory();
 
     private static readonly DataPathService DataPathServiceInstance = new(SettingsDirectory);
-
-    static App()
-    {
-        Directory.CreateDirectory(SettingsDirectory);
-        EnsureDefaultSettings();
-    }
 
     public static IHost Host { get; } = new HostBuilder()
         .ConfigureAppConfiguration((_, config) =>
         {
             config.SetBasePath(SettingsDirectory);
-            config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+            config.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
             config.AddUserSecrets<App>();
         })
         .UseSerilog((context, services, loggerConfig) =>
@@ -624,9 +616,14 @@ public partial class App : Application
             "UPDATE TemplateContents SET ChildProductType = 'Bundle' WHERE ChildProductType = 'BundleBox'");
     }
 
-    private static void EnsureDefaultSettings()
+    private static string InitSettingsDirectory()
     {
-        var appsettingsPath = Path.Combine(SettingsDirectory, "appsettings.json");
+        var dir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "OmniCard");
+        Directory.CreateDirectory(dir);
+
+        var appsettingsPath = Path.Combine(dir, "appsettings.json");
         if (!File.Exists(appsettingsPath))
         {
             File.WriteAllText(appsettingsPath, """
@@ -671,5 +668,7 @@ public partial class App : Application
                 }
                 """);
         }
+
+        return dir;
     }
 }
