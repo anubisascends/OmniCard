@@ -11,6 +11,29 @@ public class OptcgDbContext : DbContext
 
     public OptcgDbContext(DbContextOptions<OptcgDbContext> options) : base(options) { }
 
+    // Identifies data sourced from api.poneglyph.one. A stored user_version below
+    // this value means the DB still holds old-API data and must be wiped.
+    public const int PoneglyphSchemaVersion = 1;
+
+    public int GetSchemaVersion()
+    {
+        var conn = Database.GetDbConnection();
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "PRAGMA user_version;";
+        return Convert.ToInt32(cmd.ExecuteScalar());
+    }
+
+    public void MarkMigrationComplete()
+    {
+        var conn = Database.GetDbConnection();
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        // PRAGMA does not accept parameters; value is a compile-time constant.
+        cmd.CommandText = $"PRAGMA user_version = {PoneglyphSchemaVersion};";
+        cmd.ExecuteNonQuery();
+    }
+
     public void ApplySchemaUpgrades()
     {
         var conn = Database.GetDbConnection();

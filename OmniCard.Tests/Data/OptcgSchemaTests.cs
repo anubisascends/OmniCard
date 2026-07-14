@@ -67,4 +67,18 @@ public class OptcgSchemaTests : IDisposable
         check.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Cards') WHERE name IN ('CardNumber','VariantIndex','VariantLabel','Artist');";
         Assert.Equal(4L, (long)check.ExecuteScalar()!);
     }
+
+    [Fact]
+    public void SchemaVersion_DefaultsToZero_ThenMarksComplete()
+    {
+        using var ctx = NewContext();
+        ctx.Database.EnsureCreated();
+
+        Assert.Equal(0, ctx.GetSchemaVersion());
+
+        ctx.MarkMigrationComplete();
+
+        Assert.Equal(OptcgDbContext.PoneglyphSchemaVersion, ctx.GetSchemaVersion());
+        Assert.True(OptcgDbContext.PoneglyphSchemaVersion >= 1);
+    }
 }
