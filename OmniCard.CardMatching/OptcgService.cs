@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OmniCard.Data;
@@ -15,6 +16,8 @@ namespace OmniCard.CardMatching;
 
 public sealed class OptcgService : ICardGameService, IDisposable
 {
+    private const string ApiBaseUrl = "https://api.poneglyph.one";
+
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IDbContextFactory<OptcgDbContext> _dbContextFactory;
     private readonly IPerceptualHashService _hashService;
@@ -47,7 +50,53 @@ public sealed class OptcgService : ICardGameService, IDisposable
         }
         _readContext.Database.EnsureCreated();
         _readContext.ApplySchemaUpgrades();
+
+        if (_readContext.GetSchemaVersion() < OptcgDbContext.PoneglyphSchemaVersion)
+        {
+            _logger.LogWarning("OPTCG database predates api.poneglyph.one; wiping for migration");
+            WipeForMigration();
+        }
+
         _logger.LogInformation("OPTCG database ready at {DbPath}", dbPath);
+    }
+
+    private void WipeForMigration()
+    {
+        try
+        {
+            using var ctx = _dbContextFactory.CreateDbContext();
+            ctx.Database.ExecuteSqlRaw("DELETE FROM Cards");
+            ctx.Database.ExecuteSqlRaw("DELETE FROM HashCorrections");
+        }
+        catch (SqliteException ex) when (ex.Message.Contains("readonly"))
+        {
+            // Read-only consumer (e.g. the Web app) hitting a not-yet-migrated DB.
+            // Skip the wipe and serve the stale data as-is rather than crashing.
+            _logger.LogWarning(ex, "OPTCG database is read-only; skipping migration wipe");
+        }
+
+        var artDir = Path.Combine(_dataDirectory, "optcg-art");
+        if (Directory.Exists(artDir))
+        {
+            try
+            {
+                Directory.Delete(artDir, recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _logger.LogWarning(ex, "Failed to delete OPTCG art directory during migration wipe");
+            }
+        }
+
+        // Refresh the read context and drop in-memory caches so nothing stale survives.
+        var oldContext = _readContext;
+        _readContext = _dbContextFactory.CreateDbContext();
+        _hashCache = null;
+        _hashSetLookup = null;
+        _correctionsCache = null;
+        oldContext.Dispose();
+
+        _logger.LogInformation("OPTCG migration wipe complete");
     }
 
     public CardGame Game => CardGame.OnePiece;
@@ -61,32 +110,72 @@ public sealed class OptcgService : ICardGameService, IDisposable
 
     public async Task DownloadBulkDataAsync(IProgress<string>? progress = null, CancellationToken ct = default)
     {
-        _logger.LogInformation("Starting OPTCG card data download");
+        _logger.LogInformation("Starting OPTCG card data download from poneglyph API");
         var sw = Stopwatch.StartNew();
 
         var client = _httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.UserAgent.ParseAdd("OmniCard/1.0");
 
-        progress?.Report("Downloading OPTCG set cards...");
-        _logger.LogDebug("Fetching all set cards from OPTCG API");
-
         var jsonOptions = new JsonSerializerOptions
         {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
             NumberHandling = JsonNumberHandling.AllowReadingFromString
         };
 
-        var cards = await client.GetFromJsonAsync<List<OptcgCard>>(
-            "https://www.optcgapi.com/api/allSetCards/", jsonOptions, ct)
-            ?? throw new InvalidOperationException("Failed to fetch card data from OPTCG API.");
+        progress?.Report("Fetching OPTCG set list...");
+        var setList = await client.GetFromJsonAsync<OptcgSetListResponse>(
+            $"{ApiBaseUrl}/v1/sets", jsonOptions, ct)
+            ?? throw new InvalidOperationException("Failed to fetch set list from poneglyph API.");
 
-        // API can return duplicate CardSetIds (alternate art variants); keep the last occurrence
-        var deduped = cards
+        _logger.LogInformation("Discovered {Count} OPTCG sets", setList.Data.Count);
+
+        // Fetch each set's detail (cards + variants), throttled to 4 concurrent
+        // requests via Parallel.ForEachAsync's MaxDegreeOfParallelism.
+        var allCards = new List<OptcgCard>();
+        var cardsLock = new object();
+        var fetchedSets = 0;
+
+        await Parallel.ForEachAsync(setList.Data, new ParallelOptions
+        {
+            MaxDegreeOfParallelism = 4,
+            CancellationToken = ct
+        }, async (set, token) =>
+        {
+            try
+            {
+                var detail = await client.GetFromJsonAsync<OptcgSetDetailResponse>(
+                    $"{ApiBaseUrl}/v1/sets/{set.Code}", jsonOptions, token);
+                if (detail is null)
+                {
+                    _logger.LogWarning("Set {SetCode} returned no detail; skipping", set.Code);
+                    return;
+                }
+
+                var rows = detail.Data.Cards
+                    .SelectMany(card => card.Variants.Select(v => MapVariant(card, v)))
+                    .ToList();
+
+                lock (cardsLock)
+                    allCards.AddRange(rows);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Failed to fetch OPTCG set {SetCode}; skipping", set.Code);
+            }
+            finally
+            {
+                var done = Interlocked.Increment(ref fetchedSets);
+                progress?.Report($"Fetched {done}/{setList.Data.Count} sets...");
+            }
+        });
+
+        // Dedupe defensively on the variant uid (primary key).
+        var deduped = allCards
             .GroupBy(c => c.CardSetId)
             .Select(g => g.Last())
             .ToList();
-        _logger.LogInformation("Downloaded {Count} cards from OPTCG API ({Unique} unique)", cards.Count, deduped.Count);
-        cards = deduped;
-        progress?.Report($"Downloaded {cards.Count} unique cards, importing...");
+        _logger.LogInformation("Fetched {Total} variant rows ({Unique} unique)", allCards.Count, deduped.Count);
+        progress?.Report($"Fetched {deduped.Count} cards, importing...");
 
         await using var importContext = _dbContextFactory.CreateDbContext();
         importContext.Database.EnsureCreated();
@@ -99,8 +188,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
         var inserted = 0;
         var updated = 0;
 
-        // Process in batches of 500
-        foreach (var batch in cards.Chunk(500))
+        foreach (var batch in deduped.Chunk(500))
         {
             var newCards = new List<OptcgCard>();
             var existingCardIds = new List<string>();
@@ -113,7 +201,8 @@ public sealed class OptcgService : ICardGameService, IDisposable
                     newCards.Add(card);
             }
 
-            // Update prices for existing cards
+            // Update all metadata (not just price) for existing rows, preserving
+            // computed ImageHash / LocalImagePath.
             if (existingCardIds.Count > 0)
             {
                 var tracked = await importContext.Cards
@@ -124,8 +213,26 @@ public sealed class OptcgService : ICardGameService, IDisposable
                 {
                     if (tracked.TryGetValue(card.CardSetId, out var existing))
                     {
+                        existing.CardNumber = card.CardNumber;
+                        existing.VariantIndex = card.VariantIndex;
+                        existing.VariantLabel = card.VariantLabel;
+                        existing.Artist = card.Artist;
+                        existing.CardName = card.CardName;
+                        existing.SetId = card.SetId;
+                        existing.SetName = card.SetName;
+                        existing.Rarity = card.Rarity;
+                        existing.CardColor = card.CardColor;
+                        existing.CardType = card.CardType;
+                        existing.CardCost = card.CardCost;
+                        existing.CardPower = card.CardPower;
+                        existing.Life = card.Life;
+                        existing.CardText = card.CardText;
+                        existing.SubTypes = card.SubTypes;
+                        existing.Attribute = card.Attribute;
+                        existing.CounterAmount = card.CounterAmount;
                         existing.InventoryPrice = card.InventoryPrice;
                         existing.MarketPrice = card.MarketPrice;
+                        existing.CardImageUri = card.CardImageUri;
                         existing.DateScraped = card.DateScraped;
                     }
                 }
@@ -135,7 +242,6 @@ public sealed class OptcgService : ICardGameService, IDisposable
                 updated += existingCardIds.Count;
             }
 
-            // Insert new cards
             if (newCards.Count > 0)
             {
                 importContext.Cards.AddRange(newCards);
@@ -151,7 +257,12 @@ public sealed class OptcgService : ICardGameService, IDisposable
             progress?.Report($"Processed {inserted + updated} cards ({inserted} new, {updated} updated)...");
         }
 
-        // Swap read context and invalidate hash cache
+        // Migration complete: stamp the version so future launches skip the wipe.
+        // Only stamp when we actually imported data, so a total per-set fetch
+        // failure leaves the DB unmigrated and eligible for re-download.
+        if (deduped.Count > 0)
+            importContext.MarkMigrationComplete();
+
         var oldContext = _readContext;
         _readContext = _dbContextFactory.CreateDbContext();
         _hashCache = null;
@@ -162,13 +273,54 @@ public sealed class OptcgService : ICardGameService, IDisposable
         _logger.LogInformation("OPTCG download complete: {Inserted} new, {Updated} updated in {ElapsedSec:F1}s", inserted, updated, sw.Elapsed.TotalSeconds);
         progress?.Report($"Download complete — {inserted} new, {updated} updated.");
 
-        // Auto-hash new records (incremental only)
         if (inserted > 0)
         {
             _logger.LogInformation("Auto-computing hashes for {Count} newly added cards", inserted);
             await ComputeImageHashesAsync(forceAll: false, progress, ct);
         }
     }
+
+    private static OptcgCard MapVariant(OptcgApiCard card, OptcgApiVariant variant)
+    {
+        var uid = variant.Index == 0 ? card.CardNumber : $"{card.CardNumber}_p{variant.Index}";
+
+        var imageUri = variant.Images.Scan.Display
+            ?? variant.Images.Scan.Full
+            ?? variant.Images.Stock.Full
+            ?? variant.Images.Stock.Thumb;
+
+        return new OptcgCard
+        {
+            CardSetId = uid,
+            CardNumber = card.CardNumber,
+            VariantIndex = variant.Index,
+            VariantLabel = variant.Label,
+            Artist = variant.Artist,
+            CardName = card.Name,
+            SetId = card.Set,
+            SetName = card.SetName,
+            Rarity = card.Rarity ?? "",
+            CardColor = string.Join("/", card.Color),
+            CardType = card.CardType,
+            CardCost = card.Cost?.ToString(),
+            CardPower = card.Power?.ToString(),
+            Life = card.Life?.ToString(),
+            CardText = card.Effect,
+            SubTypes = card.Types.Count > 0 ? string.Join("/", card.Types) : null,
+            Attribute = card.Attribute is { Count: > 0 } ? string.Join("/", card.Attribute) : null,
+            CounterAmount = card.Counter,
+            MarketPrice = ParsePrice(variant.Market.MarketPrice),
+            InventoryPrice = ParsePrice(variant.Market.LowPrice),
+            CardImageUri = imageUri,
+            DateScraped = DateTime.UtcNow.ToString("o"),
+        };
+    }
+
+    private static decimal? ParsePrice(string? raw) =>
+        decimal.TryParse(raw, System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out var value)
+            ? value
+            : null;
 
     public async Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default)
     {
@@ -307,6 +459,8 @@ public sealed class OptcgService : ICardGameService, IDisposable
         // Phase 0: Direct lookup via OCR collector number (most reliable for OPTCG)
         if (ocrResult?.CollectorNumber is not null && ocrResult.CollectorNumberConfidence >= 0.5)
         {
+            // OCR reads only the shared printed number, so this resolves to the base
+            // (index-0) variant by design — alt-art disambiguation falls to pHash below.
             var ocrMatch = LookupOptcgCard(ocrResult.CollectorNumber, confidence: 100);
             if (ocrMatch is not null)
             {
@@ -466,7 +620,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
             Name = card.CardName,
             SetCode = card.SetId,
             SetName = card.SetName,
-            CollectorNumber = card.CardSetId,
+            CollectorNumber = card.CardNumber,
             Rarity = card.Rarity,
             ImageUri = card.CardImageUri,
             GameSpecificId = card.CardSetId,
@@ -492,15 +646,19 @@ public sealed class OptcgService : ICardGameService, IDisposable
     {
         _logger.LogInformation("Calculating set completion for OPTCG");
 
-        // Total cards per set (OPTCG uses CardSetId as unique key, SetId as set code)
+        // Total cards per set (counted by distinct printed CardNumber, so alt-art
+        // variant rows do not inflate totals; SetId is the set code)
         var setTotals = _readContext.Cards
             .AsNoTracking()
+            .Select(c => new { c.SetId, c.SetName, c.CardNumber })
+            .Distinct()
+            .AsEnumerable()
             .GroupBy(c => new { c.SetId, c.SetName })
             .Select(g => new { g.Key.SetId, g.Key.SetName, Total = g.Count() })
             .ToDictionary(s => s.SetId, s => (s.SetName, s.Total));
 
         // Owned cards per set (CollectionCard.SetCode stores SetId for OPTCG,
-        // CollectionCard.Number stores CardSetId)
+        // CollectionCard.Number stores the printed CardNumber)
         var ownedPerSet = ownedCards
             .GroupBy(c => c.SetCode)
             .ToDictionary(g => g.Key, g => g.Select(c => c.Number).Distinct().Count());
@@ -536,11 +694,13 @@ public sealed class OptcgService : ICardGameService, IDisposable
             .AsNoTracking()
             .Where(c => c.SetId == setCode)
             .AsEnumerable()
-            .Where(c => !ownedSet.Contains(c.CardSetId))
+            .Where(c => !ownedSet.Contains(c.CardNumber))
+            .GroupBy(c => c.CardNumber)
+            .Select(g => g.OrderBy(c => c.VariantIndex).First())
             .Select(c => new MissingCard
             {
                 Name = c.CardName,
-                CollectorNumber = c.CardSetId,
+                CollectorNumber = c.CardNumber,
                 SetCode = c.SetId,
                 Rarity = c.Rarity,
                 ImageUri = c.CardImageUri,
@@ -564,7 +724,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
             Name = card.CardName,
             SetCode = card.SetId,
             SetName = card.SetName,
-            CollectorNumber = card.CardSetId,
+            CollectorNumber = card.CardNumber,
             Rarity = card.Rarity,
             ImageUri = card.CardImageUri,
             GameSpecificId = card.CardSetId,
@@ -631,7 +791,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
             Name = c.CardName,
             SetCode = c.SetId,
             SetName = c.SetName,
-            CollectorNumber = c.CardSetId,
+            CollectorNumber = c.CardNumber,
             Rarity = c.Rarity,
             ImageUri = c.CardImageUri,
             GameSpecificId = c.CardSetId,
@@ -657,7 +817,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
             Name = c.CardName,
             SetCode = c.SetId,
             SetName = c.SetName,
-            CollectorNumber = c.CardSetId,
+            CollectorNumber = c.CardNumber,
             Rarity = c.Rarity,
             ImageUri = c.CardImageUri,
             GameSpecificId = c.CardSetId,

@@ -11,20 +11,54 @@ public class OptcgDbContext : DbContext
 
     public OptcgDbContext(DbContextOptions<OptcgDbContext> options) : base(options) { }
 
-    public void ApplySchemaUpgrades()
+    // Identifies data sourced from api.poneglyph.one. A stored user_version below
+    // this value means the DB still holds old-API data and must be wiped.
+    public const int PoneglyphSchemaVersion = 1;
+
+    public int GetSchemaVersion()
     {
         var conn = Database.GetDbConnection();
         conn.Open();
         using var cmd = conn.CreateCommand();
+        cmd.CommandText = "PRAGMA user_version;";
+        return Convert.ToInt32(cmd.ExecuteScalar());
+    }
 
+    public void MarkMigrationComplete()
+    {
+        var conn = Database.GetDbConnection();
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        // PRAGMA does not accept parameters; value is a compile-time constant.
+        cmd.CommandText = $"PRAGMA user_version = {PoneglyphSchemaVersion};";
+        cmd.ExecuteNonQuery();
+    }
+
+    public void ApplySchemaUpgrades()
+    {
+        var conn = Database.GetDbConnection();
+        conn.Open();
+
+        AddColumnIfMissing(conn, "LocalImagePath TEXT");
+        AddColumnIfMissing(conn, "CardNumber TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(conn, "VariantIndex INTEGER NOT NULL DEFAULT 0");
+        AddColumnIfMissing(conn, "VariantLabel TEXT");
+        AddColumnIfMissing(conn, "Artist TEXT");
+    }
+
+    private static void AddColumnIfMissing(System.Data.Common.DbConnection conn, string columnDef)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"ALTER TABLE Cards ADD COLUMN {columnDef}";
         try
         {
-            cmd.CommandText = "ALTER TABLE Cards ADD COLUMN LocalImagePath TEXT";
             cmd.ExecuteNonQuery();
         }
-        catch (SqliteException ex) when (ex.Message.Contains("duplicate column name"))
+        catch (SqliteException ex) when (ex.Message.Contains("duplicate column name") || ex.Message.Contains("readonly"))
         {
-            // Column already exists
+            // Column already exists, or the database is read-only (e.g. the Web app's
+            // read-only connection hitting a not-yet-migrated DB). Either way, skip
+            // the ALTER and let the caller serve whatever schema/data already exists.
         }
     }
 
@@ -36,6 +70,7 @@ public class OptcgDbContext : DbContext
 
         card.HasIndex(c => c.CardName);
         card.HasIndex(c => c.SetId);
+        card.HasIndex(c => c.CardNumber);
         card.HasIndex(c => c.CardColor);
         card.HasIndex(c => c.ImageHash);
 
