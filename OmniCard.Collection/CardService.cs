@@ -125,6 +125,16 @@ public sealed class CardService : ICardService
             // Column already exists
         }
 
+        // Add FlagReason column for cards marked as missing from database
+        try
+        {
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Cards ADD COLUMN FlagReason TEXT");
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.Message.Contains("duplicate column name"))
+        {
+            // Column already exists
+        }
+
         _logger.LogInformation("Collection database ready at {DbPath}", dbPath);
 
         AvailableGames = _gameServices.Keys.OrderBy(g => g).ToList();
@@ -509,6 +519,7 @@ public sealed class CardService : ICardService
                     PurchasePrice = scan.PurchasePrice,
                     ContainerId = container?.Id,
                     IsMissing = true,
+                    FlagReason = FlagReason.MissingFromDatabase,
                 };
             }
             else
@@ -527,6 +538,7 @@ public sealed class CardService : ICardService
                     IsFoil = scan.IsFoil,
                     PurchasePrice = scan.PurchasePrice,
                     ContainerId = container?.Id,
+                    FlagReason = scan.FlagReason != FlagReason.None ? scan.FlagReason : null,
                 };
 
                 card.Color = CardAttributeExtractor.ExtractColor(scan.Match, scan.Game);

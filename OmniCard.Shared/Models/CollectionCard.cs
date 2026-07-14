@@ -27,6 +27,7 @@ public class CollectionCard
     public string? Color { get; set; }
     public string? CardType { get; set; }
     public bool IsMissing { get; set; }
+    public FlagReason? FlagReason { get; set; }
     public EbayListing? EbayListing { get; set; }
 
     /// <summary>Cached market price for display and sorting. Not persisted.</summary>

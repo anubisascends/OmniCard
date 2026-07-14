@@ -21,6 +21,7 @@ public class CollectionDbContext : DbContext
         card.HasKey(c => c.Id);
         card.Property(c => c.Id).ValueGeneratedOnAdd();
         card.Property(c => c.Game).HasConversion<string>();
+        card.Property(c => c.FlagReason).HasConversion<string?>();
 
         card.HasIndex(c => new { c.Game, c.GameCardId });
         card.HasIndex(c => c.Name);
