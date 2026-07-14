@@ -172,11 +172,11 @@ public class OptcgSetCompletionTests : IDisposable
 
         // Seed: OP01 has 3 cards, OP02 has 2 cards
         ctx.Cards.AddRange(
-            new OptcgCard { CardSetId = "OP01-001", CardName = "Luffy", SetId = "OP01", SetName = "Romance Dawn", Rarity = "SR", CardColor = "Red", CardType = "Leader", CardCost = "5", CardPower = "5000", CardText = "Rush", CardImageUri = "https://example.com/op01-001.jpg" },
-            new OptcgCard { CardSetId = "OP01-002", CardName = "Zoro", SetId = "OP01", SetName = "Romance Dawn", Rarity = "SR", CardColor = "Green", CardType = "Character", CardCost = "3", CardPower = "4000", CardText = "Slash", CardImageUri = "https://example.com/op01-002.jpg" },
-            new OptcgCard { CardSetId = "OP01-003", CardName = "Nami", SetId = "OP01", SetName = "Romance Dawn", Rarity = "R", CardColor = "Blue", CardType = "Character", CardCost = "2", CardPower = "3000", CardText = "Draw 1", CardImageUri = "https://example.com/op01-003.jpg" },
-            new OptcgCard { CardSetId = "OP02-001", CardName = "Ace", SetId = "OP02", SetName = "Paramount War", Rarity = "SR", CardColor = "Red", CardType = "Character", CardCost = "4", CardPower = "5000", CardText = "Fire", CardImageUri = "https://example.com/op02-001.jpg" },
-            new OptcgCard { CardSetId = "OP02-002", CardName = "Marco", SetId = "OP02", SetName = "Paramount War", Rarity = "R", CardColor = "Blue", CardType = "Character", CardCost = "3", CardPower = "4000", CardText = "Heal", CardImageUri = "https://example.com/op02-002.jpg" }
+            new OptcgCard { CardSetId = "OP01-001", CardNumber = "OP01-001", CardName = "Luffy", SetId = "OP01", SetName = "Romance Dawn", Rarity = "SR", CardColor = "Red", CardType = "Leader", CardCost = "5", CardPower = "5000", CardText = "Rush", CardImageUri = "https://example.com/op01-001.jpg" },
+            new OptcgCard { CardSetId = "OP01-002", CardNumber = "OP01-002", CardName = "Zoro", SetId = "OP01", SetName = "Romance Dawn", Rarity = "SR", CardColor = "Green", CardType = "Character", CardCost = "3", CardPower = "4000", CardText = "Slash", CardImageUri = "https://example.com/op01-002.jpg" },
+            new OptcgCard { CardSetId = "OP01-003", CardNumber = "OP01-003", CardName = "Nami", SetId = "OP01", SetName = "Romance Dawn", Rarity = "R", CardColor = "Blue", CardType = "Character", CardCost = "2", CardPower = "3000", CardText = "Draw 1", CardImageUri = "https://example.com/op01-003.jpg" },
+            new OptcgCard { CardSetId = "OP02-001", CardNumber = "OP02-001", CardName = "Ace", SetId = "OP02", SetName = "Paramount War", Rarity = "SR", CardColor = "Red", CardType = "Character", CardCost = "4", CardPower = "5000", CardText = "Fire", CardImageUri = "https://example.com/op02-001.jpg" },
+            new OptcgCard { CardSetId = "OP02-002", CardNumber = "OP02-002", CardName = "Marco", SetId = "OP02", SetName = "Paramount War", Rarity = "R", CardColor = "Blue", CardType = "Character", CardCost = "3", CardPower = "4000", CardText = "Heal", CardImageUri = "https://example.com/op02-002.jpg" }
         );
         ctx.SaveChanges();
         ctx.MarkMigrationComplete();
