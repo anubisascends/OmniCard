@@ -81,6 +81,60 @@ public class OptcgMigrationTests : IDisposable
         Assert.True(File.Exists(Path.Combine(_dataDir, "optcg-art", "OP01-001.jpg")));
     }
 
+    [Fact]
+    public void Constructor_ReadOnlyLegacyDatabase_DoesNotThrow()
+    {
+        // Mode=ReadOnly can't seed an in-memory db, so use a temp file: seed it
+        // writable (leaving user_version = 0, i.e. not yet migrated), close it,
+        // then reopen read-only and construct the service over it.
+        var dbFile = Path.Combine(Path.GetTempPath(), "optcg-readonly-test-" + Guid.NewGuid().ToString("N") + ".db");
+        var readOnlyArtDir = Path.Combine(Path.GetTempPath(), "optcg-readonly-art-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var writableOptions = new DbContextOptionsBuilder<OptcgDbContext>()
+                .UseSqlite($"Data Source={dbFile}").Options;
+            using (var seedCtx = new OptcgDbContext(writableOptions))
+            {
+                seedCtx.Database.EnsureCreated();
+                seedCtx.Cards.Add(new OptcgCard { CardSetId = "OP01-001", CardNumber = "OP01-001", CardName = "Zoro", SetId = "OP01" });
+                seedCtx.SaveChanges();
+                // Intentionally do NOT call MarkMigrationComplete: user_version stays 0.
+            }
+            SqliteConnection.ClearAllPools();
+
+            var readOnlyOptions = new DbContextOptionsBuilder<OptcgDbContext>()
+                .UseSqlite($"Data Source={dbFile};Mode=ReadOnly").Options;
+            var readOnlyFactory = new TestOptcgDbFactory(readOnlyOptions);
+
+            var dataPath = new Moq.Mock<IDataPathService>();
+            dataPath.Setup(d => d.DataDirectory).Returns(readOnlyArtDir);
+
+            OptcgService? svc = null;
+            var ex = Record.Exception(() =>
+            {
+                svc = new OptcgService(
+                    new StubHttpClientFactory(),
+                    readOnlyFactory,
+                    new PerceptualHashService(NullLogger<PerceptualHashService>.Instance),
+                    dataPath.Object,
+                    NullLogger<OptcgService>.Instance);
+            });
+
+            Assert.Null(ex);
+            svc?.Dispose();
+        }
+        finally
+        {
+            // Best-effort cleanup: if construction threw mid-way, the aborted
+            // instance's connection may still hold the file open until GC runs.
+            // Never let cleanup failures mask the real assertion result above.
+            try { SqliteConnection.ClearAllPools(); } catch { /* ignore */ }
+            try { GC.Collect(); GC.WaitForPendingFinalizers(); } catch { /* ignore */ }
+            try { if (File.Exists(dbFile)) File.Delete(dbFile); } catch { /* ignore */ }
+            try { if (Directory.Exists(readOnlyArtDir)) Directory.Delete(readOnlyArtDir, recursive: true); } catch { /* ignore */ }
+        }
+    }
+
     private class TestOptcgDbFactory(DbContextOptions<OptcgDbContext> options) : IDbContextFactory<OptcgDbContext>
     {
         public OptcgDbContext CreateDbContext() => new(options);

@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OmniCard.Data;
@@ -61,10 +62,17 @@ public sealed class OptcgService : ICardGameService, IDisposable
 
     private void WipeForMigration()
     {
-        using (var ctx = _dbContextFactory.CreateDbContext())
+        try
         {
+            using var ctx = _dbContextFactory.CreateDbContext();
             ctx.Database.ExecuteSqlRaw("DELETE FROM Cards");
             ctx.Database.ExecuteSqlRaw("DELETE FROM HashCorrections");
+        }
+        catch (SqliteException ex) when (ex.Message.Contains("readonly"))
+        {
+            // Read-only consumer (e.g. the Web app) hitting a not-yet-migrated DB.
+            // Skip the wipe and serve the stale data as-is rather than crashing.
+            _logger.LogWarning(ex, "OPTCG database is read-only; skipping migration wipe");
         }
 
         var artDir = Path.Combine(_dataDirectory, "optcg-art");

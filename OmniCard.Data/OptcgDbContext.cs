@@ -54,9 +54,11 @@ public class OptcgDbContext : DbContext
         {
             cmd.ExecuteNonQuery();
         }
-        catch (SqliteException ex) when (ex.Message.Contains("duplicate column name"))
+        catch (SqliteException ex) when (ex.Message.Contains("duplicate column name") || ex.Message.Contains("readonly"))
         {
-            // Column already exists
+            // Column already exists, or the database is read-only (e.g. the Web app's
+            // read-only connection hitting a not-yet-migrated DB). Either way, skip
+            // the ALTER and let the caller serve whatever schema/data already exists.
         }
     }
 
