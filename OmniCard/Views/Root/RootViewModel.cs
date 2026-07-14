@@ -1396,8 +1396,9 @@ public sealed partial class RootViewModel(
         InvalidateHomeTab();
     }
 
-    // Matches SET-NUM patterns like TMT-002, OP15-041, BRC-85a
-    [GeneratedRegex(@"^([A-Za-z0-9]+)-(\d+[A-Za-z]*)$")]
+    // Matches SET-NUM patterns like TMT-002, OP15-041, BRC-85a.
+    // Pattern is single-sourced in PasteClassifier.CodePattern.
+    [GeneratedRegex(PasteClassifier.CodePattern)]
     private static partial Regex SetCollectorNumberRegex();
 
     [RelayCommand]
@@ -1486,6 +1487,59 @@ public sealed partial class RootViewModel(
         ManualSearchResults.Clear();
         ManualSearchQuery = "";
         SelectedManualSearchResult = null;
+    }
+
+    /// <summary>
+    /// Ctrl+V in the scanned queue: assign a card to the selected scanned card(s) from
+    /// clipboard text. A collector-number code is looked up and assigned directly; any
+    /// other text prefills and focuses the manual search box to pick a printing.
+    /// </summary>
+    public void PasteAssign(string? clipboardText)
+    {
+        var kind = PasteClassifier.Classify(clipboardText);
+        if (kind == PasteClassifier.PasteKind.Empty)
+            return;
+
+        if (SelectedScannedCards.Count == 0)
+        {
+            Message = "Select one or more cards first.";
+            return;
+        }
+
+        var text = clipboardText!.Trim();
+        ManualSearchQuery = text;
+        ManualSearch();
+
+        if (PasteClassifier.ShouldAssignDirectly(kind, ManualSearchResults.Count))
+        {
+            var result = ManualSearchResults[0];
+
+            // A code is a printed number shared across alternate-art printings. If more than
+            // one printing shares it, don't guess which — let the user pick from search.
+            var printingCount = CardService.ActiveGameService
+                .GetPrintings(result.Name)
+                .Count(p => p.CollectorNumber == result.CollectorNumber);
+
+            if (printingCount <= 1)
+            {
+                SelectedManualSearchResult = result;
+                var name = result.Name;
+                var count = SelectedScannedCards.Count;
+                AssignMatch(); // assigns to all selected, records corrections, clears search
+                Message = $"Assigned {name} to {count} card(s).";
+                return;
+            }
+
+            FocusManualSearchBox();
+            Message = $"{printingCount} printings of {result.Name} ({result.CollectorNumber}) — pick one.";
+            return;
+        }
+
+        // Name paste, or a code with no matches → let the user pick / refine.
+        FocusManualSearchBox();
+        Message = kind == PasteClassifier.PasteKind.Code
+            ? $"No match for {text}."
+            : $"Search results for \"{text}\" — pick a printing.";
     }
 
     [RelayCommand]
