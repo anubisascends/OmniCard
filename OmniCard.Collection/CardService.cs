@@ -151,30 +151,12 @@ public sealed class CardService : ICardService
         if (setFilter is { Count: 0 })
             setFilter = null;
 
-        // Try selected game first
+        // Match only within the selected game — never fall back to other games
         if (_gameServices.TryGetValue(SelectedGame, out var primaryService))
         {
             var primaryMatch = primaryService.FindClosestMatch(hash, artHashes, ocrResult, setFilter, preferredSets);
             if (primaryMatch is not null)
                 return (primaryMatch, SelectedGame);
-        }
-
-        // When a set filter is active, do not fall back to other games
-        if (setFilter is not null)
-            return (null, SelectedGame);
-
-        // Fallback: try all other games (only accept high-confidence matches)
-        foreach (var (game, service) in _gameServices)
-        {
-            if (game == SelectedGame)
-                continue;
-
-            var match = service.FindClosestMatch(hash, artHashes, ocrResult);
-            if (match is not null && match.Confidence is null or >= 50)
-            {
-                _logger.LogInformation("Fallback match found in {Game} for hash {Hash:X16} (confidence {Confidence:F0}%)", game, hash, match.Confidence);
-                return (match, game);
-            }
         }
 
         return (null, SelectedGame);

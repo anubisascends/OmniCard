@@ -30,9 +30,9 @@ public class FallbackMatchingTests : IDisposable
     public void Dispose() => _collectionConnection.Dispose();
 
     [Fact]
-    public void FindBestMatch_ReturnsMatchFromOtherGame_WhenPrimaryFails()
+    public void FindBestMatch_ReturnsNull_WhenPrimaryGameHasNoMatch()
     {
-        var expectedMatch = new CardMatch
+        var otherGameMatch = new CardMatch
         {
             Name = "Lightning Bolt",
             SetCode = "lea",
@@ -44,18 +44,15 @@ public class FallbackMatchingTests : IDisposable
         };
 
         var noMatchService = new StubGameService(CardGame.OnePiece, match: null);
-        var matchService = new StubGameService(CardGame.Mtg, match: expectedMatch);
+        var matchService = new StubGameService(CardGame.Mtg, match: otherGameMatch);
 
         var service = CreateCardService([noMatchService, matchService]);
-
-        // Selected game is OnePiece (first in enum order), which has no match
         service.SelectedGame = CardGame.OnePiece;
 
         var (match, game) = service.FindBestMatch(0xDEADBEEF);
 
-        Assert.NotNull(match);
-        Assert.Equal("Lightning Bolt", match.Name);
-        Assert.Equal(CardGame.Mtg, game);
+        Assert.Null(match);
+        Assert.Equal(CardGame.OnePiece, game);
     }
 
     [Fact]
@@ -159,7 +156,6 @@ public class FallbackMatchingTests : IDisposable
         var service = CreateCardService([mtgService, opService]);
         service.SelectedGame = CardGame.OnePiece;
 
-        // Add an unmatched card and an already-matched card
         var unmatched = CreateScannedCard(CardGame.OnePiece, hash: 0xAABB, match: null);
         var matched = CreateScannedCard(CardGame.OnePiece, hash: 0xCCDD, match: existingMatch);
         service.ScannedCards.Add(unmatched);
@@ -167,10 +163,9 @@ public class FallbackMatchingTests : IDisposable
 
         service.ReprocessScans();
 
-        // Unmatched card should now have a match and game switched to MTG
-        Assert.NotNull(unmatched.Match);
-        Assert.Equal("Bolt", unmatched.Match.Name);
-        Assert.Equal(CardGame.Mtg, unmatched.Game);
+        // Unmatched card should remain unmatched — no cross-game fallback
+        Assert.Null(unmatched.Match);
+        Assert.Equal(CardGame.OnePiece, unmatched.Game);
 
         // Already-matched card should be unchanged
         Assert.Equal("Zoro", matched.Match!.Name);
