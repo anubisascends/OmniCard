@@ -1254,6 +1254,9 @@ public sealed class CardService : ICardService
             "missing" => LinqExpression.Equal(
                 LinqExpression.Property(param, nameof(CollectionCard.IsMissing)),
                 LinqExpression.Constant(true)),
+            "missingdb" => LinqExpression.Equal(
+                LinqExpression.Property(param, nameof(CollectionCard.FlagReason)),
+                LinqExpression.Constant((FlagReason?)FlagReason.MissingFromDatabase, typeof(FlagReason?))),
             _ => LinqExpression.Constant(true),
         };
     }
