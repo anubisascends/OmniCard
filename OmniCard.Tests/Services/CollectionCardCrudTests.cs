@@ -229,6 +229,7 @@ public class CollectionCardCrudTests : IDisposable
     private class StubHashService : IPerceptualHashService
     {
         public ulong ComputeHash(System.IO.Stream imageStream, Action<HashStageResult>? onStage = null) => 0;
+        public ulong ComputeEdgeHash(System.IO.Stream imageStream, Action<HashStageResult>? onStage = null) => 0;
         public ulong[] ComputeArtHash(System.IO.Stream imageStream, (double X, double Y, double W, double H)[] cropRegions, Action<HashStageResult>? onStage = null) => new ulong[cropRegions.Length];
     }
 

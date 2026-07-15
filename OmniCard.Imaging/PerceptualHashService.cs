@@ -46,12 +46,26 @@ public sealed class PerceptualHashService : IPerceptualHashService
         // Extract pixel luminance as doubles
         var pixels = ExtractPixels(grayscale);
 
-        // 2D DCT (Type-II, separable: rows then columns)
-        var dct = ComputeDct2D(pixels);
-        if (onStage is not null)
-            onStage(new HashStageResult("DCT Coefficients", RenderDctHeatmap(dct)));
+        // DCT + median-threshold hash (shared with the edge hash).
+        var hash = ComputeHashFromPixels(pixels, out var dct);
 
-        // Extract low-frequency coefficients (top-left HashSize x HashSize), excluding DC
+        if (onStage is not null)
+        {
+            onStage(new HashStageResult("DCT Coefficients", RenderDctHeatmap(dct)));
+            onStage(new HashStageResult("Hash", RenderHashGrid(hash)));
+        }
+
+        sw.Stop();
+        _logger.LogDebug("Computed pHash {Hash:X16} from {Width}x{Height} image in {ElapsedMs}ms", hash, original.Width, original.Height, sw.ElapsedMilliseconds);
+        return hash;
+    }
+
+    // DCT-II of the 32x32 input, then a median-threshold hash over the low-frequency
+    // 8x8 block (DC excluded from the median). Shared by ComputeHash and ComputeEdgeHash.
+    private static ulong ComputeHashFromPixels(double[,] pixels, out double[,] dct)
+    {
+        dct = ComputeDct2D(pixels);
+
         var values = new double[HashSize * HashSize - 1];
         int idx = 0;
         for (int y = 0; y < HashSize; y++)
@@ -63,7 +77,6 @@ public sealed class PerceptualHashService : IPerceptualHashService
             }
         }
 
-        // Generate hash: bit=1 when coefficient exceeds median
         var median = Median(values);
         ulong hash = 0;
         for (int y = 0; y < HashSize; y++)
@@ -74,13 +87,51 @@ public sealed class PerceptualHashService : IPerceptualHashService
                     hash |= 1UL << (y * HashSize + x);
             }
         }
+        return hash;
+    }
 
+    public ulong ComputeEdgeHash(Stream imageStream, Action<HashStageResult>? onStage = null)
+    {
+        var sw = Stopwatch.StartNew();
+        using var original = LoadBitmap(imageStream);
+        onStage?.Invoke(new HashStageResult("Original", BitmapToPng(original)));
+
+        // Grayscale + resize to 32x32, then gradient magnitude — captures structure
+        // (shape boundaries) and discards color/brightness, so a foil color shift barely
+        // moves the hash.
+        using var grayscale = ToGrayscaleResized(original, ImageSize, ImageSize);
+        var pixels = ExtractPixels(grayscale);
+        var gradient = GradientMagnitude(pixels);
+
+        var hash = ComputeHashFromPixels(gradient, out var dct);
         if (onStage is not null)
+        {
+            onStage(new HashStageResult("DCT Coefficients", RenderDctHeatmap(dct)));
             onStage(new HashStageResult("Hash", RenderHashGrid(hash)));
+        }
 
         sw.Stop();
-        _logger.LogDebug("Computed pHash {Hash:X16} from {Width}x{Height} image in {ElapsedMs}ms", hash, original.Width, original.Height, sw.ElapsedMilliseconds);
+        _logger.LogDebug("Computed edge hash {Hash:X16} from {Width}x{Height} image in {ElapsedMs}ms", hash, original.Width, original.Height, sw.ElapsedMilliseconds);
         return hash;
+    }
+
+    // Per-pixel gradient magnitude (|dx| + |dy|) on a [height,width] luminance array in [0,1].
+    // Edge/right/bottom borders reuse the nearest interior difference (zero at the far edge).
+    private static double[,] GradientMagnitude(double[,] pixels)
+    {
+        int h = pixels.GetLength(0);
+        int w = pixels.GetLength(1);
+        var result = new double[h, w];
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                double dx = x + 1 < w ? Math.Abs(pixels[y, x + 1] - pixels[y, x]) : 0;
+                double dy = y + 1 < h ? Math.Abs(pixels[y + 1, x] - pixels[y, x]) : 0;
+                result[y, x] = dx + dy;
+            }
+        }
+        return result;
     }
 
     public ulong[] ComputeArtHash(Stream imageStream, (double X, double Y, double W, double H)[] cropRegions, Action<HashStageResult>? onStage = null)
