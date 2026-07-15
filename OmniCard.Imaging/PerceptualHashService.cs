@@ -7,8 +7,7 @@ using System.Numerics;
 using Microsoft.Extensions.Logging;
 using OmniCard.Interfaces;
 using OmniCard.Models;
-using Windows.Graphics.Imaging;
-using Windows.Storage.Streams;
+using SkiaSharp;
 namespace OmniCard.Imaging;
 
 /// <summary>
@@ -282,8 +281,8 @@ public sealed class PerceptualHashService : IPerceptualHashService
     // Loads an image into a System.Drawing.Bitmap. GDI+ handles PNG/JPEG/BMP directly but
     // throws ArgumentException ("Parameter is not valid") for formats it lacks a codec for
     // (notably WebP, which the poneglyph CDN serves for scan images). For those we fall back
-    // to the Windows Imaging Component (WIC), which decodes WebP on Windows 10 1809+/11, and
-    // transcode to PNG so the rest of the pipeline is unchanged.
+    // to SkiaSharp, which bundles its own codecs (no OS/WIC dependency, so it works on CI and
+    // Windows editions without the WebP codec), transcoding to PNG so the pipeline is unchanged.
     private static Bitmap LoadBitmap(Stream imageStream)
     {
         byte[] bytes;
@@ -304,43 +303,19 @@ public sealed class PerceptualHashService : IPerceptualHashService
         }
         catch (ArgumentException)
         {
-            // GDI+ cannot decode this format — transcode via WIC (handles WebP, etc.).
-            var png = TranscodeToPngViaWic(bytes);
+            // GDI+ cannot decode this format — transcode via SkiaSharp (handles WebP, etc.).
+            var png = TranscodeToPng(bytes);
             return new Bitmap(new MemoryStream(png));
         }
     }
 
-    private static byte[] TranscodeToPngViaWic(byte[] input)
-        => TranscodeToPngViaWicAsync(input).GetAwaiter().GetResult();
-
-    private static async Task<byte[]> TranscodeToPngViaWicAsync(byte[] input)
+    private static byte[] TranscodeToPng(byte[] input)
     {
-        using var inRas = new InMemoryRandomAccessStream();
-        using (var writer = new DataWriter(inRas))
-        {
-            writer.WriteBytes(input);
-            await writer.StoreAsync();
-            await writer.FlushAsync();
-            writer.DetachStream();
-        }
-        inRas.Seek(0);
-
-        var decoder = await BitmapDecoder.CreateAsync(inRas);
-        using var softwareBitmap = await decoder.GetSoftwareBitmapAsync(
-            BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
-
-        using var outRas = new InMemoryRandomAccessStream();
-        var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, outRas);
-        encoder.SetSoftwareBitmap(softwareBitmap);
-        await encoder.FlushAsync();
-
-        var bytes = new byte[outRas.Size];
-        using (var reader = new DataReader(outRas.GetInputStreamAt(0)))
-        {
-            await reader.LoadAsync((uint)outRas.Size);
-            reader.ReadBytes(bytes);
-        }
-        return bytes;
+        using var skBitmap = SKBitmap.Decode(input)
+            ?? throw new ArgumentException("Unsupported or corrupt image data — SkiaSharp could not decode it.");
+        using var image = SKImage.FromBitmap(skBitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
     }
 
     private static byte[] RenderDctHeatmap(double[,] dct)
