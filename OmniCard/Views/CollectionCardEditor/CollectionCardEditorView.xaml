@@ -12,7 +12,7 @@
         WindowStartupLocation="CenterOwner"
         WindowStyle="ToolWindow"
         d:DataContext="{d:DesignInstance {x:Type local:CollectionCardEditorView}}"
-        Title="Edit Collection Card" Height="700" Width="900"
+        Title="Edit Collection Card" Height="700" Width="1200"
         Background="{DynamicResource MaterialDesign.Brush.Background}"
         TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
         TextElement.FontWeight="Regular"
@@ -71,8 +71,8 @@
 
                     <!-- Scan image (when available) -->
                     <ScrollViewer x:Name="ScanScrollViewer"
-                                  HorizontalScrollBarVisibility="Hidden"
-                                  VerticalScrollBarVisibility="Hidden"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Auto"
                                   PreviewMouseWheel="Image_PreviewMouseWheel"
                                   MouseLeftButtonDown="Image_MouseLeftButtonDown"
                                   MouseLeftButtonUp="Image_MouseLeftButtonUp"
@@ -159,8 +159,8 @@
                     </Grid.RowDefinitions>
 
                     <ScrollViewer x:Name="ApiScrollViewer"
-                                  HorizontalScrollBarVisibility="Hidden"
-                                  VerticalScrollBarVisibility="Hidden"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Auto"
                                   PreviewMouseWheel="Image_PreviewMouseWheel"
                                   MouseLeftButtonDown="Image_MouseLeftButtonDown"
                                   MouseLeftButtonUp="Image_MouseLeftButtonUp"
