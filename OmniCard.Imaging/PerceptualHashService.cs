@@ -7,6 +7,7 @@ using System.Numerics;
 using Microsoft.Extensions.Logging;
 using OmniCard.Interfaces;
 using OmniCard.Models;
+using SkiaSharp;
 namespace OmniCard.Imaging;
 
 /// <summary>
@@ -28,7 +29,7 @@ public sealed class PerceptualHashService : IPerceptualHashService
     public ulong ComputeHash(Stream imageStream, Action<HashStageResult>? onStage = null)
     {
         var sw = Stopwatch.StartNew();
-        using var original = new Bitmap(imageStream);
+        using var original = LoadBitmap(imageStream);
         onStage?.Invoke(new HashStageResult("Original", BitmapToPng(original)));
 
         // Grayscale + resize to 32x32 for DCT input
@@ -275,6 +276,46 @@ public sealed class PerceptualHashService : IPerceptualHashService
         using var ms = new MemoryStream();
         bitmap.Save(ms, ImageFormat.Png);
         return ms.ToArray();
+    }
+
+    // Loads an image into a System.Drawing.Bitmap. GDI+ handles PNG/JPEG/BMP directly but
+    // throws ArgumentException ("Parameter is not valid") for formats it lacks a codec for
+    // (notably WebP, which the poneglyph CDN serves for scan images). For those we fall back
+    // to SkiaSharp, which bundles its own codecs (no OS/WIC dependency, so it works on CI and
+    // Windows editions without the WebP codec), transcoding to PNG so the pipeline is unchanged.
+    private static Bitmap LoadBitmap(Stream imageStream)
+    {
+        byte[] bytes;
+        if (imageStream is MemoryStream ms)
+        {
+            bytes = ms.ToArray();
+        }
+        else
+        {
+            using var buffer = new MemoryStream();
+            imageStream.CopyTo(buffer);
+            bytes = buffer.ToArray();
+        }
+
+        try
+        {
+            return new Bitmap(new MemoryStream(bytes));
+        }
+        catch (ArgumentException)
+        {
+            // GDI+ cannot decode this format — transcode via SkiaSharp (handles WebP, etc.).
+            var png = TranscodeToPng(bytes);
+            return new Bitmap(new MemoryStream(png));
+        }
+    }
+
+    private static byte[] TranscodeToPng(byte[] input)
+    {
+        using var skBitmap = SKBitmap.Decode(input)
+            ?? throw new ArgumentException("Unsupported or corrupt image data — SkiaSharp could not decode it.");
+        using var image = SKImage.FromBitmap(skBitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
     }
 
     private static byte[] RenderDctHeatmap(double[,] dct)
