@@ -331,7 +331,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
 
         var query = context.Cards.Where(c => c.CardImageUri != null);
         if (!forceAll)
-            query = query.Where(c => c.ImageHash == null);
+            query = query.Where(c => c.ImageHash == null || c.EdgeHash == null);
 
         var cards = await query
             .Select(c => new { c.CardSetId, c.CardImageUri })
@@ -347,7 +347,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
         var completed = 0;
         var failed = 0;
 
-        var results = new List<(string CardSetId, ulong Hash)>();
+        var results = new List<(string CardSetId, ulong Hash, ulong EdgeHash)>();
         var saveLock = new object();
 
         await Parallel.ForEachAsync(cards, new ParallelOptions
@@ -387,10 +387,12 @@ public sealed class OptcgService : ICardGameService, IDisposable
 
                     using var buffer = new MemoryStream(imageBytes);
                     var hash = _hashService.ComputeHash(buffer);
+                    buffer.Position = 0;
+                    var edgeHash = _hashService.ComputeEdgeHash(buffer);
 
                     lock (saveLock)
                     {
-                        results.Add((card.CardSetId, hash));
+                        results.Add((card.CardSetId, hash, edgeHash));
                     }
                 }
                 finally
@@ -409,7 +411,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
             if (done % 100 == 0)
                 progress?.Report($"Hashed {done}/{cards.Count} cards ({failed} failed)...");
 
-            List<(string CardSetId, ulong Hash)>? toSave = null;
+            List<(string CardSetId, ulong Hash, ulong EdgeHash)>? toSave = null;
             lock (saveLock)
             {
                 if (results.Count >= 200)
@@ -437,16 +439,17 @@ public sealed class OptcgService : ICardGameService, IDisposable
         progress?.Report($"Done — hashed {completed - failed} cards ({failed} failed).");
     }
 
-    private async Task SaveHashBatchAsync(List<(string CardSetId, ulong Hash)> batch, CancellationToken ct)
+    private async Task SaveHashBatchAsync(List<(string CardSetId, ulong Hash, ulong EdgeHash)> batch, CancellationToken ct)
     {
         await using var context = _dbContextFactory.CreateDbContext();
-        foreach (var (cardSetId, hash) in batch)
+        foreach (var (cardSetId, hash, edgeHash) in batch)
         {
             var artRelativePath = GetLocalArtRelativePath(cardSetId);
             await context.Cards
                 .Where(c => c.CardSetId == cardSetId)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(c => c.ImageHash, hash)
+                    .SetProperty(c => c.EdgeHash, edgeHash)
                     .SetProperty(c => c.LocalImagePath, artRelativePath), ct);
         }
     }
