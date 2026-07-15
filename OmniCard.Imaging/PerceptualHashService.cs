@@ -7,6 +7,8 @@ using System.Numerics;
 using Microsoft.Extensions.Logging;
 using OmniCard.Interfaces;
 using OmniCard.Models;
+using Windows.Graphics.Imaging;
+using Windows.Storage.Streams;
 namespace OmniCard.Imaging;
 
 /// <summary>
@@ -28,7 +30,7 @@ public sealed class PerceptualHashService : IPerceptualHashService
     public ulong ComputeHash(Stream imageStream, Action<HashStageResult>? onStage = null)
     {
         var sw = Stopwatch.StartNew();
-        using var original = new Bitmap(imageStream);
+        using var original = LoadBitmap(imageStream);
         onStage?.Invoke(new HashStageResult("Original", BitmapToPng(original)));
 
         // Grayscale + resize to 32x32 for DCT input
@@ -275,6 +277,70 @@ public sealed class PerceptualHashService : IPerceptualHashService
         using var ms = new MemoryStream();
         bitmap.Save(ms, ImageFormat.Png);
         return ms.ToArray();
+    }
+
+    // Loads an image into a System.Drawing.Bitmap. GDI+ handles PNG/JPEG/BMP directly but
+    // throws ArgumentException ("Parameter is not valid") for formats it lacks a codec for
+    // (notably WebP, which the poneglyph CDN serves for scan images). For those we fall back
+    // to the Windows Imaging Component (WIC), which decodes WebP on Windows 10 1809+/11, and
+    // transcode to PNG so the rest of the pipeline is unchanged.
+    private static Bitmap LoadBitmap(Stream imageStream)
+    {
+        byte[] bytes;
+        if (imageStream is MemoryStream ms)
+        {
+            bytes = ms.ToArray();
+        }
+        else
+        {
+            using var buffer = new MemoryStream();
+            imageStream.CopyTo(buffer);
+            bytes = buffer.ToArray();
+        }
+
+        try
+        {
+            return new Bitmap(new MemoryStream(bytes));
+        }
+        catch (ArgumentException)
+        {
+            // GDI+ cannot decode this format — transcode via WIC (handles WebP, etc.).
+            var png = TranscodeToPngViaWic(bytes);
+            return new Bitmap(new MemoryStream(png));
+        }
+    }
+
+    private static byte[] TranscodeToPngViaWic(byte[] input)
+        => TranscodeToPngViaWicAsync(input).GetAwaiter().GetResult();
+
+    private static async Task<byte[]> TranscodeToPngViaWicAsync(byte[] input)
+    {
+        using var inRas = new InMemoryRandomAccessStream();
+        using (var writer = new DataWriter(inRas))
+        {
+            writer.WriteBytes(input);
+            await writer.StoreAsync();
+            await writer.FlushAsync();
+            writer.DetachStream();
+        }
+        inRas.Seek(0);
+
+        var decoder = await BitmapDecoder.CreateAsync(inRas);
+        using var softwareBitmap = await decoder.GetSoftwareBitmapAsync(
+            BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+
+        using var outRas = new InMemoryRandomAccessStream();
+        var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, outRas);
+        encoder.SetSoftwareBitmap(softwareBitmap);
+        await encoder.FlushAsync();
+
+        var bytes = new byte[outRas.Size];
+        using (var reader = new DataReader(outRas.GetInputStreamAt(0)))
+        {
+            await reader.LoadAsync((uint)outRas.Size);
+            reader.ReadBytes(bytes);
+        }
+        return bytes;
     }
 
     private static byte[] RenderDctHeatmap(double[,] dct)
