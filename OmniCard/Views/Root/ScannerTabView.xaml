@@ -174,18 +174,19 @@
                               VerticalAlignment="Center"
                               ToolTip="Show the scanner driver's own dialog (required for some network scanners)"/>
                     <Separator/>
-                    <Button Command="{Binding ViewModel.ShowPhoneScanQrCommand}"
-                            Content="Phone Scanner"
-                            ToolTip="Show QR code to open the camera scanner on your phone"/>
-                    <Separator/>
                     <Button Command="{Binding ViewModel.ScanCommand}"
                             Content="Scan Cards..."
-                            IsEnabled="{Binding ViewModel.IsAuditComplete, Converter={conv:InverseBoolConverter}}"/>
+                            IsEnabled="{Binding ViewModel.IsAuditComplete, Converter={conv:InverseBoolConverter}}"
+                            Style="{StaticResource MaterialDesignFlatSecondaryButton}"/>
                     <Separator/>
                     <Button Command="{Binding ViewModel.ImportFromFolderCommand}"
                             Content="Import from Folder..."
                             ToolTip="Import pre-scanned card images from a folder"/>
                     <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
+                    <Button Command="{Binding ViewModel.ShowPhoneScanQrCommand}"
+                            Content="Phone Scanner"
+                            ToolTip="Show QR code to open the camera scanner on your phone"/>
+                    <Separator/>
                     <Button Command="{Binding ViewModel.ToggleAuditCompleteCommand}"
                             Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}">
                         <Button.Style>

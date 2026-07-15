@@ -19,26 +19,7 @@
         FontFamily="{StaticResource AppFont}">
 
     <Grid>
-        <ScrollViewer x:Name="ImageScroller"
-                      HorizontalScrollBarVisibility="Auto"
-                      VerticalScrollBarVisibility="Auto"
-                      PreviewMouseWheel="OnPreviewMouseWheel">
-            <Grid>
-                <Grid.LayoutTransform>
-                    <ScaleTransform ScaleX="{Binding ViewModel.Zoom}" ScaleY="{Binding ViewModel.Zoom}"/>
-                </Grid.LayoutTransform>
-                <Image Source="{Binding ViewModel.Card.TempImagePath, Converter={conv:ScanImageConverter}}"
-                       Stretch="Uniform"/>
-            </Grid>
-        </ScrollViewer>
-        <Slider HorizontalAlignment="Right"
-                VerticalAlignment="Bottom"
-                Width="200"
-                Minimum="0.5"
-                Maximum="4"
-                Value="{Binding ViewModel.Zoom}"
-                TickFrequency="0.1"
-                IsSnapToTickEnabled="True"
-                Margin="15"/>
+        <Image Source="{Binding ViewModel.Card.TempImagePath, Converter={conv:ScanImageConverter}}"
+               Stretch="Uniform"/>
     </Grid>
 </Window>

@@ -293,16 +293,15 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         TrySetPixelType(caps);
         TrySetColorProfile(caps);
         TryDisableDuplex(caps);
+        TryResetImageProcessing(caps);
 
         if (ScanQuality == ScanQuality.Fast)
         {
             TrySetResolution(caps, 200f);
-            TryResetImageProcessing(caps);
         }
         else
         {
-            TryResetResolution(caps);
-            TryResetImageProcessing(caps);
+            TrySetResolution(caps, caps.ICapXNativeResolution.GetDefault().Whole);
         }
 
         if (CardService.DefaultIsFoil)
@@ -325,10 +324,10 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
 
     private void TryResetResolution(ICapabilities caps)
     {
-        try { if (caps.ICapXResolution.CanReset) caps.ICapXResolution.Reset(); }
+        try { if (caps.ICapXResolution.CanReset) caps.ICapXResolution.SetValue(caps.ICapXNativeResolution.GetDefault()); }
         catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset XResolution"); }
 
-        try { if (caps.ICapYResolution.CanReset) caps.ICapYResolution.Reset(); }
+        try { if (caps.ICapYResolution.CanReset) caps.ICapYResolution.SetValue(caps.ICapYNativeResolution.GetDefault()); }
         catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset YResolution"); }
     }
 
