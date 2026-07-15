@@ -81,4 +81,36 @@ public class OptcgSchemaTests : IDisposable
         Assert.Equal(OptcgDbContext.PoneglyphSchemaVersion, ctx.GetSchemaVersion());
         Assert.True(OptcgDbContext.PoneglyphSchemaVersion >= 1);
     }
+
+    [Fact]
+    public void ApplySchemaUpgrades_AddsEdgeHashColumn_ToLegacyTable()
+    {
+        using (var cmd = _connection.CreateCommand())
+        {
+            cmd.CommandText = @"CREATE TABLE Cards (
+                CardSetId TEXT PRIMARY KEY, CardName TEXT, SetId TEXT, SetName TEXT,
+                Rarity TEXT, CardColor TEXT, CardType TEXT, CardCost TEXT, CardPower TEXT,
+                Life TEXT, CardText TEXT, SubTypes TEXT, Attribute TEXT, CounterAmount INTEGER,
+                InventoryPrice TEXT, MarketPrice TEXT, CardImageId TEXT, CardImageUri TEXT,
+                DateScraped TEXT, ImageHash INTEGER);";
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = NewContext();
+        ctx.ApplySchemaUpgrades();
+
+        using var check = _connection.CreateCommand();
+        check.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Cards') WHERE name = 'EdgeHash';";
+        Assert.Equal(1L, (long)check.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public void FreshDatabase_HasEdgeHashColumn()
+    {
+        using var ctx = NewContext();
+        ctx.Database.EnsureCreated();
+        ctx.Cards.Add(new OmniCard.Models.OptcgCard { CardSetId = "OP01-001", CardNumber = "OP01-001", EdgeHash = 12345UL });
+        ctx.SaveChanges();
+        Assert.Equal(12345UL, ctx.Cards.Single(c => c.CardSetId == "OP01-001").EdgeHash);
+    }
 }
