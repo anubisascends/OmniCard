@@ -172,6 +172,18 @@ public class FallbackMatchingTests : IDisposable
         Assert.Equal(CardGame.OnePiece, matched.Game);
     }
 
+    [Fact]
+    public void FindBestMatch_PassesScanEdgeHashThrough()
+    {
+        var op = new StubGameService(CardGame.OnePiece, match: null);
+        var svc = CreateCardService([op]);
+        svc.SelectedGame = CardGame.OnePiece;
+
+        svc.FindBestMatch(0xAAAA, scanEdgeHash: 0xBEEF);
+
+        Assert.Equal(0xBEEFUL, op.LastScanEdgeHash);
+    }
+
     private CardService CreateCardService(ICardGameService[] gameServices)
     {
         var factory = new MockCollectionDbContextFactory(_collectionOptions);
@@ -204,7 +216,12 @@ public class FallbackMatchingTests : IDisposable
     {
         public CardGame Game => game;
         public MatchDiagnostics? LastMatchDiagnostics => null;
-        public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14, ulong? scanEdgeHash = null) => match;
+        public ulong? LastScanEdgeHash { get; private set; }
+        public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14, ulong? scanEdgeHash = null)
+        {
+            LastScanEdgeHash = scanEdgeHash;
+            return match;
+        }
         public decimal? GetCurrentPrice(string gameCardId, bool isFoil) => null;
         public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil) => [];
         public Task DownloadBulkDataAsync(IProgress<string>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
