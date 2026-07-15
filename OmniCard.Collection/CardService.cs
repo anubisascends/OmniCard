@@ -155,7 +155,7 @@ public sealed class CardService : ICardService
 
     public void StartNewDiagnosticSession() => _currentSessionId = Guid.NewGuid().ToString();
 
-    public (CardMatch? Match, CardGame Game) FindBestMatch(ulong hash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null)
+    public (CardMatch? Match, CardGame Game) FindBestMatch(ulong hash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, ulong? scanEdgeHash = null)
     {
         // Normalize empty set filter to null
         if (setFilter is { Count: 0 })
@@ -164,7 +164,7 @@ public sealed class CardService : ICardService
         // Match only within the selected game — never fall back to other games
         if (_gameServices.TryGetValue(SelectedGame, out var primaryService))
         {
-            var primaryMatch = primaryService.FindClosestMatch(hash, artHashes, ocrResult, setFilter, preferredSets);
+            var primaryMatch = primaryService.FindClosestMatch(hash, artHashes, ocrResult, setFilter, preferredSets, scanEdgeHash: scanEdgeHash);
             if (primaryMatch is not null)
                 return (primaryMatch, SelectedGame);
         }
@@ -246,6 +246,14 @@ public sealed class CardService : ICardService
         var rawBytes = buffer.ToArray();
         buffer.Dispose();
 
+        // Foil cards scan with a holographic color shift that corrupts the luminance pHash;
+        // compute a color-robust edge hash so matching can use it (One Piece only).
+        ulong? scanEdgeHash = null;
+        if (DefaultIsFoil && SelectedGame == CardGame.OnePiece)
+        {
+            scanEdgeHash = _hashService.ComputeEdgeHash(new MemoryStream(rawBytes));
+        }
+
         // Write to temp file
         Directory.CreateDirectory(_tempScansDir);
         var tempPath = Path.Combine(_tempScansDir, $"{Guid.NewGuid()}.png");
@@ -293,7 +301,7 @@ public sealed class CardService : ICardService
         }
         else
         {
-            var (bestMatch, matchedGame) = FindBestMatch(hash, artHashes, null, SelectedSetFilter, detectedSets);
+            var (bestMatch, matchedGame) = FindBestMatch(hash, artHashes, null, SelectedSetFilter, detectedSets, scanEdgeHash);
             match = bestMatch;
             game = matchedGame;
         }
@@ -313,6 +321,7 @@ public sealed class CardService : ICardService
             TempImagePath = tempPath,
             Hash = hash,
             ArtHashes = artHashes,
+            ScanEdgeHash = scanEdgeHash,
             Game = game,
             Match = match,
             IsFoil = DefaultIsFoil,
@@ -354,7 +363,7 @@ public sealed class CardService : ICardService
                             ocrResult = new OcrMatchResult { CollectorNumber = collectorNumber, CollectorNumberConfidence = conf };
                             _logger.LogInformation("OPTCG collector number detected: {Number} (confidence {Conf:F2})", collectorNumber, conf);
 
-                            var (ocrMatch, ocrGame) = FindBestMatch(capturedHash, scannedCard.ArtHashes, ocrResult, capturedSetFilter, null);
+                            var (ocrMatch, ocrGame) = FindBestMatch(capturedHash, scannedCard.ArtHashes, ocrResult, capturedSetFilter, null, scannedCard.ScanEdgeHash);
                             if (ocrMatch is not null && (scannedCard.Match is null || ocrMatch.GameSpecificId != scannedCard.Match?.GameSpecificId))
                             {
                                 scannedCard.Match = ocrMatch;
@@ -431,7 +440,12 @@ public sealed class CardService : ICardService
                                 rotatedOcr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = cnConf };
                         }
 
-                        var (rotatedMatch, rotatedGame) = FindBestMatch(rotatedHash, null, rotatedOcr, capturedSetFilter, null);
+                        // Structure rotates too — recompute the edge hash on the rotated bytes for foil One Piece scans
+                        ulong? rotatedEdgeHash = null;
+                        if (scannedCard.IsFoil && game == CardGame.OnePiece)
+                            rotatedEdgeHash = _hashService.ComputeEdgeHash(new MemoryStream(rotatedBytes));
+
+                        var (rotatedMatch, rotatedGame) = FindBestMatch(rotatedHash, null, rotatedOcr, capturedSetFilter, null, rotatedEdgeHash);
                         if (rotatedMatch is not null)
                         {
                             scannedCard.Match = rotatedMatch;
@@ -759,6 +773,8 @@ public sealed class CardService : ICardService
     }
 
     public ulong ComputeHashFromStream(Stream stream) => _hashService.ComputeHash(stream);
+
+    public ulong ComputeEdgeHashFromStream(Stream stream) => _hashService.ComputeEdgeHash(stream);
 
     public IOcrMatchingService OcrService => _ocrService;
 

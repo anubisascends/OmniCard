@@ -9,6 +9,7 @@ public partial class ScannedCard : ObservableObject
 
     public required ulong Hash { get; set; }
     public ulong[]? ArtHashes { get; init; }
+    public ulong? ScanEdgeHash { get; set; }
 
     [ObservableProperty]
     public partial CardGame Game { get; set; }

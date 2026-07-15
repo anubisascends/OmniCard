@@ -44,6 +44,7 @@ public class OptcgDbContext : DbContext
         AddColumnIfMissing(conn, "VariantIndex INTEGER NOT NULL DEFAULT 0");
         AddColumnIfMissing(conn, "VariantLabel TEXT");
         AddColumnIfMissing(conn, "Artist TEXT");
+        AddColumnIfMissing(conn, "EdgeHash INTEGER");
     }
 
     private static void AddColumnIfMissing(System.Data.Common.DbConnection conn, string columnDef)
@@ -73,6 +74,7 @@ public class OptcgDbContext : DbContext
         card.HasIndex(c => c.CardNumber);
         card.HasIndex(c => c.CardColor);
         card.HasIndex(c => c.ImageHash);
+        card.HasIndex(c => c.EdgeHash);
 
         // HashCorrection entity
         modelBuilder.Entity<HashCorrection>(e =>

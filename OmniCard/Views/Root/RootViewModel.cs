@@ -981,7 +981,15 @@ public sealed partial class RootViewModel(
                     ocrResult = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
             }
 
-            var (match, matchedGame) = CardService.FindBestMatch(newHash, null, ocrResult, CardService.SelectedSetFilter, null);
+            // Structure rotates too — recompute the edge hash on the rotated bytes for foil One Piece scans
+            ulong? rotatedEdgeHash = null;
+            if (scan.IsFoil && scan.Game == CardGame.OnePiece)
+            {
+                using var edgeStream = new MemoryStream(rotatedBytes);
+                rotatedEdgeHash = CardService.ComputeEdgeHashFromStream(edgeStream);
+            }
+
+            var (match, matchedGame) = CardService.FindBestMatch(newHash, null, ocrResult, CardService.SelectedSetFilter, null, rotatedEdgeHash);
             scan.Match = match;
             scan.Game = matchedGame;
 

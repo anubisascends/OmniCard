@@ -188,8 +188,9 @@ public class DecklistMatchingTests : IDisposable
         public (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null) => (0, 0);
         public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section) { }
         public ulong ComputeHashFromStream(System.IO.Stream stream) => 0;
+        public ulong ComputeEdgeHashFromStream(System.IO.Stream stream) => 0;
         public IOcrMatchingService OcrService => null!;
-        public (CardMatch? Match, CardGame Game) FindBestMatch(ulong hash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null) => (null, CardGame.Mtg);
+        public (CardMatch? Match, CardGame Game) FindBestMatch(ulong hash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, ulong? scanEdgeHash = null) => (null, CardGame.Mtg);
     }
 
     private class StubGameService : ICardGameService
@@ -198,7 +199,7 @@ public class DecklistMatchingTests : IDisposable
         public MatchDiagnostics? LastMatchDiagnostics => null;
         public Task DownloadBulkDataAsync(IProgress<string>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
         public Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
-        public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14) => null;
+        public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14, ulong? scanEdgeHash = null) => null;
         public List<CardMatch> SearchCards(string query, int maxResults = 20) => [];
         public List<CardMatch> GetPrintings(string cardName) => [];
         public decimal? GetCurrentPrice(string gameCardId, bool isFoil) => null;

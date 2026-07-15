@@ -92,6 +92,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
         var oldContext = _readContext;
         _readContext = _dbContextFactory.CreateDbContext();
         _hashCache = null;
+        _edgeHashCache = null;
         _hashSetLookup = null;
         _correctionsCache = null;
         oldContext.Dispose();
@@ -104,6 +105,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
     public MatchDiagnostics? LastMatchDiagnostics { get; private set; }
 
     private List<(string CardSetId, ulong Hash)>? _hashCache;
+    private List<(string CardSetId, ulong EdgeHash, string SetId)>? _edgeHashCache;
     private Dictionary<string, string>? _hashSetLookup;
     private List<(ulong ScanHash, string CorrectCardId)>? _correctionsCache;
     private const int CorrectionTrustBonus = 5;
@@ -266,6 +268,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
         var oldContext = _readContext;
         _readContext = _dbContextFactory.CreateDbContext();
         _hashCache = null;
+        _edgeHashCache = null;
         _hashSetLookup = null;
         oldContext.Dispose();
 
@@ -331,7 +334,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
 
         var query = context.Cards.Where(c => c.CardImageUri != null);
         if (!forceAll)
-            query = query.Where(c => c.ImageHash == null);
+            query = query.Where(c => c.ImageHash == null || c.EdgeHash == null);
 
         var cards = await query
             .Select(c => new { c.CardSetId, c.CardImageUri })
@@ -347,7 +350,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
         var completed = 0;
         var failed = 0;
 
-        var results = new List<(string CardSetId, ulong Hash)>();
+        var results = new List<(string CardSetId, ulong Hash, ulong EdgeHash)>();
         var saveLock = new object();
 
         await Parallel.ForEachAsync(cards, new ParallelOptions
@@ -387,10 +390,12 @@ public sealed class OptcgService : ICardGameService, IDisposable
 
                     using var buffer = new MemoryStream(imageBytes);
                     var hash = _hashService.ComputeHash(buffer);
+                    buffer.Position = 0;
+                    var edgeHash = _hashService.ComputeEdgeHash(buffer);
 
                     lock (saveLock)
                     {
-                        results.Add((card.CardSetId, hash));
+                        results.Add((card.CardSetId, hash, edgeHash));
                     }
                 }
                 finally
@@ -409,7 +414,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
             if (done % 100 == 0)
                 progress?.Report($"Hashed {done}/{cards.Count} cards ({failed} failed)...");
 
-            List<(string CardSetId, ulong Hash)>? toSave = null;
+            List<(string CardSetId, ulong Hash, ulong EdgeHash)>? toSave = null;
             lock (saveLock)
             {
                 if (results.Count >= 200)
@@ -429,6 +434,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
         var oldContext = _readContext;
         _readContext = _dbContextFactory.CreateDbContext();
         _hashCache = null;
+        _edgeHashCache = null;
         _hashSetLookup = null;
         oldContext.Dispose();
 
@@ -437,21 +443,22 @@ public sealed class OptcgService : ICardGameService, IDisposable
         progress?.Report($"Done — hashed {completed - failed} cards ({failed} failed).");
     }
 
-    private async Task SaveHashBatchAsync(List<(string CardSetId, ulong Hash)> batch, CancellationToken ct)
+    private async Task SaveHashBatchAsync(List<(string CardSetId, ulong Hash, ulong EdgeHash)> batch, CancellationToken ct)
     {
         await using var context = _dbContextFactory.CreateDbContext();
-        foreach (var (cardSetId, hash) in batch)
+        foreach (var (cardSetId, hash, edgeHash) in batch)
         {
             var artRelativePath = GetLocalArtRelativePath(cardSetId);
             await context.Cards
                 .Where(c => c.CardSetId == cardSetId)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(c => c.ImageHash, hash)
+                    .SetProperty(c => c.EdgeHash, edgeHash)
                     .SetProperty(c => c.LocalImagePath, artRelativePath), ct);
         }
     }
 
-    public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14)
+    public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14, ulong? scanEdgeHash = null)
     {
         _logger.LogDebug("Finding closest OPTCG match for pHash {Hash:X16} (set filter: {SetFilter}, max distance: {MaxDistance})", imageHash, setFilter is not null ? string.Join(",", setFilter) : "none", maxDistance);
         LastMatchDiagnostics = new MatchDiagnostics { SetFilterActive = setFilter is not null };
@@ -476,6 +483,47 @@ public sealed class OptcgService : ICardGameService, IDisposable
             {
                 _logger.LogDebug("OPTCG OCR collector number {Number} not found in database", ocrResult.CollectorNumber);
             }
+        }
+
+        // Foil path: the scan carries an edge (structure) hash — match on it instead of the
+        // luminance pHash, which the foil color shift corrupts.
+        if (scanEdgeHash is ulong scanEdge)
+        {
+            if (_edgeHashCache is null)
+            {
+                _edgeHashCache = _readContext.Cards
+                    .Where(c => c.EdgeHash != null)
+                    .Select(c => new { c.CardSetId, Edge = c.EdgeHash!.Value, c.SetId })
+                    .AsNoTracking()
+                    .AsEnumerable()
+                    .Select(c => (c.CardSetId, c.Edge, c.SetId))
+                    .ToList();
+                _logger.LogInformation("OPTCG edge-hash cache loaded with {Count} entries", _edgeHashCache.Count);
+            }
+
+            string bestEdgeId = "";
+            int bestEdgeDist = int.MaxValue;
+            foreach (var (cardSetId, edge, setId) in _edgeHashCache)
+            {
+                if (setFilter is not null && !setFilter.Contains(setId))
+                    continue;
+
+                var dist = PerceptualHashService.HammingDistance(scanEdge, edge);
+                if (dist < bestEdgeDist) { bestEdgeDist = dist; bestEdgeId = cardSetId; }
+            }
+
+            if (bestEdgeId.Length > 0 && bestEdgeDist <= maxDistance)
+            {
+                LastMatchDiagnostics.DecisionPhase = "EdgeHashFoil";
+                LastMatchDiagnostics.PHashDistance = bestEdgeDist;
+                var edgeConfidence = Math.Max(0, 1.0 - (double)bestEdgeDist / maxDistance) * 100;
+                _logger.LogInformation("OPTCG foil edge-hash match: {CardId} dist {Dist}", bestEdgeId, bestEdgeDist);
+                return LookupOptcgCard(bestEdgeId, edgeConfidence);
+            }
+
+            _logger.LogDebug("OPTCG foil edge-hash: no match within {Max} (best {Dist})", maxDistance, bestEdgeDist);
+            LastMatchDiagnostics.DecisionPhase = "NoMatch";
+            return null;
         }
 
         if (_hashCache is null)
