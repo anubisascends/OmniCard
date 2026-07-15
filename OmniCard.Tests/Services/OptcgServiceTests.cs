@@ -35,6 +35,7 @@ public class OptcgServiceTests : IDisposable
             CardColor = "Red",
             CardType = "Leader",
             ImageHash = 0x0000000000000000UL,
+            EdgeHash = 0x0F0F0F0F0F0F0F0FUL,
             MarketPrice = 12.50m,
         });
         ctx.Cards.Add(new OptcgCard
@@ -47,6 +48,7 @@ public class OptcgServiceTests : IDisposable
             CardColor = "Green",
             CardType = "Character",
             ImageHash = 0x00000000000000FFUL, // Hamming distance 8 from 0x0
+            EdgeHash = 0xF0F0F0F0F0F0F0F0UL,
             MarketPrice = 5.00m,
         });
         ctx.Cards.Add(new OptcgCard
@@ -118,6 +120,31 @@ public class OptcgServiceTests : IDisposable
 
         // OP02-001 has hash 0xFFFF... which is distance 63 from 0x01 — beyond default maxDistance=14
         Assert.Null(match);
+    }
+
+    [Fact]
+    public void FindClosestMatch_FoilScan_MatchesViaEdgeHash_NotLuminance()
+    {
+        var svc = CreateService();
+        // Luminance hash is deliberately far from every card (would miss); edge hash is
+        // exact for OP01-001.
+        var match = svc.FindClosestMatch(
+            imageHash: 0x1234_5678_9ABC_DEF0UL,
+            scanEdgeHash: 0x0F0F0F0F0F0F0F0FUL);
+
+        Assert.NotNull(match);
+        Assert.Equal("OP01-001", match!.GameSpecificId);
+    }
+
+    [Fact]
+    public void FindClosestMatch_NonFoil_UsesLuminanceHash()
+    {
+        var svc = CreateService();
+        // scanEdgeHash null -> luminance path; 0x0 is exact for OP01-001's ImageHash.
+        var match = svc.FindClosestMatch(0x0000000000000000UL);
+
+        Assert.NotNull(match);
+        Assert.Equal("OP01-001", match!.GameSpecificId);
     }
 
     // --- SearchCards ---

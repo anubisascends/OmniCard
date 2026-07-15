@@ -92,6 +92,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
         var oldContext = _readContext;
         _readContext = _dbContextFactory.CreateDbContext();
         _hashCache = null;
+        _edgeHashCache = null;
         _hashSetLookup = null;
         _correctionsCache = null;
         oldContext.Dispose();
@@ -104,6 +105,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
     public MatchDiagnostics? LastMatchDiagnostics { get; private set; }
 
     private List<(string CardSetId, ulong Hash)>? _hashCache;
+    private List<(string CardSetId, ulong EdgeHash)>? _edgeHashCache;
     private Dictionary<string, string>? _hashSetLookup;
     private List<(ulong ScanHash, string CorrectCardId)>? _correctionsCache;
     private const int CorrectionTrustBonus = 5;
@@ -266,6 +268,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
         var oldContext = _readContext;
         _readContext = _dbContextFactory.CreateDbContext();
         _hashCache = null;
+        _edgeHashCache = null;
         _hashSetLookup = null;
         oldContext.Dispose();
 
@@ -431,6 +434,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
         var oldContext = _readContext;
         _readContext = _dbContextFactory.CreateDbContext();
         _hashCache = null;
+        _edgeHashCache = null;
         _hashSetLookup = null;
         oldContext.Dispose();
 
@@ -454,7 +458,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
         }
     }
 
-    public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14)
+    public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14, ulong? scanEdgeHash = null)
     {
         _logger.LogDebug("Finding closest OPTCG match for pHash {Hash:X16} (set filter: {SetFilter}, max distance: {MaxDistance})", imageHash, setFilter is not null ? string.Join(",", setFilter) : "none", maxDistance);
         LastMatchDiagnostics = new MatchDiagnostics { SetFilterActive = setFilter is not null };
@@ -479,6 +483,48 @@ public sealed class OptcgService : ICardGameService, IDisposable
             {
                 _logger.LogDebug("OPTCG OCR collector number {Number} not found in database", ocrResult.CollectorNumber);
             }
+        }
+
+        // Foil path: the scan carries an edge (structure) hash — match on it instead of the
+        // luminance pHash, which the foil color shift corrupts.
+        if (scanEdgeHash is ulong scanEdge)
+        {
+            if (_edgeHashCache is null)
+            {
+                _edgeHashCache = _readContext.Cards
+                    .Where(c => c.EdgeHash != null)
+                    .Select(c => new { c.CardSetId, Edge = c.EdgeHash!.Value })
+                    .AsNoTracking()
+                    .AsEnumerable()
+                    .Select(c => (c.CardSetId, c.Edge))
+                    .ToList();
+                _logger.LogInformation("OPTCG edge-hash cache loaded with {Count} entries", _edgeHashCache.Count);
+            }
+
+            string bestEdgeId = "";
+            int bestEdgeDist = int.MaxValue;
+            foreach (var (cardSetId, edge) in _edgeHashCache)
+            {
+                var dist = PerceptualHashService.HammingDistance(scanEdge, edge);
+                if (dist < bestEdgeDist) { bestEdgeDist = dist; bestEdgeId = cardSetId; }
+            }
+
+            if (bestEdgeId.Length > 0 && bestEdgeDist <= maxDistance)
+            {
+                var edgeCard = _readContext.Cards.AsNoTracking().FirstOrDefault(c => c.CardSetId == bestEdgeId);
+                if (edgeCard is not null && (setFilter is null || setFilter.Contains(edgeCard.SetId)))
+                {
+                    LastMatchDiagnostics.DecisionPhase = "EdgeHashFoil";
+                    LastMatchDiagnostics.PHashDistance = bestEdgeDist;
+                    var edgeConfidence = Math.Max(0, 1.0 - (double)bestEdgeDist / maxDistance) * 100;
+                    _logger.LogInformation("OPTCG foil edge-hash match: {CardName} ({CardId}) dist {Dist}", edgeCard.CardName, edgeCard.CardSetId, bestEdgeDist);
+                    return LookupOptcgCard(edgeCard.CardSetId, edgeConfidence);
+                }
+            }
+
+            _logger.LogDebug("OPTCG foil edge-hash: no match within {Max} (best {Dist})", maxDistance, bestEdgeDist);
+            LastMatchDiagnostics.DecisionPhase = "NoMatch";
+            return null;
         }
 
         if (_hashCache is null)

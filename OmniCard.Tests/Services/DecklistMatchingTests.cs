@@ -198,7 +198,7 @@ public class DecklistMatchingTests : IDisposable
         public MatchDiagnostics? LastMatchDiagnostics => null;
         public Task DownloadBulkDataAsync(IProgress<string>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
         public Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
-        public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14) => null;
+        public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14, ulong? scanEdgeHash = null) => null;
         public List<CardMatch> SearchCards(string query, int maxResults = 20) => [];
         public List<CardMatch> GetPrintings(string cardName) => [];
         public decimal? GetCurrentPrice(string gameCardId, bool isFoil) => null;
