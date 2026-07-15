@@ -188,6 +188,7 @@ public class DecklistMatchingTests : IDisposable
         public (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null) => (0, 0);
         public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section) { }
         public ulong ComputeHashFromStream(System.IO.Stream stream) => 0;
+        public ulong ComputeEdgeHashFromStream(System.IO.Stream stream) => 0;
         public IOcrMatchingService OcrService => null!;
         public (CardMatch? Match, CardGame Game) FindBestMatch(ulong hash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, ulong? scanEdgeHash = null) => (null, CardGame.Mtg);
     }

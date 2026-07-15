@@ -42,6 +42,7 @@ public interface ICardService
     (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null);
     void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section);
     ulong ComputeHashFromStream(Stream stream);
+    ulong ComputeEdgeHashFromStream(Stream stream);
     IOcrMatchingService OcrService { get; }
     (CardMatch? Match, CardGame Game) FindBestMatch(ulong hash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, ulong? scanEdgeHash = null);
 }

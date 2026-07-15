@@ -774,6 +774,8 @@ public sealed class CardService : ICardService
 
     public ulong ComputeHashFromStream(Stream stream) => _hashService.ComputeHash(stream);
 
+    public ulong ComputeEdgeHashFromStream(Stream stream) => _hashService.ComputeEdgeHash(stream);
+
     public IOcrMatchingService OcrService => _ocrService;
 
     public void SearchCollection(string query, CardGame? gameFilter, ObservableCollection<CollectionCard> results)

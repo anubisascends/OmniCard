@@ -61,7 +61,20 @@ public class OptcgServiceTests : IDisposable
             CardColor = "Blue",
             CardType = "Character",
             ImageHash = 0xFFFFFFFFFFFFFFFFUL, // Hamming distance 64 from 0x0
+            EdgeHash = 0xAAAAAAAAAAAAAAABUL, // Hamming distance 1 from the foil-set-filter test's scan edge hash
             MarketPrice = 0.50m,
+        });
+        ctx.Cards.Add(new OptcgCard
+        {
+            CardSetId = "OP03-001",
+            CardName = "Buggy",
+            SetId = "OP03",
+            SetName = "Pillars of Strength",
+            Rarity = "C",
+            CardColor = "Purple",
+            CardType = "Character",
+            EdgeHash = 0xAAAAAAAAAAAAAAAAUL, // exact match (distance 0) but outside the set filter
+            MarketPrice = 0.25m,
         });
         ctx.SaveChanges();
         ctx.MarkMigrationComplete();
@@ -134,6 +147,24 @@ public class OptcgServiceTests : IDisposable
 
         Assert.NotNull(match);
         Assert.Equal("OP01-001", match!.GameSpecificId);
+    }
+
+    [Fact]
+    public void FindClosestMatch_FoilScan_WithSetFilter_ReturnsBestInFilterCard()
+    {
+        var svc = CreateService();
+        var setFilter = new HashSet<string> { "OP02" };
+
+        // OP03-001's edge hash exactly matches the scan (global best, distance 0) but its
+        // set (OP03) is outside the filter. OP02-001's edge hash is a small distance away
+        // and is in-filter — the in-filter loop must pick it up instead of returning null.
+        var match = svc.FindClosestMatch(
+            imageHash: 0x1234_5678_9ABC_DEF0UL,
+            setFilter: setFilter,
+            scanEdgeHash: 0xAAAAAAAAAAAAAAAAUL);
+
+        Assert.NotNull(match);
+        Assert.Equal("OP02-001", match!.GameSpecificId);
     }
 
     [Fact]

@@ -116,7 +116,7 @@ public sealed class PerceptualHashService : IPerceptualHashService
     }
 
     // Per-pixel gradient magnitude (|dx| + |dy|) on a [height,width] luminance array in [0,1].
-    // Edge/right/bottom borders reuse the nearest interior difference (zero at the far edge).
+    // Forward differences; the far-edge row/column has no next pixel, so its gradient is zero.
     private static double[,] GradientMagnitude(double[,] pixels)
     {
         int h = pixels.GetLength(0);

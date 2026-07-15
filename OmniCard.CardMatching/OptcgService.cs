@@ -105,7 +105,7 @@ public sealed class OptcgService : ICardGameService, IDisposable
     public MatchDiagnostics? LastMatchDiagnostics { get; private set; }
 
     private List<(string CardSetId, ulong Hash)>? _hashCache;
-    private List<(string CardSetId, ulong EdgeHash)>? _edgeHashCache;
+    private List<(string CardSetId, ulong EdgeHash, string SetId)>? _edgeHashCache;
     private Dictionary<string, string>? _hashSetLookup;
     private List<(ulong ScanHash, string CorrectCardId)>? _correctionsCache;
     private const int CorrectionTrustBonus = 5;
@@ -493,33 +493,32 @@ public sealed class OptcgService : ICardGameService, IDisposable
             {
                 _edgeHashCache = _readContext.Cards
                     .Where(c => c.EdgeHash != null)
-                    .Select(c => new { c.CardSetId, Edge = c.EdgeHash!.Value })
+                    .Select(c => new { c.CardSetId, Edge = c.EdgeHash!.Value, c.SetId })
                     .AsNoTracking()
                     .AsEnumerable()
-                    .Select(c => (c.CardSetId, c.Edge))
+                    .Select(c => (c.CardSetId, c.Edge, c.SetId))
                     .ToList();
                 _logger.LogInformation("OPTCG edge-hash cache loaded with {Count} entries", _edgeHashCache.Count);
             }
 
             string bestEdgeId = "";
             int bestEdgeDist = int.MaxValue;
-            foreach (var (cardSetId, edge) in _edgeHashCache)
+            foreach (var (cardSetId, edge, setId) in _edgeHashCache)
             {
+                if (setFilter is not null && !setFilter.Contains(setId))
+                    continue;
+
                 var dist = PerceptualHashService.HammingDistance(scanEdge, edge);
                 if (dist < bestEdgeDist) { bestEdgeDist = dist; bestEdgeId = cardSetId; }
             }
 
             if (bestEdgeId.Length > 0 && bestEdgeDist <= maxDistance)
             {
-                var edgeCard = _readContext.Cards.AsNoTracking().FirstOrDefault(c => c.CardSetId == bestEdgeId);
-                if (edgeCard is not null && (setFilter is null || setFilter.Contains(edgeCard.SetId)))
-                {
-                    LastMatchDiagnostics.DecisionPhase = "EdgeHashFoil";
-                    LastMatchDiagnostics.PHashDistance = bestEdgeDist;
-                    var edgeConfidence = Math.Max(0, 1.0 - (double)bestEdgeDist / maxDistance) * 100;
-                    _logger.LogInformation("OPTCG foil edge-hash match: {CardName} ({CardId}) dist {Dist}", edgeCard.CardName, edgeCard.CardSetId, bestEdgeDist);
-                    return LookupOptcgCard(edgeCard.CardSetId, edgeConfidence);
-                }
+                LastMatchDiagnostics.DecisionPhase = "EdgeHashFoil";
+                LastMatchDiagnostics.PHashDistance = bestEdgeDist;
+                var edgeConfidence = Math.Max(0, 1.0 - (double)bestEdgeDist / maxDistance) * 100;
+                _logger.LogInformation("OPTCG foil edge-hash match: {CardId} dist {Dist}", bestEdgeId, bestEdgeDist);
+                return LookupOptcgCard(bestEdgeId, edgeConfidence);
             }
 
             _logger.LogDebug("OPTCG foil edge-hash: no match within {Max} (best {Dist})", maxDistance, bestEdgeDist);
