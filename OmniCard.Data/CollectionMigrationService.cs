@@ -88,6 +88,78 @@ public static class CollectionMigrationService
         logger.LogInformation("Migration complete: {Count} cards migrated", migrated);
     }
 
+    /// <summary>
+    /// Repairs One Piece collection rows whose <c>SetCode</c>/<c>SetName</c> were written from the
+    /// legacy OPTCG data source (hyphenated codes like <c>OP-16</c>, or bogus composite codes like
+    /// <c>OP14-EB04</c>). The canonical values are recovered by joining each row's <c>GameCardId</c>
+    /// to the reference <c>optcg.db</c> (<c>CardSetId</c> → <c>SetId</c>/<c>SetName</c>).
+    /// Only rows that differ from the canonical values are updated, so this is idempotent and cheap
+    /// to run on every startup. Returns the number of rows repaired.
+    /// </summary>
+    public static int RepairOptcgSetCodes(
+        string dataDirectory,
+        IDbContextFactory<CollectionDbContext> collectionDbContextFactory,
+        ILogger logger)
+    {
+        var referencePath = Path.Combine(dataDirectory, "optcg.db");
+        if (!File.Exists(referencePath))
+        {
+            logger.LogDebug("No optcg.db reference found; skipping OPTCG set-code repair");
+            return 0;
+        }
+
+        try
+        {
+            using var context = collectionDbContextFactory.CreateDbContext();
+            var conn = (SqliteConnection)context.Database.GetDbConnection();
+            if (conn.State != System.Data.ConnectionState.Open)
+                conn.Open();
+
+            using (var attach = conn.CreateCommand())
+            {
+                attach.CommandText = "ATTACH DATABASE $ref AS refdb";
+                attach.Parameters.AddWithValue("$ref", referencePath);
+                attach.ExecuteNonQuery();
+            }
+
+            try
+            {
+                // Game is persisted as a string ("OnePiece") via HasConversion<string>().
+                // Update only rows whose canonical SetId/SetName differ from what is stored,
+                // matched by the intact GameCardId (= reference CardSetId).
+                using var update = conn.CreateCommand();
+                update.CommandText = """
+                    UPDATE Cards
+                    SET SetCode = (SELECT r.SetId   FROM refdb.Cards r WHERE r.CardSetId = Cards.GameCardId),
+                        SetName = (SELECT r.SetName FROM refdb.Cards r WHERE r.CardSetId = Cards.GameCardId)
+                    WHERE Game = 'OnePiece'
+                      AND GameCardId <> ''
+                      AND EXISTS (
+                          SELECT 1 FROM refdb.Cards r
+                          WHERE r.CardSetId = Cards.GameCardId
+                            AND (r.SetId <> Cards.SetCode OR r.SetName <> Cards.SetName))
+                    """;
+                var repaired = update.ExecuteNonQuery();
+                if (repaired > 0)
+                    logger.LogInformation("Repaired legacy OPTCG set codes on {Count} collection rows", repaired);
+                else
+                    logger.LogDebug("No OPTCG set codes needed repair");
+                return repaired;
+            }
+            finally
+            {
+                using var detach = conn.CreateCommand();
+                detach.CommandText = "DETACH DATABASE refdb";
+                detach.ExecuteNonQuery();
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to repair legacy OPTCG set codes");
+            return 0;
+        }
+    }
+
     private static bool HasOldMtgSchema(string dbPath, ILogger logger)
     {
         if (!File.Exists(dbPath))

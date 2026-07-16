@@ -706,10 +706,11 @@ public sealed class OptcgService : ICardGameService, IDisposable
             .ToDictionary(s => s.SetId, s => (s.SetName, s.Total));
 
         // Owned cards per set (CollectionCard.SetCode stores SetId for OPTCG,
-        // CollectionCard.Number stores the printed CardNumber)
+        // CollectionCard.Number stores the printed CardNumber): distinct numbers for
+        // completion, plus physical copy count (incl. duplicates) for display.
         var ownedPerSet = ownedCards
             .GroupBy(c => c.SetCode)
-            .ToDictionary(g => g.Key, g => g.Select(c => c.Number).Distinct().Count());
+            .ToDictionary(g => g.Key, g => (Distinct: g.Select(c => c.Number).Distinct().Count(), Physical: g.Count()));
 
         var results = new List<SetCompletionSummary>();
         var processed = 0;
@@ -721,8 +722,10 @@ public sealed class OptcgService : ICardGameService, IDisposable
             {
                 SetCode = setId,
                 SetName = setName,
-                OwnedCount = owned,
+                OwnedCount = owned.Distinct,
+                OwnedPhysicalCount = owned.Physical,
                 TotalCount = total,
+                Game = CardGame.OnePiece,
             });
 
             processed++;

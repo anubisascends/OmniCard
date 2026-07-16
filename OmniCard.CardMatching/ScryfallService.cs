@@ -670,10 +670,10 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
             .Select(g => new { g.Key.SetCode, g.Key.SetName, Total = g.Select(c => c.CollectorNumber).Distinct().Count() })
             .ToDictionary(s => s.SetCode, s => (s.SetName, s.Total));
 
-        // Owned cards per set (distinct collector numbers)
+        // Owned cards per set: distinct collector numbers (completion) and physical copies (incl. duplicates)
         var ownedPerSet = ownedCards
             .GroupBy(c => c.SetCode)
-            .ToDictionary(g => g.Key, g => g.Select(c => c.Number).Distinct().Count());
+            .ToDictionary(g => g.Key, g => (Distinct: g.Select(c => c.Number).Distinct().Count(), Physical: g.Count()));
 
         var results = new List<SetCompletionSummary>();
         var processed = 0;
@@ -685,8 +685,10 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
             {
                 SetCode = setCode,
                 SetName = setName,
-                OwnedCount = owned,
+                OwnedCount = owned.Distinct,
+                OwnedPhysicalCount = owned.Physical,
                 TotalCount = total,
+                Game = CardGame.Mtg,
             });
 
             processed++;

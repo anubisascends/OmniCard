@@ -94,6 +94,115 @@ public class CollectionMigrationTests : IDisposable
         Assert.Empty(verifyCtx.Cards.ToList());
     }
 
+    [Fact]
+    public void RepairOptcgSetCodes_RewritesNonCanonicalCodesFromReference()
+    {
+        var collectionPath = Path.Combine(_tempDir, "collection.db");
+        var options = new DbContextOptionsBuilder<CollectionDbContext>()
+            .UseSqlite($"Data Source={collectionPath}")
+            .Options;
+
+        using (var ctx = new CollectionDbContext(options))
+        {
+            ctx.Database.EnsureCreated();
+            ctx.Cards.AddRange(
+                // Hyphenated legacy code -> should become OP16
+                new CollectionCard { Game = CardGame.OnePiece, GameCardId = "OP16-066", SetCode = "OP-16", SetName = "wrong", Number = "OP16-066", Name = "Sengoku" },
+                // Bogus composite code, card actually belongs to OP14
+                new CollectionCard { Game = CardGame.OnePiece, GameCardId = "OP14-086", SetCode = "OP14-EB04", SetName = "wrong", Number = "OP14-086", Name = "Miss Doublefinger" },
+                // Same composite code, card actually belongs to EB04
+                new CollectionCard { Game = CardGame.OnePiece, GameCardId = "EB04-046", SetCode = "OP15-EB04", SetName = "wrong", Number = "EB04-046", Name = "Doll" },
+                // Already correct -> untouched
+                new CollectionCard { Game = CardGame.OnePiece, GameCardId = "OP16-100", SetCode = "OP16", SetName = "One Piece 16", Number = "OP16-100", Name = "Correct Card" },
+                // Unknown placeholder (empty ids) -> untouched
+                new CollectionCard { Game = CardGame.OnePiece, GameCardId = "", SetCode = "", SetName = "", Number = "", Name = "Unknown Card" },
+                // GameCardId not in reference -> untouched
+                new CollectionCard { Game = CardGame.OnePiece, GameCardId = "ZZ99-001", SetCode = "ZZ-99", SetName = "wrong", Number = "ZZ99-001", Name = "Orphan" },
+                // MTG row with a hyphenated-looking code -> untouched (repair is OnePiece-only)
+                new CollectionCard { Game = CardGame.Mtg, GameCardId = "abc", SetCode = "lea", SetName = "Alpha", Number = "1", Name = "Lightning Bolt" });
+            ctx.SaveChanges();
+        }
+
+        // Seed the canonical reference optcg.db
+        SeedReferenceOptcg(Path.Combine(_tempDir, "optcg.db"));
+        SqliteConnection.ClearAllPools();
+
+        var factory = new FileDbContextFactory(options);
+
+        // Act
+        var repaired = CollectionMigrationService.RepairOptcgSetCodes(_tempDir, factory, NullLogger.Instance);
+
+        // Assert — 3 rows corrected
+        Assert.Equal(3, repaired);
+
+        using var verify = new CollectionDbContext(options);
+        var byName = verify.Cards.AsNoTracking().ToDictionary(c => c.Name);
+
+        Assert.Equal("OP16", byName["Sengoku"].SetCode);
+        Assert.Equal("One Piece 16", byName["Sengoku"].SetName);
+        Assert.Equal("OP14", byName["Miss Doublefinger"].SetCode);
+        Assert.Equal("One Piece 14", byName["Miss Doublefinger"].SetName);
+        Assert.Equal("EB04", byName["Doll"].SetCode);
+        Assert.Equal("Extra Booster 4", byName["Doll"].SetName);
+
+        // Untouched rows
+        Assert.Equal("OP16", byName["Correct Card"].SetCode);
+        Assert.Equal("", byName["Unknown Card"].SetCode);
+        Assert.Equal("ZZ-99", byName["Orphan"].SetCode);
+        Assert.Equal("lea", byName["Lightning Bolt"].SetCode);
+
+        // Idempotent — a second run repairs nothing
+        var again = CollectionMigrationService.RepairOptcgSetCodes(_tempDir, factory, NullLogger.Instance);
+        Assert.Equal(0, again);
+    }
+
+    [Fact]
+    public void RepairOptcgSetCodes_NoReferenceDb_IsNoOp()
+    {
+        var collectionPath = Path.Combine(_tempDir, "collection.db");
+        var options = new DbContextOptionsBuilder<CollectionDbContext>()
+            .UseSqlite($"Data Source={collectionPath}")
+            .Options;
+        using (var ctx = new CollectionDbContext(options))
+        {
+            ctx.Database.EnsureCreated();
+            ctx.Cards.Add(new CollectionCard { Game = CardGame.OnePiece, GameCardId = "OP16-066", SetCode = "OP-16", SetName = "wrong", Number = "OP16-066", Name = "Sengoku" });
+            ctx.SaveChanges();
+        }
+        SqliteConnection.ClearAllPools();
+
+        var factory = new FileDbContextFactory(options);
+
+        // No optcg.db present — must not throw, must change nothing
+        var repaired = CollectionMigrationService.RepairOptcgSetCodes(_tempDir, factory, NullLogger.Instance);
+        Assert.Equal(0, repaired);
+
+        using var verify = new CollectionDbContext(options);
+        Assert.Equal("OP-16", verify.Cards.AsNoTracking().Single().SetCode);
+    }
+
+    private void SeedReferenceOptcg(string dbPath)
+    {
+        using var conn = new SqliteConnection($"Data Source={dbPath}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE Cards (
+                CardSetId TEXT NOT NULL,
+                CardName TEXT NOT NULL DEFAULT '',
+                SetId TEXT NOT NULL DEFAULT '',
+                SetName TEXT NOT NULL DEFAULT '',
+                CardNumber TEXT NOT NULL DEFAULT ''
+            );
+            INSERT INTO Cards (CardSetId, CardName, SetId, SetName, CardNumber) VALUES
+                ('OP16-066', 'Sengoku', 'OP16', 'One Piece 16', '066'),
+                ('OP16-100', 'Correct Card', 'OP16', 'One Piece 16', '100'),
+                ('OP14-086', 'Miss Doublefinger', 'OP14', 'One Piece 14', '086'),
+                ('EB04-046', 'Doll', 'EB04', 'Extra Booster 4', '046');
+            """;
+        cmd.ExecuteNonQuery();
+    }
+
     private void SeedOldMtgCollection(string dbPath)
     {
         // Create old-schema DB using raw SQL (old schema had ScryfallId, ManaCost, TypeLine, etc.)
