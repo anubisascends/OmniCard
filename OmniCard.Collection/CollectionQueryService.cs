@@ -21,13 +21,14 @@ public sealed class CollectionQueryService(
             if (gameFilter.HasValue)
                 cardsQuery = cardsQuery.Where(c => c.Game == gameFilter.Value);
 
-            // SQL aggregate: count + purchase total per container
+            // SQL aggregate: count + distinct printings + purchase total per container
             var aggregates = cardsQuery
                 .GroupBy(c => c.ContainerId)
                 .Select(g => new
                 {
                     ContainerId = g.Key,
                     Count = g.Count(),
+                    UniquePrints = g.Select(c => c.GameCardId).Distinct().Count(),
                     PurchaseTotal = g.Sum(c => c.PurchasePrice ?? 0m)
                 })
                 .ToDictionary(a => a.ContainerId);
@@ -80,6 +81,7 @@ public sealed class CollectionQueryService(
             {
                 var agg = aggregates.GetValueOrDefault(container.Id);
                 var cardCount = agg?.Count ?? 0;
+                var uniquePrints = agg?.UniquePrints ?? 0;
                 var totalPurchase = agg?.PurchaseTotal ?? 0m;
                 var totalMarket = marketTotals.GetValueOrDefault(container.Id);
 
@@ -96,6 +98,7 @@ public sealed class CollectionQueryService(
                 {
                     Container = container,
                     CardCount = cardCount,
+                    UniquePrintCount = uniquePrints,
                     TotalMarketValue = totalMarket,
                     TotalPurchaseCost = totalPurchase,
                     PriceDelta = delta,

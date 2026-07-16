@@ -3,7 +3,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:OmniCard.Views.Root"
              xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
-             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+             xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
+             xmlns:models="clr-namespace:OmniCard.Models;assembly=OmniCard.Shared"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -98,37 +101,118 @@
                     <materialDesign:PackIcon Kind="Refresh" Width="16" Height="16"/>
                 </Button>
             </DockPanel>
+
+
             <ListView Grid.Row="1"
                       ItemsSource="{Binding ViewModel.SetCompletionResults}"
                       SelectedItem="{Binding ViewModel.SelectedSetCompletion}"
-                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                <ListView.View>
-                    <GridView>
-                        <GridViewColumn Header="Set Name" DisplayMemberBinding="{Binding SetName}" Width="350"/>
-                        <GridViewColumn Header="Code" DisplayMemberBinding="{Binding SetCode}" Width="80"/>
-                        <GridViewColumn Header="Completion" Width="180">
-                            <GridViewColumn.CellTemplate>
-                                <DataTemplate>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <materialDesign:PackIcon Kind="Check" Foreground="Green" Width="16" Height="16" Margin="0,0,4,0">
-                                            <materialDesign:PackIcon.Style>
-                                                <Style TargetType="materialDesign:PackIcon">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding CompletionPercent}" Value="100">
-                                                            <Setter Property="Visibility" Value="Visible"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </materialDesign:PackIcon.Style>
-                                        </materialDesign:PackIcon>
-                                        <TextBlock Text="{Binding Converter={conv:CompletionPercentConverter}}" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </GridViewColumn.CellTemplate>
-                        </GridViewColumn>
-                    </GridView>
-                </ListView.View>
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                      HorizontalContentAlignment="Stretch">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem" BasedOn="{StaticResource {x:Type ListViewItem}}">
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Margin" Value="0"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    </Style>
+                </ListView.ItemContainerStyle>
+
+                <ListView.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ListView.ItemsPanel>
+
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="{StaticResource MaterialDesignLightSeparatorBackground}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Width="240"
+                                Margin="6"
+                                Padding="10,12">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Offset="0" Color="#33FFFFFF"/>
+                                    <GradientStop Offset="1" Color="#0DFFFFFF"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <StackPanel>
+                                <!-- [Set Name] ([set code]) -->
+                                <TextBlock HorizontalAlignment="Center"
+                                           TextAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           FontFamily="{StaticResource AppFont}"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource MaterialDesign.Brush.Primary}">
+                                    <Run Text="{Binding SetName, Mode=OneWay}"/><Run Text=" ("/><Run Text="{Binding SetCode, Mode=OneWay}"/><Run Text=")"/>
+                                </TextBlock>
+
+                                <!-- Set symbol (MTG) or set code in large font (One Piece) -->
+                                <Grid Height="48" Margin="0,10">
+                                    <!-- MTG: common-shape SVG tinted light so it reads on the dark tile -->
+                                    <Border Width="44" Height="44"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            helpers:SetSymbol.SetCode="{Binding SetCode}"
+                                            helpers:SetSymbol.Rarity="common"
+                                            helpers:SetSymbol.Tint="#F0F0F0">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Game}" Value="{x:Static models:CardGame.Mtg}">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                    </Border>
+
+                                    <!-- One Piece: no symbol, show the set code larger -->
+                                    <TextBlock Text="{Binding SetCode}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               FontFamily="{StaticResource AppFont}"
+                                               FontSize="28"
+                                               FontWeight="Bold"
+                                               Foreground="White">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Game}" Value="{x:Static models:CardGame.OnePiece}">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+
+                                <!-- [owned] / [total] ([percent]%) — distinct cards toward completion -->
+                                <TextBlock Text="{Binding Converter={conv:CompletionPercentConverter}}"
+                                           HorizontalAlignment="Center"
+                                           TextAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           FontFamily="{StaticResource AppFont}"
+                                           Foreground="White"/>
+
+                                <!-- Total physical copies (shown only when duplicates exist) -->
+                                <TextBlock Text="{Binding CopiesDisplay}"
+                                           HorizontalAlignment="Center"
+                                           TextAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           FontFamily="{StaticResource AppFont}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                           Visibility="{Binding HasDuplicateCopies, Converter={StaticResource BoolToVis}}"/>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
             </ListView>
         </Grid>
     </Grid>

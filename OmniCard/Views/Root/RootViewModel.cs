@@ -2240,11 +2240,10 @@ public sealed partial class RootViewModel(
             SelectedSetCompletion = null;
             SetCompletionResults.Clear();
 
-            // Only show sets the user owns cards in
+            // Only show sets the user owns cards in, ordered by set code
             var ownedSets = results
                 .Where(s => s.OwnedCount > 0)
-                .OrderByDescending(s => s.CompletionPercent)
-                .ThenBy(s => s.SetName);
+                .OrderBy(s => s.SetCode, StringComparer.OrdinalIgnoreCase);
 
             foreach (var summary in ownedSets)
                 SetCompletionResults.Add(summary);

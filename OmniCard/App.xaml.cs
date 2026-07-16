@@ -255,6 +255,9 @@ public partial class App : Application
             // Ensure EbayListings table (added for eBay listing integration)
             EnsureEbayListingsTable(dataDir, migrationLogger);
 
+            // Repair legacy One Piece set codes written by the pre-swap OPTCG data source
+            CollectionMigrationService.RepairOptcgSetCodes(dataDir, collectionDbFactory, migrationLogger);
+
             splash.SetStatus("Initializing databases...");
             // Initialize sealed products database
             using (var sealedCtx = Host.Services.GetRequiredService<IDbContextFactory<SealedProductDbContext>>().CreateDbContext())
