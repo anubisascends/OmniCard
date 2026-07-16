@@ -1,20 +1,30 @@
+using System.Collections.Concurrent;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using Microsoft.Extensions.Logging;
 using OmniCard.Interfaces;
 using OmniCard.Models;
-using Windows.Graphics.Imaging;
-using Windows.Media.Ocr;
-using Windows.Storage.Streams;
+using Tesseract;
 
 namespace OmniCard.Imaging;
 
-public sealed class OcrMatchingService : IOcrMatchingService
+public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
 {
     private readonly IPerceptualHashService _hashService;
     private readonly ILogger<OcrMatchingService> _logger;
-    private readonly OcrEngine? _ocrEngine;
+
+    // Tesseract engines are not thread-safe and are expensive to construct, so we keep a
+    // small pool that grows to the actual OCR concurrency. OCR runs off the UI thread
+    // (Task.Run below) because the TWAIN message pump owns the UI thread; a pool lets
+    // multiple scanned cards OCR in parallel without sharing an engine.
+    private readonly ConcurrentBag<TesseractEngine> _enginePool = [];
+    private readonly string _tessdataPath;
+    private readonly bool _ocrAvailable;
+
+    // Restrict OCR to the characters that appear in an OPTCG collector number (e.g. "OP15-043").
+    // A whitelist massively reduces misreads (0→O, 1→I, etc.) feeding the pattern regex below.
+    private const string CollectorNumberWhitelist = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
 
     // Name crop regions as percentage of card image: (X%, Y%, Width%, Height%)
     internal static readonly (double X, double Y, double W, double H)[] NameCropRegions =
@@ -42,19 +52,39 @@ public sealed class OcrMatchingService : IOcrMatchingService
         _hashService = hashService;
         _logger = logger;
 
+        _tessdataPath = Path.Combine(AppContext.BaseDirectory, "tessdata");
+
+        // Validate the engine can be constructed (native libs + language data present).
+        // Mirror the previous behaviour: if OCR is unavailable, log a warning and degrade
+        // gracefully — scanning still works via perceptual-hash matching.
         try
         {
-            _ocrEngine = OcrEngine.TryCreateFromUserProfileLanguages();
-            if (_ocrEngine is null)
-                _logger.LogWarning("Windows OCR engine unavailable — OCR matching disabled");
+            if (!File.Exists(Path.Combine(_tessdataPath, "eng.traineddata")))
+            {
+                _logger.LogWarning("Tesseract language data not found at {Path} — OCR matching disabled", _tessdataPath);
+            }
+            else
+            {
+                // Construct one engine up front both to validate and to prime the pool.
+                _enginePool.Add(CreateEngine());
+                _ocrAvailable = true;
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to initialize Windows OCR engine");
+            _logger.LogWarning(ex, "Failed to initialize Tesseract OCR engine — OCR matching disabled");
         }
     }
 
-    public async Task<OcrMatchResult> AnalyzeCardAsync(byte[] imageData)
+    private TesseractEngine CreateEngine() => new(_tessdataPath, "eng", EngineMode.Default);
+
+    private TesseractEngine RentEngine() => _enginePool.TryTake(out var engine) ? engine : CreateEngine();
+
+    private void ReturnEngine(TesseractEngine engine) => _enginePool.Add(engine);
+
+    public Task<OcrMatchResult> AnalyzeCardAsync(byte[] imageData) => Task.Run(() => AnalyzeCard(imageData));
+
+    private OcrMatchResult AnalyzeCard(byte[] imageData)
     {
         string? bestName = null;
         double bestConfidence = 0;
@@ -71,14 +101,14 @@ public sealed class OcrMatchingService : IOcrMatchingService
             var height = bitmap.Height;
 
             // OCR card name — try multiple crop regions
-            if (_ocrEngine is not null)
+            if (_ocrAvailable)
             {
                 foreach (var region in NameCropRegions)
                 {
                     var rect = ToPixelRect(region, width, height);
                     if (rect.Width < 10 || rect.Height < 5) continue;
 
-                    var (text, confidence) = await OcrCroppedRegionAsync(bitmap, rect);
+                    var (text, confidence) = OcrCroppedRegion(bitmap, rect, PageSegMode.SingleLine, whitelist: null);
                     if (confidence > bestConfidence && !string.IsNullOrWhiteSpace(text))
                     {
                         bestName = text.Trim();
@@ -146,7 +176,7 @@ public sealed class OcrMatchingService : IOcrMatchingService
         return new Rectangle(x, y, w, h);
     }
 
-    private async Task<(string Text, double Confidence)> OcrCroppedRegionAsync(Bitmap source, Rectangle cropRect)
+    private (string Text, double Confidence) OcrCroppedRegion(Bitmap source, Rectangle cropRect, PageSegMode psm, string? whitelist)
     {
         // Crop
         using var cropped = source.Clone(cropRect, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
@@ -166,49 +196,39 @@ public sealed class OcrMatchingService : IOcrMatchingService
             g.DrawImage(cropped, 0, 0, newWidth, newHeight);
         }
 
+        var engine = RentEngine();
         try
         {
-            // Convert System.Drawing.Bitmap to SoftwareBitmap for Windows.Media.Ocr
-            // Use InMemoryRandomAccessStream to avoid needing WindowsRuntimeStreamExtensions
-            using var ras = new InMemoryRandomAccessStream();
-            using (var ms = new MemoryStream())
-            {
-                toOcr.Save(ms, ImageFormat.Png);
-                ms.Position = 0;
-                var bytes = ms.ToArray();
-                using var writer = new DataWriter(ras);
-                writer.WriteBytes(bytes);
-                await writer.StoreAsync();
-                await writer.FlushAsync();
-                writer.DetachStream();
-            }
-            ras.Seek(0);
+            // Whitelist is per-recognition state on the shared engine; set it for this call
+            // and clear it afterward so a pooled engine doesn't leak the restriction.
+            engine.SetVariable("tessedit_char_whitelist", whitelist ?? string.Empty);
 
-            var decoder = await BitmapDecoder.CreateAsync(ras);
-            var softwareBitmap = await decoder.GetSoftwareBitmapAsync(
-                BitmapPixelFormat.Bgra8,
-                BitmapAlphaMode.Premultiplied);
+            using var ms = new MemoryStream();
+            toOcr.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+            using var pix = Pix.LoadFromMemory(ms.ToArray());
+            using var page = engine.Process(pix, psm);
 
-            var result = await _ocrEngine!.RecognizeAsync(softwareBitmap);
+            var text = page.GetText() ?? string.Empty;
+            // Tesseract's real mean confidence (0..1) — far better than the previous
+            // text-length proxy, and it flows into the downstream match scoring.
+            var confidence = string.IsNullOrWhiteSpace(text) ? 0.0 : page.GetMeanConfidence();
 
-            var text = result.Text;
-
-            // Use text length as a proxy for confidence — real card names are 2+ chars
-            var confidence = string.IsNullOrWhiteSpace(text) ? 0.0
-                : text.Trim().Length >= 3 ? 0.8
-                : 0.3;
-
-            return (text, confidence);
+            return (text.Trim(), confidence);
         }
         finally
         {
+            engine.SetVariable("tessedit_char_whitelist", string.Empty);
+            ReturnEngine(engine);
             if (needsDispose) toOcr.Dispose();
         }
     }
 
-    public async Task<(string? CollectorNumber, double Confidence)> DetectOptcgCollectorNumberAsync(byte[] imageData)
+    public Task<(string? CollectorNumber, double Confidence)> DetectOptcgCollectorNumberAsync(byte[] imageData)
+        => Task.Run(() => DetectOptcgCollectorNumber(imageData));
+
+    private (string? CollectorNumber, double Confidence) DetectOptcgCollectorNumber(byte[] imageData)
     {
-        if (_ocrEngine is null)
+        if (!_ocrAvailable)
             return (null, 0);
 
         try
@@ -218,7 +238,7 @@ public sealed class OcrMatchingService : IOcrMatchingService
             if (rect.Width < 10 || rect.Height < 5)
                 return (null, 0);
 
-            var (text, confidence) = await OcrCroppedRegionAsync(bitmap, rect);
+            var (text, confidence) = OcrCroppedRegion(bitmap, rect, PageSegMode.SingleLine, CollectorNumberWhitelist);
             if (string.IsNullOrWhiteSpace(text))
                 return (null, 0);
 
@@ -231,8 +251,13 @@ public sealed class OcrMatchingService : IOcrMatchingService
             if (match.Success)
             {
                 var collectorNumber = $"{match.Groups[1].Value.ToUpperInvariant()}-{match.Groups[2].Value}";
-                _logger.LogInformation("OPTCG collector number detected: {Number} (raw: {Raw})", collectorNumber, text);
-                return (collectorNumber, 0.95);
+                // A successful structured match is strong evidence on its own; floor the
+                // confidence so it always clears the downstream lookup gate, but never
+                // report below Tesseract's actual reading confidence.
+                var reportedConfidence = Math.Max(0.9, confidence);
+                _logger.LogInformation("OPTCG collector number detected: {Number} (raw: {Raw}, ocrConf: {Conf:F2})",
+                    collectorNumber, text, confidence);
+                return (collectorNumber, reportedConfidence);
             }
 
             _logger.LogDebug("OPTCG collector number OCR text did not match pattern: {Text}", text);
@@ -259,7 +284,7 @@ public sealed class OcrMatchingService : IOcrMatchingService
         }
 
         using var ms = new MemoryStream();
-        resized.Save(ms, ImageFormat.Png);
+        resized.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
         ms.Position = 0;
         var scanSymbolHash = _hashService.ComputeHash(ms);
 
@@ -278,5 +303,11 @@ public sealed class OcrMatchingService : IOcrMatchingService
         var confidence = Math.Max(0, 1.0 - (bestDistance / 20.0)); // 0 distance = 1.0, 20+ = 0.0
 
         return (codes, confidence);
+    }
+
+    public void Dispose()
+    {
+        while (_enginePool.TryTake(out var engine))
+            engine.Dispose();
     }
 }
