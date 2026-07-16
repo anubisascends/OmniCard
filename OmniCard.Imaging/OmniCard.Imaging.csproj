@@ -13,8 +13,17 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
     <PackageReference Include="SkiaSharp" Version="4.150.1" />
+    <PackageReference Include="Tesseract" Version="5.2.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OmniCard.Shared\OmniCard.Shared.csproj" />
+  </ItemGroup>
+  <!-- Tesseract language data. Copied to output (and flows to consuming apps) so the
+       engine can load it at runtime; Apache-2.0, redistributable. tessdata_fast/eng. -->
+  <ItemGroup>
+    <None Include="tessdata\**\*.traineddata">
+      <Link>tessdata\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>
