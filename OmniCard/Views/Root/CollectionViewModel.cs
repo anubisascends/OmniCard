@@ -303,6 +303,20 @@ public sealed partial class CollectionViewModel : ViewModel
 
     // --- Card List ---
 
+    /// <summary>
+    /// Immutable snapshot of everything a card-list search depends on. Used to skip a
+    /// redundant reload when navigation re-triggers a search with identical parameters.
+    /// Presets compare by reference (plain classes): an ad-hoc sort builds a fresh
+    /// <see cref="SortPreset"/> each search, so it correctly reads as "changed".
+    /// </summary>
+    public readonly record struct SearchParameters(
+        string Query,
+        CardGame Game,
+        int? ContainerFilter,
+        SortPreset? SortPreset,
+        FilterPreset? FilterPreset,
+        bool Stacked);
+
     [ObservableProperty]
     public partial ObservableCollection<CollectionCard> CollectionSearchResults { get; set; } = [];
 
