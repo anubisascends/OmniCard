@@ -423,6 +423,7 @@ public sealed partial class CollectionViewModel : ViewModel
             _cardService.SearchCollection(query, game, containerFilter, sortPreset, filterPreset, stacked, 0, PageSize, results);
 
             var priceCache = FetchBatchPrices(results);
+            HydrateMissingImageUris(results);
 
             // Re-sort by MarketPrice in-memory since it's not available at DB query time
             if (sortPreset?.SortLevels.Any(l => l.Field == "MarketPrice") == true)
@@ -465,6 +466,7 @@ public sealed partial class CollectionViewModel : ViewModel
             var batch = new ObservableCollection<CollectionCard>();
             _cardService.SearchCollection(query, game, containerFilter, sortPreset, filterPreset, stacked, skip, PageSize, batch);
             var prices = FetchBatchPrices(batch);
+            HydrateMissingImageUris(batch);
             return (batch, prices);
         });
 
@@ -498,6 +500,32 @@ public sealed partial class CollectionViewModel : ViewModel
             }
         }
         return priceCache;
+    }
+
+    /// <summary>
+    /// Fills in <see cref="CollectionCard.ImageUri"/> for cards that don't have one stored
+    /// (e.g. imported cards) by looking the print up in the game database. Runs on the search
+    /// background thread so the tile art can always prefer the downloaded image. Display-only —
+    /// the resolved URI is not persisted.
+    /// </summary>
+    private void HydrateMissingImageUris(ObservableCollection<CollectionCard> results)
+    {
+        foreach (var gameGroup in results.Where(c => string.IsNullOrEmpty(c.ImageUri)).GroupBy(c => c.Game))
+        {
+            var gameService = _cardService.GetGameService(gameGroup.Key);
+            foreach (var card in gameGroup)
+            {
+                if (string.IsNullOrEmpty(card.GameCardId)) continue;
+                try
+                {
+                    card.ImageUri = CardImageUriResolver.From(gameService.FindCardById(card.GameCardId));
+                }
+                catch
+                {
+                    // Leave ImageUri null; the tile falls back to scan art or a placeholder.
+                }
+            }
+        }
     }
 
     // --- Sort/Filter ---

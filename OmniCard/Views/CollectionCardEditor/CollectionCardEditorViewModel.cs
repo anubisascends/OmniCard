@@ -500,13 +500,7 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
     {
         try
         {
-            var source = _cardService.GetGameService(game).FindCardById(gameCardId);
-            return source switch
-            {
-                Models.Card scryfall => scryfall.ImageUris?.Normal ?? scryfall.ImageUris?.Large,
-                OptcgCard optcg => optcg.CardImageUri,
-                _ => null
-            };
+            return CardImageUriResolver.From(_cardService.GetGameService(game).FindCardById(gameCardId));
         }
         catch
         {
