@@ -127,7 +127,10 @@ public sealed partial class CollectionViewModel : ViewModel
         if (result == true)
         {
             if (ShowCardList)
+            {
+                // Data changed but search params are identical — force a refresh (bypass the guard).
                 _ = SearchCollection();
+            }
             else
                 LoadOverview();
         }
@@ -694,6 +697,7 @@ public sealed partial class CollectionViewModel : ViewModel
         foreach (var id in ids)
             _cardService.DeleteCollectionCard(id);
         ReportMessage?.Invoke($"Deleted {ids.Count} card(s).");
+        // Data changed but search params are identical — force a refresh (bypass the guard).
         _ = SearchCollection();
         CollectionChanged?.Invoke();
     }
