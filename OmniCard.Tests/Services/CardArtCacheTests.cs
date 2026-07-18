@@ -235,4 +235,24 @@ public class CardArtCacheTests : IDisposable
         Assert.Same(first, second);
         Assert.Equal(1, cache.Count);
     }
+
+    // --- Default capacity ---
+
+    [StaFact]
+    public void DefaultCapacity_IsTwoHundred()
+    {
+        // Construct with the default capacity (no capacity argument).
+        var cache = new CardArtCache(
+            NullLogger<CardArtCache>.Instance,
+            new Mock<IHttpClientFactory>().Object);
+
+        // Insert 201 distinct local images; the oldest must be evicted at 200.
+        for (int i = 0; i < 201; i++)
+        {
+            var path = CreateTestImage(_tempDir, $"cap-{i}.png");
+            Assert.NotNull(cache.GetImage(path, null));
+        }
+
+        Assert.Equal(200, cache.Count);
+    }
 }

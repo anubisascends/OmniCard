@@ -130,4 +130,31 @@ public class ScanImageCacheTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    // --- Default capacity ---
+
+    [StaFact]
+    public void DefaultCapacity_IsTwoHundred()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"scancache-default-{Guid.NewGuid()}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var cache = new ScanImageCache(
+                new DataPathService(dir),
+                NullLogger<ScanImageCache>.Instance);
+
+            for (int i = 0; i < 201; i++)
+            {
+                var path = CreateTestImage(dir, $"cap-{i}.png");
+                Assert.NotNull(cache.GetImage(path));
+            }
+
+            Assert.Equal(200, cache.Count);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
 }
