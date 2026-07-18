@@ -2,148 +2,124 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
-             xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
              xmlns:i="http://schemas.microsoft.com/xaml/behaviors">
 
-    <DataGrid x:Name="CollectionDataGrid"
-              ItemsSource="{Binding CollectionSearchResults}"
-              AutoGenerateColumns="False"
-              IsReadOnly="True"
-              SelectionMode="Extended"
-              SelectedItem="{Binding SelectedCollectionCard}"
-              EnableRowVirtualization="True"
-              EnableColumnVirtualization="True"
-              VirtualizingPanel.IsVirtualizing="True"
-              VirtualizingPanel.VirtualizationMode="Recycling"
-              ScrollViewer.IsDeferredScrollingEnabled="True"
-              LoadingRow="CollectionDataGrid_LoadingRow"
-              SelectionChanged="CollectionDataGrid_SelectionChanged">
+    <ListBox x:Name="CollectionListBox"
+             ItemsSource="{Binding CollectionSearchResults}"
+             SelectedItem="{Binding SelectedCollectionCard}"
+             SelectionMode="Extended"
+             HorizontalContentAlignment="Stretch"
+             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+             ScrollViewer.VerticalScrollBarVisibility="Auto"
+             VirtualizingPanel.IsVirtualizing="False"
+             SelectionChanged="CollectionListBox_SelectionChanged"
+             PreviewMouseRightButtonDown="CollectionListBox_PreviewMouseRightButtonDown">
 
-        <DataGrid.ColumnHeaderStyle>
-            <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
-                <EventSetter Event="Click" Handler="CollectionColumnHeader_Click"/>
+        <ListBox.ItemsPanel>
+            <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal"/>
+            </ItemsPanelTemplate>
+        </ListBox.ItemsPanel>
+
+        <!-- Tile container: flat, with a selection highlight border -->
+        <ListBox.ItemContainerStyle>
+            <Style TargetType="ListBoxItem">
+                <Setter Property="Margin" Value="0"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                            <Border x:Name="SelBorder"
+                                    BorderThickness="2"
+                                    BorderBrush="Transparent"
+                                    CornerRadius="8"
+                                    Background="Transparent">
+                                <ContentPresenter/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="SelBorder" Property="BorderBrush"
+                                            Value="{DynamicResource MaterialDesign.Brush.Primary}"/>
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="SelBorder" Property="BorderBrush"
+                                            Value="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
-        </DataGrid.ColumnHeaderStyle>
+        </ListBox.ItemContainerStyle>
 
-        <DataGrid.RowStyle>
-            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
-                <Setter Property="ToolTipService.InitialShowDelay" Value="300"/>
-            </Style>
-        </DataGrid.RowStyle>
+        <!-- Tile: art (or placeholder) + name + set + price + qty -->
+        <ListBox.ItemTemplate>
+            <DataTemplate>
+                <Border Width="160"
+                        Margin="6"
+                        Padding="6"
+                        Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                        BorderBrush="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                    <StackPanel>
+                        <!-- Art area (63:88 card ratio) -->
+                        <Grid Width="148" Height="207" Margin="0,0,0,6">
+                            <!-- Placeholder shown when the image resolves to null -->
+                            <Border CornerRadius="6"
+                                    Background="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"
+                                    Visibility="{Binding Source, ElementName=TileImage,
+                                        Converter={conv:NullToVisibleConverter}}">
+                                <TextBlock Text="No Image"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontStyle="Italic"
+                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                            </Border>
+                            <Image x:Name="TileImage" Stretch="Uniform">
+                                <Image.Source>
+                                    <MultiBinding Converter="{conv:TileArtConverter}">
+                                        <Binding/>
+                                        <Binding Path="DataContext.IsStacked"
+                                                 RelativeSource="{RelativeSource AncestorType=ListBox}"/>
+                                        <Binding Path="DataContext.DataDirectory"
+                                                 RelativeSource="{RelativeSource AncestorType=ListBox}"/>
+                                    </MultiBinding>
+                                </Image.Source>
+                            </Image>
+                        </Grid>
 
-        <DataGrid.Columns>
-            <DataGridTextColumn Header="Qty"
-                                conv:ColumnTag.Key="Quantity"
-                                Binding="{Binding Quantity}"
-                                Width="40"
-                                CanUserSort="False"/>
-            <DataGridTextColumn Header="Name"
-                                conv:ColumnTag.Key="Name"
-                                Binding="{Binding Name}"
-                                Width="*"
-                                CanUserSort="False"/>
-            <DataGridTemplateColumn Header="Set"
-                                    conv:ColumnTag.Key="Set"
-                                    Width="140"
-                                    CanUserSort="False">
-                <DataGridTemplateColumn.CellTemplate>
-                    <DataTemplate>
-                        <StackPanel Orientation="Horizontal"
-                                    VerticalAlignment="Center">
-                            <Border Width="{Binding DataContext.ViewModel.CardDetailFontSize,
-                                        RelativeSource={RelativeSource AncestorType=Window}}"
-                                    Height="{Binding DataContext.ViewModel.CardDetailFontSize,
-                                        RelativeSource={RelativeSource AncestorType=Window}}"
-                                    helpers:SetSymbol.SetCode="{Binding SetCode}"
-                                    helpers:SetSymbol.Rarity="{Binding Rarity}"/>
-                            <TextBlock Text="{Binding SetName}"
-                                       VerticalAlignment="Center"
-                                       Margin="2,0,0,0"/>
-                        </StackPanel>
-                    </DataTemplate>
-                </DataGridTemplateColumn.CellTemplate>
-            </DataGridTemplateColumn>
-            <DataGridTextColumn Header="#"
-                                conv:ColumnTag.Key="Number"
-                                Binding="{Binding Number}"
-                                Width="60"
-                                CanUserSort="False"/>
-            <DataGridTextColumn Header="Type"
-                                conv:ColumnTag.Key="Type"
-                                Binding="{Binding CardType}"
-                                Width="120"
-                                CanUserSort="False"/>
-            <DataGridTextColumn Header="Rarity"
-                                conv:ColumnTag.Key="Rarity"
-                                Binding="{Binding Rarity}"
-                                Width="70"
-                                CanUserSort="False"/>
-            <DataGridTextColumn Header="Finish"
-                                conv:ColumnTag.Key="Finish"
-                                Binding="{Binding IsFoil, Converter={conv:FoilToFinishConverter}}"
-                                Width="60"
-                                CanUserSort="False"/>
-            <DataGridTemplateColumn Header="Market $"
-                                    conv:ColumnTag.Key="MarketPrice"
-                                    Width="80"
-                                    CanUserSort="False">
-                <DataGridTemplateColumn.CellTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=DataGridRow}}"
-                                   VerticalAlignment="Center"
-                                   HorizontalAlignment="Right"/>
-                    </DataTemplate>
-                </DataGridTemplateColumn.CellTemplate>
-            </DataGridTemplateColumn>
-            <DataGridTextColumn Header="Game"
-                                conv:ColumnTag.Key="Game"
-                                Binding="{Binding Game}"
-                                Width="70"
-                                CanUserSort="False"/>
-            <DataGridTextColumn Header="Color"
-                                conv:ColumnTag.Key="Color"
-                                Binding="{Binding Color}"
-                                Width="60"
-                                CanUserSort="False"/>
-            <DataGridTextColumn Header="Condition"
-                                conv:ColumnTag.Key="Condition"
-                                Binding="{Binding Condition}"
-                                Width="65"
-                                CanUserSort="False"/>
-            <DataGridTextColumn Header="Purchase $"
-                                conv:ColumnTag.Key="PurchasePrice"
-                                Binding="{Binding PurchasePrice, StringFormat={}{0:F2}, TargetNullValue=''}"
-                                Width="80"
-                                CanUserSort="False"/>
-            <DataGridTextColumn Header="Date Added"
-                                conv:ColumnTag.Key="DateAdded"
-                                Binding="{Binding DateAdded, StringFormat={}{0:yyyy-MM-dd}}"
-                                Width="90"
-                                CanUserSort="False"/>
-            <DataGridTemplateColumn Header="Location"
-                                    conv:ColumnTag.Key="Location"
-                                    Width="140"
-                                    CanUserSort="False">
-                <DataGridTemplateColumn.CellTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding Converter={conv:LocationDisplayConverter}}"
-                                   VerticalAlignment="Center"/>
-                    </DataTemplate>
-                </DataGridTemplateColumn.CellTemplate>
-            </DataGridTemplateColumn>
-            <DataGridTextColumn Header="Set Code"
-                                conv:ColumnTag.Key="SetCode"
-                                Binding="{Binding SetCode}"
-                                Width="60"
-                                CanUserSort="False"/>
-            <DataGridTextColumn Header="eBay"
-                                conv:ColumnTag.Key="EbayStatus"
-                                Binding="{Binding EbayListing.Status}"
-                                Width="70"
-                                CanUserSort="False"/>
-        </DataGrid.Columns>
+                        <!-- Name -->
+                        <TextBlock Text="{Binding Name}"
+                                   FontWeight="Bold"
+                                   TextWrapping="Wrap"
+                                   MaxHeight="36"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding Name}"/>
 
-        <DataGrid.ContextMenu>
+                        <!-- Set Name (Set Code) -->
+                        <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                   TextTrimming="CharacterEllipsis">
+                            <Run Text="{Binding SetName, Mode=OneWay}"/><Run Text=" ("/><Run Text="{Binding SetCode, Mode=OneWay}"/><Run Text=")"/>
+                        </TextBlock>
+
+                        <!-- Market price -->
+                        <TextBlock Text="{Binding MarketPrice, StringFormat=${0:F2}}"
+                                   FontWeight="SemiBold"/>
+
+                        <!-- Quantity (stacked mode only) -->
+                        <TextBlock Text="{Binding Quantity, StringFormat=×{0}}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Primary}"
+                                   Visibility="{Binding DataContext.IsStacked,
+                                       RelativeSource={RelativeSource AncestorType=ListBox},
+                                       Converter={conv:BoolToVisibilityConverter}}"/>
+                    </StackPanel>
+                </Border>
+            </DataTemplate>
+        </ListBox.ItemTemplate>
+
+        <ListBox.ContextMenu>
             <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
                 <MenuItem Header="Open Card Editor"
                           Command="{Binding CollectionCardDoubleClickCommand}"/>
@@ -177,7 +153,7 @@
                 <MenuItem Header="Delete Selected"
                           Command="{Binding BulkDeleteCollectionCommand}"/>
             </ContextMenu>
-        </DataGrid.ContextMenu>
+        </ListBox.ContextMenu>
 
         <i:Interaction.Triggers>
             <i:EventTrigger EventName="MouseDoubleClick">
@@ -185,5 +161,5 @@
             </i:EventTrigger>
         </i:Interaction.Triggers>
 
-    </DataGrid>
+    </ListBox>
 </UserControl>
