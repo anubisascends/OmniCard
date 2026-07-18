@@ -459,42 +459,53 @@ public sealed partial class CollectionViewModel : ViewModel
         _lastStacked = stacked;
 
         // Run DB query, stacking, and pricing off the UI thread
-        var (displayResults, prices, totalCount) = await Task.Run(() =>
+        try
         {
-            // Get total count for the status bar (cheap SQL COUNT)
-            var total = _cardService.GetSearchCount(query, game, containerFilter, filterPreset, stacked);
-
-            // Load first page
-            var results = new ObservableCollection<CollectionCard>();
-            _cardService.SearchCollection(query, game, containerFilter, sortPreset, filterPreset, stacked, 0, PageSize, results);
-
-            var priceCache = FetchBatchPrices(results);
-            HydrateMissingImageUris(results);
-
-            // Re-sort by MarketPrice in-memory since it's not available at DB query time
-            if (sortPreset?.SortLevels.Any(l => l.Field == "MarketPrice") == true)
+            var (displayResults, prices, totalCount) = await Task.Run(() =>
             {
-                var level = sortPreset.SortLevels.First(l => l.Field == "MarketPrice");
-                var sorted = level.Direction == SortDirection.Ascending
-                    ? results.OrderBy(c => c.MarketPrice)
-                    : results.OrderByDescending(c => c.MarketPrice);
-                results = new ObservableCollection<CollectionCard>(sorted);
-            }
+                // Get total count for the status bar (cheap SQL COUNT)
+                var total = _cardService.GetSearchCount(query, game, containerFilter, filterPreset, stacked);
 
-            return (results, priceCache, total);
-        });
+                // Load first page
+                var results = new ObservableCollection<CollectionCard>();
+                _cardService.SearchCollection(query, game, containerFilter, sortPreset, filterPreset, stacked, 0, PageSize, results);
 
-        // A newer search (or a NavigateBack) started while we awaited? Drop this stale result.
-        if (generation != _searchGeneration)
-            return;
+                var priceCache = FetchBatchPrices(results);
+                HydrateMissingImageUris(results);
 
-        // Single property assignment on UI thread — DataGrid updates once
-        MarketPrices = prices;
-        CollectionSearchResults = displayResults;
-        TotalCardCount = totalCount;
-        OnPropertyChanged(nameof(FilteredCardCount));
-        OnPropertyChanged(nameof(FilteredMarketValue));
-        OnPropertyChanged(nameof(HasMoreResults));
+                // Re-sort by MarketPrice in-memory since it's not available at DB query time
+                if (sortPreset?.SortLevels.Any(l => l.Field == "MarketPrice") == true)
+                {
+                    var level = sortPreset.SortLevels.First(l => l.Field == "MarketPrice");
+                    var sorted = level.Direction == SortDirection.Ascending
+                        ? results.OrderBy(c => c.MarketPrice)
+                        : results.OrderByDescending(c => c.MarketPrice);
+                    results = new ObservableCollection<CollectionCard>(sorted);
+                }
+
+                return (results, priceCache, total);
+            });
+
+            // A newer search (or a NavigateBack) started while we awaited? Drop this stale result.
+            if (generation != _searchGeneration)
+                return;
+
+            // Single property assignment on UI thread — DataGrid updates once
+            MarketPrices = prices;
+            CollectionSearchResults = displayResults;
+            TotalCardCount = totalCount;
+            OnPropertyChanged(nameof(FilteredCardCount));
+            OnPropertyChanged(nameof(FilteredMarketValue));
+            OnPropertyChanged(nameof(HasMoreResults));
+        }
+        catch
+        {
+            // Load failed: clear the request marker (unless a newer search already
+            // replaced it) so the guard does not skip a retry of these same params.
+            if (generation == _searchGeneration)
+                _requestedSearch = null;
+            throw;
+        }
     }
 
     /// <summary>Called by the view when the user scrolls near the bottom of the DataGrid.</summary>
