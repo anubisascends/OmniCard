@@ -95,6 +95,11 @@ public sealed class CardArtCache
     {
         var client = _httpClientFactory.CreateClient();
         var bytes = client.GetByteArrayAsync(uri).GetAwaiter().GetResult();
+        return LoadFromBytes(bytes);
+    }
+
+    private static BitmapImage LoadFromBytes(byte[] bytes)
+    {
         var bmp = new BitmapImage();
         bmp.BeginInit();
         bmp.CacheOption = BitmapCacheOption.OnLoad;
@@ -104,6 +109,62 @@ public sealed class CardArtCache
         bmp.StreamSource.Dispose();
         bmp.Freeze();
         return bmp;
+    }
+
+    /// <summary>
+    /// Async twin of <see cref="GetImage"/>. The network fetch runs off the calling thread;
+    /// the continuation resumes on the caller's synchronization context (the UI thread in the
+    /// app), so cache mutation stays single-threaded. Call this from the UI thread only.
+    /// </summary>
+    public async Task<BitmapImage?> GetImageAsync(string? localPath, string? imageUri)
+    {
+        string? key = null;
+        if (!string.IsNullOrEmpty(localPath) && File.Exists(localPath))
+            key = localPath;
+        else if (!string.IsNullOrEmpty(imageUri))
+            key = imageUri;
+
+        if (key is null)
+            return null;
+
+        if (_map.TryGetValue(key, out var node))
+        {
+            _order.Remove(node);
+            _order.AddFirst(node);
+            return node.Value.Image;
+        }
+
+        try
+        {
+            BitmapImage bmp;
+            if (key == localPath)
+            {
+                bmp = LoadFromFile(localPath!);
+            }
+            else
+            {
+                var client = _httpClientFactory.CreateClient();
+                var bytes = await client.GetByteArrayAsync(imageUri!).ConfigureAwait(true);
+                bmp = LoadFromBytes(bytes);
+            }
+
+            var newNode = _order.AddFirst((key, bmp));
+            _map[key] = newNode;
+
+            if (_map.Count > _capacity)
+            {
+                var last = _order.Last!;
+                _map.Remove(last.Value.Key);
+                _order.RemoveLast();
+            }
+
+            return bmp;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load card art (async): {Key}", key);
+            return null;
+        }
     }
 
     public void Evict(string key)

@@ -1,11 +1,9 @@
 using System.Collections;
 using System.Globalization;
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Markup;
-using System.Windows.Media;
 using OmniCard.Imaging;
 using OmniCard.Models;
 
@@ -337,6 +335,17 @@ public class FoilToFinishConverter : MarkupExtension, IValueConverter
     public override object ProvideValue(IServiceProvider serviceProvider) => this;
 }
 
+public class MarketPriceDisplayConverter : MarkupExtension, IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is decimal d && d > 0 ? $"${d:F2}" : "";
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
+
 /// <summary>
 /// Compares an enum value to the ConverterParameter string.
 /// Returns true when they match; sets the enum value on ConvertBack.
@@ -355,46 +364,6 @@ public class EnumBoolConverter : MarkupExtension, IValueConverter
         if (value is not true || parameter is null) return Binding.DoNothing;
         return Enum.Parse(targetType, parameter.ToString()!);
     }
-
-    public override object ProvideValue(IServiceProvider serviceProvider) => this;
-}
-
-/// <summary>
-/// Resolves the tile image for a collection card. Bindings, in order:
-/// [0] CollectionCard, [1] bool IsStacked, [2] string data directory.
-/// Returns the first available ImageSource (see <see cref="CardArtCandidateResolver"/>),
-/// or null when no art is available (the tile then shows a placeholder).
-/// </summary>
-public class TileArtConverter : MarkupExtension, IMultiValueConverter
-{
-    public object? Convert(object[] values, Type targetType, object? parameter, CultureInfo culture)
-    {
-        if (values.Length < 3 || values[0] is not CollectionCard card)
-            return null;
-
-        var isStacked = values[1] is true;
-        var dataDir = values[2] as string ?? "";
-
-        foreach (var candidate in CardArtCandidateResolver.Resolve(card, isStacked))
-        {
-            ImageSource? image = candidate.Kind switch
-            {
-                CardArtKind.Scan =>
-                    ScanImageCache.Instance?.GetImage(Path.Combine(dataDir, candidate.Value)),
-                CardArtKind.Downloaded =>
-                    CardArtCache.Instance?.GetImage(null, candidate.Value),
-                _ => null
-            };
-
-            if (image is not null)
-                return image;
-        }
-
-        return null;
-    }
-
-    public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)
-        => throw new NotSupportedException();
 
     public override object ProvideValue(IServiceProvider serviceProvider) => this;
 }
