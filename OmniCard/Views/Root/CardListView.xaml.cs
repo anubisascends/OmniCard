@@ -1,7 +1,10 @@
+using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using OmniCard.Models;
 
 namespace OmniCard.Views.Root;
@@ -18,8 +21,12 @@ public partial class CardListView : UserControl
 
     public void WireUp(CollectionViewModel vm)
     {
+        if (ViewModel is not null)
+            ViewModel.PropertyChanged -= ViewModel_PropertyChanged;
+
         ViewModel = vm;
         DataContext = vm;
+        vm.PropertyChanged += ViewModel_PropertyChanged;
 
         // Hook scroll detection for incremental loading
         CollectionListBox.Loaded += (_, _) =>
@@ -31,6 +38,22 @@ public partial class CardListView : UserControl
             if (_scrollViewer is not null)
                 _scrollViewer.ScrollChanged += ScrollViewer_ScrollChanged;
         };
+    }
+
+    // A new result set replaces CollectionSearchResults on every search/filter/sort. WPF keeps
+    // the ScrollViewer's old vertical offset across the swap, so with virtualization the viewport
+    // can sit past the replaced (often shorter) list, leaving it blank until the user scrolls up.
+    // Reset to the top when the collection is replaced. LoadMore appends to the same instance
+    // (no property change), so paging does not trigger this and the scroll position is preserved.
+    private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(CollectionViewModel.CollectionSearchResults))
+            return;
+
+        // Defer so the ItemsSource binding and layout update before we scroll.
+        Dispatcher.BeginInvoke(
+            DispatcherPriority.Background,
+            new Action(() => _scrollViewer?.ScrollToTop()));
     }
 
     private async void ScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
