@@ -191,6 +191,7 @@ public sealed partial class CollectionViewModel : ViewModel
         CurrentLocationName = "";
         ResetSearchState();
         CollectionSearchResults.Clear();
+        _loadedSearch = null;
         MarketPrices.Clear();
         TotalCardCount = 0;
         LoadOverview();
@@ -365,13 +366,13 @@ public sealed partial class CollectionViewModel : ViewModel
 
     partial void OnIsStackedChanged(bool value)
     {
-        if (ShowCardList) _ = SearchCollection();
+        if (ShowCardList) _ = SearchCollectionCore(forceRefresh: false);
         PersistSettings?.Invoke();
     }
 
     private void LoadCardList()
     {
-        _ = SearchCollection();
+        _ = SearchCollectionCore(forceRefresh: false);
     }
 
     // Cached search parameters for LoadMore
@@ -383,8 +384,14 @@ public sealed partial class CollectionViewModel : ViewModel
     private bool _lastStacked;
     private bool _isLoadingMore;
 
+    // Parameters of the results currently displayed; used to skip redundant reloads.
+    // Null means "nothing loaded" (initial state, or invalidated by NavigateBack).
+    private SearchParameters? _loadedSearch;
+
     [RelayCommand]
-    public async Task SearchCollection()
+    public Task SearchCollection() => SearchCollectionCore(forceRefresh: true);
+
+    private async Task SearchCollectionCore(bool forceRefresh)
     {
         // Overview mode: filter location tiles instead of searching cards
         if (!ShowCardList)
@@ -419,6 +426,14 @@ public sealed partial class CollectionViewModel : ViewModel
         var game = _selectedGame;
         var filterPreset = SelectedFilterPreset;
         var stacked = IsStacked;
+
+        var currentParams = new SearchParameters(query, game, containerFilter, sortPreset, filterPreset, stacked);
+        if (!forceRefresh && _loadedSearch == currentParams)
+        {
+            _logger.LogDebug("SearchCollection skipped: parameters unchanged");
+            return;
+        }
+
         _lastSortPreset = sortPreset;
         _lastContainerFilter = containerFilter;
         _lastQuery = query;
@@ -459,6 +474,7 @@ public sealed partial class CollectionViewModel : ViewModel
         OnPropertyChanged(nameof(FilteredCardCount));
         OnPropertyChanged(nameof(FilteredMarketValue));
         OnPropertyChanged(nameof(HasMoreResults));
+        _loadedSearch = currentParams;
     }
 
     /// <summary>Called by the view when the user scrolls near the bottom of the DataGrid.</summary>
@@ -558,7 +574,7 @@ public sealed partial class CollectionViewModel : ViewModel
             _presetService.SetActiveSortPreset(_selectedGame, value.Name);
         else
             _presetService.SetActiveSortPreset(_selectedGame, null);
-        if (ShowCardList) _ = SearchCollection();
+        if (ShowCardList) _ = SearchCollectionCore(forceRefresh: false);
     }
 
     [RelayCommand]
@@ -573,7 +589,7 @@ public sealed partial class CollectionViewModel : ViewModel
             _presetService.SetActiveFilterPreset(_selectedGame, value.Name);
         else
             _presetService.SetActiveFilterPreset(_selectedGame, null);
-        if (ShowCardList) _ = SearchCollection();
+        if (ShowCardList) _ = SearchCollectionCore(forceRefresh: false);
     }
 
     [RelayCommand]
@@ -605,7 +621,7 @@ public sealed partial class CollectionViewModel : ViewModel
         }
 
         IsAdHocSortActive = _adHocSortLevels.Count > 0;
-        _ = SearchCollection();
+        _ = SearchCollectionCore(forceRefresh: false);
     }
 
     [RelayCommand]
@@ -613,7 +629,7 @@ public sealed partial class CollectionViewModel : ViewModel
     {
         _adHocSortLevels.Clear();
         IsAdHocSortActive = false;
-        _ = SearchCollection();
+        _ = SearchCollectionCore(forceRefresh: false);
     }
 
     // --- Collection actions ---
@@ -711,7 +727,7 @@ public sealed partial class CollectionViewModel : ViewModel
 
     partial void OnSelectedContainerFilterChanged(StorageContainer? value)
     {
-        if (ShowCardList) _ = SearchCollection();
+        if (ShowCardList) _ = SearchCollectionCore(forceRefresh: false);
     }
 
     public void LoadContainers()
