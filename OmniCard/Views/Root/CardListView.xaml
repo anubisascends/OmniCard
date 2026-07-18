@@ -3,7 +3,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
              xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
-             xmlns:i="http://schemas.microsoft.com/xaml/behaviors">
+             xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+             xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel">
 
     <ListBox x:Name="CollectionListBox"
              ItemsSource="{Binding CollectionSearchResults}"
@@ -12,13 +13,18 @@
              HorizontalContentAlignment="Stretch"
              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
              ScrollViewer.VerticalScrollBarVisibility="Auto"
-             VirtualizingPanel.IsVirtualizing="False"
+             ScrollViewer.CanContentScroll="True"
+             VirtualizingPanel.IsVirtualizing="True"
+             VirtualizingPanel.VirtualizationMode="Recycling"
+             VirtualizingPanel.ScrollUnit="Pixel"
+             VirtualizingPanel.CacheLengthUnit="Item"
+             VirtualizingPanel.CacheLength="30,30"
              SelectionChanged="CollectionListBox_SelectionChanged"
              PreviewMouseRightButtonDown="CollectionListBox_PreviewMouseRightButtonDown">
 
         <ListBox.ItemsPanel>
             <ItemsPanelTemplate>
-                <WrapPanel Orientation="Horizontal"/>
+                <vwp:VirtualizingWrapPanel Orientation="Horizontal" SpacingMode="None"/>
             </ItemsPanelTemplate>
         </ListBox.ItemsPanel>
 
