@@ -194,7 +194,8 @@ public sealed partial class CollectionViewModel : ViewModel
         CurrentLocationName = "";
         ResetSearchState();
         CollectionSearchResults.Clear();
-        _loadedSearch = null;
+        _requestedSearch = null;
+        _searchGeneration++;   // cancel any in-flight search from the view we're leaving
         MarketPrices.Clear();
         TotalCardCount = 0;
         LoadOverview();
@@ -387,9 +388,16 @@ public sealed partial class CollectionViewModel : ViewModel
     private bool _lastStacked;
     private bool _isLoadingMore;
 
-    // Parameters of the results currently displayed; used to skip redundant reloads.
-    // Null means "nothing loaded" (initial state, or invalidated by NavigateBack).
-    private SearchParameters? _loadedSearch;
+    // Guard state for redundant/overlapping searches.
+    // _requestedSearch = params of the most recently REQUESTED search (set before the
+    // async load, not after it), so the guard skips a non-forced call only when an
+    // identical search is already loaded or in flight — and never skips a genuinely
+    // new selection just because a slower earlier search hasn't finished yet.
+    // _searchGeneration increments per requested search; a slower earlier search that
+    // completes after a newer one is dropped instead of clobbering the newer results.
+    // Null _requestedSearch means "nothing loaded" (initial, or invalidated by NavigateBack).
+    private SearchParameters? _requestedSearch;
+    private int _searchGeneration;
 
     [RelayCommand]
     public Task SearchCollection() => SearchCollectionCore(forceRefresh: true);
@@ -431,11 +439,17 @@ public sealed partial class CollectionViewModel : ViewModel
         var stacked = IsStacked;
 
         var currentParams = new SearchParameters(query, game, containerFilter, sortPreset, filterPreset, stacked);
-        if (!forceRefresh && _loadedSearch == currentParams)
+        if (!forceRefresh && _requestedSearch == currentParams)
         {
             _logger.LogDebug("SearchCollection skipped: parameters unchanged");
             return;
         }
+
+        // Mark this search as the current request before awaiting, so a re-selection of
+        // these same params while the load is in flight is correctly skipped, and a
+        // different selection is not.
+        _requestedSearch = currentParams;
+        var generation = ++_searchGeneration;
 
         _lastSortPreset = sortPreset;
         _lastContainerFilter = containerFilter;
@@ -470,6 +484,10 @@ public sealed partial class CollectionViewModel : ViewModel
             return (results, priceCache, total);
         });
 
+        // A newer search (or a NavigateBack) started while we awaited? Drop this stale result.
+        if (generation != _searchGeneration)
+            return;
+
         // Single property assignment on UI thread — DataGrid updates once
         MarketPrices = prices;
         CollectionSearchResults = displayResults;
@@ -477,7 +495,6 @@ public sealed partial class CollectionViewModel : ViewModel
         OnPropertyChanged(nameof(FilteredCardCount));
         OnPropertyChanged(nameof(FilteredMarketValue));
         OnPropertyChanged(nameof(HasMoreResults));
-        _loadedSearch = currentParams;
     }
 
     /// <summary>Called by the view when the user scrolls near the bottom of the DataGrid.</summary>
