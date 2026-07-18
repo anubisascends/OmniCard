@@ -175,4 +175,64 @@ public class CardArtCacheTests : IDisposable
         cache.Clear();
         Assert.Equal(0, cache.Count);
     }
+
+    // --- Async loading ---
+
+    [Fact]
+    public async Task GetImageAsync_NullPaths_ReturnsNull()
+    {
+        var cache = CreateCache();
+        var result = await cache.GetImageAsync(null, null);
+        Assert.Null(result);
+        Assert.Equal(0, cache.Count);
+    }
+
+    [StaFact]
+    public async Task GetImageAsync_LocalFile_ReturnsBitmapImage()
+    {
+        var cache = CreateCache();
+        var path = CreateTestImage(_tempDir);
+
+        var result = await cache.GetImageAsync(path, null);
+
+        Assert.NotNull(result);
+        Assert.True(result!.IsFrozen);
+        Assert.Equal(1, cache.Count);
+    }
+
+    [StaFact]
+    public async Task GetImageAsync_HttpFallback_WhenLocalFileMissing()
+    {
+        byte[] pngBytes;
+        using (var ms = new MemoryStream())
+        {
+            var bmp = new RenderTargetBitmap(50, 50, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bmp));
+            encoder.Save(ms);
+            pngBytes = ms.ToArray();
+        }
+
+        var httpFactory = CreateMockHttpFactory(pngBytes);
+        var cache = CreateCache(httpFactory);
+
+        var result = await cache.GetImageAsync(null, "https://example.com/card.png");
+
+        Assert.NotNull(result);
+        Assert.True(result!.IsFrozen);
+        Assert.Equal(1, cache.Count);
+    }
+
+    [StaFact]
+    public async Task GetImageAsync_SameKey_ReturnsCachedInstance()
+    {
+        var cache = CreateCache();
+        var path = CreateTestImage(_tempDir);
+
+        var first = await cache.GetImageAsync(path, null);
+        var second = await cache.GetImageAsync(path, null);
+
+        Assert.Same(first, second);
+        Assert.Equal(1, cache.Count);
+    }
 }

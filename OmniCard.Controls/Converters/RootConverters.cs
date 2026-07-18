@@ -335,6 +335,17 @@ public class FoilToFinishConverter : MarkupExtension, IValueConverter
     public override object ProvideValue(IServiceProvider serviceProvider) => this;
 }
 
+public class MarketPriceDisplayConverter : MarkupExtension, IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is decimal d && d > 0 ? $"${d:F2}" : "";
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
+
 /// <summary>
 /// Compares an enum value to the ConverterParameter string.
 /// Returns true when they match; sets the enum value on ConvertBack.

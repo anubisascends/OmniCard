@@ -190,41 +190,6 @@
                                   RelativeSource={RelativeSource AncestorType=Window},
                                   Converter={conv:BoolToVisibilityConverter}}"/>
 
-                    <Separator Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
-                        RelativeSource={RelativeSource AncestorType=Window},
-                        Converter={conv:BoolToVisibilityConverter}}"/>
-
-                    <!-- Column chooser -->
-                    <Button x:Name="ColumnChooserLink"
-                            Click="ColumnChooserLink_Click"
-                            VerticalAlignment="Center"
-                            Margin="4,0"
-                            Cursor="Hand"
-                            Style="{StaticResource MaterialDesignFlatButton}"
-                            Padding="4,2"
-                            Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
-                                RelativeSource={RelativeSource AncestorType=Window},
-                                Converter={conv:BoolToVisibilityConverter}}">
-                        <TextBlock TextDecorations="Underline"
-                                   Text="Columns"
-                                   Foreground="{DynamicResource MaterialDesign.Brush.Primary}"/>
-                    </Button>
-                    <Popup x:Name="ColumnChooserPopup"
-                           PlacementTarget="{Binding ElementName=ColumnChooserLink}"
-                           Placement="Bottom"
-                           StaysOpen="False"
-                           AllowsTransparency="True"
-                           Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
-                               RelativeSource={RelativeSource AncestorType=Window},
-                               Converter={conv:BoolToVisibilityConverter}}">
-                        <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
-                                CornerRadius="4"
-                                Padding="8"
-                                BorderBrush="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"
-                                BorderThickness="1">
-                            <ItemsControl x:Name="ColumnChooserList"/>
-                        </Border>
-                    </Popup>
                 </ToolBar>
             </ToolBarTray>
         </ToolBarPanel>
