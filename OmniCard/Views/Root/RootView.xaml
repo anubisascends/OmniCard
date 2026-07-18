@@ -55,24 +55,29 @@
                 <MenuItem Header="_Import..."
                           Command="{Binding ViewModel.ImportCollectionCommand}"
                           InputGestureText="Ctrl+I"/>
+                <Separator />
+                <MenuItem Header="Clear Scan _Cache"
+                          Command="{Binding ViewModel.ClearScanCacheCommand}"/>
+                <MenuItem Header="Clear _Diagnostic Logs"
+                          Command="{Binding ViewModel.ClearDiagnosticLogsCommand}"/>
+                <MenuItem Header="Export _Diagnostics..."
+                          Command="{Binding ViewModel.ExportDiagnosticsCommand}"/>
+                <MenuItem Header="Delete _Orphaned Scans"
+                          Command="{Binding ViewModel.DeleteOrphanedScansCommand}"/>
                 <Separator/>
                 <MenuItem Header="E_xit"
                           Click="ExitMenuItem_Click"/>
             </MenuItem>
             <MenuItem Header="_Edit">
-                <MenuItem Header="Search _Collection"
-                          Command="{Binding ViewModel.FocusCollectionSearchBoxCommand}"
-                          InputGestureText="Ctrl+F"/>
-                <MenuItem Header="Search _Scanner"
-                          Command="{Binding ViewModel.FocusManualSearchBoxCommand}"
-                          InputGestureText="Ctrl+Shift+F"/>
-                <Separator/>
                 <MenuItem Header="Select _All"
                           InputGestureText="Ctrl+A"
                           Command="{Binding ViewModel.SelectAllCommand}"/>
                 <MenuItem Header="_Delete Selected"
                           InputGestureText="Del"
                           Click="DeleteSelectedMenuItem_Click"/>
+                <Separator />
+                <MenuItem Header="Data _Location..."
+                          Command="{Binding ViewModel.ShowDataLocationCommand}"/>
             </MenuItem>
             <MenuItem Header="_View">
                 <MenuItem>
@@ -152,12 +157,14 @@
                           IsChecked="{Binding ViewModel.ShowHashPreview}"/>
             </MenuItem>
             <MenuItem Header="_Collection">
+                <MenuItem Header="Search _Collection"
+                          Command="{Binding ViewModel.FocusCollectionSearchBoxCommand}"
+                          InputGestureText="Ctrl+F"/>
+                <Separator />
                 <MenuItem Header="Sort &amp; Filter Builder..."
                           Command="{Binding ViewModel.Collection.OpenSortFilterBuilderCommand}"/>
                 <MenuItem Header="Manage Storage _Locations..."
                           Command="{Binding ViewModel.ManageStorageLocationsCommand}"/>
-                <MenuItem Header="Data _Location..."
-                          Command="{Binding ViewModel.ShowDataLocationCommand}"/>
                 <Separator/>
                 <MenuItem Header="Refresh Card _Data..."
                           Command="{Binding ViewModel.RefreshCardDataCommand}"/>
@@ -167,22 +174,26 @@
                           Command="{Binding ViewModel.ComputeImageHashesCommand}"/>
             </MenuItem>
             <MenuItem Header="_Scanner">
-                <MenuItem Header="_Connect To Scanner..."
+                <MenuItem Header="Search _Scanner"
+                          Command="{Binding ViewModel.FocusManualSearchBoxCommand}"
+                          InputGestureText="Ctrl+Shift+F"/>
+                <Separator />
+                <MenuItem Header="_Connect..."
                           Command="{Binding ViewModel.ConnectToScannerCommand}"/>
-                <MenuItem Header="Clear _Default Scanner"
+                <MenuItem Header="Clear _Default"
                           Command="{Binding ViewModel.ClearDefaultScannerCommand}"/>
                 <Separator/>
-                <MenuItem Header="_Scan Cards..."
+                <MenuItem Header="_Scan..."
                           Command="{Binding ViewModel.ScanCommand}"
                           InputGestureText="Ctrl+N"/>
                 <Separator />
-                <MenuItem Header="_Commit Scans"
+                <MenuItem Header="_Commit"
                           Command="{Binding ViewModel.CommitScansCommand}"
                           InputGestureText="Ctrl+S"/>
                 <MenuItem Header="_Reprocess Unmatched"
                           Command="{Binding ViewModel.ReprocessScansCommand}"
                           InputGestureText="F5"/>
-                <MenuItem Header="C_lear Scan Queue"
+                <MenuItem Header="C_lear Queue"
                           Command="{Binding ViewModel.ClearScansCommand}"/>
             </MenuItem>
             <MenuItem Header="_Tools">
@@ -192,15 +203,6 @@
                 <MenuItem Header="Disconnect from eBay"
                           Command="{Binding ViewModel.DisconnectEbayCommand}"
                           Visibility="{Binding ViewModel.IsEbayConnected, Converter={conv:BoolToVisibilityConverter}}"/>
-                <Separator/>
-                <MenuItem Header="Clear Scan _Cache"
-                          Command="{Binding ViewModel.ClearScanCacheCommand}"/>
-                <MenuItem Header="Clear _Diagnostic Logs"
-                          Command="{Binding ViewModel.ClearDiagnosticLogsCommand}"/>
-                <MenuItem Header="Export _Diagnostics..."
-                          Command="{Binding ViewModel.ExportDiagnosticsCommand}"/>
-                <MenuItem Header="Delete _Orphaned Scans"
-                          Command="{Binding ViewModel.DeleteOrphanedScansCommand}"/>
                 <Separator/>
                 <MenuItem Header="Check _Decklist..."
                           Command="{Binding ViewModel.CheckDecklistCommand}"/>
