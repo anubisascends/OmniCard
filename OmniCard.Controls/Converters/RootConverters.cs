@@ -1,9 +1,11 @@
 using System.Collections;
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Markup;
+using System.Windows.Media;
 using OmniCard.Imaging;
 using OmniCard.Models;
 
@@ -353,6 +355,46 @@ public class EnumBoolConverter : MarkupExtension, IValueConverter
         if (value is not true || parameter is null) return Binding.DoNothing;
         return Enum.Parse(targetType, parameter.ToString()!);
     }
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
+
+/// <summary>
+/// Resolves the tile image for a collection card. Bindings, in order:
+/// [0] CollectionCard, [1] bool IsStacked, [2] string data directory.
+/// Returns the first available ImageSource (see <see cref="CardArtCandidateResolver"/>),
+/// or null when no art is available (the tile then shows a placeholder).
+/// </summary>
+public class TileArtConverter : MarkupExtension, IMultiValueConverter
+{
+    public object? Convert(object[] values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (values.Length < 3 || values[0] is not CollectionCard card)
+            return null;
+
+        var isStacked = values[1] is true;
+        var dataDir = values[2] as string ?? "";
+
+        foreach (var candidate in CardArtCandidateResolver.Resolve(card, isStacked))
+        {
+            ImageSource? image = candidate.Kind switch
+            {
+                CardArtKind.Scan =>
+                    ScanImageCache.Instance?.GetImage(Path.Combine(dataDir, candidate.Value)),
+                CardArtKind.Downloaded =>
+                    CardArtCache.Instance?.GetImage(null, candidate.Value),
+                _ => null
+            };
+
+            if (image is not null)
+                return image;
+        }
+
+        return null;
+    }
+
+    public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
 
     public override object ProvideValue(IServiceProvider serviceProvider) => this;
 }
