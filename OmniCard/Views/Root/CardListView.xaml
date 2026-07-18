@@ -80,8 +80,6 @@
                             <Image x:Name="TileImage"
                                    Stretch="Uniform"
                                    helpers:TileArt.Card="{Binding}"
-                                   helpers:TileArt.IsStacked="{Binding DataContext.IsStacked,
-                                       RelativeSource={RelativeSource AncestorType=ListBox}}"
                                    helpers:TileArt.DataDirectory="{Binding DataContext.DataDirectory,
                                        RelativeSource={RelativeSource AncestorType=ListBox}}"/>
                         </Grid>

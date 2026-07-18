@@ -6,28 +6,10 @@ namespace OmniCard.Tests.Services;
 public class CardArtCandidateResolverTests
 {
     [Fact]
-    public void Unstacked_WithScan_ReturnsScanOnly()
+    public void WithBoth_ReturnsDownloadedThenScan()
     {
         var card = new CollectionCard { ScanImagePath = "scan.png", ImageUri = "http://x/art.png" };
-        var result = CardArtCandidateResolver.Resolve(card, isStacked: false);
-        Assert.Single(result);
-        Assert.Equal(CardArtKind.Scan, result[0].Kind);
-        Assert.Equal("scan.png", result[0].Value);
-    }
-
-    [Fact]
-    public void Unstacked_WithoutScan_ReturnsEmpty_EvenWhenDownloadedExists()
-    {
-        var card = new CollectionCard { ScanImagePath = null, ImageUri = "http://x/art.png" };
-        var result = CardArtCandidateResolver.Resolve(card, isStacked: false);
-        Assert.Empty(result);
-    }
-
-    [Fact]
-    public void Stacked_WithBoth_ReturnsDownloadedThenScan()
-    {
-        var card = new CollectionCard { ScanImagePath = "scan.png", ImageUri = "http://x/art.png" };
-        var result = CardArtCandidateResolver.Resolve(card, isStacked: true);
+        var result = CardArtCandidateResolver.Resolve(card);
         Assert.Equal(2, result.Count);
         Assert.Equal(CardArtKind.Downloaded, result[0].Kind);
         Assert.Equal("http://x/art.png", result[0].Value);
@@ -36,19 +18,30 @@ public class CardArtCandidateResolverTests
     }
 
     [Fact]
-    public void Stacked_WithOnlyScan_ReturnsScan()
+    public void WithOnlyDownloaded_ReturnsDownloaded()
     {
-        var card = new CollectionCard { ScanImagePath = "scan.png", ImageUri = null };
-        var result = CardArtCandidateResolver.Resolve(card, isStacked: true);
+        var card = new CollectionCard { ScanImagePath = null, ImageUri = "http://x/art.png" };
+        var result = CardArtCandidateResolver.Resolve(card);
         Assert.Single(result);
-        Assert.Equal(CardArtKind.Scan, result[0].Kind);
+        Assert.Equal(CardArtKind.Downloaded, result[0].Kind);
+        Assert.Equal("http://x/art.png", result[0].Value);
     }
 
     [Fact]
-    public void Stacked_WithNeither_ReturnsEmpty()
+    public void WithOnlyScan_ReturnsScan()
+    {
+        var card = new CollectionCard { ScanImagePath = "scan.png", ImageUri = null };
+        var result = CardArtCandidateResolver.Resolve(card);
+        Assert.Single(result);
+        Assert.Equal(CardArtKind.Scan, result[0].Kind);
+        Assert.Equal("scan.png", result[0].Value);
+    }
+
+    [Fact]
+    public void WithNeither_ReturnsEmpty()
     {
         var card = new CollectionCard { ScanImagePath = null, ImageUri = null };
-        var result = CardArtCandidateResolver.Resolve(card, isStacked: true);
+        var result = CardArtCandidateResolver.Resolve(card);
         Assert.Empty(result);
     }
 }

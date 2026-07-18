@@ -10,10 +10,10 @@ namespace OmniCard.Controls;
 
 /// <summary>
 /// Attached behavior that fills an <see cref="Image"/> with a collection card's art
-/// without blocking the UI thread. Scan art (a local file) loads synchronously; downloaded
-/// art loads asynchronously, leaving <see cref="Image.Source"/> null (so the tile placeholder
-/// shows) until the download completes. Art source order comes from
-/// <see cref="CardArtCandidateResolver"/> (unstacked: scan only; stacked: downloaded then scan).
+/// without blocking the UI thread. Downloaded (API) art is preferred and loads asynchronously,
+/// leaving <see cref="Image.Source"/> null (so the tile placeholder shows) until the download
+/// completes; the scanned image is the fallback and loads synchronously (a local file).
+/// Art source order comes from <see cref="CardArtCandidateResolver"/> (downloaded then scan).
 /// </summary>
 public static class TileArt
 {
@@ -25,14 +25,6 @@ public static class TileArt
     public static CollectionCard? GetCard(DependencyObject o) => (CollectionCard?)o.GetValue(CardProperty);
     public static void SetCard(DependencyObject o, CollectionCard? v) => o.SetValue(CardProperty, v);
 
-    public static readonly DependencyProperty IsStackedProperty =
-        DependencyProperty.RegisterAttached(
-            "IsStacked", typeof(bool), typeof(TileArt),
-            new PropertyMetadata(false, OnChanged));
-
-    public static bool GetIsStacked(DependencyObject o) => (bool)o.GetValue(IsStackedProperty);
-    public static void SetIsStacked(DependencyObject o, bool v) => o.SetValue(IsStackedProperty, v);
-
     public static readonly DependencyProperty DataDirectoryProperty =
         DependencyProperty.RegisterAttached(
             "DataDirectory", typeof(string), typeof(TileArt),
@@ -41,8 +33,8 @@ public static class TileArt
     public static string GetDataDirectory(DependencyObject o) => (string)o.GetValue(DataDirectoryProperty);
     public static void SetDataDirectory(DependencyObject o, string v) => o.SetValue(DataDirectoryProperty, v);
 
-    // Generation token: only the newest scheduled update runs, so the three initial
-    // property sets (Card/IsStacked/DataDirectory) coalesce into one resolve, and a stale
+    // Generation token: only the newest scheduled update runs, so the initial
+    // property sets (Card/DataDirectory) coalesce into one resolve, and a stale
     // async download that finishes after the inputs changed is ignored.
     private static readonly DependencyProperty TokenProperty =
         DependencyProperty.RegisterAttached(
@@ -70,10 +62,9 @@ public static class TileArt
         var card = GetCard(image);
         if (card is null) return;
 
-        var isStacked = GetIsStacked(image);
         var dataDir = GetDataDirectory(image) ?? "";
 
-        foreach (var candidate in CardArtCandidateResolver.Resolve(card, isStacked))
+        foreach (var candidate in CardArtCandidateResolver.Resolve(card))
         {
             if (candidate.Kind == CardArtKind.Scan)
             {
