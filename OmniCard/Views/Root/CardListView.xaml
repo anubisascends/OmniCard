@@ -69,6 +69,38 @@
                         BorderBrush="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"
                         BorderThickness="1"
                         CornerRadius="6">
+                    <!-- Full card details on hover (the tile itself trims to fit). -->
+                    <Border.ToolTip>
+                        <ToolTip MaxWidth="340">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Name}"
+                                           FontWeight="Bold"
+                                           FontSize="14"
+                                           TextWrapping="Wrap"/>
+                                <TextBlock Margin="0,2,0,0"
+                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                           TextWrapping="Wrap">
+                                    <Run Text="{Binding SetName, Mode=OneWay}"/><Run Text=" ("/><Run Text="{Binding SetCode, Mode=OneWay}"/><Run Text=")"/>
+                                </TextBlock>
+                                <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}">
+                                    <Run Text="#"/><Run Text="{Binding Number, Mode=OneWay}"/><Run Text="   "/><Run Text="{Binding Rarity, Mode=OneWay}"/>
+                                </TextBlock>
+                                <TextBlock Margin="0,4,0,0">
+                                    <Run Text="Condition: "/><Run Text="{Binding Condition, Mode=OneWay}"/>
+                                </TextBlock>
+                                <TextBlock Text="Foil"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource MaterialDesign.Brush.Primary}"
+                                           Visibility="{Binding IsFoil, Converter={conv:BoolToVisibilityConverter}}"/>
+                                <TextBlock>
+                                    <Run Text="Market: "/><Run Text="{Binding MarketPrice, Converter={conv:MarketPriceDisplayConverter}, Mode=OneWay}"/>
+                                </TextBlock>
+                                <TextBlock>
+                                    <Run Text="Quantity: "/><Run Text="{Binding Quantity, Mode=OneWay}"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </ToolTip>
+                    </Border.ToolTip>
                     <StackPanel>
                         <!-- Art area (63:88 card ratio) -->
                         <Grid Width="148" Height="207" Margin="0,0,0,6">
@@ -90,13 +122,11 @@
                                        RelativeSource={RelativeSource AncestorType=ListBox}}"/>
                         </Grid>
 
-                        <!-- Name -->
+                        <!-- Name: single line, ellipsis when too long (full name in the tile tooltip) -->
                         <TextBlock Text="{Binding Name}"
                                    FontWeight="Bold"
-                                   TextWrapping="Wrap"
-                                   MaxHeight="36"
-                                   TextTrimming="CharacterEllipsis"
-                                   ToolTip="{Binding Name}"/>
+                                   TextWrapping="NoWrap"
+                                   TextTrimming="CharacterEllipsis"/>
 
                         <!-- Set Name (Set Code) -->
                         <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
