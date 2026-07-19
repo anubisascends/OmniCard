@@ -549,7 +549,7 @@ public sealed partial class CollectionViewModel : ViewModel
     public void RefreshVisiblePrices()
     {
         if (!ShowCardList) return;
-        var results = CollectionSearchResults;
+        var results = CollectionSearchResults.ToList();
         if (results.Count == 0) return;
 
         _ = Task.Run(() =>
