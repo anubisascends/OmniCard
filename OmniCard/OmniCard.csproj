@@ -79,6 +79,16 @@
     <Resource Include="Resources\Fonts\*.ttf" />
   </ItemGroup>
 
+  <!-- Keep the published output minimal: drop debug symbols (dominated by the ~85MB third-party
+       libSkiaSharp.pdb) from the distributable. Only runs on publish, not on build/test. -->
+  <Target Name="StripPublishSymbols" AfterTargets="Publish">
+    <ItemGroup>
+      <PublishPdbFiles Include="$(PublishDir)**\*.pdb" />
+    </ItemGroup>
+    <Delete Files="@(PublishPdbFiles)" />
+    <Message Importance="high" Text="StripPublishSymbols: removed %(PublishPdbFiles.Identity)" Condition="'@(PublishPdbFiles)' != ''" />
+  </Target>
+
   <Target Name="CopyScannerHost" AfterTargets="Build">
     <PropertyGroup>
       <ScannerHostOutputDir>
