@@ -32,7 +32,6 @@ using OmniCard.Views.DataLocation;
 using OmniCard.Views.SetFilterBuilder;
 using OmniCard.Views.SortFilterBuilder;
 using OmniCard.Views.AuditReport;
-using OmniCard.Views.SealedProductEditor;
 using OmniCard.Views.StorageManager;
 using OmniCard.Views.EbayListing;
 using OmniCard.Views.ManualAdd;
@@ -73,7 +72,6 @@ public partial class App : Application
             services.Configure<ScryfallSettings>(context.Configuration.GetSection("Scryfall"));
             services.Configure<WebCompanionSettings>(context.Configuration.GetSection("WebCompanion"));
             services.AddSingleton<CollectionViewModel>();
-            services.AddSingleton<SealedProductViewModel>();
             services.AddSingleton<RootViewModel>();
             services.AddSingleton<ScannerService>();
             services.AddSingleton<WebScannerService>();
@@ -105,11 +103,6 @@ public partial class App : Application
                 options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "optcg.db")}"));
             services.AddSingleton<ICardGameService, OptcgService>();
             services.AddSingleton<Services.PriceUpdateService>();
-
-            // Sealed products
-            services.AddDbContextFactory<SealedProductDbContext>(options =>
-                options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "sealed_products.db")}"));
-            services.AddSingleton<ISealedProductService, SealedProductService>();
 
             // Storage containers
             services.AddSingleton<IStorageContainerService, StorageContainerService>();
@@ -166,12 +159,6 @@ public partial class App : Application
             services.AddTransient<CoverArtPickerViewModel>();
             services.AddTransient<OmniCard.Views.MoveToLocation.MoveToLocationView>();
             services.AddTransient<OmniCard.Views.MoveToLocation.MoveToLocationViewModel>();
-            services.AddTransient<SealedProductTemplateEditorView>();
-            services.AddTransient<SealedProductTemplateEditorViewModel>();
-            services.AddTransient<SealedProductEntryView>();
-            services.AddTransient<SealedProductEntryViewModel>();
-            services.AddTransient<CrackProductView>();
-            services.AddTransient<CrackProductViewModel>();
             services.AddTransient<AuditReportView>();
             services.AddTransient<AuditReportViewModel>();
             services.AddTransient<EbayListingViewModel>();
@@ -260,12 +247,6 @@ public partial class App : Application
             CollectionMigrationService.RepairOptcgSetCodes(dataDir, collectionDbFactory, migrationLogger);
 
             splash.SetStatus("Initializing databases...");
-            // Initialize sealed products database
-            using (var sealedCtx = Host.Services.GetRequiredService<IDbContextFactory<SealedProductDbContext>>().CreateDbContext())
-            {
-                sealedCtx.Database.EnsureCreated();
-                MigrateSealedProductEnumValues(sealedCtx);
-            }
 
             splash.SetStatus("Loading collection data...");
             // Backfill Color/CardType for existing cards
@@ -611,14 +592,6 @@ public partial class App : Application
             ctx.SaveChanges();
             logger.LogInformation("Backfilled Color/CardType for {Count} cards", filled);
         }
-    }
-
-    private static void MigrateSealedProductEnumValues(SealedProductDbContext ctx)
-    {
-        ctx.Database.ExecuteSqlRaw(
-            "UPDATE Templates SET ProductType = 'Bundle' WHERE ProductType = 'BundleBox'");
-        ctx.Database.ExecuteSqlRaw(
-            "UPDATE TemplateContents SET ChildProductType = 'Bundle' WHERE ChildProductType = 'BundleBox'");
     }
 
     private static string InitSettingsDirectory()

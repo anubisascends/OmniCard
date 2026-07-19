@@ -23,11 +23,6 @@ public partial class CollectionTabView : UserControl
         CollectionSearchBox.SelectAll();
     }
 
-    public void WireUpSealed(SealedProductViewModel vm)
-    {
-        SealedList.WireUp(vm);
-    }
-
     public void SelectAll() => CardList.SelectAll();
 
     public IList<CollectionCard> GetSelectedCards() => CardList.GetSelectedCards();

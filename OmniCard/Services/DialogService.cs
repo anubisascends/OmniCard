@@ -12,7 +12,6 @@ using OmniCard.Views.EbayAuth;
 using OmniCard.Views.SetFilterBuilder;
 using OmniCard.Views.SortFilterBuilder;
 using OmniCard.Views.MoveToLocation;
-using OmniCard.Views.SealedProductEditor;
 using OmniCard.Views.AuditReport;
 using OmniCard.Views.StorageManager;
 using OmniCard.Views.EbayListing;
@@ -142,35 +141,6 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         var wnd = Services.GetRequiredService<MoveToLocationView>();
         SetOwner(wnd);
         wnd.ViewModel.Load();
-        var result = wnd.ShowDialog();
-        return result == true ? wnd.ViewModel.Result : null;
-    }
-
-    public SealedProductTemplate? EditSealedProductTemplate(SealedProductTemplate? existing)
-    {
-        var wnd = Services.GetRequiredService<SealedProductTemplateEditorView>();
-        SetOwner(wnd);
-        wnd.ViewModel.Load(existing);
-        var result = wnd.ShowDialog();
-        return result == true ? wnd.ViewModel.Result : null;
-    }
-
-    public List<SealedProductInstance>? OpenSealedProductEntry()
-    {
-        var wnd = Services.GetRequiredService<SealedProductEntryView>();
-        SetOwner(wnd);
-        wnd.ViewModel.Load();
-        var result = wnd.ShowDialog();
-        return result == true ? wnd.ViewModel.Result : null;
-    }
-
-    public List<SealedProductInstance>? CrackSealedProduct(SealedProductInstance instance)
-    {
-        var sealedProductService = Services.GetRequiredService<ISealedProductService>();
-        var fullInstance = sealedProductService.GetInstanceWithContents(instance.Id) ?? instance;
-        var wnd = Services.GetRequiredService<CrackProductView>();
-        SetOwner(wnd);
-        wnd.ViewModel.Load(fullInstance);
         var result = wnd.ShowDialog();
         return result == true ? wnd.ViewModel.Result : null;
     }

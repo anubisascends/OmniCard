@@ -12,36 +12,8 @@
             <RowDefinition Height="1*"/>
         </Grid.RowDefinitions>
 
-        <!-- Cards / Sealed toggle -->
-        <Border Padding="8,4"
-                Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
-                BorderBrush="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"
-                BorderThickness="0,0,0,1">
-            <StackPanel Orientation="Horizontal">
-                <RadioButton Content="Cards" GroupName="CollectionMode"
-                             IsChecked="{Binding DataContext.ViewModel.Sealed.ShowSealed,
-                                 RelativeSource={RelativeSource AncestorType=Window},
-                                 Converter={conv:InverseBoolConverter}}"
-                             Margin="0,0,12,0"/>
-                <RadioButton Content="Sealed Products" GroupName="CollectionMode"
-                             IsChecked="{Binding DataContext.ViewModel.Sealed.ShowSealed,
-                                 RelativeSource={RelativeSource AncestorType=Window}}"/>
-            </StackPanel>
-        </Border>
-
-        <!-- Toolbar (hidden when showing sealed; card-list-only controls hidden in overview mode) -->
+        <!-- Toolbar (card-list-only controls hidden in overview mode) -->
         <ToolBarPanel Grid.Row="1">
-            <ToolBarPanel.Style>
-                <Style TargetType="ToolBarPanel">
-                    <Setter Property="Visibility" Value="Visible"/>
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding DataContext.ViewModel.Sealed.ShowSealed,
-                            RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </ToolBarPanel.Style>
             <ToolBarTray>
                 <ToolBar>
                     <!-- Back button -->
@@ -194,23 +166,13 @@
             </ToolBarTray>
         </ToolBarPanel>
 
-        <!-- Stats bar (visible in card list mode, hidden when showing sealed) -->
+        <!-- Stats bar (visible in card list mode) -->
         <Border Grid.Row="2"
                 Padding="8,4"
-                Background="{DynamicResource MaterialDesign.Brush.Card.Background}">
-            <Border.Style>
-                <Style TargetType="Border">
-                    <Setter Property="Visibility" Value="{Binding DataContext.ViewModel.Collection.ShowCardList,
-                        RelativeSource={RelativeSource AncestorType=Window},
-                        Converter={conv:BoolToVisibilityConverter}}"/>
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding DataContext.ViewModel.Sealed.ShowSealed,
-                            RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Border.Style>
+                Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                    RelativeSource={RelativeSource AncestorType=Window},
+                    Converter={conv:BoolToVisibilityConverter}}">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Margin="0,0,20,0">
                     <Run Text="Cards:"
@@ -236,41 +198,19 @@
 
         <!-- Content area -->
         <Grid Grid.Row="3">
-            <!-- Location overview (tile grid) — hidden when showing sealed -->
-            <local:LocationOverviewView>
-                <local:LocationOverviewView.Style>
-                    <Style TargetType="local:LocationOverviewView">
-                        <Setter Property="Visibility" Value="{Binding DataContext.ViewModel.Collection.ShowCardList,
-                            RelativeSource={RelativeSource AncestorType=Window},
-                            Converter={conv:InverseBoolToVisibilityConverter}}"/>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding DataContext.ViewModel.Sealed.ShowSealed,
-                                RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </local:LocationOverviewView.Style>
-            </local:LocationOverviewView>
+            <!-- Location overview (tile grid) -->
+            <local:LocationOverviewView
+                Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                    RelativeSource={RelativeSource AncestorType=Window},
+                    Converter={conv:InverseBoolToVisibilityConverter}}"/>
 
-            <!-- Card list — hidden when showing sealed -->
-            <local:CardListView x:Name="CardList">
-                <local:CardListView.Style>
-                    <Style TargetType="local:CardListView">
-                        <Setter Property="Visibility" Value="{Binding DataContext.ViewModel.Collection.ShowCardList,
-                            RelativeSource={RelativeSource AncestorType=Window},
-                            Converter={conv:BoolToVisibilityConverter}}"/>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding DataContext.ViewModel.Sealed.ShowSealed,
-                                RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </local:CardListView.Style>
-            </local:CardListView>
+            <!-- Card list -->
+            <local:CardListView x:Name="CardList"
+                Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                    RelativeSource={RelativeSource AncestorType=Window},
+                    Converter={conv:BoolToVisibilityConverter}}"/>
 
-            <!-- No cards found placeholder — hidden when showing sealed -->
+            <!-- No cards found placeholder -->
             <TextBlock Text="No Cards Found"
                        HorizontalAlignment="Center"
                        VerticalAlignment="Center"
@@ -287,8 +227,6 @@
                                         RelativeSource={RelativeSource AncestorType=Window}}" Value="True"/>
                                     <Condition Binding="{Binding DataContext.ViewModel.Collection.FilteredCardCount,
                                         RelativeSource={RelativeSource AncestorType=Window}}" Value="0"/>
-                                    <Condition Binding="{Binding DataContext.ViewModel.Sealed.ShowSealed,
-                                        RelativeSource={RelativeSource AncestorType=Window}}" Value="False"/>
                                 </MultiDataTrigger.Conditions>
                                 <Setter Property="Visibility" Value="Visible"/>
                             </MultiDataTrigger>
@@ -296,12 +234,6 @@
                     </Style>
                 </TextBlock.Style>
             </TextBlock>
-
-            <!-- Sealed products view -->
-            <local:SealedProductListView x:Name="SealedList"
-                Visibility="{Binding DataContext.ViewModel.Sealed.ShowSealed,
-                    RelativeSource={RelativeSource AncestorType=Window},
-                    Converter={conv:BoolToVisibilityConverter}}"/>
         </Grid>
     </Grid>
 </UserControl>
