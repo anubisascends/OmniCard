@@ -10,6 +10,9 @@
     <ApplicationIcon>Resources\Images\OmniCard_Logo.ico</ApplicationIcon>
     <UserSecretsId>c8de53ce-799f-421d-a8e9-e4a5a678993a</UserSecretsId>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- Framework-dependent deployment: target machines need the .NET 10 Desktop Runtime
+         installed. Avoids bundling the runtime, keeping the published output minimal. -->
+    <SelfContained>false</SelfContained>
   </PropertyGroup>
 
   <ItemGroup>
