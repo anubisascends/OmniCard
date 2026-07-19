@@ -1164,6 +1164,10 @@ public sealed partial class RootViewModel(
         Collection.ReportMessage = msg => Message = msg;
         Collection.CollectionChanged = InvalidateHomeTab;
 
+        // Refresh visible collection prices in place when a background price update completes
+        priceUpdateService.PricesUpdated += (_, _) =>
+            Application.Current?.Dispatcher.Invoke(() => Collection.RefreshVisiblePrices());
+
         // Wire Sealed delegates
         Sealed.ReportMessage = msg => Message = msg;
         Sealed.LoadInstances();

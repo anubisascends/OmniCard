@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Windows;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 using System.Threading.Tasks;
@@ -540,6 +541,38 @@ public sealed partial class CollectionViewModel : ViewModel
         OnPropertyChanged(nameof(FilteredMarketValue));
         OnPropertyChanged(nameof(HasMoreResults));
         _isLoadingMore = false;
+    }
+
+    /// <summary>Re-pull prices for the currently displayed cards (no DB re-search) after a
+    /// background price refresh. Prices are read off the UI thread, then applied on it so the
+    /// observable MarketPrice change updates tiles in place.</summary>
+    public void RefreshVisiblePrices()
+    {
+        if (!ShowCardList) return;
+        var results = CollectionSearchResults;
+        if (results.Count == 0) return;
+
+        _ = Task.Run(() =>
+        {
+            var prices = new Dictionary<int, decimal>();
+            foreach (var g in results.GroupBy(c => c.Game))
+            {
+                var gs = _cardService.GetGameService(g.Key);
+                foreach (var fg in g.GroupBy(c => c.IsFoil))
+                {
+                    var batch = gs.GetCurrentPrices(fg.Select(c => c.GameCardId), fg.Key);
+                    foreach (var c in fg)
+                        prices[c.Id] = batch.GetValueOrDefault(c.GameCardId);
+                }
+            }
+            Application.Current?.Dispatcher.Invoke(() =>
+            {
+                foreach (var c in results)
+                    if (prices.TryGetValue(c.Id, out var p)) c.MarketPrice = p;
+                MarketPrices = prices;
+                OnPropertyChanged(nameof(FilteredMarketValue));
+            });
+        });
     }
 
     private Dictionary<int, decimal> FetchBatchPrices(ObservableCollection<CollectionCard> results)
