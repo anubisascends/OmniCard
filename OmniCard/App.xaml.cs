@@ -104,6 +104,10 @@ public partial class App : Application
             services.AddSingleton<ICardGameService, OptcgService>();
             services.AddSingleton<Services.PriceUpdateService>();
 
+            // Inventory (unified product model)
+            services.AddDbContextFactory<InventoryDbContext>(options =>
+                options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "inventory.db")}"));
+
             // Storage containers
             services.AddSingleton<IStorageContainerService, StorageContainerService>();
 
@@ -247,6 +251,8 @@ public partial class App : Application
             CollectionMigrationService.RepairOptcgSetCodes(dataDir, collectionDbFactory, migrationLogger);
 
             splash.SetStatus("Initializing databases...");
+            using (var invCtx = Host.Services.GetRequiredService<IDbContextFactory<InventoryDbContext>>().CreateDbContext())
+                invCtx.Database.EnsureCreated();
 
             splash.SetStatus("Loading collection data...");
             // Backfill Color/CardType for existing cards
