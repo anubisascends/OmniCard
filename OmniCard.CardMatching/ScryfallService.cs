@@ -984,14 +984,17 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         }
 
         // Swap read context to pick up new data and invalidate hash cache
-        var oldContext = _readContext;
-        _readContext = _dbContextFactory.CreateDbContext();
-        _hashCache = null;
-        _artHashCache = null;
-        _hashSetLookup = null;
-        _hashCollectorNumberLookup = null;
-        _symbolHashCache = null;
-        oldContext.Dispose();
+        if (!pricesOnly)
+        {
+            var oldContext = _readContext;
+            _readContext = _dbContextFactory.CreateDbContext();
+            _hashCache = null;
+            _artHashCache = null;
+            _hashSetLookup = null;
+            _hashCollectorNumberLookup = null;
+            _symbolHashCache = null;
+            oldContext.Dispose();
+        }
 
         sw.Stop();
         _logger.LogInformation("Bulk data download complete: {Inserted} new, {Updated} updated in {ElapsedSec:F1}s", inserted, updated, sw.Elapsed.TotalSeconds);
@@ -1011,6 +1014,15 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
 
     public async Task UpdatePricesAsync(IProgress<PriceUpdateProgress>? progress = null, CancellationToken ct = default)
     {
+        await using (var ctx = _dbContextFactory.CreateDbContext())
+        {
+            if (!await ctx.Cards.AnyAsync(ct))
+            {
+                _logger.LogInformation("Skipping MTG price refresh: card database is empty (run a full data download first)");
+                return;
+            }
+        }
+
         // MTG prices come as one daily bulk file; refresh applies only price fields to existing
         // cards (no inserts, no hashing). Bridges the string progress into PriceUpdateProgress.
         var bridge = progress is null

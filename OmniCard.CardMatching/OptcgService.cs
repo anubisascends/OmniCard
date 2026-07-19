@@ -296,6 +296,15 @@ public sealed class OptcgService : ICardGameService, IDisposable
 
     public async Task UpdatePricesAsync(IProgress<PriceUpdateProgress>? progress = null, CancellationToken ct = default)
     {
+        await using (var ctx = _dbContextFactory.CreateDbContext())
+        {
+            if (!await ctx.Cards.AnyAsync(ct))
+            {
+                _logger.LogInformation("Skipping One Piece price refresh: card database is empty (run a full data download first)");
+                return;
+            }
+        }
+
         _logger.LogInformation("Starting OPTCG price-only refresh");
         var client = _httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.UserAgent.ParseAdd("OmniCard/1.0");
@@ -340,11 +349,6 @@ public sealed class OptcgService : ICardGameService, IDisposable
             await context.SaveChangesAsync(ct);
             context.ChangeTracker.Clear();
         }
-
-        // Swap the read context so reads see the refreshed prices.
-        var oldContext = _readContext;
-        _readContext = _dbContextFactory.CreateDbContext();
-        oldContext.Dispose();
 
         _logger.LogInformation("OPTCG price refresh complete: {Updated} cards updated", updated);
         progress?.Report(new PriceUpdateProgress(CardGame.OnePiece, null, 0, 0,

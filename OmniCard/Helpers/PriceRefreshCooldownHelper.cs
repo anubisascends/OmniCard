@@ -20,7 +20,7 @@ public static class PriceRefreshCooldownHelper
             var data = JsonSerializer.Deserialize<Dictionary<string, DateTime>>(File.ReadAllText(path));
             return data?.TryGetValue(game.ToString(), out var ts) == true ? ts : null;
         }
-        catch (JsonException)
+        catch (Exception)
         {
             return null;
         }
