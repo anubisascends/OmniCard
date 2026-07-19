@@ -912,7 +912,10 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         }).ToList();
     }
 
-    public async Task DownloadBulkDataAsync(IProgress<string>? progress = null, CancellationToken ct = default)
+    public Task DownloadBulkDataAsync(IProgress<string>? progress = null, CancellationToken ct = default)
+        => RunBulkImportAsync(pricesOnly: false, progress, ct);
+
+    private async Task RunBulkImportAsync(bool pricesOnly, IProgress<string>? progress, CancellationToken ct)
     {
         _logger.LogInformation("Starting Scryfall bulk data download");
         var sw = Stopwatch.StartNew();
@@ -965,7 +968,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
 
             if (batch.Count >= 1000)
             {
-                var (ins, upd) = await UpsertBatchAsync(importContext, batch, existingIds, ct);
+                var (ins, upd) = await UpsertBatchAsync(importContext, batch, existingIds, pricesOnly, ct);
                 inserted += ins;
                 updated += upd;
                 batch.Clear();
@@ -975,7 +978,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
 
         if (batch.Count > 0)
         {
-            var (ins, upd) = await UpsertBatchAsync(importContext, batch, existingIds, ct);
+            var (ins, upd) = await UpsertBatchAsync(importContext, batch, existingIds, pricesOnly, ct);
             inserted += ins;
             updated += upd;
         }
@@ -995,7 +998,8 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         progress?.Report($"Download complete — {inserted} new, {updated} updated.");
 
         // Re-link orphaned corrections whose card IDs no longer exist
-        RelinkOrphanedCorrections();
+        if (!pricesOnly)
+            RelinkOrphanedCorrections();
 
         // Auto-hash new records (incremental only)
         if (inserted > 0)
@@ -1005,8 +1009,18 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         }
     }
 
+    public async Task UpdatePricesAsync(IProgress<PriceUpdateProgress>? progress = null, CancellationToken ct = default)
+    {
+        // MTG prices come as one daily bulk file; refresh applies only price fields to existing
+        // cards (no inserts, no hashing). Bridges the string progress into PriceUpdateProgress.
+        var bridge = progress is null
+            ? null
+            : new Progress<string>(msg => progress.Report(new PriceUpdateProgress(CardGame.Mtg, null, 0, 0, msg)));
+        await RunBulkImportAsync(pricesOnly: true, bridge, ct);
+    }
+
     private async Task<(int Inserted, int Updated)> UpsertBatchAsync(
-        ScryfallDbContext context, List<Card> batch, HashSet<Guid> existingIds, CancellationToken ct)
+        ScryfallDbContext context, List<Card> batch, HashSet<Guid> existingIds, bool pricesOnly, CancellationToken ct)
     {
         var newCards = new List<Card>();
         var existingCardIds = new List<Guid>();
@@ -1036,8 +1050,8 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
             context.ChangeTracker.Clear();
         }
 
-        // Insert new cards
-        if (newCards.Count > 0)
+        // Prices-only refresh does not insert new cards (that is the full download's job).
+        if (!pricesOnly && newCards.Count > 0)
         {
             foreach (var card in newCards)
                 MapAllParts(card);
@@ -1050,7 +1064,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
                 existingIds.Add(card.Id);
         }
 
-        return (newCards.Count, existingCardIds.Count);
+        return (pricesOnly ? 0 : newCards.Count, existingCardIds.Count);
     }
 
     public async Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default)
