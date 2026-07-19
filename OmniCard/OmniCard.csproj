@@ -84,9 +84,13 @@
   <Target Name="StripPublishSymbols" AfterTargets="Publish">
     <ItemGroup>
       <PublishPdbFiles Include="$(PublishDir)**\*.pdb" />
+      <!-- x86 native OCR binaries (Tesseract/leptonica) are dead weight in a win-x64-only build. -->
+      <PublishX86Natives Include="$(PublishDir)x86\**\*" />
     </ItemGroup>
     <Delete Files="@(PublishPdbFiles)" />
-    <Message Importance="high" Text="StripPublishSymbols: removed %(PublishPdbFiles.Identity)" Condition="'@(PublishPdbFiles)' != ''" />
+    <Delete Files="@(PublishX86Natives)" />
+    <RemoveDir Directories="$(PublishDir)x86" />
+    <Message Importance="high" Text="StripPublishSymbols: removed debug symbols and x86 native binaries from publish output." />
   </Target>
 
   <Target Name="CopyScannerHost" AfterTargets="Build">
