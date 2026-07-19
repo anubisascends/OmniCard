@@ -312,11 +312,7 @@ public partial class App : Application
         var setSymbolCache = Host.Services.GetRequiredService<SetSymbolCache>();
         SetSymbol.Initialize(setSymbolCache);
 
-        // Kick off background price refresh (non-blocking; throttled per game; continues after splash closes)
-        splash.SetStatus("Updating card prices in background...");
-        var priceUpdater = Host.Services.GetRequiredService<Services.PriceUpdateService>();
-        _ = priceUpdater.RunAsync(force: false);
-
+        // Price refresh is manual only (Collection > Refresh Prices) to keep startup light.
         splash.Close();
     }
 
