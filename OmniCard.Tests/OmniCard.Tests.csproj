@@ -27,6 +27,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OmniCard\OmniCard.csproj" />
+    <ProjectReference Include="..\OmniCard.Shared\OmniCard.Shared.csproj" />
     <ProjectReference Include="..\OmniCard.Audit\OmniCard.Audit.csproj" />
     <ProjectReference Include="..\OmniCard.Controls\OmniCard.Controls.csproj" />
     <ProjectReference Include="..\OmniCard.Web\OmniCard.Web.csproj" />

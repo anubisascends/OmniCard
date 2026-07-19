@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Windows;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 using System.Threading.Tasks;
@@ -127,7 +128,10 @@ public sealed partial class CollectionViewModel : ViewModel
         if (result == true)
         {
             if (ShowCardList)
+            {
+                // Data changed but search params are identical — force a refresh (bypass the guard).
                 _ = SearchCollection();
+            }
             else
                 LoadOverview();
         }
@@ -191,6 +195,8 @@ public sealed partial class CollectionViewModel : ViewModel
         CurrentLocationName = "";
         ResetSearchState();
         CollectionSearchResults.Clear();
+        _requestedSearch = null;
+        _searchGeneration++;   // cancel any in-flight search from the view we're leaving
         MarketPrices.Clear();
         TotalCardCount = 0;
         LoadOverview();
@@ -303,6 +309,20 @@ public sealed partial class CollectionViewModel : ViewModel
 
     // --- Card List ---
 
+    /// <summary>
+    /// Immutable snapshot of everything a card-list search depends on. Used to skip a
+    /// redundant reload when navigation re-triggers a search with identical parameters.
+    /// Presets compare by reference (plain classes): an ad-hoc sort builds a fresh
+    /// <see cref="SortPreset"/> each search, so it correctly reads as "changed".
+    /// </summary>
+    public readonly record struct SearchParameters(
+        string Query,
+        CardGame Game,
+        int? ContainerFilter,
+        SortPreset? SortPreset,
+        FilterPreset? FilterPreset,
+        bool Stacked);
+
     [ObservableProperty]
     public partial ObservableCollection<CollectionCard> CollectionSearchResults { get; set; } = [];
 
@@ -351,13 +371,13 @@ public sealed partial class CollectionViewModel : ViewModel
 
     partial void OnIsStackedChanged(bool value)
     {
-        if (ShowCardList) _ = SearchCollection();
+        if (ShowCardList) _ = SearchCollectionCore(forceRefresh: false);
         PersistSettings?.Invoke();
     }
 
     private void LoadCardList()
     {
-        _ = SearchCollection();
+        _ = SearchCollectionCore(forceRefresh: false);
     }
 
     // Cached search parameters for LoadMore
@@ -369,8 +389,21 @@ public sealed partial class CollectionViewModel : ViewModel
     private bool _lastStacked;
     private bool _isLoadingMore;
 
+    // Guard state for redundant/overlapping searches.
+    // _requestedSearch = params of the most recently REQUESTED search (set before the
+    // async load, not after it), so the guard skips a non-forced call only when an
+    // identical search is already loaded or in flight — and never skips a genuinely
+    // new selection just because a slower earlier search hasn't finished yet.
+    // _searchGeneration increments per requested search; a slower earlier search that
+    // completes after a newer one is dropped instead of clobbering the newer results.
+    // Null _requestedSearch means "nothing loaded" (initial, or invalidated by NavigateBack).
+    private SearchParameters? _requestedSearch;
+    private int _searchGeneration;
+
     [RelayCommand]
-    public async Task SearchCollection()
+    public Task SearchCollection() => SearchCollectionCore(forceRefresh: true);
+
+    private async Task SearchCollectionCore(bool forceRefresh)
     {
         // Overview mode: filter location tiles instead of searching cards
         if (!ShowCardList)
@@ -405,6 +438,20 @@ public sealed partial class CollectionViewModel : ViewModel
         var game = _selectedGame;
         var filterPreset = SelectedFilterPreset;
         var stacked = IsStacked;
+
+        var currentParams = new SearchParameters(query, game, containerFilter, sortPreset, filterPreset, stacked);
+        if (!forceRefresh && _requestedSearch == currentParams)
+        {
+            _logger.LogDebug("SearchCollection skipped: parameters unchanged");
+            return;
+        }
+
+        // Mark this search as the current request before awaiting, so a re-selection of
+        // these same params while the load is in flight is correctly skipped, and a
+        // different selection is not.
+        _requestedSearch = currentParams;
+        var generation = ++_searchGeneration;
+
         _lastSortPreset = sortPreset;
         _lastContainerFilter = containerFilter;
         _lastQuery = query;
@@ -413,38 +460,53 @@ public sealed partial class CollectionViewModel : ViewModel
         _lastStacked = stacked;
 
         // Run DB query, stacking, and pricing off the UI thread
-        var (displayResults, prices, totalCount) = await Task.Run(() =>
+        try
         {
-            // Get total count for the status bar (cheap SQL COUNT)
-            var total = _cardService.GetSearchCount(query, game, containerFilter, filterPreset, stacked);
-
-            // Load first page
-            var results = new ObservableCollection<CollectionCard>();
-            _cardService.SearchCollection(query, game, containerFilter, sortPreset, filterPreset, stacked, 0, PageSize, results);
-
-            var priceCache = FetchBatchPrices(results);
-            HydrateMissingImageUris(results);
-
-            // Re-sort by MarketPrice in-memory since it's not available at DB query time
-            if (sortPreset?.SortLevels.Any(l => l.Field == "MarketPrice") == true)
+            var (displayResults, prices, totalCount) = await Task.Run(() =>
             {
-                var level = sortPreset.SortLevels.First(l => l.Field == "MarketPrice");
-                var sorted = level.Direction == SortDirection.Ascending
-                    ? results.OrderBy(c => c.MarketPrice)
-                    : results.OrderByDescending(c => c.MarketPrice);
-                results = new ObservableCollection<CollectionCard>(sorted);
-            }
+                // Get total count for the status bar (cheap SQL COUNT)
+                var total = _cardService.GetSearchCount(query, game, containerFilter, filterPreset, stacked);
 
-            return (results, priceCache, total);
-        });
+                // Load first page
+                var results = new ObservableCollection<CollectionCard>();
+                _cardService.SearchCollection(query, game, containerFilter, sortPreset, filterPreset, stacked, 0, PageSize, results);
 
-        // Single property assignment on UI thread — DataGrid updates once
-        MarketPrices = prices;
-        CollectionSearchResults = displayResults;
-        TotalCardCount = totalCount;
-        OnPropertyChanged(nameof(FilteredCardCount));
-        OnPropertyChanged(nameof(FilteredMarketValue));
-        OnPropertyChanged(nameof(HasMoreResults));
+                var priceCache = FetchBatchPrices(results);
+                HydrateMissingImageUris(results);
+
+                // Re-sort by MarketPrice in-memory since it's not available at DB query time
+                if (sortPreset?.SortLevels.Any(l => l.Field == "MarketPrice") == true)
+                {
+                    var level = sortPreset.SortLevels.First(l => l.Field == "MarketPrice");
+                    var sorted = level.Direction == SortDirection.Ascending
+                        ? results.OrderBy(c => c.MarketPrice)
+                        : results.OrderByDescending(c => c.MarketPrice);
+                    results = new ObservableCollection<CollectionCard>(sorted);
+                }
+
+                return (results, priceCache, total);
+            });
+
+            // A newer search (or a NavigateBack) started while we awaited? Drop this stale result.
+            if (generation != _searchGeneration)
+                return;
+
+            // Single property assignment on UI thread — DataGrid updates once
+            MarketPrices = prices;
+            CollectionSearchResults = displayResults;
+            TotalCardCount = totalCount;
+            OnPropertyChanged(nameof(FilteredCardCount));
+            OnPropertyChanged(nameof(FilteredMarketValue));
+            OnPropertyChanged(nameof(HasMoreResults));
+        }
+        catch
+        {
+            // Load failed: clear the request marker (unless a newer search already
+            // replaced it) so the guard does not skip a retry of these same params.
+            if (generation == _searchGeneration)
+                _requestedSearch = null;
+            throw;
+        }
     }
 
     /// <summary>Called by the view when the user scrolls near the bottom of the DataGrid.</summary>
@@ -479,6 +541,38 @@ public sealed partial class CollectionViewModel : ViewModel
         OnPropertyChanged(nameof(FilteredMarketValue));
         OnPropertyChanged(nameof(HasMoreResults));
         _isLoadingMore = false;
+    }
+
+    /// <summary>Re-pull prices for the currently displayed cards (no DB re-search) after a
+    /// background price refresh. Prices are read off the UI thread, then applied on it so the
+    /// observable MarketPrice change updates tiles in place.</summary>
+    public void RefreshVisiblePrices()
+    {
+        if (!ShowCardList) return;
+        var results = CollectionSearchResults.ToList();
+        if (results.Count == 0) return;
+
+        _ = Task.Run(() =>
+        {
+            var prices = new Dictionary<int, decimal>();
+            foreach (var g in results.GroupBy(c => c.Game))
+            {
+                var gs = _cardService.GetGameService(g.Key);
+                foreach (var fg in g.GroupBy(c => c.IsFoil))
+                {
+                    var batch = gs.GetCurrentPrices(fg.Select(c => c.GameCardId), fg.Key);
+                    foreach (var c in fg)
+                        prices[c.Id] = batch.GetValueOrDefault(c.GameCardId);
+                }
+            }
+            Application.Current?.Dispatcher.Invoke(() =>
+            {
+                foreach (var c in results)
+                    if (prices.TryGetValue(c.Id, out var p)) c.MarketPrice = p;
+                MarketPrices = prices;
+                OnPropertyChanged(nameof(FilteredMarketValue));
+            });
+        });
     }
 
     private Dictionary<int, decimal> FetchBatchPrices(ObservableCollection<CollectionCard> results)
@@ -544,7 +638,7 @@ public sealed partial class CollectionViewModel : ViewModel
             _presetService.SetActiveSortPreset(_selectedGame, value.Name);
         else
             _presetService.SetActiveSortPreset(_selectedGame, null);
-        if (ShowCardList) _ = SearchCollection();
+        if (ShowCardList) _ = SearchCollectionCore(forceRefresh: false);
     }
 
     [RelayCommand]
@@ -559,7 +653,7 @@ public sealed partial class CollectionViewModel : ViewModel
             _presetService.SetActiveFilterPreset(_selectedGame, value.Name);
         else
             _presetService.SetActiveFilterPreset(_selectedGame, null);
-        if (ShowCardList) _ = SearchCollection();
+        if (ShowCardList) _ = SearchCollectionCore(forceRefresh: false);
     }
 
     [RelayCommand]
@@ -591,7 +685,7 @@ public sealed partial class CollectionViewModel : ViewModel
         }
 
         IsAdHocSortActive = _adHocSortLevels.Count > 0;
-        _ = SearchCollection();
+        _ = SearchCollectionCore(forceRefresh: false);
     }
 
     [RelayCommand]
@@ -599,7 +693,7 @@ public sealed partial class CollectionViewModel : ViewModel
     {
         _adHocSortLevels.Clear();
         IsAdHocSortActive = false;
-        _ = SearchCollection();
+        _ = SearchCollectionCore(forceRefresh: false);
     }
 
     // --- Collection actions ---
@@ -664,6 +758,7 @@ public sealed partial class CollectionViewModel : ViewModel
         foreach (var id in ids)
             _cardService.DeleteCollectionCard(id);
         ReportMessage?.Invoke($"Deleted {ids.Count} card(s).");
+        // Data changed but search params are identical — force a refresh (bypass the guard).
         _ = SearchCollection();
         CollectionChanged?.Invoke();
     }
@@ -697,7 +792,7 @@ public sealed partial class CollectionViewModel : ViewModel
 
     partial void OnSelectedContainerFilterChanged(StorageContainer? value)
     {
-        if (ShowCardList) _ = SearchCollection();
+        if (ShowCardList) _ = SearchCollectionCore(forceRefresh: false);
     }
 
     public void LoadContainers()

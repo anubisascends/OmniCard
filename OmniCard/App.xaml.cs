@@ -104,6 +104,7 @@ public partial class App : Application
             services.AddDbContextFactory<OptcgDbContext>(options =>
                 options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "optcg.db")}"));
             services.AddSingleton<ICardGameService, OptcgService>();
+            services.AddSingleton<Services.PriceUpdateService>();
 
             // Sealed products
             services.AddDbContextFactory<SealedProductDbContext>(options =>
@@ -311,6 +312,7 @@ public partial class App : Application
         var setSymbolCache = Host.Services.GetRequiredService<SetSymbolCache>();
         SetSymbol.Initialize(setSymbolCache);
 
+        // Price refresh is manual only (Collection > Refresh Prices) to keep startup light.
         splash.Close();
     }
 

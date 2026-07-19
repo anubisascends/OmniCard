@@ -168,6 +168,8 @@
                 <Separator/>
                 <MenuItem Header="Refresh Card _Data..."
                           Command="{Binding ViewModel.RefreshCardDataCommand}"/>
+                <MenuItem Header="Refresh _Prices"
+                          Command="{Binding ViewModel.RefreshPricesCommand}"/>
                 <MenuItem Header="Compute _Missing Hashes..."
                           Command="{Binding ViewModel.ComputeMissingHashesCommand}"/>
                 <MenuItem Header="Recompute _All Hashes..."
@@ -254,6 +256,8 @@
         <StatusBar Grid.Row="3">
             <StatusBarItem>v0.2</StatusBarItem>
             <StatusBarItem Content="{Binding ViewModel.Message}"/>
+            <StatusBarItem Content="{Binding ViewModel.PriceUpdates.StatusText}"
+                           Visibility="{Binding ViewModel.PriceUpdates.IsRunning, Converter={conv:BoolToVisibilityConverter}}"/>
             <StatusBarItem HorizontalAlignment="Right">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="{Binding ViewModel.DiagnosticEventCount, StringFormat='{}{0} diagnostic events'}"

@@ -125,51 +125,8 @@ public sealed class OptcgService : ICardGameService, IDisposable
         };
 
         progress?.Report("Fetching OPTCG set list...");
-        var setList = await client.GetFromJsonAsync<OptcgSetListResponse>(
-            $"{ApiBaseUrl}/v1/sets", jsonOptions, ct)
-            ?? throw new InvalidOperationException("Failed to fetch set list from poneglyph API.");
-
-        _logger.LogInformation("Discovered {Count} OPTCG sets", setList.Data.Count);
-
-        // Fetch each set's detail (cards + variants), throttled to 4 concurrent
-        // requests via Parallel.ForEachAsync's MaxDegreeOfParallelism.
-        var allCards = new List<OptcgCard>();
-        var cardsLock = new object();
-        var fetchedSets = 0;
-
-        await Parallel.ForEachAsync(setList.Data, new ParallelOptions
-        {
-            MaxDegreeOfParallelism = 4,
-            CancellationToken = ct
-        }, async (set, token) =>
-        {
-            try
-            {
-                var detail = await client.GetFromJsonAsync<OptcgSetDetailResponse>(
-                    $"{ApiBaseUrl}/v1/sets/{set.Code}", jsonOptions, token);
-                if (detail is null)
-                {
-                    _logger.LogWarning("Set {SetCode} returned no detail; skipping", set.Code);
-                    return;
-                }
-
-                var rows = detail.Data.Cards
-                    .SelectMany(card => card.Variants.Select(v => MapVariant(card, v)))
-                    .ToList();
-
-                lock (cardsLock)
-                    allCards.AddRange(rows);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _logger.LogWarning(ex, "Failed to fetch OPTCG set {SetCode}; skipping", set.Code);
-            }
-            finally
-            {
-                var done = Interlocked.Increment(ref fetchedSets);
-                progress?.Report($"Fetched {done}/{setList.Data.Count} sets...");
-            }
-        });
+        var allCards = await FetchAllVariantsAsync(client, jsonOptions,
+            (done, total, _) => progress?.Report($"Fetched {done}/{total} sets..."), ct);
 
         // Dedupe defensively on the variant uid (primary key).
         var deduped = allCards
@@ -281,6 +238,121 @@ public sealed class OptcgService : ICardGameService, IDisposable
             _logger.LogInformation("Auto-computing hashes for {Count} newly added cards", inserted);
             await ComputeImageHashesAsync(forceAll: false, progress, ct);
         }
+    }
+
+    // Fetches the full set list and, for each set, its card variants (mapped). Invokes
+    // onSetCompleted(done, total, setCode) after each set finishes. Shared by the full
+    // download and the price-only refresh.
+    private async Task<List<OptcgCard>> FetchAllVariantsAsync(
+        HttpClient client, JsonSerializerOptions jsonOptions,
+        Action<int, int, string>? onSetCompleted, CancellationToken ct)
+    {
+        var setList = await client.GetFromJsonAsync<OptcgSetListResponse>(
+            $"{ApiBaseUrl}/v1/sets", jsonOptions, ct)
+            ?? throw new InvalidOperationException("Failed to fetch set list from poneglyph API.");
+
+        _logger.LogInformation("Discovered {Count} OPTCG sets", setList.Data.Count);
+
+        var allCards = new List<OptcgCard>();
+        var cardsLock = new object();
+        var fetchedSets = 0;
+
+        await Parallel.ForEachAsync(setList.Data, new ParallelOptions
+        {
+            MaxDegreeOfParallelism = 4,
+            CancellationToken = ct
+        }, async (set, token) =>
+        {
+            try
+            {
+                var detail = await client.GetFromJsonAsync<OptcgSetDetailResponse>(
+                    $"{ApiBaseUrl}/v1/sets/{set.Code}", jsonOptions, token);
+                if (detail is null)
+                {
+                    _logger.LogWarning("Set {SetCode} returned no detail; skipping", set.Code);
+                    return;
+                }
+
+                var rows = detail.Data.Cards
+                    .SelectMany(card => card.Variants.Select(v => MapVariant(card, v)))
+                    .ToList();
+
+                lock (cardsLock)
+                    allCards.AddRange(rows);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Failed to fetch OPTCG set {SetCode}; skipping", set.Code);
+            }
+            finally
+            {
+                var done = Interlocked.Increment(ref fetchedSets);
+                onSetCompleted?.Invoke(done, setList.Data.Count, set.Code);
+            }
+        });
+
+        return allCards;
+    }
+
+    public async Task UpdatePricesAsync(IProgress<PriceUpdateProgress>? progress = null, CancellationToken ct = default)
+    {
+        await using (var ctx = _dbContextFactory.CreateDbContext())
+        {
+            if (!await ctx.Cards.AnyAsync(ct))
+            {
+                _logger.LogInformation("Skipping One Piece price refresh: card database is empty (run a full data download first)");
+                return;
+            }
+        }
+
+        _logger.LogInformation("Starting OPTCG price-only refresh");
+        var client = _httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("OmniCard/1.0");
+
+        var jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            NumberHandling = JsonNumberHandling.AllowReadingFromString
+        };
+
+        var allCards = await FetchAllVariantsAsync(client, jsonOptions,
+            (done, total, setCode) => progress?.Report(
+                new PriceUpdateProgress(CardGame.OnePiece, setCode, done, total,
+                    $"One Piece prices: {done}/{total} sets")), ct);
+
+        var deduped = allCards
+            .GroupBy(c => c.CardSetId)
+            .Select(g => g.Last())
+            .ToList();
+
+        await using var context = _dbContextFactory.CreateDbContext();
+        context.Database.EnsureCreated();
+
+        var updated = 0;
+        foreach (var batch in deduped.Chunk(500))
+        {
+            var ids = batch.Select(c => c.CardSetId).ToList();
+            var tracked = await context.Cards
+                .Where(c => ids.Contains(c.CardSetId))
+                .ToDictionaryAsync(c => c.CardSetId, ct);
+
+            foreach (var card in batch)
+            {
+                if (tracked.TryGetValue(card.CardSetId, out var existing))
+                {
+                    existing.MarketPrice = card.MarketPrice;
+                    existing.InventoryPrice = card.InventoryPrice;
+                    updated++;
+                }
+            }
+
+            await context.SaveChangesAsync(ct);
+            context.ChangeTracker.Clear();
+        }
+
+        _logger.LogInformation("OPTCG price refresh complete: {Updated} cards updated", updated);
+        progress?.Report(new PriceUpdateProgress(CardGame.OnePiece, null, 0, 0,
+            $"One Piece prices updated ({updated} cards)"));
     }
 
     private static OptcgCard MapVariant(OptcgApiCard card, OptcgApiVariant variant)

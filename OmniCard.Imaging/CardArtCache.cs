@@ -17,7 +17,7 @@ public sealed class CardArtCache
     private readonly Dictionary<string, LinkedListNode<(string Key, BitmapImage Image)>> _map = new();
     private readonly LinkedList<(string Key, BitmapImage Image)> _order = new();
 
-    public CardArtCache(ILogger<CardArtCache> logger, IHttpClientFactory httpClientFactory, int capacity = 100)
+    public CardArtCache(ILogger<CardArtCache> logger, IHttpClientFactory httpClientFactory, int capacity = 200)
     {
         _logger = logger;
         _httpClientFactory = httpClientFactory;

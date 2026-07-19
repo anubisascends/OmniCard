@@ -1,8 +1,9 @@
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace OmniCard.Models;
 
-public class CollectionCard
+public class CollectionCard : INotifyPropertyChanged
 {
     public int Id { get; set; }
     public CardGame Game { get; set; }
@@ -32,7 +33,17 @@ public class CollectionCard
 
     /// <summary>Cached market price for display and sorting. Not persisted.</summary>
     [NotMapped]
-    public decimal MarketPrice { get; set; }
+    public decimal MarketPrice
+    {
+        get => _marketPrice;
+        set
+        {
+            if (_marketPrice == value) return;
+            _marketPrice = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MarketPrice)));
+        }
+    }
+    private decimal _marketPrice;
 
     /// <summary>Display-only quantity when stacking identical cards. Not persisted.</summary>
     [NotMapped]
@@ -41,4 +52,6 @@ public class CollectionCard
     /// <summary>All card IDs in this stack (including this card). Only populated when stacked.</summary>
     [NotMapped]
     public List<int>? StackedIds { get; set; }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 }
