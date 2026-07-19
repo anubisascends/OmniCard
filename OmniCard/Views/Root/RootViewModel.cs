@@ -21,6 +21,7 @@ using OmniCard.Interfaces;
 using OmniCard.Models;
 using NTwain;
 using OmniCard.Scanner;
+using OmniCard.Services;
 using OmniCard.Views.HashPreview;
 
 namespace OmniCard.Views.Root;
@@ -41,6 +42,7 @@ public sealed partial class RootViewModel(
     IAuditService auditService,
     IDataPathService dataPathService,
     IOptionsMonitor<WebCompanionSettings> webCompanionSettings,
+    PriceUpdateService priceUpdateService,
     ILogger<RootViewModel> logger) : ViewModel
 {
     private readonly ILogger<RootViewModel> _logger = logger;
@@ -49,6 +51,8 @@ public sealed partial class RootViewModel(
     private System.Windows.Threading.DispatcherTimer? _ebaySyncTimer;
     private bool _suppressGameChangeHandler;
     private CardGame _previousGame;
+
+    public PriceUpdateService PriceUpdates => priceUpdateService;
 
     public string PhoneScanUrl
     {
@@ -1356,6 +1360,13 @@ public sealed partial class RootViewModel(
         }
 
         InvalidateHomeTab();
+    }
+
+    [RelayCommand]
+    public async Task RefreshPrices()
+    {
+        _logger.LogInformation("User initiated manual price refresh (all games)");
+        await priceUpdateService.RunAsync(force: true);
     }
 
     [RelayCommand]
