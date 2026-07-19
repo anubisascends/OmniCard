@@ -1,5 +1,6 @@
 using System.Windows.Controls;
 using OmniCard.Models;
+using OmniCard.Views.Inventory;
 
 namespace OmniCard.Views.Root;
 
@@ -15,6 +16,11 @@ public partial class CollectionTabView : UserControl
     public void WireUp(CollectionViewModel vm)
     {
         CardList.WireUp(vm);
+    }
+
+    public void WireUpInventory(InventoryViewModel vm)
+    {
+        InventoryList.WireUp(vm);
     }
 
     public void FocusSearchBox()

@@ -72,6 +72,7 @@ public partial class App : Application
             services.Configure<ScryfallSettings>(context.Configuration.GetSection("Scryfall"));
             services.Configure<WebCompanionSettings>(context.Configuration.GetSection("WebCompanion"));
             services.AddSingleton<CollectionViewModel>();
+            services.AddSingleton<Views.Inventory.InventoryViewModel>();
             services.AddSingleton<RootViewModel>();
             services.AddSingleton<ScannerService>();
             services.AddSingleton<WebScannerService>();
@@ -172,6 +173,12 @@ public partial class App : Application
             services.AddTransient<ManualAddViewModel>();
             services.AddTransient<DecklistCheckView>();
             services.AddTransient<DecklistCheckViewModel>();
+            services.AddTransient<Views.Inventory.ProductEditorView>();
+            services.AddTransient<Views.Inventory.ProductEditorViewModel>();
+            services.AddTransient<Views.Inventory.AddLotView>();
+            services.AddTransient<Views.Inventory.AddLotViewModel>();
+            services.AddTransient<Views.Inventory.OpenUnitsView>();
+            services.AddTransient<Views.Inventory.OpenUnitsViewModel>();
         })
         .Build();
 

@@ -22,6 +22,7 @@ public partial class RootView : IView<RootViewModel>, IHostedService
 
         CollectionTab.ViewModel = viewModel;
         CollectionTab.WireUp(viewModel.Collection);
+        CollectionTab.WireUpInventory(viewModel.Inventory);
         ScannerTab.ViewModel = viewModel;
         ScannerTab.WireUpAutoScroll();
 

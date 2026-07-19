@@ -21,4 +21,7 @@ public interface IDialogService
     bool? OpenEbayListingDialog(CollectionCard card);
     bool? OpenManualAdd(StorageContainer? defaultContainer = null);
     void ShowDecklistCheck();
+    Product? EditProduct(Product? existing);
+    (int Quantity, decimal? UnitCost, int? LocationId, string? Source, DateTime AcquisitionDate)? AddLotDialog(int productId);
+    bool OpenUnitsDialog(Product product);
 }

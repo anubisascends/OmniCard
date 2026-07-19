@@ -35,6 +35,7 @@ public sealed partial class RootViewModel(
     IEbayAuthService ebayAuthService,
     ICsvExportImportService csvService,
     CollectionViewModel collection,
+    Views.Inventory.InventoryViewModel inventory,
     IMismatchLogService mismatchLogService,
     SetSymbolCache setSymbolCache,
     IScanDiagnosticService diagnosticService,
@@ -159,6 +160,9 @@ public sealed partial class RootViewModel(
 
     /// <summary>The nested CollectionViewModel that owns all collection-specific state.</summary>
     public CollectionViewModel Collection { get; } = collection;
+
+    /// <summary>The nested InventoryViewModel that owns all inventory (sealed product ERP) state.</summary>
+    public Views.Inventory.InventoryViewModel Inventory { get; } = inventory;
 
     /// <summary>Set by the View to focus and select the manual search box.</summary>
     public Action? FocusManualSearch { get; set; }
@@ -1163,6 +1167,10 @@ public sealed partial class RootViewModel(
         // Refresh visible collection prices in place when a background price update completes
         priceUpdateService.PricesUpdated += (_, _) =>
             Application.Current?.Dispatcher.Invoke(() => Collection.RefreshVisiblePrices());
+
+        // Wire Inventory delegates
+        Inventory.ReportMessage = msg => Message = msg;
+        Inventory.LoadInventory();
 
         // Keep HasMatchedScans in sync with the ScannedCards collection
         if (_scannedCardsHandler is not null)

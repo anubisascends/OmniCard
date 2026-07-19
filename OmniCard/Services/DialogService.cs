@@ -17,6 +17,7 @@ using OmniCard.Views.StorageManager;
 using OmniCard.Views.EbayListing;
 using OmniCard.Views.ManualAdd;
 using OmniCard.Views.DecklistCheck;
+using OmniCard.Views.Inventory;
 
 namespace OmniCard.Services;
 
@@ -174,5 +175,32 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         var wnd = Services.GetRequiredService<DecklistCheckView>();
         SetOwner(wnd);
         wnd.ShowDialog();
+    }
+
+    public Product? EditProduct(Product? existing)
+    {
+        var wnd = Services.GetRequiredService<ProductEditorView>();
+        SetOwner(wnd);
+        wnd.ViewModel.Load(existing);
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.Result : null;
+    }
+
+    public (int Quantity, decimal? UnitCost, int? LocationId, string? Source, DateTime AcquisitionDate)? AddLotDialog(int productId)
+    {
+        var wnd = Services.GetRequiredService<AddLotView>();
+        SetOwner(wnd);
+        wnd.ViewModel.Load(productId);
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.Result : null;
+    }
+
+    public bool OpenUnitsDialog(Product product)
+    {
+        var wnd = Services.GetRequiredService<OpenUnitsView>();
+        SetOwner(wnd);
+        wnd.ViewModel.Load(product);
+        var result = wnd.ShowDialog();
+        return result == true && wnd.ViewModel.WasOpened;
     }
 }
