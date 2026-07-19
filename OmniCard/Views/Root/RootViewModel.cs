@@ -317,7 +317,7 @@ public sealed partial class RootViewModel(
         {
             var appSettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
             var json = File.ReadAllText(appSettingsPath);
-            var doc = System.Text.Json.JsonDocument.Parse(json);
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
 
             using var stream = new MemoryStream();
             using (var writer = new System.Text.Json.Utf8JsonWriter(stream, new System.Text.Json.JsonWriterOptions { Indented = true }))

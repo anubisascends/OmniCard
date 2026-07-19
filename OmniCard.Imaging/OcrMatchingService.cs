@@ -26,6 +26,12 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     // A whitelist massively reduces misreads (0→O, 1→I, etc.) feeding the pattern regex below.
     private const string CollectorNumberWhitelist = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
 
+    // Collector-number pattern: 2-4 letters + 2 digits + dash + 2-3 digits (e.g. OP15-043, EB01-021).
+    // Compiled once and reused — this runs on the OCR hot path (once per scanned One Piece card).
+    private static readonly System.Text.RegularExpressions.Regex CollectorNumberPattern =
+        new(@"([A-Za-z]{2,4}\d{2})\s*[-—]\s*(\d{2,3})",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
     // Name crop regions as percentage of card image: (X%, Y%, Width%, Height%)
     internal static readonly (double X, double Y, double W, double H)[] NameCropRegions =
     [
@@ -242,11 +248,8 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
             if (string.IsNullOrWhiteSpace(text))
                 return (null, 0);
 
-            // Extract collector number pattern: 2-4 letters + 2 digits + dash + 3 digits
-            // e.g., OP15-043, EB01-021, ST01-001
-            var match = System.Text.RegularExpressions.Regex.Match(
-                text, @"([A-Za-z]{2,4}\d{2})\s*[-—]\s*(\d{2,3})",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            // Extract collector number (e.g. OP15-043, EB01-021, ST01-001) using the shared pattern.
+            var match = CollectorNumberPattern.Match(text);
 
             if (match.Success)
             {
