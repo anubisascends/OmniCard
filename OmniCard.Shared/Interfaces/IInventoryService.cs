@@ -10,7 +10,7 @@ public interface IInventoryService
     void UpdateProduct(Product product);
     void DeleteProduct(int productId);
     List<InventoryLot> GetLots(int productId);
-    InventoryLot AddLot(int productId, int quantity, decimal? unitCost, int? locationId, string? source);
+    InventoryLot AddLot(int productId, int quantity, decimal? unitCost, int? locationId, string? source, DateTime? acquisitionDate = null);
     void UpdateLot(InventoryLot lot);
     void DeleteLot(int lotId);
     void OpenUnits(int lotId, int quantity, string? note);

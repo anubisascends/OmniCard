@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OmniCard.Interfaces;
@@ -23,6 +24,16 @@ public sealed partial class InventoryViewModel : ViewModel
 
     [ObservableProperty]
     public partial InventoryRow? SelectedRow { get; set; }
+
+    public bool HasSelection => SelectedRow is not null;
+
+    partial void OnSelectedRowChanged(InventoryRow? value)
+    {
+        EditProductCommand.NotifyCanExecuteChanged();
+        AddLotCommand.NotifyCanExecuteChanged();
+        OpenUnitsCommand.NotifyCanExecuteChanged();
+        DeleteProductCommand.NotifyCanExecuteChanged();
+    }
 
     // Header totals (from IInventoryService.GetValuation)
     [ObservableProperty]
@@ -79,7 +90,7 @@ public sealed partial class InventoryViewModel : ViewModel
         LoadInventory();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSelection))]
     public void EditProduct()
     {
         if (SelectedRow is null) return;
@@ -92,7 +103,7 @@ public sealed partial class InventoryViewModel : ViewModel
         LoadInventory();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSelection))]
     public void AddLot()
     {
         if (SelectedRow is null) return;
@@ -101,21 +112,13 @@ public sealed partial class InventoryViewModel : ViewModel
         if (input is null) return;
 
         var (quantity, unitCost, locationId, source, date) = input.Value;
-        var lot = _inventoryService.AddLot(SelectedRow.Product.Id, quantity, unitCost, locationId, source);
-
-        // AddLot doesn't accept an acquisition date, so apply it as a follow-up update if the
-        // user picked something other than "today" (the lot's default AcquisitionDate).
-        if (date.Date != lot.AcquisitionDate.Date)
-        {
-            lot.AcquisitionDate = date;
-            _inventoryService.UpdateLot(lot);
-        }
+        _inventoryService.AddLot(SelectedRow.Product.Id, quantity, unitCost, locationId, source, date);
 
         ReportMessage?.Invoke($"Added {quantity} unit(s) of '{SelectedRow.Product.Name}'.");
         LoadInventory();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSelection))]
     public void OpenUnits()
     {
         if (SelectedRow is null) return;
@@ -125,5 +128,24 @@ public sealed partial class InventoryViewModel : ViewModel
             ReportMessage?.Invoke($"Opened units of '{SelectedRow.Product.Name}'.");
             LoadInventory();
         }
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    public void DeleteProduct()
+    {
+        if (SelectedRow is null) return;
+
+        var product = SelectedRow.Product;
+        var confirm = MessageBox.Show(
+            $"Delete '{product.Name}' and all of its lots? This cannot be undone.",
+            "Confirm Delete",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (confirm != MessageBoxResult.Yes) return;
+
+        _inventoryService.DeleteProduct(product.Id);
+        ReportMessage?.Invoke($"Deleted '{product.Name}'.");
+        LoadInventory();
     }
 }

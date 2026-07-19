@@ -61,7 +61,7 @@ public class InventoryService(IDbContextFactory<InventoryDbContext> dbContextFac
             .ToList();
     }
 
-    public InventoryLot AddLot(int productId, int quantity, decimal? unitCost, int? locationId, string? source)
+    public InventoryLot AddLot(int productId, int quantity, decimal? unitCost, int? locationId, string? source, DateTime? acquisitionDate = null)
     {
         using var ctx = dbContextFactory.CreateDbContext();
         var lot = new InventoryLot
@@ -71,10 +71,13 @@ public class InventoryService(IDbContextFactory<InventoryDbContext> dbContextFac
             UnitCost = unitCost,
             LocationId = locationId,
             Source = source,
+            AcquisitionDate = acquisitionDate ?? DateTime.UtcNow,
         };
         ctx.Lots.Add(lot);
         ctx.SaveChanges();
 
+        // The Acquire movement timestamp always reflects "now" (when the entry was recorded),
+        // independent of the lot's (possibly backdated) AcquisitionDate.
         ctx.Movements.Add(new InventoryMovement
         {
             ProductId = productId,

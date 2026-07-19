@@ -21,6 +21,8 @@
                         Padding="8,4" Margin="0,0,8,0"/>
                 <Button Content="Open Units..." Command="{Binding OpenUnitsCommand}"
                         Padding="8,4" Margin="0,0,8,0"/>
+                <Button Content="Delete" Command="{Binding DeleteProductCommand}"
+                        Padding="8,4" Margin="0,0,8,0"/>
                 <Separator/>
                 <Button Content="Refresh" Command="{Binding RefreshInventoryCommand}"
                         Padding="8,4" Margin="8,0,0,0"
@@ -74,6 +76,8 @@
                     <MenuItem Header="Edit..." Command="{Binding EditProductCommand}"/>
                     <MenuItem Header="Add Lot..." Command="{Binding AddLotCommand}"/>
                     <MenuItem Header="Open Units..." Command="{Binding OpenUnitsCommand}"/>
+                    <Separator/>
+                    <MenuItem Header="Delete" Command="{Binding DeleteProductCommand}"/>
                 </ContextMenu>
             </DataGrid.ContextMenu>
         </DataGrid>

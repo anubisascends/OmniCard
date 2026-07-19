@@ -14,7 +14,7 @@ Supports **Magic: The Gathering** (via Scryfall) and **One Piece TCG**.
 - **Decklist checking** against your collection (Moxfield and Archidekt)
 - **CSV import/export** (Manabox, Moxfield, TCGPlayer, app-native formats)
 - **eBay listing integration** for selling cards
-- **Sealed product tracking** (booster boxes, bundles, etc.)
+- **Inventory tracking** for sealed product (booster boxes, packs, bundles, etc.) with lots and valuation
 - **Web companion** for browsing your collection from any device and scanning cards with your phone camera
 - **Location auditing** with PDF reports
 
@@ -129,7 +129,7 @@ Card data and scans are stored locally in `%LOCALAPPDATA%\OmniCard` by default (
 - `collection.db` -- your scanned cards and storage locations
 - `scryfall.db` -- MTG card reference data (downloaded from Scryfall)
 - `optcg.db` -- One Piece TCG reference data
-- `sealed_products.db` -- sealed product inventory
+- `inventory.db` -- sealed product inventory (products, lots, valuation)
 - `scans/` -- saved scan images
 - `logs/` -- application logs (14-day rolling retention)
 

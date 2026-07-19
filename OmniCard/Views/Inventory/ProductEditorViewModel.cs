@@ -9,7 +9,11 @@ public sealed partial class ProductEditorViewModel : ViewModel
     private int _productId;
 
     public IReadOnlyList<CardGame> AllGames { get; } = Enum.GetValues<CardGame>();
-    public IReadOnlyList<ProductCategory> AllCategories { get; } = Enum.GetValues<ProductCategory>();
+
+    // Phase 1 is sealed-only; ProductCategory.Single is reserved for the Phase 2 singles migration
+    // and must not be selectable here.
+    public IReadOnlyList<ProductCategory> AllCategories { get; } =
+        Enum.GetValues<ProductCategory>().Where(c => c != ProductCategory.Single).ToArray();
 
     [ObservableProperty]
     public partial CardGame Game { get; set; }
@@ -45,7 +49,8 @@ public sealed partial class ProductEditorViewModel : ViewModel
     {
         _productId = existing?.Id ?? 0;
         Game = existing?.Game ?? CardGame.Mtg;
-        Category = existing?.Category ?? ProductCategory.Single;
+        var existingCategory = existing?.Category;
+        Category = existingCategory is null or ProductCategory.Single ? ProductCategory.Box : existingCategory.Value;
         Name = existing?.Name ?? "";
         SetCode = existing?.SetCode;
         Upc = existing?.Upc;
@@ -61,6 +66,14 @@ public sealed partial class ProductEditorViewModel : ViewModel
         if (string.IsNullOrWhiteSpace(Name))
         {
             ValidationMessage = "Name is required.";
+            return;
+        }
+
+        // Defensive guard: Phase 1 is sealed-only. Single is excluded from AllCategories so this
+        // should be unreachable via the UI, but never let a Single-category product be saved.
+        if (Category == ProductCategory.Single)
+        {
+            ValidationMessage = "Category 'Single' is reserved for Phase 2 and cannot be used here.";
             return;
         }
 
