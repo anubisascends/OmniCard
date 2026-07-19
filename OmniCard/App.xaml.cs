@@ -104,6 +104,7 @@ public partial class App : Application
             services.AddDbContextFactory<OptcgDbContext>(options =>
                 options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "optcg.db")}"));
             services.AddSingleton<ICardGameService, OptcgService>();
+            services.AddSingleton<Services.PriceUpdateService>();
 
             // Sealed products
             services.AddDbContextFactory<SealedProductDbContext>(options =>
