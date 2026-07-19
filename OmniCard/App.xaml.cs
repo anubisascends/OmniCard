@@ -107,6 +107,7 @@ public partial class App : Application
             // Inventory (unified product model)
             services.AddDbContextFactory<InventoryDbContext>(options =>
                 options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "inventory.db")}"));
+            services.AddSingleton<IInventoryService, InventoryService>();
 
             // Storage containers
             services.AddSingleton<IStorageContainerService, StorageContainerService>();
