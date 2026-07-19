@@ -5,10 +5,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
-    <SelfContained>true</SelfContained>
+    <!-- Framework-dependent: relies on the .NET 10 Desktop Runtime already required by the
+         main app, instead of bundling a second copy of the runtime (~60MB) into a self-contained
+         single-file exe. Keeps the scanner host to a few small assemblies. -->
+    <SelfContained>false</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <PublishSingleFile>true</PublishSingleFile>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="NTwain" Version="3.7.6" />

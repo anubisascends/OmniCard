@@ -115,6 +115,7 @@ public sealed partial class DataLocationViewModel(
         var result = await migrationService.ExecuteMigrationAsync(progress, _migrationCts.Token);
 
         IsMigrating = false;
+        _migrationCts?.Dispose();
         _migrationCts = null;
 
         if (result.Success)

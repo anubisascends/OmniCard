@@ -4,27 +4,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Markup;
-using OmniCard.Imaging;
 using OmniCard.Models;
 
 namespace OmniCard.Controls.Converters;
-
-/// <summary>
-/// Attached property that stores a string tag on any DependencyObject,
-/// including DataGridColumn which is not a FrameworkElement.
-/// </summary>
-public static class ColumnTag
-{
-    public static readonly DependencyProperty KeyProperty =
-        DependencyProperty.RegisterAttached(
-            "Key",
-            typeof(string),
-            typeof(ColumnTag),
-            new PropertyMetadata(null));
-
-    public static string? GetKey(DependencyObject obj) => (string?)obj.GetValue(KeyProperty);
-    public static void SetKey(DependencyObject obj, string? value) => obj.SetValue(KeyProperty, value);
-}
 
 public class BoolToVisibilityConverter : MarkupExtension, IValueConverter
 {
@@ -181,43 +163,6 @@ public class ScanQualityDisplayConverter : MarkupExtension, IValueConverter
     public override object ProvideValue(IServiceProvider serviceProvider) => this;
 }
 
-public class LocationDisplayConverter : MarkupExtension, IValueConverter
-{
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-    {
-        if (value is not CollectionCard card || card.Container is null)
-            return "";
-
-        var container = card.Container;
-        return container.ContainerType switch
-        {
-            ContainerType.Binder when card.Page.HasValue && card.Slot.HasValue =>
-                $"{container.Name} (P{card.Page}/S{card.Slot})",
-            ContainerType.Binder when card.Page.HasValue =>
-                $"{container.Name} (P{card.Page})",
-            ContainerType.Box when !string.IsNullOrEmpty(card.Section) =>
-                $"{container.Name} - {card.Section}",
-            _ => container.Name,
-        };
-    }
-
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => throw new NotSupportedException();
-
-    public override object ProvideValue(IServiceProvider serviceProvider) => this;
-}
-
-public class SetInfoDisplayConverter : MarkupExtension, IValueConverter
-{
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => value is SetInfo s && s.SetCode.Length > 0 ? $"{s.SetName} ({s.SetCode})" : "All Sets";
-
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => throw new NotSupportedException();
-
-    public override object ProvideValue(IServiceProvider serviceProvider) => this;
-}
-
 public class CompletionPercentConverter : MarkupExtension, IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -254,49 +199,6 @@ public class LowConfidenceToVisibleConverter : MarkupExtension, IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => value is double confidence and < 80 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
-
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => throw new NotSupportedException();
-
-    public override object ProvideValue(IServiceProvider serviceProvider) => this;
-}
-
-public class CardPreviewImageConverter : MarkupExtension, IValueConverter
-{
-    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-    {
-        if (value is not CollectionCard card) return null;
-
-        // Try scan image from cache first
-        if (card.ScanImagePath is not null && ScanImageCache.Instance is not null)
-        {
-            var dataDir = parameter as string ?? "";
-            var fullPath = System.IO.Path.Combine(dataDir, card.ScanImagePath);
-            var cached = ScanImageCache.Instance.GetImage(fullPath);
-            if (cached is not null)
-                return cached;
-        }
-
-        // Fall back to API image via cache
-        if (card.ImageUri is not null)
-            return CardArtCache.Instance?.GetImage(null, card.ImageUri);
-
-        return null;
-    }
-
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => throw new NotSupportedException();
-
-    public override object ProvideValue(IServiceProvider serviceProvider) => this;
-}
-
-public class PriceDeltaColorConverter : MarkupExtension, IValueConverter
-{
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-    {
-        if (value is not decimal delta) return System.Windows.Media.Brushes.Gray;
-        return delta >= 0 ? System.Windows.Media.Brushes.LimeGreen : System.Windows.Media.Brushes.OrangeRed;
-    }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();

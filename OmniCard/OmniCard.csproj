@@ -10,6 +10,9 @@
     <ApplicationIcon>Resources\Images\OmniCard_Logo.ico</ApplicationIcon>
     <UserSecretsId>c8de53ce-799f-421d-a8e9-e4a5a678993a</UserSecretsId>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- Framework-dependent deployment: target machines need the .NET 10 Desktop Runtime
+         installed. Avoids bundling the runtime, keeping the published output minimal. -->
+    <SelfContained>false</SelfContained>
   </PropertyGroup>
 
   <ItemGroup>
@@ -75,6 +78,20 @@
     <Resource Include="Resources\Symbols\Mana\*.svg" />
     <Resource Include="Resources\Fonts\*.ttf" />
   </ItemGroup>
+
+  <!-- Keep the published output minimal: drop debug symbols (dominated by the ~85MB third-party
+       libSkiaSharp.pdb) from the distributable. Only runs on publish, not on build/test. -->
+  <Target Name="StripPublishSymbols" AfterTargets="Publish">
+    <ItemGroup>
+      <PublishPdbFiles Include="$(PublishDir)**\*.pdb" />
+      <!-- x86 native OCR binaries (Tesseract/leptonica) are dead weight in a win-x64-only build. -->
+      <PublishX86Natives Include="$(PublishDir)x86\**\*" />
+    </ItemGroup>
+    <Delete Files="@(PublishPdbFiles)" />
+    <Delete Files="@(PublishX86Natives)" />
+    <RemoveDir Directories="$(PublishDir)x86" />
+    <Message Importance="high" Text="StripPublishSymbols: removed debug symbols and x86 native binaries from publish output." />
+  </Target>
 
   <Target Name="CopyScannerHost" AfterTargets="Build">
     <PropertyGroup>

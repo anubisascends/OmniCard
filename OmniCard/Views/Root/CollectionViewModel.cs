@@ -38,7 +38,7 @@ public sealed partial class CollectionViewModel : ViewModel
     /// <summary>Set by RootViewModel so the home tab refreshes after collection mutations.</summary>
     public Action? CollectionChanged { get; set; }
 
-    /// <summary>The data directory path, used as converter parameter for CardPreviewImageConverter.</summary>
+    /// <summary>The data directory path, used by the tile art behavior to resolve scan images.</summary>
     public string DataDirectory => _dataPathService.DataDirectory;
 
     public CollectionViewModel(

@@ -13,6 +13,7 @@ public partial class CardListView : UserControl
 {
     public CollectionViewModel? ViewModel { get; set; }
     private ScrollViewer? _scrollViewer;
+    private RoutedEventHandler? _listBoxLoadedHandler;
 
     public CardListView()
     {
@@ -28,8 +29,12 @@ public partial class CardListView : UserControl
         DataContext = vm;
         vm.PropertyChanged += ViewModel_PropertyChanged;
 
-        // Hook scroll detection for incremental loading
-        CollectionListBox.Loaded += (_, _) =>
+        // Hook scroll detection for incremental loading (unsubscribe first so repeated WireUp
+        // calls don't accumulate handlers).
+        if (_listBoxLoadedHandler is not null)
+            CollectionListBox.Loaded -= _listBoxLoadedHandler;
+
+        _listBoxLoadedHandler = (_, _) =>
         {
             if (_scrollViewer is not null)
                 _scrollViewer.ScrollChanged -= ScrollViewer_ScrollChanged;
@@ -38,6 +43,7 @@ public partial class CardListView : UserControl
             if (_scrollViewer is not null)
                 _scrollViewer.ScrollChanged += ScrollViewer_ScrollChanged;
         };
+        CollectionListBox.Loaded += _listBoxLoadedHandler;
     }
 
     // A new result set replaces CollectionSearchResults on every search/filter/sort. WPF keeps
