@@ -5,19 +5,19 @@ using OmniCard.Models;
 
 namespace OmniCard.Tests.Data;
 
-public class InventoryDbContextTests : IDisposable
+public class OmniCardDbContextTests : IDisposable
 {
     private readonly SqliteConnection _connection;
-    private readonly DbContextOptions<InventoryDbContext> _options;
+    private readonly DbContextOptions<OmniCardDbContext> _options;
 
-    public InventoryDbContextTests()
+    public OmniCardDbContextTests()
     {
         _connection = new SqliteConnection("Data Source=:memory:");
         _connection.Open();
-        _options = new DbContextOptionsBuilder<InventoryDbContext>()
+        _options = new DbContextOptionsBuilder<OmniCardDbContext>()
             .UseSqlite(_connection)
             .Options;
-        using var ctx = new InventoryDbContext(_options);
+        using var ctx = new OmniCardDbContext(_options);
         ctx.Database.EnsureCreated();
     }
 
@@ -27,7 +27,7 @@ public class InventoryDbContextTests : IDisposable
     public void Product_CategoryAndGame_RoundTripAsStrings()
     {
         int productId;
-        using (var ctx = new InventoryDbContext(_options))
+        using (var ctx = new OmniCardDbContext(_options))
         {
             var product = new Product
             {
@@ -51,7 +51,7 @@ public class InventoryDbContextTests : IDisposable
             Assert.Equal("Bundle", reader.GetString(1));
         }
 
-        using var readCtx = new InventoryDbContext(_options);
+        using var readCtx = new OmniCardDbContext(_options);
         var reloaded = readCtx.Products.AsNoTracking().Single(p => p.Id == productId);
         Assert.Equal(CardGame.OnePiece, reloaded.Game);
         Assert.Equal(ProductCategory.Bundle, reloaded.Category);
@@ -61,7 +61,7 @@ public class InventoryDbContextTests : IDisposable
     public void Movement_Type_RoundTripsAsString()
     {
         int movementId;
-        using (var ctx = new InventoryDbContext(_options))
+        using (var ctx = new OmniCardDbContext(_options))
         {
             var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Box, Name = "Test Box" };
             ctx.Products.Add(product);
@@ -87,7 +87,7 @@ public class InventoryDbContextTests : IDisposable
             Assert.Equal("Adjust", reader.GetString(0));
         }
 
-        using var readCtx = new InventoryDbContext(_options);
+        using var readCtx = new OmniCardDbContext(_options);
         var reloaded = readCtx.Movements.AsNoTracking().Single(m => m.Id == movementId);
         Assert.Equal(MovementType.Adjust, reloaded.Type);
     }
@@ -97,7 +97,7 @@ public class InventoryDbContextTests : IDisposable
     {
         int productId;
         int lotId;
-        using (var ctx = new InventoryDbContext(_options))
+        using (var ctx = new OmniCardDbContext(_options))
         {
             var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Box, Name = "Test Box" };
             ctx.Products.Add(product);
@@ -111,15 +111,15 @@ public class InventoryDbContextTests : IDisposable
         }
 
         // Delete the product without touching the lot explicitly; the FK's cascade delete
-        // behavior (configured in InventoryDbContext.OnModelCreating) should remove it too.
-        using (var ctx = new InventoryDbContext(_options))
+        // behavior (configured in OmniCardDbContext.OnModelCreating) should remove it too.
+        using (var ctx = new OmniCardDbContext(_options))
         {
             var product = ctx.Products.Single(p => p.Id == productId);
             ctx.Products.Remove(product);
             ctx.SaveChanges();
         }
 
-        using var readCtx = new InventoryDbContext(_options);
+        using var readCtx = new OmniCardDbContext(_options);
         Assert.False(readCtx.Products.Any(p => p.Id == productId));
         Assert.False(readCtx.Lots.Any(l => l.Id == lotId));
     }
@@ -129,7 +129,7 @@ public class InventoryDbContextTests : IDisposable
     {
         int productId;
         int movementId;
-        using (var ctx = new InventoryDbContext(_options))
+        using (var ctx = new OmniCardDbContext(_options))
         {
             var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Box, Name = "Test Box" };
             ctx.Products.Add(product);
@@ -150,14 +150,14 @@ public class InventoryDbContextTests : IDisposable
         // Movements has no FK relationship to Product in OnModelCreating, so deleting the
         // product must not fail (no FK constraint) and must not remove the movement row —
         // callers (InventoryService.DeleteProduct) are responsible for cleaning those up explicitly.
-        using (var ctx = new InventoryDbContext(_options))
+        using (var ctx = new OmniCardDbContext(_options))
         {
             var product = ctx.Products.Single(p => p.Id == productId);
             ctx.Products.Remove(product);
             ctx.SaveChanges();
         }
 
-        using var readCtx = new InventoryDbContext(_options);
+        using var readCtx = new OmniCardDbContext(_options);
         Assert.False(readCtx.Products.Any(p => p.Id == productId));
 
         var reloadedMovement = readCtx.Movements.AsNoTracking().Single(m => m.Id == movementId);

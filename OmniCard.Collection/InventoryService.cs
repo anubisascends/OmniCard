@@ -5,7 +5,7 @@ using OmniCard.Models;
 
 namespace OmniCard.Collection;
 
-public class InventoryService(IDbContextFactory<InventoryDbContext> dbContextFactory) : IInventoryService
+public class InventoryService(IDbContextFactory<OmniCardDbContext> dbContextFactory) : IInventoryService
 {
     public List<Product> GetProducts(CardGame? game = null, ProductCategory? category = null)
     {

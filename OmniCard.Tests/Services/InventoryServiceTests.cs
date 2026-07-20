@@ -10,16 +10,16 @@ namespace OmniCard.Tests.Services;
 public class InventoryServiceTests : IDisposable
 {
     private readonly SqliteConnection _connection;
-    private readonly DbContextOptions<InventoryDbContext> _options;
+    private readonly DbContextOptions<OmniCardDbContext> _options;
 
     public InventoryServiceTests()
     {
         _connection = new SqliteConnection("Data Source=:memory:");
         _connection.Open();
-        _options = new DbContextOptionsBuilder<InventoryDbContext>()
+        _options = new DbContextOptionsBuilder<OmniCardDbContext>()
             .UseSqlite(_connection)
             .Options;
-        using var ctx = new InventoryDbContext(_options);
+        using var ctx = new OmniCardDbContext(_options);
         ctx.Database.EnsureCreated();
     }
 
@@ -207,8 +207,8 @@ public class InventoryServiceTests : IDisposable
         Assert.Equal(2 * 5m + 1 * 8m, boxOnly.TotalCost);
     }
 
-    private class MockFactory(DbContextOptions<InventoryDbContext> options) : IDbContextFactory<InventoryDbContext>
+    private class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
-        public InventoryDbContext CreateDbContext() => new(options);
+        public OmniCardDbContext CreateDbContext() => new(options);
     }
 }

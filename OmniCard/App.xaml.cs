@@ -105,8 +105,8 @@ public partial class App : Application
             services.AddSingleton<ICardGameService, OptcgService>();
             services.AddSingleton<Services.PriceUpdateService>();
 
-            // Inventory (unified product model)
-            services.AddDbContextFactory<InventoryDbContext>(options =>
+            // Inventory (unified product model) — now the app-wide OmniCardDbContext
+            services.AddDbContextFactory<OmniCardDbContext>(options =>
                 options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "inventory.db")}"));
             services.AddSingleton<IInventoryService, InventoryService>();
 
@@ -259,7 +259,7 @@ public partial class App : Application
             CollectionMigrationService.RepairOptcgSetCodes(dataDir, collectionDbFactory, migrationLogger);
 
             splash.SetStatus("Initializing databases...");
-            using (var invCtx = Host.Services.GetRequiredService<IDbContextFactory<InventoryDbContext>>().CreateDbContext())
+            using (var invCtx = Host.Services.GetRequiredService<IDbContextFactory<OmniCardDbContext>>().CreateDbContext())
                 invCtx.Database.EnsureCreated();
 
             splash.SetStatus("Loading collection data...");
