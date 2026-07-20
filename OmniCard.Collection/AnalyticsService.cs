@@ -101,8 +101,16 @@ public class AnalyticsService : IAnalyticsService
 
             var quantity = sells.Sum(m => m.Quantity);
             var proceeds = sells.Sum(m => m.Quantity * (m.UnitValue ?? 0m));
-            var cost = lotGroup.Where(m => m.Type == MovementType.Acquire)
-                .Sum(m => m.Quantity * (m.UnitValue ?? 0m));
+
+            // Prorate cost to the sold quantity: a partially-sold lot (e.g. qty-2 lot, 1 unit
+            // sold) must only realize the cost of the units actually sold, not the whole lot's
+            // acquire cost — the remaining unit's cost still belongs to held inventory and would
+            // otherwise be double-counted (once here, once in GetHoldings).
+            var acquires = lotGroup.Where(m => m.Type == MovementType.Acquire).ToList();
+            var acquiredQuantity = acquires.Sum(m => m.Quantity);
+            var acquiredCost = acquires.Sum(m => m.Quantity * (m.UnitValue ?? 0m));
+            var perUnitAcquireCost = acquiredQuantity == 0 ? 0m : acquiredCost / acquiredQuantity;
+            var cost = quantity * perUnitAcquireCost;
 
             var productId = lotGroup.First().ProductId;
             var game = products.TryGetValue(productId, out var product) ? product.Game : (CardGame?)null;

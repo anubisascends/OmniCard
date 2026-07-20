@@ -210,6 +210,33 @@ public class AnalyticsServiceTests : IDisposable
     }
 
     [Fact]
+    public void GetRealized_PartialSale_ProratesCostToSoldQuantity_NotWholeLot()
+    {
+        using var ctx = new OmniCardDbContext(_options);
+
+        // Qty-2 lot acquired @ $4/unit ($8 total); only 1 unit sold @ $10. The eBay
+        // decrement-on-sale flow leaves the lot at qty 1 (still held), so realized cost must be
+        // prorated to the 1 sold unit ($4), not the whole lot's $8 acquire cost.
+        var bolt = SeedProduct(ctx, CardGame.Mtg, ProductCategory.Single, "Lightning Bolt", "bolt-1");
+        var boltLot = SeedLot(ctx, bolt.Id, 1, 4.00m, null); // lot now holds the 1 remaining unit
+        SeedMovement(ctx, bolt.Id, boltLot.Id, MovementType.Acquire, 2, 4.00m); // original lot: 2 @ $4
+        SeedMovement(ctx, bolt.Id, boltLot.Id, MovementType.Sell, 1, 10.00m);   // sold 1 @ $10
+
+        var service = CreateService();
+        var realized = service.GetRealized();
+
+        Assert.Equal(1, realized.TotalSold);
+        Assert.Equal(10.00m, realized.TotalProceeds);
+        Assert.Equal(4.00m, realized.TotalCost); // prorated: 1 * ($8 / 2), not the full $8
+        Assert.Equal(6.00m, realized.TotalProceeds - realized.TotalCost);
+
+        var byGame = realized.ByGame.ToDictionary(l => l.Key);
+        Assert.Equal(1, byGame["Mtg"].Count);
+        Assert.Equal(10.00m, byGame["Mtg"].Proceeds);
+        Assert.Equal(4.00m, byGame["Mtg"].Cost);
+    }
+
+    [Fact]
     public void GetRealized_NoSales_ReturnsEmptySummary()
     {
         using var ctx = new OmniCardDbContext(_options);
