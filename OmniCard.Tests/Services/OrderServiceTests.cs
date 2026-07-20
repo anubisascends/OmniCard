@@ -65,6 +65,47 @@ public class OrderServiceTests : IDisposable
     }
 
     [Fact]
+    public void SetStatus_Shipped_RemovesInventory_RecordsSell_MarksListingSold()
+    {
+        var (customerId, lotId) = SeedCustomerAndLot();
+        var listing = new ListingService(new Factory(_opts), new StubSettings());
+        listing.ListForSale([lotId], SalesChannel.TcgPlayer, 3.50m, 1);
+
+        var svc = OrderSvc();
+        var order = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "TCG-42");
+        var line = svc.AddLine(order.Id, lotId, 3.50m);
+
+        svc.SetStatus(order.Id, OrderStatus.Shipped);
+
+        using var ctx = new OmniCardDbContext(_opts);
+        // Lot removed (qty 1 -> 0)
+        Assert.Null(ctx.Lots.FirstOrDefault(l => l.Id == lotId));
+        // Sell movement recorded with proceeds
+        var sell = Assert.Single(ctx.Movements.Where(m => m.Type == MovementType.Sell && m.LotId == lotId).ToList());
+        Assert.Equal(3.50m, sell.UnitValue);
+        // Listing marked Sold
+        Assert.Equal(ListingStatus.Sold, ctx.Listings.Single(l => l.LotId == lotId).Status);
+        // Order stamped
+        var shipped = ctx.Orders.Single(o => o.Id == order.Id);
+        Assert.Equal(OrderStatus.Shipped, shipped.Status);
+        Assert.NotNull(shipped.ShippedAt);
+    }
+
+    [Fact]
+    public void SetStatus_Shipped_IsIdempotent()
+    {
+        var (customerId, lotId) = SeedCustomerAndLot();
+        var svc = OrderSvc();
+        var order = svc.CreateOrder(customerId, SalesChannel.Manual, null);
+        svc.AddLine(order.Id, lotId, 2m);
+        svc.SetStatus(order.Id, OrderStatus.Shipped);
+        svc.SetStatus(order.Id, OrderStatus.Shipped); // second call must not double-decrement
+
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.Single(ctx.Movements.Where(m => m.Type == MovementType.Sell && m.LotId == lotId).ToList());
+    }
+
+    [Fact]
     public void OrderGraph_RoundTrips()
     {
         using (var ctx = new OmniCardDbContext(_opts))

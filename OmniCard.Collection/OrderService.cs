@@ -83,5 +83,52 @@ public class OrderService(
         ctx.SaveChanges();
     }
 
-    public void SetStatus(int orderId, OrderStatus status) => throw new NotImplementedException();
+    public void SetStatus(int orderId, OrderStatus status)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var order = ctx.Orders.FirstOrDefault(o => o.Id == orderId);
+        if (order is null) return;
+
+        var shipping = status == OrderStatus.Shipped && order.Status != OrderStatus.Shipped
+                       && order.Status != OrderStatus.Completed && order.Status != OrderStatus.Cancelled;
+
+        order.Status = status;
+
+        if (shipping)
+        {
+            order.ShippedAt = DateTime.UtcNow;
+            var lines = ctx.OrderLines.Where(l => l.OrderId == orderId).ToList();
+            foreach (var line in lines)
+            {
+                if (line.LotId is not int lotId) continue;
+                var lot = ctx.Lots.FirstOrDefault(l => l.Id == lotId);
+                if (lot is null) continue;
+
+                // Record the sale first (scalar values survive the lot removal below).
+                ctx.Movements.Add(new InventoryMovement
+                {
+                    ProductId = lot.ProductId,
+                    LotId = lot.Id,
+                    Type = MovementType.Sell,
+                    Quantity = line.Quantity,
+                    UnitValue = line.UnitSalePrice,
+                    Timestamp = DateTime.UtcNow,
+                    Note = order.OrderNumber ?? $"Order {order.Id}",
+                });
+
+                lot.Quantity -= line.Quantity;
+                if (lot.Quantity <= 0)
+                    ctx.Lots.Remove(lot);
+            }
+            ctx.SaveChanges();
+
+            // Mark each sold lot's active listing Sold (separate context inside the service).
+            foreach (var line in lines.Where(l => l.LotId is not null))
+                listingService.MarkSold(line.LotId!.Value, line.Id);
+        }
+        else
+        {
+            ctx.SaveChanges();
+        }
+    }
 }
