@@ -15,6 +15,8 @@ public class CardServiceCollectionTests : IDisposable
 {
     private readonly SqliteConnection _connection;
     private readonly DbContextOptions<CollectionDbContext> _options;
+    private readonly SqliteConnection _omniConnection;
+    private readonly DbContextOptions<OmniCardDbContext> _omniOptions;
 
     public CardServiceCollectionTests()
     {
@@ -25,32 +27,68 @@ public class CardServiceCollectionTests : IDisposable
             .Options;
         using var ctx = new CollectionDbContext(_options);
         ctx.Database.EnsureCreated();
+
+        _omniConnection = new SqliteConnection("Data Source=:memory:");
+        _omniConnection.Open();
+        _omniOptions = new DbContextOptionsBuilder<OmniCardDbContext>()
+            .UseSqlite(_omniConnection)
+            .Options;
+        using var omniCtx = new OmniCardDbContext(_omniOptions);
+        omniCtx.Database.EnsureCreated();
     }
 
-    public void Dispose() => _connection.Dispose();
+    public void Dispose()
+    {
+        _connection.Dispose();
+        _omniConnection.Dispose();
+    }
 
     private IDbContextFactory<CollectionDbContext> CreateFactory() => new MockCollectionDbContextFactory(_options);
+    private IDbContextFactory<OmniCardDbContext> CreateOmniFactory() => new MockOmniDbContextFactory(_omniOptions);
+
+    /// <summary>Seeds a Product+Lot pair (the unified-store equivalent of a single CollectionCard row).</summary>
+    private static InventoryLot SeedCard(OmniCardDbContext ctx, CardGame game, string gameCardId, string name,
+        string setName = "", int? containerId = null)
+    {
+        var product = new Product
+        {
+            Game = game,
+            Category = ProductCategory.Single,
+            GameCardId = gameCardId,
+            Name = name,
+            SetName = setName,
+        };
+        ctx.Products.Add(product);
+        ctx.SaveChanges();
+
+        var lot = new InventoryLot { ProductId = product.Id, LocationId = containerId };
+        ctx.Lots.Add(lot);
+        ctx.SaveChanges();
+        return lot;
+    }
+
+    private CardService CreateService() => new(
+        new StubHashService(),
+        [],
+        CreateFactory(),
+        CreateOmniFactory(),
+        new StubOcrService(),
+        new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
+        NullLogger<CardService>.Instance,
+        new DataPathService(Path.GetTempPath()),
+        new NullScanDiagnosticService(),
+        new NullAuditService());
 
     [Fact]
     public void SearchCollection_NoFilter_ReturnsAllGames()
     {
-        using (var ctx = new CollectionDbContext(_options))
+        using (var ctx = new OmniCardDbContext(_omniOptions))
         {
-            ctx.Cards.Add(new CollectionCard { Game = CardGame.Mtg, GameCardId = "id1", Name = "MTG Card" });
-            ctx.Cards.Add(new CollectionCard { Game = CardGame.OnePiece, GameCardId = "id2", Name = "OP Card" });
-            ctx.SaveChanges();
+            SeedCard(ctx, CardGame.Mtg, "id1", "MTG Card");
+            SeedCard(ctx, CardGame.OnePiece, "id2", "OP Card");
         }
 
-        var service = new CardService(
-            new StubHashService(),
-            [],
-            CreateFactory(),
-            new StubOcrService(),
-            new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-            NullLogger<CardService>.Instance,
-            new DataPathService(Path.GetTempPath()),
-            new NullScanDiagnosticService(),
-            new NullAuditService());
+        var service = CreateService();
 
         var results = new ObservableCollection<CollectionCard>();
         service.SearchCollection("", null, results);
@@ -61,23 +99,13 @@ public class CardServiceCollectionTests : IDisposable
     [Fact]
     public void SearchCollection_WithGameFilter_ReturnsOnlyThatGame()
     {
-        using (var ctx = new CollectionDbContext(_options))
+        using (var ctx = new OmniCardDbContext(_omniOptions))
         {
-            ctx.Cards.Add(new CollectionCard { Game = CardGame.Mtg, GameCardId = "id1", Name = "MTG Card" });
-            ctx.Cards.Add(new CollectionCard { Game = CardGame.OnePiece, GameCardId = "id2", Name = "OP Card" });
-            ctx.SaveChanges();
+            SeedCard(ctx, CardGame.Mtg, "id1", "MTG Card");
+            SeedCard(ctx, CardGame.OnePiece, "id2", "OP Card");
         }
 
-        var service = new CardService(
-            new StubHashService(),
-            [],
-            CreateFactory(),
-            new StubOcrService(),
-            new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-            NullLogger<CardService>.Instance,
-            new DataPathService(Path.GetTempPath()),
-            new NullScanDiagnosticService(),
-            new NullAuditService());
+        var service = CreateService();
 
         var results = new ObservableCollection<CollectionCard>();
         service.SearchCollection("", CardGame.OnePiece, results);
@@ -89,23 +117,13 @@ public class CardServiceCollectionTests : IDisposable
     [Fact]
     public void SearchCollection_WithQuery_FiltersbyNameOrSet()
     {
-        using (var ctx = new CollectionDbContext(_options))
+        using (var ctx = new OmniCardDbContext(_omniOptions))
         {
-            ctx.Cards.Add(new CollectionCard { Game = CardGame.Mtg, GameCardId = "id1", Name = "Lightning Bolt", SetName = "Alpha" });
-            ctx.Cards.Add(new CollectionCard { Game = CardGame.Mtg, GameCardId = "id2", Name = "Counterspell", SetName = "Alpha" });
-            ctx.SaveChanges();
+            SeedCard(ctx, CardGame.Mtg, "id1", "Lightning Bolt", "Alpha");
+            SeedCard(ctx, CardGame.Mtg, "id2", "Counterspell", "Alpha");
         }
 
-        var service = new CardService(
-            new StubHashService(),
-            [],
-            CreateFactory(),
-            new StubOcrService(),
-            new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-            NullLogger<CardService>.Instance,
-            new DataPathService(Path.GetTempPath()),
-            new NullScanDiagnosticService(),
-            new NullAuditService());
+        var service = CreateService();
 
         var results = new ObservableCollection<CollectionCard>();
         service.SearchCollection("Lightning", null, results);
@@ -117,16 +135,7 @@ public class CardServiceCollectionTests : IDisposable
     [Fact]
     public void CommitScans_WritesToCollectionDb()
     {
-        var service = new CardService(
-            new StubHashService(),
-            [],
-            CreateFactory(),
-            new StubOcrService(),
-            new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-            NullLogger<CardService>.Instance,
-            new DataPathService(Path.GetTempPath()),
-            new NullScanDiagnosticService(),
-            new NullAuditService());
+        var service = CreateService();
 
         var scans = new[]
         {
@@ -161,16 +170,7 @@ public class CardServiceCollectionTests : IDisposable
     [Fact]
     public void CommitScans_PopulatesColorAndCardType()
     {
-        var service = new CardService(
-            new StubHashService(),
-            [],
-            CreateFactory(),
-            new StubOcrService(),
-            new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-            NullLogger<CardService>.Instance,
-            new DataPathService(Path.GetTempPath()),
-            new NullScanDiagnosticService(),
-            new NullAuditService());
+        var service = CreateService();
 
         var scans = new[]
         {
@@ -234,67 +234,44 @@ public class CardServiceCollectionTests : IDisposable
     [Fact]
     public void GetMatchingContainerIds_ReturnsOnlyContainersWithMatchingCards()
     {
-        using (var ctx = new CollectionDbContext(_options))
+        int binderId, boxId;
+        using (var ctx = new OmniCardDbContext(_omniOptions))
         {
             var binder = new StorageContainer { Name = "Binder", ContainerType = ContainerType.Binder };
             var box = new StorageContainer { Name = "Box", ContainerType = ContainerType.Box };
             ctx.StorageContainers.AddRange(binder, box);
             ctx.SaveChanges();
+            binderId = binder.Id;
+            boxId = box.Id;
 
-            ctx.Cards.AddRange(
-                new CollectionCard { Game = CardGame.Mtg, GameCardId = "id1", Name = "Lightning Bolt", SetCode = "LEA", ContainerId = binder.Id },
-                new CollectionCard { Game = CardGame.Mtg, GameCardId = "id2", Name = "Counterspell", SetCode = "LEA", ContainerId = box.Id }
-            );
-            ctx.SaveChanges();
+            SeedCard(ctx, CardGame.Mtg, "id1", "Lightning Bolt", containerId: binderId);
+            SeedCard(ctx, CardGame.Mtg, "id2", "Counterspell", containerId: boxId);
         }
 
-        var service = new CardService(
-            new StubHashService(),
-            [],
-            CreateFactory(),
-            new StubOcrService(),
-            new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-            NullLogger<CardService>.Instance,
-            new DataPathService(Path.GetTempPath()),
-            new NullScanDiagnosticService(),
-            new NullAuditService());
+        var service = CreateService();
 
         var result = service.GetMatchingContainerIds("Lightning Bolt", CardGame.Mtg);
 
         Assert.Single(result);
         // The binder has "Lightning Bolt", the box does not
-        using var ctx2 = new CollectionDbContext(_options);
-        var binderId = ctx2.StorageContainers.First(c => c.Name == "Binder").Id;
         Assert.Contains(binderId, result);
     }
 
     [Fact]
     public void GetMatchingContainerIds_EmptyQuery_ReturnsAllContainers()
     {
-        using (var ctx = new CollectionDbContext(_options))
+        using (var ctx = new OmniCardDbContext(_omniOptions))
         {
             var binder = new StorageContainer { Name = "Binder2", ContainerType = ContainerType.Binder };
             var box = new StorageContainer { Name = "Box2", ContainerType = ContainerType.Box };
             ctx.StorageContainers.AddRange(binder, box);
             ctx.SaveChanges();
 
-            ctx.Cards.AddRange(
-                new CollectionCard { Game = CardGame.Mtg, GameCardId = "id10", Name = "Card A", ContainerId = binder.Id },
-                new CollectionCard { Game = CardGame.Mtg, GameCardId = "id11", Name = "Card B", ContainerId = box.Id }
-            );
-            ctx.SaveChanges();
+            SeedCard(ctx, CardGame.Mtg, "id10", "Card A", containerId: binder.Id);
+            SeedCard(ctx, CardGame.Mtg, "id11", "Card B", containerId: box.Id);
         }
 
-        var service = new CardService(
-            new StubHashService(),
-            [],
-            CreateFactory(),
-            new StubOcrService(),
-            new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
-            NullLogger<CardService>.Instance,
-            new DataPathService(Path.GetTempPath()),
-            new NullScanDiagnosticService(),
-            new NullAuditService());
+        var service = CreateService();
 
         var result = service.GetMatchingContainerIds("", CardGame.Mtg);
 
@@ -333,6 +310,11 @@ public class CardServiceCollectionTests : IDisposable
     private class MockCollectionDbContextFactory(DbContextOptions<CollectionDbContext> options) : IDbContextFactory<CollectionDbContext>
     {
         public CollectionDbContext CreateDbContext() => new(options);
+    }
+
+    private class MockOmniDbContextFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
+    {
+        public OmniCardDbContext CreateDbContext() => new(options);
     }
 
     private class NullAuditService : IAuditService

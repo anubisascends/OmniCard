@@ -21,6 +21,7 @@ public sealed class CardService : ICardService
     private readonly IPerceptualHashService _hashService;
     private readonly Dictionary<CardGame, ICardGameService> _gameServices;
     private readonly IDbContextFactory<CollectionDbContext> _collectionDbContextFactory;
+    private readonly IDbContextFactory<OmniCardDbContext> _omniDbContextFactory;
     private readonly IOcrMatchingService _ocrService;
     private readonly ScanImageCache _imageCache;
     private readonly ILogger<CardService> _logger;
@@ -34,6 +35,7 @@ public sealed class CardService : ICardService
         IPerceptualHashService hashService,
         IEnumerable<ICardGameService> gameServices,
         IDbContextFactory<CollectionDbContext> collectionDbContextFactory,
+        IDbContextFactory<OmniCardDbContext> omniDbContextFactory,
         IOcrMatchingService ocrService,
         ScanImageCache imageCache,
         ILogger<CardService> logger,
@@ -44,6 +46,7 @@ public sealed class CardService : ICardService
         _hashService = hashService;
         _gameServices = gameServices.ToDictionary(s => s.Game);
         _collectionDbContextFactory = collectionDbContextFactory;
+        _omniDbContextFactory = omniDbContextFactory;
         _ocrService = ocrService;
         _imageCache = imageCache;
         _tempScansDir = imageCache.TempScansDirectory;
@@ -796,7 +799,7 @@ public sealed class CardService : ICardService
         if (skip == 0)
             results.Clear();
 
-        using var context = _collectionDbContextFactory.CreateDbContext();
+        using var context = _omniDbContextFactory.CreateDbContext();
         var cards = BuildFilteredQuery(context, query, gameFilter, containerFilter, filterPreset);
 
         if (stacked)
@@ -851,7 +854,7 @@ public sealed class CardService : ICardService
 
     public int GetSearchCount(string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset, bool stacked)
     {
-        using var context = _collectionDbContextFactory.CreateDbContext();
+        using var context = _omniDbContextFactory.CreateDbContext();
         var cards = BuildFilteredQuery(context, query, gameFilter, containerFilter, filterPreset);
 
         if (stacked)
@@ -866,7 +869,7 @@ public sealed class CardService : ICardService
 
     public HashSet<int> GetMatchingContainerIds(string query, CardGame? gameFilter)
     {
-        using var context = _collectionDbContextFactory.CreateDbContext();
+        using var context = _omniDbContextFactory.CreateDbContext();
         var cards = BuildFilteredQuery(context, query, gameFilter, containerFilter: null, filterPreset: null);
         return cards
             .Where(c => c.ContainerId != null)
@@ -1010,9 +1013,47 @@ public sealed class CardService : ICardService
         return count;
     }
 
-    private IQueryable<CollectionCard> BuildFilteredQuery(CollectionDbContext context, string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset)
+    /// <summary>
+    /// Builds the base read query by projecting Lots⋈Products (Category=Single) into the
+    /// <see cref="CollectionCard"/> DTO shape, left-joined to StorageContainers so
+    /// location-based filters keep working. Downstream filter/sort code (below) is written
+    /// against <see cref="CollectionCard"/> and is unchanged from the Phase-1 CollectionDbContext
+    /// version — only the source of the IQueryable moved.
+    /// </summary>
+    private IQueryable<CollectionCard> BuildFilteredQuery(OmniCardDbContext context, string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset)
     {
-        IQueryable<CollectionCard> cards = context.Cards.AsNoTracking().Include(c => c.Container).Include(c => c.EbayListing);
+        IQueryable<CollectionCard> cards =
+            from l in context.Lots.AsNoTracking()
+            join p in context.Products.AsNoTracking() on l.ProductId equals p.Id
+            where p.Category == ProductCategory.Single
+            join sc in context.StorageContainers.AsNoTracking() on l.LocationId equals sc.Id into containerJoin
+            from sc in containerJoin.DefaultIfEmpty()
+            select new CollectionCard
+            {
+                Id = l.Id,
+                Game = p.Game,
+                GameCardId = p.GameCardId ?? "",
+                Name = p.Name,
+                SetName = p.SetName ?? "",
+                SetCode = p.SetCode ?? "",
+                Number = p.CollectorNumber ?? "",
+                Rarity = p.Rarity ?? "",
+                ImageUri = p.ImageUri,
+                ScanImagePath = l.ScanImagePath,
+                Condition = l.Condition ?? "NM",
+                IsFoil = p.Foil,
+                PurchasePrice = l.UnitCost,
+                DateAdded = l.AcquisitionDate,
+                ContainerId = l.LocationId,
+                Container = sc,
+                Page = l.Page,
+                Slot = l.Slot,
+                Section = l.Section,
+                Color = p.Color,
+                CardType = p.CardType,
+                IsMissing = l.IsMissing,
+                FlagReason = l.FlagReason,
+            };
 
         if (gameFilter.HasValue)
             cards = cards.Where(c => c.Game == gameFilter.Value);
@@ -1031,8 +1072,8 @@ public sealed class CardService : ICardService
 
     public List<string> GetDistinctFieldValues(string field, CardGame game)
     {
-        using var context = _collectionDbContextFactory.CreateDbContext();
-        var cards = context.Cards.AsNoTracking().Where(c => c.Game == game);
+        using var context = _omniDbContextFactory.CreateDbContext();
+        var cards = BuildFilteredQuery(context, "", game, containerFilter: null, filterPreset: null);
 
         IQueryable<string> values = field switch
         {
@@ -1439,9 +1480,14 @@ public sealed class CardService : ICardService
 
     public List<CollectionCard> GetCollectionCards(IEnumerable<int> cardIds)
     {
-        using var context = _collectionDbContextFactory.CreateDbContext();
+        using var context = _omniDbContextFactory.CreateDbContext();
         var ids = cardIds.ToList();
-        return context.Cards.AsNoTracking().Where(c => ids.Contains(c.Id)).ToList();
+        return context.Lots.AsNoTracking()
+            .Include(l => l.Product)
+            .Where(l => ids.Contains(l.Id))
+            .ToList()
+            .Select(l => CollectionCardMapper.ToDto(l, l.Product, 0m))
+            .ToList();
     }
 
     public void UpdateCollectionCard(CollectionCard card)

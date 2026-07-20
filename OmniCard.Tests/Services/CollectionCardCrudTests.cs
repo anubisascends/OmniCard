@@ -14,6 +14,8 @@ public class CollectionCardCrudTests : IDisposable
 {
     private readonly SqliteConnection _connection;
     private readonly DbContextOptions<CollectionDbContext> _options;
+    private readonly SqliteConnection _omniConnection;
+    private readonly DbContextOptions<OmniCardDbContext> _omniOptions;
 
     public CollectionCardCrudTests()
     {
@@ -24,9 +26,21 @@ public class CollectionCardCrudTests : IDisposable
             .Options;
         using var ctx = new CollectionDbContext(_options);
         ctx.Database.EnsureCreated();
+
+        _omniConnection = new SqliteConnection("Data Source=:memory:");
+        _omniConnection.Open();
+        _omniOptions = new DbContextOptionsBuilder<OmniCardDbContext>()
+            .UseSqlite(_omniConnection)
+            .Options;
+        using var omniCtx = new OmniCardDbContext(_omniOptions);
+        omniCtx.Database.EnsureCreated();
     }
 
-    public void Dispose() => _connection.Dispose();
+    public void Dispose()
+    {
+        _connection.Dispose();
+        _omniConnection.Dispose();
+    }
 
     [Fact]
     public void UpdateCollectionCard_PersistsChanges()
@@ -218,6 +232,7 @@ public class CollectionCardCrudTests : IDisposable
             new StubHashService(),
             [],
             new MockCollectionDbContextFactory(_options),
+            new MockOmniDbContextFactory(_omniOptions),
             new StubOcrService(),
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
             NullLogger<CardService>.Instance,
@@ -256,6 +271,11 @@ public class CollectionCardCrudTests : IDisposable
     private class MockCollectionDbContextFactory(DbContextOptions<CollectionDbContext> options) : IDbContextFactory<CollectionDbContext>
     {
         public CollectionDbContext CreateDbContext() => new(options);
+    }
+
+    private class MockOmniDbContextFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
+    {
+        public OmniCardDbContext CreateDbContext() => new(options);
     }
 
     private class NullAuditService : IAuditService
