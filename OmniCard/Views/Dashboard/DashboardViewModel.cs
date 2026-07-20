@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 
@@ -13,11 +14,13 @@ namespace OmniCard.Views.Dashboard;
 public sealed partial class DashboardViewModel : ViewModel
 {
     private readonly IAnalyticsService _analyticsService;
+    private readonly ILogger<DashboardViewModel> _logger;
     private bool _loaded;
 
-    public DashboardViewModel(IAnalyticsService analyticsService)
+    public DashboardViewModel(IAnalyticsService analyticsService, ILogger<DashboardViewModel> logger)
     {
         _analyticsService = analyticsService;
+        _logger = logger;
     }
 
     [ObservableProperty]
@@ -28,6 +31,12 @@ public sealed partial class DashboardViewModel : ViewModel
 
     [ObservableProperty]
     public partial bool IsBusy { get; set; }
+
+    /// <summary>Set when the most recent refresh failed (e.g. a price-fetch exception), so the
+    /// view can show why the tiles are empty instead of looking like "no data". Cleared at the
+    /// start of the next successful refresh.</summary>
+    [ObservableProperty]
+    public partial string? StatusMessage { get; set; }
 
     // Derived tile properties — recomputed whenever Holdings/Realized are reassigned.
     public decimal TotalCost => Holdings?.TotalCost ?? 0m;
@@ -61,6 +70,7 @@ public sealed partial class DashboardViewModel : ViewModel
     {
         if (IsBusy) return; // guard against overlapping runs (e.g. double-click)
         IsBusy = true;
+        StatusMessage = null;
         try
         {
             var (holdings, realized) = await Task.Run(() => (_analyticsService.GetHoldings(), _analyticsService.GetRealized()));
@@ -70,6 +80,13 @@ public sealed partial class DashboardViewModel : ViewModel
             // happen back on the UI thread.
             Holdings = holdings;
             Realized = realized;
+        }
+        catch (Exception ex)
+        {
+            // Leave any previously-loaded Holdings/Realized as-is rather than blanking them —
+            // surface the failure via StatusMessage so the view doesn't just look like "no data".
+            _logger.LogError(ex, "Dashboard refresh failed");
+            StatusMessage = $"Failed to refresh: {ex.Message}";
         }
         finally
         {

@@ -38,6 +38,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -63,8 +64,15 @@
                      IsIndeterminate="True"
                      Visibility="{Binding IsBusy, Converter={conv:BoolToVisibilityConverter}}"/>
 
+        <TextBlock Grid.Row="2"
+                   Text="{Binding StatusMessage}"
+                   Margin="0,0,0,8"
+                   FontStyle="Italic"
+                   Foreground="OrangeRed"
+                   Visibility="{Binding StatusMessage, Converter={conv:StringToVisibilityConverter}}"/>
+
         <!-- Summary tiles -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
@@ -112,7 +120,7 @@
         </Grid>
 
         <!-- Breakdown tables -->
-        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="4,0,4,8">
 
                 <TextBlock Text="Holdings by Game" Style="{StaticResource BreakdownHeaderStyle}"/>

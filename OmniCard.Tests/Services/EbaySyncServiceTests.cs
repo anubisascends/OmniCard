@@ -39,7 +39,7 @@ public class EbaySyncServiceTests : IDisposable
 
     private IDbContextFactory<OmniCardDbContext> CreateDbFactory() => new TestDbContextFactory(_options);
 
-    private static int SeedLot(OmniCardDbContext ctx, string name = "Test Card")
+    private static int SeedLot(OmniCardDbContext ctx, string name = "Test Card", int quantity = 1)
     {
         var product = new Product
         {
@@ -50,7 +50,7 @@ public class EbaySyncServiceTests : IDisposable
         ctx.Products.Add(product);
         ctx.SaveChanges();
 
-        var lot = new InventoryLot { ProductId = product.Id, Quantity = 1 };
+        var lot = new InventoryLot { ProductId = product.Id, Quantity = quantity };
         ctx.Lots.Add(lot);
         ctx.SaveChanges();
         return lot.Id;
@@ -136,6 +136,68 @@ public class EbaySyncServiceTests : IDisposable
         Assert.Equal(1, realized.TotalSold);
         Assert.Equal(10.00m, realized.TotalProceeds);
         Assert.Equal(4.00m, realized.TotalCost);
+    }
+
+    [Fact]
+    public async Task SyncAllActiveAsync_QtyTwoLot_DecrementsInsteadOfRemoving()
+    {
+        // A lot with quantity 2 should survive a single eBay sale with its quantity reduced to 1,
+        // rather than being deleted outright — only the sold unit is decremented off the lot.
+        var dbFactory = CreateDbFactory();
+        int lotId;
+        using (var ctx = dbFactory.CreateDbContext())
+        {
+            lotId = SeedLot(ctx, "Multi-Qty Card", quantity: 2);
+            ctx.EbayListings.Add(new EbayListing
+            {
+                LotId = lotId, EbayItemId = "ebay-sold-qty2",
+                Status = EbayListingStatus.Active, ListedPrice = 15m,
+            });
+            ctx.SaveChanges();
+        }
+
+        var ordersJson = JsonSerializer.Serialize(new
+        {
+            orders = new[]
+            {
+                new
+                {
+                    orderId = "order-1",
+                    buyer = new { username = "buyerqty2" },
+                    lineItems = new[]
+                    {
+                        new { legacyItemId = "ebay-sold-qty2", total = new { value = "15.00", currency = "USD" } }
+                    },
+                }
+            }
+        });
+
+        var factory = new FakeHttpClientFactory(new FakeHttpHandler(HttpStatusCode.OK, ordersJson));
+        var authService = new FakeEbayAuthService("test-token");
+
+        var svc = new EbaySyncService(
+            Options.Create(_settings),
+            factory,
+            authService,
+            dbFactory,
+            NullLogger<EbaySyncService>.Instance);
+
+        var synced = await svc.SyncAllActiveAsync();
+        Assert.Equal(1, synced);
+
+        using var verifyCtx = dbFactory.CreateDbContext();
+
+        // The lot survives with its remaining quantity — it is not removed just because one
+        // unit sold on eBay.
+        var lot = verifyCtx.Lots.Find(lotId);
+        Assert.NotNull(lot);
+        Assert.Equal(1, lot!.Quantity);
+
+        // Exactly one Sell movement (qty 1) was seeded for the sale.
+        var sellMovement = Assert.Single(verifyCtx.Movements.Where(m => m.LotId == lotId && m.Type == MovementType.Sell));
+        Assert.Equal(1, sellMovement.Quantity);
+        Assert.Equal(15.00m, sellMovement.UnitValue);
+        Assert.Equal("ebay-sold-qty2", sellMovement.Note);
     }
 
     [Fact]

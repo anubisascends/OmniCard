@@ -107,10 +107,12 @@ public class EbaySyncService : IEbaySyncService
     /// <summary>
     /// Records the sale as a <see cref="MovementType.Sell"/> inventory movement against the lot's
     /// product, so eBay sales show up in the same movement history as manual sells/acquisitions,
-    /// then removes the sold lot from holdings so it stops counting toward the collection (a sold
-    /// card is no longer held). The eBay item id is stamped on the movement's <c>Note</c> because
-    /// removing the lot cascade-deletes the (now Sold) <see cref="EbayListing"/> row, and the
-    /// movement is the only durable record of the sale afterward.
+    /// then decrements the sold quantity (1 unit) off the lot. Once the lot's quantity is exhausted
+    /// it is removed from holdings so it stops counting toward the collection (a sold card is no
+    /// longer held); a multi-quantity lot survives with its remaining quantity intact. The eBay
+    /// item id is stamped on the movement's <c>Note</c> because removing the lot (when it happens)
+    /// cascade-deletes the (now Sold) <see cref="EbayListing"/> row, and the movement is the only
+    /// durable record of the sale afterward.
     /// Best-effort: if the lot has already been removed (e.g. by an earlier sync, or removed from
     /// the collection before the sale synced), this silently does nothing rather than fail the
     /// whole sync — that also guards against double-seeding a Sell movement on re-sync, since once
@@ -132,10 +134,14 @@ public class EbaySyncService : IEbaySyncService
             Note = ebayItemId,
         });
 
-        // Remove the sold lot last: the movement above already captured everything needed for
-        // P&L (proceeds via UnitValue, provenance via Note) by scalar value, not FK, so it
-        // survives this same SaveChanges even though the lot row is being deleted.
-        ctx.Lots.Remove(lot);
+        // Decrement the sold unit off the lot last: the movement above already captured
+        // everything needed for P&L (proceeds via UnitValue, provenance via Note) by scalar
+        // value, not FK, so it survives this same SaveChanges even if the lot row is deleted
+        // below. Only remove the lot once its quantity is exhausted — a qty>1 lot (e.g. a
+        // multi-copy lot with only one unit listed/sold on eBay) keeps its remaining units.
+        lot.Quantity -= 1;
+        if (lot.Quantity <= 0)
+            ctx.Lots.Remove(lot);
     }
 
     private async Task<Dictionary<string, SaleInfo>> FetchSoldItemIdsAsync(string token)
