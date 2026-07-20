@@ -1209,9 +1209,11 @@ public sealed class CardService : ICardService
             "Color" => cards.Where(c => c.Color != null).Select(c => c.Color!),
             "CardType" => cards.Where(c => c.CardType != null).Select(c => c.CardType!),
             "SetName" => cards.Select(c => c.SetName),
+            "SetCode" => cards.Select(c => c.SetCode),
             "Rarity" => cards.Select(c => c.Rarity),
             "Condition" => cards.Select(c => c.Condition),
             "IsFoil" => cards.Select(c => c.IsFoil ? "True" : "False"),
+            "Section" => cards.Where(c => c.Section != null).Select(c => c.Section!),
             _ => Enumerable.Empty<string>().AsQueryable()
         };
 
@@ -1479,7 +1481,8 @@ public sealed class CardService : ICardService
             return cards.OrderBy(c => c.Name);
 
         // If no sort level uses CustomOrder, we can sort entirely in SQL
-        if (preset.SortLevels.All(l => l.CustomOrder is null))
+        // An empty CustomOrder ([]) is equivalent to no custom order: sort by natural field value.
+        if (preset.SortLevels.All(l => l.CustomOrder is not { Count: > 0 }))
             return ApplySortPresetInSql(cards, preset.SortLevels);
 
         // Custom orders require in-memory sorting since SQLite can't do CASE WHEN with parameter lists
@@ -1488,8 +1491,8 @@ public sealed class CardService : ICardService
         IOrderedEnumerable<CollectionCard>? ordered = null;
         foreach (var level in preset.SortLevels)
         {
-            Func<CollectionCard, object> keySelector = level.CustomOrder is not null
-                ? c => GetCustomOrderIndex(GetFieldValue(c, level.Field), level.CustomOrder)
+            Func<CollectionCard, object> keySelector = level.CustomOrder is { Count: > 0 } customOrder
+                ? c => GetCustomOrderIndex(GetFieldValue(c, level.Field), customOrder)
                 : c => GetFieldValue(c, level.Field);
 
             if (ordered is null)
@@ -1527,6 +1530,12 @@ public sealed class CardService : ICardService
                 "PurchasePrice" => c => c.PurchasePrice ?? 0m,
                 "DateAdded" => c => c.DateAdded,
                 "Number" => c => c.Number,
+                "Section" => c => c.Section ?? "",
+                "Page" => c => c.Page ?? 0,
+                "Slot" => c => c.Slot ?? 0,
+                "IsMissing" => c => c.IsMissing,
+                // MarketPrice and Quantity are not DB columns; they are sorted in-memory
+                // after materialization (see CollectionViewModel), so fall back to Name here.
                 _ => c => c.Name
             };
 
@@ -1561,8 +1570,13 @@ public sealed class CardService : ICardService
             "IsFoil" => card.IsFoil.ToString(),
             "PurchasePrice" => card.PurchasePrice?.ToString("0000000000.00") ?? "",
             "MarketPrice" => card.MarketPrice.ToString("0000000000.00"),
+            "Quantity" => card.Quantity.ToString("0000000000"),
             "DateAdded" => card.DateAdded.ToString("o"),
             "Number" => card.Number,
+            "Section" => card.Section ?? "",
+            "Page" => (card.Page ?? 0).ToString("0000000000"),
+            "Slot" => (card.Slot ?? 0).ToString("0000000000"),
+            "IsMissing" => card.IsMissing.ToString(),
             _ => ""
         };
     }

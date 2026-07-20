@@ -80,6 +80,49 @@ public class CollectionSortFilterTests : IDisposable
         new NullScanDiagnosticService(),
         new NullAuditService());
 
+    [Theory]
+    [InlineData("SetCode")]
+    [InlineData("Number")]
+    [InlineData("Section")]
+    [InlineData("Page")]
+    [InlineData("Slot")]
+    [InlineData("IsMissing")]
+    public void SearchCollection_NewSortableField_TranslatesWithoutError(string field)
+    {
+        // Guards EF translation of newly-exposed sortable fields over the projected query
+        // (unstacked SQL path) and the in-memory path (stacked).
+        var sort = new SortPreset { Name = "t", Game = CardGame.Mtg, SortLevels = [new SortLevel { Field = field, Direction = SortDirection.Descending }] };
+
+        var unstacked = new ObservableCollection<CollectionCard>();
+        CreateService().SearchCollection("", CardGame.Mtg, null, sort, null, false, unstacked);
+        Assert.Equal(8, unstacked.Count);
+
+        var stacked = new ObservableCollection<CollectionCard>();
+        CreateService().SearchCollection("", CardGame.Mtg, null, sort, null, true, stacked);
+        Assert.Equal(8, stacked.Count);
+    }
+
+    [Fact]
+    public void SearchCollection_EmptyCustomOrder_SortsByNaturalFieldValue()
+    {
+        // An empty CustomOrder array ([]) must be treated as "no custom order" and fall
+        // back to natural field ordering — not nullify the sort level. Regression: presets
+        // saved with CustomOrder=[] (e.g. the user's "Sort by Price") stopped sorting.
+        var sort = new SortPreset
+        {
+            Name = "Name (empty custom order)",
+            Game = CardGame.Mtg,
+            SortLevels = [new SortLevel { Field = "Name", Direction = SortDirection.Ascending, CustomOrder = [] }]
+        };
+
+        var results = new ObservableCollection<CollectionCard>();
+        CreateService().SearchCollection("", CardGame.Mtg, null, sort, null, results);
+
+        Assert.Equal("Azorius Charm", results[0].Name);
+        Assert.Equal("Counterspell", results[1].Name);
+        Assert.Equal("Wrath of God", results[^1].Name);
+    }
+
     [Fact]
     public void SearchCollection_WithSortPreset_CustomColorOrder()
     {

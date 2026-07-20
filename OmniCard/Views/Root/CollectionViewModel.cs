@@ -474,13 +474,18 @@ public sealed partial class CollectionViewModel : ViewModel
                 var priceCache = FetchBatchPrices(results);
                 HydrateMissingImageUris(results);
 
-                // Re-sort by MarketPrice in-memory since it's not available at DB query time
-                if (sortPreset?.SortLevels.Any(l => l.Field == "MarketPrice") == true)
+                // MarketPrice and Quantity are not DB columns (fetched/computed after the
+                // query), so the DB sort can't order by them. When the primary sort level is
+                // one of these derived fields, re-sort the materialized page in-memory.
+                var primaryLevel = sortPreset?.SortLevels.FirstOrDefault();
+                if (primaryLevel is { Field: "MarketPrice" or "Quantity" })
                 {
-                    var level = sortPreset.SortLevels.First(l => l.Field == "MarketPrice");
-                    var sorted = level.Direction == SortDirection.Ascending
-                        ? results.OrderBy(c => c.MarketPrice)
-                        : results.OrderByDescending(c => c.MarketPrice);
+                    Func<CollectionCard, object> key = primaryLevel.Field == "MarketPrice"
+                        ? c => c.MarketPrice
+                        : c => c.Quantity;
+                    var sorted = primaryLevel.Direction == SortDirection.Ascending
+                        ? results.OrderBy(key)
+                        : results.OrderByDescending(key);
                     results = new ObservableCollection<CollectionCard>(sorted);
                 }
 
