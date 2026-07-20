@@ -22,7 +22,7 @@ public partial class RootView : IView<RootViewModel>, IHostedService
 
         CollectionTab.ViewModel = viewModel;
         CollectionTab.WireUp(viewModel.Collection);
-        CollectionTab.WireUpSealed(viewModel.Sealed);
+        CollectionTab.WireUpInventory(viewModel.Inventory);
         ScannerTab.ViewModel = viewModel;
         ScannerTab.WireUpAutoScroll();
 
@@ -36,10 +36,6 @@ public partial class RootView : IView<RootViewModel>, IHostedService
         {
             MainTabControl.SelectedIndex = MainTabControl.Items.IndexOf(tabItemScanner);
             ScannerTab.FocusManualSearchBox();
-        };
-        viewModel.Sealed.LaunchScanner = () =>
-        {
-            MainTabControl.SelectedIndex = MainTabControl.Items.IndexOf(tabItemScanner);
         };
         ViewModel.SelectAllInActiveTab = () =>
         {

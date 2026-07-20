@@ -17,11 +17,11 @@ public interface IDialogService
     void ShowDataLocation();
     int? PickCoverArt(int containerId, string containerName);
     MoveToLocationResult? PickMoveToLocation();
-    SealedProductTemplate? EditSealedProductTemplate(SealedProductTemplate? existing);
-    List<SealedProductInstance>? OpenSealedProductEntry();
-    List<SealedProductInstance>? CrackSealedProduct(SealedProductInstance instance);
     void ShowAuditReport(AuditReport report);
     bool? OpenEbayListingDialog(CollectionCard card);
     bool? OpenManualAdd(StorageContainer? defaultContainer = null);
     void ShowDecklistCheck();
+    Product? EditProduct(Product? existing);
+    (int Quantity, decimal? UnitCost, int? LocationId, string? Source, DateTime AcquisitionDate)? AddLotDialog(int productId);
+    bool OpenUnitsDialog(Product product);
 }

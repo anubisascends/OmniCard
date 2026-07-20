@@ -1,0 +1,83 @@
+<Window x:Class="OmniCard.Views.Inventory.ProductEditorView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:OmniCard.Views.Inventory"
+        xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Title="{Binding ViewModel.Title}" Height="440" Width="450"
+        Background="{DynamicResource MaterialDesign.Brush.Background}"
+        TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="13"
+        FontFamily="{StaticResource AppFont}">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="1*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Text="Game:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+            <ComboBox Grid.Column="1" Margin="0,4"
+                      ItemsSource="{Binding ViewModel.AllGames}"
+                      SelectedItem="{Binding ViewModel.Game}"/>
+
+            <TextBlock Grid.Row="1" Text="Category:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+            <ComboBox Grid.Row="1" Grid.Column="1" Margin="0,4"
+                      ItemsSource="{Binding ViewModel.AllCategories}"
+                      SelectedItem="{Binding ViewModel.Category}"/>
+
+            <TextBlock Grid.Row="2" Text="Name:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+            <TextBox Grid.Row="2" Grid.Column="1" Margin="0,4"
+                     Text="{Binding ViewModel.Name, UpdateSourceTrigger=PropertyChanged}"/>
+
+            <TextBlock Grid.Row="3" Text="Set Code:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+            <TextBox Grid.Row="3" Grid.Column="1" Margin="0,4"
+                     Text="{Binding ViewModel.SetCode, UpdateSourceTrigger=PropertyChanged}"/>
+
+            <TextBlock Grid.Row="4" Text="UPC:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+            <TextBox Grid.Row="4" Grid.Column="1" Margin="0,4"
+                     Text="{Binding ViewModel.Upc, UpdateSourceTrigger=PropertyChanged}"/>
+
+            <TextBlock Grid.Row="5" Text="Market Price $:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+            <TextBox Grid.Row="5" Grid.Column="1" Margin="0,4"
+                     Text="{Binding ViewModel.MarketPrice, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}"/>
+
+            <TextBlock Grid.Row="6" Text="Image URI:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+            <TextBox Grid.Row="6" Grid.Column="1" Margin="0,4"
+                     Text="{Binding ViewModel.ImageUri, UpdateSourceTrigger=PropertyChanged}"/>
+        </Grid>
+
+        <TextBlock Grid.Row="1" Text="{Binding ViewModel.ValidationMessage}"
+                   Foreground="Red" Margin="0,4,0,0"
+                   Visibility="{Binding ViewModel.ValidationMessage, Converter={conv:NullToVisibilityConverter}}"/>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Cancel" Command="{Binding ViewModel.CancelCommand}"
+                    IsCancel="True" Padding="16,6" Margin="0,0,8,0"/>
+            <Button Content="Save" Command="{Binding ViewModel.SaveCommand}"
+                    IsDefault="True" Padding="16,6" FontWeight="SemiBold"/>
+        </StackPanel>
+    </Grid>
+</Window>

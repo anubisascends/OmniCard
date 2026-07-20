@@ -1,5 +1,6 @@
 using System.Windows.Controls;
 using OmniCard.Models;
+using OmniCard.Views.Inventory;
 
 namespace OmniCard.Views.Root;
 
@@ -17,15 +18,15 @@ public partial class CollectionTabView : UserControl
         CardList.WireUp(vm);
     }
 
+    public void WireUpInventory(InventoryViewModel vm)
+    {
+        InventoryList.WireUp(vm);
+    }
+
     public void FocusSearchBox()
     {
         CollectionSearchBox.Focus();
         CollectionSearchBox.SelectAll();
-    }
-
-    public void WireUpSealed(SealedProductViewModel vm)
-    {
-        SealedList.WireUp(vm);
     }
 
     public void SelectAll() => CardList.SelectAll();

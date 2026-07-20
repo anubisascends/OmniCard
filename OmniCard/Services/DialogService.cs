@@ -12,12 +12,12 @@ using OmniCard.Views.EbayAuth;
 using OmniCard.Views.SetFilterBuilder;
 using OmniCard.Views.SortFilterBuilder;
 using OmniCard.Views.MoveToLocation;
-using OmniCard.Views.SealedProductEditor;
 using OmniCard.Views.AuditReport;
 using OmniCard.Views.StorageManager;
 using OmniCard.Views.EbayListing;
 using OmniCard.Views.ManualAdd;
 using OmniCard.Views.DecklistCheck;
+using OmniCard.Views.Inventory;
 
 namespace OmniCard.Services;
 
@@ -146,35 +146,6 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         return result == true ? wnd.ViewModel.Result : null;
     }
 
-    public SealedProductTemplate? EditSealedProductTemplate(SealedProductTemplate? existing)
-    {
-        var wnd = Services.GetRequiredService<SealedProductTemplateEditorView>();
-        SetOwner(wnd);
-        wnd.ViewModel.Load(existing);
-        var result = wnd.ShowDialog();
-        return result == true ? wnd.ViewModel.Result : null;
-    }
-
-    public List<SealedProductInstance>? OpenSealedProductEntry()
-    {
-        var wnd = Services.GetRequiredService<SealedProductEntryView>();
-        SetOwner(wnd);
-        wnd.ViewModel.Load();
-        var result = wnd.ShowDialog();
-        return result == true ? wnd.ViewModel.Result : null;
-    }
-
-    public List<SealedProductInstance>? CrackSealedProduct(SealedProductInstance instance)
-    {
-        var sealedProductService = Services.GetRequiredService<ISealedProductService>();
-        var fullInstance = sealedProductService.GetInstanceWithContents(instance.Id) ?? instance;
-        var wnd = Services.GetRequiredService<CrackProductView>();
-        SetOwner(wnd);
-        wnd.ViewModel.Load(fullInstance);
-        var result = wnd.ShowDialog();
-        return result == true ? wnd.ViewModel.Result : null;
-    }
-
     public void ShowAuditReport(AuditReport report)
     {
         var wnd = Services.GetRequiredService<AuditReportView>();
@@ -204,5 +175,32 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         var wnd = Services.GetRequiredService<DecklistCheckView>();
         SetOwner(wnd);
         wnd.ShowDialog();
+    }
+
+    public Product? EditProduct(Product? existing)
+    {
+        var wnd = Services.GetRequiredService<ProductEditorView>();
+        SetOwner(wnd);
+        wnd.ViewModel.Load(existing);
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.Result : null;
+    }
+
+    public (int Quantity, decimal? UnitCost, int? LocationId, string? Source, DateTime AcquisitionDate)? AddLotDialog(int productId)
+    {
+        var wnd = Services.GetRequiredService<AddLotView>();
+        SetOwner(wnd);
+        wnd.ViewModel.Load(productId);
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.Result : null;
+    }
+
+    public bool OpenUnitsDialog(Product product)
+    {
+        var wnd = Services.GetRequiredService<OpenUnitsView>();
+        SetOwner(wnd);
+        wnd.ViewModel.Load(product);
+        var result = wnd.ShowDialog();
+        return result == true && wnd.ViewModel.WasOpened;
     }
 }

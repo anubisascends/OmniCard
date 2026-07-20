@@ -1,8 +1,8 @@
-namespace OmniCard.Views.SealedProductEditor;
+namespace OmniCard.Views.Inventory;
 
-public partial class CrackProductView : IView<CrackProductViewModel>
+public partial class ProductEditorView : IView<ProductEditorViewModel>
 {
-    public CrackProductView(CrackProductViewModel viewModel)
+    public ProductEditorView(ProductEditorViewModel viewModel)
     {
         InitializeComponent();
         ViewModel = viewModel;
@@ -14,7 +14,7 @@ public partial class CrackProductView : IView<CrackProductViewModel>
         DataContext = this;
     }
 
-    public CrackProductViewModel ViewModel { get; }
+    public ProductEditorViewModel ViewModel { get; }
 
     IViewModel IView.ViewModel => ViewModel;
 }
