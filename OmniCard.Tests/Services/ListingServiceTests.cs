@@ -50,6 +50,41 @@ public class ListingServiceTests : IDisposable
         }
     }
 
+    [Fact]
+    public void GetPickList_ProjectsSetCode()
+    {
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            var p = new Product
+            {
+                Game = CardGame.Mtg,
+                Category = ProductCategory.Single,
+                Name = "Sazh Katzroy",
+                SetCode = "FIN",
+                SetName = "Final Fantasy",
+            };
+            ctx.Products.Add(p);
+            ctx.SaveChanges();
+            var lot = new InventoryLot { ProductId = p.Id, Quantity = 1, LocationId = null };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            ctx.Listings.Add(new Listing
+            {
+                LotId = lot.Id,
+                Channel = SalesChannel.Manual,
+                Status = ListingStatus.Listed,
+                ListedPrice = 1m,
+                Quantity = 1,
+                ListedAt = new DateTime(2026, 1, 1),
+            });
+            ctx.SaveChanges();
+        }
+
+        var entry = Assert.Single(CreateService().GetPickList(CardGame.Mtg));
+        Assert.Equal("FIN", entry.SetCode);
+        Assert.Equal("Final Fantasy", entry.SetName);
+    }
+
     private static (int lotId, int locId) SeedLot(DbContextOptions<OmniCardDbContext> opts, int? locationId = 7)
     {
         using var ctx = new OmniCardDbContext(opts);

@@ -146,6 +146,7 @@ public class ListingService(
                 lot.Id,
                 p.Name,
                 p.SetName ?? "",
+                p.SetCode ?? "",
                 lot.Condition,
                 p.Foil,
                 sc != null ? sc.Name : "(unassigned)",

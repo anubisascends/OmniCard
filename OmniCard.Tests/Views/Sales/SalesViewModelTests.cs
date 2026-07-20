@@ -12,7 +12,7 @@ public class SalesViewModelTests
         new() { Id = id, Name = name, ContainerType = ContainerType.Binder };
 
     private static PickListEntry Entry(int lotId) =>
-        new(lotId, "Card Name", "Set Name", "NM", false, "Binder A", null, null, null, 1.00m, 1);
+        new(lotId, "Card Name", "Set Name", "SET", "NM", false, "Binder A", null, null, null, 1.00m, 1);
 
     [Fact]
     public async Task Load_PopulatesLocationsAndPickList_AndSelectsSavedForSaleLocation()

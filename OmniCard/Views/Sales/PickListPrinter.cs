@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Media;
 using OmniCard.Models;
 
 namespace OmniCard.Views.Sales;
@@ -13,30 +14,64 @@ public static class PickListPrinter
         var dialog = new PrintDialog();
         if (dialog.ShowDialog() != true) return;
 
-        var doc = new FlowDocument { PagePadding = new Thickness(40), ColumnWidth = double.PositiveInfinity };
-        doc.Blocks.Add(new Paragraph(new Run($"Pick List ({entries.Count} cards)")) { FontSize = 16, FontWeight = FontWeights.Bold });
+        var doc = new FlowDocument
+        {
+            PagePadding = new Thickness(40),
+            ColumnWidth = double.PositiveInfinity,
+            FontFamily = new FontFamily("Segoe UI"),
+        };
 
-        var table = new Table();
-        for (int i = 0; i < 5; i++) table.Columns.Add(new TableColumn());
-        var group = new TableRowGroup();
-        AddRow(group, "Location", "Slot", "Name", "Set", "Price", bold: true);
-        foreach (var e in entries)
-            AddRow(group, $"{e.LocationName} {e.Section}", $"{e.Page}/{e.Slot}", e.Name, e.SetName, e.ListedPrice.ToString("C"));
-        table.RowGroups.Add(group);
-        doc.Blocks.Add(table);
+        doc.Blocks.Add(new Paragraph(
+            new Run($"Pick List ({entries.Count} {(entries.Count == 1 ? "card" : "cards")})"))
+        {
+            FontSize = 16,
+            FontWeight = FontWeights.Bold,
+            Margin = new Thickness(0, 0, 0, 12),
+        });
+
+        foreach (var entry in entries)
+        {
+            // Line 1: [checkbox]  Card Name (SET)
+            var titleLine = new Paragraph { Margin = new Thickness(0, 0, 0, 0) };
+            titleLine.Inlines.Add(new InlineUIContainer(
+                new Border
+                {
+                    Width = 13,
+                    Height = 13,
+                    BorderBrush = Brushes.Black,
+                    BorderThickness = new Thickness(1),
+                })
+            {
+                BaselineAlignment = BaselineAlignment.Center,
+            });
+            var title = string.IsNullOrWhiteSpace(entry.SetCode)
+                ? entry.Name
+                : $"{entry.Name} ({entry.SetCode})";
+            titleLine.Inlines.Add(new Run("  " + title) { FontSize = 13, FontWeight = FontWeights.SemiBold });
+            doc.Blocks.Add(titleLine);
+
+            // Line 2 (indented): Location Name      Section/Page/Slot (omit what's absent)
+            var position = FormatPosition(entry);
+            var locationText = string.IsNullOrWhiteSpace(position)
+                ? entry.LocationName
+                : $"{entry.LocationName}      {position}";
+            doc.Blocks.Add(new Paragraph(new Run(locationText) { FontSize = 11 })
+            {
+                Margin = new Thickness(26, 1, 0, 10),
+                Foreground = Brushes.DimGray,
+            });
+        }
 
         dialog.PrintDocument(((IDocumentPaginatorSource)doc).DocumentPaginator, "Pick List");
     }
 
-    private static void AddRow(TableRowGroup group, string a, string b, string c, string d, string e, bool bold = false)
+    /// <summary>Compact "where in the location" string, skipping any absent parts.</summary>
+    private static string FormatPosition(PickListEntry entry)
     {
-        var row = new TableRow();
-        foreach (var text in new[] { a, b, c, d, e })
-        {
-            var p = new Paragraph(new Run(text));
-            if (bold) p.FontWeight = FontWeights.Bold;
-            row.Cells.Add(new TableCell(p));
-        }
-        group.Rows.Add(row);
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(entry.Section)) parts.Add(entry.Section!);
+        if (entry.Page is int page) parts.Add($"Pg {page}");
+        if (entry.Slot is int slot) parts.Add($"Slot {slot}");
+        return string.Join("   ", parts);
     }
 }

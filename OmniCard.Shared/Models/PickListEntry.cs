@@ -4,6 +4,7 @@ public record PickListEntry(
     int LotId,
     string Name,
     string SetName,
+    string SetCode,
     string? Condition,
     bool IsFoil,
     string LocationName,
