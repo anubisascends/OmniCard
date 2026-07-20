@@ -95,12 +95,31 @@ public partial class OrdersViewModel(
     public void SetStatus(OrderStatus status)
     {
         if (SelectedOrder is null) return;
+        if (!IsValidTransition(SelectedOrder.Status, status))
+        {
+            StatusMessage = $"Can't mark {status} from {SelectedOrder.Status}.";
+            return;
+        }
         orderService.SetStatus(SelectedOrder.Id, status);
         var id = SelectedOrder.Id;
         Load();
         SelectedOrder = Orders.FirstOrDefault(o => o.Id == id);
         StatusMessage = $"Order marked {status}.";
     }
+
+    /// <summary>Enforces a forward-only order status flow so inventory/sale accounting
+    /// (which only runs on the Open/Packed → Shipped transition) can't be skipped by
+    /// jumping straight to Completed, and so Shipped/Completed orders can't be cancelled
+    /// (no restock support).</summary>
+    private static bool IsValidTransition(OrderStatus from, OrderStatus to) => to switch
+    {
+        OrderStatus.Packed => from is OrderStatus.Open,
+        OrderStatus.Shipped => from is OrderStatus.Open or OrderStatus.Packed,
+        OrderStatus.Completed => from is OrderStatus.Shipped,
+        OrderStatus.Cancelled => from is OrderStatus.Open or OrderStatus.Packed,
+        OrderStatus.Open => false,
+        _ => false,
+    };
 
     private void RefreshLines()
     {

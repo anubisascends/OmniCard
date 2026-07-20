@@ -441,6 +441,58 @@ public class ListingServiceTests : IDisposable
     }
 
     [Fact]
+    public void GetActiveListings_ExcludesLotOnOpenOrderLine()
+    {
+        var (lotId, _) = SeedLot(_opts);
+        var svc = CreateService();
+        svc.ListForSale([lotId], SalesChannel.Manual, 2m, 1);
+
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            var order = new Order { CustomerId = 1, Status = OrderStatus.Open, OrderNumber = "ORD-1" };
+            ctx.Orders.Add(order);
+            ctx.SaveChanges();
+            ctx.OrderLines.Add(new OrderLine
+            {
+                OrderId = order.Id,
+                LotId = lotId,
+                NameSnapshot = "Sol Ring",
+                Quantity = 1,
+                UnitSalePrice = 2m,
+            });
+            ctx.SaveChanges();
+        }
+
+        Assert.DoesNotContain(svc.GetActiveListings(), x => x.LotId == lotId);
+    }
+
+    [Fact]
+    public void GetActiveListings_IncludesLotOnCancelledOrderLine()
+    {
+        var (lotId, _) = SeedLot(_opts);
+        var svc = CreateService();
+        svc.ListForSale([lotId], SalesChannel.Manual, 2m, 1);
+
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            var order = new Order { CustomerId = 1, Status = OrderStatus.Cancelled, OrderNumber = "ORD-2" };
+            ctx.Orders.Add(order);
+            ctx.SaveChanges();
+            ctx.OrderLines.Add(new OrderLine
+            {
+                OrderId = order.Id,
+                LotId = lotId,
+                NameSnapshot = "Sol Ring",
+                Quantity = 1,
+                UnitSalePrice = 2m,
+            });
+            ctx.SaveChanges();
+        }
+
+        Assert.Contains(svc.GetActiveListings(), x => x.LotId == lotId);
+    }
+
+    [Fact]
     public void MarkSold_SetsListingSoldWithOrderLine()
     {
         var lotId = SeedLot(_opts).lotId;

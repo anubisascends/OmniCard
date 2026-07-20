@@ -173,6 +173,20 @@ public class ListingService(
     public List<ActiveListing> GetActiveListings(CardGame? game = null)
     {
         using var ctx = dbContextFactory.CreateDbContext();
+
+        // A lot already sitting on an active (Open/Packed) order's line is "committed" and
+        // must not be offered again in the picker — otherwise it could be added to a second
+        // order, and the second ship would silently drop it. Cancelled orders free the lot;
+        // Shipped/Completed orders already flip the listing to Sold (excluded by
+        // ActiveStatuses below), so only Open/Packed need to be excluded here.
+        var committedLotIds = (
+            from line in ctx.OrderLines.AsNoTracking()
+            join order in ctx.Orders.AsNoTracking() on line.OrderId equals order.Id
+            where line.LotId != null
+                  && (order.Status == OrderStatus.Open || order.Status == OrderStatus.Packed)
+            select line.LotId!.Value
+        ).ToHashSet();
+
         var query =
             from listing in ctx.Listings.AsNoTracking()
             where ActiveStatuses.Contains(listing.Status)
@@ -189,7 +203,7 @@ public class ListingService(
                 p.Foil,
                 listing.ListedPrice,
                 listing.Status);
-        return query.ToList();
+        return query.ToList().Where(a => !committedLotIds.Contains(a.LotId)).ToList();
     }
 
     public void MarkSold(int lotId, int orderLineId)

@@ -174,6 +174,37 @@ public class OrdersViewModelTests
     }
 
     [Fact]
+    public void SetStatus_Completed_OnOpenOrder_DoesNotCallService_AndSetsStatusMessage()
+    {
+        var vm = MakeVm(out var orderService, out _, out _);
+        var order = NewOrder(1, 1, OrderStatus.Open);
+        orderService.Setup(s => s.GetLines(1)).Returns([]);
+
+        vm.SelectedOrder = order;
+        vm.SetStatus(OrderStatus.Completed);
+
+        orderService.Verify(s => s.SetStatus(It.IsAny<int>(), It.IsAny<OrderStatus>()), Times.Never);
+        Assert.Equal("Can't mark Completed from Open.", vm.StatusMessage);
+    }
+
+    [Fact]
+    public void SetStatus_Shipped_OnOpenOrder_CallsService()
+    {
+        var vm = MakeVm(out var orderService, out var customerService, out var listingService);
+        var order = NewOrder(1, 1, OrderStatus.Open);
+
+        customerService.Setup(s => s.GetAll()).Returns([]);
+        listingService.Setup(s => s.GetActiveListings(null)).Returns([]);
+        orderService.Setup(s => s.GetOrders()).Returns([NewOrder(1, 1, OrderStatus.Shipped)]);
+        orderService.Setup(s => s.GetLines(1)).Returns([]);
+
+        vm.SelectedOrder = order;
+        vm.SetStatus(OrderStatus.Shipped);
+
+        orderService.Verify(s => s.SetStatus(1, OrderStatus.Shipped), Times.Once);
+    }
+
+    [Fact]
     public void SaveOrder_WithSelectedOrder_CallsUpdateOrder()
     {
         var vm = MakeVm(out var orderService, out _, out _);
