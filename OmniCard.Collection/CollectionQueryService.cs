@@ -6,7 +6,7 @@ using OmniCard.Models;
 namespace OmniCard.Collection;
 
 public sealed class CollectionQueryService(
-    IDbContextFactory<CollectionDbContext> dbContextFactory,
+    IDbContextFactory<OmniCardDbContext> dbContextFactory,
     IStorageContainerService containerService,
     ICardService cardService) : ICollectionQueryService
 {
@@ -16,7 +16,20 @@ public sealed class CollectionQueryService(
         {
             var containers = containerService.GetAll();
             using var context = dbContextFactory.CreateDbContext();
-            IQueryable<CollectionCard> cardsQuery = context.Cards.AsNoTracking();
+            IQueryable<CollectionCard> cardsQuery =
+                from l in context.Lots.AsNoTracking()
+                join p in context.Products.AsNoTracking() on l.ProductId equals p.Id
+                where p.Category == ProductCategory.Single
+                select new CollectionCard
+                {
+                    Id = l.Id,
+                    Game = p.Game,
+                    GameCardId = p.GameCardId ?? "",
+                    IsFoil = p.Foil,
+                    ImageUri = p.ImageUri,
+                    PurchasePrice = l.UnitCost,
+                    ContainerId = l.LocationId,
+                };
 
             if (gameFilter.HasValue)
                 cardsQuery = cardsQuery.Where(c => c.Game == gameFilter.Value);

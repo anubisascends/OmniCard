@@ -96,6 +96,7 @@ public sealed class WebCardService : ICardService
     public (int FlagResolutions, int MismatchLogs, int DiagnosticEvents) ClearDiagnosticLogs() => throw new NotSupportedException();
     public (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null) => throw new NotSupportedException();
     public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section) => throw new NotSupportedException();
+    public int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates) => throw new NotSupportedException();
     public ulong ComputeHashFromStream(Stream stream) => throw new NotSupportedException();
     public ulong ComputeEdgeHashFromStream(Stream stream) => throw new NotSupportedException();
     public (CardMatch? Match, CardGame Game) FindBestMatch(ulong hash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, ulong? scanEdgeHash = null) => throw new NotSupportedException();

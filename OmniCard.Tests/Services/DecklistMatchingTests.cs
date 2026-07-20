@@ -11,16 +11,16 @@ namespace OmniCard.Tests.Services;
 public class DecklistMatchingTests : IDisposable
 {
     private readonly SqliteConnection _connection;
-    private readonly IDbContextFactory<CollectionDbContext> _dbFactory;
+    private readonly IDbContextFactory<OmniCardDbContext> _dbFactory;
 
     public DecklistMatchingTests()
     {
         _connection = new SqliteConnection("Data Source=:memory:");
         _connection.Open();
-        var options = new DbContextOptionsBuilder<CollectionDbContext>()
+        var options = new DbContextOptionsBuilder<OmniCardDbContext>()
             .UseSqlite(_connection)
             .Options;
-        _dbFactory = new TestCollectionDbFactory(options);
+        _dbFactory = new TestOmniDbFactory(options);
         using var ctx = _dbFactory.CreateDbContext();
         ctx.Database.EnsureCreated();
 
@@ -44,13 +44,21 @@ public class DecklistMatchingTests : IDisposable
         int? page = null, int? slot = null, string? section = null, bool isFoil = false)
     {
         using var ctx = _dbFactory.CreateDbContext();
-        ctx.Cards.Add(new CollectionCard
+        var product = new Product
         {
             Game = CardGame.Mtg, GameCardId = Guid.NewGuid().ToString(),
-            Name = name, SetCode = setCode, Number = number,
+            Category = ProductCategory.Single,
+            Name = name, SetCode = setCode, CollectorNumber = number,
             SetName = setCode, Rarity = "common",
-            ContainerId = containerId, Page = page, Slot = slot, Section = section,
-            IsFoil = isFoil,
+            Foil = isFoil,
+        };
+        ctx.Products.Add(product);
+        ctx.SaveChanges();
+
+        ctx.Lots.Add(new InventoryLot
+        {
+            ProductId = product.Id, Condition = "NM",
+            LocationId = containerId, Page = page, Slot = slot, Section = section,
         });
         ctx.SaveChanges();
     }
@@ -144,10 +152,10 @@ public class DecklistMatchingTests : IDisposable
         Assert.True(owned.Locations[0].IsExactSetMatch);
     }
 
-    private class TestCollectionDbFactory(DbContextOptions<CollectionDbContext> options)
-        : IDbContextFactory<CollectionDbContext>
+    private class TestOmniDbFactory(DbContextOptions<OmniCardDbContext> options)
+        : IDbContextFactory<OmniCardDbContext>
     {
-        public CollectionDbContext CreateDbContext() => new(options);
+        public OmniCardDbContext CreateDbContext() => new(options);
     }
 
     private class StubCardService : ICardService
@@ -187,6 +195,7 @@ public class DecklistMatchingTests : IDisposable
         public (int FlagResolutions, int MismatchLogs, int DiagnosticEvents) ClearDiagnosticLogs() => (0, 0, 0);
         public (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null) => (0, 0);
         public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section) { }
+        public int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates) => 0;
         public ulong ComputeHashFromStream(System.IO.Stream stream) => 0;
         public ulong ComputeEdgeHashFromStream(System.IO.Stream stream) => 0;
         public IOcrMatchingService OcrService => null!;

@@ -27,7 +27,7 @@ if (string.IsNullOrWhiteSpace(dataDir))
     return 1;
 }
 
-var dbPath = Path.Combine(dataDir, "collection.db");
+var dbPath = Path.Combine(dataDir, "inventory.db");
 if (!File.Exists(dbPath))
 {
     Console.Error.WriteLine($"Error: Database not found at {dbPath}");
@@ -42,7 +42,7 @@ builder.Services.AddControllers();
 builder.Services.AddHttpClient();
 
 // Database contexts
-builder.Services.AddDbContextFactory<CollectionDbContext>(options =>
+builder.Services.AddDbContextFactory<OmniCardDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath};Mode=ReadOnly"));
 builder.Services.AddDbContextFactory<ScryfallDbContext>(options =>
     options.UseSqlite($"Data Source={Path.Combine(dataDir, "scryfall.db")};Mode=ReadOnly"));

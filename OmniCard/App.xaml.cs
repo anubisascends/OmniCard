@@ -93,8 +93,6 @@ public partial class App : Application
             // MTG (Scryfall)
             services.AddDbContextFactory<ScryfallDbContext>(options =>
                 options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "scryfall.db")}"));
-            services.AddDbContextFactory<CollectionDbContext>(options =>
-                options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "collection.db")}"));
             services.AddSingleton<SetSymbolCache>();
             services.AddSingleton<ICardGameService, ScryfallService>();
             services.AddSingleton<IScryfallService>(sp => (ScryfallService)sp.GetRequiredService<IEnumerable<ICardGameService>>().First(s => s.Game == Models.CardGame.Mtg));
@@ -105,8 +103,8 @@ public partial class App : Application
             services.AddSingleton<ICardGameService, OptcgService>();
             services.AddSingleton<Services.PriceUpdateService>();
 
-            // Inventory (unified product model)
-            services.AddDbContextFactory<InventoryDbContext>(options =>
+            // Inventory (unified product model) — now the app-wide OmniCardDbContext
+            services.AddDbContextFactory<OmniCardDbContext>(options =>
                 options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "inventory.db")}"));
             services.AddSingleton<IInventoryService, InventoryService>();
 
@@ -224,7 +222,6 @@ public partial class App : Application
             }
         }
 
-        var collectionDbFactory = Host.Services.GetRequiredService<IDbContextFactory<CollectionDbContext>>();
         var loggerFactory = Host.Services.GetRequiredService<ILoggerFactory>();
         var migrationLogger = loggerFactory.CreateLogger("CollectionMigration");
 
@@ -232,40 +229,41 @@ public partial class App : Application
         await Task.Run(() =>
         {
             splash.SetStatus("Running database migrations...");
-            CollectionMigrationService.MigrateIfNeeded(dataDir, collectionDbFactory, migrationLogger);
-
-            // Ensure ScanImagePath column exists (added in v0.3)
-            EnsureScanImagePathColumn(dataDir, collectionDbFactory, migrationLogger);
-
-            // Ensure StorageContainer schema (added in v0.4)
-            EnsureStorageContainerSchema(dataDir, collectionDbFactory, migrationLogger);
 
             // Ensure HashCorrections table in game databases (added in v0.5)
             EnsureHashCorrectionsInGameDbs(dataDir, migrationLogger);
 
-            // Ensure Color/CardType columns on Cards table (added for sort/filter)
-            EnsureColorCardTypeColumns(dataDir, collectionDbFactory, migrationLogger);
-
-            // Ensure CoverCardId column on StorageContainers (added for collection redesign)
-            EnsureCoverCardIdColumn(dataDir, collectionDbFactory, migrationLogger);
-
-            // Ensure ExcludeFromDeckCheck column on StorageContainers
-            EnsureExcludeFromDeckCheckColumn(dataDir, collectionDbFactory, migrationLogger);
-
-            // Ensure EbayListings table (added for eBay listing integration)
-            EnsureEbayListingsTable(dataDir, migrationLogger);
-
-            // Repair legacy One Piece set codes written by the pre-swap OPTCG data source
-            CollectionMigrationService.RepairOptcgSetCodes(dataDir, collectionDbFactory, migrationLogger);
+            // Ensure the unified store's schema is complete on a pre-existing inventory.db
+            // (EnsureCreated() below only creates tables/columns for a brand-new database file).
+            UnifiedMigrationService.EnsureUnifiedSchema(dataDir, migrationLogger);
 
             splash.SetStatus("Initializing databases...");
-            using (var invCtx = Host.Services.GetRequiredService<IDbContextFactory<InventoryDbContext>>().CreateDbContext())
+            var unifiedFactory = Host.Services.GetRequiredService<IDbContextFactory<OmniCardDbContext>>();
+            using (var invCtx = unifiedFactory.CreateDbContext())
                 invCtx.Database.EnsureCreated();
 
-            splash.SetStatus("Loading collection data...");
-            // Backfill Color/CardType for existing cards
-            var gameServices = Host.Services.GetRequiredService<IEnumerable<ICardGameService>>();
-            BackfillColorCardType(collectionDbFactory, gameServices, migrationLogger);
+            // One-time migration of collection.db's singles into the unified Product/Lot store.
+            // Guarded by the MigrationState "UnifiedDataMigration" DB marker, so this is a no-op
+            // on every launch after the first successful run. collection.db is read raw (no
+            // CollectionDbContext) and is left untouched on disk afterwards for rollback.
+            //
+            // Guarded (not awaited-and-thrown): this reads a legacy collection.db whose schema this
+            // build doesn't fully control (older releases can be missing a since-added column), and
+            // it runs unguarded inside this background Task.Run. An uncaught exception here used to
+            // crash startup outright — and because the migration transaction rolls back on failure,
+            // the DB marker never gets written, so every subsequent launch hit the exact same crash
+            // (a permanent brick). The transaction's rollback already leaves the unified store
+            // consistent on failure; logging and continuing just means the migration retries on the
+            // next launch instead of bricking this one.
+            splash.SetStatus("Migrating collection data...");
+            try
+            {
+                UnifiedMigrationService.MigrateDataIfNeeded(dataDir, unifiedFactory, migrationLogger);
+            }
+            catch (Exception ex)
+            {
+                migrationLogger.LogError(ex, "Unified data migration failed; continuing startup without it (will retry on next launch)");
+            }
 
             splash.SetStatus("Preparing scan cache...");
             Directory.CreateDirectory(DataPathServiceInstance.ScansDirectory);
@@ -311,44 +309,6 @@ public partial class App : Application
         splash.Close();
     }
 
-    private static void EnsureScanImagePathColumn(
-        string dataDirectory,
-        IDbContextFactory<CollectionDbContext> factory,
-        Microsoft.Extensions.Logging.ILogger logger)
-    {
-        var dbPath = Path.Combine(dataDirectory, "collection.db");
-        if (!File.Exists(dbPath))
-            return;
-
-        using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath}");
-        conn.Open();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Cards') WHERE name = 'ScanImagePath'";
-        var exists = cmd.ExecuteScalar() is long count && count > 0;
-
-        if (!exists)
-        {
-            cmd.CommandText = "ALTER TABLE Cards ADD COLUMN ScanImagePath TEXT";
-            cmd.ExecuteNonQuery();
-            logger.LogInformation("Added ScanImagePath column to Cards table");
-        }
-    }
-
-    internal static void EnsureStorageContainerSchema(
-        string dataDirectory,
-        IDbContextFactory<CollectionDbContext> factory,
-        Microsoft.Extensions.Logging.ILogger logger)
-    {
-        var dbPath = Path.Combine(dataDirectory, "collection.db");
-        if (!File.Exists(dbPath))
-            return;
-
-        using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath}");
-        conn.Open();
-        EnsureStorageContainerSchema(conn);
-        logger.LogInformation("Storage container schema migration complete");
-    }
-
     internal static void EnsureHashCorrectionsTable(Microsoft.Data.Sqlite.SqliteConnection conn)
     {
         using var cmd = conn.CreateCommand();
@@ -379,232 +339,6 @@ public partial class App : Application
             conn.Open();
             EnsureHashCorrectionsTable(conn);
             logger.LogInformation("HashCorrections table ensured in {Database}", dbName);
-        }
-    }
-
-    internal static void EnsureStorageContainerSchema(Microsoft.Data.Sqlite.SqliteConnection conn)
-    {
-        using var cmd = conn.CreateCommand();
-
-        // 1. Create StorageContainers table
-        cmd.CommandText = """
-            CREATE TABLE IF NOT EXISTS StorageContainers (
-                Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                Name TEXT NOT NULL UNIQUE,
-                ContainerType TEXT NOT NULL,
-                IsSystem INTEGER NOT NULL DEFAULT 0,
-                SortOrder INTEGER NOT NULL DEFAULT 0
-            )
-            """;
-        cmd.ExecuteNonQuery();
-
-        // 2. Seed Bulk container
-        cmd.CommandText = "INSERT OR IGNORE INTO StorageContainers (Name, ContainerType, IsSystem, SortOrder) VALUES ('Bulk', 'Bulk', 1, 0)";
-        cmd.ExecuteNonQuery();
-
-        // 3. Add columns to Cards table
-        foreach (var col in new[] { ("ContainerId", "INTEGER"), ("Page", "INTEGER"), ("Slot", "INTEGER"), ("Section", "TEXT") })
-        {
-            cmd.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('Cards') WHERE name = '{col.Item1}'";
-            if ((long)cmd.ExecuteScalar()! == 0)
-            {
-                cmd.CommandText = $"ALTER TABLE Cards ADD COLUMN {col.Item1} {col.Item2}";
-                cmd.ExecuteNonQuery();
-            }
-        }
-
-        // 4. Default existing cards to Bulk
-        cmd.CommandText = "UPDATE Cards SET ContainerId = (SELECT Id FROM StorageContainers WHERE IsSystem = 1) WHERE ContainerId IS NULL";
-        cmd.ExecuteNonQuery();
-    }
-
-    internal static void EnsureColorCardTypeColumns(Microsoft.Data.Sqlite.SqliteConnection conn)
-    {
-        using var cmd = conn.CreateCommand();
-        foreach (var col in new[] { "Color", "CardType" })
-        {
-            cmd.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('Cards') WHERE name = '{col}'";
-            if ((long)cmd.ExecuteScalar()! == 0)
-            {
-                cmd.CommandText = $"ALTER TABLE Cards ADD COLUMN {col} TEXT";
-                cmd.ExecuteNonQuery();
-            }
-        }
-
-        cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_Cards_Color ON Cards(Color)";
-        cmd.ExecuteNonQuery();
-        cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_Cards_CardType ON Cards(CardType)";
-        cmd.ExecuteNonQuery();
-    }
-
-    internal static void EnsureCoverCardIdColumn(Microsoft.Data.Sqlite.SqliteConnection conn)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('StorageContainers') WHERE name = 'CoverCardId'";
-        if ((long)cmd.ExecuteScalar()! == 0)
-        {
-            cmd.CommandText = "ALTER TABLE StorageContainers ADD COLUMN CoverCardId INTEGER";
-            cmd.ExecuteNonQuery();
-        }
-    }
-
-    private static void EnsureColorCardTypeColumns(
-        string dataDirectory,
-        IDbContextFactory<CollectionDbContext> factory,
-        Microsoft.Extensions.Logging.ILogger logger)
-    {
-        var dbPath = Path.Combine(dataDirectory, "collection.db");
-        if (!File.Exists(dbPath))
-            return;
-
-        using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath}");
-        conn.Open();
-        EnsureColorCardTypeColumns(conn);
-        logger.LogInformation("Color/CardType column migration complete");
-    }
-
-    private static void EnsureCoverCardIdColumn(
-        string dataDirectory,
-        IDbContextFactory<CollectionDbContext> factory,
-        Microsoft.Extensions.Logging.ILogger logger)
-    {
-        var dbPath = Path.Combine(dataDirectory, "collection.db");
-        if (!File.Exists(dbPath))
-            return;
-
-        using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath}");
-        conn.Open();
-        EnsureCoverCardIdColumn(conn);
-        logger.LogInformation("Added CoverCardId column to StorageContainers table");
-    }
-
-    internal static void EnsureExcludeFromDeckCheckColumn(Microsoft.Data.Sqlite.SqliteConnection conn)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('StorageContainers') WHERE name = 'ExcludeFromDeckCheck'";
-        if ((long)cmd.ExecuteScalar()! == 0)
-        {
-            cmd.CommandText = "ALTER TABLE StorageContainers ADD COLUMN ExcludeFromDeckCheck INTEGER NOT NULL DEFAULT 0";
-            cmd.ExecuteNonQuery();
-        }
-    }
-
-    private static void EnsureExcludeFromDeckCheckColumn(
-        string dataDirectory,
-        IDbContextFactory<CollectionDbContext> factory,
-        Microsoft.Extensions.Logging.ILogger logger)
-    {
-        var dbPath = Path.Combine(dataDirectory, "collection.db");
-        if (!File.Exists(dbPath))
-            return;
-
-        using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath}");
-        conn.Open();
-        EnsureExcludeFromDeckCheckColumn(conn);
-        logger.LogInformation("ExcludeFromDeckCheck column migration complete");
-    }
-
-    private static void EnsureEbayListingsTable(
-        string dataDirectory,
-        Microsoft.Extensions.Logging.ILogger logger)
-    {
-        var dbPath = Path.Combine(dataDirectory, "collection.db");
-        if (!File.Exists(dbPath))
-            return;
-
-        using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath}");
-        conn.Open();
-        using var cmd = conn.CreateCommand();
-
-        // Check if table exists
-        cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='EbayListings'";
-        var exists = cmd.ExecuteScalar() is long count && count > 0;
-
-        if (!exists)
-        {
-            cmd.CommandText = """
-                CREATE TABLE EbayListings (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    CollectionCardId INTEGER NOT NULL UNIQUE,
-                    EbayItemId TEXT NOT NULL DEFAULT '',
-                    EbayCatalogProductId TEXT,
-                    Status TEXT NOT NULL DEFAULT 'Draft',
-                    ListingType TEXT NOT NULL DEFAULT 'FixedPrice',
-                    ListedPrice REAL NOT NULL DEFAULT 0,
-                    SoldPrice REAL,
-                    StartTime TEXT,
-                    EndTime TEXT,
-                    AuctionDuration INTEGER,
-                    BuyerUsername TEXT,
-                    LastSyncedAt TEXT,
-                    CreatedAt TEXT NOT NULL,
-                    ErrorMessage TEXT,
-                    FOREIGN KEY (CollectionCardId) REFERENCES Cards(Id) ON DELETE CASCADE
-                )
-                """;
-            cmd.ExecuteNonQuery();
-
-            cmd.CommandText = "CREATE INDEX IX_EbayListings_Status ON EbayListings(Status)";
-            cmd.ExecuteNonQuery();
-
-            cmd.CommandText = "CREATE INDEX IX_EbayListings_EbayItemId ON EbayListings(EbayItemId)";
-            cmd.ExecuteNonQuery();
-
-            logger.LogInformation("Created EbayListings table");
-        }
-    }
-
-    private static void BackfillColorCardType(
-        IDbContextFactory<CollectionDbContext> collectionFactory,
-        IEnumerable<ICardGameService> gameServices,
-        Microsoft.Extensions.Logging.ILogger logger)
-    {
-        using var ctx = collectionFactory.CreateDbContext();
-
-        // On first run the collection DB may not have the Cards table yet
-        // (it gets created later by CardService). Skip backfill in that case.
-        try
-        {
-            if (!ctx.Database.GetAppliedMigrations().Any() && !ctx.Database.CanConnect())
-                return;
-        }
-        catch { /* CanConnect may throw if DB is brand new */ }
-
-        List<CollectionCard> cardsToFill;
-        try
-        {
-            cardsToFill = ctx.Cards.Where(c => c.Color == null || c.CardType == null).ToList();
-        }
-        catch (Microsoft.Data.Sqlite.SqliteException)
-        {
-            // Table doesn't exist yet — nothing to backfill
-            return;
-        }
-        if (cardsToFill.Count == 0)
-            return;
-
-        var services = gameServices.ToDictionary(s => s.Game);
-        var filled = 0;
-
-        foreach (var card in cardsToFill)
-        {
-            if (!services.TryGetValue(card.Game, out var gameService))
-                continue;
-
-            var sourceCard = gameService.FindCardById(card.GameCardId);
-            if (sourceCard is null)
-                continue;
-
-            var match = new CardMatch { Source = sourceCard };
-            card.Color ??= CardAttributeExtractor.ExtractColor(match, card.Game);
-            card.CardType ??= CardAttributeExtractor.ExtractCardType(match, card.Game);
-            filled++;
-        }
-
-        if (filled > 0)
-        {
-            ctx.SaveChanges();
-            logger.LogInformation("Backfilled Color/CardType for {Count} cards", filled);
         }
     }
 

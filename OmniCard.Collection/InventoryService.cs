@@ -5,7 +5,7 @@ using OmniCard.Models;
 
 namespace OmniCard.Collection;
 
-public class InventoryService(IDbContextFactory<InventoryDbContext> dbContextFactory) : IInventoryService
+public class InventoryService(IDbContextFactory<OmniCardDbContext> dbContextFactory) : IInventoryService
 {
     public List<Product> GetProducts(CardGame? game = null, ProductCategory? category = null)
     {
@@ -103,6 +103,11 @@ public class InventoryService(IDbContextFactory<InventoryDbContext> dbContextFac
         using var ctx = dbContextFactory.CreateDbContext();
         var lot = ctx.Lots.Find(lotId);
         if (lot is null) return;
+
+        // Explicit cleanup, defense-in-depth: see CardService.DeleteCollectionCard for rationale
+        // (a dev db renamed in place from an older schema may not enforce the cascade-delete FK).
+        ctx.EbayListings.RemoveRange(ctx.EbayListings.Where(l => l.LotId == lotId));
+        ctx.FlagResolutions.RemoveRange(ctx.FlagResolutions.Where(f => f.LotId == lotId));
         ctx.Lots.Remove(lot);
         ctx.SaveChanges();
     }
@@ -120,6 +125,9 @@ public class InventoryService(IDbContextFactory<InventoryDbContext> dbContextFac
 
         if (lot.Quantity <= 0)
         {
+            // Explicit cleanup, defense-in-depth: see CardService.DeleteCollectionCard for rationale.
+            ctx.EbayListings.RemoveRange(ctx.EbayListings.Where(l => l.LotId == lotId));
+            ctx.FlagResolutions.RemoveRange(ctx.FlagResolutions.Where(f => f.LotId == lotId));
             ctx.Lots.Remove(lot);
         }
 

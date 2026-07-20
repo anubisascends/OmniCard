@@ -13,44 +13,66 @@ namespace OmniCard.Tests.Services;
 
 public class CollectionSortFilterTests : IDisposable
 {
-    private readonly SqliteConnection _connection;
-    private readonly DbContextOptions<CollectionDbContext> _options;
+    private readonly SqliteConnection _omniConnection;
+    private readonly DbContextOptions<OmniCardDbContext> _omniOptions;
 
     public CollectionSortFilterTests()
     {
-        _connection = new SqliteConnection("Data Source=:memory:");
-        _connection.Open();
-        _options = new DbContextOptionsBuilder<CollectionDbContext>()
-            .UseSqlite(_connection)
+        _omniConnection = new SqliteConnection("Data Source=:memory:");
+        _omniConnection.Open();
+        _omniOptions = new DbContextOptionsBuilder<OmniCardDbContext>()
+            .UseSqlite(_omniConnection)
             .Options;
-        using var ctx = new CollectionDbContext(_options);
-        ctx.Database.EnsureCreated();
-        SeedCards(ctx);
+        using var omniCtx = new OmniCardDbContext(_omniOptions);
+        omniCtx.Database.EnsureCreated();
+        SeedCards(omniCtx);
     }
 
-    public void Dispose() => _connection.Dispose();
-
-    private static void SeedCards(CollectionDbContext ctx)
+    public void Dispose()
     {
-        ctx.Cards.AddRange(
-            new CollectionCard { Game = CardGame.Mtg, GameCardId = "1", Name = "Wrath of God", Color = "W", CardType = "Sorcery", SetCode = "lea", SetName = "Alpha", Rarity = "Rare" },
-            new CollectionCard { Game = CardGame.Mtg, GameCardId = "2", Name = "Counterspell", Color = "U", CardType = "Instant", SetCode = "lea", SetName = "Alpha", Rarity = "Uncommon" },
-            new CollectionCard { Game = CardGame.Mtg, GameCardId = "3", Name = "Dark Ritual", Color = "B", CardType = "Instant", SetCode = "lea", SetName = "Alpha", Rarity = "Common" },
-            new CollectionCard { Game = CardGame.Mtg, GameCardId = "4", Name = "Lightning Bolt", Color = "R", CardType = "Instant", SetCode = "lea", SetName = "Alpha", Rarity = "Common" },
-            new CollectionCard { Game = CardGame.Mtg, GameCardId = "5", Name = "Llanowar Elves", Color = "G", CardType = "Creature", SetCode = "lea", SetName = "Alpha", Rarity = "Common" },
-            new CollectionCard { Game = CardGame.Mtg, GameCardId = "6", Name = "Sol Ring", Color = "Colorless", CardType = "Artifact", SetCode = "lea", SetName = "Alpha", Rarity = "Uncommon" },
-            new CollectionCard { Game = CardGame.Mtg, GameCardId = "7", Name = "Azorius Charm", Color = "WU", CardType = "Instant", SetCode = "rtr", SetName = "RTR", Rarity = "Uncommon" },
-            new CollectionCard { Game = CardGame.Mtg, GameCardId = "8", Name = "Unknown Card", SetCode = "", SetName = "", Rarity = "", FlagReason = FlagReason.MissingFromDatabase }
-        );
+        _omniConnection.Dispose();
+    }
+
+    private static void SeedCards(OmniCardDbContext ctx)
+    {
+        SeedCard(ctx, "1", "Wrath of God", "W", "Sorcery", "lea", "Alpha", "Rare");
+        SeedCard(ctx, "2", "Counterspell", "U", "Instant", "lea", "Alpha", "Uncommon");
+        SeedCard(ctx, "3", "Dark Ritual", "B", "Instant", "lea", "Alpha", "Common");
+        SeedCard(ctx, "4", "Lightning Bolt", "R", "Instant", "lea", "Alpha", "Common");
+        SeedCard(ctx, "5", "Llanowar Elves", "G", "Creature", "lea", "Alpha", "Common");
+        SeedCard(ctx, "6", "Sol Ring", "Colorless", "Artifact", "lea", "Alpha", "Uncommon");
+        SeedCard(ctx, "7", "Azorius Charm", "WU", "Instant", "rtr", "RTR", "Uncommon");
+        SeedCard(ctx, "8", "Unknown Card", null, null, "", "", "", flagReason: FlagReason.MissingFromDatabase);
+    }
+
+    private static void SeedCard(OmniCardDbContext ctx, string gameCardId, string name, string? color, string? cardType,
+        string setCode, string setName, string rarity, FlagReason? flagReason = null)
+    {
+        var product = new Product
+        {
+            Game = CardGame.Mtg,
+            Category = ProductCategory.Single,
+            GameCardId = gameCardId,
+            Name = name,
+            Color = color,
+            CardType = cardType,
+            SetCode = setCode,
+            SetName = setName,
+            Rarity = rarity,
+        };
+        ctx.Products.Add(product);
+        ctx.SaveChanges();
+
+        ctx.Lots.Add(new InventoryLot { ProductId = product.Id, FlagReason = flagReason });
         ctx.SaveChanges();
     }
 
-    private IDbContextFactory<CollectionDbContext> CreateFactory() => new MockFactory(_options);
+    private IDbContextFactory<OmniCardDbContext> CreateOmniFactory() => new MockOmniFactory(_omniOptions);
 
     private CardService CreateService() => new(
         new StubHashService(),
         [],
-        CreateFactory(),
+        CreateOmniFactory(),
         new StubOcrService(),
         new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
         NullLogger<CardService>.Instance,
@@ -284,9 +306,9 @@ public class CollectionSortFilterTests : IDisposable
         public int GetEventCount() => 0;
     }
 
-    private class MockFactory(DbContextOptions<CollectionDbContext> options) : IDbContextFactory<CollectionDbContext>
+    private class MockOmniFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
-        public CollectionDbContext CreateDbContext() => new(options);
+        public OmniCardDbContext CreateDbContext() => new(options);
     }
 
     private class NullAuditService : IAuditService

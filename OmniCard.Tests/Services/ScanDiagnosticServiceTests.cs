@@ -12,16 +12,16 @@ namespace OmniCard.Tests.Services;
 public class ScanDiagnosticServiceTests : IDisposable
 {
     private readonly SqliteConnection _connection;
-    private readonly DbContextOptions<CollectionDbContext> _options;
+    private readonly DbContextOptions<OmniCardDbContext> _options;
 
     public ScanDiagnosticServiceTests()
     {
         _connection = new SqliteConnection("Data Source=:memory:");
         _connection.Open();
-        _options = new DbContextOptionsBuilder<CollectionDbContext>()
+        _options = new DbContextOptionsBuilder<OmniCardDbContext>()
             .UseSqlite(_connection)
             .Options;
-        using var ctx = new CollectionDbContext(_options);
+        using var ctx = new OmniCardDbContext(_options);
         ctx.Database.EnsureCreated();
     }
 
@@ -57,7 +57,7 @@ public class ScanDiagnosticServiceTests : IDisposable
 
         Assert.Equal(1, service.GetEventCount());
 
-        using var ctx = new CollectionDbContext(_options);
+        using var ctx = new OmniCardDbContext(_options);
         var evt = ctx.ScanDiagnosticEvents.Single();
         Assert.Equal("ScanCompleted", evt.EventType);
         Assert.Equal("session-1", evt.SessionId);
@@ -93,7 +93,7 @@ public class ScanDiagnosticServiceTests : IDisposable
         var newMatch = new CardMatch { Name = "Bolt", SetCode = "2xm", CollectorNumber = "141", GameSpecificId = "def-456", Confidence = 100 };
         service.LogUserCorrected(0xAAAA, card, newMatch);
 
-        using var ctx = new CollectionDbContext(_options);
+        using var ctx = new OmniCardDbContext(_options);
         var evt = ctx.ScanDiagnosticEvents.Where(e => e.EventType == "UserCorrected").Single();
         var payload = JsonDocument.Parse(evt.Payload);
         Assert.True(payload.RootElement.GetProperty("wasInTieZone").GetBoolean());
@@ -117,7 +117,7 @@ public class ScanDiagnosticServiceTests : IDisposable
         var newMatch = new CardMatch { Name = "Other Card", SetCode = "leg", GameSpecificId = "xyz-999", Confidence = 100 };
         service.LogUserCorrected(0xBBBB, card, newMatch);
 
-        using var ctx = new CollectionDbContext(_options);
+        using var ctx = new OmniCardDbContext(_options);
         var evt = ctx.ScanDiagnosticEvents.Where(e => e.EventType == "UserCorrected").Single();
         var payload = JsonDocument.Parse(evt.Payload);
         Assert.False(payload.RootElement.GetProperty("wasInTieZone").GetBoolean());
@@ -147,7 +147,7 @@ public class ScanDiagnosticServiceTests : IDisposable
         service.LogScanCompleted("s1", 0xCCCC, card.Match, null, null, null, FlagReason.None);
         service.LogUserFlagged(0xCCCC, card);
 
-        using var ctx = new CollectionDbContext(_options);
+        using var ctx = new OmniCardDbContext(_options);
         var evt = ctx.ScanDiagnosticEvents.Where(e => e.EventType == "UserFlagged").Single();
         var payload = JsonDocument.Parse(evt.Payload);
         Assert.Equal("Manual", payload.RootElement.GetProperty("flagReason").GetString());
@@ -163,8 +163,8 @@ public class ScanDiagnosticServiceTests : IDisposable
         Assert.Equal(1, service.GetEventCount());
     }
 
-    private class MockFactory(DbContextOptions<CollectionDbContext> options) : IDbContextFactory<CollectionDbContext>
+    private class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
-        public CollectionDbContext CreateDbContext() => new(options);
+        public OmniCardDbContext CreateDbContext() => new(options);
     }
 }

@@ -6,7 +6,7 @@ using OmniCard.Models;
 namespace OmniCard.Collection;
 
 public sealed class MismatchLogService(
-    IDbContextFactory<CollectionDbContext> dbContextFactory) : IMismatchLogService
+    IDbContextFactory<OmniCardDbContext> dbContextFactory) : IMismatchLogService
 {
     public async Task LogMismatchAsync(CardMatch oldMatch, CardMatch newMatch, ScannedCard scannedCard)
     {

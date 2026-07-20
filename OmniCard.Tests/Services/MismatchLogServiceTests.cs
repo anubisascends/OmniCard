@@ -9,13 +9,13 @@ namespace OmniCard.Tests.Services;
 public class MismatchLogServiceTests : IDisposable
 {
     private readonly SqliteConnection _connection;
-    private readonly IDbContextFactory<CollectionDbContext> _factory;
+    private readonly IDbContextFactory<OmniCardDbContext> _factory;
 
     public MismatchLogServiceTests()
     {
         _connection = new SqliteConnection("Data Source=:memory:");
         _connection.Open();
-        var options = new DbContextOptionsBuilder<CollectionDbContext>()
+        var options = new DbContextOptionsBuilder<OmniCardDbContext>()
             .UseSqlite(_connection).Options;
         _factory = new TestDbContextFactory(options);
         using var ctx = _factory.CreateDbContext();
@@ -122,9 +122,9 @@ public class MismatchLogServiceTests : IDisposable
         Assert.Equal("99", log.CorrectedNumber);
     }
 
-    private class TestDbContextFactory(DbContextOptions<CollectionDbContext> options)
-        : IDbContextFactory<CollectionDbContext>
+    private class TestDbContextFactory(DbContextOptions<OmniCardDbContext> options)
+        : IDbContextFactory<OmniCardDbContext>
     {
-        public CollectionDbContext CreateDbContext() => new(options);
+        public OmniCardDbContext CreateDbContext() => new(options);
     }
 }

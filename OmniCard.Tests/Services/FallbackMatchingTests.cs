@@ -13,21 +13,24 @@ namespace OmniCard.Tests.Services;
 
 public class FallbackMatchingTests : IDisposable
 {
-    private readonly SqliteConnection _collectionConnection;
-    private readonly DbContextOptions<CollectionDbContext> _collectionOptions;
+    private readonly SqliteConnection _omniConnection;
+    private readonly DbContextOptions<OmniCardDbContext> _omniOptions;
 
     public FallbackMatchingTests()
     {
-        _collectionConnection = new SqliteConnection("Data Source=:memory:");
-        _collectionConnection.Open();
-        _collectionOptions = new DbContextOptionsBuilder<CollectionDbContext>()
-            .UseSqlite(_collectionConnection)
+        _omniConnection = new SqliteConnection("Data Source=:memory:");
+        _omniConnection.Open();
+        _omniOptions = new DbContextOptionsBuilder<OmniCardDbContext>()
+            .UseSqlite(_omniConnection)
             .Options;
-        using var ctx = new CollectionDbContext(_collectionOptions);
-        ctx.Database.EnsureCreated();
+        using var omniCtx = new OmniCardDbContext(_omniOptions);
+        omniCtx.Database.EnsureCreated();
     }
 
-    public void Dispose() => _collectionConnection.Dispose();
+    public void Dispose()
+    {
+        _omniConnection.Dispose();
+    }
 
     [Fact]
     public void FindBestMatch_ReturnsNull_WhenPrimaryGameHasNoMatch()
@@ -186,11 +189,11 @@ public class FallbackMatchingTests : IDisposable
 
     private CardService CreateCardService(ICardGameService[] gameServices)
     {
-        var factory = new MockCollectionDbContextFactory(_collectionOptions);
+        var omniFactory = new MockOmniDbContextFactory(_omniOptions);
         return new CardService(
             new StubHashService(),
             gameServices,
-            factory,
+            omniFactory,
             new StubOcrService(),
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
             NullLogger<CardService>.Instance,
@@ -263,9 +266,9 @@ public class FallbackMatchingTests : IDisposable
         public int GetEventCount() => 0;
     }
 
-    private class MockCollectionDbContextFactory(DbContextOptions<CollectionDbContext> options) : IDbContextFactory<CollectionDbContext>
+    private class MockOmniDbContextFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
-        public CollectionDbContext CreateDbContext() => new(options);
+        public OmniCardDbContext CreateDbContext() => new(options);
     }
 
     private class NullAuditService : IAuditService

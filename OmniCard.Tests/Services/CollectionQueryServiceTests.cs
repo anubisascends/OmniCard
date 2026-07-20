@@ -11,13 +11,13 @@ namespace OmniCard.Tests.Services;
 public class CollectionQueryServiceTests : IDisposable
 {
     private readonly SqliteConnection _connection;
-    private readonly IDbContextFactory<CollectionDbContext> _factory;
+    private readonly IDbContextFactory<OmniCardDbContext> _factory;
 
     public CollectionQueryServiceTests()
     {
         _connection = new SqliteConnection("Data Source=:memory:");
         _connection.Open();
-        var options = new DbContextOptionsBuilder<CollectionDbContext>()
+        var options = new DbContextOptionsBuilder<OmniCardDbContext>()
             .UseSqlite(_connection).Options;
         _factory = new TestDbContextFactory(options);
         using var ctx = _factory.CreateDbContext();
@@ -68,28 +68,33 @@ public class CollectionQueryServiceTests : IDisposable
         return container;
     }
 
-    private CollectionCard SeedCard(int containerId, string gameCardId, string name,
+    /// <summary>Seeds a Product+Lot pair (the unified-store equivalent of a single CollectionCard row).
+    /// Returns the Lot, whose Id is the CollectionCard.Id replacement (used e.g. for CoverCardId).</summary>
+    private InventoryLot SeedCard(int containerId, string gameCardId, string name,
         CardGame game = CardGame.Mtg, decimal? purchasePrice = null,
         bool isFoil = false, string? imageUri = null)
     {
         using var ctx = _factory.CreateDbContext();
-        var card = new CollectionCard
+        var product = new Product
         {
             Game = game,
+            Category = ProductCategory.Single,
             GameCardId = gameCardId,
             Name = name,
             SetName = "TestSet",
             SetCode = "TST",
-            Number = "1",
+            CollectorNumber = "1",
             Rarity = "common",
-            ContainerId = containerId,
-            PurchasePrice = purchasePrice,
-            IsFoil = isFoil,
+            Foil = isFoil,
             ImageUri = imageUri,
         };
-        ctx.Cards.Add(card);
+        ctx.Products.Add(product);
         ctx.SaveChanges();
-        return card;
+
+        var lot = new InventoryLot { ProductId = product.Id, LocationId = containerId, UnitCost = purchasePrice };
+        ctx.Lots.Add(lot);
+        ctx.SaveChanges();
+        return lot;
     }
 
     [Fact]
@@ -228,9 +233,9 @@ public class CollectionQueryServiceTests : IDisposable
         Assert.NotNull(summary.CoverImageUri);
     }
 
-    private class TestDbContextFactory(DbContextOptions<CollectionDbContext> options)
-        : IDbContextFactory<CollectionDbContext>
+    private class TestDbContextFactory(DbContextOptions<OmniCardDbContext> options)
+        : IDbContextFactory<OmniCardDbContext>
     {
-        public CollectionDbContext CreateDbContext() => new(options);
+        public OmniCardDbContext CreateDbContext() => new(options);
     }
 }

@@ -9,7 +9,7 @@ using OmniCard.Models;
 namespace OmniCard.Collection;
 
 public sealed partial class DecklistService(
-    IDbContextFactory<CollectionDbContext> dbContextFactory,
+    IDbContextFactory<OmniCardDbContext> dbContextFactory,
     IHttpClientFactory httpClientFactory,
     ICardService cardService) : IDecklistService
 {
@@ -187,10 +187,21 @@ public sealed partial class DecklistService(
     public DecklistCheckResult CheckAgainstCollection(string deckName, string deckSource, List<DecklistEntry> entries)
     {
         using var ctx = dbContextFactory.CreateDbContext();
-        var allCards = ctx.Cards
-            .Include(c => c.Container)
-            .AsNoTracking()
-            .Where(c => c.Container == null || !c.Container.ExcludeFromDeckCheck)
+        var allCards =
+            (from l in ctx.Lots.AsNoTracking()
+             join p in ctx.Products.AsNoTracking() on l.ProductId equals p.Id
+             where p.Category == ProductCategory.Single
+             join sc in ctx.StorageContainers.AsNoTracking() on l.LocationId equals sc.Id into containerJoin
+             from sc in containerJoin.DefaultIfEmpty()
+             where sc == null || !sc.ExcludeFromDeckCheck
+             select new { Lot = l, Product = p, Container = sc })
+            .ToList()
+            .Select(x =>
+            {
+                var dto = CollectionCardMapper.ToDto(x.Lot, x.Product, 0m);
+                dto.Container = x.Container;
+                return dto;
+            })
             .ToList();
 
         var ownedEntries = new List<OwnedDecklistEntry>();

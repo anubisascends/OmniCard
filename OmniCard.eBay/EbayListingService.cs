@@ -16,7 +16,7 @@ public class EbayListingService : IEbayListingService
     private readonly EbaySettings _settings;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IEbayAuthService _ebayAuthService;
-    private readonly IDbContextFactory<CollectionDbContext> _dbContextFactory;
+    private readonly IDbContextFactory<OmniCardDbContext> _dbContextFactory;
     private readonly ILogger<EbayListingService> _logger;
 
     private static readonly Dictionary<string, int> ConditionMap = new()
@@ -32,7 +32,7 @@ public class EbayListingService : IEbayListingService
         IOptions<EbaySettings> settings,
         IHttpClientFactory httpClientFactory,
         IEbayAuthService ebayAuthService,
-        IDbContextFactory<CollectionDbContext> dbContextFactory,
+        IDbContextFactory<OmniCardDbContext> dbContextFactory,
         ILogger<EbayListingService> logger)
     {
         _settings = settings.Value;
@@ -151,7 +151,7 @@ public class EbayListingService : IEbayListingService
             var client = _httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var sku = $"omnicard-{listing.CollectionCardId}";
+            var sku = $"omnicard-{listing.LotId}";
             var inventoryItem = BuildInventoryItem(null, options);
             var inventoryJson = JsonSerializer.Serialize(inventoryItem);
 
@@ -195,7 +195,7 @@ public class EbayListingService : IEbayListingService
             var client = _httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var sku = $"omnicard-{listing.CollectionCardId}";
+            var sku = $"omnicard-{listing.LotId}";
 
             var response = await client.DeleteAsync(
                 $"{_settings.ApiBaseUrl}/sell/inventory/v1/inventory_item/{Uri.EscapeDataString(sku)}");
@@ -339,10 +339,10 @@ public class EbayListingService : IEbayListingService
         };
     }
 
-    private async Task SaveActiveListing(int cardId, EbayListingOptions options, string ebayItemId)
+    private async Task SaveActiveListing(int lotId, EbayListingOptions options, string ebayItemId)
     {
         using var ctx = _dbContextFactory.CreateDbContext();
-        var existing = await ctx.EbayListings.FirstOrDefaultAsync(l => l.CollectionCardId == cardId);
+        var existing = await ctx.EbayListings.FirstOrDefaultAsync(l => l.LotId == lotId);
         if (existing is not null)
         {
             existing.EbayItemId = ebayItemId;
@@ -359,7 +359,7 @@ public class EbayListingService : IEbayListingService
         {
             ctx.EbayListings.Add(new EbayListing
             {
-                CollectionCardId = cardId,
+                LotId = lotId,
                 EbayItemId = ebayItemId,
                 Status = EbayListingStatus.Active,
                 ListingType = options.ListingType,
@@ -371,12 +371,12 @@ public class EbayListingService : IEbayListingService
         await ctx.SaveChangesAsync();
     }
 
-    private async Task SaveListingError(int cardId, EbayListingOptions options, string error)
+    private async Task SaveListingError(int lotId, EbayListingOptions options, string error)
     {
         try
         {
             using var ctx = _dbContextFactory.CreateDbContext();
-            var existing = await ctx.EbayListings.FirstOrDefaultAsync(l => l.CollectionCardId == cardId);
+            var existing = await ctx.EbayListings.FirstOrDefaultAsync(l => l.LotId == lotId);
             if (existing is not null)
             {
                 existing.Status = EbayListingStatus.Error;
@@ -386,7 +386,7 @@ public class EbayListingService : IEbayListingService
             {
                 ctx.EbayListings.Add(new EbayListing
                 {
-                    CollectionCardId = cardId,
+                    LotId = lotId,
                     Status = EbayListingStatus.Error,
                     ListingType = options.ListingType,
                     ListedPrice = options.Price,
@@ -397,7 +397,7 @@ public class EbayListingService : IEbayListingService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to save listing error for card {CardId}", cardId);
+            _logger.LogWarning(ex, "Failed to save listing error for lot {LotId}", lotId);
         }
     }
 }
