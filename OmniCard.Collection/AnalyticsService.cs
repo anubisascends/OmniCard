@@ -143,21 +143,24 @@ public class AnalyticsService : IAnalyticsService
         if (filter.Since.HasValue)
             query = query.Where(m => m.Timestamp >= filter.Since.Value);
 
+        // Movements whose product was since deleted are kept (audit ledger semantics) with a
+        // placeholder name/blank game, rather than silently dropped.
         var joined = query
-            .Select(m => (Movement: m, Product: products.GetValueOrDefault(m.ProductId)))
-            .Where(x => x.Product is not null);
+            .Select(m => (Movement: m, Product: products.GetValueOrDefault(m.ProductId)));
 
         if (!string.IsNullOrWhiteSpace(filter.ProductQuery))
         {
+            // A name search naturally excludes nameless deleted-product rows.
             var q = filter.ProductQuery.Trim();
-            joined = joined.Where(x => x.Product!.Name.Contains(q, StringComparison.OrdinalIgnoreCase));
+            joined = joined.Where(x => x.Product is not null && x.Product.Name.Contains(q, StringComparison.OrdinalIgnoreCase));
         }
 
         return joined
             .OrderByDescending(x => x.Movement.Timestamp)
             .Take(filter.Take)
-            .Select(x => new MovementView(x.Movement.Timestamp, x.Movement.Type, x.Product!.Name,
-                x.Product!.Game, x.Movement.Quantity, x.Movement.UnitValue, x.Movement.Note))
+            .Select(x => new MovementView(x.Movement.Timestamp, x.Movement.Type,
+                x.Product?.Name ?? "(deleted product)",
+                x.Product?.Game, x.Movement.Quantity, x.Movement.UnitValue, x.Movement.Note))
             .ToList();
     }
 }

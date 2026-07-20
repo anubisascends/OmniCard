@@ -406,6 +406,35 @@ public class AnalyticsServiceTests : IDisposable
         Assert.Empty(results);
     }
 
+    [Fact]
+    public void GetMovements_IncludesRowsForDeletedProducts_WithPlaceholderNameAndNullGame()
+    {
+        using var ctx = new OmniCardDbContext(_options);
+        var bolt = SeedProduct(ctx, CardGame.Mtg, ProductCategory.Single, "Lightning Bolt", "bolt-1");
+        SeedMovement(ctx, bolt.Id, null, MovementType.Acquire, 4, 1.50m, new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        var deleted = SeedProduct(ctx, CardGame.OnePiece, ProductCategory.Single, "Zoro", "op-1");
+        SeedMovement(ctx, deleted.Id, null, MovementType.Sell, 1, 3.00m, new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc));
+        ctx.Products.Remove(ctx.Products.Single(p => p.Id == deleted.Id));
+        ctx.SaveChanges();
+
+        var service = CreateService();
+
+        // Unfiltered: the deleted-product row is included, not silently dropped (audit ledger).
+        var all = service.GetMovements(new MovementFilter());
+        Assert.Equal(2, all.Count);
+        Assert.Equal("(deleted product)", all[0].ProductName); // newest first: the Sell (Jun)
+        Assert.Null(all[0].Game);
+        Assert.Equal(MovementType.Sell, all[0].Type);
+        Assert.Equal("Lightning Bolt", all[1].ProductName);
+        Assert.Equal(CardGame.Mtg, all[1].Game);
+
+        // A product-name query naturally excludes the nameless deleted-product row.
+        var filtered = service.GetMovements(new MovementFilter(ProductQuery: "light"));
+        Assert.Single(filtered);
+        Assert.Equal("Lightning Bolt", filtered[0].ProductName);
+    }
+
     // --- Test doubles ---
 
     private class FakeCardGameService(CardGame game, Dictionary<(string GameCardId, bool IsFoil), decimal> prices) : ICardGameService

@@ -41,7 +41,8 @@ public sealed partial class InventoryViewModel : ViewModel
         DeleteProductCommand.NotifyCanExecuteChanged();
     }
 
-    // Header totals (from IInventoryService.GetValuation)
+    // Header totals — summed from the sealed-only rows built in LoadInventory (not
+    // IInventoryService.GetValuation, which also includes singles).
     [ObservableProperty]
     public partial int TotalUnits { get; set; }
 
@@ -66,23 +67,31 @@ public sealed partial class InventoryViewModel : ViewModel
     public void LoadInventory()
     {
         Rows.Clear();
-        foreach (var product in _inventoryService.GetProducts())
+
+        var totalUnits = 0;
+        var totalCost = 0m;
+        var totalMarket = 0m;
+
+        // The Inventory tab is scoped to sealed product (singles live in the Collection tab,
+        // which prices them via the live per-card game service rather than Product.MarketPrice).
+        foreach (var product in _inventoryService.GetProducts().Where(p => p.Category != ProductCategory.Single))
         {
             var lots = _inventoryService.GetLots(product.Id);
             var qty = lots.Sum(l => l.Quantity);
             var cost = lots.Sum(l => l.Quantity * (l.UnitCost ?? 0m));
             // Sealed products (Task 1, Phase 3) are priced via the persisted eBay-derived
-            // LastMarketPrice; singles keep the existing (manually/live-set) MarketPrice.
-            var market = qty * (product.Category == ProductCategory.Single
-                ? product.MarketPrice
-                : (product.LastMarketPrice ?? 0m));
+            // LastMarketPrice.
+            var market = qty * (product.LastMarketPrice ?? 0m);
             Rows.Add(new InventoryRow(product, qty, cost, market));
+
+            totalUnits += qty;
+            totalCost += cost;
+            totalMarket += market;
         }
 
-        var valuation = _inventoryService.GetValuation();
-        TotalUnits = valuation.TotalUnits;
-        TotalCost = valuation.TotalCost;
-        TotalMarket = valuation.TotalMarket;
+        TotalUnits = totalUnits;
+        TotalCost = totalCost;
+        TotalMarket = totalMarket;
 
         // Keep the selected row's identity across a reload, if it still exists.
         if (SelectedRow is not null)

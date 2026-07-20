@@ -61,9 +61,11 @@ public sealed partial class DataLocationViewModel(
         if (string.Equals(Path.GetFullPath(selectedPath), Path.GetFullPath(CurrentPath), StringComparison.OrdinalIgnoreCase))
             return;
 
-        // Warn if non-empty and not already a OmniCard directory
+        // Warn if non-empty and not already a OmniCard directory. The current store is
+        // inventory.db; collection.db is the legacy pre-migration name (absent once migrated).
         if (Directory.Exists(selectedPath) &&
             Directory.EnumerateFileSystemEntries(selectedPath).Any() &&
+            !File.Exists(Path.Combine(selectedPath, "inventory.db")) &&
             !File.Exists(Path.Combine(selectedPath, "collection.db")))
         {
             var result = System.Windows.MessageBox.Show(
