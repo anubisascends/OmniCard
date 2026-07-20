@@ -20,7 +20,6 @@ public sealed class CardService : ICardService
 {
     private readonly IPerceptualHashService _hashService;
     private readonly Dictionary<CardGame, ICardGameService> _gameServices;
-    private readonly IDbContextFactory<CollectionDbContext> _collectionDbContextFactory;
     private readonly IDbContextFactory<OmniCardDbContext> _omniDbContextFactory;
     private readonly IOcrMatchingService _ocrService;
     private readonly ScanImageCache _imageCache;
@@ -34,7 +33,6 @@ public sealed class CardService : ICardService
     public CardService(
         IPerceptualHashService hashService,
         IEnumerable<ICardGameService> gameServices,
-        IDbContextFactory<CollectionDbContext> collectionDbContextFactory,
         IDbContextFactory<OmniCardDbContext> omniDbContextFactory,
         IOcrMatchingService ocrService,
         ScanImageCache imageCache,
@@ -45,7 +43,6 @@ public sealed class CardService : ICardService
     {
         _hashService = hashService;
         _gameServices = gameServices.ToDictionary(s => s.Game);
-        _collectionDbContextFactory = collectionDbContextFactory;
         _omniDbContextFactory = omniDbContextFactory;
         _ocrService = ocrService;
         _imageCache = imageCache;
@@ -55,8 +52,10 @@ public sealed class CardService : ICardService
         _diagnosticService = diagnosticService;
         _auditService = auditService;
 
-        // Ensure collection DB exists
-        using var ctx = _collectionDbContextFactory.CreateDbContext();
+        // Ensure the unified store exists. Schema completeness beyond a brand-new file
+        // (missing tables/columns on a pre-existing inventory.db) is handled at startup by
+        // UnifiedMigrationService.EnsureUnifiedSchema, which runs before any service is constructed.
+        using var ctx = _omniDbContextFactory.CreateDbContext();
         var dbPath = ctx.Database.GetConnectionString();
         if (dbPath is not null)
         {
@@ -67,78 +66,7 @@ public sealed class CardService : ICardService
         }
         ctx.Database.EnsureCreated();
 
-        // Manual migration: create MismatchLogs table on existing databases
-        ctx.Database.ExecuteSqlRaw("""
-            CREATE TABLE IF NOT EXISTS "MismatchLogs" (
-                "Id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                "ScanHash" INTEGER NOT NULL,
-                "ScanImagePath" TEXT,
-                "OriginalCardId" TEXT NOT NULL DEFAULT '',
-                "OriginalName" TEXT NOT NULL DEFAULT '',
-                "OriginalSetCode" TEXT NOT NULL DEFAULT '',
-                "OriginalNumber" TEXT NOT NULL DEFAULT '',
-                "OriginalConfidence" REAL NOT NULL DEFAULT 0,
-                "CorrectedCardId" TEXT NOT NULL DEFAULT '',
-                "CorrectedName" TEXT NOT NULL DEFAULT '',
-                "CorrectedSetCode" TEXT NOT NULL DEFAULT '',
-                "CorrectedNumber" TEXT NOT NULL DEFAULT '',
-                "CreatedAt" TEXT NOT NULL DEFAULT ''
-            );
-            """);
-
-        ctx.Database.ExecuteSqlRaw("""
-            CREATE TABLE IF NOT EXISTS "FlagResolutions" (
-                "Id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                "CollectionCardId" INTEGER NOT NULL,
-                "FlagReason" TEXT NOT NULL DEFAULT '',
-                "FixType" TEXT NOT NULL DEFAULT '',
-                "OriginalData" TEXT NOT NULL DEFAULT '',
-                "ResolvedData" TEXT NOT NULL DEFAULT '',
-                "ScanHash" INTEGER NOT NULL DEFAULT 0,
-                "Confidence" REAL,
-                "FixedAt" TEXT NOT NULL DEFAULT '',
-                "CreatedAt" TEXT NOT NULL DEFAULT '',
-                FOREIGN KEY ("CollectionCardId") REFERENCES "Cards"("Id") ON DELETE CASCADE
-            );
-            """);
-
-        ctx.Database.ExecuteSqlRaw("""
-            CREATE TABLE IF NOT EXISTS "ScanDiagnosticEvents" (
-                "Id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                "SessionId" TEXT NOT NULL DEFAULT '',
-                "ScanHash" INTEGER NOT NULL DEFAULT 0,
-                "EventType" TEXT NOT NULL DEFAULT '',
-                "Timestamp" TEXT NOT NULL DEFAULT '',
-                "Payload" TEXT NOT NULL DEFAULT ''
-            );
-            """);
-
-        // Add indexes if they don't exist (safe to repeat)
-        ctx.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_ScanDiagnosticEvents_ScanHash ON ScanDiagnosticEvents(ScanHash)");
-        ctx.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_ScanDiagnosticEvents_SessionId ON ScanDiagnosticEvents(SessionId)");
-        ctx.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_ScanDiagnosticEvents_EventType ON ScanDiagnosticEvents(EventType)");
-
-        // Add IsMissing column for cards not found in card database
-        try
-        {
-            ctx.Database.ExecuteSqlRaw("ALTER TABLE Cards ADD COLUMN IsMissing INTEGER NOT NULL DEFAULT 0");
-        }
-        catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.Message.Contains("duplicate column name"))
-        {
-            // Column already exists
-        }
-
-        // Add FlagReason column for cards marked as missing from database
-        try
-        {
-            ctx.Database.ExecuteSqlRaw("ALTER TABLE Cards ADD COLUMN FlagReason TEXT");
-        }
-        catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.Message.Contains("duplicate column name"))
-        {
-            // Column already exists
-        }
-
-        _logger.LogInformation("Collection database ready at {DbPath}", dbPath);
+        _logger.LogInformation("Unified database ready at {DbPath}", dbPath);
 
         AvailableGames = _gameServices.Keys.OrderBy(g => g).ToList();
         SelectedGame = AvailableGames.FirstOrDefault();
@@ -773,13 +701,10 @@ public sealed class CardService : ICardService
 
     public (int FlagResolutions, int MismatchLogs, int DiagnosticEvents) ClearDiagnosticLogs()
     {
-        // MismatchLogs/ScanDiagnosticEvents are still written by other services against the
-        // Phase-1 CollectionDbContext. FlagResolutions, however, is now written by CommitScans
-        // against OmniCardDbContext (the Phase-1 Cards table stopped receiving rows once writes
-        // moved to Product/Lot, and FlagResolution.LotId is FK-cascaded to Cards in that legacy
-        // context under its original CollectionCardId column — inserting a LotId there would
-        // violate the FK).
-        using var context = _collectionDbContextFactory.CreateDbContext();
+        // MismatchLogs, ScanDiagnosticEvents, and FlagResolutions are all now written against
+        // the unified OmniCardDbContext (Task 6 moved MismatchLogService/ScanDiagnosticService
+        // off the Phase-1 CollectionDbContext).
+        using var context = _omniDbContextFactory.CreateDbContext();
         var mismatchCount = context.MismatchLogs.Count();
         var diagnosticCount = context.ScanDiagnosticEvents.Count();
 
@@ -787,10 +712,9 @@ public sealed class CardService : ICardService
         context.ScanDiagnosticEvents.RemoveRange(context.ScanDiagnosticEvents);
         context.SaveChanges();
 
-        using var omniContext = _omniDbContextFactory.CreateDbContext();
-        var flagCount = omniContext.FlagResolutions.Count();
-        omniContext.FlagResolutions.RemoveRange(omniContext.FlagResolutions);
-        omniContext.SaveChanges();
+        var flagCount = context.FlagResolutions.Count();
+        context.FlagResolutions.RemoveRange(context.FlagResolutions);
+        context.SaveChanges();
 
         _logger.LogInformation("Cleared diagnostic logs: {FlagResolutions} flag resolutions, {MismatchLogs} mismatch logs, {DiagnosticEvents} diagnostic events", flagCount, mismatchCount, diagnosticCount);
         return (flagCount, mismatchCount, diagnosticCount);
@@ -889,6 +813,71 @@ public sealed class CardService : ICardService
         _logger.LogInformation("Manually added {Quantity}x {Name} ({SetCode}) to collection", quantity, match.Name, match.SetCode);
     }
 
+    /// <summary>
+    /// Writes CSV-imported <see cref="CollectionCard"/> rows into the unified store as one
+    /// Product (find-or-create by Game/GameCardId/Foil) + Lot per row. Callers (CsvExportImportService)
+    /// are expected to have already resolved <c>card.ContainerId</c> (including creating any
+    /// container referenced by name in app-native imports) before calling this.
+    /// </summary>
+    public int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates)
+    {
+        using var context = _omniDbContextFactory.CreateDbContext();
+        var productCache = new Dictionary<(CardGame Game, string GameCardId, bool Foil), Product>();
+        var imported = 0;
+        var committed = new List<InventoryLot>();
+
+        foreach (var card in cards)
+        {
+            if (skipDuplicates)
+            {
+                var exists = context.Lots
+                    .Any(l => l.Product.Game == card.Game
+                        && l.Product.GameCardId == card.GameCardId
+                        && l.Product.Foil == card.IsFoil
+                        && l.Condition == card.Condition);
+                if (exists)
+                    continue;
+            }
+
+            var product = FindOrCreateProduct(context, productCache, card.Game, card.GameCardId, card.IsFoil,
+                card.Name, card.SetCode, card.SetName, card.Number, card.Rarity, card.ImageUri, card.Color, card.CardType);
+
+            var lot = new InventoryLot
+            {
+                Product = product,
+                Condition = card.Condition,
+                UnitCost = card.PurchasePrice,
+                AcquisitionDate = card.DateAdded,
+                LocationId = card.ContainerId,
+                Page = card.Page,
+                Slot = card.Slot,
+                Section = card.Section,
+            };
+
+            context.Lots.Add(lot);
+            committed.Add(lot);
+            imported++;
+        }
+
+        context.SaveChanges();
+
+        foreach (var lot in committed)
+        {
+            context.Movements.Add(new InventoryMovement
+            {
+                ProductId = lot.ProductId,
+                LotId = lot.Id,
+                Type = MovementType.Acquire,
+                Quantity = 1,
+                UnitValue = lot.UnitCost,
+            });
+        }
+        context.SaveChanges();
+
+        _logger.LogInformation("Imported {Count} cards into collection", imported);
+        return imported;
+    }
+
     public ulong ComputeHashFromStream(Stream stream) => _hashService.ComputeHash(stream);
 
     public ulong ComputeEdgeHashFromStream(Stream stream) => _hashService.ComputeEdgeHash(stream);
@@ -952,14 +941,18 @@ public sealed class CardService : ICardService
 
             // Apply sort, then paginate
             var sorted = ApplySortPreset(stackedResults.AsQueryable(), sortPreset);
-            foreach (var card in sorted.Skip(skip).Take(take))
+            var page = sorted.Skip(skip).Take(take).ToList();
+            AttachEbayListings(context, page);
+            foreach (var card in page)
                 results.Add(card);
         }
         else
         {
             // Apply sort preset (or default to Name), then paginate
             var sorted = ApplySortPreset(cards, sortPreset);
-            foreach (var card in sorted.Skip(skip).Take(take))
+            var page = sorted.Skip(skip).Take(take).ToList();
+            AttachEbayListings(context, page);
+            foreach (var card in page)
                 results.Add(card);
         }
 
@@ -1182,6 +1175,27 @@ public sealed class CardService : ICardService
             cards = ApplyScryfallFilter(cards, filterPreset.Query);
 
         return cards;
+    }
+
+    /// <summary>
+    /// Batch-loads <see cref="EbayListing"/> rows for the given (already-materialized) cards' Lot
+    /// ids and attaches each to its owning <see cref="CollectionCard"/>. A single lot has at most
+    /// one listing (unique index on LotId), so this is a dictionary lookup, not a join — avoids an
+    /// N+1 query per card for UI/editor code that reads <c>card.EbayListing?.Status</c> etc.
+    /// </summary>
+    private static void AttachEbayListings(OmniCardDbContext context, IReadOnlyCollection<CollectionCard> cards)
+    {
+        if (cards.Count == 0)
+            return;
+
+        var lotIds = cards.Select(c => c.Id).ToList();
+        var listingsByLotId = context.EbayListings
+            .AsNoTracking()
+            .Where(l => lotIds.Contains(l.LotId))
+            .ToDictionary(l => l.LotId);
+
+        foreach (var card in cards)
+            card.EbayListing = listingsByLotId.GetValueOrDefault(card.Id);
     }
 
     public List<string> GetDistinctFieldValues(string field, CardGame game)
@@ -1612,12 +1626,14 @@ public sealed class CardService : ICardService
     {
         using var context = _omniDbContextFactory.CreateDbContext();
         var ids = cardIds.ToList();
-        return context.Lots.AsNoTracking()
+        var dtos = context.Lots.AsNoTracking()
             .Include(l => l.Product)
             .Where(l => ids.Contains(l.Id) && l.Product.Category == ProductCategory.Single)
             .ToList()
             .Select(l => CollectionCardMapper.ToDto(l, l.Product, 0m))
             .ToList();
+        AttachEbayListings(context, dtos);
+        return dtos;
     }
 
     public void UpdateCollectionCard(CollectionCard card)
@@ -1640,6 +1656,12 @@ public sealed class CardService : ICardService
         if (lot is null)
             return;
 
+        // Explicit cleanup, defense-in-depth: OmniCardDbContext models EbayListing/FlagResolution
+        // with a cascade-delete FK to Lot, but a dev db that was renamed in place from an older
+        // schema may not have that FK actually enforced at the SQLite level, which would silently
+        // orphan these rows instead of removing them.
+        context.EbayListings.RemoveRange(context.EbayListings.Where(l => l.LotId == id));
+        context.FlagResolutions.RemoveRange(context.FlagResolutions.Where(f => f.LotId == id));
         context.Lots.Remove(lot);
         context.SaveChanges();
 

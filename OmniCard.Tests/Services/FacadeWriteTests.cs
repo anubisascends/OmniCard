@@ -18,21 +18,11 @@ namespace OmniCard.Tests.Services;
 /// </summary>
 public class FacadeWriteTests : IDisposable
 {
-    private readonly SqliteConnection _collectionConnection;
-    private readonly DbContextOptions<CollectionDbContext> _collectionOptions;
     private readonly SqliteConnection _omniConnection;
     private readonly DbContextOptions<OmniCardDbContext> _omniOptions;
 
     public FacadeWriteTests()
     {
-        _collectionConnection = new SqliteConnection("Data Source=:memory:");
-        _collectionConnection.Open();
-        _collectionOptions = new DbContextOptionsBuilder<CollectionDbContext>()
-            .UseSqlite(_collectionConnection)
-            .Options;
-        using var ctx = new CollectionDbContext(_collectionOptions);
-        ctx.Database.EnsureCreated();
-
         _omniConnection = new SqliteConnection("Data Source=:memory:");
         _omniConnection.Open();
         _omniOptions = new DbContextOptionsBuilder<OmniCardDbContext>()
@@ -44,14 +34,12 @@ public class FacadeWriteTests : IDisposable
 
     public void Dispose()
     {
-        _collectionConnection.Dispose();
         _omniConnection.Dispose();
     }
 
     private CardService CreateService() => new(
         new StubHashService(),
         [],
-        new MockCollectionDbContextFactory(_collectionOptions),
         new MockOmniDbContextFactory(_omniOptions),
         new StubOcrService(),
         new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
@@ -500,11 +488,6 @@ public class FacadeWriteTests : IDisposable
         public void EndAudit() { }
         public CardMatch? FindScopedMatch(ulong hash, ulong[]? artHashes) => null;
         public AuditReport GenerateReport(IEnumerable<ScannedCard> scannedCards) => throw new NotImplementedException();
-    }
-
-    private class MockCollectionDbContextFactory(DbContextOptions<CollectionDbContext> options) : IDbContextFactory<CollectionDbContext>
-    {
-        public CollectionDbContext CreateDbContext() => new(options);
     }
 
     private class MockOmniDbContextFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>

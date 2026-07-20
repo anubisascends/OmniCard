@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using OmniCard.Collection;
 using OmniCard.Data;
 using OmniCard.Models;
 
@@ -8,9 +9,9 @@ namespace OmniCard.Web.Pages;
 
 public class LocationModel : PageModel
 {
-    private readonly IDbContextFactory<CollectionDbContext> _dbFactory;
+    private readonly IDbContextFactory<OmniCardDbContext> _dbFactory;
 
-    public LocationModel(IDbContextFactory<CollectionDbContext> dbFactory)
+    public LocationModel(IDbContextFactory<OmniCardDbContext> dbFactory)
     {
         _dbFactory = dbFactory;
     }
@@ -33,9 +34,12 @@ public class LocationModel : PageModel
 
         Container = container;
 
-        var rawCards = db.Cards
+        var rawCards = db.Lots
             .AsNoTracking()
-            .Where(c => c.ContainerId == id)
+            .Include(l => l.Product)
+            .Where(l => l.LocationId == id && l.Product.Category == ProductCategory.Single)
+            .ToList()
+            .Select(l => CollectionCardMapper.ToDto(l, l.Product, 0m))
             .OrderBy(c => c.Name)
             .ToList();
 

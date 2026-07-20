@@ -8,7 +8,7 @@ using OmniCard.Models;
 
 namespace OmniCard.Scanner;
 
-public class ScanDiagnosticService(IDbContextFactory<CollectionDbContext> dbContextFactory, IDiagnosticExporter diagnosticExporter) : IScanDiagnosticService
+public class ScanDiagnosticService(IDbContextFactory<OmniCardDbContext> dbContextFactory, IDiagnosticExporter diagnosticExporter) : IScanDiagnosticService
 {
     private static readonly JsonSerializerOptions JsonOpts = new()
     {

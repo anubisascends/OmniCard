@@ -5,7 +5,7 @@ using OmniCard.Models;
 
 namespace OmniCard.Collection;
 
-public sealed class StorageContainerService(IDbContextFactory<CollectionDbContext> dbContextFactory)
+public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext> dbContextFactory)
     : IStorageContainerService
 {
     public List<StorageContainer> GetAll()
@@ -64,22 +64,27 @@ public sealed class StorageContainerService(IDbContextFactory<CollectionDbContex
         if (container.IsSystem)
             throw new InvalidOperationException("Cannot delete system container");
 
-        var cards = context.Cards.Where(c => c.ContainerId == id).ToList();
+        var lots = context.Lots.Include(l => l.Product)
+            .Where(l => l.LocationId == id && l.Product.Category == ProductCategory.Single)
+            .ToList();
 
         if (moveCardsToBulk)
         {
             var bulkId = context.StorageContainers.First(c => c.IsSystem).Id;
-            foreach (var card in cards)
+            foreach (var lot in lots)
             {
-                card.ContainerId = bulkId;
-                card.Page = null;
-                card.Slot = null;
-                card.Section = null;
+                lot.LocationId = bulkId;
+                lot.Page = null;
+                lot.Slot = null;
+                lot.Section = null;
             }
         }
         else
         {
-            context.Cards.RemoveRange(cards);
+            var lotIds = lots.Select(l => l.Id).ToList();
+            context.EbayListings.RemoveRange(context.EbayListings.Where(e => lotIds.Contains(e.LotId)));
+            context.FlagResolutions.RemoveRange(context.FlagResolutions.Where(f => lotIds.Contains(f.LotId)));
+            context.Lots.RemoveRange(lots);
         }
 
         context.StorageContainers.Remove(container);
@@ -89,7 +94,7 @@ public sealed class StorageContainerService(IDbContextFactory<CollectionDbContex
     public int GetCardCount(int containerId)
     {
         using var context = dbContextFactory.CreateDbContext();
-        return context.Cards.Count(c => c.ContainerId == containerId);
+        return context.Lots.Count(l => l.LocationId == containerId && l.Product.Category == ProductCategory.Single);
     }
 
     public void SetCoverCard(int containerId, int? cardId)
@@ -104,9 +109,11 @@ public sealed class StorageContainerService(IDbContextFactory<CollectionDbContex
     public List<CollectionCard> GetCardsInContainer(int containerId)
     {
         using var context = dbContextFactory.CreateDbContext();
-        return context.Cards
-            .AsNoTracking()
-            .Where(c => c.ContainerId == containerId)
+        return context.Lots.AsNoTracking()
+            .Include(l => l.Product)
+            .Where(l => l.LocationId == containerId && l.Product.Category == ProductCategory.Single)
+            .ToList()
+            .Select(l => CollectionCardMapper.ToDto(l, l.Product, 0m))
             .OrderBy(c => c.Name)
             .ToList();
     }

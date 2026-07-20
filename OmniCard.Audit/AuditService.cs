@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using OmniCard.Collection;
 using OmniCard.Data;
 using OmniCard.Imaging;
 using OmniCard.Interfaces;
@@ -9,7 +10,7 @@ namespace OmniCard.Audit;
 
 public sealed class AuditService : IAuditService
 {
-    private readonly IDbContextFactory<CollectionDbContext> _collectionDbFactory;
+    private readonly IDbContextFactory<OmniCardDbContext> _omniDbFactory;
     private readonly IDbContextFactory<ScryfallDbContext> _scryfallDbFactory;
     private readonly IStorageContainerService _containerService;
     private readonly ILogger<AuditService> _logger;
@@ -26,12 +27,12 @@ public sealed class AuditService : IAuditService
     public string? AuditLocationName { get; private set; }
 
     public AuditService(
-        IDbContextFactory<CollectionDbContext> collectionDbFactory,
+        IDbContextFactory<OmniCardDbContext> omniDbFactory,
         IDbContextFactory<ScryfallDbContext> scryfallDbFactory,
         IStorageContainerService containerService,
         ILogger<AuditService> logger)
     {
-        _collectionDbFactory = collectionDbFactory;
+        _omniDbFactory = omniDbFactory;
         _scryfallDbFactory = scryfallDbFactory;
         _containerService = containerService;
         _logger = logger;
@@ -39,18 +40,22 @@ public sealed class AuditService : IAuditService
 
     public void StartAudit(int containerId)
     {
-        using var collCtx = _collectionDbFactory.CreateDbContext();
-        var container = collCtx.StorageContainers.FirstOrDefault(c => c.Id == containerId);
+        using var omniCtx = _omniDbFactory.CreateDbContext();
+        var container = omniCtx.StorageContainers.FirstOrDefault(c => c.Id == containerId);
         if (container is null)
             throw new InvalidOperationException($"Container {containerId} not found");
 
         AuditLocationId = containerId;
         AuditLocationName = container.Name;
 
-        // Load expected cards from the location
-        _expectedCards = collCtx.Cards
+        // Load expected cards from the location — project Lots⋈Products (owned singles) into the
+        // CollectionCard DTO shape, same as CardService's read facade.
+        _expectedCards = omniCtx.Lots
             .AsNoTracking()
-            .Where(c => c.ContainerId == containerId)
+            .Include(l => l.Product)
+            .Where(l => l.LocationId == containerId && l.Product.Category == ProductCategory.Single)
+            .ToList()
+            .Select(l => CollectionCardMapper.ToDto(l, l.Product, 0m))
             .ToList();
 
         // Get distinct GameCardIds (as Guids) to build scoped hash index — filter server-side

@@ -13,21 +13,11 @@ namespace OmniCard.Tests.Services;
 
 public class FallbackMatchingTests : IDisposable
 {
-    private readonly SqliteConnection _collectionConnection;
-    private readonly DbContextOptions<CollectionDbContext> _collectionOptions;
     private readonly SqliteConnection _omniConnection;
     private readonly DbContextOptions<OmniCardDbContext> _omniOptions;
 
     public FallbackMatchingTests()
     {
-        _collectionConnection = new SqliteConnection("Data Source=:memory:");
-        _collectionConnection.Open();
-        _collectionOptions = new DbContextOptionsBuilder<CollectionDbContext>()
-            .UseSqlite(_collectionConnection)
-            .Options;
-        using var ctx = new CollectionDbContext(_collectionOptions);
-        ctx.Database.EnsureCreated();
-
         _omniConnection = new SqliteConnection("Data Source=:memory:");
         _omniConnection.Open();
         _omniOptions = new DbContextOptionsBuilder<OmniCardDbContext>()
@@ -39,7 +29,6 @@ public class FallbackMatchingTests : IDisposable
 
     public void Dispose()
     {
-        _collectionConnection.Dispose();
         _omniConnection.Dispose();
     }
 
@@ -200,12 +189,10 @@ public class FallbackMatchingTests : IDisposable
 
     private CardService CreateCardService(ICardGameService[] gameServices)
     {
-        var factory = new MockCollectionDbContextFactory(_collectionOptions);
         var omniFactory = new MockOmniDbContextFactory(_omniOptions);
         return new CardService(
             new StubHashService(),
             gameServices,
-            factory,
             omniFactory,
             new StubOcrService(),
             new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
@@ -277,11 +264,6 @@ public class FallbackMatchingTests : IDisposable
         public void ExportDiagnostics(string filePath) { }
         public void ClearDiagnostics() { }
         public int GetEventCount() => 0;
-    }
-
-    private class MockCollectionDbContextFactory(DbContextOptions<CollectionDbContext> options) : IDbContextFactory<CollectionDbContext>
-    {
-        public CollectionDbContext CreateDbContext() => new(options);
     }
 
     private class MockOmniDbContextFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>

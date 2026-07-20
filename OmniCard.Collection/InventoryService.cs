@@ -103,6 +103,11 @@ public class InventoryService(IDbContextFactory<OmniCardDbContext> dbContextFact
         using var ctx = dbContextFactory.CreateDbContext();
         var lot = ctx.Lots.Find(lotId);
         if (lot is null) return;
+
+        // Explicit cleanup, defense-in-depth: see CardService.DeleteCollectionCard for rationale
+        // (a dev db renamed in place from an older schema may not enforce the cascade-delete FK).
+        ctx.EbayListings.RemoveRange(ctx.EbayListings.Where(l => l.LotId == lotId));
+        ctx.FlagResolutions.RemoveRange(ctx.FlagResolutions.Where(f => f.LotId == lotId));
         ctx.Lots.Remove(lot);
         ctx.SaveChanges();
     }
@@ -120,6 +125,9 @@ public class InventoryService(IDbContextFactory<OmniCardDbContext> dbContextFact
 
         if (lot.Quantity <= 0)
         {
+            // Explicit cleanup, defense-in-depth: see CardService.DeleteCollectionCard for rationale.
+            ctx.EbayListings.RemoveRange(ctx.EbayListings.Where(l => l.LotId == lotId));
+            ctx.FlagResolutions.RemoveRange(ctx.FlagResolutions.Where(f => f.LotId == lotId));
             ctx.Lots.Remove(lot);
         }
 

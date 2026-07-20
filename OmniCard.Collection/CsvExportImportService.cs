@@ -2,16 +2,14 @@ using System.Globalization;
 using System.IO;
 using CsvHelper;
 using CsvHelper.Configuration;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using OmniCard.Data;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Collection;
 
 public class CsvExportImportService(
-    IDbContextFactory<CollectionDbContext>? dbContextFactory,
+    ICardService? cardService,
     IScryfallService? scryfallService,
     IStorageContainerService? containerService,
     ILogger<CsvExportImportService> logger) : ICsvExportImportService
@@ -392,22 +390,9 @@ public class CsvExportImportService(
     {
         logger.LogInformation("Importing {Count} cards (skipDuplicates={Skip}, container={Container})",
             preview.Cards.Count, skipDuplicates, targetContainerId);
-        using var context = dbContextFactory!.CreateDbContext();
 
-        var imported = 0;
         foreach (var card in preview.Cards)
         {
-            if (skipDuplicates)
-            {
-                var exists = context.Cards.Any(c =>
-                    c.Game == card.Game &&
-                    c.GameCardId == card.GameCardId &&
-                    c.Condition == card.Condition &&
-                    c.IsFoil == card.IsFoil);
-                if (exists)
-                    continue;
-            }
-
             // Resolve container: use target if specified, otherwise resolve from app-native data
             if (targetContainerId is not null && card.ContainerId is null)
             {
@@ -424,12 +409,9 @@ public class CsvExportImportService(
                 card.ContainerId = existing.Id;
                 card.Container = null; // Clear nav property for EF insert
             }
-
-            context.Cards.Add(card);
-            imported++;
         }
 
-        context.SaveChanges();
+        var imported = cardService!.ImportCollectionCards(preview.Cards, skipDuplicates);
         logger.LogInformation("Imported {Count} cards", imported);
         return imported;
     }

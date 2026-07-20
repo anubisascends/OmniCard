@@ -9,13 +9,13 @@ namespace OmniCard.Tests.Services;
 public class StorageContainerServiceTests : IDisposable
 {
     private readonly SqliteConnection _connection;
-    private readonly IDbContextFactory<CollectionDbContext> _factory;
+    private readonly IDbContextFactory<OmniCardDbContext> _factory;
 
     public StorageContainerServiceTests()
     {
         _connection = new SqliteConnection("Data Source=:memory:");
         _connection.Open();
-        var options = new DbContextOptionsBuilder<CollectionDbContext>()
+        var options = new DbContextOptionsBuilder<OmniCardDbContext>()
             .UseSqlite(_connection)
             .Options;
         _factory = new TestDbContextFactory(options);
@@ -36,6 +36,18 @@ public class StorageContainerServiceTests : IDisposable
     public void Dispose() => _connection.Dispose();
 
     private StorageContainerService CreateService() => new(_factory);
+
+    private static Product NewSingle(string gameCardId, string name) => new()
+    {
+        Game = CardGame.Mtg,
+        Category = ProductCategory.Single,
+        GameCardId = gameCardId,
+        Name = name,
+        SetName = "S",
+        SetCode = "S",
+        CollectorNumber = "1",
+        Rarity = "common",
+    };
 
     [Fact]
     public void GetAll_ReturnsBulkFirst()
@@ -127,17 +139,10 @@ public class StorageContainerServiceTests : IDisposable
         // Add a card to this container
         using (var ctx = _factory.CreateDbContext())
         {
-            ctx.Cards.Add(new CollectionCard
-            {
-                Game = CardGame.Mtg,
-                GameCardId = "test",
-                Name = "Test",
-                SetName = "Test",
-                SetCode = "TST",
-                Number = "1",
-                Rarity = "common",
-                ContainerId = container.Id,
-            });
+            var product = NewSingle("test", "Test");
+            ctx.Products.Add(product);
+            ctx.SaveChanges();
+            ctx.Lots.Add(new InventoryLot { ProductId = product.Id, LocationId = container.Id });
             ctx.SaveChanges();
         }
 
@@ -151,11 +156,11 @@ public class StorageContainerServiceTests : IDisposable
         // Verify card was moved to bulk
         using (var ctx = _factory.CreateDbContext())
         {
-            var card = ctx.Cards.First(c => c.Name == "Test");
-            Assert.Equal(bulk.Id, card.ContainerId);
-            Assert.Null(card.Page);
-            Assert.Null(card.Slot);
-            Assert.Null(card.Section);
+            var lot = ctx.Lots.Include(l => l.Product).First(l => l.Product.Name == "Test");
+            Assert.Equal(bulk.Id, lot.LocationId);
+            Assert.Null(lot.Page);
+            Assert.Null(lot.Slot);
+            Assert.Null(lot.Section);
         }
     }
 
@@ -168,17 +173,10 @@ public class StorageContainerServiceTests : IDisposable
         // Add a card to this container
         using (var ctx = _factory.CreateDbContext())
         {
-            ctx.Cards.Add(new CollectionCard
-            {
-                Game = CardGame.Mtg,
-                GameCardId = "test",
-                Name = "Test",
-                SetName = "Test",
-                SetCode = "TST",
-                Number = "1",
-                Rarity = "common",
-                ContainerId = container.Id,
-            });
+            var product = NewSingle("test", "Test");
+            ctx.Products.Add(product);
+            ctx.SaveChanges();
+            ctx.Lots.Add(new InventoryLot { ProductId = product.Id, LocationId = container.Id });
             ctx.SaveChanges();
         }
 
@@ -192,7 +190,7 @@ public class StorageContainerServiceTests : IDisposable
         // Verify card was deleted
         using (var ctx = _factory.CreateDbContext())
         {
-            Assert.Empty(ctx.Cards.Where(c => c.Name == "Test"));
+            Assert.Empty(ctx.Lots.Include(l => l.Product).Where(l => l.Product.Name == "Test"));
         }
     }
 
@@ -203,8 +201,12 @@ public class StorageContainerServiceTests : IDisposable
         var container = svc.Create("Box", ContainerType.Box);
 
         using var ctx = _factory.CreateDbContext();
-        ctx.Cards.Add(new CollectionCard { Game = CardGame.Mtg, GameCardId = "a", Name = "A", SetName = "S", SetCode = "S", Number = "1", Rarity = "common", ContainerId = container.Id });
-        ctx.Cards.Add(new CollectionCard { Game = CardGame.Mtg, GameCardId = "b", Name = "B", SetName = "S", SetCode = "S", Number = "2", Rarity = "common", ContainerId = container.Id });
+        var a = NewSingle("a", "A");
+        var b = NewSingle("b", "B");
+        ctx.Products.AddRange(a, b);
+        ctx.SaveChanges();
+        ctx.Lots.Add(new InventoryLot { ProductId = a.Id, LocationId = container.Id });
+        ctx.Lots.Add(new InventoryLot { ProductId = b.Id, LocationId = container.Id });
         ctx.SaveChanges();
 
         Assert.Equal(2, svc.GetCardCount(container.Id));
@@ -220,20 +222,13 @@ public class StorageContainerServiceTests : IDisposable
         int cardId;
         using (var ctx = _factory.CreateDbContext())
         {
-            var card = new CollectionCard
-            {
-                Game = CardGame.Mtg,
-                GameCardId = "cover",
-                Name = "Cover Card",
-                SetName = "S",
-                SetCode = "S",
-                Number = "1",
-                Rarity = "common",
-                ContainerId = container.Id,
-            };
-            ctx.Cards.Add(card);
+            var product = NewSingle("cover", "Cover Card");
+            ctx.Products.Add(product);
             ctx.SaveChanges();
-            cardId = card.Id;
+            var lot = new InventoryLot { ProductId = product.Id, LocationId = container.Id };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            cardId = lot.Id;
         }
 
         // Set cover card
@@ -258,20 +253,13 @@ public class StorageContainerServiceTests : IDisposable
         int cardId;
         using (var ctx = _factory.CreateDbContext())
         {
-            var card = new CollectionCard
-            {
-                Game = CardGame.Mtg,
-                GameCardId = "cover",
-                Name = "Cover Card",
-                SetName = "S",
-                SetCode = "S",
-                Number = "1",
-                Rarity = "common",
-                ContainerId = container.Id,
-            };
-            ctx.Cards.Add(card);
+            var product = NewSingle("cover", "Cover Card");
+            ctx.Products.Add(product);
             ctx.SaveChanges();
-            cardId = card.Id;
+            var lot = new InventoryLot { ProductId = product.Id, LocationId = container.Id };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            cardId = lot.Id;
         }
 
         // Set then clear cover card
@@ -295,8 +283,12 @@ public class StorageContainerServiceTests : IDisposable
 
         using (var ctx = _factory.CreateDbContext())
         {
-            ctx.Cards.Add(new CollectionCard { Game = CardGame.Mtg, GameCardId = "a", Name = "B Card", SetName = "S", SetCode = "S", Number = "1", Rarity = "common", ContainerId = container.Id });
-            ctx.Cards.Add(new CollectionCard { Game = CardGame.Mtg, GameCardId = "b", Name = "A Card", SetName = "S", SetCode = "S", Number = "2", Rarity = "common", ContainerId = container.Id });
+            var bCard = NewSingle("a", "B Card");
+            var aCard = NewSingle("b", "A Card");
+            ctx.Products.AddRange(bCard, aCard);
+            ctx.SaveChanges();
+            ctx.Lots.Add(new InventoryLot { ProductId = bCard.Id, LocationId = container.Id });
+            ctx.Lots.Add(new InventoryLot { ProductId = aCard.Id, LocationId = container.Id });
             ctx.SaveChanges();
         }
 
@@ -317,8 +309,8 @@ public class StorageContainerServiceTests : IDisposable
         Assert.Empty(cards);
     }
 
-    private class TestDbContextFactory(DbContextOptions<CollectionDbContext> options) : IDbContextFactory<CollectionDbContext>
+    private class TestDbContextFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
-        public CollectionDbContext CreateDbContext() => new(options);
+        public OmniCardDbContext CreateDbContext() => new(options);
     }
 }

@@ -10,20 +10,20 @@ namespace OmniCard.Tests.Services;
 
 public class AuditServiceTests : IDisposable
 {
-    private readonly SqliteConnection _collectionConn;
-    private readonly DbContextOptions<CollectionDbContext> _collectionOptions;
+    private readonly SqliteConnection _omniConn;
+    private readonly DbContextOptions<OmniCardDbContext> _omniOptions;
     private readonly SqliteConnection _scryfallConn;
     private readonly DbContextOptions<ScryfallDbContext> _scryfallOptions;
 
     public AuditServiceTests()
     {
-        _collectionConn = new SqliteConnection("Data Source=:memory:");
-        _collectionConn.Open();
-        _collectionOptions = new DbContextOptionsBuilder<CollectionDbContext>()
-            .UseSqlite(_collectionConn)
+        _omniConn = new SqliteConnection("Data Source=:memory:");
+        _omniConn.Open();
+        _omniOptions = new DbContextOptionsBuilder<OmniCardDbContext>()
+            .UseSqlite(_omniConn)
             .Options;
-        using var collCtx = new CollectionDbContext(_collectionOptions);
-        collCtx.Database.EnsureCreated();
+        using var omniCtx = new OmniCardDbContext(_omniOptions);
+        omniCtx.Database.EnsureCreated();
 
         _scryfallConn = new SqliteConnection("Data Source=:memory:");
         _scryfallConn.Open();
@@ -36,40 +36,54 @@ public class AuditServiceTests : IDisposable
 
     public void Dispose()
     {
-        _collectionConn.Dispose();
+        _omniConn.Dispose();
         _scryfallConn.Dispose();
     }
 
-    private IDbContextFactory<CollectionDbContext> CollectionFactory() => new MockCollectionFactory(_collectionOptions);
+    private IDbContextFactory<OmniCardDbContext> OmniFactory() => new MockOmniFactory(_omniOptions);
     private IDbContextFactory<ScryfallDbContext> ScryfallFactory() => new MockScryfallFactory(_scryfallOptions);
 
     private AuditService CreateService() => new(
-        CollectionFactory(),
+        OmniFactory(),
         ScryfallFactory(),
         new StubContainerService(),
         NullLogger<AuditService>.Instance);
+
+    private static Product NewSingle(string gameCardId, string name, string setCode) => new()
+    {
+        Game = CardGame.Mtg,
+        Category = ProductCategory.Single,
+        GameCardId = gameCardId,
+        Name = name,
+        SetCode = setCode,
+    };
 
     [Fact]
     public void GenerateReport_MatchesOneToOneByGameCardId()
     {
         // Setup: location has 2x CardA and 1x CardB
-        using (var ctx = new CollectionDbContext(_collectionOptions))
+        using (var ctx = new OmniCardDbContext(_omniOptions))
         {
             var container = new StorageContainer { Name = "Binder", ContainerType = ContainerType.Binder };
             ctx.StorageContainers.Add(container);
             ctx.SaveChanges();
 
-            ctx.Cards.AddRange(
-                new CollectionCard { Game = CardGame.Mtg, GameCardId = "card-a", Name = "Card A", SetCode = "SET", ContainerId = container.Id },
-                new CollectionCard { Game = CardGame.Mtg, GameCardId = "card-a", Name = "Card A", SetCode = "SET", ContainerId = container.Id },
-                new CollectionCard { Game = CardGame.Mtg, GameCardId = "card-b", Name = "Card B", SetCode = "SET", ContainerId = container.Id }
+            var cardA = NewSingle("card-a", "Card A", "SET");
+            var cardB = NewSingle("card-b", "Card B", "SET");
+            ctx.Products.AddRange(cardA, cardB);
+            ctx.SaveChanges();
+
+            ctx.Lots.AddRange(
+                new InventoryLot { ProductId = cardA.Id, LocationId = container.Id },
+                new InventoryLot { ProductId = cardA.Id, LocationId = container.Id },
+                new InventoryLot { ProductId = cardB.Id, LocationId = container.Id }
             );
             ctx.SaveChanges();
         }
 
         var service = CreateService();
         int containerId;
-        using (var ctx = new CollectionDbContext(_collectionOptions))
+        using (var ctx = new OmniCardDbContext(_omniOptions))
             containerId = ctx.StorageContainers.First().Id;
 
         service.StartAudit(containerId);
@@ -96,7 +110,7 @@ public class AuditServiceTests : IDisposable
     [Fact]
     public void StartAudit_SetsActiveState()
     {
-        using (var ctx = new CollectionDbContext(_collectionOptions))
+        using (var ctx = new OmniCardDbContext(_omniOptions))
         {
             var container = new StorageContainer { Name = "Box", ContainerType = ContainerType.Box };
             ctx.StorageContainers.Add(container);
@@ -105,7 +119,7 @@ public class AuditServiceTests : IDisposable
 
         var service = CreateService();
         int containerId;
-        using (var ctx = new CollectionDbContext(_collectionOptions))
+        using (var ctx = new OmniCardDbContext(_omniOptions))
             containerId = ctx.StorageContainers.First().Id;
 
         Assert.False(service.IsAuditActive);
@@ -143,23 +157,22 @@ public class AuditServiceTests : IDisposable
             cardBId = cardB.Id;
         }
 
-        using (var ctx = new CollectionDbContext(_collectionOptions))
+        using (var ctx = new OmniCardDbContext(_omniOptions))
         {
             var container = new StorageContainer { Name = "Binder", ContainerType = ContainerType.Binder };
             ctx.StorageContainers.Add(container);
             ctx.SaveChanges();
             // Only CardA is in the location
-            ctx.Cards.Add(new CollectionCard
-            {
-                Game = CardGame.Mtg, GameCardId = cardAId.ToString(), Name = "Card A",
-                SetCode = "SET", ContainerId = container.Id
-            });
+            var product = NewSingle(cardAId.ToString(), "Card A", "SET");
+            ctx.Products.Add(product);
+            ctx.SaveChanges();
+            ctx.Lots.Add(new InventoryLot { ProductId = product.Id, LocationId = container.Id });
             ctx.SaveChanges();
         }
 
         var service = CreateService();
         int containerId;
-        using (var ctx = new CollectionDbContext(_collectionOptions))
+        using (var ctx = new OmniCardDbContext(_omniOptions))
             containerId = ctx.StorageContainers.First().Id;
 
         service.StartAudit(containerId);
@@ -216,9 +229,9 @@ public class AuditServiceTests : IDisposable
 
     // --- Stubs ---
 
-    private class MockCollectionFactory(DbContextOptions<CollectionDbContext> options) : IDbContextFactory<CollectionDbContext>
+    private class MockOmniFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
-        public CollectionDbContext CreateDbContext() => new(options);
+        public OmniCardDbContext CreateDbContext() => new(options);
     }
 
     private class MockScryfallFactory(DbContextOptions<ScryfallDbContext> options) : IDbContextFactory<ScryfallDbContext>
@@ -228,7 +241,7 @@ public class AuditServiceTests : IDisposable
 
     private class StubContainerService : IStorageContainerService
     {
-        // AuditService reads container name from CollectionDbContext directly — this stub is unused
+        // AuditService reads container name from OmniCardDbContext directly — this stub is unused
         public List<StorageContainer> GetAll() => [];
         public StorageContainer GetBulk() => throw new NotImplementedException();
         public StorageContainer Create(string name, ContainerType type) => throw new NotImplementedException();

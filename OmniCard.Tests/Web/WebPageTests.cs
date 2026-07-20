@@ -14,13 +14,13 @@ namespace OmniCard.Tests.Web;
 public class WebPageTests : IDisposable
 {
     private readonly SqliteConnection _connection;
-    private readonly IDbContextFactory<CollectionDbContext> _factory;
+    private readonly IDbContextFactory<OmniCardDbContext> _factory;
 
     public WebPageTests()
     {
         _connection = new SqliteConnection("Data Source=:memory:");
         _connection.Open();
-        var options = new DbContextOptionsBuilder<CollectionDbContext>()
+        var options = new DbContextOptionsBuilder<OmniCardDbContext>()
             .UseSqlite(_connection).Options;
         _factory = new TestDbContextFactory(options);
         using var ctx = _factory.CreateDbContext();
@@ -36,6 +36,18 @@ public class WebPageTests : IDisposable
         var actionContext = new ActionContext(httpContext, new RouteData(), new PageActionDescriptor(), modelState);
         return new PageContext(actionContext);
     }
+
+    private static Product NewSingle(string gameCardId, string name, string setName, string setCode, string number, string rarity) => new()
+    {
+        Game = CardGame.Mtg,
+        Category = ProductCategory.Single,
+        GameCardId = gameCardId,
+        Name = name,
+        SetName = setName,
+        SetCode = setCode,
+        CollectorNumber = number,
+        Rarity = rarity,
+    };
 
     // --- IndexModel ---
 
@@ -88,9 +100,16 @@ public class WebPageTests : IDisposable
             ctx.SaveChanges();
             containerId = container.Id;
 
-            ctx.Cards.Add(new CollectionCard { Game = CardGame.Mtg, GameCardId = "c1", Name = "A", SetName = "Alpha", SetCode = "LEA", Number = "1", Rarity = "common", ContainerId = containerId });
-            ctx.Cards.Add(new CollectionCard { Game = CardGame.Mtg, GameCardId = "c2", Name = "B", SetName = "Alpha", SetCode = "LEA", Number = "2", Rarity = "common", ContainerId = containerId });
-            ctx.Cards.Add(new CollectionCard { Game = CardGame.Mtg, GameCardId = "c3", Name = "C", SetName = "Beta", SetCode = "LEB", Number = "1", Rarity = "rare", ContainerId = containerId });
+            var pa = NewSingle("c1", "A", "Alpha", "LEA", "1", "common");
+            var pb = NewSingle("c2", "B", "Alpha", "LEA", "2", "common");
+            var pc = NewSingle("c3", "C", "Beta", "LEB", "1", "rare");
+            ctx.Products.AddRange(pa, pb, pc);
+            ctx.SaveChanges();
+
+            ctx.Lots.AddRange(
+                new InventoryLot { ProductId = pa.Id, LocationId = containerId },
+                new InventoryLot { ProductId = pb.Id, LocationId = containerId },
+                new InventoryLot { ProductId = pc.Id, LocationId = containerId });
             ctx.SaveChanges();
         }
 
@@ -117,32 +136,26 @@ public class WebPageTests : IDisposable
     [Fact]
     public void CardModel_OnGet_ReturnsCardWithContainer()
     {
-        int cardId;
+        int lotId;
         using (var ctx = _factory.CreateDbContext())
         {
             var container = new StorageContainer { Name = "Box", ContainerType = ContainerType.Box };
             ctx.StorageContainers.Add(container);
             ctx.SaveChanges();
 
-            var card = new CollectionCard
-            {
-                Game = CardGame.Mtg,
-                GameCardId = "test-id",
-                Name = "Lightning Bolt",
-                SetName = "Alpha",
-                SetCode = "LEA",
-                Number = "161",
-                Rarity = "common",
-                ContainerId = container.Id,
-                ImageUri = "https://img/bolt.jpg",
-            };
-            ctx.Cards.Add(card);
+            var product = NewSingle("test-id", "Lightning Bolt", "Alpha", "LEA", "161", "common");
+            product.ImageUri = "https://img/bolt.jpg";
+            ctx.Products.Add(product);
             ctx.SaveChanges();
-            cardId = card.Id;
+
+            var lot = new InventoryLot { ProductId = product.Id, LocationId = container.Id };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            lotId = lot.Id;
         }
 
         var model = new CardModel(_factory) { PageContext = CreatePageContext() };
-        var result = model.OnGet(cardId);
+        var result = model.OnGet(lotId);
 
         Assert.IsType<PageResult>(result);
         Assert.Equal("Lightning Bolt", model.Card.Name);
@@ -161,36 +174,30 @@ public class WebPageTests : IDisposable
     [Fact]
     public void CardModel_ImageUrl_ResolvesScanPathOverApiUri()
     {
-        int cardId;
+        int lotId;
         using (var ctx = _factory.CreateDbContext())
         {
-            var card = new CollectionCard
-            {
-                Game = CardGame.Mtg,
-                GameCardId = "scan-card",
-                Name = "Scanned Card",
-                SetName = "Set",
-                SetCode = "SET",
-                Number = "1",
-                Rarity = "common",
-                ScanImagePath = "scans/12345.jpg",
-                ImageUri = "https://api.example.com/card.jpg",
-            };
-            ctx.Cards.Add(card);
+            var product = NewSingle("scan-card", "Scanned Card", "Set", "SET", "1", "common");
+            product.ImageUri = "https://api.example.com/card.jpg";
+            ctx.Products.Add(product);
             ctx.SaveChanges();
-            cardId = card.Id;
+
+            var lot = new InventoryLot { ProductId = product.Id, ScanImagePath = "scans/12345.jpg" };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            lotId = lot.Id;
         }
 
         var model = new CardModel(_factory) { PageContext = CreatePageContext() };
-        model.OnGet(cardId);
+        model.OnGet(lotId);
 
         // ScanImagePath takes precedence: extracts filename → /scans/12345.jpg
         Assert.Equal("/scans/12345.jpg", model.ImageUrl);
     }
 
-    private class TestDbContextFactory(DbContextOptions<CollectionDbContext> options)
-        : IDbContextFactory<CollectionDbContext>
+    private class TestDbContextFactory(DbContextOptions<OmniCardDbContext> options)
+        : IDbContextFactory<OmniCardDbContext>
     {
-        public CollectionDbContext CreateDbContext() => new(options);
+        public OmniCardDbContext CreateDbContext() => new(options);
     }
 }
