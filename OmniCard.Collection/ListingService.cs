@@ -84,7 +84,42 @@ public class ListingService(
         ctx.SaveChanges();
     }
 
-    public int MarkPicked(IEnumerable<int> lotIds) => throw new NotImplementedException();
+    public int MarkPicked(IEnumerable<int> lotIds)
+    {
+        var forSaleLocationId = salesSettings.ForSaleLocationId
+            ?? throw new InvalidOperationException("No 'For Sale' location is configured. Set one in Sales settings before picking.");
+
+        using var ctx = dbContextFactory.CreateDbContext();
+        var ids = lotIds.Distinct().ToList();
+
+        var listings = ctx.Listings
+            .Where(l => ids.Contains(l.LotId) && l.Status == ListingStatus.Listed)
+            .ToList();
+
+        var picked = 0;
+        foreach (var listing in listings)
+        {
+            var lot = ctx.Lots.FirstOrDefault(l => l.Id == listing.LotId);
+            if (lot is null) continue;
+
+            listing.Status = ListingStatus.Picked;
+            listing.PickedAt = DateTime.UtcNow;
+            lot.LocationId = forSaleLocationId;
+            ctx.Movements.Add(new InventoryMovement
+            {
+                ProductId = lot.ProductId,
+                LotId = lot.Id,
+                Type = MovementType.Move,
+                Quantity = lot.Quantity,
+                Timestamp = DateTime.UtcNow,
+                Note = "Picked for sale",
+            });
+            picked++;
+        }
+
+        ctx.SaveChanges();
+        return picked;
+    }
     public List<PickListEntry> GetPickList(CardGame? game = null) => throw new NotImplementedException();
     public Dictionary<int, ListingStatus> GetActiveListingStatusByLot(IEnumerable<int> lotIds) => throw new NotImplementedException();
 }

@@ -174,4 +174,40 @@ public class ListingServiceTests : IDisposable
             Assert.Equal(MovementType.Move, movement.Type);
         }
     }
+
+    [Fact]
+    public void MarkPicked_MovesLotToForSaleLocation_AndRecordsMovement()
+    {
+        var (lotId, _) = SeedLot(_opts, locationId: 7);
+        // For-Sale location (Id 99, the StubSalesSettings default) must exist as a
+        // StorageContainer row, since InventoryLot.LocationId is FK-constrained.
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            ctx.StorageContainers.Add(new StorageContainer { Id = 99, Name = "For Sale Location" });
+            ctx.SaveChanges();
+        }
+        var svc = CreateService(); // StubSalesSettings.ForSaleLocationId = 99
+        svc.ListForSale([lotId], SalesChannel.Manual, 1m, 1);
+
+        var count = svc.MarkPicked([lotId]);
+
+        Assert.Equal(1, count);
+        using var ctx2 = new OmniCardDbContext(_opts);
+        var listing = Assert.Single(ctx2.Listings.ToList());
+        Assert.Equal(ListingStatus.Picked, listing.Status);
+        Assert.NotNull(listing.PickedAt);
+        Assert.Equal(99, ctx2.Lots.Single(l => l.Id == lotId).LocationId);
+        Assert.Contains(ctx2.Movements.ToList(), m => m.Type == MovementType.Move && m.LotId == lotId);
+    }
+
+    [Fact]
+    public void MarkPicked_Throws_WhenNoForSaleLocationConfigured()
+    {
+        var (lotId, _) = SeedLot(_opts);
+        var settings = new StubSalesSettings();
+        settings.SetForSaleLocationId(null);
+        var svc = new ListingService(new MockFactory(_opts), settings);
+        svc.ListForSale([lotId], SalesChannel.Manual, 1m, 1);
+        Assert.Throws<InvalidOperationException>(() => svc.MarkPicked([lotId]));
+    }
 }
