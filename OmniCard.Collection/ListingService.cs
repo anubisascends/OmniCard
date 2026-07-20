@@ -66,7 +66,12 @@ public class ListingService(
                 var lot = ctx.Lots.FirstOrDefault(l => l.Id == listing.LotId);
                 if (lot is not null && lot.LocationId != listing.OriginalLocationId)
                 {
-                    lot.LocationId = listing.OriginalLocationId;
+                    // The original container may have been deleted since the listing was
+                    // created (InventoryLot.LocationId has an enforced FK to
+                    // StorageContainers.Id). Restore to unassigned rather than a dangling
+                    // id, which would FK-violate on SaveChanges.
+                    var originalContainerExists = ctx.StorageContainers.Any(c => c.Id == listing.OriginalLocationId);
+                    lot.LocationId = originalContainerExists ? listing.OriginalLocationId : null;
                     ctx.Movements.Add(new InventoryMovement
                     {
                         ProductId = lot.ProductId,
@@ -90,6 +95,10 @@ public class ListingService(
             ?? throw new InvalidOperationException("No 'For Sale' location is configured. Set one in Sales settings before picking.");
 
         using var ctx = dbContextFactory.CreateDbContext();
+
+        if (!ctx.StorageContainers.Any(c => c.Id == forSaleLocationId))
+            throw new InvalidOperationException("The configured For-Sale location no longer exists. Pick a new one in the Sales tab.");
+
         var ids = lotIds.Distinct().ToList();
 
         var listings = ctx.Listings

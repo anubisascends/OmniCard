@@ -212,6 +212,76 @@ public class ListingServiceTests : IDisposable
     }
 
     [Fact]
+    public void MarkPicked_ThrowsInvalidOperation_WhenForSaleContainerMissing()
+    {
+        // StubSalesSettings.ForSaleLocationId defaults to 99, but no StorageContainer with
+        // that id is seeded here — MarkPicked must detect this and throw before mutating
+        // anything, rather than let SaveChanges FK-violate.
+        var (lotId, originalLocationId) = SeedLot(_opts, locationId: 7);
+        var svc = CreateService();
+        svc.ListForSale([lotId], SalesChannel.Manual, 1m, 1);
+
+        Assert.Throws<InvalidOperationException>(() => svc.MarkPicked([lotId]));
+
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.Equal(originalLocationId, ctx.Lots.Single(l => l.Id == lotId).LocationId);
+        Assert.Equal(ListingStatus.Listed, ctx.Listings.Single().Status);
+    }
+
+    [Fact]
+    public void Unlist_PickedListing_WithDeletedOriginalContainer_RestoresToNull()
+    {
+        int forSaleLocationId = 99; // Also the default from StubSalesSettings
+        int lotId;
+
+        // Seed only the For-Sale container the lot currently sits in — deliberately do NOT
+        // seed a container for OriginalLocationId, simulating a container deleted after the
+        // listing was created.
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, Name = "Sol Ring" };
+            ctx.Products.Add(product);
+            ctx.SaveChanges();
+
+            ctx.StorageContainers.Add(new StorageContainer { Id = forSaleLocationId, Name = "For Sale Location" });
+            ctx.SaveChanges();
+
+            var lot = new InventoryLot { ProductId = product.Id, Quantity = 1, LocationId = forSaleLocationId };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            lotId = lot.Id;
+
+            var listing = new Listing
+            {
+                LotId = lot.Id,
+                Channel = SalesChannel.Manual,
+                Status = ListingStatus.Picked,
+                ListedPrice = 1.50m,
+                Quantity = 1,
+                OriginalLocationId = 7, // no StorageContainer with id 7 exists
+                ListedAt = new DateTime(2026, 1, 1),
+            };
+            ctx.Listings.Add(listing);
+            ctx.SaveChanges();
+        }
+
+        var ex = Record.Exception(() => CreateService().Unlist([lotId]));
+        Assert.Null(ex);
+
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            var listing = Assert.Single(ctx.Listings.ToList());
+            Assert.Equal(ListingStatus.Cancelled, listing.Status);
+
+            var lot = Assert.Single(ctx.Lots.ToList());
+            Assert.Null(lot.LocationId);
+
+            var movement = Assert.Single(ctx.Movements.Where(m => m.LotId == lotId).ToList());
+            Assert.Equal(MovementType.Move, movement.Type);
+        }
+    }
+
+    [Fact]
     public void GetPickList_ReturnsListedNotPicked_GroupedByLocation()
     {
         var (lotId, _) = SeedLot(_opts, locationId: null);

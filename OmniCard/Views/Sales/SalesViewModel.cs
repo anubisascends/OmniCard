@@ -42,25 +42,35 @@ public partial class SalesViewModel(
     /// queries run off the UI thread so tab activation never blocks on synchronous DB I/O.</summary>
     public async Task Load()
     {
-        var (containers, pickList) = await Task.Run(() => (storageContainers.GetAll(), listingService.GetPickList()));
-
-        Locations.Clear();
-        foreach (var c in containers)
-            Locations.Add(c);
-
-        _suppressPersist = true;
         try
         {
-            ForSaleLocation = Locations.FirstOrDefault(c => c.Id == salesSettings.ForSaleLocationId);
-        }
-        finally
-        {
-            _suppressPersist = false;
-        }
+            var (containers, pickList) = await Task.Run(() => (storageContainers.GetAll(), listingService.GetPickList()));
 
-        PickList.Clear();
-        foreach (var e in pickList)
-            PickList.Add(e);
+            Locations.Clear();
+            foreach (var c in containers)
+                Locations.Add(c);
+
+            _suppressPersist = true;
+            try
+            {
+                ForSaleLocation = Locations.FirstOrDefault(c => c.Id == salesSettings.ForSaleLocationId);
+            }
+            finally
+            {
+                _suppressPersist = false;
+            }
+
+            PickList.Clear();
+            foreach (var e in pickList)
+                PickList.Add(e);
+        }
+        catch (Exception ex)
+        {
+            // Leave any previously-loaded Locations/PickList as-is rather than blanking them —
+            // surface the failure via StatusMessage instead of crashing (there is no global
+            // unhandled-exception handler to fall back on).
+            StatusMessage = $"Failed to load pick list: {ex.Message}";
+        }
     }
 
     partial void OnForSaleLocationChanged(StorageContainer? value)

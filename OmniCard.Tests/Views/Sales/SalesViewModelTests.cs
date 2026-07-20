@@ -37,6 +37,26 @@ public class SalesViewModelTests
     }
 
     [Fact]
+    public async Task Load_WhenGetPickListThrows_SetsStatusMessage_AndDoesNotThrow()
+    {
+        var listingService = new Mock<IListingService>();
+        var salesSettings = new Mock<ISalesSettingsService>();
+        var containerService = new Mock<IStorageContainerService>();
+
+        containerService.Setup(c => c.GetAll()).Returns([Container(1, "Binder A")]);
+        salesSettings.Setup(s => s.ForSaleLocationId).Returns(1);
+        listingService.Setup(l => l.GetPickList(null)).Throws(new InvalidOperationException("db is locked"));
+
+        var vm = new SalesViewModel(listingService.Object, salesSettings.Object, containerService.Object);
+
+        var ex = await Record.ExceptionAsync(() => vm.Load());
+
+        Assert.Null(ex);
+        Assert.NotNull(vm.StatusMessage);
+        Assert.Contains("db is locked", vm.StatusMessage);
+    }
+
+    [Fact]
     public async Task Load_RestoringPersistedLocation_DoesNotRewriteSettings()
     {
         var listingService = new Mock<IListingService>();
