@@ -43,6 +43,7 @@ public class OmniCardDbContext : DbContext
             e.HasOne<StorageContainer>().WithMany().HasForeignKey(l => l.LocationId)
                 .OnDelete(DeleteBehavior.SetNull);
             e.HasIndex(l => l.LocationId);
+            e.Property(l => l.FlagReason).HasConversion<string?>();
         });
 
         modelBuilder.Entity<InventoryMovement>(e =>

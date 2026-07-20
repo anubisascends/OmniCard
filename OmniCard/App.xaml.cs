@@ -258,9 +258,18 @@ public partial class App : Application
             // Repair legacy One Piece set codes written by the pre-swap OPTCG data source
             CollectionMigrationService.RepairOptcgSetCodes(dataDir, collectionDbFactory, migrationLogger);
 
+            // Ensure the unified store's schema is complete on a pre-existing inventory.db
+            // (EnsureCreated() below only creates tables/columns for a brand-new database file).
+            UnifiedMigrationService.EnsureUnifiedSchema(dataDir, migrationLogger);
+
             splash.SetStatus("Initializing databases...");
             using (var invCtx = Host.Services.GetRequiredService<IDbContextFactory<OmniCardDbContext>>().CreateDbContext())
                 invCtx.Database.EnsureCreated();
+
+            // One-time migration of collection.db singles data into the unified Product/Lot store.
+            splash.SetStatus("Migrating collection data into unified store...");
+            var unifiedDbFactory = Host.Services.GetRequiredService<IDbContextFactory<OmniCardDbContext>>();
+            UnifiedMigrationService.MigrateDataIfNeeded(dataDir, collectionDbFactory, unifiedDbFactory, migrationLogger);
 
             splash.SetStatus("Loading collection data...");
             // Backfill Color/CardType for existing cards

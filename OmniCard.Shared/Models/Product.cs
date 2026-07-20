@@ -16,6 +16,11 @@ public class Product
     public string? Rarity { get; set; }
     public bool Foil { get; set; }
     public string? ImageUri { get; set; }
+    // Added in the Phase 2a unified-store migration (Task 2) to carry the remaining
+    // CollectionCard fields faithfully — the Phase-1 model omitted these.
+    public string? SetName { get; set; }
+    public string? Color { get; set; }
+    public string? CardType { get; set; }
 
     /// <summary>Cached market price for display/valuation. Not persisted.</summary>
     [NotMapped] public decimal MarketPrice { get; set; }

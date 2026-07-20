@@ -16,4 +16,8 @@ public class InventoryLot
     public int? Page { get; set; }
     public int? Slot { get; set; }
     public string? Section { get; set; }
+    // Added in the Phase 2a unified-store migration (Task 2) to carry over
+    // CollectionCard.IsMissing/FlagReason faithfully.
+    public bool IsMissing { get; set; }
+    public FlagReason? FlagReason { get; set; }
 }
