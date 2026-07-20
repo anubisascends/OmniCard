@@ -707,13 +707,13 @@ public class UnifiedMigrationTests : IDisposable
         verifyConn.Open();
         using var verifyCmd = verifyConn.CreateCommand();
 
-        foreach (var table in new[] { "StorageContainers", "EbayListings", "MismatchLogs", "FlagResolutions", "ScanDiagnosticEvents", "MigrationState" })
+        foreach (var table in new[] { "StorageContainers", "EbayListings", "MismatchLogs", "FlagResolutions", "ScanDiagnosticEvents", "MigrationState", "Listings" })
         {
             verifyCmd.CommandText = $"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{table}'";
             Assert.Equal(1L, (long)verifyCmd.ExecuteScalar()!);
         }
 
-        foreach (var (table, column) in new[] { ("Products", "SetName"), ("Products", "Color"), ("Products", "CardType"), ("Products", "LastMarketPrice"), ("Products", "PriceUpdatedAt"), ("Lots", "IsMissing"), ("Lots", "FlagReason") })
+        foreach (var (table, column) in new[] { ("Products", "SetName"), ("Products", "Color"), ("Products", "CardType"), ("Products", "LastMarketPrice"), ("Products", "PriceUpdatedAt"), ("Lots", "IsMissing"), ("Lots", "FlagReason"), ("Listings", "Channel"), ("Listings", "Status"), ("Listings", "ListedPrice") })
         {
             verifyCmd.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = '{column}'";
             Assert.True((long)verifyCmd.ExecuteScalar()! > 0, $"{table}.{column} should exist");
