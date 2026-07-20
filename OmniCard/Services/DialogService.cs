@@ -19,6 +19,7 @@ using OmniCard.Views.ManualAdd;
 using OmniCard.Views.DecklistCheck;
 using OmniCard.Views.Inventory;
 using OmniCard.Views.MovementHistory;
+using OmniCard.Views.SalesListing;
 
 namespace OmniCard.Services;
 
@@ -211,5 +212,14 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         SetOwner(wnd);
         wnd.ViewModel.Load();
         wnd.ShowDialog();
+    }
+
+    public ListForSaleResult? PickListForSale(decimal suggestedPrice)
+    {
+        var vm = new ListForSaleViewModel(suggestedPrice);
+        var wnd = new ListForSaleDialog(vm);
+        SetOwner(wnd);
+        var result = wnd.ShowDialog();
+        return result == true ? vm.ToResult() : null;
     }
 }
