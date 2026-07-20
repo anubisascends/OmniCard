@@ -31,9 +31,21 @@ public partial class CustomersViewModel(ICustomerService customerService) : Obse
     public void Save()
     {
         if (SelectedCustomer is null || string.IsNullOrWhiteSpace(SelectedCustomer.Name)) return;
-        if (SelectedCustomer.Id == 0) customerService.Create(SelectedCustomer);
-        else customerService.Update(SelectedCustomer);
+
+        int savedId;
+        if (SelectedCustomer.Id == 0)
+        {
+            var saved = customerService.Create(SelectedCustomer);
+            savedId = saved.Id;
+        }
+        else
+        {
+            customerService.Update(SelectedCustomer);
+            savedId = SelectedCustomer.Id;
+        }
+
         Load();
+        SelectedCustomer = Customers.FirstOrDefault(c => c.Id == savedId);
     }
 
     [RelayCommand]

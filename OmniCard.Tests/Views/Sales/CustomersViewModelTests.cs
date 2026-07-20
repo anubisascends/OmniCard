@@ -40,7 +40,9 @@ public class CustomersViewModelTests
     public void Save_WithNewCustomer_CallsCreate_ThenReloads()
     {
         var service = new Mock<ICustomerService>();
-        service.Setup(s => s.GetAll()).Returns([Cust(1, "Alice")]);
+        var createdCustomer = Cust(1, "Alice");
+        service.Setup(s => s.Create(It.IsAny<Customer>())).Returns(createdCustomer);
+        service.Setup(s => s.GetAll()).Returns([createdCustomer]);
 
         var vm = new CustomersViewModel(service.Object);
         vm.SelectedCustomer = new Customer { Id = 0, Name = "Alice" };
@@ -50,6 +52,7 @@ public class CustomersViewModelTests
         service.Verify(s => s.Create(It.Is<Customer>(c => c.Name == "Alice")), Times.Once);
         service.Verify(s => s.Update(It.IsAny<Customer>()), Times.Never);
         Assert.Single(vm.Customers);
+        Assert.Equal(1, vm.SelectedCustomer?.Id);
     }
 
     [Fact]
@@ -118,5 +121,34 @@ public class CustomersViewModelTests
 
         service.Verify(s => s.Delete(It.IsAny<int>()), Times.Never);
         Assert.NotNull(vm.SelectedCustomer);
+    }
+
+    [Fact]
+    public void Save_NewCustomerTwice_CallsCreateOnce_ThenUpdateOnSecondSave()
+    {
+        var service = new Mock<ICustomerService>();
+        var createdCustomer = Cust(5, "Ada");
+
+        // Setup Create to return a customer with real Id
+        service.Setup(s => s.Create(It.IsAny<Customer>())).Returns(createdCustomer);
+
+        // Setup GetAll to return the created customer so re-select finds it
+        service.Setup(s => s.GetAll()).Returns([createdCustomer]);
+
+        var vm = new CustomersViewModel(service.Object);
+        vm.SelectedCustomer = new Customer { Id = 0, Name = "Ada" };
+
+        // First save: should call Create
+        vm.Save();
+
+        service.Verify(s => s.Create(It.Is<Customer>(c => c.Name == "Ada")), Times.Once);
+        Assert.NotNull(vm.SelectedCustomer);
+        Assert.Equal(5, vm.SelectedCustomer.Id);
+
+        // Second save: should call Update, not Create
+        vm.Save();
+
+        service.Verify(s => s.Create(It.IsAny<Customer>()), Times.Once); // Still only once
+        service.Verify(s => s.Update(It.Is<Customer>(c => c.Id == 5)), Times.Once);
     }
 }
