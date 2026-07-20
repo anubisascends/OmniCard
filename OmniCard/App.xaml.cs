@@ -246,8 +246,24 @@ public partial class App : Application
             // Guarded by the MigrationState "UnifiedDataMigration" DB marker, so this is a no-op
             // on every launch after the first successful run. collection.db is read raw (no
             // CollectionDbContext) and is left untouched on disk afterwards for rollback.
+            //
+            // Guarded (not awaited-and-thrown): this reads a legacy collection.db whose schema this
+            // build doesn't fully control (older releases can be missing a since-added column), and
+            // it runs unguarded inside this background Task.Run. An uncaught exception here used to
+            // crash startup outright — and because the migration transaction rolls back on failure,
+            // the DB marker never gets written, so every subsequent launch hit the exact same crash
+            // (a permanent brick). The transaction's rollback already leaves the unified store
+            // consistent on failure; logging and continuing just means the migration retries on the
+            // next launch instead of bricking this one.
             splash.SetStatus("Migrating collection data...");
-            UnifiedMigrationService.MigrateDataIfNeeded(dataDir, unifiedFactory, migrationLogger);
+            try
+            {
+                UnifiedMigrationService.MigrateDataIfNeeded(dataDir, unifiedFactory, migrationLogger);
+            }
+            catch (Exception ex)
+            {
+                migrationLogger.LogError(ex, "Unified data migration failed; continuing startup without it (will retry on next launch)");
+            }
 
             splash.SetStatus("Preparing scan cache...");
             Directory.CreateDirectory(DataPathServiceInstance.ScansDirectory);

@@ -432,7 +432,90 @@ public class FacadeWriteTests : IDisposable
         Assert.Equal(2, moves.Count);
     }
 
+    // --- Category=Single guard: write-by-id methods must never touch a sealed-lot id ---
+    //
+    // GetCollectionCards already scopes to Product.Category == Single; these tests confirm the
+    // write-by-id methods that fetch lots purely by id — UpdateCollectionCard, DeleteCollectionCard,
+    // MoveCardsToContainer, BulkUpdateField — apply the same guard, so a stray sealed-lot id (e.g. one
+    // leaked in from a bulk selection covering the wrong tab) can never be mutated via the singles
+    // write path.
+
+    [Fact]
+    public void UpdateCollectionCard_SealedLotId_IsIgnored()
+    {
+        var service = CreateService();
+        var (lotId, _) = SeedSealedLot();
+
+        var card = new CollectionCard { Id = lotId, Name = "Booster Box", Condition = "HP", PurchasePrice = 99m };
+        service.UpdateCollectionCard(card);
+
+        using var ctx = new OmniCardDbContext(_omniOptions);
+        var lot = ctx.Lots.AsNoTracking().Single(l => l.Id == lotId);
+        Assert.NotEqual("HP", lot.Condition); // untouched
+    }
+
+    [Fact]
+    public void DeleteCollectionCard_SealedLotId_IsIgnored()
+    {
+        var service = CreateService();
+        var (lotId, _) = SeedSealedLot();
+
+        service.DeleteCollectionCard(lotId);
+
+        using var ctx = new OmniCardDbContext(_omniOptions);
+        Assert.NotNull(ctx.Lots.Find(lotId)); // survives
+    }
+
+    [Fact]
+    public void MoveCardsToContainer_SealedLotId_IsIgnored()
+    {
+        var service = CreateService();
+        var (lotId, _) = SeedSealedLot();
+        int containerId;
+        using (var seedCtx = new OmniCardDbContext(_omniOptions))
+        {
+            var container = new StorageContainer { Name = "Box C", ContainerType = ContainerType.Box };
+            seedCtx.StorageContainers.Add(container);
+            seedCtx.SaveChanges();
+            containerId = container.Id;
+        }
+
+        service.MoveCardsToContainer([lotId], containerId, "Section A");
+
+        using var ctx = new OmniCardDbContext(_omniOptions);
+        var lot = ctx.Lots.AsNoTracking().Single(l => l.Id == lotId);
+        Assert.NotEqual(containerId, lot.LocationId);
+        Assert.Empty(ctx.Movements.AsNoTracking().ToList());
+    }
+
+    [Fact]
+    public void BulkUpdateField_SealedLotId_IsIgnored()
+    {
+        var service = CreateService();
+        var (lotId, _) = SeedSealedLot();
+
+        service.BulkUpdateField([lotId], c => c.Condition = "LP");
+
+        using var ctx = new OmniCardDbContext(_omniOptions);
+        var lot = ctx.Lots.AsNoTracking().Single(l => l.Id == lotId);
+        Assert.NotEqual("LP", lot.Condition);
+    }
+
     // --- Helpers ---
+
+    private (int LotId, int ProductId) SeedSealedLot()
+    {
+        using var ctx = new OmniCardDbContext(_omniOptions);
+        var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Box, Name = "Booster Box" };
+        ctx.Products.Add(product);
+        ctx.SaveChanges();
+
+        var lot = new InventoryLot { ProductId = product.Id, Condition = "NM" };
+        ctx.Lots.Add(lot);
+        ctx.SaveChanges();
+
+        return (lot.Id, product.Id);
+    }
 
     private List<int> SeedLots(int count)
     {

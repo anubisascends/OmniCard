@@ -612,11 +612,28 @@ public static class UnifiedMigrationService
     }
 
     /// <summary>
+    /// Columns on the legacy <c>Cards</c> table that have existed since v1 and can be assumed
+    /// present on any <c>collection.db</c> this migration will ever see. Everything else was added
+    /// incrementally by since-deleted migrations and must be probed for with <see cref="ColumnExists"/>
+    /// (see <see cref="ReadLegacyCollectionDb"/>) — an older release's <c>collection.db</c> can be
+    /// missing any of them, and a fixed <c>SELECT</c> naming a column that isn't there throws
+    /// <c>SqliteException: no such column</c>, which (via <c>MigrateDataIfNeeded</c>) used to crash
+    /// startup permanently (the migration marker never gets written, so every subsequent launch
+    /// re-crashes the same way).
+    /// </summary>
+    private static readonly string[] CardsCoreColumns =
+        ["Id", "Game", "GameCardId", "Name", "SetName", "SetCode", "Number", "Rarity", "IsFoil", "DateAdded", "ContainerId"];
+
+    /// <summary>
     /// Reads every row this migration needs out of <c>collection.db</c>'s legacy schema, using a
     /// plain <see cref="SqliteConnection"/> — no <c>CollectionDbContext</c> involved. EbayListings
     /// and FlagResolutions are read via their still-physical <c>CollectionCardId</c> column (the
     /// Task-5 rename to <c>LotId</c> only ever applied to <c>inventory.db</c>, never to
     /// <c>collection.db</c>, since the app stopped opening the latter once this migration ran).
+    /// Tolerant of older schemas: any column added to <c>Cards</c> after v1 (ScanImagePath, Page,
+    /// Slot, Section, Color, CardType, IsMissing, FlagReason, ...) is probed for existence first and
+    /// defaulted (null / false, as appropriate) if the column isn't there, rather than being named in
+    /// a fixed <c>SELECT</c> that would throw on a database missing it.
     /// </summary>
     private static LegacyCollectionData ReadLegacyCollectionDb(string collectionDbPath)
     {
@@ -624,47 +641,76 @@ public static class UnifiedMigrationService
         conn.Open();
         using var cmd = conn.CreateCommand();
 
+        // Required-since-v1 columns are assumed present (per CardsCoreColumns); everything else on
+        // Cards is optional and probed for below so the SELECT only ever names columns that exist.
+        var optionalCardColumns = new[]
+        {
+            "ImageUri", "ScanImagePath", "Condition", "PurchasePrice", "Page", "Slot", "Section",
+            "Color", "CardType", "IsMissing", "FlagReason",
+        };
+        var presentOptional = optionalCardColumns.Where(c => ColumnExists(cmd, "Cards", c)).ToHashSet();
+
+        var selectColumns = CardsCoreColumns.Concat(optionalCardColumns.Where(presentOptional.Contains)).ToList();
         var cards = new List<LegacyCard>();
-        cmd.CommandText = """
-            SELECT Id, Game, GameCardId, Name, SetName, SetCode, Number, Rarity, ImageUri, ScanImagePath,
-                   Condition, IsFoil, PurchasePrice, DateAdded, ContainerId, Page, Slot, Section, Color,
-                   CardType, IsMissing, FlagReason
-            FROM Cards
-            """;
+        cmd.CommandText = $"SELECT {string.Join(", ", selectColumns)} FROM Cards";
         using (var reader = cmd.ExecuteReader())
         {
+            var ordinals = selectColumns
+                .Select((name, index) => (name, index))
+                .ToDictionary(x => x.name, x => x.index);
+
+            // Small helpers, closed over `reader`/`ordinals`, so each field read below is a single
+            // expression regardless of whether the underlying column exists on this database.
+            string GetStringOrDefault(string col, string @default = "")
+                => ordinals.TryGetValue(col, out var i) && !reader.IsDBNull(i) ? reader.GetString(i) : @default;
+            string? GetNullableString(string col)
+                => ordinals.TryGetValue(col, out var i) && !reader.IsDBNull(i) ? reader.GetString(i) : null;
+            int? GetNullableInt(string col)
+                => ordinals.TryGetValue(col, out var i) && !reader.IsDBNull(i) ? reader.GetInt32(i) : null;
+            decimal? GetNullableDecimal(string col)
+                => ordinals.TryGetValue(col, out var i) && !reader.IsDBNull(i) ? reader.GetFieldValue<decimal>(i) : null;
+            bool GetBoolOrDefault(string col, bool @default = false)
+                => ordinals.TryGetValue(col, out var i) && !reader.IsDBNull(i) ? reader.GetBoolean(i) : @default;
+
             while (reader.Read())
             {
+                var flagReasonText = GetNullableString("FlagReason");
                 cards.Add(new LegacyCard(
-                    Id: reader.GetInt32(0),
-                    Game: Enum.Parse<CardGame>(reader.GetString(1)),
-                    GameCardId: reader.GetString(2),
-                    Name: reader.GetString(3),
-                    SetName: reader.IsDBNull(4) ? "" : reader.GetString(4),
-                    SetCode: reader.IsDBNull(5) ? "" : reader.GetString(5),
-                    Number: reader.IsDBNull(6) ? "" : reader.GetString(6),
-                    Rarity: reader.IsDBNull(7) ? "" : reader.GetString(7),
-                    ImageUri: reader.IsDBNull(8) ? null : reader.GetString(8),
-                    ScanImagePath: reader.IsDBNull(9) ? null : reader.GetString(9),
-                    Condition: reader.IsDBNull(10) ? "NM" : reader.GetString(10),
-                    IsFoil: reader.GetBoolean(11),
-                    PurchasePrice: reader.IsDBNull(12) ? null : reader.GetFieldValue<decimal>(12),
-                    DateAdded: reader.GetFieldValue<DateTime>(13),
-                    ContainerId: reader.IsDBNull(14) ? null : reader.GetInt32(14),
-                    Page: reader.IsDBNull(15) ? null : reader.GetInt32(15),
-                    Slot: reader.IsDBNull(16) ? null : reader.GetInt32(16),
-                    Section: reader.IsDBNull(17) ? null : reader.GetString(17),
-                    Color: reader.IsDBNull(18) ? null : reader.GetString(18),
-                    CardType: reader.IsDBNull(19) ? null : reader.GetString(19),
-                    IsMissing: reader.GetBoolean(20),
-                    FlagReason: reader.IsDBNull(21) ? null : Enum.Parse<FlagReason>(reader.GetString(21))));
+                    Id: reader.GetInt32(ordinals["Id"]),
+                    Game: Enum.Parse<CardGame>(reader.GetString(ordinals["Game"])),
+                    GameCardId: reader.GetString(ordinals["GameCardId"]),
+                    Name: reader.GetString(ordinals["Name"]),
+                    SetName: reader.IsDBNull(ordinals["SetName"]) ? "" : reader.GetString(ordinals["SetName"]),
+                    SetCode: reader.IsDBNull(ordinals["SetCode"]) ? "" : reader.GetString(ordinals["SetCode"]),
+                    Number: reader.IsDBNull(ordinals["Number"]) ? "" : reader.GetString(ordinals["Number"]),
+                    Rarity: reader.IsDBNull(ordinals["Rarity"]) ? "" : reader.GetString(ordinals["Rarity"]),
+                    ImageUri: GetNullableString("ImageUri"),
+                    ScanImagePath: GetNullableString("ScanImagePath"),
+                    Condition: GetStringOrDefault("Condition", "NM"),
+                    IsFoil: reader.GetBoolean(ordinals["IsFoil"]),
+                    PurchasePrice: GetNullableDecimal("PurchasePrice"),
+                    DateAdded: reader.GetFieldValue<DateTime>(ordinals["DateAdded"]),
+                    ContainerId: reader.IsDBNull(ordinals["ContainerId"]) ? null : reader.GetInt32(ordinals["ContainerId"]),
+                    Page: GetNullableInt("Page"),
+                    Slot: GetNullableInt("Slot"),
+                    Section: GetNullableString("Section"),
+                    Color: GetNullableString("Color"),
+                    CardType: GetNullableString("CardType"),
+                    IsMissing: GetBoolOrDefault("IsMissing"),
+                    FlagReason: flagReasonText is null ? null : Enum.Parse<FlagReason>(flagReasonText)));
             }
         }
 
         var containers = new List<LegacyContainer>();
         if (TableExists(cmd, "StorageContainers"))
         {
-            cmd.CommandText = "SELECT Id, Name, ContainerType, IsSystem, SortOrder, CoverCardId, ExcludeFromDeckCheck FROM StorageContainers";
+            // ExcludeFromDeckCheck was added to StorageContainers well after Id/Name/ContainerType/
+            // IsSystem/SortOrder/CoverCardId (which have been there since v1) — probe for it too,
+            // same tolerance as the Cards table above.
+            var hasExcludeFromDeckCheck = ColumnExists(cmd, "StorageContainers", "ExcludeFromDeckCheck");
+            cmd.CommandText = hasExcludeFromDeckCheck
+                ? "SELECT Id, Name, ContainerType, IsSystem, SortOrder, CoverCardId, ExcludeFromDeckCheck FROM StorageContainers"
+                : "SELECT Id, Name, ContainerType, IsSystem, SortOrder, CoverCardId FROM StorageContainers";
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
@@ -675,7 +721,7 @@ public static class UnifiedMigrationService
                     IsSystem: reader.GetBoolean(3),
                     SortOrder: reader.GetInt32(4),
                     CoverCardId: reader.IsDBNull(5) ? null : reader.GetInt32(5),
-                    ExcludeFromDeckCheck: reader.GetBoolean(6)));
+                    ExcludeFromDeckCheck: hasExcludeFromDeckCheck && !reader.IsDBNull(6) && reader.GetBoolean(6)));
             }
         }
 

@@ -1585,7 +1585,9 @@ public sealed class CardService : ICardService
     {
         using var context = _omniDbContextFactory.CreateDbContext();
         var ids = cardIds.ToList();
-        var lots = context.Lots.Where(l => ids.Contains(l.Id)).ToList();
+        // Category=Single guard, defense-in-depth: matches GetCollectionCards' scoping so a stray
+        // sealed-lot id passed in from elsewhere can never be mutated via the singles write path.
+        var lots = context.Lots.Where(l => ids.Contains(l.Id) && l.Product.Category == ProductCategory.Single).ToList();
         foreach (var lot in lots)
         {
             lot.LocationId = containerId;
@@ -1609,7 +1611,11 @@ public sealed class CardService : ICardService
     {
         using var context = _omniDbContextFactory.CreateDbContext();
         var ids = cardIds.ToList();
-        var lots = context.Lots.Include(l => l.Product).Where(l => ids.Contains(l.Id)).ToList();
+        // Category=Single guard, defense-in-depth: matches GetCollectionCards' scoping so a stray
+        // sealed-lot id passed in from elsewhere can never be mutated via the singles write path.
+        var lots = context.Lots.Include(l => l.Product)
+            .Where(l => ids.Contains(l.Id) && l.Product.Category == ProductCategory.Single)
+            .ToList();
         var productCache = new Dictionary<(CardGame Game, string GameCardId, bool Foil), Product>();
 
         foreach (var lot in lots)
@@ -1640,7 +1646,10 @@ public sealed class CardService : ICardService
     {
         _logger.LogInformation("Updating collection card {Id}: {Name}", card.Id, card.Name);
         using var context = _omniDbContextFactory.CreateDbContext();
-        var lot = context.Lots.Include(l => l.Product).FirstOrDefault(l => l.Id == card.Id);
+        // Category=Single guard, defense-in-depth: matches GetCollectionCards' scoping so a stray
+        // sealed-lot id can never be mutated via the singles write path.
+        var lot = context.Lots.Include(l => l.Product)
+            .FirstOrDefault(l => l.Id == card.Id && l.Product.Category == ProductCategory.Single);
         if (lot is null)
             return;
 
@@ -1652,7 +1661,10 @@ public sealed class CardService : ICardService
     {
         _logger.LogInformation("Deleting collection card {Id}", id);
         using var context = _omniDbContextFactory.CreateDbContext();
-        var lot = context.Lots.Find(id);
+        // Category=Single guard, defense-in-depth: matches GetCollectionCards' scoping so a stray
+        // sealed-lot id can never be deleted via the singles write path. Find() can't apply a filter,
+        // so this uses an explicit query instead.
+        var lot = context.Lots.FirstOrDefault(l => l.Id == id && l.Product.Category == ProductCategory.Single);
         if (lot is null)
             return;
 

@@ -185,6 +185,69 @@ public class UnifiedMigrationTests : IDisposable
         return (int)(long)cmd.ExecuteScalar()!;
     }
 
+    /// <summary>
+    /// Creates a legacy collection.db whose <c>Cards</c> table is missing every column added after
+    /// v1 (ScanImagePath, Color, CardType, IsMissing, FlagReason) — simulating a <c>collection.db</c>
+    /// carried forward from a release that predates the (now-deleted) migrations that added them.
+    /// Used by <see cref="MigrateDataIfNeeded_LegacyCardsTableMissingLateAddedColumns_MigratesWithoutThrowing"/>
+    /// to verify the reader tolerates this instead of throwing "no such column".
+    /// </summary>
+    private string CreateLegacyCollectionDbMissingOptionalColumns()
+    {
+        var path = Path.Combine(_tempDir, "collection.db");
+        using var conn = new SqliteConnection($"Data Source={path}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE Cards (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Game TEXT NOT NULL,
+                GameCardId TEXT NOT NULL,
+                Name TEXT NOT NULL,
+                SetName TEXT NOT NULL DEFAULT '',
+                SetCode TEXT NOT NULL DEFAULT '',
+                Number TEXT NOT NULL DEFAULT '',
+                Rarity TEXT NOT NULL DEFAULT '',
+                ImageUri TEXT,
+                Condition TEXT NOT NULL DEFAULT 'NM',
+                IsFoil INTEGER NOT NULL DEFAULT 0,
+                PurchasePrice TEXT,
+                DateAdded TEXT NOT NULL,
+                ContainerId INTEGER,
+                Page INTEGER,
+                Slot INTEGER,
+                Section TEXT
+            );
+            """;
+        cmd.ExecuteNonQuery();
+        SqliteConnection.ClearAllPools();
+        return path;
+    }
+
+    private static int InsertCardMissingOptionalColumns(
+        SqliteConnection conn, CardGame game, string gameCardId, string name, bool isFoil,
+        string setName = "", string setCode = "", string number = "", string rarity = "",
+        decimal? purchasePrice = null, DateTime? dateAdded = null)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO Cards (Game, GameCardId, Name, SetName, SetCode, Number, Rarity, IsFoil, PurchasePrice, DateAdded)
+            VALUES ($game, $gameCardId, $name, $setName, $setCode, $number, $rarity, $isFoil, $purchasePrice, $dateAdded);
+            SELECT last_insert_rowid();
+            """;
+        cmd.Parameters.AddWithValue("$game", game.ToString());
+        cmd.Parameters.AddWithValue("$gameCardId", gameCardId);
+        cmd.Parameters.AddWithValue("$name", name);
+        cmd.Parameters.AddWithValue("$setName", setName);
+        cmd.Parameters.AddWithValue("$setCode", setCode);
+        cmd.Parameters.AddWithValue("$number", number);
+        cmd.Parameters.AddWithValue("$rarity", rarity);
+        cmd.Parameters.AddWithValue("$isFoil", isFoil ? 1 : 0);
+        cmd.Parameters.AddWithValue("$purchasePrice", purchasePrice is null ? DBNull.Value : purchasePrice.Value.ToString());
+        cmd.Parameters.AddWithValue("$dateAdded", (dateAdded ?? DateTime.UtcNow).ToString("O"));
+        return (int)(long)cmd.ExecuteScalar()!;
+    }
+
     private static int InsertContainer(SqliteConnection conn, string name, ContainerType type, int? coverCardId = null)
     {
         using var cmd = conn.CreateCommand();
@@ -264,6 +327,47 @@ public class UnifiedMigrationTests : IDisposable
         Assert.Equal(12.00m, foilLot.UnitCost);
         Assert.True(foilLot.IsMissing);
         Assert.Equal(FlagReason.Manual, foilLot.FlagReason);
+    }
+
+    [Fact]
+    public void MigrateDataIfNeeded_LegacyCardsTableMissingLateAddedColumns_MigratesWithoutThrowing()
+    {
+        // collection.db from a release that predates the ScanImagePath/Color/CardType/IsMissing/
+        // FlagReason columns entirely (not merely NULL — the columns themselves don't exist). Before
+        // the fix, the reader's fixed SELECT naming these columns threw SqliteException ("no such
+        // column"), which (uncaught, in App.xaml.cs's startup Task.Run) crashed startup permanently,
+        // since the failed migration never wrote the DB marker.
+        CreateLegacyCollectionDbMissingOptionalColumns();
+        using (var conn = new SqliteConnection($"Data Source={Path.Combine(_tempDir, "collection.db")}"))
+        {
+            conn.Open();
+            InsertCardMissingOptionalColumns(conn, CardGame.Mtg, "bolt-1", "Lightning Bolt", isFoil: false,
+                setName: "Alpha", setCode: "lea", number: "1", rarity: "common",
+                purchasePrice: 5.50m, dateAdded: new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        }
+        SqliteConnection.ClearAllPools();
+
+        // Must not throw.
+        var map = UnifiedMigrationService.MigrateDataIfNeeded(_tempDir, _unifiedFactory, NullLogger.Instance);
+        Assert.Single(map);
+
+        using var verify = NewUnifiedCtx();
+        var product = Assert.Single(verify.Products.AsNoTracking().ToList());
+        // Present columns still map correctly.
+        Assert.Equal("Lightning Bolt", product.Name);
+        Assert.Equal("Alpha", product.SetName);
+        Assert.Equal("lea", product.SetCode);
+        Assert.Equal("1", product.CollectorNumber);
+        Assert.Equal("common", product.Rarity);
+        // Columns absent from the legacy table default rather than throwing.
+        Assert.Null(product.Color);
+        Assert.Null(product.CardType);
+
+        var lot = Assert.Single(verify.Lots.AsNoTracking().ToList());
+        Assert.Equal(5.50m, lot.UnitCost);
+        Assert.Null(lot.ScanImagePath);
+        Assert.False(lot.IsMissing);
+        Assert.Null(lot.FlagReason);
     }
 
     [Fact]
