@@ -10,6 +10,7 @@ public class OmniCardDbContext : DbContext
     public DbSet<InventoryMovement> Movements => Set<InventoryMovement>();
     public DbSet<StorageContainer> StorageContainers => Set<StorageContainer>();
     public DbSet<EbayListing> EbayListings => Set<EbayListing>();
+    public DbSet<Listing> Listings => Set<Listing>();
     public DbSet<MismatchLog> MismatchLogs => Set<MismatchLog>();
     public DbSet<FlagResolution> FlagResolutions => Set<FlagResolution>();
     public DbSet<ScanDiagnosticEvent> ScanDiagnosticEvents => Set<ScanDiagnosticEvent>();
@@ -128,6 +129,16 @@ public class OmniCardDbContext : DbContext
             e.HasOne(l => l.Lot).WithMany()
                 .HasForeignKey(l => l.LotId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Listing>(e =>
+        {
+            e.HasKey(l => l.Id);
+            e.Property(l => l.Id).ValueGeneratedOnAdd();
+            e.Property(l => l.Channel).HasConversion<string>();
+            e.Property(l => l.Status).HasConversion<string>();
+            e.HasIndex(l => l.LotId);
+            e.HasIndex(l => l.Status);
         });
 
         modelBuilder.Entity<MigrationState>(e =>
