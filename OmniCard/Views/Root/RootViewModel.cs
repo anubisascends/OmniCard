@@ -36,6 +36,7 @@ public sealed partial class RootViewModel(
     ICsvExportImportService csvService,
     CollectionViewModel collection,
     Views.Inventory.InventoryViewModel inventory,
+    Views.Dashboard.DashboardViewModel dashboard,
     IMismatchLogService mismatchLogService,
     SetSymbolCache setSymbolCache,
     IScanDiagnosticService diagnosticService,
@@ -163,6 +164,9 @@ public sealed partial class RootViewModel(
 
     /// <summary>The nested InventoryViewModel that owns all inventory (sealed product ERP) state.</summary>
     public Views.Inventory.InventoryViewModel Inventory { get; } = inventory;
+
+    /// <summary>The nested DashboardViewModel that owns valuation + realized P&amp;L reporting state.</summary>
+    public Views.Dashboard.DashboardViewModel Dashboard { get; } = dashboard;
 
     /// <summary>Set by the View to focus and select the manual search box.</summary>
     public Action? FocusManualSearch { get; set; }

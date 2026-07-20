@@ -269,3 +269,124 @@ public class EnumBoolConverter : MarkupExtension, IValueConverter
 
     public override object ProvideValue(IServiceProvider serviceProvider) => this;
 }
+
+/// <summary>
+/// Dashboard breakdown row keys are raw enum names ("Mtg", "OnePiece", "Single", "Box", ...)
+/// or, for the by-location breakdown, a storage container name/"Unassigned". Maps the known
+/// enum names to friendly display text and passes everything else through unchanged.
+/// </summary>
+public class BreakdownKeyDisplayConverter : MarkupExtension, IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var key = value as string;
+        if (string.IsNullOrEmpty(key)) return "";
+
+        if (Enum.TryParse<CardGame>(key, out var game))
+        {
+            return game switch
+            {
+                CardGame.Mtg => "Magic: The Gathering",
+                CardGame.OnePiece => "One Piece TCG",
+                _ => key
+            };
+        }
+
+        if (Enum.TryParse<ProductCategory>(key, out var category))
+        {
+            return category switch
+            {
+                ProductCategory.Single => "Singles",
+                ProductCategory.Case => "Case",
+                ProductCategory.Box => "Box",
+                ProductCategory.Pack => "Pack",
+                ProductCategory.Deck => "Deck",
+                ProductCategory.Bundle => "Bundle",
+                ProductCategory.Other => "Other",
+                _ => key
+            };
+        }
+
+        return key; // storage location name, "Unassigned", or "Unknown" — shown as-is
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
+
+/// <summary>Formats a decimal as a signed dollar amount, e.g. "+$12.34" / "-$12.34".</summary>
+public class SignedMoneyConverter : MarkupExtension, IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is decimal d
+            ? d >= 0 ? $"+${d:N2}" : $"-${Math.Abs(d):N2}"
+            : "";
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
+
+/// <summary>Green when the decimal value is non-negative, red otherwise. Used for gain/loss tiles.</summary>
+public class GainLossColorConverter : MarkupExtension, IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is decimal d
+            ? d >= 0 ? System.Windows.Media.Brushes.LimeGreen : System.Windows.Media.Brushes.OrangeRed
+            : System.Windows.Media.Brushes.Gray;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
+
+/// <summary>
+/// Multi-value converter for a breakdown row's Unrealized/Profit column: values[0] minus
+/// values[1] (e.g. Market-Cost, or Proceeds-Cost), formatted as a signed dollar amount.
+/// </summary>
+public class DeltaMoneyConverter : MarkupExtension, IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var a = values.Length > 0 && values[0] is decimal da ? da : 0m;
+        var b = values.Length > 1 && values[1] is decimal db ? db : 0m;
+        var delta = a - b;
+        return delta >= 0 ? $"+${delta:N2}" : $"-${Math.Abs(delta):N2}";
+    }
+
+    public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
+
+/// <summary>
+/// Multi-value converter for an inline breakdown proportion bar: values[0] is the row's amount,
+/// values[1] is the grand total. Returns a bar width in device-independent pixels, scaled against
+/// a max width (ConverterParameter, default 80).
+/// </summary>
+public class ShareBarWidthConverter : MarkupExtension, IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var amount = values.Length > 0 && values[0] is decimal da ? da : 0m;
+        var total = values.Length > 1 && values[1] is decimal dt ? dt : 0m;
+        var maxWidth = parameter is string s && double.TryParse(s, culture, out var mw) ? mw : 80.0;
+
+        if (total <= 0m || amount <= 0m) return 0.0;
+
+        var ratio = (double)(amount / total);
+        if (ratio > 1.0) ratio = 1.0;
+        if (ratio < 0.0) ratio = 0.0;
+        return ratio * maxWidth;
+    }
+
+    public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}

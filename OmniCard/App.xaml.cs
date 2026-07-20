@@ -73,6 +73,7 @@ public partial class App : Application
             services.Configure<WebCompanionSettings>(context.Configuration.GetSection("WebCompanion"));
             services.AddSingleton<CollectionViewModel>();
             services.AddSingleton<Views.Inventory.InventoryViewModel>();
+            services.AddSingleton<Views.Dashboard.DashboardViewModel>();
             services.AddSingleton<RootViewModel>();
             services.AddSingleton<ScannerService>();
             services.AddSingleton<WebScannerService>();
