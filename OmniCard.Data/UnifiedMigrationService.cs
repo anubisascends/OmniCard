@@ -177,6 +177,60 @@ public static class UnifiedMigrationService
         cmd.ExecuteNonQuery();
 
         cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS Customers (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL DEFAULT '',
+                Email TEXT, Phone TEXT, TcgPlayerUsername TEXT,
+                AddressLine1 TEXT, AddressLine2 TEXT, City TEXT, State TEXT,
+                PostalCode TEXT, Country TEXT, Notes TEXT,
+                CreatedAt TEXT NOT NULL
+            )
+            """;
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_Customers_Name ON Customers(Name)";
+        cmd.ExecuteNonQuery();
+
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS Orders (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CustomerId INTEGER NOT NULL,
+                Channel TEXT NOT NULL DEFAULT 'Manual',
+                OrderNumber TEXT,
+                OrderDate TEXT NOT NULL,
+                Status TEXT NOT NULL DEFAULT 'Open',
+                TrackingNumber TEXT, Carrier TEXT,
+                ShippingChargedToBuyer TEXT NOT NULL DEFAULT '0',
+                ShippingCost TEXT NOT NULL DEFAULT '0',
+                MarketplaceFees TEXT NOT NULL DEFAULT '0',
+                Notes TEXT,
+                CreatedAt TEXT NOT NULL,
+                ShippedAt TEXT
+            )
+            """;
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_Orders_CustomerId ON Orders(CustomerId)";
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_Orders_Status ON Orders(Status)";
+        cmd.ExecuteNonQuery();
+
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS OrderLines (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                OrderId INTEGER NOT NULL,
+                LotId INTEGER,
+                ProductId INTEGER,
+                NameSnapshot TEXT NOT NULL DEFAULT '',
+                SetSnapshot TEXT, ConditionSnapshot TEXT,
+                IsFoilSnapshot INTEGER NOT NULL DEFAULT 0,
+                Quantity INTEGER NOT NULL DEFAULT 1,
+                UnitSalePrice TEXT NOT NULL DEFAULT '0'
+            )
+            """;
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_OrderLines_OrderId ON OrderLines(OrderId)";
+        cmd.ExecuteNonQuery();
+
+        cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS MismatchLogs (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ScanHash INTEGER NOT NULL,

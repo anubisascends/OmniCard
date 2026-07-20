@@ -11,6 +11,9 @@ public class OmniCardDbContext : DbContext
     public DbSet<StorageContainer> StorageContainers => Set<StorageContainer>();
     public DbSet<EbayListing> EbayListings => Set<EbayListing>();
     public DbSet<Listing> Listings => Set<Listing>();
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<Order> Orders => Set<Order>();
+    public DbSet<OrderLine> OrderLines => Set<OrderLine>();
     public DbSet<MismatchLog> MismatchLogs => Set<MismatchLog>();
     public DbSet<FlagResolution> FlagResolutions => Set<FlagResolution>();
     public DbSet<ScanDiagnosticEvent> ScanDiagnosticEvents => Set<ScanDiagnosticEvent>();
@@ -139,6 +142,30 @@ public class OmniCardDbContext : DbContext
             e.Property(l => l.Status).HasConversion<string>();
             e.HasIndex(l => l.LotId);
             e.HasIndex(l => l.Status);
+        });
+
+        modelBuilder.Entity<Customer>(e =>
+        {
+            e.HasKey(c => c.Id);
+            e.Property(c => c.Id).ValueGeneratedOnAdd();
+            e.HasIndex(c => c.Name);
+        });
+
+        modelBuilder.Entity<Order>(e =>
+        {
+            e.HasKey(o => o.Id);
+            e.Property(o => o.Id).ValueGeneratedOnAdd();
+            e.Property(o => o.Channel).HasConversion<string>();
+            e.Property(o => o.Status).HasConversion<string>();
+            e.HasIndex(o => o.CustomerId);
+            e.HasIndex(o => o.Status);
+        });
+
+        modelBuilder.Entity<OrderLine>(e =>
+        {
+            e.HasKey(l => l.Id);
+            e.Property(l => l.Id).ValueGeneratedOnAdd();
+            e.HasIndex(l => l.OrderId);
         });
 
         modelBuilder.Entity<MigrationState>(e =>
