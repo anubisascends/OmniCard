@@ -6,7 +6,7 @@ public record MovementView(
     DateTime Timestamp,
     MovementType Type,
     string ProductName,
-    CardGame Game,
+    CardGame? Game,
     int Quantity,
     decimal? UnitValue,
     string? Note);
