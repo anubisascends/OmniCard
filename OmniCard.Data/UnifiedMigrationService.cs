@@ -86,7 +86,7 @@ public static class UnifiedMigrationService
                 AddColumnIfMissing(cmd, "Products", col, "TEXT");
 
             // Task 1 (Phase 3): persisted eBay-derived sealed pricing.
-            AddColumnIfMissing(cmd, "Products", "LastMarketPrice", "REAL");
+            AddColumnIfMissing(cmd, "Products", "LastMarketPrice", "TEXT");
             AddColumnIfMissing(cmd, "Products", "PriceUpdatedAt", "TEXT");
         }
 
