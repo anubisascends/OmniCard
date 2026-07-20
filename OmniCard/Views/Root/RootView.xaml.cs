@@ -27,11 +27,15 @@ public partial class RootView : IView<RootViewModel>, IHostedService
         ScannerTab.WireUpAutoScroll();
         DashboardTab.WireUp(viewModel.Dashboard);
 
-        // Lazy-load the Dashboard tab's data the first time it's selected.
+        // Lazy-load the Dashboard tab's data the first time it's selected; the Sales tab's
+        // pick list is reloaded on every activation (cheap query, and needs to reflect any
+        // listings changed elsewhere since the tab was last shown).
         MainTabControl.SelectionChanged += (_, _) =>
         {
             if (MainTabControl.SelectedItem == tabItemDashboard)
                 viewModel.Dashboard.Load();
+            else if (MainTabControl.SelectedItem == tabItemSales)
+                viewModel.Sales.Load();
         };
 
         ViewModel.Collection.GetSelectedCards = () => CollectionTab.GetSelectedCards();

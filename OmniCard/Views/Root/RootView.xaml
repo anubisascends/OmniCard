@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:OmniCard.Views.Root"
         xmlns:dashboard="clr-namespace:OmniCard.Views.Dashboard"
+        xmlns:sales="clr-namespace:OmniCard.Views.Sales"
         xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance {x:Type local:RootView}}"
@@ -257,6 +258,11 @@
             <TabItem Header="Dashboard"
                      x:Name="tabItemDashboard">
                 <dashboard:DashboardView x:Name="DashboardTab"/>
+            </TabItem>
+
+            <TabItem Header="Sales"
+                     x:Name="tabItemSales">
+                <sales:SalesView DataContext="{Binding ViewModel.Sales}"/>
             </TabItem>
 
         </TabControl>
