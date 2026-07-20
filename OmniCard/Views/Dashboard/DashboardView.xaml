@@ -31,6 +31,25 @@
             <Setter Property="GridLinesVisibility" Value="None"/>
             <Setter Property="MaxHeight" Value="220"/>
         </Style>
+
+        <!-- Charts: one row per category, label + proportional bar + value, sorted desc by the VM.
+             Bar width is scaled by ShareBarWidthConverter against the chart's section-max (not the
+             grand total), so the largest row always fills the available track. -->
+        <Style x:Key="ChartRowLabelStyle" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+        </Style>
+        <Style x:Key="ChartRowValueStyle" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+        </Style>
+        <Style x:Key="ChartBarStyle" TargetType="Border">
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="CornerRadius" Value="2"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
     </UserControl.Resources>
 
     <Grid Margin="8">
@@ -132,6 +151,105 @@
         <!-- Breakdown tables -->
         <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="4,0,4,8">
+
+                <!-- Charts -->
+                <TextBlock Text="Charts" Style="{StaticResource BreakdownHeaderStyle}" Margin="0,4,0,8" FontSize="16"/>
+
+                <TextBlock Text="Market Value by Game" Style="{StaticResource BreakdownHeaderStyle}"/>
+                <ItemsControl ItemsSource="{Binding MarketByGameRows}" AlternationCount="8">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="90"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource ChartRowLabelStyle}"
+                                           Text="{Binding Key, Converter={conv:BreakdownKeyDisplayConverter}}"/>
+                                <Border Grid.Column="1" Style="{StaticResource ChartBarStyle}"
+                                        Background="{Binding Path=(ItemsControl.AlternationIndex),
+                                                     RelativeSource={RelativeSource TemplatedParent},
+                                                     Converter={conv:SeriesIndexBrushConverter}}">
+                                    <Border.Width>
+                                        <MultiBinding Converter="{conv:ShareBarWidthConverter}" ConverterParameter="220">
+                                            <Binding Path="Value"/>
+                                            <Binding Path="DataContext.MarketByGameMax"
+                                                     RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
+                                        </MultiBinding>
+                                    </Border.Width>
+                                </Border>
+                                <TextBlock Grid.Column="2" Style="{StaticResource ChartRowValueStyle}"
+                                           Text="{Binding Value, StringFormat='${0:N2}'}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Text="Market Value by Category" Style="{StaticResource BreakdownHeaderStyle}"/>
+                <ItemsControl ItemsSource="{Binding MarketByCategoryRows}" AlternationCount="8">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="90"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource ChartRowLabelStyle}"
+                                           Text="{Binding Key, Converter={conv:BreakdownKeyDisplayConverter}}"/>
+                                <Border Grid.Column="1" Style="{StaticResource ChartBarStyle}"
+                                        Background="{Binding Path=(ItemsControl.AlternationIndex),
+                                                     RelativeSource={RelativeSource TemplatedParent},
+                                                     Converter={conv:SeriesIndexBrushConverter}}">
+                                    <Border.Width>
+                                        <MultiBinding Converter="{conv:ShareBarWidthConverter}" ConverterParameter="220">
+                                            <Binding Path="Value"/>
+                                            <Binding Path="DataContext.MarketByCategoryMax"
+                                                     RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
+                                        </MultiBinding>
+                                    </Border.Width>
+                                </Border>
+                                <TextBlock Grid.Column="2" Style="{StaticResource ChartRowValueStyle}"
+                                           Text="{Binding Value, StringFormat='${0:N2}'}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Text="Realized Profit by Game" Style="{StaticResource BreakdownHeaderStyle}"/>
+                <ItemsControl ItemsSource="{Binding RealizedProfitByGameRows}" AlternationCount="8">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="90"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource ChartRowLabelStyle}"
+                                           Text="{Binding Key, Converter={conv:BreakdownKeyDisplayConverter}}"/>
+                                <!-- Negative (loss) values render a zero-width bar (ShareBarWidthConverter
+                                     clamps non-positive amounts to 0) — the signed label is the signal. -->
+                                <Border Grid.Column="1" Style="{StaticResource ChartBarStyle}"
+                                        Background="{Binding Path=(ItemsControl.AlternationIndex),
+                                                     RelativeSource={RelativeSource TemplatedParent},
+                                                     Converter={conv:SeriesIndexBrushConverter}}">
+                                    <Border.Width>
+                                        <MultiBinding Converter="{conv:ShareBarWidthConverter}" ConverterParameter="220">
+                                            <Binding Path="Value"/>
+                                            <Binding Path="DataContext.RealizedProfitByGameMax"
+                                                     RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
+                                        </MultiBinding>
+                                    </Border.Width>
+                                </Border>
+                                <TextBlock Grid.Column="2" Style="{StaticResource ChartRowValueStyle}"
+                                           Text="{Binding Value, Converter={conv:SignedMoneyConverter}}"
+                                           Foreground="{Binding Value, Converter={conv:GainLossColorConverter}}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
                 <TextBlock Text="Holdings by Game" Style="{StaticResource BreakdownHeaderStyle}"/>
                 <DataGrid Style="{StaticResource BreakdownGridStyle}"

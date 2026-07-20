@@ -14,6 +14,11 @@ public enum RealizedPeriod
     ThisMonth,
 }
 
+/// <summary>A single bar-chart row on the Dashboard's Charts section: a breakdown key (raw enum
+/// name or location name, as in <see cref="OmniCard.Models.ValuationLine"/>/<see
+/// cref="OmniCard.Models.RealizedLine"/>) paired with the charted value.</summary>
+public sealed record ChartRow(string Key, decimal Value);
+
 /// <summary>
 /// Backs the Dashboard tab: a read-only valuation + realized-P&amp;L overview sourced from
 /// <see cref="IAnalyticsService"/>. Data is loaded lazily on first tab activation and can be
@@ -70,12 +75,52 @@ public sealed partial class DashboardViewModel : ViewModel
     /// breakdown tables' empty-state message (as opposed to the pre-first-load null state).</summary>
     public bool HasNoHoldings => Holdings is { TotalUnits: 0 };
 
+    // --- Chart rows (Charts section) ---------------------------------------------------------
+    // Each bar chart is driven by a small (Key, Value) projection, sorted descending by the
+    // charted value, plus a section-max used to scale bar widths via ShareBarWidthConverter.
+    // Recomputed (not cached) so they always reflect the latest Holdings/Realized.
+
+    /// <summary>Market value by game, sorted descending by market value.</summary>
+    public IReadOnlyList<ChartRow> MarketByGameRows =>
+        Holdings?.ByGame.Select(l => new ChartRow(l.Key, l.Market)).OrderByDescending(r => r.Value).ToList()
+        ?? [];
+
+    /// <summary>Largest value in <see cref="MarketByGameRows"/> (0 if empty); the chart's bar-scale denominator.</summary>
+    public decimal MarketByGameMax => MarketByGameRows.Count > 0 ? MarketByGameRows[0].Value : 0m;
+
+    /// <summary>Market value by category, sorted descending by market value.</summary>
+    public IReadOnlyList<ChartRow> MarketByCategoryRows =>
+        Holdings?.ByCategory.Select(l => new ChartRow(l.Key, l.Market)).OrderByDescending(r => r.Value).ToList()
+        ?? [];
+
+    /// <summary>Largest value in <see cref="MarketByCategoryRows"/> (0 if empty); the chart's bar-scale denominator.</summary>
+    public decimal MarketByCategoryMax => MarketByCategoryRows.Count > 0 ? MarketByCategoryRows[0].Value : 0m;
+
+    /// <summary>Realized profit (Proceeds-Cost) by game, sorted descending by profit — largest
+    /// gains first, largest losses last. Losses (negative values) render a zero-width bar via
+    /// <c>ShareBarWidthConverter</c> (which clamps non-positive amounts to 0) but keep their
+    /// signed value label, so a loss is never misread as "no data".</summary>
+    public IReadOnlyList<ChartRow> RealizedProfitByGameRows =>
+        Realized?.ByGame.Select(l => new ChartRow(l.Key, l.Proceeds - l.Cost)).OrderByDescending(r => r.Value).ToList()
+        ?? [];
+
+    /// <summary>Largest (most positive) value in <see cref="RealizedProfitByGameRows"/>, clamped to
+    /// ≥0 — if every game lost money this is 0, which zeroes every bar's width while the signed
+    /// labels remain the only (correct) signal.</summary>
+    public decimal RealizedProfitByGameMax => RealizedProfitByGameRows.Count > 0
+        ? Math.Max(0m, RealizedProfitByGameRows[0].Value)
+        : 0m;
+
     partial void OnHoldingsChanged(HoldingsValuation? value)
     {
         OnPropertyChanged(nameof(TotalCost));
         OnPropertyChanged(nameof(TotalMarket));
         OnPropertyChanged(nameof(UnrealizedGain));
         OnPropertyChanged(nameof(HasNoHoldings));
+        OnPropertyChanged(nameof(MarketByGameRows));
+        OnPropertyChanged(nameof(MarketByGameMax));
+        OnPropertyChanged(nameof(MarketByCategoryRows));
+        OnPropertyChanged(nameof(MarketByCategoryMax));
     }
 
     partial void OnRealizedChanged(RealizedSummary? value)
@@ -83,6 +128,8 @@ public sealed partial class DashboardViewModel : ViewModel
         OnPropertyChanged(nameof(RealizedProceeds));
         OnPropertyChanged(nameof(RealizedCost));
         OnPropertyChanged(nameof(RealizedProfit));
+        OnPropertyChanged(nameof(RealizedProfitByGameRows));
+        OnPropertyChanged(nameof(RealizedProfitByGameMax));
     }
 
     /// <summary>Recomputes only the realized side, off the UI thread, whenever the period

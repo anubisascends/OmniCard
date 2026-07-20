@@ -378,6 +378,54 @@ public class DeltaMoneyConverter : MarkupExtension, IMultiValueConverter
 }
 
 /// <summary>
+/// Assigns a categorical bar-chart color by a fixed slot order (never by rank/value), keyed off
+/// an <c>ItemsControl.AlternationIndex</c> (0-based, cycling if a chart has more rows than
+/// slots). Hues are the dataviz-skill categorical palette's dark-mode steps — validated for
+/// CVD-safe adjacent contrast on a dark chart surface, matching this app's fixed dark
+/// MaterialDesign theme (see App.xaml, BaseTheme="Dark").
+/// </summary>
+public class SeriesIndexBrushConverter : MarkupExtension, IValueConverter
+{
+    private static readonly System.Windows.Media.SolidColorBrush[] Palette = CreatePalette();
+
+    private static System.Windows.Media.SolidColorBrush[] CreatePalette()
+    {
+        string[] hex =
+        [
+            "#3987E5", // 1 blue
+            "#199E70", // 2 aqua
+            "#C98500", // 3 yellow
+            "#008300", // 4 green
+            "#9085E9", // 5 violet
+            "#E66767", // 6 red
+            "#D55181", // 7 magenta
+            "#D95926", // 8 orange
+        ];
+        var brushes = new System.Windows.Media.SolidColorBrush[hex.Length];
+        for (var i = 0; i < hex.Length; i++)
+        {
+            var brush = (System.Windows.Media.SolidColorBrush)
+                System.Windows.Media.ColorConverter.ConvertFromString(hex[i]);
+            brush.Freeze();
+            brushes[i] = brush;
+        }
+        return brushes;
+    }
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var index = value is int i ? i : 0;
+        if (index < 0) index = 0;
+        return Palette[index % Palette.Length];
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
+
+/// <summary>
 /// Multi-value converter for an inline breakdown proportion bar: values[0] is the row's amount,
 /// values[1] is the grand total. Returns a bar width in device-independent pixels, scaled against
 /// a max width (ConverterParameter, default 80).
