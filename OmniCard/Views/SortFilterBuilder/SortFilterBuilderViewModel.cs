@@ -51,12 +51,18 @@ public partial class SortFilterBuilderViewModel : ObservableObject
         Game = game;
 
         AvailableFields.Clear();
-        foreach (var field in new[] { "Name", "Color", "CardType", "SetName", "Rarity", "Condition", "IsFoil", "PurchasePrice", "DateAdded" })
+        foreach (var field in new[]
+        {
+            "Name", "SetName", "SetCode", "Number", "Rarity", "Color", "CardType",
+            "Condition", "IsFoil", "PurchasePrice", "MarketPrice", "Quantity",
+            "DateAdded", "Section", "Page", "Slot", "IsMissing",
+        })
             AvailableFields.Add(field);
 
-        // Cache distinct values for Sort tab's "Fill" button
+        // Cache distinct values for the Sort tab's "Fill" (custom order) button. Only
+        // categorical fields with a manageable set of values are worth filling.
         _distinctValues = [];
-        foreach (var field in new[] { "Color", "CardType", "SetName", "Rarity", "Condition", "IsFoil" })
+        foreach (var field in new[] { "Color", "CardType", "SetName", "SetCode", "Rarity", "Condition", "IsFoil", "Section" })
             _distinctValues[field] = _cardService.GetDistinctFieldValues(field, game);
 
         RefreshSortPresets();
