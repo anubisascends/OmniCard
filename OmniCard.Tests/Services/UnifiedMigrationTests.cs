@@ -15,6 +15,7 @@ public class UnifiedMigrationTests : IDisposable
     private readonly DbContextOptions<OmniCardDbContext> _unifiedOptions;
     private readonly CollectionDbContextFactory _collectionFactory;
     private readonly UnifiedDbContextFactory _unifiedFactory;
+    private readonly DateTime _testStart = DateTime.UtcNow;
 
     public UnifiedMigrationTests()
     {
@@ -162,7 +163,11 @@ public class UnifiedMigrationTests : IDisposable
         Assert.Equal(lot.ProductId, movement.ProductId);
         Assert.Equal(1, movement.Quantity);
         Assert.Equal(lot.UnitCost, movement.UnitValue);
-        Assert.Equal(lot.AcquisitionDate, movement.Timestamp);
+
+        // Acquire movement Timestamp is the recording time ("now"), NOT the lot's (here,
+        // backdated) AcquisitionDate — matches InventoryService.AddLot's convention.
+        Assert.NotEqual(lot.AcquisitionDate, movement.Timestamp);
+        Assert.True(movement.Timestamp >= _testStart);
     }
 
     [Fact]
@@ -245,6 +250,41 @@ public class UnifiedMigrationTests : IDisposable
     }
 
     [Fact]
+    public void MigrateDataIfNeeded_RemapsStorageContainerCoverCardId_ToNewLotId()
+    {
+        int oldCardId;
+        using (var ctx = NewCollectionCtx())
+        {
+            var container = new StorageContainer { Name = "Binder 1", ContainerType = ContainerType.Binder, SortOrder = 1 };
+            ctx.StorageContainers.Add(container);
+            ctx.SaveChanges();
+
+            var card = new CollectionCard
+            {
+                Game = CardGame.Mtg, GameCardId = "bolt-1", Name = "Lightning Bolt", SetCode = "lea",
+                Number = "1", Rarity = "common", IsFoil = false, ContainerId = container.Id,
+            };
+            ctx.Cards.Add(card);
+            ctx.SaveChanges();
+            oldCardId = card.Id;
+
+            // CoverCardId is a CollectionCard.Id in the old (Phase-1) schema; it must be remapped
+            // to the new LotId, same as EbayListing/FlagResolution.CollectionCardId above.
+            container.CoverCardId = oldCardId;
+            ctx.SaveChanges();
+        }
+
+        var map = UnifiedMigrationService.MigrateDataIfNeeded(_tempDir, _collectionFactory, _unifiedFactory, NullLogger.Instance);
+
+        Assert.True(map.TryGetValue(oldCardId, out var newLotId));
+
+        using var verify = NewUnifiedCtx();
+        var newContainer = Assert.Single(verify.StorageContainers.AsNoTracking().ToList());
+        Assert.Equal("Binder 1", newContainer.Name);
+        Assert.Equal(newLotId, newContainer.CoverCardId);
+    }
+
+    [Fact]
     public void MigrateDataIfNeeded_SecondRun_IsNoOp()
     {
         using (var ctx = NewCollectionCtx())
@@ -260,13 +300,69 @@ public class UnifiedMigrationTests : IDisposable
         var firstMap = UnifiedMigrationService.MigrateDataIfNeeded(_tempDir, _collectionFactory, _unifiedFactory, NullLogger.Instance);
         Assert.Single(firstMap);
 
+        // The DB marker (not the file flag) is authoritative: delete the file flag to prove the
+        // guard is really reading the committed DB marker, not the file.
+        var flagPath = Path.Combine(_tempDir, UnifiedMigrationService.MigratedFlagFileName);
+        Assert.True(File.Exists(flagPath));
+        File.Delete(flagPath);
+
         var secondMap = UnifiedMigrationService.MigrateDataIfNeeded(_tempDir, _collectionFactory, _unifiedFactory, NullLogger.Instance);
-        Assert.Empty(secondMap); // flag file short-circuits; nothing new to report
+        Assert.Empty(secondMap); // DB marker short-circuits; nothing new to report
 
         using var verify = NewUnifiedCtx();
         Assert.Single(verify.Products.AsNoTracking().ToList());
         Assert.Single(verify.Lots.AsNoTracking().ToList());
         Assert.Single(verify.Movements.AsNoTracking().ToList());
+    }
+
+    [Fact]
+    public void MigrateDataIfNeeded_CommitsMigrationStateMarker_AtomicWithData()
+    {
+        using (var ctx = NewCollectionCtx())
+        {
+            ctx.Cards.Add(new CollectionCard
+            {
+                Game = CardGame.Mtg, GameCardId = "bolt-1", Name = "Lightning Bolt", SetCode = "lea",
+                Number = "1", Rarity = "common", IsFoil = false,
+            });
+            ctx.SaveChanges();
+        }
+
+        UnifiedMigrationService.MigrateDataIfNeeded(_tempDir, _collectionFactory, _unifiedFactory, NullLogger.Instance);
+
+        using var verify = NewUnifiedCtx();
+        var marker = Assert.Single(verify.MigrationState.AsNoTracking().ToList());
+        Assert.Equal(UnifiedMigrationService.MigrationStateKey, marker.Key);
+        Assert.True(marker.CompletedAt >= _testStart);
+    }
+
+    [Fact]
+    public void MigrateDataIfNeeded_DoesNotOverwriteExistingPreMigrationBackup()
+    {
+        // Simulate a real inventory.db file plus a ".bak" already left behind by a prior
+        // (e.g. crashed) migration attempt. On retry, the existing backup — the clean
+        // pre-migration snapshot — must survive untouched rather than being overwritten by
+        // whatever inventory.db looks like now.
+        var inventoryDbPath = Path.Combine(_tempDir, "inventory.db");
+        File.WriteAllText(inventoryDbPath, "current-inventory-db-contents");
+
+        var backupPath = inventoryDbPath + ".pre-unified-migration.bak";
+        const string originalBackupContents = "clean-pre-migration-snapshot";
+        File.WriteAllText(backupPath, originalBackupContents);
+
+        using (var ctx = NewCollectionCtx())
+        {
+            ctx.Cards.Add(new CollectionCard
+            {
+                Game = CardGame.Mtg, GameCardId = "bolt-1", Name = "Lightning Bolt", SetCode = "lea",
+                Number = "1", Rarity = "common", IsFoil = false,
+            });
+            ctx.SaveChanges();
+        }
+
+        UnifiedMigrationService.MigrateDataIfNeeded(_tempDir, _collectionFactory, _unifiedFactory, NullLogger.Instance);
+
+        Assert.Equal(originalBackupContents, File.ReadAllText(backupPath));
     }
 
     [Fact]
@@ -354,7 +450,7 @@ public class UnifiedMigrationTests : IDisposable
         verifyConn.Open();
         using var verifyCmd = verifyConn.CreateCommand();
 
-        foreach (var table in new[] { "StorageContainers", "EbayListings", "MismatchLogs", "FlagResolutions", "ScanDiagnosticEvents" })
+        foreach (var table in new[] { "StorageContainers", "EbayListings", "MismatchLogs", "FlagResolutions", "ScanDiagnosticEvents", "MigrationState" })
         {
             verifyCmd.CommandText = $"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{table}'";
             Assert.Equal(1L, (long)verifyCmd.ExecuteScalar()!);

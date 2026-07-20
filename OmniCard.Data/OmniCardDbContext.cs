@@ -13,6 +13,7 @@ public class OmniCardDbContext : DbContext
     public DbSet<MismatchLog> MismatchLogs => Set<MismatchLog>();
     public DbSet<FlagResolution> FlagResolutions => Set<FlagResolution>();
     public DbSet<ScanDiagnosticEvent> ScanDiagnosticEvents => Set<ScanDiagnosticEvent>();
+    public DbSet<MigrationState> MigrationState => Set<MigrationState>();
 
     public OmniCardDbContext(DbContextOptions<OmniCardDbContext> options) : base(options) { }
 
@@ -107,6 +108,11 @@ public class OmniCardDbContext : DbContext
             // Same as FlagResolution above: no CollectionCard table here yet, so the FK
             // relationship to Cards is intentionally omitted (Task 5 wires this to Lot).
             e.Ignore(l => l.CollectionCard);
+        });
+
+        modelBuilder.Entity<MigrationState>(e =>
+        {
+            e.HasKey(m => m.Key);
         });
     }
 }

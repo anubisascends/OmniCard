@@ -28,6 +28,14 @@ public static class UnifiedMigrationService
     private const string CollectionDbFileName = "collection.db";
     private const string InventoryBackupSuffix = ".pre-unified-migration.bak";
 
+    /// <summary>
+    /// Key of the <see cref="Models.MigrationState"/> row inserted (atomically, in the same
+    /// transaction as the migrated data) once the one-time migration completes. This DB marker —
+    /// not the file flag below — is authoritative for "has this migration already run?", because
+    /// it commits (or rolls back) together with the data it describes.
+    /// </summary>
+    public const string MigrationStateKey = "UnifiedDataMigration";
+
     // ---------------------------------------------------------------------
     // Step 1: ensure unified schema exists on a pre-existing inventory.db
     // ---------------------------------------------------------------------
@@ -174,6 +182,16 @@ public static class UnifiedMigrationService
         cmd.ExecuteNonQuery();
         cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_ScanDiagnosticEvents_EventType ON ScanDiagnosticEvents(EventType)";
         cmd.ExecuteNonQuery();
+
+        // Marker table used to atomically record one-time data migrations alongside the data
+        // they migrate (see MigrateDataIfNeeded's use of the MigrationState DbSet).
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS MigrationState (
+                Key TEXT NOT NULL PRIMARY KEY,
+                CompletedAt TEXT NOT NULL
+            )
+            """;
+        cmd.ExecuteNonQuery();
     }
 
     private static bool TableExists(SqliteCommand cmd, string tableName)
@@ -210,16 +228,26 @@ public static class UnifiedMigrationService
         ILogger logger)
     {
         var flagPath = Path.Combine(dataDirectory, MigratedFlagFileName);
-        if (File.Exists(flagPath))
+
+        // The DB marker is authoritative: it is committed atomically with the migrated data (or
+        // rolled back with it), so it can't disagree with what's actually in the unified store the
+        // way a separately-written file flag can after a crash between the data commit and the
+        // flag write. The file flag is still written below for cheap external inspection, but it is
+        // never consulted here.
+        using (var checkCtx = unifiedFactory.CreateDbContext())
         {
-            logger.LogDebug("Unified data migration already completed; skipping");
-            return new Dictionary<int, int>();
+            if (checkCtx.MigrationState.AsNoTracking().Any(m => m.Key == MigrationStateKey))
+            {
+                logger.LogDebug("Unified data migration already completed (DB marker present); skipping");
+                return new Dictionary<int, int>();
+            }
         }
 
         var collectionDbPath = Path.Combine(dataDirectory, CollectionDbFileName);
         if (!File.Exists(collectionDbPath))
         {
             logger.LogDebug("No collection.db found; nothing to migrate into the unified store");
+            MarkMigrationComplete(unifiedFactory);
             WriteFlag(flagPath);
             return new Dictionary<int, int>();
         }
@@ -311,7 +339,10 @@ public static class UnifiedMigrationService
             foreach (var (card, lot) in lotsByCard)
                 cardIdToLotId[card.Id] = lot.Id;
 
-            // Seed one Acquire movement per lot.
+            // Seed one Acquire movement per lot. The Acquire movement's Timestamp records "when
+            // this entry was recorded" and is intentionally independent of the (possibly backdated)
+            // Lot.AcquisitionDate — see InventoryService.AddLot's identical convention.
+            var recordedAt = DateTime.UtcNow;
             var movements = lotsByCard.Select(x => new InventoryMovement
             {
                 ProductId = x.Lot.ProductId,
@@ -319,7 +350,7 @@ public static class UnifiedMigrationService
                 Type = MovementType.Acquire,
                 Quantity = 1,
                 UnitValue = x.Lot.UnitCost,
-                Timestamp = x.Lot.AcquisitionDate,
+                Timestamp = recordedAt,
             });
             unifiedCtx.Movements.AddRange(movements);
 
@@ -395,6 +426,11 @@ public static class UnifiedMigrationService
             }).ToList();
             unifiedCtx.EbayListings.AddRange(ebayListings);
 
+            // Insert the "migration complete" marker in the SAME transaction as the data above, so
+            // it is atomic with it: a crash before Commit() leaves neither the data nor the marker
+            // committed, and a re-run starts clean instead of duplicating Products/Lots/Movements.
+            unifiedCtx.MigrationState.Add(new MigrationState { Key = MigrationStateKey, CompletedAt = recordedAt });
+
             unifiedCtx.SaveChanges();
 
             transaction.Commit();
@@ -423,12 +459,36 @@ public static class UnifiedMigrationService
         if (!File.Exists(inventoryDbPath))
             return;
 
-        SqliteConnection.ClearAllPools();
         var backupPath = Path.Combine(dataDirectory, InventoryDbFileName + InventoryBackupSuffix);
-        File.Copy(inventoryDbPath, backupPath, overwrite: true);
+        if (File.Exists(backupPath))
+        {
+            // Never overwrite an existing backup: it is the clean pre-migration snapshot taken on
+            // the FIRST attempt. If a retry (e.g. after a crash) overwrote it with an in-progress or
+            // already-migrated inventory.db, the original rollback point would be lost.
+            logger.LogInformation(
+                "Pre-migration backup already exists at {BackupPath}; leaving it untouched", backupPath);
+            return;
+        }
+
+        SqliteConnection.ClearAllPools();
+        File.Copy(inventoryDbPath, backupPath, overwrite: false);
         logger.LogInformation(
             "Backed up inventory.db to {BackupPath} before unified migration (collection.db is left untouched on disk for rollback)",
             backupPath);
+    }
+
+    /// <summary>
+    /// Writes the DB migration marker for the "nothing to migrate" (no collection.db) path, where
+    /// there is no other data to make it atomic with — a plain SaveChanges is sufficient.
+    /// </summary>
+    private static void MarkMigrationComplete(IDbContextFactory<OmniCardDbContext> unifiedFactory)
+    {
+        using var ctx = unifiedFactory.CreateDbContext();
+        if (!ctx.MigrationState.Any(m => m.Key == MigrationStateKey))
+        {
+            ctx.MigrationState.Add(new MigrationState { Key = MigrationStateKey, CompletedAt = DateTime.UtcNow });
+            ctx.SaveChanges();
+        }
     }
 
     private static void PersistCardToLotMap(string dataDirectory, Dictionary<int, int> map, ILogger logger)
