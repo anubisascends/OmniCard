@@ -97,12 +97,18 @@ public partial class CardListView : UserControl
         if (e.OriginalSource is not DependencyObject source) return;
 
         var item = FindAncestor<ListBoxItem>(source);
-        if (item is null) return;
+        if (item?.DataContext is not { } data) return;
 
-        if (!item.IsSelected)
+        // VirtualizationMode=Recycling reuses ListBoxItem containers, so item.IsSelected can be
+        // stale after the ItemsSource is swapped (e.g. by the refresh that follows a List/Unlist/
+        // Mark-Picked, which clears SelectedItems). Consulting the container's IsSelected there
+        // wrongly reports "already selected" and skips selecting, leaving SelectedItems empty so
+        // the context-menu command operates on nothing. Consult the ListBox's actual selection
+        // (by data item) instead, which is authoritative regardless of container recycling.
+        if (!CollectionListBox.SelectedItems.Contains(data))
         {
             CollectionListBox.SelectedItems.Clear();
-            item.IsSelected = true;
+            CollectionListBox.SelectedItems.Add(data);
         }
     }
 

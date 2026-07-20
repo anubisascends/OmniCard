@@ -27,11 +27,23 @@ public partial class RootView : IView<RootViewModel>, IHostedService
         ScannerTab.WireUpAutoScroll();
         DashboardTab.WireUp(viewModel.Dashboard);
 
-        // Lazy-load the Dashboard tab's data the first time it's selected.
-        MainTabControl.SelectionChanged += (_, _) =>
+        // Lazy-load the Dashboard tab's data the first time it's selected; the Sales tab's
+        // pick list is reloaded on every activation (cheap query, and needs to reflect any
+        // listings changed elsewhere since the tab was last shown).
+        MainTabControl.SelectionChanged += (_, e) =>
         {
+            // SelectionChanged is a routed event that bubbles up from inner Selectors (e.g. the
+            // Sales tab's For-Sale location ComboBox, list boxes). React only to the TabControl's
+            // OWN tab changes — otherwise picking a location re-runs Sales.Load(), which re-selects
+            // a fresh container instance (reference-unequal) and re-raises SelectionChanged, an
+            // infinite reload loop that freezes the UI.
+            if (!ReferenceEquals(e.OriginalSource, MainTabControl))
+                return;
+
             if (MainTabControl.SelectedItem == tabItemDashboard)
                 viewModel.Dashboard.Load();
+            else if (MainTabControl.SelectedItem == tabItemSales)
+                _ = viewModel.Sales.Load();
         };
 
         ViewModel.Collection.GetSelectedCards = () => CollectionTab.GetSelectedCards();

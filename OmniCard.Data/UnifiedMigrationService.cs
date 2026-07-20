@@ -155,6 +155,28 @@ public static class UnifiedMigrationService
         cmd.ExecuteNonQuery();
 
         cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS Listings (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                LotId INTEGER NOT NULL,
+                Channel TEXT NOT NULL DEFAULT 'Manual',
+                Status TEXT NOT NULL DEFAULT 'Listed',
+                ListedPrice TEXT NOT NULL DEFAULT '0',
+                Quantity INTEGER NOT NULL DEFAULT 1,
+                OriginalLocationId INTEGER,
+                ListedAt TEXT NOT NULL,
+                PickedAt TEXT,
+                ExternalRef TEXT,
+                OrderLineId INTEGER,
+                Note TEXT
+            )
+            """;
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_Listings_LotId ON Listings(LotId)";
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_Listings_Status ON Listings(Status)";
+        cmd.ExecuteNonQuery();
+
+        cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS MismatchLogs (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ScanHash INTEGER NOT NULL,

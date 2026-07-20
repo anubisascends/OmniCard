@@ -120,6 +120,16 @@
                                    helpers:TileArt.Card="{Binding}"
                                    helpers:TileArt.DataDirectory="{Binding DataContext.DataDirectory,
                                        RelativeSource={RelativeSource AncestorType=ListBox}}"/>
+
+                            <!-- "Listed"/"Picked" badge: visible only when the card is on-market -->
+                            <Border VerticalAlignment="Top" HorizontalAlignment="Left"
+                                    Margin="4" Padding="4,1" CornerRadius="3"
+                                    Background="{DynamicResource MaterialDesign.Brush.Primary}"
+                                    Visibility="{Binding ListingStatus, Converter={conv:NullToCollapsedConverter}}">
+                                <TextBlock Text="{Binding ListingStatus, Converter={conv:ListingStatusToBadgeConverter}}"
+                                           FontSize="9" FontWeight="Bold"
+                                           Foreground="White"/>
+                            </Border>
                         </Grid>
 
                         <!-- Name: single line, ellipsis when too long (full name in the tile tooltip) -->
@@ -159,6 +169,13 @@
                 <Separator/>
                 <MenuItem Header="Move to Location..."
                           Command="{Binding MoveSelectedToLocationCommand}"/>
+                <Separator/>
+                <MenuItem Header="List for Sale..."
+                          Command="{Binding ListForSaleCommand}"/>
+                <MenuItem Header="Mark Picked"
+                          Command="{Binding MarkPickedCommand}"/>
+                <MenuItem Header="Unlist"
+                          Command="{Binding UnlistForSaleCommand}"/>
                 <Separator/>
                 <MenuItem Header="Set Condition">
                     <MenuItem Header="NM" Command="{Binding BulkSetCollectionConditionCommand}" CommandParameter="NM"/>
