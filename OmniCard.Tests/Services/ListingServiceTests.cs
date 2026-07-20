@@ -118,4 +118,60 @@ public class ListingServiceTests : IDisposable
         using var ctx = new OmniCardDbContext(_opts);
         Assert.Equal(ListingStatus.Cancelled, Assert.Single(ctx.Listings.ToList()).Status);
     }
+
+    [Fact]
+    public void Unlist_PickedListing_RestoresLocationAndRecordsMoveMovement()
+    {
+        int originalLocationId = 7;
+        int forSaleLocationId = 99; // Also the default from StubSalesSettings
+        int lotId;
+
+        // Seed the original location, for-sale location, product, and lot
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, Name = "Sol Ring" };
+            ctx.Products.Add(product);
+            ctx.SaveChanges();
+
+            ctx.StorageContainers.Add(new StorageContainer { Id = originalLocationId, Name = "Original Location" });
+            ctx.StorageContainers.Add(new StorageContainer { Id = forSaleLocationId, Name = "For Sale Location" });
+            ctx.SaveChanges();
+
+            // Lot is currently at the for-sale location (because it's picked)
+            var lot = new InventoryLot { ProductId = product.Id, Quantity = 1, LocationId = forSaleLocationId };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            lotId = lot.Id;
+
+            // Create a listing with status Picked, with OriginalLocationId set to the original container
+            var listing = new Listing
+            {
+                LotId = lot.Id,
+                Channel = SalesChannel.Manual,
+                Status = ListingStatus.Picked,
+                ListedPrice = 1.50m,
+                Quantity = 1,
+                OriginalLocationId = originalLocationId,
+                ListedAt = new DateTime(2026, 1, 1),
+            };
+            ctx.Listings.Add(listing);
+            ctx.SaveChanges();
+        }
+
+        // Call Unlist
+        CreateService().Unlist([lotId]);
+
+        // Verify
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            var listing = Assert.Single(ctx.Listings.ToList());
+            Assert.Equal(ListingStatus.Cancelled, listing.Status);
+
+            var lot = Assert.Single(ctx.Lots.ToList());
+            Assert.Equal(originalLocationId, lot.LocationId);
+
+            var movement = Assert.Single(ctx.Movements.Where(m => m.LotId == lotId).ToList());
+            Assert.Equal(MovementType.Move, movement.Type);
+        }
+    }
 }
