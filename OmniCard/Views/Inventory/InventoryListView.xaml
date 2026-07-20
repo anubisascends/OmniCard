@@ -27,6 +27,10 @@
                 <Button Content="Refresh" Command="{Binding RefreshInventoryCommand}"
                         Padding="8,4" Margin="8,0,0,0"
                         Style="{StaticResource MaterialDesignFlatButton}"/>
+                <Button Content="Refresh Sealed Prices" Command="{Binding RefreshSealedPricesCommand}"
+                        Padding="8,4" Margin="8,0,0,0"
+                        ToolTip="Query eBay for current sealed-product median prices"
+                        Style="{StaticResource MaterialDesignFlatButton}"/>
             </StackPanel>
         </Border>
 

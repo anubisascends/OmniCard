@@ -29,7 +29,7 @@ public class AnalyticsServiceTests : IDisposable
         new AnalyticsService(new MockFactory(_options), gameServices);
 
     private static Product SeedProduct(OmniCardDbContext ctx, CardGame game, ProductCategory category,
-        string name, string? gameCardId = null, bool foil = false, decimal marketPrice = 0m)
+        string name, string? gameCardId = null, bool foil = false, decimal marketPrice = 0m, decimal? lastMarketPrice = null)
     {
         var product = new Product
         {
@@ -39,6 +39,7 @@ public class AnalyticsServiceTests : IDisposable
             GameCardId = gameCardId,
             Foil = foil,
             MarketPrice = marketPrice,
+            LastMarketPrice = lastMarketPrice,
         };
         ctx.Products.Add(product);
         ctx.SaveChanges();
@@ -91,8 +92,10 @@ public class AnalyticsServiceTests : IDisposable
         var opCard = SeedProduct(ctx, CardGame.OnePiece, ProductCategory.Single, "Zoro", "op-1", foil: false);
         SeedLot(ctx, opCard.Id, 3, 2.00m, container.Id);
 
-        // Sealed product: market comes from Product.MarketPrice (NotMapped -> defaults to 0 on reload).
-        var box = SeedProduct(ctx, CardGame.Mtg, ProductCategory.Box, "Bloomburrow Booster Box", marketPrice: 999m);
+        // Sealed product: market comes from the persisted Product.LastMarketPrice (Task 1,
+        // Phase 3 — eBay-derived). Product.MarketPrice ([NotMapped]) is irrelevant for sealed.
+        var box = SeedProduct(ctx, CardGame.Mtg, ProductCategory.Box, "Bloomburrow Booster Box",
+            marketPrice: 999m, lastMarketPrice: 30.00m);
         SeedLot(ctx, box.Id, 2, 20.00m, container.Id);
 
         var mtgService = new FakeCardGameService(CardGame.Mtg, new Dictionary<(string, bool), decimal>
@@ -110,13 +113,13 @@ public class AnalyticsServiceTests : IDisposable
 
         Assert.Equal(8, holdings.TotalUnits);
         Assert.Equal(52.00m, holdings.TotalCost);
-        // 2*5 + 1*8 + 3*1 + 2*0(sealed, NotMapped defaults to 0 on reload) = 21
-        Assert.Equal(21.00m, holdings.TotalMarket);
+        // 2*5 + 1*8 + 3*1 (singles, live) + 2*30 (sealed box, LastMarketPrice) = 81
+        Assert.Equal(81.00m, holdings.TotalMarket);
 
         var byGame = holdings.ByGame.ToDictionary(l => l.Key);
         Assert.Equal(5, byGame["Mtg"].Units);
         Assert.Equal(46.00m, byGame["Mtg"].Cost);
-        Assert.Equal(18.00m, byGame["Mtg"].Market);
+        Assert.Equal(78.00m, byGame["Mtg"].Market); // 10 (bolt) + 8 (shock) + 60 (box, 2*30)
         Assert.Equal(3, byGame["OnePiece"].Units);
         Assert.Equal(6.00m, byGame["OnePiece"].Cost);
         Assert.Equal(3.00m, byGame["OnePiece"].Market);
@@ -127,12 +130,12 @@ public class AnalyticsServiceTests : IDisposable
         Assert.Equal(21.00m, byCategory["Single"].Market);
         Assert.Equal(2, byCategory["Box"].Units);
         Assert.Equal(40.00m, byCategory["Box"].Cost);
-        Assert.Equal(0m, byCategory["Box"].Market);
+        Assert.Equal(60.00m, byCategory["Box"].Market); // LastMarketPrice-derived, not 0
 
         var byLocation = holdings.ByLocation.ToDictionary(l => l.Key);
         Assert.Equal(7, byLocation["Binder A"].Units);
         Assert.Equal(49.00m, byLocation["Binder A"].Cost);
-        Assert.Equal(13.00m, byLocation["Binder A"].Market);
+        Assert.Equal(73.00m, byLocation["Binder A"].Market); // 10 (bolt) + 3 (op) + 60 (box)
         Assert.Equal(1, byLocation["Unassigned"].Units);
         Assert.Equal(3.00m, byLocation["Unassigned"].Cost);
         Assert.Equal(8.00m, byLocation["Unassigned"].Market);

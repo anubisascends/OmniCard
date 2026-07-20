@@ -57,9 +57,10 @@ public class AnalyticsService : IAnalyticsService
             }
         }
 
-        // Sealed/non-single products: market comes from the manually-maintained Product.MarketPrice.
+        // Sealed/non-single products: market comes from the persisted eBay-derived
+        // Product.LastMarketPrice (Task 1, Phase 3), refreshed via ISealedPriceUpdateService.
         foreach (var lot in lots.Where(l => l.Product.Category != ProductCategory.Single))
-            marketByLotId[lot.Id] = lot.Product.MarketPrice * lot.Quantity;
+            marketByLotId[lot.Id] = (lot.Product.LastMarketPrice ?? 0m) * lot.Quantity;
 
         decimal CostOf(InventoryLot l) => l.Quantity * (l.UnitCost ?? 0m);
         decimal MarketOf(InventoryLot l) => marketByLotId.GetValueOrDefault(l.Id);

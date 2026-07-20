@@ -199,12 +199,34 @@ public class InventoryServiceTests : IDisposable
         var valuation = service.GetValuation();
         Assert.Equal(7, valuation.TotalUnits);
         Assert.Equal(2 * 5m + 1 * 8m + 4 * 2m, valuation.TotalCost);
-        // MarketPrice is [NotMapped]; unset on reload => 0.
+        // Sealed products with no LastMarketPrice set yet (Task 1, Phase 3) value at 0.
         Assert.Equal(0m, valuation.TotalMarket);
 
         var boxOnly = service.GetValuation(category: ProductCategory.Box);
         Assert.Equal(3, boxOnly.TotalUnits);
         Assert.Equal(2 * 5m + 1 * 8m, boxOnly.TotalCost);
+    }
+
+    [Fact]
+    public void GetValuation_SealedProducts_UseLastMarketPrice_NotNotMappedMarketPrice()
+    {
+        var service = CreateService();
+        var box = service.CreateProduct(new Product
+        {
+            Game = CardGame.Mtg,
+            Category = ProductCategory.Box,
+            Name = "Bloomburrow Booster Box",
+            MarketPrice = 999m, // [NotMapped]; must be ignored for sealed valuation
+        });
+        service.AddLot(box.Id, 2, 20m, null, null);
+
+        box.LastMarketPrice = 45.50m;
+        service.UpdateProduct(box);
+
+        var valuation = service.GetValuation();
+        Assert.Equal(2, valuation.TotalUnits);
+        Assert.Equal(40m, valuation.TotalCost);
+        Assert.Equal(2 * 45.50m, valuation.TotalMarket);
     }
 
     private class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>

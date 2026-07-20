@@ -26,6 +26,10 @@ public class OmniCardDbContext : DbContext
             e.Property(p => p.Game).HasConversion<string>();
             e.Property(p => p.Category).HasConversion<string>();
             e.Ignore(p => p.MarketPrice);
+            // Task 1 (Phase 3): persisted eBay-derived sealed price, mapped by convention but
+            // named explicitly here for discoverability alongside the Ignore(MarketPrice) above.
+            e.Property(p => p.LastMarketPrice);
+            e.Property(p => p.PriceUpdatedAt);
             e.HasIndex(p => new { p.Game, p.Category });
             e.HasIndex(p => p.Upc);
             e.HasIndex(p => new { p.Game, p.GameCardId, p.Foil });
