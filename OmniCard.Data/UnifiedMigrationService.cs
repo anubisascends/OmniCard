@@ -84,6 +84,10 @@ public static class UnifiedMigrationService
         {
             foreach (var col in new[] { "SetName", "Color", "CardType" })
                 AddColumnIfMissing(cmd, "Products", col, "TEXT");
+
+            // Task 1 (Phase 3): persisted eBay-derived sealed pricing.
+            AddColumnIfMissing(cmd, "Products", "LastMarketPrice", "TEXT");
+            AddColumnIfMissing(cmd, "Products", "PriceUpdatedAt", "TEXT");
         }
 
         if (TableExists(cmd, "Lots"))

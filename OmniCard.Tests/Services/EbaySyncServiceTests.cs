@@ -2,7 +2,9 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using OmniCard.Collection;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 using OmniCard.eBay;
 using System.Net;
@@ -37,7 +39,7 @@ public class EbaySyncServiceTests : IDisposable
 
     private IDbContextFactory<OmniCardDbContext> CreateDbFactory() => new TestDbContextFactory(_options);
 
-    private static int SeedLot(OmniCardDbContext ctx, string name = "Test Card")
+    private static int SeedLot(OmniCardDbContext ctx, string name = "Test Card", int quantity = 1)
     {
         var product = new Product
         {
@@ -48,7 +50,7 @@ public class EbaySyncServiceTests : IDisposable
         ctx.Products.Add(product);
         ctx.SaveChanges();
 
-        var lot = new InventoryLot { ProductId = product.Id, Quantity = 1 };
+        var lot = new InventoryLot { ProductId = product.Id, Quantity = quantity };
         ctx.Lots.Add(lot);
         ctx.SaveChanges();
         return lot.Id;
@@ -68,6 +70,12 @@ public class EbaySyncServiceTests : IDisposable
             {
                 LotId = lotId, EbayItemId = "ebay-sold-123",
                 Status = EbayListingStatus.Active, ListedPrice = 10m,
+            });
+            // Acquire movement so realized P&L (cost basis) has something to net against.
+            ctx.Movements.Add(new InventoryMovement
+            {
+                ProductId = productId, LotId = lotId, Type = MovementType.Acquire,
+                Quantity = 1, UnitValue = 4m,
             });
             ctx.SaveChanges();
         }
@@ -106,16 +114,144 @@ public class EbaySyncServiceTests : IDisposable
         Assert.Equal(1, synced);
 
         using var verifyCtx = dbFactory.CreateDbContext();
-        var listing = verifyCtx.EbayListings.First(l => l.LotId == lotId);
-        Assert.Equal(EbayListingStatus.Sold, listing.Status);
-        Assert.Equal("buyer123", listing.BuyerUsername);
-        Assert.Equal(10.00m, listing.SoldPrice);
+
+        // The sold lot is removed from holdings so it stops double-counting alongside the
+        // realized Sell movement, and the (now Sold) listing cascade-deletes with the lot.
+        Assert.Null(verifyCtx.Lots.Find(lotId));
+        Assert.Empty(verifyCtx.EbayListings.Where(l => l.LotId == lotId));
 
         // A sale should seed a Sell movement for the lot's product so it shows up in
-        // inventory history alongside manual sells/acquisitions.
+        // inventory history alongside manual sells/acquisitions. The eBay item id is stamped
+        // on the Note since it's the only place that provenance survives after the listing
+        // row is gone.
         var sellMovement = Assert.Single(verifyCtx.Movements.Where(m => m.LotId == lotId && m.Type == MovementType.Sell));
         Assert.Equal(productId, sellMovement.ProductId);
         Assert.Equal(10.00m, sellMovement.UnitValue);
+        Assert.Equal("ebay-sold-123", sellMovement.Note);
+
+        // Realized P&L still computes correctly off the surviving movements even though the
+        // lot row itself is gone.
+        var analytics = new AnalyticsService(dbFactory, Array.Empty<ICardGameService>());
+        var realized = analytics.GetRealized();
+        Assert.Equal(1, realized.TotalSold);
+        Assert.Equal(10.00m, realized.TotalProceeds);
+        Assert.Equal(4.00m, realized.TotalCost);
+    }
+
+    [Fact]
+    public async Task SyncAllActiveAsync_QtyTwoLot_DecrementsInsteadOfRemoving()
+    {
+        // A lot with quantity 2 should survive a single eBay sale with its quantity reduced to 1,
+        // rather than being deleted outright — only the sold unit is decremented off the lot.
+        var dbFactory = CreateDbFactory();
+        int lotId;
+        using (var ctx = dbFactory.CreateDbContext())
+        {
+            lotId = SeedLot(ctx, "Multi-Qty Card", quantity: 2);
+            ctx.EbayListings.Add(new EbayListing
+            {
+                LotId = lotId, EbayItemId = "ebay-sold-qty2",
+                Status = EbayListingStatus.Active, ListedPrice = 15m,
+            });
+            ctx.SaveChanges();
+        }
+
+        var ordersJson = JsonSerializer.Serialize(new
+        {
+            orders = new[]
+            {
+                new
+                {
+                    orderId = "order-1",
+                    buyer = new { username = "buyerqty2" },
+                    lineItems = new[]
+                    {
+                        new { legacyItemId = "ebay-sold-qty2", total = new { value = "15.00", currency = "USD" } }
+                    },
+                }
+            }
+        });
+
+        var factory = new FakeHttpClientFactory(new FakeHttpHandler(HttpStatusCode.OK, ordersJson));
+        var authService = new FakeEbayAuthService("test-token");
+
+        var svc = new EbaySyncService(
+            Options.Create(_settings),
+            factory,
+            authService,
+            dbFactory,
+            NullLogger<EbaySyncService>.Instance);
+
+        var synced = await svc.SyncAllActiveAsync();
+        Assert.Equal(1, synced);
+
+        using var verifyCtx = dbFactory.CreateDbContext();
+
+        // The lot survives with its remaining quantity — it is not removed just because one
+        // unit sold on eBay.
+        var lot = verifyCtx.Lots.Find(lotId);
+        Assert.NotNull(lot);
+        Assert.Equal(1, lot!.Quantity);
+
+        // Exactly one Sell movement (qty 1) was seeded for the sale.
+        var sellMovement = Assert.Single(verifyCtx.Movements.Where(m => m.LotId == lotId && m.Type == MovementType.Sell));
+        Assert.Equal(1, sellMovement.Quantity);
+        Assert.Equal(15.00m, sellMovement.UnitValue);
+        Assert.Equal("ebay-sold-qty2", sellMovement.Note);
+    }
+
+    [Fact]
+    public async Task SyncAllActiveAsync_SecondSync_DoesNotReprocessRemovedLot()
+    {
+        var dbFactory = CreateDbFactory();
+        int lotId;
+        using (var ctx = dbFactory.CreateDbContext())
+        {
+            lotId = SeedLot(ctx, "Double Sync Card");
+            ctx.EbayListings.Add(new EbayListing
+            {
+                LotId = lotId, EbayItemId = "ebay-sold-777",
+                Status = EbayListingStatus.Active, ListedPrice = 20m,
+            });
+            ctx.SaveChanges();
+        }
+
+        var ordersJson = JsonSerializer.Serialize(new
+        {
+            orders = new[]
+            {
+                new
+                {
+                    orderId = "order-1",
+                    buyer = new { username = "buyer777" },
+                    lineItems = new[]
+                    {
+                        new { legacyItemId = "ebay-sold-777", total = new { value = "20.00", currency = "USD" } }
+                    },
+                }
+            }
+        });
+
+        var factory = new FakeHttpClientFactory(new FakeHttpHandler(HttpStatusCode.OK, ordersJson));
+        var authService = new FakeEbayAuthService("test-token");
+
+        var svc = new EbaySyncService(
+            Options.Create(_settings),
+            factory,
+            authService,
+            dbFactory,
+            NullLogger<EbaySyncService>.Instance);
+
+        var firstSync = await svc.SyncAllActiveAsync();
+        Assert.Equal(1, firstSync);
+
+        // Second sync should find no active listings left (the listing cascade-deleted with the
+        // lot), so it must not throw and must not seed a second Sell movement.
+        var secondSync = await svc.SyncAllActiveAsync();
+        Assert.Equal(0, secondSync);
+
+        using var verifyCtx = dbFactory.CreateDbContext();
+        Assert.Single(verifyCtx.Movements.Where(m => m.LotId == lotId && m.Type == MovementType.Sell));
     }
 
     [Fact]

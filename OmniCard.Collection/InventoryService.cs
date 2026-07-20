@@ -162,7 +162,11 @@ public class InventoryService(IDbContextFactory<OmniCardDbContext> dbContextFact
         var lots = query.ToList();
         var totalUnits = lots.Sum(l => l.Quantity);
         var totalCost = lots.Sum(l => l.Quantity * (l.UnitCost ?? 0m));
-        var totalMarket = lots.Sum(l => l.Quantity * l.Product.MarketPrice);
+        // Singles use the manually/live-set Product.MarketPrice; sealed products (Task 1,
+        // Phase 3) use the persisted eBay-derived Product.LastMarketPrice.
+        var totalMarket = lots.Sum(l => l.Quantity * (l.Product.Category == ProductCategory.Single
+            ? l.Product.MarketPrice
+            : (l.Product.LastMarketPrice ?? 0m)));
 
         return new InventoryValuation(totalUnits, totalCost, totalMarket);
     }

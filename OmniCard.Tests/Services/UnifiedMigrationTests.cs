@@ -713,7 +713,7 @@ public class UnifiedMigrationTests : IDisposable
             Assert.Equal(1L, (long)verifyCmd.ExecuteScalar()!);
         }
 
-        foreach (var (table, column) in new[] { ("Products", "SetName"), ("Products", "Color"), ("Products", "CardType"), ("Lots", "IsMissing"), ("Lots", "FlagReason") })
+        foreach (var (table, column) in new[] { ("Products", "SetName"), ("Products", "Color"), ("Products", "CardType"), ("Products", "LastMarketPrice"), ("Products", "PriceUpdatedAt"), ("Lots", "IsMissing"), ("Lots", "FlagReason") })
         {
             verifyCmd.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = '{column}'";
             Assert.True((long)verifyCmd.ExecuteScalar()! > 0, $"{table}.{column} should exist");

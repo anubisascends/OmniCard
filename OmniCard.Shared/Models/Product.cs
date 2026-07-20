@@ -24,4 +24,14 @@ public class Product
 
     /// <summary>Cached market price for display/valuation. Not persisted.</summary>
     [NotMapped] public decimal MarketPrice { get; set; }
+
+    // Added by Task 1 (Phase 3): automated sealed pricing via eBay median. Persisted so a
+    // sealed product's last-known market price survives across app restarts without needing
+    // a live re-query every time it's displayed.
+    /// <summary>Last eBay-derived median market price for this product (sealed products only;
+    /// singles are priced live via <see cref="ICardGameService"/>). Null until a refresh runs.</summary>
+    public decimal? LastMarketPrice { get; set; }
+
+    /// <summary>UTC timestamp of the last successful <see cref="LastMarketPrice"/> update.</summary>
+    public DateTime? PriceUpdatedAt { get; set; }
 }

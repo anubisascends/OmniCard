@@ -3,6 +3,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OmniCard.Interfaces;
+using OmniCard.Models;
 
 namespace OmniCard.Views.Inventory;
 
@@ -10,11 +11,16 @@ public sealed partial class InventoryViewModel : ViewModel
 {
     private readonly IInventoryService _inventoryService;
     private readonly IDialogService _dialogService;
+    private readonly ISealedPriceUpdateService _sealedPriceUpdateService;
 
-    public InventoryViewModel(IInventoryService inventoryService, IDialogService dialogService)
+    public InventoryViewModel(
+        IInventoryService inventoryService,
+        IDialogService dialogService,
+        ISealedPriceUpdateService sealedPriceUpdateService)
     {
         _inventoryService = inventoryService;
         _dialogService = dialogService;
+        _sealedPriceUpdateService = sealedPriceUpdateService;
     }
 
     [ObservableProperty]
@@ -48,6 +54,9 @@ public sealed partial class InventoryViewModel : ViewModel
     /// <summary>Set by RootViewModel to report status messages.</summary>
     public Action<string>? ReportMessage { get; set; }
 
+    [ObservableProperty]
+    public partial bool IsRefreshingSealedPrices { get; set; }
+
     partial void OnShowInventoryChanged(bool value)
     {
         if (value)
@@ -62,7 +71,11 @@ public sealed partial class InventoryViewModel : ViewModel
             var lots = _inventoryService.GetLots(product.Id);
             var qty = lots.Sum(l => l.Quantity);
             var cost = lots.Sum(l => l.Quantity * (l.UnitCost ?? 0m));
-            var market = qty * product.MarketPrice;
+            // Sealed products (Task 1, Phase 3) are priced via the persisted eBay-derived
+            // LastMarketPrice; singles keep the existing (manually/live-set) MarketPrice.
+            var market = qty * (product.Category == ProductCategory.Single
+                ? product.MarketPrice
+                : (product.LastMarketPrice ?? 0m));
             Rows.Add(new InventoryRow(product, qty, cost, market));
         }
 
@@ -78,6 +91,32 @@ public sealed partial class InventoryViewModel : ViewModel
 
     [RelayCommand]
     public void RefreshInventory() => LoadInventory();
+
+    public bool CanRefreshSealedPrices => !IsRefreshingSealedPrices;
+
+    partial void OnIsRefreshingSealedPricesChanged(bool value) => RefreshSealedPricesCommand.NotifyCanExecuteChanged();
+
+    /// <summary>Task 1 (Phase 3): manual trigger for automated sealed pricing via eBay median.
+    /// Ignores any cooldown — this is an explicit, user-initiated refresh.</summary>
+    [RelayCommand(CanExecute = nameof(CanRefreshSealedPrices))]
+    public async Task RefreshSealedPricesAsync()
+    {
+        IsRefreshingSealedPrices = true;
+        ReportMessage?.Invoke("Refreshing sealed product prices...");
+        try
+        {
+            var progress = new Progress<PriceUpdateProgress>(p => ReportMessage?.Invoke(p.Message));
+            var updated = await _sealedPriceUpdateService.RefreshSealedPricesAsync(progress);
+            ReportMessage?.Invoke(updated > 0
+                ? $"Updated market price for {updated} sealed product(s)."
+                : "No sealed product prices were updated.");
+            LoadInventory();
+        }
+        finally
+        {
+            IsRefreshingSealedPrices = false;
+        }
+    }
 
     [RelayCommand]
     public void AddProduct()

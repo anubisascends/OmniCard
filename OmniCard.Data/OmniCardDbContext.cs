@@ -26,6 +26,10 @@ public class OmniCardDbContext : DbContext
             e.Property(p => p.Game).HasConversion<string>();
             e.Property(p => p.Category).HasConversion<string>();
             e.Ignore(p => p.MarketPrice);
+            // Task 1 (Phase 3): persisted eBay-derived sealed price, mapped by convention but
+            // named explicitly here for discoverability alongside the Ignore(MarketPrice) above.
+            e.Property(p => p.LastMarketPrice);
+            e.Property(p => p.PriceUpdatedAt);
             e.HasIndex(p => new { p.Game, p.Category });
             e.HasIndex(p => p.Upc);
             e.HasIndex(p => new { p.Game, p.GameCardId, p.Foil });
@@ -35,6 +39,19 @@ public class OmniCardDbContext : DbContext
         {
             e.HasKey(l => l.Id);
             e.Property(l => l.Id).ValueGeneratedOnAdd();
+            // Force SQLite AUTOINCREMENT on the Lots table's rowid so a deleted lot's id is never
+            // reused. Without this, INTEGER PRIMARY KEY defaults to plain rowid reuse semantics:
+            // if the deleted lot happened to hold the current max id, the very next inserted lot
+            // gets that same id back and can be mis-paired with the deleted lot's still-persisted
+            // Sell movements in GetRealized/GetMovements (movements are keyed by LotId and are
+            // intentionally kept after a lot is deleted).
+            // NOTE (residual risk): this annotation only affects newly-created Lots tables (fresh
+            // installs, or a fresh EnsureCreated/migration). An already-existing inventory.db has
+            // its Lots table already created without AUTOINCREMENT, and SQLite cannot add
+            // AUTOINCREMENT to an existing table without a full table rebuild (create new table,
+            // copy rows, drop/rename) — which is risky and out of scope here. Pre-existing
+            // databases remain narrowly exposed to id reuse until such a migration is written.
+            e.HasAnnotation("Sqlite:Autoincrement", true);
             e.HasOne(l => l.Product).WithMany().HasForeignKey(l => l.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(l => l.ProductId);

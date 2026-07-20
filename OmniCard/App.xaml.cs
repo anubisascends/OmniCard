@@ -73,6 +73,7 @@ public partial class App : Application
             services.Configure<WebCompanionSettings>(context.Configuration.GetSection("WebCompanion"));
             services.AddSingleton<CollectionViewModel>();
             services.AddSingleton<Views.Inventory.InventoryViewModel>();
+            services.AddSingleton<Views.Dashboard.DashboardViewModel>();
             services.AddSingleton<RootViewModel>();
             services.AddSingleton<ScannerService>();
             services.AddSingleton<WebScannerService>();
@@ -107,6 +108,8 @@ public partial class App : Application
             services.AddDbContextFactory<OmniCardDbContext>(options =>
                 options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "inventory.db")}"));
             services.AddSingleton<IInventoryService, InventoryService>();
+            services.AddSingleton<IAnalyticsService, AnalyticsService>();
+            services.AddSingleton<ISealedPriceUpdateService, SealedPriceUpdateService>();
 
             // Storage containers
             services.AddSingleton<IStorageContainerService, StorageContainerService>();
@@ -177,6 +180,8 @@ public partial class App : Application
             services.AddTransient<Views.Inventory.AddLotViewModel>();
             services.AddTransient<Views.Inventory.OpenUnitsView>();
             services.AddTransient<Views.Inventory.OpenUnitsViewModel>();
+            services.AddTransient<Views.MovementHistory.MovementHistoryView>();
+            services.AddTransient<Views.MovementHistory.MovementHistoryViewModel>();
         })
         .Build();
 

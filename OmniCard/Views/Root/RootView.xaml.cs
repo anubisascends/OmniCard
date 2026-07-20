@@ -25,6 +25,14 @@ public partial class RootView : IView<RootViewModel>, IHostedService
         CollectionTab.WireUpInventory(viewModel.Inventory);
         ScannerTab.ViewModel = viewModel;
         ScannerTab.WireUpAutoScroll();
+        DashboardTab.WireUp(viewModel.Dashboard);
+
+        // Lazy-load the Dashboard tab's data the first time it's selected.
+        MainTabControl.SelectionChanged += (_, _) =>
+        {
+            if (MainTabControl.SelectedItem == tabItemDashboard)
+                viewModel.Dashboard.Load();
+        };
 
         ViewModel.Collection.GetSelectedCards = () => CollectionTab.GetSelectedCards();
         ViewModel.Collection.FocusSearch = () =>
