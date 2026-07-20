@@ -25,6 +25,13 @@ public sealed partial class DashboardViewModel : ViewModel
     private readonly ILogger<DashboardViewModel> _logger;
     private bool _loaded;
 
+    /// <summary>Set when <see cref="RealizedPeriod"/> changes while a refresh (full <see
+    /// cref="Refresh"/> or a realized-only <see cref="RefreshRealized"/>) is already in flight.
+    /// Consumed by <see cref="RunPendingRealizedRefreshIfAny"/> once that run's <c>finally</c>
+    /// clears <see cref="IsBusy"/>, so the realized figures always converge on whichever period
+    /// is selected once the dust settles. Only ever touched on the UI thread.</summary>
+    private bool _realizedRefreshPending;
+
     public DashboardViewModel(IAnalyticsService analyticsService, ILogger<DashboardViewModel> logger)
     {
         _analyticsService = analyticsService;
@@ -123,16 +130,26 @@ public sealed partial class DashboardViewModel : ViewModel
         finally
         {
             IsBusy = false;
+            RunPendingRealizedRefreshIfAny();
         }
     }
 
     /// <summary>Recomputes only <see cref="Realized"/> (and its derived tile properties) for the
     /// currently selected <see cref="RealizedPeriod"/>, off the UI thread. Holdings are untouched,
     /// so this is much cheaper than a full <see cref="Refresh"/> and safe to run on every period
-    /// change.</summary>
+    /// change. If a refresh (full or realized-only) is already in flight, this does NOT block
+    /// waiting for it — it records the request via <see cref="_realizedRefreshPending"/> and
+    /// returns immediately; the in-flight run's <c>finally</c> will re-dispatch a realized-only
+    /// recompute for whatever period is current by then, so <see cref="Realized"/> always
+    /// converges on the currently selected <see cref="RealizedPeriod"/> instead of silently
+    /// keeping stale data from before the period changed.</summary>
     private async Task RefreshRealized()
     {
-        if (IsBusy) return; // a full refresh is in flight; it will pick up the new period itself
+        if (IsBusy)
+        {
+            _realizedRefreshPending = true;
+            return;
+        }
         IsBusy = true;
         StatusMessage = null;
         try
@@ -149,7 +166,21 @@ public sealed partial class DashboardViewModel : ViewModel
         finally
         {
             IsBusy = false;
+            RunPendingRealizedRefreshIfAny();
         }
+    }
+
+    /// <summary>If <see cref="RealizedPeriod"/> changed while a refresh was in flight (recorded in
+    /// <see cref="_realizedRefreshPending"/>), kicks off one more realized-only recompute now that
+    /// <see cref="IsBusy"/> has just cleared. Called from the <c>finally</c> of both <see
+    /// cref="Refresh"/> and <see cref="RefreshRealized"/> so the realized figures never get stuck
+    /// showing a stale period. The flag is cleared before re-dispatching, so a stable period
+    /// converges after at most one extra run and this can't loop forever.</summary>
+    private void RunPendingRealizedRefreshIfAny()
+    {
+        if (!_realizedRefreshPending) return;
+        _realizedRefreshPending = false;
+        _ = RefreshRealized();
     }
 
     /// <summary>Loads the dashboard once, on first activation. Subsequent activations are no-ops;
