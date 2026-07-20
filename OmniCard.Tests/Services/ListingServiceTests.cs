@@ -244,6 +244,55 @@ public class ListingServiceTests : IDisposable
     }
 
     [Fact]
+    public void GetPickList_OrdersByLocationName_AcrossMultipleLocations()
+    {
+        // Seed in an order that contradicts alphabetical LocationName order (Location 8
+        // gets the lower lotId since it's seeded first) so the assertion only passes if
+        // the orderby-before-select on sc.Name is actually applied by EF.
+        var (lotId8, _) = SeedLot(_opts, locationId: 8);
+        var (lotId7, _) = SeedLot(_opts, locationId: 7);
+        var svc = CreateService();
+        svc.ListForSale([lotId8, lotId7], SalesChannel.Manual, 1m, 1);
+
+        var pick = svc.GetPickList(CardGame.Mtg);
+
+        Assert.Equal(2, pick.Count);
+        Assert.Equal("Location 7", pick[0].LocationName);
+        Assert.Equal("Location 8", pick[1].LocationName);
+    }
+
+    [Fact]
+    public void GetPickList_FiltersByGame_ExcludesOtherGame()
+    {
+        var (mtgLotId, _) = SeedLot(_opts, locationId: 7);
+
+        int onePieceLotId;
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            var product = new Product { Game = CardGame.OnePiece, Category = ProductCategory.Single, Name = "OP Card" };
+            ctx.Products.Add(product);
+            ctx.SaveChanges();
+
+            ctx.StorageContainers.Add(new StorageContainer { Id = 8, Name = "Location 8" });
+            ctx.SaveChanges();
+
+            var lot = new InventoryLot { ProductId = product.Id, Quantity = 1, LocationId = 8 };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            onePieceLotId = lot.Id;
+        }
+
+        var svc = CreateService();
+        svc.ListForSale([mtgLotId, onePieceLotId], SalesChannel.Manual, 1m, 1);
+
+        var pick = svc.GetPickList(CardGame.Mtg);
+
+        var entry = Assert.Single(pick);
+        Assert.Equal("Sol Ring", entry.Name);
+        Assert.DoesNotContain(pick, e => e.Name == "OP Card");
+    }
+
+    [Fact]
     public void GetActiveListingStatusByLot_ReportsListedAndPicked()
     {
         var a = SeedLot(_opts, locationId: 7).lotId;
