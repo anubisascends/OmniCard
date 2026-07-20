@@ -102,4 +102,7 @@ public partial class SalesViewModel(
 
         RefreshPickList();
     }
+
+    [RelayCommand]
+    public void PrintPickList() => PickListPrinter.Print(PickList.ToList());
 }
