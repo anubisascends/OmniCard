@@ -210,4 +210,57 @@ public class ListingServiceTests : IDisposable
         svc.ListForSale([lotId], SalesChannel.Manual, 1m, 1);
         Assert.Throws<InvalidOperationException>(() => svc.MarkPicked([lotId]));
     }
+
+    [Fact]
+    public void GetPickList_ReturnsListedNotPicked_GroupedByLocation()
+    {
+        var (lotId, _) = SeedLot(_opts, locationId: null);
+        var svc = CreateService();
+        svc.ListForSale([lotId], SalesChannel.Manual, 3.25m, 1);
+
+        var pick = svc.GetPickList(CardGame.Mtg);
+
+        var entry = Assert.Single(pick);
+        Assert.Equal(lotId, entry.LotId);
+        Assert.Equal("Sol Ring", entry.Name);
+        Assert.Equal(3.25m, entry.ListedPrice);
+    }
+
+    [Fact]
+    public void GetPickList_ExcludesPicked()
+    {
+        var (lotId, _) = SeedLot(_opts, locationId: 7);
+        // MarkPicked moves the lot to the "For Sale" location (Id 99, the
+        // StubSalesSettings default), which is FK-constrained to StorageContainers.
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            ctx.StorageContainers.Add(new StorageContainer { Id = 99, Name = "For Sale Location" });
+            ctx.SaveChanges();
+        }
+        var svc = CreateService();
+        svc.ListForSale([lotId], SalesChannel.Manual, 1m, 1);
+        svc.MarkPicked([lotId]);
+        Assert.Empty(svc.GetPickList());
+    }
+
+    [Fact]
+    public void GetActiveListingStatusByLot_ReportsListedAndPicked()
+    {
+        var a = SeedLot(_opts, locationId: 7).lotId;
+        var b = SeedLot(_opts, locationId: 8).lotId;
+        // MarkPicked moves the lot to the "For Sale" location (Id 99, the
+        // StubSalesSettings default), which is FK-constrained to StorageContainers.
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            ctx.StorageContainers.Add(new StorageContainer { Id = 99, Name = "For Sale Location" });
+            ctx.SaveChanges();
+        }
+        var svc = CreateService();
+        svc.ListForSale([a, b], SalesChannel.Manual, 1m, 1);
+        svc.MarkPicked([b]);
+
+        var map = svc.GetActiveListingStatusByLot([a, b]);
+        Assert.Equal(ListingStatus.Listed, map[a]);
+        Assert.Equal(ListingStatus.Picked, map[b]);
+    }
 }

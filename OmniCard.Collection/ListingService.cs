@@ -120,6 +120,43 @@ public class ListingService(
         ctx.SaveChanges();
         return picked;
     }
-    public List<PickListEntry> GetPickList(CardGame? game = null) => throw new NotImplementedException();
-    public Dictionary<int, ListingStatus> GetActiveListingStatusByLot(IEnumerable<int> lotIds) => throw new NotImplementedException();
+
+    public List<PickListEntry> GetPickList(CardGame? game = null)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var query =
+            from listing in ctx.Listings.AsNoTracking()
+            where listing.Status == ListingStatus.Listed
+            join lot in ctx.Lots.AsNoTracking() on listing.LotId equals lot.Id
+            join p in ctx.Products.AsNoTracking() on lot.ProductId equals p.Id
+            join sc in ctx.StorageContainers.AsNoTracking() on lot.LocationId equals sc.Id into scj
+            from sc in scj.DefaultIfEmpty()
+            where game == null || p.Game == game
+            orderby sc != null ? sc.Name : "(unassigned)", lot.Section, lot.Page, lot.Slot
+            select new PickListEntry(
+                lot.Id,
+                p.Name,
+                p.SetName ?? "",
+                lot.Condition,
+                p.Foil,
+                sc != null ? sc.Name : "(unassigned)",
+                lot.Section,
+                lot.Page,
+                lot.Slot,
+                listing.ListedPrice,
+                listing.Quantity);
+
+        return query.ToList();
+    }
+
+    public Dictionary<int, ListingStatus> GetActiveListingStatusByLot(IEnumerable<int> lotIds)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var ids = lotIds.Distinct().ToList();
+        return ctx.Listings.AsNoTracking()
+            .Where(l => ids.Contains(l.LotId) && ActiveStatuses.Contains(l.Status))
+            .ToList()
+            .GroupBy(l => l.LotId)
+            .ToDictionary(g => g.Key, g => g.Max(l => l.Status));
+    }
 }
