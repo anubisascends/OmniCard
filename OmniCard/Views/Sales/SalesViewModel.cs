@@ -20,22 +20,54 @@ public partial class SalesViewModel(
     public ObservableCollection<PickListEntry> PickList { get; } = [];
     public ObservableCollection<StorageContainer> Locations { get; } = [];
 
+    /// <summary>Suppresses <see cref="OnForSaleLocationChanged"/>'s persist-to-settings side
+    /// effect while <see cref="Load"/> assigns the previously-saved location back onto <see
+    /// cref="ForSaleLocation"/>. That assignment merely reflects settings already on disk — it
+    /// isn't a user change — so it must not rewrite the setting (on every tab activation) or, if
+    /// the saved container is no longer in <see cref="Locations"/>, null it out and clobber the
+    /// saved id with the "not found" result.</summary>
+    private bool _suppressPersist;
+
     [ObservableProperty]
     public partial StorageContainer? ForSaleLocation { get; set; }
 
+    /// <summary>Surfaces guard/failure outcomes from <see cref="MarkAllPicked"/> (no For-Sale
+    /// location configured, or the underlying <see cref="IListingService.MarkPicked"/> call
+    /// throwing) since there is no global unhandled-exception handler to fall back on.</summary>
+    [ObservableProperty]
+    public partial string? StatusMessage { get; set; }
+
     /// <summary>Loads the storage locations and pick list. Safe to call repeatedly (e.g. on
-    /// every tab activation) — always refreshes, unlike Dashboard's once-only lazy load.</summary>
-    public void Load()
+    /// every tab activation) — always refreshes, unlike Dashboard's once-only lazy load. Both
+    /// queries run off the UI thread so tab activation never blocks on synchronous DB I/O.</summary>
+    public async Task Load()
     {
+        var (containers, pickList) = await Task.Run(() => (storageContainers.GetAll(), listingService.GetPickList()));
+
         Locations.Clear();
-        foreach (var c in storageContainers.GetAll())
+        foreach (var c in containers)
             Locations.Add(c);
-        ForSaleLocation = Locations.FirstOrDefault(c => c.Id == salesSettings.ForSaleLocationId);
-        RefreshPickList();
+
+        _suppressPersist = true;
+        try
+        {
+            ForSaleLocation = Locations.FirstOrDefault(c => c.Id == salesSettings.ForSaleLocationId);
+        }
+        finally
+        {
+            _suppressPersist = false;
+        }
+
+        PickList.Clear();
+        foreach (var e in pickList)
+            PickList.Add(e);
     }
 
     partial void OnForSaleLocationChanged(StorageContainer? value)
-        => salesSettings.SetForSaleLocationId(value?.Id);
+    {
+        if (_suppressPersist) return;
+        salesSettings.SetForSaleLocationId(value?.Id);
+    }
 
     [RelayCommand]
     public void RefreshPickList()
@@ -48,9 +80,26 @@ public partial class SalesViewModel(
     [RelayCommand]
     public void MarkAllPicked()
     {
+        if (ForSaleLocation is null)
+        {
+            StatusMessage = "Select a For-Sale location first.";
+            return;
+        }
+
         var ids = PickList.Select(e => e.LotId).ToList();
         if (ids.Count == 0) return;
-        listingService.MarkPicked(ids);
+
+        try
+        {
+            var count = listingService.MarkPicked(ids);
+            StatusMessage = $"Marked {count} card(s) picked.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            StatusMessage = ex.Message;
+            return;
+        }
+
         RefreshPickList();
     }
 }

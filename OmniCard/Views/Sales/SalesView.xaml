@@ -13,6 +13,7 @@
                       ItemsSource="{Binding Locations}" SelectedItem="{Binding ForSaleLocation}"/>
             <Button Content="Refresh" Margin="12,0,0,0" Command="{Binding RefreshPickListCommand}"/>
             <Button Content="Mark All Picked" Margin="6,0,0,0" Command="{Binding MarkAllPickedCommand}"/>
+            <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center" Margin="12,0,0,0"/>
         </StackPanel>
         <DataGrid ItemsSource="{Binding PickList}" AutoGenerateColumns="False" IsReadOnly="True"
                   Style="{StaticResource {x:Type DataGrid}}">

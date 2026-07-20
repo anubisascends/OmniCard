@@ -35,7 +35,7 @@ public partial class RootView : IView<RootViewModel>, IHostedService
             if (MainTabControl.SelectedItem == tabItemDashboard)
                 viewModel.Dashboard.Load();
             else if (MainTabControl.SelectedItem == tabItemSales)
-                viewModel.Sales.Load();
+                _ = viewModel.Sales.Load();
         };
 
         ViewModel.Collection.GetSelectedCards = () => CollectionTab.GetSelectedCards();

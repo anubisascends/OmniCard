@@ -15,7 +15,7 @@ public class SalesViewModelTests
         new(lotId, "Card Name", "Set Name", "NM", false, "Binder A", null, null, null, 1.00m, 1);
 
     [Fact]
-    public void Load_PopulatesLocationsAndPickList_AndSelectsSavedForSaleLocation()
+    public async Task Load_PopulatesLocationsAndPickList_AndSelectsSavedForSaleLocation()
     {
         var listingService = new Mock<IListingService>();
         var salesSettings = new Mock<ISalesSettingsService>();
@@ -28,12 +28,36 @@ public class SalesViewModelTests
 
         var vm = new SalesViewModel(listingService.Object, salesSettings.Object, containerService.Object);
 
-        vm.Load();
+        await vm.Load();
 
         Assert.Equal(2, vm.Locations.Count);
         Assert.NotNull(vm.ForSaleLocation);
         Assert.Equal(2, vm.ForSaleLocation!.Id);
         Assert.Equal(2, vm.PickList.Count);
+    }
+
+    [Fact]
+    public async Task Load_RestoringPersistedLocation_DoesNotRewriteSettings()
+    {
+        var listingService = new Mock<IListingService>();
+        var salesSettings = new Mock<ISalesSettingsService>();
+        var containerService = new Mock<IStorageContainerService>();
+
+        var containers = new List<StorageContainer> { Container(1, "Binder A"), Container(2, "Box B") };
+        containerService.Setup(c => c.GetAll()).Returns(containers);
+        salesSettings.Setup(s => s.ForSaleLocationId).Returns(2);
+        listingService.Setup(l => l.GetPickList(null)).Returns([]);
+
+        var vm = new SalesViewModel(listingService.Object, salesSettings.Object, containerService.Object);
+
+        await vm.Load();
+
+        // Restoring the saved location during Load must never rewrite (or clobber) settings.
+        salesSettings.Verify(s => s.SetForSaleLocationId(It.IsAny<int?>()), Times.Never);
+
+        // A genuine, subsequent user-driven change still persists.
+        vm.ForSaleLocation = containers[0];
+        salesSettings.Verify(s => s.SetForSaleLocationId(1), Times.Once);
     }
 
     [Fact]
@@ -54,17 +78,18 @@ public class SalesViewModelTests
     }
 
     [Fact]
-    public void MarkAllPicked_MarksThenRefreshes_AndNoOpsWhenPickListEmpty()
+    public async Task MarkAllPicked_MarksThenRefreshes_AndNoOpsWhenPickListEmpty()
     {
         var listingService = new Mock<IListingService>();
         var salesSettings = new Mock<ISalesSettingsService>();
         var containerService = new Mock<IStorageContainerService>();
 
-        containerService.Setup(c => c.GetAll()).Returns([]);
+        containerService.Setup(c => c.GetAll()).Returns([Container(1, "Binder A")]);
+        salesSettings.Setup(s => s.ForSaleLocationId).Returns(1);
         listingService.Setup(l => l.GetPickList(null)).Returns([Entry(10), Entry(11)]);
 
         var vm = new SalesViewModel(listingService.Object, salesSettings.Object, containerService.Object);
-        vm.Load();
+        await vm.Load();
 
         listingService.Setup(l => l.MarkPicked(It.IsAny<IEnumerable<int>>()))
             .Callback(() => listingService.Setup(l => l.GetPickList(null)).Returns([]))
@@ -78,5 +103,23 @@ public class SalesViewModelTests
         // No-op when the pick list is already empty — MarkPicked must not be called again.
         vm.MarkAllPicked();
         listingService.Verify(l => l.MarkPicked(It.IsAny<IEnumerable<int>>()), Times.Once);
+    }
+
+    [Fact]
+    public void MarkAllPicked_WithNoForSaleLocationConfigured_DoesNotCallMarkPicked_AndDoesNotThrow()
+    {
+        var listingService = new Mock<IListingService>();
+        var salesSettings = new Mock<ISalesSettingsService>();
+        var containerService = new Mock<IStorageContainerService>();
+
+        var vm = new SalesViewModel(listingService.Object, salesSettings.Object, containerService.Object);
+        // ForSaleLocation left at its default (null) — the state before the user has picked one.
+        vm.PickList.Add(Entry(10));
+
+        var ex = Record.Exception(() => vm.MarkAllPicked());
+
+        Assert.Null(ex);
+        listingService.Verify(l => l.MarkPicked(It.IsAny<IEnumerable<int>>()), Times.Never);
+        Assert.Equal("Select a For-Sale location first.", vm.StatusMessage);
     }
 }
