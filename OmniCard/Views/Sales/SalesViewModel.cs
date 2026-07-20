@@ -46,13 +46,17 @@ public partial class SalesViewModel(
         {
             var (containers, pickList) = await Task.Run(() => (storageContainers.GetAll(), listingService.GetPickList()));
 
-            Locations.Clear();
-            foreach (var c in containers)
-                Locations.Add(c);
-
+            // Suppress persistence across the whole location refresh: clearing Locations resets the
+            // bound ComboBox's SelectedItem to null, firing OnForSaleLocationChanged BEFORE we
+            // reassign the saved value — without this window that null write clobbers the saved
+            // For-Sale location id on every tab activation.
             _suppressPersist = true;
             try
             {
+                Locations.Clear();
+                foreach (var c in containers)
+                    Locations.Add(c);
+
                 ForSaleLocation = Locations.FirstOrDefault(c => c.Id == salesSettings.ForSaleLocationId);
             }
             finally
