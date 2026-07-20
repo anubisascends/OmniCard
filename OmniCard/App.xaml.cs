@@ -235,14 +235,19 @@ public partial class App : Application
 
             // Ensure the unified store's schema is complete on a pre-existing inventory.db
             // (EnsureCreated() below only creates tables/columns for a brand-new database file).
-            // collection.db is no longer opened by the app as of Phase 2a Task 6 — its data was
-            // migrated into inventory.db's Product/Lot store by an earlier run of this app (see
-            // UnifiedMigrationService's MigrationState marker); the file is left on disk for rollback.
             UnifiedMigrationService.EnsureUnifiedSchema(dataDir, migrationLogger);
 
             splash.SetStatus("Initializing databases...");
-            using (var invCtx = Host.Services.GetRequiredService<IDbContextFactory<OmniCardDbContext>>().CreateDbContext())
+            var unifiedFactory = Host.Services.GetRequiredService<IDbContextFactory<OmniCardDbContext>>();
+            using (var invCtx = unifiedFactory.CreateDbContext())
                 invCtx.Database.EnsureCreated();
+
+            // One-time migration of collection.db's singles into the unified Product/Lot store.
+            // Guarded by the MigrationState "UnifiedDataMigration" DB marker, so this is a no-op
+            // on every launch after the first successful run. collection.db is read raw (no
+            // CollectionDbContext) and is left untouched on disk afterwards for rollback.
+            splash.SetStatus("Migrating collection data...");
+            UnifiedMigrationService.MigrateDataIfNeeded(dataDir, unifiedFactory, migrationLogger);
 
             splash.SetStatus("Preparing scan cache...");
             Directory.CreateDirectory(DataPathServiceInstance.ScansDirectory);
