@@ -22,6 +22,7 @@ public sealed partial class CollectionViewModel : ViewModel
     private readonly ILogger<CollectionViewModel> _logger;
     private readonly IEbayListingService _ebayListingService;
     private readonly EbaySettings _ebaySettings;
+    private readonly IListingService _listingService;
 
     /// <summary>Set by RootViewModel to delegate settings persistence.</summary>
     public Action? PersistSettings { get; set; }
@@ -51,7 +52,8 @@ public sealed partial class CollectionViewModel : ViewModel
         IDataPathService dataPathService,
         ILogger<CollectionViewModel> logger,
         IEbayListingService ebayListingService,
-        IOptions<EbaySettings> ebaySettings)
+        IOptions<EbaySettings> ebaySettings,
+        IListingService listingService)
     {
         _cardService = cardService;
         _containerService = containerService;
@@ -62,6 +64,7 @@ public sealed partial class CollectionViewModel : ViewModel
         _logger = logger;
         _ebayListingService = ebayListingService;
         _ebaySettings = ebaySettings.Value;
+        _listingService = listingService;
 
         // Initialize column visibility from settings
         var saved = displaySettings.Value.CollectionColumnVisibility;
@@ -473,6 +476,11 @@ public sealed partial class CollectionViewModel : ViewModel
 
                 var priceCache = FetchBatchPrices(results);
                 HydrateMissingImageUris(results);
+
+                // Tag on-market cards so the tile badge can render.
+                var statusByLot = _listingService.GetActiveListingStatusByLot(results.Select(c => c.Id));
+                foreach (var card in results)
+                    card.ListingStatus = statusByLot.TryGetValue(card.Id, out var st) ? st : null;
 
                 // MarketPrice and Quantity are not DB columns (fetched/computed after the
                 // query), so the DB sort can't order by them. When the primary sort level is

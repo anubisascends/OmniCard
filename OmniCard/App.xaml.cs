@@ -114,6 +114,10 @@ public partial class App : Application
             // Storage containers
             services.AddSingleton<IStorageContainerService, StorageContainerService>();
 
+            // Sales & fulfillment
+            services.AddSingleton<ISalesSettingsService, SalesSettingsService>();
+            services.AddSingleton<IListingService, ListingService>();
+
             // Sort/filter presets
             services.AddSingleton<ICollectionPresetService, CollectionPresetService>();
 

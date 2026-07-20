@@ -49,6 +49,10 @@ public class CollectionCard : INotifyPropertyChanged
     [NotMapped]
     public int Quantity { get; set; } = 1;
 
+    /// <summary>Active listing status for this lot (Listed/Picked), or null if not on the market. Not persisted.</summary>
+    [NotMapped]
+    public ListingStatus? ListingStatus { get; set; }
+
     /// <summary>All card IDs in this stack (including this card). Only populated when stacked.</summary>
     [NotMapped]
     public List<int>? StackedIds { get; set; }
