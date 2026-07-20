@@ -127,7 +127,20 @@ public class AnalyticsService : IAnalyticsService
             .Select(g => new RealizedLine(g.Key, g.Sum(l => l.Quantity), g.Sum(l => l.Proceeds), g.Sum(l => l.Cost)))
             .ToList();
 
-        return new RealizedSummary(totalSold, totalProceeds, totalCost, byGame);
+        // Fees and shipping come from Orders (both eBay-synced and manual orders emit a Sell
+        // movement, but fees/shipping only live on the Order row), scoped to orders that have
+        // actually shipped/completed within the period.
+        var orders = ctx.Orders.AsNoTracking()
+            .Where(o => (o.Status == OrderStatus.Shipped || o.Status == OrderStatus.Completed)
+                        && o.ShippedAt != null
+                        && (!since.HasValue || o.ShippedAt >= since.Value))
+            .ToList();
+        var totalFees = orders.Sum(o => o.MarketplaceFees);
+        var totalShipCost = orders.Sum(o => o.ShippingCost);
+        var totalShipCharged = orders.Sum(o => o.ShippingChargedToBuyer);
+
+        return new RealizedSummary(totalSold, totalProceeds, totalCost, byGame,
+            totalFees, totalShipCost, totalShipCharged);
     }
 
     public IReadOnlyList<MovementView> GetMovements(MovementFilter filter)

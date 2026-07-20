@@ -75,6 +75,23 @@ public class AnalyticsServiceTests : IDisposable
         ctx.SaveChanges();
     }
 
+    private static Order SeedOrder(OmniCardDbContext ctx, int customerId, OrderStatus status, DateTime? shippedAt,
+        decimal marketplaceFees, decimal shippingCost, decimal shippingChargedToBuyer)
+    {
+        var order = new Order
+        {
+            CustomerId = customerId,
+            Status = status,
+            ShippedAt = shippedAt,
+            MarketplaceFees = marketplaceFees,
+            ShippingCost = shippingCost,
+            ShippingChargedToBuyer = shippingChargedToBuyer,
+        };
+        ctx.Orders.Add(order);
+        ctx.SaveChanges();
+        return order;
+    }
+
     // --- Holdings ---
 
     [Fact]
@@ -294,6 +311,61 @@ public class AnalyticsServiceTests : IDisposable
         Assert.Equal(realizedAllTime.TotalSold, realizedAllTimeExplicitNull.TotalSold);
         Assert.Equal(realizedAllTime.TotalProceeds, realizedAllTimeExplicitNull.TotalProceeds);
         Assert.Equal(realizedAllTime.TotalCost, realizedAllTimeExplicitNull.TotalCost);
+    }
+
+    [Fact]
+    public void GetRealized_IncludesOrderFeesAndShipping_FromShippedAndCompletedOrders()
+    {
+        using var ctx = new OmniCardDbContext(_options);
+
+        // One sold lot via a Sell movement (proceeds 10, cost 4) — proceeds/cost are unaffected
+        // by order data; they still come from movements alone.
+        var bolt = SeedProduct(ctx, CardGame.Mtg, ProductCategory.Single, "Lightning Bolt", "bolt-1");
+        var boltLot = SeedLot(ctx, bolt.Id, 1, 4.00m, null);
+        SeedMovement(ctx, bolt.Id, boltLot.Id, MovementType.Acquire, 1, 4.00m);
+        SeedMovement(ctx, bolt.Id, boltLot.Id, MovementType.Sell, 1, 10.00m);
+
+        var customer = new Customer { Name = "A" };
+        ctx.Customers.Add(customer);
+        ctx.SaveChanges();
+
+        // Counted: Shipped and Completed orders with a ShippedAt date.
+        SeedOrder(ctx, customer.Id, OrderStatus.Shipped, DateTime.UtcNow, marketplaceFees: 1.5m, shippingCost: 0.8m, shippingChargedToBuyer: 1.0m);
+        SeedOrder(ctx, customer.Id, OrderStatus.Completed, DateTime.UtcNow, marketplaceFees: 2.0m, shippingCost: 1.2m, shippingChargedToBuyer: 1.5m);
+        // Excluded: not shipped/completed, or missing a ShippedAt.
+        SeedOrder(ctx, customer.Id, OrderStatus.Open, null, marketplaceFees: 99m, shippingCost: 99m, shippingChargedToBuyer: 99m);
+        SeedOrder(ctx, customer.Id, OrderStatus.Shipped, null, marketplaceFees: 99m, shippingCost: 99m, shippingChargedToBuyer: 99m);
+
+        var service = CreateService();
+        var realized = service.GetRealized();
+
+        Assert.Equal(10m, realized.TotalProceeds);
+        Assert.Equal(4m, realized.TotalCost);
+        Assert.Equal(3.5m, realized.TotalFees); // 1.5 + 2.0
+        Assert.Equal(2.0m, realized.TotalShippingCost); // 0.8 + 1.2
+        Assert.Equal(2.5m, realized.TotalShippingCharged); // 1.0 + 1.5
+    }
+
+    [Fact]
+    public void GetRealized_Since_FiltersOrderFeesAndShipping_ByShippedAt()
+    {
+        using var ctx = new OmniCardDbContext(_options);
+        var customer = new Customer { Name = "A" };
+        ctx.Customers.Add(customer);
+        ctx.SaveChanges();
+
+        SeedOrder(ctx, customer.Id, OrderStatus.Shipped, new DateTime(2023, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+            marketplaceFees: 1.5m, shippingCost: 0.8m, shippingChargedToBuyer: 1.0m); // too old, excluded
+        SeedOrder(ctx, customer.Id, OrderStatus.Completed, new DateTime(2025, 3, 1, 0, 0, 0, DateTimeKind.Utc),
+            marketplaceFees: 2.0m, shippingCost: 1.2m, shippingChargedToBuyer: 1.5m); // within period
+
+        var service = CreateService();
+        var since2025 = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var realized = service.GetRealized(since2025);
+
+        Assert.Equal(2.0m, realized.TotalFees);
+        Assert.Equal(1.2m, realized.TotalShippingCost);
+        Assert.Equal(1.5m, realized.TotalShippingCharged);
     }
 
     // --- Movements ---
