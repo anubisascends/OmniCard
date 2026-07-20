@@ -1,6 +1,5 @@
 using System.IO;
 using OmniCard.Collection;
-using OmniCard.Data;
 using Xunit;
 
 namespace OmniCard.Tests.Services;
@@ -17,6 +16,21 @@ public class SalesSettingsServiceTests
             var dps = new DataPathServiceStub(dir);
             new SalesSettingsService(dps).SetForSaleLocationId(42);
             Assert.Equal(42, new SalesSettingsService(dps).ForSaleLocationId);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
+    public void ForSaleLocationId_Returns_Null_OnCorruptJson()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "omnicard-sales-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var filePath = Path.Combine(dir, "sales-settings.json");
+            File.WriteAllText(filePath, "{ not valid json");
+            var dps = new DataPathServiceStub(dir);
+            Assert.Null(new SalesSettingsService(dps).ForSaleLocationId);
         }
         finally { Directory.Delete(dir, recursive: true); }
     }

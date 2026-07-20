@@ -28,7 +28,14 @@ public class SalesSettingsService : ISalesSettingsService
     {
         if (!File.Exists(_filePath))
             return new SalesSettings();
-        return JsonSerializer.Deserialize<SalesSettings>(File.ReadAllText(_filePath), JsonOptions) ?? new SalesSettings();
+        try
+        {
+            return JsonSerializer.Deserialize<SalesSettings>(File.ReadAllText(_filePath), JsonOptions) ?? new SalesSettings();
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return new SalesSettings();
+        }
     }
 
     private void Save(SalesSettings settings)
