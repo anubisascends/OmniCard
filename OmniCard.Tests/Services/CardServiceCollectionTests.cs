@@ -155,16 +155,16 @@ public class CardServiceCollectionTests : IDisposable
 
         service.CommitScans(scans);
 
-        using var ctx = new CollectionDbContext(_options);
-        var cards = ctx.Cards.AsNoTracking().OrderBy(c => c.Name).ToList();
-        Assert.Equal(2, cards.Count);
+        using var ctx = new OmniCardDbContext(_omniOptions);
+        var lots = ctx.Lots.AsNoTracking().Include(l => l.Product).OrderBy(l => l.Product.Name).ToList();
+        Assert.Equal(2, lots.Count);
 
-        Assert.Equal(CardGame.Mtg, cards[0].Game);
-        Assert.Equal("Bolt", cards[0].Name);
+        Assert.Equal(CardGame.Mtg, lots[0].Product.Game);
+        Assert.Equal("Bolt", lots[0].Product.Name);
 
-        Assert.Equal(CardGame.OnePiece, cards[1].Game);
-        Assert.Equal("Zoro", cards[1].Name);
-        Assert.Equal("OP01-001", cards[1].GameCardId);
+        Assert.Equal(CardGame.OnePiece, lots[1].Product.Game);
+        Assert.Equal("Zoro", lots[1].Product.Name);
+        Assert.Equal("OP01-001", lots[1].Product.GameCardId);
     }
 
     [Fact]
@@ -191,14 +191,14 @@ public class CardServiceCollectionTests : IDisposable
 
         service.CommitScans(scans);
 
-        using var ctx = new CollectionDbContext(_options);
-        var cards = ctx.Cards.AsNoTracking().OrderBy(c => c.Name).ToList();
+        using var ctx = new OmniCardDbContext(_omniOptions);
+        var lots = ctx.Lots.AsNoTracking().Include(l => l.Product).OrderBy(l => l.Product.Name).ToList();
 
-        Assert.Equal("R", cards[0].Color);
-        Assert.Equal("Instant", cards[0].CardType);
+        Assert.Equal("R", lots[0].Product.Color);
+        Assert.Equal("Instant", lots[0].Product.CardType);
 
-        Assert.Equal("Green", cards[1].Color);
-        Assert.Equal("Character", cards[1].CardType);
+        Assert.Equal("Green", lots[1].Product.Color);
+        Assert.Equal("Character", lots[1].Product.CardType);
     }
 
     private static ScannedCard CreateScan(CardGame game, object sourceCard)

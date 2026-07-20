@@ -45,74 +45,79 @@ public class CollectionCardCrudTests : IDisposable
     [Fact]
     public void UpdateCollectionCard_PersistsChanges()
     {
-        // Seed a card
-        using (var ctx = new CollectionDbContext(_options))
+        // Seed a Product + Lot (the unified-store equivalent of a CollectionCard row)
+        int lotId;
+        using (var ctx = new OmniCardDbContext(_omniOptions))
         {
-            ctx.Cards.Add(new CollectionCard
+            var product = new Product
             {
                 Game = CardGame.Mtg,
+                Category = ProductCategory.Single,
                 GameCardId = "id1",
                 Name = "Lightning Bolt",
                 SetName = "Alpha",
                 SetCode = "lea",
-                Number = "1",
+                CollectorNumber = "1",
                 Rarity = "common",
-                Condition = "NM",
-            });
+            };
+            ctx.Products.Add(product);
             ctx.SaveChanges();
+
+            var lot = new InventoryLot { ProductId = product.Id, Condition = "NM" };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            lotId = lot.Id;
         }
 
         var service = CreateService();
 
-        // Read the card, modify it, update
-        CollectionCard card;
-        using (var ctx = new CollectionDbContext(_options))
-        {
-            card = ctx.Cards.Single();
-        }
-
+        var card = service.GetCollectionCards([lotId]).Single();
         card.Condition = "LP";
         card.IsFoil = true;
         card.PurchasePrice = 5.99m;
         service.UpdateCollectionCard(card);
 
         // Verify
-        using (var ctx = new CollectionDbContext(_options))
+        using (var ctx = new OmniCardDbContext(_omniOptions))
         {
-            var updated = ctx.Cards.AsNoTracking().Single();
-            Assert.Equal("LP", updated.Condition);
-            Assert.True(updated.IsFoil);
-            Assert.Equal(5.99m, updated.PurchasePrice);
+            var updatedLot = ctx.Lots.AsNoTracking().Include(l => l.Product).Single(l => l.Id == lotId);
+            Assert.Equal("LP", updatedLot.Condition);
+            Assert.True(updatedLot.Product.Foil);
+            Assert.Equal(5.99m, updatedLot.UnitCost);
         }
     }
 
     [Fact]
     public void UpdateCollectionCard_CanReassignCard()
     {
-        using (var ctx = new CollectionDbContext(_options))
+        int lotId;
+        using (var ctx = new OmniCardDbContext(_omniOptions))
         {
-            ctx.Cards.Add(new CollectionCard
+            var product = new Product
             {
                 Game = CardGame.Mtg,
+                Category = ProductCategory.Single,
                 GameCardId = "old-id",
                 Name = "Wrong Card",
                 SetName = "Alpha",
                 SetCode = "lea",
-                Number = "1",
+                CollectorNumber = "1",
                 Rarity = "common",
-            });
+            };
+            ctx.Products.Add(product);
             ctx.SaveChanges();
+
+            var lot = new InventoryLot { ProductId = product.Id };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            lotId = lot.Id;
         }
 
         var service = CreateService();
 
-        CollectionCard card;
-        using (var ctx = new CollectionDbContext(_options))
-        {
-            card = ctx.Cards.Single();
-        }
+        var card = service.GetCollectionCards([lotId]).Single();
 
-        // Reassign to a different card
+        // Reassign to a different card (identity change -> moves the lot to a different Product)
         card.GameCardId = "new-id";
         card.Name = "Correct Card";
         card.SetName = "Beta";
@@ -122,38 +127,44 @@ public class CollectionCardCrudTests : IDisposable
         card.ImageUri = "https://img/correct.jpg";
         service.UpdateCollectionCard(card);
 
-        using (var ctx = new CollectionDbContext(_options))
+        using (var ctx = new OmniCardDbContext(_omniOptions))
         {
-            var updated = ctx.Cards.AsNoTracking().Single();
-            Assert.Equal("new-id", updated.GameCardId);
-            Assert.Equal("Correct Card", updated.Name);
-            Assert.Equal("Beta", updated.SetName);
+            var updatedLot = ctx.Lots.AsNoTracking().Include(l => l.Product).Single(l => l.Id == lotId);
+            Assert.Equal("new-id", updatedLot.Product.GameCardId);
+            Assert.Equal("Correct Card", updatedLot.Product.Name);
+            Assert.Equal("Beta", updatedLot.Product.SetName);
+
+            // The old product row is untouched (still exists, still "Wrong Card")
+            var oldProduct = ctx.Products.AsNoTracking().Single(p => p.GameCardId == "old-id");
+            Assert.Equal("Wrong Card", oldProduct.Name);
         }
     }
 
     [Fact]
     public void DeleteCollectionCard_RemovesFromDb()
     {
-        int cardId;
-        using (var ctx = new CollectionDbContext(_options))
+        int lotId, productId;
+        using (var ctx = new OmniCardDbContext(_omniOptions))
         {
-            var card = new CollectionCard
-            {
-                Game = CardGame.Mtg,
-                GameCardId = "id1",
-                Name = "Test Card",
-            };
-            ctx.Cards.Add(card);
+            var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, GameCardId = "id1", Name = "Test Card" };
+            ctx.Products.Add(product);
             ctx.SaveChanges();
-            cardId = card.Id;
+            productId = product.Id;
+
+            var lot = new InventoryLot { ProductId = product.Id };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            lotId = lot.Id;
         }
 
         var service = CreateService();
-        service.DeleteCollectionCard(cardId);
+        service.DeleteCollectionCard(lotId);
 
-        using (var ctx = new CollectionDbContext(_options))
+        using (var ctx = new OmniCardDbContext(_omniOptions))
         {
-            Assert.Empty(ctx.Cards.ToList());
+            Assert.Empty(ctx.Lots.ToList());
+            // The Product catalog row is left in place.
+            Assert.NotNull(ctx.Products.Find(productId));
         }
     }
 
@@ -185,12 +196,12 @@ public class CollectionCardCrudTests : IDisposable
         {
             service.CommitScans([scan]);
 
-            using var ctx = new CollectionDbContext(_options);
-            var card = ctx.Cards.AsNoTracking().Single();
-            Assert.Equal("Unknown Card", card.Name);
-            Assert.True(card.IsMissing);
-            Assert.Equal(CardGame.Mtg, card.Game);
-            Assert.Equal("", card.GameCardId);
+            using var ctx = new OmniCardDbContext(_omniOptions);
+            var lot = ctx.Lots.AsNoTracking().Include(l => l.Product).Single();
+            Assert.Equal("Unknown Card", lot.Product.Name);
+            Assert.True(lot.IsMissing);
+            Assert.Equal(CardGame.Mtg, lot.Product.Game);
+            Assert.Equal("", lot.Product.GameCardId);
         }
         finally
         {
@@ -217,8 +228,8 @@ public class CollectionCardCrudTests : IDisposable
         {
             service.CommitScans([scan]);
 
-            using var ctx = new CollectionDbContext(_options);
-            Assert.Empty(ctx.Cards.ToList());
+            using var ctx = new OmniCardDbContext(_omniOptions);
+            Assert.Empty(ctx.Lots.ToList());
         }
         finally
         {
