@@ -41,7 +41,7 @@ public class FlagResolutionMigrationTests : IDisposable
 
         var resolution = new FlagResolution
         {
-            CollectionCardId = card.Id,
+            LotId = card.Id,
             FlagReason = "NoMatch",
             FixType = "CardReassign",
             OriginalData = "{}",
@@ -56,7 +56,7 @@ public class FlagResolutionMigrationTests : IDisposable
         var loaded = ctx.FlagResolutions.First();
         Assert.Equal("NoMatch", loaded.FlagReason);
         Assert.Equal("CardReassign", loaded.FixType);
-        Assert.Equal(card.Id, loaded.CollectionCardId);
+        Assert.Equal(card.Id, loaded.LotId);
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public class FlagResolutionMigrationTests : IDisposable
 
         ctx.FlagResolutions.Add(new FlagResolution
         {
-            CollectionCardId = card.Id,
+            LotId = card.Id,
             FlagReason = "VeryLowConfidence",
             FixType = "MatchConfirmed",
             OriginalData = "{}",

@@ -588,7 +588,7 @@ public sealed class CardService : ICardService
             {
                 context.FlagResolutions.Add(new FlagResolution
                 {
-                    CollectionCardId = lot.Id,
+                    LotId = lot.Id,
                     FlagReason = scan.FlagFix.OriginalFlagReason.ToString(),
                     FixType = scan.FlagFix.FixType,
                     OriginalData = scan.FlagFix.OriginalData,
@@ -776,8 +776,9 @@ public sealed class CardService : ICardService
         // MismatchLogs/ScanDiagnosticEvents are still written by other services against the
         // Phase-1 CollectionDbContext. FlagResolutions, however, is now written by CommitScans
         // against OmniCardDbContext (the Phase-1 Cards table stopped receiving rows once writes
-        // moved to Product/Lot, and FlagResolutions.CollectionCardId is FK-cascaded to Cards in
-        // that context — inserting a LotId there would violate the FK).
+        // moved to Product/Lot, and FlagResolution.LotId is FK-cascaded to Cards in that legacy
+        // context under its original CollectionCardId column — inserting a LotId there would
+        // violate the FK).
         using var context = _collectionDbContextFactory.CreateDbContext();
         var mismatchCount = context.MismatchLogs.Count();
         var diagnosticCount = context.ScanDiagnosticEvents.Count();

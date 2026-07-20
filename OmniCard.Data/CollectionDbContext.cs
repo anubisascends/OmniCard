@@ -53,12 +53,24 @@ public class CollectionDbContext : DbContext
         {
             e.HasKey(f => f.Id);
             e.Property(f => f.Id).ValueGeneratedOnAdd();
-            e.HasIndex(f => f.CollectionCardId);
 
-            e.HasOne(f => f.CollectionCard)
+            // FlagResolution.LotId is a Phase-2a rename of what this (Phase-1) context still
+            // physically stores as "CollectionCardId" — this db's FlagResolutions rows predate
+            // the unified store and genuinely reference Cards(Id), not an InventoryLot. Map the
+            // shared property back onto the old column/relationship so collection.db's on-disk
+            // schema doesn't need to change.
+            e.Property(f => f.LotId).HasColumnName("CollectionCardId");
+            e.HasIndex(f => f.LotId);
+
+            e.HasOne<CollectionCard>()
                 .WithMany()
-                .HasForeignKey(f => f.CollectionCardId)
+                .HasForeignKey(f => f.LotId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // InventoryLot is not part of this (Phase-1) context's model; ignore the nav so EF
+            // doesn't try to pull that unmapped type — and transitively Product — into this model
+            // (same rationale as StorageContainer.Cards being Ignore'd in OmniCardDbContext).
+            e.Ignore(f => f.Lot);
         });
 
         modelBuilder.Entity<ScanDiagnosticEvent>(e =>
@@ -76,14 +88,21 @@ public class CollectionDbContext : DbContext
             e.Property(l => l.Id).ValueGeneratedOnAdd();
             e.Property(l => l.Status).HasConversion<string>();
             e.Property(l => l.ListingType).HasConversion<string>();
-            e.HasIndex(l => l.CollectionCardId).IsUnique();
+
+            // Same rationale as FlagResolution.LotId above: keep the physical column/FK on this
+            // legacy context pointed at Cards(Id) under its original name.
+            e.Property(l => l.LotId).HasColumnName("CollectionCardId");
+            e.HasIndex(l => l.LotId).IsUnique();
             e.HasIndex(l => l.Status);
             e.HasIndex(l => l.EbayItemId);
 
-            e.HasOne(l => l.CollectionCard)
+            e.HasOne<CollectionCard>()
                 .WithOne(c => c.EbayListing)
-                .HasForeignKey<EbayListing>(l => l.CollectionCardId)
+                .HasForeignKey<EbayListing>(l => l.LotId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // Same rationale as FlagResolution.Lot above.
+            e.Ignore(l => l.Lot);
         });
     }
 }

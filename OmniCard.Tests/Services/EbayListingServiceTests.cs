@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -9,7 +10,7 @@ using System.Text.Json;
 
 namespace OmniCard.Tests.Services;
 
-public class EbayListingServiceTests
+public class EbayListingServiceTests : IDisposable
 {
     private readonly EbaySettings _settings = new()
     {
@@ -18,29 +19,50 @@ public class EbayListingServiceTests
         Environment = "sandbox",
     };
 
-    private IDbContextFactory<CollectionDbContext> CreateInMemoryDbFactory()
+    private readonly SqliteConnection _connection;
+    private readonly DbContextOptions<OmniCardDbContext> _options;
+
+    public EbayListingServiceTests()
     {
-        var options = new DbContextOptionsBuilder<CollectionDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+        // Real SQLite (not InMemory) so the EbayListing -> InventoryLot FK/cascade configured in
+        // OmniCardDbContext is actually enforced by the database, matching production behavior.
+        _connection = new SqliteConnection("Data Source=:memory:");
+        _connection.Open();
+        _options = new DbContextOptionsBuilder<OmniCardDbContext>()
+            .UseSqlite(_connection)
             .Options;
-        return new TestDbContextFactory(options);
+        using var ctx = new OmniCardDbContext(_options);
+        ctx.Database.EnsureCreated();
+    }
+
+    public void Dispose() => _connection.Dispose();
+
+    private IDbContextFactory<OmniCardDbContext> CreateDbFactory() => new TestDbContextFactory(_options);
+
+    private static int SeedLot(OmniCardDbContext ctx, string name = "Black Lotus")
+    {
+        var product = new Product
+        {
+            Game = CardGame.Mtg, Category = ProductCategory.Single, Name = name,
+            SetName = "Alpha", SetCode = "LEA", CollectorNumber = "232", Rarity = "Rare",
+            GameCardId = "scryfall-123",
+        };
+        ctx.Products.Add(product);
+        ctx.SaveChanges();
+
+        var lot = new InventoryLot { ProductId = product.Id, Quantity = 1 };
+        ctx.Lots.Add(lot);
+        ctx.SaveChanges();
+        return lot.Id;
     }
 
     [Fact]
     public async Task CreateListingAsync_SavesEbayListing_WhenApiSucceeds()
     {
-        var dbFactory = CreateInMemoryDbFactory();
-
-        // Seed a card
+        var dbFactory = CreateDbFactory();
+        int lotId;
         using (var ctx = dbFactory.CreateDbContext())
-        {
-            ctx.Cards.Add(new CollectionCard
-            {
-                Id = 1, Name = "Black Lotus", SetName = "Alpha", SetCode = "LEA",
-                Number = "232", Rarity = "Rare", GameCardId = "scryfall-123",
-            });
-            ctx.SaveChanges();
-        }
+            lotId = SeedLot(ctx);
 
         var responseJson = JsonSerializer.Serialize(new { listingId = "ebay-item-12345" });
         var handler = new FakeHttpHandler(HttpStatusCode.OK, responseJson);
@@ -62,13 +84,15 @@ public class EbayListingServiceTests
             ListingType = EbayListingType.FixedPrice,
         };
 
-        var card = dbFactory.CreateDbContext().Cards.First(c => c.Id == 1);
+        // The DTO's Id is the LotId (per the unified read facade); CreateListingAsync doesn't
+        // require the CollectionCard itself to be persisted anywhere.
+        var card = new CollectionCard { Id = lotId, Name = "Black Lotus" };
         var result = await svc.CreateListingAsync(card, options);
 
         Assert.True(result);
 
         using var verifyCtx = dbFactory.CreateDbContext();
-        var listing = verifyCtx.EbayListings.FirstOrDefault(l => l.CollectionCardId == 1);
+        var listing = verifyCtx.EbayListings.FirstOrDefault(l => l.LotId == lotId);
         Assert.NotNull(listing);
         Assert.Equal(EbayListingStatus.Active, listing.Status);
         Assert.Equal(5000m, listing.ListedPrice);
@@ -77,18 +101,14 @@ public class EbayListingServiceTests
     [Fact]
     public async Task EndListingAsync_UpdatesStatusToEnded()
     {
-        var dbFactory = CreateInMemoryDbFactory();
-
+        var dbFactory = CreateDbFactory();
+        int lotId;
         using (var ctx = dbFactory.CreateDbContext())
         {
-            ctx.Cards.Add(new CollectionCard
-            {
-                Id = 1, Name = "Test", SetName = "Set", SetCode = "TST",
-                Number = "1", Rarity = "Common", GameCardId = "test-1",
-            });
+            lotId = SeedLot(ctx, "Test");
             ctx.EbayListings.Add(new EbayListing
             {
-                Id = 1, CollectionCardId = 1, EbayItemId = "ebay-123",
+                LotId = lotId, EbayItemId = "ebay-123",
                 Status = EbayListingStatus.Active, ListedPrice = 10m,
             });
             ctx.SaveChanges();
@@ -105,13 +125,13 @@ public class EbayListingServiceTests
             dbFactory,
             NullLogger<EbayListingService>.Instance);
 
-        var listing = dbFactory.CreateDbContext().EbayListings.First(l => l.Id == 1);
+        var listing = dbFactory.CreateDbContext().EbayListings.First(l => l.LotId == lotId);
         var result = await svc.EndListingAsync(listing);
 
         Assert.True(result);
 
         using var verifyCtx = dbFactory.CreateDbContext();
-        var updated = verifyCtx.EbayListings.First(l => l.Id == 1);
+        var updated = verifyCtx.EbayListings.First(l => l.LotId == lotId);
         Assert.Equal(EbayListingStatus.Ended, updated.Status);
     }
 
@@ -129,7 +149,7 @@ public class EbayListingServiceTests
         var handler = new FakeHttpHandler(HttpStatusCode.OK, responseJson);
         var factory = new FakeHttpClientFactory(handler);
         var authService = new FakeEbayAuthService("test-token");
-        var dbFactory = CreateInMemoryDbFactory();
+        var dbFactory = CreateDbFactory();
 
         var svc = new EbayListingService(
             Options.Create(_settings),
@@ -144,11 +164,37 @@ public class EbayListingServiceTests
         Assert.Equal("policy-1", policies[0].PolicyId);
         Assert.Equal("Standard Shipping", policies[0].Name);
     }
+
+    [Fact]
+    public void DeletingLot_CascadesEbayListing()
+    {
+        var dbFactory = CreateDbFactory();
+        int lotId;
+        using (var ctx = dbFactory.CreateDbContext())
+        {
+            lotId = SeedLot(ctx, "Cascade Test");
+            ctx.EbayListings.Add(new EbayListing
+            {
+                LotId = lotId, EbayItemId = "ebay-cascade", Status = EbayListingStatus.Active, ListedPrice = 1m,
+            });
+            ctx.SaveChanges();
+        }
+
+        using (var ctx = dbFactory.CreateDbContext())
+        {
+            var lot = ctx.Lots.Single(l => l.Id == lotId);
+            ctx.Lots.Remove(lot);
+            ctx.SaveChanges();
+        }
+
+        using var verifyCtx = dbFactory.CreateDbContext();
+        Assert.Empty(verifyCtx.EbayListings.Where(l => l.LotId == lotId));
+    }
 }
 
-public class TestDbContextFactory : IDbContextFactory<CollectionDbContext>
+public class TestDbContextFactory : IDbContextFactory<OmniCardDbContext>
 {
-    private readonly DbContextOptions<CollectionDbContext> _options;
-    public TestDbContextFactory(DbContextOptions<CollectionDbContext> options) => _options = options;
-    public CollectionDbContext CreateDbContext() => new(_options);
+    private readonly DbContextOptions<OmniCardDbContext> _options;
+    public TestDbContextFactory(DbContextOptions<OmniCardDbContext> options) => _options = options;
+    public OmniCardDbContext CreateDbContext() => new(_options);
 }

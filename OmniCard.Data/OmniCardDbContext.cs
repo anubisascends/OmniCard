@@ -78,12 +78,13 @@ public class OmniCardDbContext : DbContext
         {
             e.HasKey(f => f.Id);
             e.Property(f => f.Id).ValueGeneratedOnAdd();
-            e.HasIndex(f => f.CollectionCardId);
+            e.HasIndex(f => f.LotId);
 
-            // No CollectionCard entity in this context yet (added in Task 5 once the
-            // unified CollectionCard/Lot relationship lands); keep the scalar FK column
-            // but don't configure a relationship to a nonexistent table.
-            e.Ignore(f => f.CollectionCard);
+            // A lot can accumulate more than one flag-resolution record over time, so this is a
+            // regular (non-unique) FK; deleting the lot removes its flag-resolution history too.
+            e.HasOne(f => f.Lot).WithMany()
+                .HasForeignKey(f => f.LotId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<ScanDiagnosticEvent>(e =>
@@ -101,13 +102,15 @@ public class OmniCardDbContext : DbContext
             e.Property(l => l.Id).ValueGeneratedOnAdd();
             e.Property(l => l.Status).HasConversion<string>();
             e.Property(l => l.ListingType).HasConversion<string>();
-            e.HasIndex(l => l.CollectionCardId).IsUnique();
+            e.HasIndex(l => l.LotId).IsUnique();
             e.HasIndex(l => l.Status);
             e.HasIndex(l => l.EbayItemId);
 
-            // Same as FlagResolution above: no CollectionCard table here yet, so the FK
-            // relationship to Cards is intentionally omitted (Task 5 wires this to Lot).
-            e.Ignore(l => l.CollectionCard);
+            // A lot can have at most one eBay listing at a time (unique index above);
+            // deleting the lot removes its listing too.
+            e.HasOne(l => l.Lot).WithMany()
+                .HasForeignKey(l => l.LotId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<MigrationState>(e =>

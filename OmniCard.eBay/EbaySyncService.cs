@@ -15,14 +15,14 @@ public class EbaySyncService : IEbaySyncService
     private readonly EbaySettings _settings;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IEbayAuthService _ebayAuthService;
-    private readonly IDbContextFactory<CollectionDbContext> _dbContextFactory;
+    private readonly IDbContextFactory<OmniCardDbContext> _dbContextFactory;
     private readonly ILogger<EbaySyncService> _logger;
 
     public EbaySyncService(
         IOptions<EbaySettings> settings,
         IHttpClientFactory httpClientFactory,
         IEbayAuthService ebayAuthService,
-        IDbContextFactory<CollectionDbContext> dbContextFactory,
+        IDbContextFactory<OmniCardDbContext> dbContextFactory,
         ILogger<EbaySyncService> logger)
     {
         _settings = settings.Value;
@@ -61,6 +61,8 @@ public class EbaySyncService : IEbaySyncService
                 syncedCount++;
                 _logger.LogInformation("Listing {ItemId} marked as sold to {Buyer} for {Price}",
                     listing.EbayItemId, saleInfo.BuyerUsername, saleInfo.SoldPrice);
+
+                await SeedSellMovementAsync(ctx, listing.LotId, saleInfo.SoldPrice);
             }
             else
             {
@@ -86,16 +88,42 @@ public class EbaySyncService : IEbaySyncService
         if (tracked is null)
             return;
 
-        if (soldItemIds.TryGetValue(tracked.EbayItemId, out var saleInfo))
+        // Guard against re-seeding a Sell movement if this listing was already synced as Sold
+        // by an earlier call (e.g. SyncAllActiveAsync ran first).
+        if (tracked.Status != EbayListingStatus.Sold && soldItemIds.TryGetValue(tracked.EbayItemId, out var saleInfo))
         {
             tracked.Status = EbayListingStatus.Sold;
             tracked.SoldPrice = saleInfo.SoldPrice;
             tracked.BuyerUsername = saleInfo.BuyerUsername;
             tracked.EndTime = DateTime.UtcNow;
+
+            await SeedSellMovementAsync(ctx, tracked.LotId, saleInfo.SoldPrice);
         }
 
         tracked.LastSyncedAt = DateTime.UtcNow;
         await ctx.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Records the sale as a <see cref="MovementType.Sell"/> inventory movement against the lot's
+    /// product, so eBay sales show up in the same movement history as manual sells/acquisitions.
+    /// Best-effort: if the lot has already been deleted (e.g. removed from the collection before
+    /// the sale synced), this silently does nothing rather than fail the whole sync.
+    /// </summary>
+    private static async Task SeedSellMovementAsync(OmniCardDbContext ctx, int lotId, decimal? soldPrice)
+    {
+        var lot = await ctx.Lots.FindAsync(lotId);
+        if (lot is null)
+            return;
+
+        ctx.Movements.Add(new InventoryMovement
+        {
+            ProductId = lot.ProductId,
+            LotId = lot.Id,
+            Type = MovementType.Sell,
+            Quantity = 1,
+            UnitValue = soldPrice,
+        });
     }
 
     private async Task<Dictionary<string, SaleInfo>> FetchSoldItemIdsAsync(string token)

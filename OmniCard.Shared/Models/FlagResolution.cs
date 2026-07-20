@@ -3,8 +3,8 @@ namespace OmniCard.Models;
 public class FlagResolution
 {
     public int Id { get; set; }
-    public int CollectionCardId { get; set; }
-    public CollectionCard? CollectionCard { get; set; }
+    public int LotId { get; set; }
+    public InventoryLot? Lot { get; set; }
     public string FlagReason { get; set; } = "";
     public string FixType { get; set; } = "";
     public string OriginalData { get; set; } = "";

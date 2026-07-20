@@ -218,13 +218,13 @@ public class UnifiedMigrationTests : IDisposable
 
             ctx.EbayListings.Add(new EbayListing
             {
-                CollectionCardId = oldCardId, EbayItemId = "item-1", Status = EbayListingStatus.Active,
+                LotId = oldCardId, EbayItemId = "item-1", Status = EbayListingStatus.Active,
                 ListingType = EbayListingType.FixedPrice, ListedPrice = 9.99m,
                 CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             });
             ctx.FlagResolutions.Add(new FlagResolution
             {
-                CollectionCardId = oldCardId, FlagReason = "NoMatch", FixType = "Manual",
+                LotId = oldCardId, FlagReason = "NoMatch", FixType = "Manual",
                 OriginalData = "orig", ResolvedData = "resolved", ScanHash = 55,
                 FixedAt = new DateTime(2026, 1, 3, 0, 0, 0, DateTimeKind.Utc),
             });
@@ -237,11 +237,11 @@ public class UnifiedMigrationTests : IDisposable
 
         using var verify = NewUnifiedCtx();
         var listing = Assert.Single(verify.EbayListings.AsNoTracking().ToList());
-        Assert.Equal(newLotId, listing.CollectionCardId);
+        Assert.Equal(newLotId, listing.LotId);
         Assert.Equal("item-1", listing.EbayItemId);
 
         var flag = Assert.Single(verify.FlagResolutions.AsNoTracking().ToList());
-        Assert.Equal(newLotId, flag.CollectionCardId);
+        Assert.Equal(newLotId, flag.LotId);
         Assert.Equal("NoMatch", flag.FlagReason);
 
         // Map is also persisted to disk for a later process (Task 5) to consume.
@@ -467,6 +467,80 @@ public class UnifiedMigrationTests : IDisposable
         UnifiedMigrationService.EnsureUnifiedSchema(realDir, NullLogger.Instance);
 
         verifyConn.Dispose();
+        SqliteConnection.ClearAllPools();
+    }
+
+    [Fact]
+    public void EnsureUnifiedSchema_RenamesLegacyCollectionCardIdColumn_ToLotId()
+    {
+        // Simulates an inventory.db from earlier in Task 5's own development, before the
+        // CollectionCardId -> LotId rename: EbayListings/FlagResolutions already exist under
+        // their pre-rename column name.
+        var dir = Path.Combine(_tempDir, "legacy-column-name");
+        Directory.CreateDirectory(dir);
+        var dbPath = Path.Combine(dir, "inventory.db");
+
+        using (var conn = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE EbayListings (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    CollectionCardId INTEGER NOT NULL,
+                    EbayItemId TEXT NOT NULL DEFAULT '',
+                    Status TEXT NOT NULL DEFAULT 'Draft',
+                    ListingType TEXT NOT NULL DEFAULT 'FixedPrice',
+                    ListedPrice REAL NOT NULL DEFAULT 0,
+                    CreatedAt TEXT NOT NULL
+                );
+                CREATE UNIQUE INDEX IX_EbayListings_CollectionCardId ON EbayListings(CollectionCardId);
+                CREATE TABLE FlagResolutions (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    CollectionCardId INTEGER NOT NULL,
+                    FlagReason TEXT NOT NULL DEFAULT '',
+                    FixType TEXT NOT NULL DEFAULT '',
+                    OriginalData TEXT NOT NULL DEFAULT '',
+                    ResolvedData TEXT NOT NULL DEFAULT '',
+                    ScanHash INTEGER NOT NULL,
+                    FixedAt TEXT NOT NULL,
+                    CreatedAt TEXT NOT NULL
+                );
+                CREATE INDEX IX_FlagResolutions_CollectionCardId ON FlagResolutions(CollectionCardId);
+                """;
+            cmd.ExecuteNonQuery();
+
+            cmd.CommandText = "INSERT INTO EbayListings (CollectionCardId, EbayItemId, CreatedAt) VALUES (7, 'item-7', '2026-01-01')";
+            cmd.ExecuteNonQuery();
+            cmd.CommandText = "INSERT INTO FlagResolutions (CollectionCardId, ScanHash, FixedAt, CreatedAt) VALUES (7, 42, '2026-01-01', '2026-01-01')";
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        UnifiedMigrationService.EnsureUnifiedSchema(dir, NullLogger.Instance);
+
+        using var verifyConn = new SqliteConnection($"Data Source={dbPath}");
+        verifyConn.Open();
+        using var verifyCmd = verifyConn.CreateCommand();
+
+        foreach (var table in new[] { "EbayListings", "FlagResolutions" })
+        {
+            verifyCmd.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = 'LotId'";
+            Assert.Equal(1L, (long)verifyCmd.ExecuteScalar()!);
+            verifyCmd.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = 'CollectionCardId'";
+            Assert.Equal(0L, (long)verifyCmd.ExecuteScalar()!);
+        }
+
+        // Existing row data survives the rename under the new column name.
+        verifyCmd.CommandText = "SELECT LotId FROM EbayListings WHERE EbayItemId = 'item-7'";
+        Assert.Equal(7L, (long)verifyCmd.ExecuteScalar()!);
+        verifyCmd.CommandText = "SELECT LotId FROM FlagResolutions WHERE ScanHash = 42";
+        Assert.Equal(7L, (long)verifyCmd.ExecuteScalar()!);
+
+        // Idempotent — running again must not throw or re-attempt the rename.
+        verifyConn.Dispose();
+        SqliteConnection.ClearAllPools();
+        UnifiedMigrationService.EnsureUnifiedSchema(dir, NullLogger.Instance);
         SqliteConnection.ClearAllPools();
     }
 

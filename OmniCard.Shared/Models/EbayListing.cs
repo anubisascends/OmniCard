@@ -3,8 +3,8 @@ namespace OmniCard.Models;
 public class EbayListing
 {
     public int Id { get; set; }
-    public int CollectionCardId { get; set; }
-    public CollectionCard CollectionCard { get; set; } = null!;
+    public int LotId { get; set; }
+    public InventoryLot? Lot { get; set; }
     public string EbayItemId { get; set; } = "";
     public string? EbayCatalogProductId { get; set; }
     public EbayListingStatus Status { get; set; }

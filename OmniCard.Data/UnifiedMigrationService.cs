@@ -101,10 +101,19 @@ public static class UnifiedMigrationService
         cmd.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS IX_StorageContainers_Name ON StorageContainers(Name)";
         cmd.ExecuteNonQuery();
 
+        // If EbayListings already exists from before the Task-5 rename, get its FK column
+        // renamed to LotId before (re)running the CREATE TABLE/index statements below — SQLite's
+        // CREATE TABLE IF NOT EXISTS is a no-op on an existing table, so the column must already
+        // be named right by the time we get there. This does NOT retrofit a database-level FK
+        // constraint onto that pre-existing table (SQLite can't ALTER TABLE to add one); only a
+        // fresh CREATE TABLE (below) gets the real FK/cascade. See Task 5 report for detail.
+        if (TableExists(cmd, "EbayListings"))
+            RenameColumnIfPresent(cmd, "EbayListings", "CollectionCardId", "LotId");
+
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS EbayListings (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                CollectionCardId INTEGER NOT NULL,
+                LotId INTEGER NOT NULL,
                 EbayItemId TEXT NOT NULL DEFAULT '',
                 EbayCatalogProductId TEXT,
                 Status TEXT NOT NULL DEFAULT 'Draft',
@@ -117,11 +126,14 @@ public static class UnifiedMigrationService
                 BuyerUsername TEXT,
                 LastSyncedAt TEXT,
                 CreatedAt TEXT NOT NULL,
-                ErrorMessage TEXT
+                ErrorMessage TEXT,
+                FOREIGN KEY (LotId) REFERENCES Lots(Id) ON DELETE CASCADE
             )
             """;
         cmd.ExecuteNonQuery();
-        cmd.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS IX_EbayListings_CollectionCardId ON EbayListings(CollectionCardId)";
+        cmd.CommandText = "DROP INDEX IF EXISTS IX_EbayListings_CollectionCardId";
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS IX_EbayListings_LotId ON EbayListings(LotId)";
         cmd.ExecuteNonQuery();
         cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_EbayListings_Status ON EbayListings(Status)";
         cmd.ExecuteNonQuery();
@@ -147,10 +159,14 @@ public static class UnifiedMigrationService
             """;
         cmd.ExecuteNonQuery();
 
+        // Same rename-in-place guard as EbayListings above.
+        if (TableExists(cmd, "FlagResolutions"))
+            RenameColumnIfPresent(cmd, "FlagResolutions", "CollectionCardId", "LotId");
+
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS FlagResolutions (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                CollectionCardId INTEGER NOT NULL,
+                LotId INTEGER NOT NULL,
                 FlagReason TEXT NOT NULL DEFAULT '',
                 FixType TEXT NOT NULL DEFAULT '',
                 OriginalData TEXT NOT NULL DEFAULT '',
@@ -158,11 +174,14 @@ public static class UnifiedMigrationService
                 ScanHash INTEGER NOT NULL,
                 Confidence REAL,
                 FixedAt TEXT NOT NULL,
-                CreatedAt TEXT NOT NULL
+                CreatedAt TEXT NOT NULL,
+                FOREIGN KEY (LotId) REFERENCES Lots(Id) ON DELETE CASCADE
             )
             """;
         cmd.ExecuteNonQuery();
-        cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_FlagResolutions_CollectionCardId ON FlagResolutions(CollectionCardId)";
+        cmd.CommandText = "DROP INDEX IF EXISTS IX_FlagResolutions_CollectionCardId";
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_FlagResolutions_LotId ON FlagResolutions(LotId)";
         cmd.ExecuteNonQuery();
 
         cmd.CommandText = """
@@ -208,6 +227,29 @@ public static class UnifiedMigrationService
             cmd.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {columnDefinition}";
             cmd.ExecuteNonQuery();
         }
+    }
+
+    private static bool ColumnExists(SqliteCommand cmd, string table, string column)
+    {
+        cmd.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = '{column}'";
+        return (long)cmd.ExecuteScalar()! > 0;
+    }
+
+    /// <summary>
+    /// Renames <paramref name="oldColumn"/> to <paramref name="newColumn"/> on <paramref name="table"/>
+    /// if the old name is still present and the new one isn't yet — idempotent, and a no-op for a
+    /// brand-new table created with the new name in the first place. Used to carry Task-5's
+    /// CollectionCardId -> LotId rename onto an <c>inventory.db</c> that already had these tables
+    /// under their pre-rename column name. Requires SQLite 3.25+ (bundled by Microsoft.Data.Sqlite),
+    /// which supports ALTER TABLE ... RENAME COLUMN.
+    /// </summary>
+    private static void RenameColumnIfPresent(SqliteCommand cmd, string table, string oldColumn, string newColumn)
+    {
+        if (ColumnExists(cmd, table, newColumn) || !ColumnExists(cmd, table, oldColumn))
+            return;
+
+        cmd.CommandText = $"ALTER TABLE {table} RENAME COLUMN {oldColumn} TO {newColumn}";
+        cmd.ExecuteNonQuery();
     }
 
     // ---------------------------------------------------------------------
@@ -380,10 +422,10 @@ public static class UnifiedMigrationService
             }).ToList();
             unifiedCtx.MismatchLogs.AddRange(mismatchLogs);
 
-            // --- FlagResolutions (CollectionCardId remapped to the new LotId) ---
+            // --- FlagResolutions (old CollectionCardId remapped to the new LotId) ---
             var flagResolutions = collectionCtx.FlagResolutions.AsNoTracking().ToList().Select(f => new FlagResolution
             {
-                CollectionCardId = cardIdToLotId.TryGetValue(f.CollectionCardId, out var lotId) ? lotId : f.CollectionCardId,
+                LotId = cardIdToLotId.TryGetValue(f.LotId, out var lotId) ? lotId : f.LotId,
                 FlagReason = f.FlagReason,
                 FixType = f.FixType,
                 OriginalData = f.OriginalData,
@@ -406,10 +448,10 @@ public static class UnifiedMigrationService
             }).ToList();
             unifiedCtx.ScanDiagnosticEvents.AddRange(diagnosticEvents);
 
-            // --- EbayListings (CollectionCardId remapped to the new LotId) ---
+            // --- EbayListings (old CollectionCardId remapped to the new LotId) ---
             var ebayListings = collectionCtx.EbayListings.AsNoTracking().ToList().Select(l => new EbayListing
             {
-                CollectionCardId = cardIdToLotId.TryGetValue(l.CollectionCardId, out var lotId) ? lotId : l.CollectionCardId,
+                LotId = cardIdToLotId.TryGetValue(l.LotId, out var lotId) ? lotId : l.LotId,
                 EbayItemId = l.EbayItemId,
                 EbayCatalogProductId = l.EbayCatalogProductId,
                 Status = l.Status,
