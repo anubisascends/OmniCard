@@ -115,6 +115,16 @@
                     <TextBlock Text="{Binding RealizedProfit, Converter={conv:SignedMoneyConverter}}"
                                Foreground="{Binding RealizedProfit, Converter={conv:GainLossColorConverter}}"
                                FontSize="24" FontWeight="Bold" Margin="0,4,0,0"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <RadioButton Content="All Time" GroupName="RealizedPeriod"
+                                     IsChecked="{Binding RealizedPeriod, Converter={conv:EnumBoolConverter}, ConverterParameter=AllTime}"
+                                     Margin="0,0,10,0"/>
+                        <RadioButton Content="This Year" GroupName="RealizedPeriod"
+                                     IsChecked="{Binding RealizedPeriod, Converter={conv:EnumBoolConverter}, ConverterParameter=ThisYear}"
+                                     Margin="0,0,10,0"/>
+                        <RadioButton Content="This Month" GroupName="RealizedPeriod"
+                                     IsChecked="{Binding RealizedPeriod, Converter={conv:EnumBoolConverter}, ConverterParameter=ThisMonth}"/>
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </Grid>

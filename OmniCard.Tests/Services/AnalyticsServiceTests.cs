@@ -60,16 +60,18 @@ public class AnalyticsServiceTests : IDisposable
         return lot;
     }
 
-    private static void SeedMovement(OmniCardDbContext ctx, int productId, int? lotId, MovementType type, int quantity, decimal? unitValue)
+    private static void SeedMovement(OmniCardDbContext ctx, int productId, int? lotId, MovementType type, int quantity, decimal? unitValue, DateTime? timestamp = null)
     {
-        ctx.Movements.Add(new InventoryMovement
+        var movement = new InventoryMovement
         {
             ProductId = productId,
             LotId = lotId,
             Type = type,
             Quantity = quantity,
             UnitValue = unitValue,
-        });
+        };
+        if (timestamp.HasValue) movement.Timestamp = timestamp.Value;
+        ctx.Movements.Add(movement);
         ctx.SaveChanges();
     }
 
@@ -222,6 +224,49 @@ public class AnalyticsServiceTests : IDisposable
         Assert.Equal(0m, realized.TotalProceeds);
         Assert.Equal(0m, realized.TotalCost);
         Assert.Empty(realized.ByGame);
+    }
+
+    [Fact]
+    public void GetRealized_Since_FiltersSellsByTimestamp_ButKeepsPairedAcquireCostRegardlessOfItsOwnDate()
+    {
+        using var ctx = new OmniCardDbContext(_options);
+
+        // Old sale (2023) — cost (Acquire) happened even earlier, in 2022.
+        var bolt = SeedProduct(ctx, CardGame.Mtg, ProductCategory.Single, "Lightning Bolt", "bolt-1");
+        var boltLot = SeedLot(ctx, bolt.Id, 2, 1.50m, null);
+        SeedMovement(ctx, bolt.Id, boltLot.Id, MovementType.Acquire, 2, 1.50m, new DateTime(2022, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        SeedMovement(ctx, bolt.Id, boltLot.Id, MovementType.Sell, 2, 5.00m, new DateTime(2023, 6, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        // Recent sale (2025) on a lot whose Acquire cost is from 2024 — should always be included
+        // regardless of the Acquire's own date, since only the Sell's Timestamp is filtered.
+        var op = SeedProduct(ctx, CardGame.OnePiece, ProductCategory.Single, "Zoro", "op-1");
+        var opLot = SeedLot(ctx, op.Id, 1, 2.00m, null);
+        SeedMovement(ctx, op.Id, opLot.Id, MovementType.Acquire, 1, 2.00m, new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        SeedMovement(ctx, op.Id, opLot.Id, MovementType.Sell, 1, 1.00m, new DateTime(2025, 3, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        var service = CreateService();
+
+        // since = start of 2025 -> only the OnePiece sale qualifies; its Acquire cost (2024) is
+        // still included in full even though it predates the cutoff.
+        var since2025 = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var realizedSince2025 = service.GetRealized(since2025);
+
+        Assert.Equal(1, realizedSince2025.TotalSold);
+        Assert.Equal(1.00m, realizedSince2025.TotalProceeds);
+        Assert.Equal(2.00m, realizedSince2025.TotalCost); // paired Acquire cost included despite 2024 date
+        var byGame = realizedSince2025.ByGame.ToDictionary(l => l.Key);
+        Assert.True(byGame.ContainsKey("OnePiece"));
+        Assert.False(byGame.ContainsKey("Mtg")); // excluded: its Sell predates the cutoff
+
+        // since = null (default, all-time) -> unchanged from the no-arg overload's prior behavior.
+        var realizedAllTime = service.GetRealized();
+        var realizedAllTimeExplicitNull = service.GetRealized(null);
+        Assert.Equal(3, realizedAllTime.TotalSold); // 2 (bolt) + 1 (op)
+        Assert.Equal(11.00m, realizedAllTime.TotalProceeds);
+        Assert.Equal(5.00m, realizedAllTime.TotalCost);
+        Assert.Equal(realizedAllTime.TotalSold, realizedAllTimeExplicitNull.TotalSold);
+        Assert.Equal(realizedAllTime.TotalProceeds, realizedAllTimeExplicitNull.TotalProceeds);
+        Assert.Equal(realizedAllTime.TotalCost, realizedAllTimeExplicitNull.TotalCost);
     }
 
     // --- Test doubles ---

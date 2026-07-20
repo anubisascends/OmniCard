@@ -85,7 +85,7 @@ public class AnalyticsService : IAnalyticsService
         return new HoldingsValuation(totalUnits, totalCost, totalMarket, byGame, byCategory, byLocation);
     }
 
-    public RealizedSummary GetRealized()
+    public RealizedSummary GetRealized(DateTime? since = null)
     {
         using var ctx = _dbContextFactory.CreateDbContext();
         var movements = ctx.Movements.AsNoTracking().ToList();
@@ -95,8 +95,9 @@ public class AnalyticsService : IAnalyticsService
 
         foreach (var lotGroup in movements.Where(m => m.LotId.HasValue).GroupBy(m => m.LotId!.Value))
         {
-            var sells = lotGroup.Where(m => m.Type == MovementType.Sell).ToList();
-            if (sells.Count == 0) continue; // unsold lot: excluded from realized
+            var sells = lotGroup.Where(m => m.Type == MovementType.Sell
+                && (!since.HasValue || m.Timestamp >= since.Value)).ToList();
+            if (sells.Count == 0) continue; // unsold lot, or no sales within the period: excluded
 
             var quantity = sells.Sum(m => m.Quantity);
             var proceeds = sells.Sum(m => m.Quantity * (m.UnitValue ?? 0m));
