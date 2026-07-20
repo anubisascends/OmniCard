@@ -160,6 +160,13 @@
                 <MenuItem Header="Move to Location..."
                           Command="{Binding MoveSelectedToLocationCommand}"/>
                 <Separator/>
+                <MenuItem Header="List for Sale..."
+                          Command="{Binding ListForSaleCommand}"/>
+                <MenuItem Header="Mark Picked"
+                          Command="{Binding MarkPickedCommand}"/>
+                <MenuItem Header="Unlist"
+                          Command="{Binding UnlistForSaleCommand}"/>
+                <Separator/>
                 <MenuItem Header="Set Condition">
                     <MenuItem Header="NM" Command="{Binding BulkSetCollectionConditionCommand}" CommandParameter="NM"/>
                     <MenuItem Header="LP" Command="{Binding BulkSetCollectionConditionCommand}" CommandParameter="LP"/>

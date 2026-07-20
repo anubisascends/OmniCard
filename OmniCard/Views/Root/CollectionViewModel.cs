@@ -743,6 +743,54 @@ public sealed partial class CollectionViewModel : ViewModel
     }
 
     [RelayCommand]
+    public void ListForSale()
+    {
+        var ids = GetAllSelectedCardIds();
+        if (ids.Count == 0) return;
+
+        var suggested = GetSelectedCards?.Invoke()?.FirstOrDefault()?.MarketPrice ?? 0m;
+        var result = _dialogService.PickListForSale(suggested);
+        if (result is null) return;
+
+        if (result.Quantity <= 0 || result.Price < 0)
+        {
+            ReportMessage?.Invoke("Enter a positive quantity and non-negative price.");
+            return;
+        }
+
+        var count = _listingService.ListForSale(ids, result.Channel, result.Price, result.Quantity);
+        ReportMessage?.Invoke($"Listed {count} card(s) for sale.");
+        _ = SearchCollection();
+    }
+
+    [RelayCommand]
+    public void UnlistForSale()
+    {
+        var ids = GetAllSelectedCardIds();
+        if (ids.Count == 0) return;
+        _listingService.Unlist(ids);
+        ReportMessage?.Invoke($"Unlisted {ids.Count} card(s).");
+        _ = SearchCollection();
+    }
+
+    [RelayCommand]
+    public void MarkPicked()
+    {
+        var ids = GetAllSelectedCardIds();
+        if (ids.Count == 0) return;
+        try
+        {
+            var count = _listingService.MarkPicked(ids);
+            ReportMessage?.Invoke($"Marked {count} card(s) picked.");
+            _ = SearchCollection();
+        }
+        catch (InvalidOperationException ex)
+        {
+            ReportMessage?.Invoke(ex.Message);
+        }
+    }
+
+    [RelayCommand]
     public void BulkSetCollectionCondition(string condition)
     {
         var ids = GetAllSelectedCardIds();
