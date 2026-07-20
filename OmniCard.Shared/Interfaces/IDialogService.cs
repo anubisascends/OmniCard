@@ -24,4 +24,5 @@ public interface IDialogService
     Product? EditProduct(Product? existing);
     (int Quantity, decimal? UnitCost, int? LocationId, string? Source, DateTime AcquisitionDate)? AddLotDialog(int productId);
     bool OpenUnitsDialog(Product product);
+    void OpenMovementHistory();
 }

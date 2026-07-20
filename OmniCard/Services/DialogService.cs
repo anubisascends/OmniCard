@@ -18,6 +18,7 @@ using OmniCard.Views.EbayListing;
 using OmniCard.Views.ManualAdd;
 using OmniCard.Views.DecklistCheck;
 using OmniCard.Views.Inventory;
+using OmniCard.Views.MovementHistory;
 
 namespace OmniCard.Services;
 
@@ -202,5 +203,13 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         wnd.ViewModel.Load(product);
         var result = wnd.ShowDialog();
         return result == true && wnd.ViewModel.WasOpened;
+    }
+
+    public void OpenMovementHistory()
+    {
+        var wnd = Services.GetRequiredService<MovementHistoryView>();
+        SetOwner(wnd);
+        wnd.ViewModel.Load();
+        wnd.ShowDialog();
     }
 }

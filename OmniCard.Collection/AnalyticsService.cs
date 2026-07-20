@@ -121,4 +121,35 @@ public class AnalyticsService : IAnalyticsService
 
         return new RealizedSummary(totalSold, totalProceeds, totalCost, byGame);
     }
+
+    public IReadOnlyList<MovementView> GetMovements(MovementFilter filter)
+    {
+        using var ctx = _dbContextFactory.CreateDbContext();
+        var movements = ctx.Movements.AsNoTracking().ToList();
+        var products = ctx.Products.AsNoTracking().ToDictionary(p => p.Id);
+
+        IEnumerable<InventoryMovement> query = movements;
+
+        if (filter.Type.HasValue)
+            query = query.Where(m => m.Type == filter.Type.Value);
+        if (filter.Since.HasValue)
+            query = query.Where(m => m.Timestamp >= filter.Since.Value);
+
+        var joined = query
+            .Select(m => (Movement: m, Product: products.GetValueOrDefault(m.ProductId)))
+            .Where(x => x.Product is not null);
+
+        if (!string.IsNullOrWhiteSpace(filter.ProductQuery))
+        {
+            var q = filter.ProductQuery.Trim();
+            joined = joined.Where(x => x.Product!.Name.Contains(q, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return joined
+            .OrderByDescending(x => x.Movement.Timestamp)
+            .Take(filter.Take)
+            .Select(x => new MovementView(x.Movement.Timestamp, x.Movement.Type, x.Product!.Name,
+                x.Product!.Game, x.Movement.Quantity, x.Movement.UnitValue, x.Movement.Note))
+            .ToList();
+    }
 }

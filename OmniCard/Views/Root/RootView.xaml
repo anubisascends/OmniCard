@@ -209,6 +209,8 @@
                 <Separator/>
                 <MenuItem Header="Check _Decklist..."
                           Command="{Binding ViewModel.CheckDecklistCommand}"/>
+                <MenuItem Header="_Movement History..."
+                          Command="{Binding ViewModel.OpenMovementHistoryCommand}"/>
             </MenuItem>
         </Menu>
 

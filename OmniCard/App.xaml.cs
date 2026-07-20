@@ -180,6 +180,8 @@ public partial class App : Application
             services.AddTransient<Views.Inventory.AddLotViewModel>();
             services.AddTransient<Views.Inventory.OpenUnitsView>();
             services.AddTransient<Views.Inventory.OpenUnitsViewModel>();
+            services.AddTransient<Views.MovementHistory.MovementHistoryView>();
+            services.AddTransient<Views.MovementHistory.MovementHistoryViewModel>();
         })
         .Build();
 

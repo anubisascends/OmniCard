@@ -269,6 +269,116 @@ public class AnalyticsServiceTests : IDisposable
         Assert.Equal(realizedAllTime.TotalCost, realizedAllTimeExplicitNull.TotalCost);
     }
 
+    // --- Movements ---
+
+    [Fact]
+    public void GetMovements_NoFilter_OrdersNewestFirst_AndProjectsProductNameAndGame()
+    {
+        using var ctx = new OmniCardDbContext(_options);
+
+        var bolt = SeedProduct(ctx, CardGame.Mtg, ProductCategory.Single, "Lightning Bolt", "bolt-1");
+        var op = SeedProduct(ctx, CardGame.OnePiece, ProductCategory.Single, "Zoro", "op-1");
+
+        SeedMovement(ctx, bolt.Id, null, MovementType.Acquire, 4, 1.50m, new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        SeedMovement(ctx, op.Id, null, MovementType.Sell, 1, 3.00m, new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc));
+        SeedMovement(ctx, bolt.Id, null, MovementType.Adjust, -1, null, new DateTime(2025, 3, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        var service = CreateService();
+        var results = service.GetMovements(new MovementFilter());
+
+        Assert.Equal(3, results.Count);
+        // Newest first: Sell (Jun) -> Adjust (Mar) -> Acquire (Jan)
+        Assert.Equal(MovementType.Sell, results[0].Type);
+        Assert.Equal("Zoro", results[0].ProductName);
+        Assert.Equal(CardGame.OnePiece, results[0].Game);
+        Assert.Equal(1, results[0].Quantity);
+        Assert.Equal(3.00m, results[0].UnitValue);
+
+        Assert.Equal(MovementType.Adjust, results[1].Type);
+        Assert.Equal("Lightning Bolt", results[1].ProductName);
+        Assert.Equal(CardGame.Mtg, results[1].Game);
+        Assert.Null(results[1].UnitValue);
+
+        Assert.Equal(MovementType.Acquire, results[2].Type);
+    }
+
+    [Fact]
+    public void GetMovements_FiltersByType()
+    {
+        using var ctx = new OmniCardDbContext(_options);
+        var bolt = SeedProduct(ctx, CardGame.Mtg, ProductCategory.Single, "Lightning Bolt", "bolt-1");
+
+        SeedMovement(ctx, bolt.Id, null, MovementType.Acquire, 4, 1.50m);
+        SeedMovement(ctx, bolt.Id, null, MovementType.Sell, 1, 3.00m);
+        SeedMovement(ctx, bolt.Id, null, MovementType.Sell, 1, 4.00m);
+
+        var service = CreateService();
+        var results = service.GetMovements(new MovementFilter(Type: MovementType.Sell));
+
+        Assert.Equal(2, results.Count);
+        Assert.All(results, m => Assert.Equal(MovementType.Sell, m.Type));
+    }
+
+    [Fact]
+    public void GetMovements_FiltersBySince()
+    {
+        using var ctx = new OmniCardDbContext(_options);
+        var bolt = SeedProduct(ctx, CardGame.Mtg, ProductCategory.Single, "Lightning Bolt", "bolt-1");
+
+        SeedMovement(ctx, bolt.Id, null, MovementType.Acquire, 1, 1.00m, new DateTime(2023, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        SeedMovement(ctx, bolt.Id, null, MovementType.Acquire, 1, 1.00m, new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        var service = CreateService();
+        var since = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var results = service.GetMovements(new MovementFilter(Since: since));
+
+        Assert.Single(results);
+        Assert.Equal(new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc), results[0].Timestamp);
+    }
+
+    [Fact]
+    public void GetMovements_FiltersByProductQuery_CaseInsensitiveContains()
+    {
+        using var ctx = new OmniCardDbContext(_options);
+        var bolt = SeedProduct(ctx, CardGame.Mtg, ProductCategory.Single, "Lightning Bolt", "bolt-1");
+        var shock = SeedProduct(ctx, CardGame.Mtg, ProductCategory.Single, "Shock", "shock-1");
+
+        SeedMovement(ctx, bolt.Id, null, MovementType.Acquire, 1, 1.00m);
+        SeedMovement(ctx, shock.Id, null, MovementType.Acquire, 1, 0.50m);
+
+        var service = CreateService();
+        var results = service.GetMovements(new MovementFilter(ProductQuery: "light"));
+
+        Assert.Single(results);
+        Assert.Equal("Lightning Bolt", results[0].ProductName);
+    }
+
+    [Fact]
+    public void GetMovements_RespectsTake()
+    {
+        using var ctx = new OmniCardDbContext(_options);
+        var bolt = SeedProduct(ctx, CardGame.Mtg, ProductCategory.Single, "Lightning Bolt", "bolt-1");
+
+        for (var i = 0; i < 5; i++)
+            SeedMovement(ctx, bolt.Id, null, MovementType.Acquire, 1, 1.00m, new DateTime(2025, 1, i + 1, 0, 0, 0, DateTimeKind.Utc));
+
+        var service = CreateService();
+        var results = service.GetMovements(new MovementFilter(Take: 2));
+
+        Assert.Equal(2, results.Count);
+        // Newest-first, so the two latest days (Jan 5, Jan 4) should be returned.
+        Assert.Equal(new DateTime(2025, 1, 5, 0, 0, 0, DateTimeKind.Utc), results[0].Timestamp);
+        Assert.Equal(new DateTime(2025, 1, 4, 0, 0, 0, DateTimeKind.Utc), results[1].Timestamp);
+    }
+
+    [Fact]
+    public void GetMovements_NoMovements_ReturnsEmpty()
+    {
+        var service = CreateService();
+        var results = service.GetMovements(new MovementFilter());
+        Assert.Empty(results);
+    }
+
     // --- Test doubles ---
 
     private class FakeCardGameService(CardGame game, Dictionary<(string GameCardId, bool IsFoil), decimal> prices) : ICardGameService
