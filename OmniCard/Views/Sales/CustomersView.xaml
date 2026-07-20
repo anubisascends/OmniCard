@@ -1,0 +1,100 @@
+<UserControl x:Class="OmniCard.Views.Sales.CustomersView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:OmniCard.Views.Sales"
+             xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance {x:Type local:CustomersViewModel}}"
+             Loaded="CustomersView_OnLoaded">
+    <Grid Margin="8">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Customer list -->
+        <DockPanel Grid.Column="0" Margin="0,0,8,0">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                <Button Content="New" Command="{Binding NewCustomerCommand}" Padding="12,4"/>
+            </StackPanel>
+            <ListBox ItemsSource="{Binding Customers}"
+                     SelectedItem="{Binding SelectedCustomer}"
+                     DisplayMemberPath="Name"/>
+        </DockPanel>
+
+        <!-- Editable form -->
+        <DockPanel Grid.Column="1"
+                    Visibility="{Binding SelectedCustomer, Converter={conv:NullToVisibilityConverter}}">
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
+                <Button Content="Save" Command="{Binding SaveCommand}" Padding="12,4" Margin="0,0,8,0"/>
+                <Button Content="Delete" Command="{Binding DeleteCommand}" Padding="12,4"/>
+            </StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="Name:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBox Grid.Row="0" Grid.Column="1" Margin="0,4"
+                         Text="{Binding SelectedCustomer.Name, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Grid.Row="1" Text="Email:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4"
+                         Text="{Binding SelectedCustomer.Email, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Grid.Row="2" Text="Phone:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBox Grid.Row="2" Grid.Column="1" Margin="0,4"
+                         Text="{Binding SelectedCustomer.Phone, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Grid.Row="3" Text="TCGplayer Username:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBox Grid.Row="3" Grid.Column="1" Margin="0,4"
+                         Text="{Binding SelectedCustomer.TcgPlayerUsername, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Grid.Row="4" Text="Address Line 1:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBox Grid.Row="4" Grid.Column="1" Margin="0,4"
+                         Text="{Binding SelectedCustomer.AddressLine1, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Grid.Row="5" Text="Address Line 2:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBox Grid.Row="5" Grid.Column="1" Margin="0,4"
+                         Text="{Binding SelectedCustomer.AddressLine2, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Grid.Row="6" Text="City:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBox Grid.Row="6" Grid.Column="1" Margin="0,4"
+                         Text="{Binding SelectedCustomer.City, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Grid.Row="7" Text="State:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBox Grid.Row="7" Grid.Column="1" Margin="0,4"
+                         Text="{Binding SelectedCustomer.State, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Grid.Row="8" Text="Postal Code:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBox Grid.Row="8" Grid.Column="1" Margin="0,4"
+                         Text="{Binding SelectedCustomer.PostalCode, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Grid.Row="9" Text="Country:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBox Grid.Row="9" Grid.Column="1" Margin="0,4"
+                         Text="{Binding SelectedCustomer.Country, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Grid.Row="10" Text="Notes:" FontWeight="SemiBold" Margin="0,4,8,4"/>
+                <TextBox Grid.Row="10" Grid.Column="1" Margin="0,4"
+                         Text="{Binding SelectedCustomer.Notes, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60"/>
+            </Grid>
+        </DockPanel>
+    </Grid>
+</UserControl>
