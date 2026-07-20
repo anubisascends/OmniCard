@@ -404,8 +404,9 @@ public class SeriesIndexBrushConverter : MarkupExtension, IValueConverter
         var brushes = new System.Windows.Media.SolidColorBrush[hex.Length];
         for (var i = 0; i < hex.Length; i++)
         {
-            var brush = (System.Windows.Media.SolidColorBrush)
+            var color = (System.Windows.Media.Color)
                 System.Windows.Media.ColorConverter.ConvertFromString(hex[i]);
+            var brush = new System.Windows.Media.SolidColorBrush(color);
             brush.Freeze();
             brushes[i] = brush;
         }
