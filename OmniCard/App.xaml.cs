@@ -124,6 +124,7 @@ public partial class App : Application
             services.AddSingleton<IListingService, ListingService>();
             services.AddSingleton<ICustomerService, CustomerService>();
             services.AddSingleton<IOrderService, OrderService>();
+            services.AddSingleton<IReceiptService, ReceiptService>();
 
             // Sort/filter presets
             services.AddSingleton<ICollectionPresetService, CollectionPresetService>();
