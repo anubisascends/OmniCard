@@ -97,6 +97,7 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0" Style="{StaticResource TileBorderStyle}">
@@ -144,6 +145,16 @@
                         <RadioButton Content="This Month" GroupName="RealizedPeriod"
                                      IsChecked="{Binding RealizedPeriod, Converter={conv:EnumBoolConverter}, ConverterParameter=ThisMonth}"/>
                     </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="4" Style="{StaticResource TileBorderStyle}">
+                <StackPanel>
+                    <TextBlock Text="Realized (net)"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                    <TextBlock Text="{Binding RealizedNet, Converter={conv:SignedMoneyConverter}}"
+                               Foreground="{Binding RealizedNet, Converter={conv:GainLossColorConverter}}"
+                               FontSize="24" FontWeight="Bold" Margin="0,4,0,0"/>
                 </StackPanel>
             </Border>
         </Grid>

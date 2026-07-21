@@ -169,4 +169,53 @@ public class ListingService(
             .GroupBy(l => l.LotId)
             .ToDictionary(g => g.Key, g => g.Max(l => l.Status));
     }
+
+    public List<ActiveListing> GetActiveListings(CardGame? game = null)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+
+        // A lot already sitting on an active (Open/Packed) order's line is "committed" and
+        // must not be offered again in the picker — otherwise it could be added to a second
+        // order, and the second ship would silently drop it. Cancelled orders free the lot;
+        // Shipped/Completed orders already flip the listing to Sold (excluded by
+        // ActiveStatuses below), so only Open/Packed need to be excluded here.
+        var committedLotIds = (
+            from line in ctx.OrderLines.AsNoTracking()
+            join order in ctx.Orders.AsNoTracking() on line.OrderId equals order.Id
+            where line.LotId != null
+                  && (order.Status == OrderStatus.Open || order.Status == OrderStatus.Packed)
+            select line.LotId!.Value
+        ).ToHashSet();
+
+        var query =
+            from listing in ctx.Listings.AsNoTracking()
+            where ActiveStatuses.Contains(listing.Status)
+            join lot in ctx.Lots.AsNoTracking() on listing.LotId equals lot.Id
+            join p in ctx.Products.AsNoTracking() on lot.ProductId equals p.Id
+            where game == null || p.Game == game
+            orderby p.Name
+            select new ActiveListing(
+                lot.Id,
+                p.Name,
+                p.SetName ?? "",
+                p.SetCode ?? "",
+                lot.Condition,
+                p.Foil,
+                listing.ListedPrice,
+                listing.Status);
+        return query.ToList().Where(a => !committedLotIds.Contains(a.LotId)).ToList();
+    }
+
+    public void MarkSold(int lotId, int orderLineId)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var listing = ctx.Listings
+            .Where(l => l.LotId == lotId && ActiveStatuses.Contains(l.Status))
+            .OrderByDescending(l => l.Status)
+            .FirstOrDefault();
+        if (listing is null) return;
+        listing.Status = ListingStatus.Sold;
+        listing.OrderLineId = orderLineId;
+        ctx.SaveChanges();
+    }
 }

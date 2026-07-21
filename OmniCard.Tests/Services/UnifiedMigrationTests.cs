@@ -707,13 +707,13 @@ public class UnifiedMigrationTests : IDisposable
         verifyConn.Open();
         using var verifyCmd = verifyConn.CreateCommand();
 
-        foreach (var table in new[] { "StorageContainers", "EbayListings", "MismatchLogs", "FlagResolutions", "ScanDiagnosticEvents", "MigrationState", "Listings" })
+        foreach (var table in new[] { "StorageContainers", "EbayListings", "MismatchLogs", "FlagResolutions", "ScanDiagnosticEvents", "MigrationState", "Listings", "Customers", "Orders", "OrderLines" })
         {
             verifyCmd.CommandText = $"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{table}'";
             Assert.Equal(1L, (long)verifyCmd.ExecuteScalar()!);
         }
 
-        foreach (var (table, column) in new[] { ("Products", "SetName"), ("Products", "Color"), ("Products", "CardType"), ("Products", "LastMarketPrice"), ("Products", "PriceUpdatedAt"), ("Lots", "IsMissing"), ("Lots", "FlagReason"), ("Listings", "Channel"), ("Listings", "Status"), ("Listings", "ListedPrice") })
+        foreach (var (table, column) in new[] { ("Products", "SetName"), ("Products", "Color"), ("Products", "CardType"), ("Products", "LastMarketPrice"), ("Products", "PriceUpdatedAt"), ("Lots", "IsMissing"), ("Lots", "FlagReason"), ("Listings", "Channel"), ("Listings", "Status"), ("Listings", "ListedPrice"), ("Orders", "Status"), ("Orders", "MarketplaceFees"), ("Orders", "ShippedAt") })
         {
             verifyCmd.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = '{column}'";
             Assert.True((long)verifyCmd.ExecuteScalar()! > 0, $"{table}.{column} should exist");

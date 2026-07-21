@@ -1,0 +1,141 @@
+<UserControl x:Class="OmniCard.Views.Sales.OrdersView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:OmniCard.Views.Sales"
+             xmlns:models="clr-namespace:OmniCard.Models;assembly=OmniCard.Shared"
+             xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance {x:Type local:OrdersViewModel}}"
+             Loaded="OrdersView_OnLoaded">
+    <Grid Margin="8">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Order list -->
+        <DockPanel Grid.Column="0" Margin="0,0,8,0">
+            <ComboBox DockPanel.Dock="Top" Margin="0,0,0,8"
+                      ItemsSource="{Binding Customers}"
+                      SelectedItem="{Binding SelectedCustomer}"
+                      DisplayMemberPath="Name"/>
+            <Button DockPanel.Dock="Top" Content="New Order" Command="{Binding NewOrderCommand}"
+                    Padding="12,4" Margin="0,0,0,8" HorizontalAlignment="Left"/>
+            <ListBox ItemsSource="{Binding Orders}" SelectedItem="{Binding SelectedOrder}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding OrderNumber, TargetNullValue='(no number)'}" FontWeight="SemiBold"/>
+                            <TextBlock Text=" — "/>
+                            <TextBlock Text="{Binding Status}"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+
+        <!-- Editor -->
+        <DockPanel Grid.Column="1"
+                   Visibility="{Binding SelectedOrder, Converter={conv:NullToVisibilityConverter}}">
+
+            <!-- Header fields -->
+            <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Order #:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBox Grid.Row="0" Grid.Column="1" Margin="0,4,16,4"
+                         Text="{Binding SelectedOrder.OrderNumber, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="Tracking #:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBox Grid.Row="0" Grid.Column="3" Margin="0,4"
+                         Text="{Binding SelectedOrder.TrackingNumber, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Carrier:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4,16,4"
+                         Text="{Binding SelectedOrder.Carrier, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Grid.Row="1" Grid.Column="2" Text="Marketplace fees:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBox Grid.Row="1" Grid.Column="3" Margin="0,4"
+                         Text="{Binding SelectedOrder.MarketplaceFees, UpdateSourceTrigger=PropertyChanged, StringFormat=F2}"/>
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Shipping cost:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBox Grid.Row="2" Grid.Column="1" Margin="0,4,16,4"
+                         Text="{Binding SelectedOrder.ShippingCost, UpdateSourceTrigger=PropertyChanged, StringFormat=F2}"/>
+
+                <TextBlock Grid.Row="2" Grid.Column="2" Text="Shipping charged to buyer:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBox Grid.Row="2" Grid.Column="3" Margin="0,4"
+                         Text="{Binding SelectedOrder.ShippingChargedToBuyer, UpdateSourceTrigger=PropertyChanged, StringFormat=F2}"/>
+            </Grid>
+
+            <!-- Status buttons + total + status message -->
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
+                <Button Content="Save" Command="{Binding SaveOrderCommand}" Padding="12,4" Margin="0,0,8,0"/>
+                <Button Content="Pack" Command="{Binding SetStatusCommand}"
+                        CommandParameter="{x:Static models:OrderStatus.Packed}" Padding="12,4" Margin="0,0,8,0"/>
+                <Button Content="Ship" Command="{Binding SetStatusCommand}"
+                        CommandParameter="{x:Static models:OrderStatus.Shipped}" Padding="12,4" Margin="0,0,8,0"/>
+                <Button Content="Complete" Command="{Binding SetStatusCommand}"
+                        CommandParameter="{x:Static models:OrderStatus.Completed}" Padding="12,4" Margin="0,0,8,0"/>
+                <Button Content="Cancel" Command="{Binding SetStatusCommand}"
+                        CommandParameter="{x:Static models:OrderStatus.Cancelled}" Padding="12,4" Margin="0,0,16,0"/>
+                <TextBlock Text="{Binding OrderTotal, StringFormat=C}" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Add-card row -->
+            <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0" LastChildFill="True">
+                <Button DockPanel.Dock="Right" Content="Add" Command="{Binding AddCardCommand}" Padding="12,4" Margin="8,0,0,0"/>
+                <ComboBox ItemsSource="{Binding AvailableCards}"
+                          SelectedItem="{Binding SelectedAvailableCard}"
+                          IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock>
+                                <Run Text="{Binding Name, Mode=OneWay}"/>
+                                <Run Text=" — "/>
+                                <Run Text="{Binding SetName, Mode=OneWay}"/>
+                                <Run Text=" ("/>
+                                <Run Text="{Binding Condition, Mode=OneWay}"/>
+                                <Run Text=") $"/>
+                                <Run Text="{Binding ListedPrice, Mode=OneWay, StringFormat=F2}"/>
+                            </TextBlock>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </DockPanel>
+
+            <!-- Lines -->
+            <DataGrid ItemsSource="{Binding Lines}" AutoGenerateColumns="False" IsReadOnly="True"
+                      Style="{StaticResource {x:Type DataGrid}}">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Name" Binding="{Binding NameSnapshot}" Width="*"/>
+                    <DataGridTextColumn Header="Set" Binding="{Binding SetSnapshot}"/>
+                    <DataGridTextColumn Header="Condition" Binding="{Binding ConditionSnapshot}"/>
+                    <DataGridTextColumn Header="Qty" Binding="{Binding Quantity}"/>
+                    <DataGridTextColumn Header="Price" Binding="{Binding UnitSalePrice, StringFormat=C}"/>
+                    <DataGridTemplateColumn Header="">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Button Content="Remove" Padding="8,2"
+                                        Command="{Binding DataContext.RemoveLineCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+        </DockPanel>
+    </Grid>
+</UserControl>

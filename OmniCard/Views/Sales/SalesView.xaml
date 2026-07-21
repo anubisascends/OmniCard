@@ -6,28 +6,15 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance {x:Type local:SalesViewModel}}">
-    <DockPanel Margin="8">
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
-            <TextBlock Text="For-Sale location:" VerticalAlignment="Center" Margin="0,0,6,0"/>
-            <ComboBox Width="180" DisplayMemberPath="Name"
-                      ItemsSource="{Binding Locations}" SelectedItem="{Binding ForSaleLocation}"/>
-            <Button Content="Refresh" Margin="12,0,0,0" Command="{Binding RefreshPickListCommand}"/>
-            <Button Content="Mark All Picked" Margin="6,0,0,0" Command="{Binding MarkAllPickedCommand}"/>
-            <Button Content="Print Pick List" Margin="6,0,0,0" Command="{Binding PrintPickListCommand}"/>
-            <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center" Margin="12,0,0,0"/>
-        </StackPanel>
-        <DataGrid ItemsSource="{Binding PickList}" AutoGenerateColumns="False" IsReadOnly="True"
-                  Style="{StaticResource {x:Type DataGrid}}">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Location" Binding="{Binding LocationName}"/>
-                <DataGridTextColumn Header="Section" Binding="{Binding Section}"/>
-                <DataGridTextColumn Header="Pg" Binding="{Binding Page}"/>
-                <DataGridTextColumn Header="Slot" Binding="{Binding Slot}"/>
-                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
-                <DataGridTextColumn Header="Set" Binding="{Binding SetName}"/>
-                <DataGridTextColumn Header="Cond" Binding="{Binding Condition}"/>
-                <DataGridTextColumn Header="Price" Binding="{Binding ListedPrice, StringFormat=C}"/>
-            </DataGrid.Columns>
-        </DataGrid>
-    </DockPanel>
+    <TabControl>
+        <TabItem Header="Pick List">
+            <local:PickListView/>
+        </TabItem>
+        <TabItem Header="Orders">
+            <local:OrdersView DataContext="{Binding Orders}"/>
+        </TabItem>
+        <TabItem Header="Customers">
+            <local:CustomersView DataContext="{Binding Customers}"/>
+        </TabItem>
+    </TabControl>
 </UserControl>

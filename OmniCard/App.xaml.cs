@@ -75,6 +75,8 @@ public partial class App : Application
             services.AddSingleton<Views.Inventory.InventoryViewModel>();
             services.AddSingleton<Views.Dashboard.DashboardViewModel>();
             services.AddSingleton<Views.Sales.SalesViewModel>();
+            services.AddSingleton<Views.Sales.CustomersViewModel>();
+            services.AddSingleton<Views.Sales.OrdersViewModel>();
             services.AddSingleton<RootViewModel>();
             services.AddSingleton<ScannerService>();
             services.AddSingleton<WebScannerService>();
@@ -118,6 +120,8 @@ public partial class App : Application
             // Sales & fulfillment
             services.AddSingleton<ISalesSettingsService, SalesSettingsService>();
             services.AddSingleton<IListingService, ListingService>();
+            services.AddSingleton<ICustomerService, CustomerService>();
+            services.AddSingleton<IOrderService, OrderService>();
 
             // Sort/filter presets
             services.AddSingleton<ICollectionPresetService, CollectionPresetService>();

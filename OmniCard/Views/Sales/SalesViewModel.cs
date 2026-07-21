@@ -15,10 +15,15 @@ namespace OmniCard.Views.Sales;
 public partial class SalesViewModel(
     IListingService listingService,
     ISalesSettingsService salesSettings,
-    IStorageContainerService storageContainers) : ObservableObject
+    IStorageContainerService storageContainers,
+    OrdersViewModel orders,
+    CustomersViewModel customers) : ObservableObject
 {
     public ObservableCollection<PickListEntry> PickList { get; } = [];
     public ObservableCollection<StorageContainer> Locations { get; } = [];
+
+    public OrdersViewModel Orders { get; } = orders;
+    public CustomersViewModel Customers { get; } = customers;
 
     /// <summary>Suppresses <see cref="OnForSaleLocationChanged"/>'s persist-to-settings side
     /// effect while <see cref="Load"/> assigns the previously-saved location back onto <see

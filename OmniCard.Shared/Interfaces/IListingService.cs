@@ -9,4 +9,6 @@ public interface IListingService
     int MarkPicked(IEnumerable<int> lotIds);
     List<PickListEntry> GetPickList(CardGame? game = null);
     Dictionary<int, ListingStatus> GetActiveListingStatusByLot(IEnumerable<int> lotIds);
+    List<ActiveListing> GetActiveListings(CardGame? game = null);
+    void MarkSold(int lotId, int orderLineId);
 }

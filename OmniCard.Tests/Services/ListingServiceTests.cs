@@ -417,4 +417,93 @@ public class ListingServiceTests : IDisposable
         Assert.Equal(ListingStatus.Listed, map[a]);
         Assert.Equal(ListingStatus.Picked, map[b]);
     }
+
+    [Fact]
+    public void GetActiveListings_ReturnsListedAndPicked()
+    {
+        var a = SeedLot(_opts).lotId;
+        var b = SeedLot(_opts, locationId: 8).lotId;
+        // MarkPicked moves lot b to the "For Sale" location (Id 99, the
+        // StubSalesSettings default), which is FK-constrained to StorageContainers.
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            ctx.StorageContainers.Add(new StorageContainer { Id = 99, Name = "For Sale Location" });
+            ctx.SaveChanges();
+        }
+        var svc = CreateService();
+        svc.ListForSale([a, b], SalesChannel.Manual, 2m, 1);
+        svc.MarkPicked([b]);
+
+        var active = svc.GetActiveListings();
+        Assert.Equal(2, active.Count);
+        Assert.Contains(active, x => x.LotId == a && x.Status == ListingStatus.Listed);
+        Assert.Contains(active, x => x.LotId == b && x.Status == ListingStatus.Picked);
+    }
+
+    [Fact]
+    public void GetActiveListings_ExcludesLotOnOpenOrderLine()
+    {
+        var (lotId, _) = SeedLot(_opts);
+        var svc = CreateService();
+        svc.ListForSale([lotId], SalesChannel.Manual, 2m, 1);
+
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            var order = new Order { CustomerId = 1, Status = OrderStatus.Open, OrderNumber = "ORD-1" };
+            ctx.Orders.Add(order);
+            ctx.SaveChanges();
+            ctx.OrderLines.Add(new OrderLine
+            {
+                OrderId = order.Id,
+                LotId = lotId,
+                NameSnapshot = "Sol Ring",
+                Quantity = 1,
+                UnitSalePrice = 2m,
+            });
+            ctx.SaveChanges();
+        }
+
+        Assert.DoesNotContain(svc.GetActiveListings(), x => x.LotId == lotId);
+    }
+
+    [Fact]
+    public void GetActiveListings_IncludesLotOnCancelledOrderLine()
+    {
+        var (lotId, _) = SeedLot(_opts);
+        var svc = CreateService();
+        svc.ListForSale([lotId], SalesChannel.Manual, 2m, 1);
+
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            var order = new Order { CustomerId = 1, Status = OrderStatus.Cancelled, OrderNumber = "ORD-2" };
+            ctx.Orders.Add(order);
+            ctx.SaveChanges();
+            ctx.OrderLines.Add(new OrderLine
+            {
+                OrderId = order.Id,
+                LotId = lotId,
+                NameSnapshot = "Sol Ring",
+                Quantity = 1,
+                UnitSalePrice = 2m,
+            });
+            ctx.SaveChanges();
+        }
+
+        Assert.Contains(svc.GetActiveListings(), x => x.LotId == lotId);
+    }
+
+    [Fact]
+    public void MarkSold_SetsListingSoldWithOrderLine()
+    {
+        var lotId = SeedLot(_opts).lotId;
+        var svc = CreateService();
+        svc.ListForSale([lotId], SalesChannel.Manual, 2m, 1);
+
+        svc.MarkSold(lotId, orderLineId: 77);
+
+        using var ctx = new OmniCardDbContext(_opts);
+        var listing = ctx.Listings.Single(l => l.LotId == lotId);
+        Assert.Equal(ListingStatus.Sold, listing.Status);
+        Assert.Equal(77, listing.OrderLineId);
+    }
 }

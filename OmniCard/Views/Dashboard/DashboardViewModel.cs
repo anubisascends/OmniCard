@@ -70,6 +70,13 @@ public sealed partial class DashboardViewModel : ViewModel
     public decimal RealizedProceeds => Realized?.TotalProceeds ?? 0m;
     public decimal RealizedCost => Realized?.TotalCost ?? 0m;
     public decimal RealizedProfit => RealizedProceeds - RealizedCost;
+    public decimal RealizedFees => Realized?.TotalFees ?? 0m;
+    public decimal RealizedShippingCost => Realized?.TotalShippingCost ?? 0m;
+    public decimal RealizedShippingCharged => Realized?.TotalShippingCharged ?? 0m;
+
+    /// <summary>Realized profit after fees and net shipping (cost paid to ship minus what was
+    /// charged to the buyer) — the bottom-line take-home from realized sales.</summary>
+    public decimal RealizedNet => RealizedProfit - RealizedFees - RealizedShippingCost + RealizedShippingCharged;
 
     /// <summary>True once holdings have loaded and there is nothing in inventory — drives the
     /// breakdown tables' empty-state message (as opposed to the pre-first-load null state).</summary>
@@ -128,6 +135,10 @@ public sealed partial class DashboardViewModel : ViewModel
         OnPropertyChanged(nameof(RealizedProceeds));
         OnPropertyChanged(nameof(RealizedCost));
         OnPropertyChanged(nameof(RealizedProfit));
+        OnPropertyChanged(nameof(RealizedFees));
+        OnPropertyChanged(nameof(RealizedShippingCost));
+        OnPropertyChanged(nameof(RealizedShippingCharged));
+        OnPropertyChanged(nameof(RealizedNet));
         OnPropertyChanged(nameof(RealizedProfitByGameRows));
         OnPropertyChanged(nameof(RealizedProfitByGameMax));
     }
