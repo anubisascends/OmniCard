@@ -77,6 +77,7 @@ public partial class App : Application
             services.AddSingleton<Views.Sales.SalesViewModel>();
             services.AddSingleton<Views.Sales.CustomersViewModel>();
             services.AddSingleton<Views.Sales.OrdersViewModel>();
+            services.AddSingleton<Views.Settings.SalesSettingsViewModel>();
             services.AddSingleton<RootViewModel>();
             services.AddSingleton<ScannerService>();
             services.AddSingleton<WebScannerService>();
