@@ -29,7 +29,15 @@ public class OrderServiceTests : IDisposable
     private sealed class Factory(DbContextOptions<OmniCardDbContext> o) : IDbContextFactory<OmniCardDbContext>
     { public OmniCardDbContext CreateDbContext() => new(o); }
     private sealed class StubSettings : OmniCard.Interfaces.ISalesSettingsService
-    { public int? ForSaleLocationId => 99; public void SetForSaleLocationId(int? id) { } }
+    {
+        public int? ForSaleLocationId => 99;
+        public void SetForSaleLocationId(int? id) { }
+        public OmniCard.Models.CompanyProfile GetCompany() => new();
+        public void SaveCompany(OmniCard.Models.CompanyProfile company) { }
+        public OmniCard.Models.ReceiptSettings GetReceipt() => new();
+        public void SaveReceipt(OmniCard.Models.ReceiptSettings receipt) { }
+        public string SetLogo(string sourcePath) => "company-logo.png";
+    }
 
     private (int customerId, int lotId) SeedCustomerAndLot()
     {
