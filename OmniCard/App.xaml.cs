@@ -175,7 +175,6 @@ public partial class App : Application
             services.AddTransient<SortFilterBuilderViewModel>();
             services.AddTransient<SetFilterBuilderView>();
             services.AddTransient<SetFilterBuilderViewModel>();
-            services.AddTransient<DataLocationView>();
             services.AddTransient<DataLocationViewModel>();
             services.AddTransient<Views.Settings.SettingsView>();
             services.AddTransient<CoverArtPickerView>();
