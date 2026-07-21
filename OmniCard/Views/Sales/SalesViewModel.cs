@@ -8,9 +8,10 @@ namespace OmniCard.Views.Sales;
 
 /// <summary>
 /// Backs the Sales tab: a location-grouped pick list sourced from <see cref="IListingService"/>,
-/// plus the For-Sale storage location picker (persisted via <see cref="ISalesSettingsService"/>).
-/// Data is loaded lazily on first tab activation (see <see cref="Load"/>) and can be recomputed
-/// on demand via <see cref="RefreshPickListCommand"/>.
+/// plus a read-only view of the For-Sale storage location (configured and persisted via
+/// <see cref="ISalesSettingsService"/> from Settings ▸ Sales &amp; Receipts, see
+/// <c>SalesSettingsViewModel</c>). Data is loaded lazily on first tab activation (see
+/// <see cref="Load"/>) and can be recomputed on demand via <see cref="RefreshPickListCommand"/>.
 /// </summary>
 public partial class SalesViewModel(
     IListingService listingService,
@@ -24,14 +25,6 @@ public partial class SalesViewModel(
 
     public OrdersViewModel Orders { get; } = orders;
     public CustomersViewModel Customers { get; } = customers;
-
-    /// <summary>Suppresses <see cref="OnForSaleLocationChanged"/>'s persist-to-settings side
-    /// effect while <see cref="Load"/> assigns the previously-saved location back onto <see
-    /// cref="ForSaleLocation"/>. That assignment merely reflects settings already on disk — it
-    /// isn't a user change — so it must not rewrite the setting (on every tab activation) or, if
-    /// the saved container is no longer in <see cref="Locations"/>, null it out and clobber the
-    /// saved id with the "not found" result.</summary>
-    private bool _suppressPersist;
 
     [ObservableProperty]
     public partial StorageContainer? ForSaleLocation { get; set; }
@@ -51,23 +44,11 @@ public partial class SalesViewModel(
         {
             var (containers, pickList) = await Task.Run(() => (storageContainers.GetAll(), listingService.GetPickList()));
 
-            // Suppress persistence across the whole location refresh: clearing Locations resets the
-            // bound ComboBox's SelectedItem to null, firing OnForSaleLocationChanged BEFORE we
-            // reassign the saved value — without this window that null write clobbers the saved
-            // For-Sale location id on every tab activation.
-            _suppressPersist = true;
-            try
-            {
-                Locations.Clear();
-                foreach (var c in containers)
-                    Locations.Add(c);
+            Locations.Clear();
+            foreach (var c in containers)
+                Locations.Add(c);
 
-                ForSaleLocation = Locations.FirstOrDefault(c => c.Id == salesSettings.ForSaleLocationId);
-            }
-            finally
-            {
-                _suppressPersist = false;
-            }
+            ForSaleLocation = Locations.FirstOrDefault(c => c.Id == salesSettings.ForSaleLocationId);
 
             PickList.Clear();
             foreach (var e in pickList)
@@ -80,12 +61,6 @@ public partial class SalesViewModel(
             // unhandled-exception handler to fall back on).
             StatusMessage = $"Failed to load pick list: {ex.Message}";
         }
-    }
-
-    partial void OnForSaleLocationChanged(StorageContainer? value)
-    {
-        if (_suppressPersist) return;
-        salesSettings.SetForSaleLocationId(value?.Id);
     }
 
     [RelayCommand]

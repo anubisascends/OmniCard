@@ -15,10 +15,8 @@
         <TabItem Header="Data Location">
             <local:DataLocationSectionView DataContext="{Binding Settings.DataLocation}"/>
         </TabItem>
-        <!-- TODO(Task 4): restore once SalesSettingsView exists.
         <TabItem Header="Sales &amp; Receipts">
             <local:SalesSettingsView DataContext="{Binding Settings.Sales}"/>
         </TabItem>
-        -->
     </TabControl>
 </UserControl>
