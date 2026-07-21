@@ -113,8 +113,17 @@ public partial class OrdersViewModel(
     public void PrintReceipt()
     {
         if (SelectedOrder is null) { StatusMessage = "Select an order first."; return; }
-        var doc = receiptService.BuildReceipt(SelectedOrder.Id);
-        ReceiptPrinter.Print(doc);
+        try
+        {
+            var doc = receiptService.BuildReceipt(SelectedOrder.Id);
+            ReceiptPrinter.Print(doc);
+        }
+        catch (Exception ex)
+        {
+            // No global unhandled-exception handler (see SalesViewModel.Load/MarkAllPicked) —
+            // a printer-driver error or undecodable logo image must not crash the app.
+            StatusMessage = $"Print failed: {ex.Message}";
+        }
     }
 
     [RelayCommand]
@@ -129,9 +138,18 @@ public partial class OrdersViewModel(
         };
         if (dialog.ShowDialog() != true) return;
 
-        var doc = receiptService.BuildReceipt(SelectedOrder.Id);
-        receiptPdfExporter.Export(doc, dialog.FileName);
-        StatusMessage = $"Exported to {dialog.FileName}";
+        try
+        {
+            var doc = receiptService.BuildReceipt(SelectedOrder.Id);
+            receiptPdfExporter.Export(doc, dialog.FileName);
+            StatusMessage = $"Exported to {dialog.FileName}";
+        }
+        catch (Exception ex)
+        {
+            // No global unhandled-exception handler (see SalesViewModel.Load/MarkAllPicked) —
+            // an undecodable logo image or an unwritable/locked export path must not crash the app.
+            StatusMessage = $"Export failed: {ex.Message}";
+        }
     }
 
     /// <summary>Enforces a forward-only order status flow so inventory/sale accounting

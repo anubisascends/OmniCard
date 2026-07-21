@@ -110,4 +110,25 @@ public class ReceiptServiceTests : IDisposable
         var svc = BuildService(out _);
         Assert.Throws<InvalidOperationException>(() => svc.BuildReceipt(99999));
     }
+
+    [Fact]
+    public void BuildReceipt_WithLogoConfigured_ResolvesAbsolutePath()
+    {
+        var svc = BuildService(out var orderId);
+
+        const string logoFileName = "company-logo.png";
+        var logoPath = Path.Combine(_dataDir, logoFileName);
+        File.WriteAllBytes(logoPath, [0x89, 0x50, 0x4E, 0x47]); // not a real PNG, just needs to exist
+
+        var settings = new SalesSettingsService(new DataPathStub(_dataDir));
+        var company = settings.GetCompany();
+        company.LogoPath = logoFileName;
+        settings.SaveCompany(company);
+
+        var doc = svc.BuildReceipt(orderId);
+
+        Assert.NotNull(doc.CompanyLogoAbsolutePath);
+        Assert.True(Path.IsPathRooted(doc.CompanyLogoAbsolutePath));
+        Assert.True(File.Exists(doc.CompanyLogoAbsolutePath));
+    }
 }
