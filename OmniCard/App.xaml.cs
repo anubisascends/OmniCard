@@ -177,6 +177,7 @@ public partial class App : Application
             services.AddTransient<SetFilterBuilderViewModel>();
             services.AddTransient<DataLocationView>();
             services.AddTransient<DataLocationViewModel>();
+            services.AddTransient<Views.Settings.SettingsView>();
             services.AddTransient<CoverArtPickerView>();
             services.AddTransient<CoverArtPickerViewModel>();
             services.AddTransient<OmniCard.Views.MoveToLocation.MoveToLocationView>();

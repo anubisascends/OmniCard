@@ -15,6 +15,7 @@ public interface IDialogService
     bool OpenSortFilterBuilder(CardGame game);
     IReadOnlyList<string>? OpenSetFilterBuilder(IReadOnlyList<SetInfo> allSets, IReadOnlySet<string>? currentFilter);
     void ShowDataLocation();
+    void ShowSettings();
     int? PickCoverArt(int containerId, string containerName);
     MoveToLocationResult? PickMoveToLocation();
     void ShowAuditReport(AuditReport report);

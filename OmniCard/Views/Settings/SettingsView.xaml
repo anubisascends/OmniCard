@@ -1,22 +1,58 @@
-<UserControl x:Class="OmniCard.Views.Settings.SettingsView"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:OmniCard.Views.Settings"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d"
-             d:DataContext="{d:DesignInstance {x:Type local:SettingsViewModel}}">
-    <!-- DataContext for this control is the RootViewModel (set in RootView), which exposes
-         a `Settings` SettingsViewModel. The Display section binds to the RootViewModel itself. -->
-    <TabControl>
-        <TabItem Header="Display">
-            <local:DisplaySettingsView/>
-        </TabItem>
-        <TabItem Header="Data Location">
-            <local:DataLocationSectionView DataContext="{Binding Settings.DataLocation}"/>
-        </TabItem>
-        <TabItem Header="Sales &amp; Receipts">
-            <local:SalesSettingsView DataContext="{Binding Settings.Sales}"/>
-        </TabItem>
-    </TabControl>
-</UserControl>
+<Window x:Class="OmniCard.Views.Settings.SettingsView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:OmniCard.Views.Settings"
+        xmlns:root="clr-namespace:OmniCard.Views.Root"
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance {x:Type root:RootViewModel}}"
+        Title="Settings" Height="560" Width="760"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource MaterialDesign.Brush.Background}"
+        TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="13"
+        FontFamily="{StaticResource AppFont}">
+
+    <!-- DataContext is the RootViewModel, which exposes a `Settings` SettingsViewModel.
+         The Display section binds to the RootViewModel directly; the other sections bind to
+         Settings.DataLocation / Settings.Sales. -->
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="190"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Left-hand group nav -->
+        <ListBox Grid.Column="0"
+                 BorderThickness="0,0,1,0"
+                 BorderBrush="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                 Background="Transparent"
+                 SelectedIndex="{Binding Settings.SelectedSectionIndex}">
+            <ListBoxItem Content="Display" Padding="16,10"/>
+            <ListBoxItem Content="Data Location" Padding="16,10"/>
+            <ListBoxItem Content="Sales &amp; Receipts" Padding="16,10"/>
+        </ListBox>
+
+        <!-- Section content: the selected group's view is shown; the others are collapsed.
+             Each wrapper keeps the RootViewModel DataContext (so Settings.Show* resolves),
+             while the inner section view overrides its own DataContext where needed. -->
+        <Grid Grid.Column="1">
+            <ContentControl Visibility="{Binding Settings.ShowDisplay, Converter={StaticResource BoolToVis}}">
+                <local:DisplaySettingsView/>
+            </ContentControl>
+            <ContentControl Visibility="{Binding Settings.ShowDataLocation, Converter={StaticResource BoolToVis}}">
+                <local:DataLocationSectionView DataContext="{Binding Settings.DataLocation}"/>
+            </ContentControl>
+            <ContentControl Visibility="{Binding Settings.ShowSales, Converter={StaticResource BoolToVis}}">
+                <local:SalesSettingsView DataContext="{Binding Settings.Sales}"/>
+            </ContentControl>
+        </Grid>
+    </Grid>
+</Window>

@@ -202,6 +202,10 @@ public sealed partial class RootViewModel(
     [ObservableProperty]
     public partial decimal? BulkPurchasePrice { get; set; }
 
+    /// <summary>Opens the Settings dialog (Edit ▸ Settings…), owned by and centered on the app.</summary>
+    [RelayCommand]
+    public void ShowSettings() => dialogService.ShowSettings();
+
     [RelayCommand]
     public void ApplyBulkEdit()
     {
