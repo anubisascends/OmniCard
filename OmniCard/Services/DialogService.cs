@@ -7,7 +7,6 @@ using OmniCard.Views.CollectionCardEditor;
 using OmniCard.Views.Connection;
 using OmniCard.Views.CoverArtPicker;
 using OmniCard.Views.CsvImport;
-using OmniCard.Views.DataLocation;
 using OmniCard.Views.EbayAuth;
 using OmniCard.Views.SetFilterBuilder;
 using OmniCard.Views.SortFilterBuilder;
@@ -122,13 +121,6 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         SetOwner(wnd);
         var result = wnd.ShowDialog();
         return result == true ? wnd.ViewModel.GetSelectedCodes() : null;
-    }
-
-    public void ShowDataLocation()
-    {
-        var wnd = Services.GetRequiredService<DataLocationView>();
-        SetOwner(wnd);
-        wnd.ShowDialog();
     }
 
     public void ShowSettings()

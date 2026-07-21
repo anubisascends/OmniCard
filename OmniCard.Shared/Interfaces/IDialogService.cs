@@ -14,7 +14,6 @@ public interface IDialogService
     int? ShowImportPreview(CsvImportPreview preview);
     bool OpenSortFilterBuilder(CardGame game);
     IReadOnlyList<string>? OpenSetFilterBuilder(IReadOnlyList<SetInfo> allSets, IReadOnlySet<string>? currentFilter);
-    void ShowDataLocation();
     void ShowSettings();
     int? PickCoverArt(int containerId, string containerName);
     MoveToLocationResult? PickMoveToLocation();

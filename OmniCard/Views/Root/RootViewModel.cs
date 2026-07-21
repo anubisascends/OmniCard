@@ -1847,9 +1847,6 @@ public sealed partial class RootViewModel(
     }
 
     [RelayCommand]
-    public void ShowDataLocation() => dialogService.ShowDataLocation();
-
-    [RelayCommand]
     public void CheckDecklist() => DialogService.ShowDecklistCheck();
 
     [RelayCommand]
