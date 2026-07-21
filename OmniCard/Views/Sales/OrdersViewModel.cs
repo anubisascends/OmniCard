@@ -13,7 +13,9 @@ namespace OmniCard.Views.Sales;
 public partial class OrdersViewModel(
     IOrderService orderService,
     ICustomerService customerService,
-    IListingService listingService) : ObservableObject
+    IListingService listingService,
+    IReceiptService receiptService,
+    IReceiptPdfExporter receiptPdfExporter) : ObservableObject
 {
     public ObservableCollection<Order> Orders { get; } = [];
     public ObservableCollection<Customer> Customers { get; } = [];
@@ -105,6 +107,49 @@ public partial class OrdersViewModel(
         Load();
         SelectedOrder = Orders.FirstOrDefault(o => o.Id == id);
         StatusMessage = $"Order marked {status}.";
+    }
+
+    [RelayCommand]
+    public void PrintReceipt()
+    {
+        if (SelectedOrder is null) { StatusMessage = "Select an order first."; return; }
+        try
+        {
+            var doc = receiptService.BuildReceipt(SelectedOrder.Id);
+            ReceiptPrinter.Print(doc);
+        }
+        catch (Exception ex)
+        {
+            // No global unhandled-exception handler (see SalesViewModel.Load/MarkAllPicked) —
+            // a printer-driver error or undecodable logo image must not crash the app.
+            StatusMessage = $"Print failed: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    public void ExportPdf()
+    {
+        if (SelectedOrder is null) { StatusMessage = "Select an order first."; return; }
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Export receipt PDF",
+            Filter = "PDF|*.pdf",
+            FileName = $"receipt-{SelectedOrder.OrderNumber ?? SelectedOrder.Id.ToString()}.pdf",
+        };
+        if (dialog.ShowDialog() != true) return;
+
+        try
+        {
+            var doc = receiptService.BuildReceipt(SelectedOrder.Id);
+            receiptPdfExporter.Export(doc, dialog.FileName);
+            StatusMessage = $"Exported to {dialog.FileName}";
+        }
+        catch (Exception ex)
+        {
+            // No global unhandled-exception handler (see SalesViewModel.Load/MarkAllPicked) —
+            // an undecodable logo image or an unwritable/locked export path must not crash the app.
+            StatusMessage = $"Export failed: {ex.Message}";
+        }
     }
 
     /// <summary>Enforces a forward-only order status flow so inventory/sale accounting

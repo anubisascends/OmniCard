@@ -19,6 +19,15 @@ public class OrdersViewModelTests
     private static ActiveListing Listing(int lotId, decimal price) =>
         new(lotId, "Card", "Set", "SET", "NM", false, price, ListingStatus.Listed);
 
+    private sealed class FakeReceiptService(bool throwOnBuild = false) : IReceiptService
+    {
+        public ReceiptDocument BuildReceipt(int orderId) =>
+            throwOnBuild ? throw new InvalidOperationException("boom") : new ReceiptDocument();
+    }
+
+    private sealed class FakeReceiptPdfExporter : IReceiptPdfExporter
+    { public void Export(ReceiptDocument document, string filePath) { } }
+
     private static OrdersViewModel MakeVm(
         out Mock<IOrderService> orderService,
         out Mock<ICustomerService> customerService,
@@ -27,7 +36,9 @@ public class OrdersViewModelTests
         orderService = new Mock<IOrderService>();
         customerService = new Mock<ICustomerService>();
         listingService = new Mock<IListingService>();
-        return new OrdersViewModel(orderService.Object, customerService.Object, listingService.Object);
+        return new OrdersViewModel(
+            orderService.Object, customerService.Object, listingService.Object,
+            new FakeReceiptService(), new FakeReceiptPdfExporter());
     }
 
     [Fact]
@@ -216,6 +227,25 @@ public class OrdersViewModelTests
 
         orderService.Verify(s => s.UpdateOrder(order), Times.Once);
         Assert.Equal("Saved.", vm.StatusMessage);
+    }
+
+    [Fact]
+    public void PrintReceipt_WhenBuildReceiptThrows_DoesNotPropagate_AndSetsStatusMessage()
+    {
+        var orderService = new Mock<IOrderService>();
+        var customerService = new Mock<ICustomerService>();
+        var listingService = new Mock<IListingService>();
+        var vm = new OrdersViewModel(
+            orderService.Object, customerService.Object, listingService.Object,
+            new FakeReceiptService(throwOnBuild: true), new FakeReceiptPdfExporter());
+        var order = NewOrder(1, 1);
+        orderService.Setup(s => s.GetLines(1)).Returns([]);
+        vm.SelectedOrder = order;
+
+        var ex = Record.Exception(() => vm.PrintReceiptCommand.Execute(null));
+
+        Assert.Null(ex);
+        Assert.Equal("Print failed: boom", vm.StatusMessage);
     }
 
     [Fact]

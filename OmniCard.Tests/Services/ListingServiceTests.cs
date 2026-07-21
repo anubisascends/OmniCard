@@ -116,6 +116,11 @@ public class ListingServiceTests : IDisposable
     {
         public int? ForSaleLocationId { get; private set; } = 99;
         public void SetForSaleLocationId(int? id) => ForSaleLocationId = id;
+        public OmniCard.Models.CompanyProfile GetCompany() => new();
+        public void SaveCompany(OmniCard.Models.CompanyProfile company) { }
+        public OmniCard.Models.ReceiptSettings GetReceipt() => new();
+        public void SaveReceipt(OmniCard.Models.ReceiptSettings receipt) { }
+        public string SetLogo(string sourcePath) => "company-logo.png";
     }
 
     [Fact]

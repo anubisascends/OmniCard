@@ -77,6 +77,8 @@ public partial class App : Application
             services.AddSingleton<Views.Sales.SalesViewModel>();
             services.AddSingleton<Views.Sales.CustomersViewModel>();
             services.AddSingleton<Views.Sales.OrdersViewModel>();
+            services.AddSingleton<Views.Settings.SalesSettingsViewModel>();
+            services.AddSingleton<Views.Settings.SettingsViewModel>();
             services.AddSingleton<RootViewModel>();
             services.AddSingleton<ScannerService>();
             services.AddSingleton<WebScannerService>();
@@ -122,6 +124,7 @@ public partial class App : Application
             services.AddSingleton<IListingService, ListingService>();
             services.AddSingleton<ICustomerService, CustomerService>();
             services.AddSingleton<IOrderService, OrderService>();
+            services.AddSingleton<IReceiptService, ReceiptService>();
 
             // Sort/filter presets
             services.AddSingleton<ICollectionPresetService, CollectionPresetService>();
@@ -140,6 +143,9 @@ public partial class App : Application
             // Decklist check
             services.AddSingleton<IDecklistService, DecklistService>();
             services.AddSingleton<IDecklistPdfExporter, DecklistPdfExporter>();
+
+            // Receipt export
+            services.AddSingleton<IReceiptPdfExporter, ReceiptPdfExporter>();
 
             // eBay OAuth
             services.AddSingleton<ICredentialStore, CredentialStore>();
@@ -171,6 +177,7 @@ public partial class App : Application
             services.AddTransient<SetFilterBuilderViewModel>();
             services.AddTransient<DataLocationView>();
             services.AddTransient<DataLocationViewModel>();
+            services.AddTransient<Views.Settings.SettingsView>();
             services.AddTransient<CoverArtPickerView>();
             services.AddTransient<CoverArtPickerViewModel>();
             services.AddTransient<OmniCard.Views.MoveToLocation.MoveToLocationView>();

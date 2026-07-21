@@ -90,6 +90,8 @@
                         CommandParameter="{x:Static models:OrderStatus.Completed}" Padding="12,4" Margin="0,0,8,0"/>
                 <Button Content="Cancel" Command="{Binding SetStatusCommand}"
                         CommandParameter="{x:Static models:OrderStatus.Cancelled}" Padding="12,4" Margin="0,0,16,0"/>
+                <Button Content="Print Receipt" Command="{Binding PrintReceiptCommand}" Padding="12,4" Margin="0,0,8,0"/>
+                <Button Content="Export PDF" Command="{Binding ExportPdfCommand}" Padding="12,4" Margin="0,0,16,0"/>
                 <TextBlock Text="{Binding OrderTotal, StringFormat=C}" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,16,0"/>
                 <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center"/>
             </StackPanel>

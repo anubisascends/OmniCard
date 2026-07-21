@@ -8,10 +8,12 @@ namespace OmniCard.Collection;
 public class SalesSettingsService : ISalesSettingsService
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private readonly IDataPathService _dataPath;
     private readonly string _filePath;
 
     public SalesSettingsService(IDataPathService dataPathService)
     {
+        _dataPath = dataPathService;
         _filePath = Path.Combine(dataPathService.DataDirectory, "sales-settings.json");
     }
 
@@ -24,18 +26,55 @@ public class SalesSettingsService : ISalesSettingsService
         Save(settings);
     }
 
+    public CompanyProfile GetCompany() => Load().Company;
+
+    public void SaveCompany(CompanyProfile company)
+    {
+        var settings = Load();
+        settings.Company = company;
+        Save(settings);
+    }
+
+    public ReceiptSettings GetReceipt() => Load().Receipt;
+
+    public void SaveReceipt(ReceiptSettings receipt)
+    {
+        var settings = Load();
+        settings.Receipt = receipt;
+        Save(settings);
+    }
+
+    public string SetLogo(string sourcePath)
+    {
+        var ext = Path.GetExtension(sourcePath);
+        var destName = "company-logo" + ext;
+        var dest = Path.Combine(_dataPath.DataDirectory, destName);
+        File.Copy(sourcePath, dest, overwrite: true);
+        return destName;
+    }
+
     private SalesSettings Load()
     {
+        SalesSettings settings;
         if (!File.Exists(_filePath))
-            return new SalesSettings();
-        try
+            settings = new SalesSettings();
+        else
         {
-            return JsonSerializer.Deserialize<SalesSettings>(File.ReadAllText(_filePath), JsonOptions) ?? new SalesSettings();
+            try
+            {
+                settings = JsonSerializer.Deserialize<SalesSettings>(File.ReadAllText(_filePath), JsonOptions)
+                           ?? new SalesSettings();
+            }
+            catch (JsonException)
+            {
+                settings = new SalesSettings();
+            }
         }
-        catch (System.Text.Json.JsonException)
-        {
-            return new SalesSettings();
-        }
+
+        // Guard against old files (or explicit nulls) lacking the phase-3 sections.
+        settings.Company ??= new CompanyProfile();
+        settings.Receipt ??= new ReceiptSettings();
+        return settings;
     }
 
     private void Save(SalesSettings settings)

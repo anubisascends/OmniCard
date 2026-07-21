@@ -18,7 +18,8 @@ public class SalesViewModelTests
     // Customers sub-tabs) that these pick-list-focused tests exercise. Real instances are cheap to
     // construct off mocked interfaces and are never invoked here.
     private static OrdersViewModel NewOrdersViewModel() =>
-        new(Mock.Of<IOrderService>(), Mock.Of<ICustomerService>(), Mock.Of<IListingService>());
+        new(Mock.Of<IOrderService>(), Mock.Of<ICustomerService>(), Mock.Of<IListingService>(),
+            Mock.Of<IReceiptService>(), Mock.Of<IReceiptPdfExporter>());
 
     private static CustomersViewModel NewCustomersViewModel() =>
         new(Mock.Of<ICustomerService>());
@@ -83,15 +84,15 @@ public class SalesViewModelTests
 
         // Restoring the saved location during Load must never rewrite (or clobber) settings.
         salesSettings.Verify(s => s.SetForSaleLocationId(It.IsAny<int?>()), Times.Never);
-
-        // A genuine, subsequent user-driven change still persists.
-        vm.ForSaleLocation = containers[0];
-        salesSettings.Verify(s => s.SetForSaleLocationId(1), Times.Once);
     }
 
     [Fact]
-    public void SettingForSaleLocation_PersistsViaSalesSettingsService()
+    public void SettingForSaleLocation_DoesNotPersist_PersistenceMovedToSalesSettingsViewModel()
     {
+        // The Pick List's For-Sale location display is now read-only (Task 4): the picker lives
+        // in Settings ▸ Sales & Receipts, backed by SalesSettingsViewModel.Save(). Assigning
+        // SalesViewModel.ForSaleLocation directly (e.g. programmatically, or were a binding ever
+        // reintroduced) must not write through to ISalesSettingsService.
         var listingService = new Mock<IListingService>();
         var salesSettings = new Mock<ISalesSettingsService>();
         var containerService = new Mock<IStorageContainerService>();
@@ -103,7 +104,7 @@ public class SalesViewModelTests
 
         vm.ForSaleLocation = location;
 
-        salesSettings.Verify(s => s.SetForSaleLocationId(5), Times.Once);
+        salesSettings.Verify(s => s.SetForSaleLocationId(It.IsAny<int?>()), Times.Never);
     }
 
     [Fact]

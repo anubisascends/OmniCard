@@ -20,6 +20,7 @@ using OmniCard.Views.DecklistCheck;
 using OmniCard.Views.Inventory;
 using OmniCard.Views.MovementHistory;
 using OmniCard.Views.SalesListing;
+using OmniCard.Views.Settings;
 
 namespace OmniCard.Services;
 
@@ -126,6 +127,13 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
     public void ShowDataLocation()
     {
         var wnd = Services.GetRequiredService<DataLocationView>();
+        SetOwner(wnd);
+        wnd.ShowDialog();
+    }
+
+    public void ShowSettings()
+    {
+        var wnd = Services.GetRequiredService<SettingsView>();
         SetOwner(wnd);
         wnd.ShowDialog();
     }
