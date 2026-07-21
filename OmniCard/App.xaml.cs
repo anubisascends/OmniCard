@@ -144,6 +144,9 @@ public partial class App : Application
             services.AddSingleton<IDecklistService, DecklistService>();
             services.AddSingleton<IDecklistPdfExporter, DecklistPdfExporter>();
 
+            // Receipt export
+            services.AddSingleton<IReceiptPdfExporter, ReceiptPdfExporter>();
+
             // eBay OAuth
             services.AddSingleton<ICredentialStore, CredentialStore>();
             services.AddSingleton<IEbayAuthService, EbayAuthService>();
