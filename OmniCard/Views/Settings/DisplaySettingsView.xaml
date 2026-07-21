@@ -1,0 +1,41 @@
+<UserControl x:Class="OmniCard.Views.Settings.DisplaySettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+    <!-- DataContext is the RootViewModel (set by SettingsView host). -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="16" MaxWidth="520" HorizontalAlignment="Left">
+            <TextBlock Text="Display" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,12"/>
+
+            <CheckBox Content="Dark theme" IsChecked="{Binding IsDarkTheme}" Margin="0,0,0,12"/>
+
+            <TextBlock Text="Card detail font size" Margin="0,0,0,4"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <Slider Width="200" Minimum="10" Maximum="24" TickFrequency="1" IsSnapToTickEnabled="True"
+                        Value="{Binding CardDetailFontSize}" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding CardDetailFontSize, StringFormat='{}{0:F0}'}"
+                           VerticalAlignment="Center" Margin="8,0,0,0"/>
+            </StackPanel>
+
+            <TextBlock Text="Card preview size" Margin="0,0,0,4"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <Slider Width="200" Minimum="100" Maximum="175" TickFrequency="25" IsSnapToTickEnabled="True"
+                        Value="{Binding CardPreviewScale}" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding CardPreviewScale, StringFormat='{}{0:F0}%'}"
+                           VerticalAlignment="Center" Margin="8,0,0,0"/>
+            </StackPanel>
+
+            <CheckBox Content="Stack duplicates" IsChecked="{Binding Collection.IsStacked}" Margin="0,0,0,12"/>
+
+            <TextBlock Text="Scanner font size" Margin="0,0,0,4"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <Slider Width="200" Minimum="10" Maximum="24" TickFrequency="1" IsSnapToTickEnabled="True"
+                        Value="{Binding ScannerFontSize}" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding ScannerFontSize, StringFormat='{}{0:F0}'}"
+                           VerticalAlignment="Center" Margin="8,0,0,0"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

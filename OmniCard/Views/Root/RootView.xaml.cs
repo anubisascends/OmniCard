@@ -44,6 +44,8 @@ public partial class RootView : IView<RootViewModel>, IHostedService
                 viewModel.Dashboard.Load();
             else if (MainTabControl.SelectedItem == tabItemSales)
                 _ = viewModel.Sales.Load();
+            else if (MainTabControl.SelectedItem == tabItemSettings)
+                _ = viewModel.Settings.Load();
         };
 
         ViewModel.Collection.GetSelectedCards = () => CollectionTab.GetSelectedCards();
@@ -95,6 +97,9 @@ public partial class RootView : IView<RootViewModel>, IHostedService
     {
         Application.Current.Shutdown();
     }
+
+    private void DataLocationMenuItem_Click(object sender, RoutedEventArgs e)
+        => MainTabControl.SelectedIndex = MainTabControl.Items.IndexOf(tabItemSettings);
 
     private void DeleteSelectedMenuItem_Click(object sender, RoutedEventArgs e)
     {

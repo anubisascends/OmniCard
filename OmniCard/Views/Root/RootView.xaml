@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:OmniCard.Views.Root"
         xmlns:dashboard="clr-namespace:OmniCard.Views.Dashboard"
         xmlns:sales="clr-namespace:OmniCard.Views.Sales"
+        xmlns:settings="clr-namespace:OmniCard.Views.Settings"
         xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance {x:Type local:RootView}}"
@@ -79,81 +80,9 @@
                           Click="DeleteSelectedMenuItem_Click"/>
                 <Separator />
                 <MenuItem Header="Data _Location..."
-                          Command="{Binding ViewModel.ShowDataLocationCommand}"/>
+                          Click="DataLocationMenuItem_Click"/>
             </MenuItem>
             <MenuItem Header="_View">
-                <MenuItem>
-                    <MenuItem.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Dark Theme:"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,8,0"/>
-                            <CheckBox IsChecked="{Binding ViewModel.IsDarkTheme}"
-                                      VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </MenuItem.Header>
-                </MenuItem>
-                <MenuItem>
-                    <MenuItem.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Font Size:"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,8,0"/>
-                            <Slider Width="120"
-                                    Minimum="10"
-                                    Maximum="24"
-                                    TickFrequency="1"
-                                    IsSnapToTickEnabled="True"
-                                    Value="{Binding ViewModel.CardDetailFontSize}"
-                                    VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding ViewModel.CardDetailFontSize, StringFormat='{}{0:F0}'}"
-                                       VerticalAlignment="Center"
-                                       Margin="8,0,0,0"
-                                       Width="20"/>
-                        </StackPanel>
-                    </MenuItem.Header>
-                </MenuItem>
-                <MenuItem>
-                    <MenuItem.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Card Preview Size:"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,8,0"/>
-                            <Slider Width="100"
-                                    Minimum="100"
-                                    Maximum="175"
-                                    TickFrequency="25"
-                                    IsSnapToTickEnabled="True"
-                                    Value="{Binding ViewModel.CardPreviewScale}"
-                                    VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding ViewModel.CardPreviewScale, StringFormat='{}{0:F0}%'}"
-                                       VerticalAlignment="Center"
-                                       Margin="8,0,0,0"
-                                       Width="36"/>
-                        </StackPanel>
-                    </MenuItem.Header>
-                </MenuItem>
-                <MenuItem>
-                    <MenuItem.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Scanner Font Size:"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,8,0"/>
-                            <Slider Width="120"
-                                    Minimum="10"
-                                    Maximum="24"
-                                    TickFrequency="1"
-                                    IsSnapToTickEnabled="True"
-                                    Value="{Binding ViewModel.ScannerFontSize}"
-                                    VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding ViewModel.ScannerFontSize, StringFormat='{}{0:F0}'}"
-                                       VerticalAlignment="Center"
-                                       Margin="8,0,0,0"
-                                       Width="20"/>
-                        </StackPanel>
-                    </MenuItem.Header>
-                </MenuItem>
-                <Separator/>
                 <MenuItem Header="Show p_Hash Preview"
                           IsCheckable="True"
                           IsChecked="{Binding ViewModel.ShowHashPreview}"/>
@@ -263,6 +192,11 @@
             <TabItem Header="Sales"
                      x:Name="tabItemSales">
                 <sales:SalesView DataContext="{Binding ViewModel.Sales}"/>
+            </TabItem>
+
+            <TabItem Header="Settings"
+                     x:Name="tabItemSettings">
+                <settings:SettingsView DataContext="{Binding ViewModel}"/>
             </TabItem>
 
         </TabControl>

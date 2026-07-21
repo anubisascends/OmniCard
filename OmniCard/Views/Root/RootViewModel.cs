@@ -38,6 +38,7 @@ public sealed partial class RootViewModel(
     Views.Inventory.InventoryViewModel inventory,
     Views.Dashboard.DashboardViewModel dashboard,
     Views.Sales.SalesViewModel sales,
+    Views.Settings.SettingsViewModel settings,
     IMismatchLogService mismatchLogService,
     SetSymbolCache setSymbolCache,
     IScanDiagnosticService diagnosticService,
@@ -171,6 +172,9 @@ public sealed partial class RootViewModel(
 
     /// <summary>The nested SalesViewModel that owns the location-grouped pick list + For-Sale location state.</summary>
     public Views.Sales.SalesViewModel Sales { get; } = sales;
+
+    /// <summary>The nested SettingsViewModel that composes the Settings tab's section view-models.</summary>
+    public Views.Settings.SettingsViewModel Settings { get; } = settings;
 
     /// <summary>Set by the View to focus and select the manual search box.</summary>
     public Action? FocusManualSearch { get; set; }
