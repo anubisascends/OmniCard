@@ -19,6 +19,12 @@ public class OrdersViewModelTests
     private static ActiveListing Listing(int lotId, decimal price) =>
         new(lotId, "Card", "Set", "SET", "NM", false, price, ListingStatus.Listed);
 
+    private sealed class FakeReceiptService : IReceiptService
+    { public ReceiptDocument BuildReceipt(int orderId) => new(); }
+
+    private sealed class FakeReceiptPdfExporter : IReceiptPdfExporter
+    { public void Export(ReceiptDocument document, string filePath) { } }
+
     private static OrdersViewModel MakeVm(
         out Mock<IOrderService> orderService,
         out Mock<ICustomerService> customerService,
@@ -27,7 +33,9 @@ public class OrdersViewModelTests
         orderService = new Mock<IOrderService>();
         customerService = new Mock<ICustomerService>();
         listingService = new Mock<IListingService>();
-        return new OrdersViewModel(orderService.Object, customerService.Object, listingService.Object);
+        return new OrdersViewModel(
+            orderService.Object, customerService.Object, listingService.Object,
+            new FakeReceiptService(), new FakeReceiptPdfExporter());
     }
 
     [Fact]

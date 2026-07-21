@@ -18,7 +18,8 @@ public class SalesViewModelTests
     // Customers sub-tabs) that these pick-list-focused tests exercise. Real instances are cheap to
     // construct off mocked interfaces and are never invoked here.
     private static OrdersViewModel NewOrdersViewModel() =>
-        new(Mock.Of<IOrderService>(), Mock.Of<ICustomerService>(), Mock.Of<IListingService>());
+        new(Mock.Of<IOrderService>(), Mock.Of<ICustomerService>(), Mock.Of<IListingService>(),
+            Mock.Of<IReceiptService>(), Mock.Of<IReceiptPdfExporter>());
 
     private static CustomersViewModel NewCustomersViewModel() =>
         new(Mock.Of<ICustomerService>());

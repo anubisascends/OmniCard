@@ -13,7 +13,9 @@ namespace OmniCard.Views.Sales;
 public partial class OrdersViewModel(
     IOrderService orderService,
     ICustomerService customerService,
-    IListingService listingService) : ObservableObject
+    IListingService listingService,
+    IReceiptService receiptService,
+    IReceiptPdfExporter receiptPdfExporter) : ObservableObject
 {
     public ObservableCollection<Order> Orders { get; } = [];
     public ObservableCollection<Customer> Customers { get; } = [];
@@ -105,6 +107,31 @@ public partial class OrdersViewModel(
         Load();
         SelectedOrder = Orders.FirstOrDefault(o => o.Id == id);
         StatusMessage = $"Order marked {status}.";
+    }
+
+    [RelayCommand]
+    public void PrintReceipt()
+    {
+        if (SelectedOrder is null) { StatusMessage = "Select an order first."; return; }
+        var doc = receiptService.BuildReceipt(SelectedOrder.Id);
+        ReceiptPrinter.Print(doc);
+    }
+
+    [RelayCommand]
+    public void ExportPdf()
+    {
+        if (SelectedOrder is null) { StatusMessage = "Select an order first."; return; }
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Export receipt PDF",
+            Filter = "PDF|*.pdf",
+            FileName = $"receipt-{SelectedOrder.OrderNumber ?? SelectedOrder.Id.ToString()}.pdf",
+        };
+        if (dialog.ShowDialog() != true) return;
+
+        var doc = receiptService.BuildReceipt(SelectedOrder.Id);
+        receiptPdfExporter.Export(doc, dialog.FileName);
+        StatusMessage = $"Exported to {dialog.FileName}";
     }
 
     /// <summary>Enforces a forward-only order status flow so inventory/sale accounting
