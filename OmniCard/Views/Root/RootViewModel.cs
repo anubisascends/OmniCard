@@ -1006,10 +1006,16 @@ public sealed partial class RootViewModel(
                 if (cn is not null && conf >= 0.5)
                     ocrResult = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
             }
+            else if (scan.Game == CardGame.Riftbound)
+            {
+                var (cn, conf) = await CardService.OcrService.DetectRiftboundCollectorNumberAsync(rotatedBytes);
+                if (cn is not null && conf >= 0.5)
+                    ocrResult = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
+            }
 
-            // Structure rotates too — recompute the edge hash on the rotated bytes for foil One Piece scans
+            // Structure rotates too — recompute the edge hash on the rotated bytes for foil One Piece/Riftbound scans
             ulong? rotatedEdgeHash = null;
-            if (scan.IsFoil && scan.Game == CardGame.OnePiece)
+            if (scan.IsFoil && (scan.Game == CardGame.OnePiece || scan.Game == CardGame.Riftbound))
             {
                 using var edgeStream = new MemoryStream(rotatedBytes);
                 rotatedEdgeHash = CardService.ComputeEdgeHashFromStream(edgeStream);

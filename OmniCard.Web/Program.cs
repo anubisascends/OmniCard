@@ -48,6 +48,8 @@ builder.Services.AddDbContextFactory<ScryfallDbContext>(options =>
     options.UseSqlite($"Data Source={Path.Combine(dataDir, "scryfall.db")};Mode=ReadOnly"));
 builder.Services.AddDbContextFactory<OptcgDbContext>(options =>
     options.UseSqlite($"Data Source={Path.Combine(dataDir, "optcg.db")};Mode=ReadOnly"));
+builder.Services.AddDbContextFactory<RiftboundDbContext>(options =>
+    options.UseSqlite($"Data Source={Path.Combine(dataDir, "riftbound.db")};Mode=ReadOnly"));
 
 // Infrastructure services needed by game services
 builder.Services.AddSingleton<IDataPathService>(new WebDataPathService(dataDir));
@@ -60,6 +62,8 @@ builder.Services.AddSingleton<ScryfallService>();
 builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<ScryfallService>());
 builder.Services.AddSingleton<OptcgService>();
 builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<OptcgService>());
+builder.Services.AddSingleton<RiftboundService>();
+builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<RiftboundService>());
 
 // Card & decklist services
 builder.Services.AddSingleton<ICardService, WebCardService>();

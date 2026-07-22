@@ -26,6 +26,7 @@
                 <option value="">All Games</option>
                 <option value="mtg" selected="@(Model.Game == "mtg" ? "selected" : null)">Magic: The Gathering</option>
                 <option value="optcg" selected="@(Model.Game == "optcg" ? "selected" : null)">One Piece</option>
+                <option value="riftbound" selected="@(Model.Game == "riftbound" ? "selected" : null)">Riftbound</option>
             </select>
             <button type="submit">Search</button>
             @if (Model.IsSearchActive || !string.IsNullOrWhiteSpace(Model.Game))

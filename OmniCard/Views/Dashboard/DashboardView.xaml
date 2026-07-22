@@ -574,7 +574,7 @@
                                             </Border.Style>
                                         </Border>
 
-                                        <!-- One Piece: no symbol, show the set code larger -->
+                                        <!-- One Piece / Riftbound: no symbol, show the set code larger -->
                                         <TextBlock Text="{Binding SetCode}"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center"
@@ -589,6 +589,9 @@
                                                     <Setter Property="Visibility" Value="Collapsed"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding Game}" Value="{x:Static models:CardGame.OnePiece}">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Game}" Value="{x:Static models:CardGame.Riftbound}">
                                                             <Setter Property="Visibility" Value="Visible"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>

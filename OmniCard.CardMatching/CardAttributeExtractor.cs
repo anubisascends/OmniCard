@@ -22,6 +22,7 @@ public static class CardAttributeExtractor
         {
             CardGame.Mtg => ExtractMtgColor(match.Source as Card),
             CardGame.OnePiece => (match.Source as OptcgCard)?.CardColor,
+            CardGame.Riftbound => (match.Source as RiftboundCard)?.Domain,
             _ => null
         };
     }
@@ -32,6 +33,7 @@ public static class CardAttributeExtractor
         {
             CardGame.Mtg => ExtractMtgCardType(match.Source as Card),
             CardGame.OnePiece => (match.Source as OptcgCard)?.CardType,
+            CardGame.Riftbound => (match.Source as RiftboundCard)?.CardType,
             _ => null
         };
     }

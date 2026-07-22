@@ -9,5 +9,7 @@ public interface IOcrMatchingService
     (List<string> SetCodes, double Confidence) DetectSetSymbol(byte[] imageData);
     /// <summary>OCR the collector number from an OPTCG card (e.g. "OP15-043").</summary>
     Task<(string? CollectorNumber, double Confidence)> DetectOptcgCollectorNumberAsync(byte[] imageData);
+    /// <summary>OCR the collector line from a Riftbound card, returning "{SET}-{number}" (e.g. "UNL-150").</summary>
+    Task<(string? CollectorNumber, double Confidence)> DetectRiftboundCollectorNumberAsync(byte[] imageData);
     Dictionary<string, ulong> SymbolHashes { get; set; }
 }
