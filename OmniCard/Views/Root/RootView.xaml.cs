@@ -25,7 +25,6 @@ public partial class RootView : IView<RootViewModel>, IHostedService
         CollectionTab.WireUpInventory(viewModel.Inventory);
         ScannerTab.ViewModel = viewModel;
         ScannerTab.WireUpAutoScroll();
-        DashboardTab.WireUp(viewModel.Dashboard);
 
         // Lazy-load the Dashboard tab's data the first time it's selected; the Sales tab's
         // pick list is reloaded on every activation (cheap query, and needs to reflect any
@@ -87,6 +86,12 @@ public partial class RootView : IView<RootViewModel>, IHostedService
         OmniCardTheme.Apply(ViewModel.IsDarkTheme);
 
         ViewModel.Initialize();
+
+        // Dashboard is the default-selected tab (index 0); no SelectionChanged fires for the
+        // initial selection, so load its financials explicitly. Collection stats are already
+        // triggered by InvalidateHomeTab() inside Initialize().
+        ViewModel.Dashboard.Load();
+
         _logger.LogInformation("Application initialized and ready");
         return Task.CompletedTask;
     }

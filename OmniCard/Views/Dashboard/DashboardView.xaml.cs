@@ -8,9 +8,4 @@ public partial class DashboardView : UserControl
     {
         InitializeComponent();
     }
-
-    public void WireUp(DashboardViewModel vm)
-    {
-        DataContext = vm;
-    }
 }

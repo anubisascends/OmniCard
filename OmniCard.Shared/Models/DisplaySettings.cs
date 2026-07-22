@@ -12,4 +12,5 @@ public class DisplaySettings
     public string? DefaultScannerName { get; set; }
     public ScanQuality ScanQuality { get; set; } = ScanQuality.Fast;
     public bool ShowScannerUI { get; set; }
+    public bool SidebarExpanded { get; set; } = true;
 }

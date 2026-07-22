@@ -7,6 +7,7 @@
         xmlns:dashboard="clr-namespace:OmniCard.Views.Dashboard"
         xmlns:sales="clr-namespace:OmniCard.Views.Sales"
         xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance {x:Type local:RootView}}"
         Title="TCG Card Scanner"
@@ -18,6 +19,87 @@
         TextElement.FontWeight="Regular"
         TextElement.FontSize="13"
         FontFamily="{StaticResource AppFont}">
+
+    <Window.Resources>
+        <!-- Sidebar item: icon + label button chrome with selection / hover states. -->
+        <Style x:Key="SidebarTabItemStyle" TargetType="TabItem">
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="Bd" Background="Transparent" Padding="14,10" Margin="0,1">
+                            <ContentPresenter ContentSource="Header"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Left"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background"
+                                        Value="{DynamicResource MaterialDesign.Brush.Card.Background}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background"
+                                        Value="{DynamicResource MaterialDesign.Brush.Primary}"/>
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource MaterialDesign.Brush.Primary.Foreground}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- TabControl retemplated: left sidebar (hamburger + vertical item host) + content area. -->
+        <Style x:Key="SidebarTabControlStyle" TargetType="TabControl">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Sidebar -->
+                            <Border Grid.Column="0"
+                                    Background="{DynamicResource MaterialDesign.Brush.Background}"
+                                    BorderBrush="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                                    BorderThickness="0,0,1,0">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Width" Value="180"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ViewModel.IsSidebarExpanded}" Value="False">
+                                                <Setter Property="Width" Value="56"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <DockPanel>
+                                    <ToggleButton DockPanel.Dock="Top"
+                                                  HorizontalAlignment="Left"
+                                                  Margin="10,8"
+                                                  Background="Transparent"
+                                                  BorderThickness="0"
+                                                  ToolTip="Toggle sidebar"
+                                                  IsChecked="{Binding ViewModel.IsSidebarExpanded, Mode=TwoWay}">
+                                        <materialDesign:PackIcon Kind="Menu" Width="22" Height="22"/>
+                                    </ToggleButton>
+                                    <StackPanel IsItemsHost="True" DockPanel.Dock="Top"/>
+                                </DockPanel>
+                            </Border>
+
+                            <!-- Active view content -->
+                            <Border Grid.Column="1">
+                                <ContentPresenter ContentSource="SelectedContent"/>
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
 
     <Window.InputBindings>
         <KeyBinding Gesture="Ctrl+F" Command="{Binding ViewModel.FocusCollectionSearchBoxCommand}"/>
@@ -166,30 +248,50 @@
 
         <TabControl x:Name="MainTabControl"
                     Grid.Row="2"
+                    Style="{StaticResource SidebarTabControlStyle}"
                     SelectedIndex="{Binding ViewModel.SelectedTabIndex}">
 
-            <TabItem Header="Home"
-                     x:Name="tabItemHome">
-                <local:HomeTabView/>
-            </TabItem>
-
-            <TabItem Header="Collection"
-                     x:Name="tabItemCollection">
-                <local:CollectionTabView x:Name="CollectionTab"/>
-            </TabItem>
-
-            <TabItem Header="Scanner"
-                     x:Name="tabItemScanner">
-                <local:ScannerTabView x:Name="ScannerTab"/>
-            </TabItem>
-
-            <TabItem Header="Dashboard"
-                     x:Name="tabItemDashboard">
+            <TabItem x:Name="tabItemDashboard" Style="{StaticResource SidebarTabItemStyle}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="ViewDashboard" Width="22" Height="22" VerticalAlignment="Center"/>
+                        <TextBlock Text="Dashboard" Margin="12,0,0,0" VerticalAlignment="Center"
+                                   Visibility="{Binding ViewModel.IsSidebarExpanded, Converter={conv:BoolToVisibilityConverter}}"/>
+                    </StackPanel>
+                </TabItem.Header>
                 <dashboard:DashboardView x:Name="DashboardTab"/>
             </TabItem>
 
-            <TabItem Header="Sales"
-                     x:Name="tabItemSales">
+            <TabItem x:Name="tabItemCollection" Style="{StaticResource SidebarTabItemStyle}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="ViewGridOutline" Width="22" Height="22" VerticalAlignment="Center"/>
+                        <TextBlock Text="Collection" Margin="12,0,0,0" VerticalAlignment="Center"
+                                   Visibility="{Binding ViewModel.IsSidebarExpanded, Converter={conv:BoolToVisibilityConverter}}"/>
+                    </StackPanel>
+                </TabItem.Header>
+                <local:CollectionTabView x:Name="CollectionTab"/>
+            </TabItem>
+
+            <TabItem x:Name="tabItemScanner" Style="{StaticResource SidebarTabItemStyle}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="Camera" Width="22" Height="22" VerticalAlignment="Center"/>
+                        <TextBlock Text="Scanner" Margin="12,0,0,0" VerticalAlignment="Center"
+                                   Visibility="{Binding ViewModel.IsSidebarExpanded, Converter={conv:BoolToVisibilityConverter}}"/>
+                    </StackPanel>
+                </TabItem.Header>
+                <local:ScannerTabView x:Name="ScannerTab"/>
+            </TabItem>
+
+            <TabItem x:Name="tabItemSales" Style="{StaticResource SidebarTabItemStyle}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="CartOutline" Width="22" Height="22" VerticalAlignment="Center"/>
+                        <TextBlock Text="Sales" Margin="12,0,0,0" VerticalAlignment="Center"
+                                   Visibility="{Binding ViewModel.IsSidebarExpanded, Converter={conv:BoolToVisibilityConverter}}"/>
+                    </StackPanel>
+                </TabItem.Header>
                 <sales:SalesView DataContext="{Binding ViewModel.Sales}"/>
             </TabItem>
 
