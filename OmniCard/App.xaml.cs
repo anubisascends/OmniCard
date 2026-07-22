@@ -125,6 +125,7 @@ public partial class App : Application
             services.AddSingleton<ICustomerService, CustomerService>();
             services.AddSingleton<IOrderService, OrderService>();
             services.AddSingleton<IReceiptService, ReceiptService>();
+            services.AddSingleton<ITcgPlayerOrderImportService, TcgPlayerOrderImportService>();
 
             // Sort/filter presets
             services.AddSingleton<ICollectionPresetService, CollectionPresetService>();
