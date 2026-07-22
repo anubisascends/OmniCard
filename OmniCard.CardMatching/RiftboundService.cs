@@ -212,9 +212,8 @@ public sealed class RiftboundService : ICardGameService, IDisposable
         _logger.LogInformation("Riftbound download complete: {Inserted} new, {Updated} updated in {Sec:F1}s", inserted, updated, sw.Elapsed.TotalSeconds);
         progress?.Report($"Download complete — {inserted} new, {updated} updated.");
 
-        // Note: auto-hash-compute is intentionally not wired here yet — ComputeImageHashesAsync
-        // is a NotImplementedException stub until Task 5. Task 5 should reinstate the
-        // `if (inserted > 0) await ComputeImageHashesAsync(...)` call alongside its implementation.
+        if (inserted > 0)
+            await ComputeImageHashesAsync(forceAll: false, progress, ct);
     }
 
     // Fetch the set list, then page every set's cards. onSetCompleted(done,total,setId) after each set.
@@ -303,9 +302,110 @@ public sealed class RiftboundService : ICardGameService, IDisposable
         DateScraped = DateTime.UtcNow.ToString("o"),
     };
 
-    // === Image hashing (Task 5 fills the body) ===
-    public Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default)
-        => throw new NotImplementedException("Implemented in Task 5");
+    // === Image hashing ===
+    public async Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Starting Riftbound image hash computation (forceAll: {ForceAll})", forceAll);
+        var sw = Stopwatch.StartNew();
+
+        await using var context = _dbContextFactory.CreateDbContext();
+        var query = context.Cards.Where(c => c.CardImageUri != null);
+        if (!forceAll)
+            query = query.Where(c => c.ImageHash == null || c.EdgeHash == null);
+
+        var cards = await query.Select(c => new { c.Id, c.CardImageUri }).ToListAsync(ct);
+        _logger.LogInformation("Found {Count} Riftbound cards requiring hash computation", cards.Count);
+        progress?.Report($"Computing hashes for {cards.Count} cards...");
+
+        var client = _httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("OmniCard/1.0");
+
+        using var throttle = new SemaphoreSlim(8);
+        var completed = 0;
+        var failed = 0;
+        var results = new List<(string Id, ulong Hash, ulong EdgeHash)>();
+        var saveLock = new object();
+
+        await Parallel.ForEachAsync(cards, new ParallelOptions
+        {
+            MaxDegreeOfParallelism = 8,
+            CancellationToken = ct
+        }, async (card, token) =>
+        {
+            if (card.CardImageUri is null) { Interlocked.Increment(ref failed); return; }
+            try
+            {
+                await throttle.WaitAsync(token);
+                try
+                {
+                    var artFullPath = GetLocalArtFullPath(card.Id);
+                    byte[] imageBytes;
+                    if (File.Exists(artFullPath))
+                    {
+                        imageBytes = await File.ReadAllBytesAsync(artFullPath, token);
+                    }
+                    else
+                    {
+                        using var response = await client.GetAsync(card.CardImageUri, token);
+                        response.EnsureSuccessStatusCode();
+                        imageBytes = await response.Content.ReadAsByteArrayAsync(token);
+                        Directory.CreateDirectory(Path.GetDirectoryName(artFullPath)!);
+                        await File.WriteAllBytesAsync(artFullPath, imageBytes, token);
+                    }
+
+                    using var buffer = new MemoryStream(imageBytes);
+                    var hash = _hashService.ComputeHash(buffer);
+                    buffer.Position = 0;
+                    var edgeHash = _hashService.ComputeEdgeHash(buffer);
+                    lock (saveLock) results.Add((card.Id, hash, edgeHash));
+                }
+                finally { throttle.Release(); await Task.Delay(50, token); }
+            }
+            catch (Exception ex) when (!token.IsCancellationRequested)
+            {
+                _logger.LogWarning(ex, "Failed to compute hash for Riftbound card {Id}", card.Id);
+                Interlocked.Increment(ref failed);
+            }
+
+            var done = Interlocked.Increment(ref completed);
+            if (done % 100 == 0)
+                progress?.Report($"Hashed {done}/{cards.Count} cards ({failed} failed)...");
+
+            List<(string Id, ulong Hash, ulong EdgeHash)>? toSave = null;
+            lock (saveLock)
+            {
+                if (results.Count >= 200) { toSave = [.. results]; results.Clear(); }
+            }
+            if (toSave is not null) await SaveHashBatchAsync(toSave, ct);
+        });
+
+        if (results.Count > 0) await SaveHashBatchAsync(results, ct);
+
+        var oldContext = _readContext;
+        _readContext = _dbContextFactory.CreateDbContext();
+        _hashCache = null;
+        _edgeHashCache = null;
+        _hashSetLookup = null;
+        oldContext.Dispose();
+
+        sw.Stop();
+        _logger.LogInformation("Riftbound hash computation complete: {Hashed} hashed, {Failed} failed in {Sec:F1}s", completed - failed, failed, sw.Elapsed.TotalSeconds);
+        progress?.Report($"Done — hashed {completed - failed} cards ({failed} failed).");
+    }
+
+    private async Task SaveHashBatchAsync(List<(string Id, ulong Hash, ulong EdgeHash)> batch, CancellationToken ct)
+    {
+        await using var context = _dbContextFactory.CreateDbContext();
+        foreach (var (id, hash, edgeHash) in batch)
+        {
+            var rel = GetLocalArtRelativePath(id);
+            await context.Cards.Where(c => c.Id == id)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(c => c.ImageHash, hash)
+                    .SetProperty(c => c.EdgeHash, edgeHash)
+                    .SetProperty(c => c.LocalImagePath, rel), ct);
+        }
+    }
 
     // === Matching (Task 6 fills the body) ===
     public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14, ulong? scanEdgeHash = null)
