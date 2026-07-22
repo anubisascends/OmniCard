@@ -801,6 +801,55 @@ public class UnifiedMigrationTests : IDisposable
         SqliteConnection.ClearAllPools();
     }
 
+    [Fact]
+    public void EnsureUnifiedSchema_AddsImportedReconciliationColumns_ToPreExistingOrdersTable()
+    {
+        // A pre-existing Orders table (from before Task 1 added the imported-reconciliation
+        // columns) must go through the AddColumnIfMissing branch (TableExists("Orders") == true),
+        // not the CREATE TABLE IF NOT EXISTS branch that only fires for brand-new databases.
+        var dir = Path.Combine(_tempDir, "pre-existing-orders");
+        Directory.CreateDirectory(dir);
+        var dbPath = Path.Combine(dir, "inventory.db");
+
+        using (var conn = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE Orders (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    CustomerId INTEGER NOT NULL,
+                    Channel TEXT NOT NULL DEFAULT 'Manual',
+                    OrderNumber TEXT,
+                    OrderDate TEXT NOT NULL,
+                    Status TEXT NOT NULL DEFAULT 'Open',
+                    ShippingChargedToBuyer TEXT NOT NULL DEFAULT '0',
+                    CreatedAt TEXT NOT NULL
+                );
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        UnifiedMigrationService.EnsureUnifiedSchema(dir, NullLogger.Instance);
+
+        using var verifyConn = new SqliteConnection($"Data Source={dbPath}");
+        verifyConn.Open();
+        using var verifyCmd = verifyConn.CreateCommand();
+
+        foreach (var column in new[] { "ImportedItemCount", "ImportedProductValue" })
+        {
+            verifyCmd.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('Orders') WHERE name = '{column}'";
+            Assert.True((long)verifyCmd.ExecuteScalar()! > 0, $"Orders.{column} should exist");
+        }
+
+        // Idempotent — running again on the already-patched db must not throw.
+        verifyConn.Dispose();
+        SqliteConnection.ClearAllPools();
+        UnifiedMigrationService.EnsureUnifiedSchema(dir, NullLogger.Instance);
+        SqliteConnection.ClearAllPools();
+    }
+
     private class UnifiedDbContextFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
         public OmniCardDbContext CreateDbContext() => new(options);
