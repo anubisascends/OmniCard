@@ -120,12 +120,31 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         _logger.LogInformation("Launching scanner host: {Args}", args);
 
         // Close the data source and session so the host process can access
-        // the scanner exclusively.
+        // the scanner exclusively. NTwain can fault internally when Close() runs
+        // on a source/session in an unexpected state (e.g. after a prior reopen
+        // failed), so guard on IsOpen (mirroring Dispose) and treat these library
+        // calls as untrusted (as the in-process Enable path does) — the host opens
+        // its own TWAIN session, so a failed local close must not crash the scan.
         var scannerName = DataSource.Name;
-        DataSource.Close();
+        try
+        {
+            if (DataSource.IsOpen)
+                DataSource.Close();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to close TWAIN data source before launching scanner host; continuing");
+        }
         if (_sessionOpened)
         {
-            Session.Close();
+            try
+            {
+                Session.Close();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to close TWAIN session before launching scanner host; continuing");
+            }
             _sessionOpened = false;
         }
 
