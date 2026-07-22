@@ -1,4 +1,5 @@
 <UserControl x:Class="OmniCard.Views.Sales.OrdersView"
+             x:Name="OrdersRoot"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:OmniCard.Views.Sales"
@@ -11,32 +12,169 @@
              Loaded="OrdersView_OnLoaded">
     <Grid Margin="8">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="260"/>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="2*"/>
+            <ColumnDefinition Width="360"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Order list -->
+        <!-- Board -->
         <DockPanel Grid.Column="0" Margin="0,0,8,0">
-            <ComboBox DockPanel.Dock="Top" Margin="0,0,0,8"
-                      ItemsSource="{Binding Customers}"
-                      SelectedItem="{Binding SelectedCustomer}"
-                      DisplayMemberPath="Name"/>
-            <Button DockPanel.Dock="Top" Content="New Order" Command="{Binding NewOrderCommand}"
-                    Padding="12,4" Margin="0,0,0,8" HorizontalAlignment="Left"/>
-            <Button DockPanel.Dock="Top" Content="Import from TCGPlayer CSV…"
-                    Command="{Binding ImportTcgPlayerCommand}"
-                    Padding="12,4" Margin="0,0,0,8" HorizontalAlignment="Left"/>
-            <ListBox ItemsSource="{Binding Orders}" SelectedItem="{Binding SelectedOrder}">
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{Binding OrderNumber, TargetNullValue='(no number)'}" FontWeight="SemiBold"/>
-                            <TextBlock Text=" — "/>
-                            <TextBlock Text="{Binding Status}"/>
-                        </StackPanel>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                <ComboBox Width="160" Margin="0,0,8,0"
+                          ItemsSource="{Binding Customers}" SelectedItem="{Binding SelectedCustomer}"
+                          DisplayMemberPath="Name"/>
+                <Button Content="New Order" Command="{Binding NewOrderCommand}" Padding="12,4" Margin="0,0,8,0"/>
+                <Button Content="Import from TCGPlayer CSV…" Command="{Binding ImportTcgPlayerCommand}" Padding="12,4"/>
+            </StackPanel>
+
+            <!-- Cancelled strip (collapsible, not a drop target) -->
+            <Expander DockPanel.Dock="Bottom" Header="Cancelled" Margin="0,8,0,0"
+                      IsExpanded="False">
+                <ItemsControl ItemsSource="{Binding CancelledOrders}" Margin="4">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                                    Opacity="0.6" CornerRadius="4" Padding="8,4" Margin="0,0,0,4"
+                                    MouseLeftButtonUp="Card_Select" Tag="{Binding}">
+                                <Border.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="Delete order…"
+                                                  Command="{Binding DataContext.DeleteOrderCommand, Source={x:Reference OrdersRoot}}"
+                                                  CommandParameter="{Binding}"/>
+                                    </ContextMenu>
+                                </Border.ContextMenu>
+                                <TextBlock Text="{Binding OrderNumber, TargetNullValue='(no number)'}"/>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Expander>
+
+            <!-- 4 columns -->
+            <UniformGrid Rows="1">
+                <DockPanel Margin="2">
+                    <TextBlock DockPanel.Dock="Top" Text="Created" FontWeight="Bold" Margin="4"/>
+                    <ListBox ItemsSource="{Binding CreatedOrders}" AllowDrop="True"
+                             Tag="Created" Drop="Column_Drop" DragOver="Column_DragOver"
+                             SelectedItem="{Binding SelectedOrder}"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                                        CornerRadius="4" Padding="8" Margin="0,0,0,6"
+                                        PreviewMouseLeftButtonDown="Card_MouseDown"
+                                        PreviewMouseMove="Card_MouseMove" Tag="{Binding}">
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Cancel order"
+                                                      Command="{Binding DataContext.CancelOrderCommand, Source={x:Reference OrdersRoot}}"
+                                                      CommandParameter="{Binding}"/>
+                                            <MenuItem Header="Delete order…"
+                                                      Command="{Binding DataContext.DeleteOrderCommand, Source={x:Reference OrdersRoot}}"
+                                                      CommandParameter="{Binding}"/>
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding OrderNumber, TargetNullValue='(no number)'}" FontWeight="SemiBold"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+
+                <DockPanel Margin="2">
+                    <TextBlock DockPanel.Dock="Top" Text="Packed" FontWeight="Bold" Margin="4"/>
+                    <ListBox ItemsSource="{Binding PackedOrders}" AllowDrop="True"
+                             Tag="Packed" Drop="Column_Drop" DragOver="Column_DragOver"
+                             SelectedItem="{Binding SelectedOrder}"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                                        CornerRadius="4" Padding="8" Margin="0,0,0,6"
+                                        PreviewMouseLeftButtonDown="Card_MouseDown"
+                                        PreviewMouseMove="Card_MouseMove" Tag="{Binding}">
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Cancel order"
+                                                      Command="{Binding DataContext.CancelOrderCommand, Source={x:Reference OrdersRoot}}"
+                                                      CommandParameter="{Binding}"/>
+                                            <MenuItem Header="Delete order…"
+                                                      Command="{Binding DataContext.DeleteOrderCommand, Source={x:Reference OrdersRoot}}"
+                                                      CommandParameter="{Binding}"/>
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding OrderNumber, TargetNullValue='(no number)'}" FontWeight="SemiBold"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+
+                <DockPanel Margin="2">
+                    <TextBlock DockPanel.Dock="Top" Text="Shipped" FontWeight="Bold" Margin="4"/>
+                    <ListBox ItemsSource="{Binding ShippedOrders}" AllowDrop="True"
+                             Tag="Shipped" Drop="Column_Drop" DragOver="Column_DragOver"
+                             SelectedItem="{Binding SelectedOrder}"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                                        CornerRadius="4" Padding="8" Margin="0,0,0,6"
+                                        PreviewMouseLeftButtonDown="Card_MouseDown"
+                                        PreviewMouseMove="Card_MouseMove" Tag="{Binding}">
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Cancel order"
+                                                      Command="{Binding DataContext.CancelOrderCommand, Source={x:Reference OrdersRoot}}"
+                                                      CommandParameter="{Binding}"/>
+                                            <MenuItem Header="Delete order…"
+                                                      Command="{Binding DataContext.DeleteOrderCommand, Source={x:Reference OrdersRoot}}"
+                                                      CommandParameter="{Binding}"/>
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding OrderNumber, TargetNullValue='(no number)'}" FontWeight="SemiBold"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+
+                <DockPanel Margin="2">
+                    <TextBlock DockPanel.Dock="Top" Text="Completed" FontWeight="Bold" Margin="4"/>
+                    <ListBox ItemsSource="{Binding CompletedOrders}" AllowDrop="True"
+                             Tag="Completed" Drop="Column_Drop" DragOver="Column_DragOver"
+                             SelectedItem="{Binding SelectedOrder}"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                                        CornerRadius="4" Padding="8" Margin="0,0,0,6"
+                                        PreviewMouseLeftButtonDown="Card_MouseDown"
+                                        PreviewMouseMove="Card_MouseMove" Tag="{Binding}">
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Cancel order"
+                                                      Command="{Binding DataContext.CancelOrderCommand, Source={x:Reference OrdersRoot}}"
+                                                      CommandParameter="{Binding}"/>
+                                            <MenuItem Header="Delete order…"
+                                                      Command="{Binding DataContext.DeleteOrderCommand, Source={x:Reference OrdersRoot}}"
+                                                      CommandParameter="{Binding}"/>
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding OrderNumber, TargetNullValue='(no number)'}" FontWeight="SemiBold"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </UniformGrid>
         </DockPanel>
 
         <!-- Editor -->
@@ -44,7 +182,7 @@
                    Visibility="{Binding SelectedOrder, Converter={conv:NullToVisibilityConverter}}">
 
             <!-- Header fields -->
-            <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Grid DockPanel.Dock="Top" Margin="0,0,0,8" IsEnabled="{Binding IsEditable}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
@@ -82,17 +220,9 @@
                          Text="{Binding SelectedOrder.ShippingChargedToBuyer, UpdateSourceTrigger=PropertyChanged, StringFormat=F2}"/>
             </Grid>
 
-            <!-- Status buttons + total + status message -->
+            <!-- Save/Receipt/Export + total + status message -->
             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
                 <Button Content="Save" Command="{Binding SaveOrderCommand}" Padding="12,4" Margin="0,0,8,0"/>
-                <Button Content="Pack" Command="{Binding SetStatusCommand}"
-                        CommandParameter="{x:Static models:OrderStatus.Packed}" Padding="12,4" Margin="0,0,8,0"/>
-                <Button Content="Ship" Command="{Binding SetStatusCommand}"
-                        CommandParameter="{x:Static models:OrderStatus.Shipped}" Padding="12,4" Margin="0,0,8,0"/>
-                <Button Content="Complete" Command="{Binding SetStatusCommand}"
-                        CommandParameter="{x:Static models:OrderStatus.Completed}" Padding="12,4" Margin="0,0,8,0"/>
-                <Button Content="Cancel" Command="{Binding SetStatusCommand}"
-                        CommandParameter="{x:Static models:OrderStatus.Cancelled}" Padding="12,4" Margin="0,0,16,0"/>
                 <Button Content="Print Receipt" Command="{Binding PrintReceiptCommand}" Padding="12,4" Margin="0,0,8,0"/>
                 <Button Content="Export PDF" Command="{Binding ExportPdfCommand}" Padding="12,4" Margin="0,0,16,0"/>
                 <TextBlock Text="{Binding OrderTotal, StringFormat=C}" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,16,0"/>
@@ -104,7 +234,7 @@
             </StackPanel>
 
             <!-- Add-card row -->
-            <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0" LastChildFill="True">
+            <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0" LastChildFill="True" IsEnabled="{Binding IsEditable}">
                 <Button DockPanel.Dock="Right" Content="Add" Command="{Binding AddCardCommand}" Padding="12,4" Margin="8,0,0,0"/>
                 <ComboBox ItemsSource="{Binding AvailableCards}"
                           SelectedItem="{Binding SelectedAvailableCard}"
@@ -127,6 +257,7 @@
 
             <!-- Lines -->
             <DataGrid ItemsSource="{Binding Lines}" AutoGenerateColumns="False" IsReadOnly="True"
+                      IsEnabled="{Binding IsEditable}"
                       Style="{StaticResource {x:Type DataGrid}}">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Name" Binding="{Binding NameSnapshot}" Width="*"/>
