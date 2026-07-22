@@ -352,17 +352,24 @@ public sealed class RiftboundService : ICardGameService, IDisposable
         foreach (var group in groupList)
         {
             ct.ThrowIfCancellationRequested();
-            var prices = await client.GetFromJsonAsync<TcgCsvPricesResponse>(
-                $"{TcgCsvBaseUrl}/tcgplayer/{RiftboundCategoryId}/{group.GroupId}/prices", TcgCsvJsonOptions, ct);
-
-            foreach (var row in prices?.Results ?? [])
+            try
             {
-                map.TryGetValue(row.ProductId, out var entry);
-                if (string.Equals(row.SubTypeName, "Foil", StringComparison.OrdinalIgnoreCase))
-                    entry.Foil = row.MarketPrice;
-                else if (string.Equals(row.SubTypeName, "Normal", StringComparison.OrdinalIgnoreCase))
-                    entry.Normal = row.MarketPrice;
-                map[row.ProductId] = entry;
+                var prices = await client.GetFromJsonAsync<TcgCsvPricesResponse>(
+                    $"{TcgCsvBaseUrl}/tcgplayer/{RiftboundCategoryId}/{group.GroupId}/prices", TcgCsvJsonOptions, ct);
+
+                foreach (var row in prices?.Results ?? [])
+                {
+                    map.TryGetValue(row.ProductId, out var entry);
+                    if (string.Equals(row.SubTypeName, "Foil", StringComparison.OrdinalIgnoreCase))
+                        entry.Foil = row.MarketPrice;
+                    else if (string.Equals(row.SubTypeName, "Normal", StringComparison.OrdinalIgnoreCase))
+                        entry.Normal = row.MarketPrice;
+                    map[row.ProductId] = entry;
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Failed to fetch Riftbound prices for group {GroupId}; skipping", group.GroupId);
             }
 
             done++;

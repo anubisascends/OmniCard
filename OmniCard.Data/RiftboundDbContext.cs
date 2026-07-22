@@ -69,6 +69,10 @@ public class RiftboundDbContext : DbContext
         card.HasIndex(c => c.CollectorNumber);
         card.HasIndex(c => c.ImageHash);
         card.HasIndex(c => c.EdgeHash);
+        card.Property(c => c.PriceUpdatedAt)
+            .HasConversion(
+                v => v,
+                v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v);
 
         modelBuilder.Entity<HashCorrection>(e =>
         {

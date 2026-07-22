@@ -37,11 +37,13 @@ public class RiftboundSchemaTests : IDisposable
             PriceUpdatedAt = new DateTime(2026, 7, 22, 0, 0, 0, DateTimeKind.Utc),
         });
         ctx.SaveChanges();
+        ctx.ChangeTracker.Clear(); // force a genuine reload from storage, not the identity-map instance
 
         var loaded = ctx.Cards.Single(c => c.Id == "c1");
         Assert.Equal(1.23m, loaded.MarketPrice);
         Assert.Equal(4.56m, loaded.FoilMarketPrice);
         Assert.Equal(new DateTime(2026, 7, 22, 0, 0, 0, DateTimeKind.Utc), loaded.PriceUpdatedAt);
+        Assert.Equal(DateTimeKind.Utc, loaded.PriceUpdatedAt!.Value.Kind);
     }
 
     [Fact]

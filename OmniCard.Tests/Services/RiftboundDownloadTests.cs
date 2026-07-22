@@ -233,6 +233,51 @@ public class RiftboundDownloadTests : IDisposable
         Assert.Null(c4.FoilMarketPrice);
     }
 
+    // Two groups: group 1's /prices endpoint fails (simulated 500/non-OK), group 2's succeeds.
+    // A working price refresh must not abort on the first group's failure — it should log
+    // and continue, still applying prices from the second (good) group.
+    private const string TwoGroupsJson = """
+    {"results":[{"groupId":1,"name":"BadSet","abbreviation":"BAD"},{"groupId":2,"name":"GoodSet","abbreviation":"GOOD"}],"success":true,"errors":[]}
+    """;
+
+    private const string GoodGroupPricesJson = """
+    {"results":[
+      {"productId":700001,"lowPrice":4.0,"midPrice":5.0,"highPrice":6.0,"marketPrice":5.25,"directLowPrice":null,"subTypeName":"Normal"}
+    ],"success":true,"errors":[]}
+    """;
+
+    [Fact]
+    public async Task UpdatePrices_OneGroupFails_StillAppliesOtherGroupPrices()
+    {
+        using (var seed = _factory.CreateDbContext())
+        {
+            seed.Cards.Add(new RiftboundCard { Id = "good", Name = "GoodCard", SetId = "GOOD", TcgplayerId = "700001" });
+            seed.SaveChanges();
+        }
+
+        var handler = new RoutingHandler(uri =>
+        {
+            if (uri.Contains("/groups")) return TwoGroupsJson;
+            if (uri.Contains("/89/1/prices")) return null; // simulated failure -> NotFound -> throws on GetFromJsonAsync
+            if (uri.Contains("/89/2/prices")) return GoodGroupPricesJson;
+            return null;
+        });
+        var dataPath = new Moq.Mock<IDataPathService>();
+        dataPath.Setup(d => d.DataDirectory).Returns(_dataDir);
+        var svc = new RiftboundService(
+            new FakeHttpClientFactory(handler),
+            _factory,
+            new PerceptualHashService(NullLogger<PerceptualHashService>.Instance),
+            dataPath.Object,
+            NullLogger<RiftboundService>.Instance);
+
+        await svc.UpdatePricesAsync();
+
+        using var ctx = _factory.CreateDbContext();
+        var good = ctx.Cards.Single(c => c.Id == "good");
+        Assert.Equal(5.25m, good.MarketPrice);
+    }
+
     [Fact]
     public void GetCurrentPrice_IsFoilAware_WithFallback()
     {
@@ -258,12 +303,19 @@ public class RiftboundDownloadTests : IDisposable
         Assert.Equal(1.50m, svc.GetCurrentPrice("both", isFoil: false));
         Assert.Equal(9.00m, svc.GetCurrentPrice("foilonly", isFoil: false));    // falls back to foil
         Assert.Equal(2.00m, svc.GetCurrentPrice("normalonly", isFoil: false));
+        Assert.Null(svc.GetCurrentPrice("none", isFoil: false));
 
-        // Bulk
+        // Bulk (foil requested)
         var prices = svc.GetCurrentPrices(new[] { "both", "foilonly", "none" }, isFoil: true);
         Assert.Equal(3.00m, prices["both"]);
         Assert.Equal(9.00m, prices["foilonly"]);
         Assert.False(prices.ContainsKey("none"));   // no value for either subtype
+
+        // Bulk (non-foil requested) — symmetric with the foil-direction assertion above.
+        var nonFoilPrices = svc.GetCurrentPrices(new[] { "both", "normalonly", "none" }, isFoil: false);
+        Assert.Equal(1.50m, nonFoilPrices["both"]);
+        Assert.Equal(2.00m, nonFoilPrices["normalonly"]);
+        Assert.False(nonFoilPrices.ContainsKey("none"));
     }
 
     private class RoutingHandler(Func<string, string?> route) : HttpMessageHandler
