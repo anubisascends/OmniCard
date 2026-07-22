@@ -16,4 +16,10 @@ public class Order
     public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ShippedAt { get; set; }
+
+    /// <summary>Buyer-paid item count from a TCGPlayer import (null for non-imported orders);
+    /// used for the order-editor reconciliation hint.</summary>
+    public int? ImportedItemCount { get; set; }
+    /// <summary>Buyer-paid product subtotal from a TCGPlayer import (null for non-imported orders).</summary>
+    public decimal? ImportedProductValue { get; set; }
 }

@@ -155,4 +155,32 @@ public class OrderServiceTests : IDisposable
             Assert.Equal(2.50m, line.UnitSalePrice);
         }
     }
+
+    [Fact]
+    public void Order_ImportedReconciliationFields_RoundTrip()
+    {
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            ctx.Customers.Add(new Customer { Id = 1, Name = "Ada" });
+            ctx.SaveChanges();
+            ctx.Orders.Add(new Order
+            {
+                CustomerId = 1,
+                Channel = SalesChannel.TcgPlayer,
+                Status = OrderStatus.Open,
+                OrderNumber = "TCG-1",
+                OrderDate = new DateTime(2026, 7, 17),
+                ImportedItemCount = 8,
+                ImportedProductValue = 320.00m,
+            });
+            ctx.SaveChanges();
+        }
+
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            var order = ctx.Orders.Single(o => o.OrderNumber == "TCG-1");
+            Assert.Equal(8, order.ImportedItemCount);
+            Assert.Equal(320.00m, order.ImportedProductValue);
+        }
+    }
 }

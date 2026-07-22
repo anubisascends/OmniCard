@@ -99,6 +99,12 @@ public static class UnifiedMigrationService
             cmd.ExecuteNonQuery();
         }
 
+        if (TableExists(cmd, "Orders"))
+        {
+            AddColumnIfMissing(cmd, "Orders", "ImportedItemCount", "INTEGER");
+            AddColumnIfMissing(cmd, "Orders", "ImportedProductValue", "TEXT");
+        }
+
         // New tables added to OmniCardDbContext after Phase 1.
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS StorageContainers (
@@ -204,7 +210,9 @@ public static class UnifiedMigrationService
                 MarketplaceFees TEXT NOT NULL DEFAULT '0',
                 Notes TEXT,
                 CreatedAt TEXT NOT NULL,
-                ShippedAt TEXT
+                ShippedAt TEXT,
+                ImportedItemCount INTEGER,
+                ImportedProductValue TEXT
             )
             """;
         cmd.ExecuteNonQuery();
