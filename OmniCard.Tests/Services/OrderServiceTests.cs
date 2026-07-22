@@ -54,6 +54,24 @@ public class OrderServiceTests : IDisposable
     }
 
     [Fact]
+    public void GetOrderLineSummaries_AggregatesItemCountAndTotal_PerOrder_AndOmitsEmptyOrders()
+    {
+        var (customerId, lotId) = SeedCustomerAndLot();
+        var svc = OrderSvc();
+        var order = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "SUM-1");
+        svc.AddLine(order.Id, lotId, 3.50m);   // qty 1
+        svc.AddLine(order.Id, lotId, 2.00m);   // qty 1
+        var empty = svc.CreateOrder(customerId, SalesChannel.Manual, "SUM-EMPTY");
+
+        var summaries = svc.GetOrderLineSummaries();
+
+        var s = Assert.Single(summaries, x => x.OrderId == order.Id);
+        Assert.Equal(2, s.ItemCount);
+        Assert.Equal(5.50m, s.Total);
+        Assert.DoesNotContain(summaries, x => x.OrderId == empty.Id);
+    }
+
+    [Fact]
     public void CreateOrder_AddLine_SnapshotsCardAndRemoveLine()
     {
         var (customerId, lotId) = SeedCustomerAndLot();

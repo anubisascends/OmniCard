@@ -7,6 +7,10 @@ public interface IOrderService
     List<Order> GetOrders();
     Order? GetOrder(int id);
     List<OrderLine> GetLines(int orderId);
+
+    /// <summary>Per-order line aggregates (item count + total) for kanban card display,
+    /// keyed implicitly by <see cref="OrderLineSummary.OrderId"/>. Orders with no lines are absent.</summary>
+    List<OrderLineSummary> GetOrderLineSummaries();
     Order CreateOrder(int customerId, SalesChannel channel, string? orderNumber);
     void UpdateOrder(Order order);
     OrderLine AddLine(int orderId, int lotId, decimal unitSalePrice);

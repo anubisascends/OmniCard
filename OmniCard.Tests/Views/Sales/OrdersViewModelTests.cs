@@ -34,6 +34,7 @@ public class OrdersViewModelTests
         out Mock<IListingService> listingService)
     {
         orderService = new Mock<IOrderService>();
+        orderService.Setup(s => s.GetOrderLineSummaries()).Returns(new List<OrderLineSummary>());
         customerService = new Mock<ICustomerService>();
         listingService = new Mock<IListingService>();
         return new OrdersViewModel(
@@ -49,6 +50,7 @@ public class OrdersViewModelTests
         out Mock<IDialogService> dialogService)
     {
         orderService = new Mock<IOrderService>();
+        orderService.Setup(s => s.GetOrderLineSummaries()).Returns(new List<OrderLineSummary>());
         customerService = new Mock<ICustomerService>();
         listingService = new Mock<IListingService>();
         dialogService = new Mock<IDialogService>();

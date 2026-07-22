@@ -27,6 +27,19 @@ public class OrderService(
         return ctx.OrderLines.AsNoTracking().Where(l => l.OrderId == orderId).ToList();
     }
 
+    public List<OrderLineSummary> GetOrderLineSummaries()
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        // Aggregate client-side: SQLite stores decimal as TEXT, so SUM(decimal) can't be
+        // translated server-side. Volumes (order lines) are small.
+        return ctx.OrderLines.AsNoTracking()
+            .Select(l => new { l.OrderId, l.Quantity, l.UnitSalePrice })
+            .AsEnumerable()
+            .GroupBy(l => l.OrderId)
+            .Select(g => new OrderLineSummary(g.Key, g.Sum(l => l.Quantity), g.Sum(l => l.Quantity * l.UnitSalePrice)))
+            .ToList();
+    }
+
     public Order CreateOrder(int customerId, SalesChannel channel, string? orderNumber)
     {
         using var ctx = dbContextFactory.CreateDbContext();

@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace OmniCard.Models;
 
 public class Order
@@ -22,4 +24,13 @@ public class Order
     public int? ImportedItemCount { get; set; }
     /// <summary>Buyer-paid product subtotal from a TCGPlayer import (null for non-imported orders).</summary>
     public decimal? ImportedProductValue { get; set; }
+
+    // ── Display-only fields (not persisted) hydrated for the kanban cards in OrdersViewModel.Load ──
+
+    /// <summary>Customer name, resolved for card display.</summary>
+    [NotMapped] public string? CustomerNameDisplay { get; set; }
+    /// <summary>Sum of line quantities on this order (card display).</summary>
+    [NotMapped] public int LineItemCount { get; set; }
+    /// <summary>Sum of line (qty × unit price) on this order (card display).</summary>
+    [NotMapped] public decimal LineTotal { get; set; }
 }

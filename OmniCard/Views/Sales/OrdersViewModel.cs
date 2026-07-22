@@ -71,8 +71,24 @@ public partial class OrdersViewModel(
         Orders.Clear();
         CreatedOrders.Clear(); PackedOrders.Clear(); ShippedOrders.Clear();
         CompletedOrders.Clear(); CancelledOrders.Clear();
+
+        Customers.Clear();
+        foreach (var c in customerService.GetAll()) Customers.Add(c);
+
+        // Hydrate the display-only card fields (customer name + line count/total) so each
+        // kanban card can show them without loading lines per order.
+        var customerNames = Customers.ToDictionary(c => c.Id, c => c.Name);
+        var summaries = orderService.GetOrderLineSummaries().ToDictionary(s => s.OrderId);
+
         foreach (var o in orderService.GetOrders())
         {
+            o.CustomerNameDisplay = customerNames.GetValueOrDefault(o.CustomerId);
+            if (summaries.TryGetValue(o.Id, out var s))
+            {
+                o.LineItemCount = s.ItemCount;
+                o.LineTotal = s.Total;
+            }
+
             Orders.Add(o);
             (o.Status switch
             {
@@ -83,8 +99,7 @@ public partial class OrdersViewModel(
                 _ => CancelledOrders,
             }).Add(o);
         }
-        Customers.Clear();
-        foreach (var c in customerService.GetAll()) Customers.Add(c);
+
         AvailableCards.Clear();
         foreach (var a in listingService.GetActiveListings()) AvailableCards.Add(a);
     }
