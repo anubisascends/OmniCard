@@ -131,4 +131,19 @@ public class OrderService(
             ctx.SaveChanges();
         }
     }
+
+    public void DeleteOrder(int orderId)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var order = ctx.Orders.FirstOrDefault(o => o.Id == orderId);
+        if (order is null) return;
+        if (order.Status is OrderStatus.Shipped or OrderStatus.Completed)
+            throw new InvalidOperationException(
+                $"Can't delete a {order.Status} order (its sale is recorded and inventory removed).");
+
+        var lines = ctx.OrderLines.Where(l => l.OrderId == orderId).ToList();
+        ctx.OrderLines.RemoveRange(lines);
+        ctx.Orders.Remove(order);
+        ctx.SaveChanges();
+    }
 }

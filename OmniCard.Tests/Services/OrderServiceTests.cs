@@ -183,4 +183,38 @@ public class OrderServiceTests : IDisposable
             Assert.Equal(320.00m, order.ImportedProductValue);
         }
     }
+
+    [Fact]
+    public void DeleteOrder_RemovesOrderAndLines_WhenPreShip()
+    {
+        var (customerId, lotId) = SeedCustomerAndLot();
+        var svc = OrderSvc();
+        var order = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "DEL-1");
+        svc.AddLine(order.Id, lotId, 3.50m);
+
+        svc.DeleteOrder(order.Id);
+
+        Assert.Null(svc.GetOrder(order.Id));
+        Assert.Empty(svc.GetLines(order.Id));
+    }
+
+    [Fact]
+    public void DeleteOrder_Throws_WhenShippedOrCompleted()
+    {
+        var (customerId, lotId) = SeedCustomerAndLot();
+        var svc = OrderSvc();
+        var order = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "DEL-2");
+        svc.AddLine(order.Id, lotId, 3.50m);
+        svc.SetStatus(order.Id, OrderStatus.Shipped);
+
+        Assert.Throws<InvalidOperationException>(() => svc.DeleteOrder(order.Id));
+        Assert.NotNull(svc.GetOrder(order.Id));
+    }
+
+    [Fact]
+    public void DeleteOrder_NoOp_WhenMissing()
+    {
+        var svc = OrderSvc();
+        svc.DeleteOrder(999999); // must not throw
+    }
 }
