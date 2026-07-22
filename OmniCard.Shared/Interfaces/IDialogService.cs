@@ -26,4 +26,5 @@ public interface IDialogService
     bool OpenUnitsDialog(Product product);
     void OpenMovementHistory();
     ListForSaleResult? PickListForSale(decimal suggestedPrice);
+    int ShowTcgOrderImportPreview(TcgOrderImportPreview preview);
 }

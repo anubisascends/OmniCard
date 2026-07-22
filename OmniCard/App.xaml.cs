@@ -172,6 +172,8 @@ public partial class App : Application
             services.AddTransient<EbayAuthViewModel>();
             services.AddTransient<CsvImportView>();
             services.AddTransient<CsvImportViewModel>();
+            services.AddTransient<Views.TcgOrderImport.TcgOrderImportView>();
+            services.AddTransient<Views.TcgOrderImport.TcgOrderImportViewModel>();
             services.AddTransient<SortFilterBuilderView>();
             services.AddTransient<SortFilterBuilderViewModel>();
             services.AddTransient<SetFilterBuilderView>();
