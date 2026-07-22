@@ -94,7 +94,7 @@
             <StackPanel Margin="4,0,4,8">
 
                 <!-- ============ FINANCIALS (scoped to Dashboard VM) ============ -->
-                <StackPanel DataContext="{Binding ViewModel.Dashboard}">
+                <StackPanel x:Name="FinancialsScope" DataContext="{Binding ViewModel.Dashboard}">
 
                     <!-- Summary tiles -->
                     <Grid>
@@ -188,7 +188,7 @@
                                             <MultiBinding Converter="{conv:ShareBarWidthConverter}" ConverterParameter="220">
                                                 <Binding Path="Value"/>
                                                 <Binding Path="DataContext.MarketByGameMax"
-                                                         RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
+                                                         ElementName="FinancialsScope"/>
                                             </MultiBinding>
                                         </Border.Width>
                                     </Border>
@@ -219,7 +219,7 @@
                                             <MultiBinding Converter="{conv:ShareBarWidthConverter}" ConverterParameter="220">
                                                 <Binding Path="Value"/>
                                                 <Binding Path="DataContext.MarketByCategoryMax"
-                                                         RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
+                                                         ElementName="FinancialsScope"/>
                                             </MultiBinding>
                                         </Border.Width>
                                     </Border>
@@ -252,7 +252,7 @@
                                             <MultiBinding Converter="{conv:ShareBarWidthConverter}" ConverterParameter="220">
                                                 <Binding Path="Value"/>
                                                 <Binding Path="DataContext.RealizedProfitByGameMax"
-                                                         RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
+                                                         ElementName="FinancialsScope"/>
                                             </MultiBinding>
                                         </Border.Width>
                                     </Border>
@@ -297,7 +297,7 @@
                                                 <MultiBinding Converter="{conv:ShareBarWidthConverter}">
                                                     <Binding Path="Market"/>
                                                     <Binding Path="DataContext.TotalMarket"
-                                                             RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
+                                                             ElementName="FinancialsScope"/>
                                                 </MultiBinding>
                                             </Border.Width>
                                         </Border>
@@ -340,7 +340,7 @@
                                                 <MultiBinding Converter="{conv:ShareBarWidthConverter}">
                                                     <Binding Path="Market"/>
                                                     <Binding Path="DataContext.TotalMarket"
-                                                             RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
+                                                             ElementName="FinancialsScope"/>
                                                 </MultiBinding>
                                             </Border.Width>
                                         </Border>
@@ -383,7 +383,7 @@
                                                 <MultiBinding Converter="{conv:ShareBarWidthConverter}">
                                                     <Binding Path="Market"/>
                                                     <Binding Path="DataContext.TotalMarket"
-                                                             RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
+                                                             ElementName="FinancialsScope"/>
                                                 </MultiBinding>
                                             </Border.Width>
                                         </Border>
