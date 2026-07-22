@@ -178,9 +178,9 @@ public sealed class CardService : ICardService
         buffer.Dispose();
 
         // Foil cards scan with a holographic color shift that corrupts the luminance pHash;
-        // compute a color-robust edge hash so matching can use it (One Piece only).
+        // compute a color-robust edge hash so matching can use it (One Piece, Riftbound).
         ulong? scanEdgeHash = null;
-        if (DefaultIsFoil && SelectedGame == CardGame.OnePiece)
+        if (DefaultIsFoil && (SelectedGame == CardGame.OnePiece || SelectedGame == CardGame.Riftbound))
         {
             scanEdgeHash = _hashService.ComputeEdgeHash(new MemoryStream(rawBytes));
         }
@@ -304,6 +304,24 @@ public sealed class CardService : ICardService
                             }
                         }
                     }
+                    else if (game == CardGame.Riftbound)
+                    {
+                        // Riftbound: detect "{SET}-{number}" for candidate lookup + pHash disambiguation
+                        var (collectorNumber, conf) = await _ocrService.DetectRiftboundCollectorNumberAsync(rawBytes);
+                        if (collectorNumber is not null && conf >= 0.5)
+                        {
+                            ocrResult = new OcrMatchResult { CollectorNumber = collectorNumber, CollectorNumberConfidence = conf };
+                            _logger.LogInformation("Riftbound collector detected: {Number} (confidence {Conf:F2})", collectorNumber, conf);
+                            var (ocrMatch, ocrGame) = FindBestMatch(capturedHash, scannedCard.ArtHashes, ocrResult, capturedSetFilter, null, scannedCard.ScanEdgeHash);
+                            if (ocrMatch is not null && (scannedCard.Match is null || ocrMatch.GameSpecificId != scannedCard.Match?.GameSpecificId))
+                            {
+                                scannedCard.Match = ocrMatch;
+                                scannedCard.Game = ocrGame;
+                                scannedCard.FlagReason = FlagReason.None;
+                                _logger.LogInformation("OCR matched to \"{CardName}\" ({SetCode} #{Number})", ocrMatch.Name, ocrMatch.SetCode, ocrMatch.CollectorNumber);
+                            }
+                        }
+                    }
                     else
                     {
                         // MTG: name recognition + symbol detection
@@ -362,7 +380,7 @@ public sealed class CardService : ICardService
                         rotatedStream.Position = 0;
                         var rotatedBytes = rotatedStream.ToArray();
 
-                        // Try OCR on rotated image for One Piece
+                        // Try OCR on rotated image for One Piece / Riftbound
                         OcrMatchResult? rotatedOcr = null;
                         if (game == CardGame.OnePiece)
                         {
@@ -370,10 +388,16 @@ public sealed class CardService : ICardService
                             if (cn is not null && cnConf >= 0.5)
                                 rotatedOcr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = cnConf };
                         }
+                        else if (game == CardGame.Riftbound)
+                        {
+                            var (cn, cnConf) = await _ocrService.DetectRiftboundCollectorNumberAsync(rotatedBytes);
+                            if (cn is not null && cnConf >= 0.5)
+                                rotatedOcr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = cnConf };
+                        }
 
-                        // Structure rotates too — recompute the edge hash on the rotated bytes for foil One Piece scans
+                        // Structure rotates too — recompute the edge hash on the rotated bytes for foil One Piece/Riftbound scans
                         ulong? rotatedEdgeHash = null;
-                        if (scannedCard.IsFoil && game == CardGame.OnePiece)
+                        if (scannedCard.IsFoil && (game == CardGame.OnePiece || game == CardGame.Riftbound))
                             rotatedEdgeHash = _hashService.ComputeEdgeHash(new MemoryStream(rotatedBytes));
 
                         var (rotatedMatch, rotatedGame) = FindBestMatch(rotatedHash, null, rotatedOcr, capturedSetFilter, null, rotatedEdgeHash);
