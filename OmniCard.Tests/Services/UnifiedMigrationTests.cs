@@ -850,6 +850,51 @@ public class UnifiedMigrationTests : IDisposable
         SqliteConnection.ClearAllPools();
     }
 
+    [Fact]
+    public void EnsureUnifiedSchema_RenamesOpenOrderStatus_ToCreated()
+    {
+        var dir = Path.Combine(_tempDir, "open-to-created");
+        Directory.CreateDirectory(dir);
+        var dbPath = Path.Combine(dir, "inventory.db");
+
+        using (var seed = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            seed.Open();
+            using var cmd = seed.CreateCommand();
+            // Pre-rename Orders table with an 'Open' row.
+            cmd.CommandText = """
+                CREATE TABLE Orders (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT, CustomerId INTEGER NOT NULL,
+                    Channel TEXT NOT NULL DEFAULT 'Manual', OrderNumber TEXT,
+                    OrderDate TEXT NOT NULL, Status TEXT NOT NULL DEFAULT 'Open',
+                    TrackingNumber TEXT, Carrier TEXT,
+                    ShippingChargedToBuyer TEXT NOT NULL DEFAULT '0',
+                    ShippingCost TEXT NOT NULL DEFAULT '0', MarketplaceFees TEXT NOT NULL DEFAULT '0',
+                    Notes TEXT, CreatedAt TEXT NOT NULL, ShippedAt TEXT);
+                INSERT INTO Orders (CustomerId, OrderDate, Status, ShippingChargedToBuyer, ShippingCost, MarketplaceFees, CreatedAt)
+                VALUES (1, '2026-07-17', 'Open', '0', '0', '0', '2026-07-17');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        UnifiedMigrationService.EnsureUnifiedSchema(dir, NullLogger.Instance);
+
+        using var verifyConn = new SqliteConnection($"Data Source={dbPath}");
+        verifyConn.Open();
+        using var verifyCmd = verifyConn.CreateCommand();
+        verifyCmd.CommandText = "SELECT COUNT(*) FROM Orders WHERE Status='Open'";
+        Assert.Equal(0L, (long)verifyCmd.ExecuteScalar()!);
+        verifyCmd.CommandText = "SELECT COUNT(*) FROM Orders WHERE Status='Created'";
+        Assert.Equal(1L, (long)verifyCmd.ExecuteScalar()!);
+
+        // Idempotent — running again must not throw or re-attempt the rename.
+        verifyConn.Dispose();
+        SqliteConnection.ClearAllPools();
+        UnifiedMigrationService.EnsureUnifiedSchema(dir, NullLogger.Instance);
+        SqliteConnection.ClearAllPools();
+    }
+
     private class UnifiedDbContextFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
         public OmniCardDbContext CreateDbContext() => new(options);

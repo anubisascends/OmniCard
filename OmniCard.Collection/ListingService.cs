@@ -183,7 +183,7 @@ public class ListingService(
             from line in ctx.OrderLines.AsNoTracking()
             join order in ctx.Orders.AsNoTracking() on line.OrderId equals order.Id
             where line.LotId != null
-                  && (order.Status == OrderStatus.Open || order.Status == OrderStatus.Packed)
+                  && (order.Status == OrderStatus.Created || order.Status == OrderStatus.Packed)
             select line.LotId!.Value
         ).ToHashSet();
 

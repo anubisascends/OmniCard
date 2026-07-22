@@ -35,7 +35,7 @@ public class OrderService(
             CustomerId = customerId,
             Channel = channel,
             OrderNumber = orderNumber,
-            Status = OrderStatus.Open,
+            Status = OrderStatus.Created,
             OrderDate = DateTime.UtcNow,
         };
         ctx.Orders.Add(order);

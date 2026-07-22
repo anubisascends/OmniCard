@@ -95,7 +95,7 @@ public class TcgPlayerOrderImportService(IDbContextFactory<OmniCardDbContext> db
                 Channel = SalesChannel.TcgPlayer,
                 OrderNumber = row.OrderNumber,
                 OrderDate = row.OrderDate,
-                Status = OrderStatus.Open,
+                Status = OrderStatus.Created,
                 ShippingChargedToBuyer = row.ShippingFeePaid,
                 TrackingNumber = row.TrackingNumber,
                 Carrier = row.Carrier,

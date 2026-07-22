@@ -454,7 +454,7 @@ public class ListingServiceTests : IDisposable
 
         using (var ctx = new OmniCardDbContext(_opts))
         {
-            var order = new Order { CustomerId = 1, Status = OrderStatus.Open, OrderNumber = "ORD-1" };
+            var order = new Order { CustomerId = 1, Status = OrderStatus.Created, OrderNumber = "ORD-1" };
             ctx.Orders.Add(order);
             ctx.SaveChanges();
             ctx.OrderLines.Add(new OrderLine

@@ -1,3 +1,3 @@
 namespace OmniCard.Models;
 
-public enum OrderStatus { Open, Packed, Shipped, Completed, Cancelled }
+public enum OrderStatus { Created, Packed, Shipped, Completed, Cancelled }

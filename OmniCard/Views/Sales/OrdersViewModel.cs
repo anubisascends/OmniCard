@@ -93,7 +93,7 @@ public partial class OrdersViewModel(
     public void AddCard()
     {
         if (SelectedOrder is null || SelectedAvailableCard is null) return;
-        if (SelectedOrder.Status != OrderStatus.Open) { StatusMessage = "Can only edit an Open order."; return; }
+        if (SelectedOrder.Status != OrderStatus.Created) { StatusMessage = "Can only edit a Created order."; return; }
         orderService.AddLine(SelectedOrder.Id, SelectedAvailableCard.LotId, SelectedAvailableCard.ListedPrice);
         RefreshLines();
         AvailableCards.Remove(SelectedAvailableCard);
@@ -103,7 +103,7 @@ public partial class OrdersViewModel(
     public void RemoveLine(OrderLine? line)
     {
         if (SelectedOrder is null || line is null) return;
-        if (SelectedOrder.Status != OrderStatus.Open) { StatusMessage = "Can only edit an Open order."; return; }
+        if (SelectedOrder.Status != OrderStatus.Created) { StatusMessage = "Can only edit a Created order."; return; }
         orderService.RemoveLine(line.Id);
         RefreshLines();
     }
@@ -214,16 +214,16 @@ public partial class OrdersViewModel(
     }
 
     /// <summary>Enforces a forward-only order status flow so inventory/sale accounting
-    /// (which only runs on the Open/Packed → Shipped transition) can't be skipped by
+    /// (which only runs on the Created/Packed → Shipped transition) can't be skipped by
     /// jumping straight to Completed, and so Shipped/Completed orders can't be cancelled
     /// (no restock support).</summary>
     private static bool IsValidTransition(OrderStatus from, OrderStatus to) => to switch
     {
-        OrderStatus.Packed => from is OrderStatus.Open,
-        OrderStatus.Shipped => from is OrderStatus.Open or OrderStatus.Packed,
+        OrderStatus.Packed => from is OrderStatus.Created,
+        OrderStatus.Shipped => from is OrderStatus.Created or OrderStatus.Packed,
         OrderStatus.Completed => from is OrderStatus.Shipped,
-        OrderStatus.Cancelled => from is OrderStatus.Open or OrderStatus.Packed,
-        OrderStatus.Open => false,
+        OrderStatus.Cancelled => from is OrderStatus.Created or OrderStatus.Packed,
+        OrderStatus.Created => false,
         _ => false,
     };
 

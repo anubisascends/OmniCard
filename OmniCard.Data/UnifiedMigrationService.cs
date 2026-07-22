@@ -103,6 +103,9 @@ public static class UnifiedMigrationService
         {
             AddColumnIfMissing(cmd, "Orders", "ImportedItemCount", "INTEGER");
             AddColumnIfMissing(cmd, "Orders", "ImportedProductValue", "TEXT");
+
+            cmd.CommandText = "UPDATE Orders SET Status = 'Created' WHERE Status = 'Open'";
+            cmd.ExecuteNonQuery();
         }
 
         // New tables added to OmniCardDbContext after Phase 1.
@@ -203,7 +206,7 @@ public static class UnifiedMigrationService
                 Channel TEXT NOT NULL DEFAULT 'Manual',
                 OrderNumber TEXT,
                 OrderDate TEXT NOT NULL,
-                Status TEXT NOT NULL DEFAULT 'Open',
+                Status TEXT NOT NULL DEFAULT 'Created',
                 TrackingNumber TEXT, Carrier TEXT,
                 ShippingChargedToBuyer TEXT NOT NULL DEFAULT '0',
                 ShippingCost TEXT NOT NULL DEFAULT '0',

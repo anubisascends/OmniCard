@@ -333,7 +333,7 @@ public class AnalyticsServiceTests : IDisposable
         SeedOrder(ctx, customer.Id, OrderStatus.Shipped, DateTime.UtcNow, marketplaceFees: 1.5m, shippingCost: 0.8m, shippingChargedToBuyer: 1.0m);
         SeedOrder(ctx, customer.Id, OrderStatus.Completed, DateTime.UtcNow, marketplaceFees: 2.0m, shippingCost: 1.2m, shippingChargedToBuyer: 1.5m);
         // Excluded: not shipped/completed, or missing a ShippedAt.
-        SeedOrder(ctx, customer.Id, OrderStatus.Open, null, marketplaceFees: 99m, shippingCost: 99m, shippingChargedToBuyer: 99m);
+        SeedOrder(ctx, customer.Id, OrderStatus.Created, null, marketplaceFees: 99m, shippingCost: 99m, shippingChargedToBuyer: 99m);
         SeedOrder(ctx, customer.Id, OrderStatus.Shipped, null, marketplaceFees: 99m, shippingCost: 99m, shippingChargedToBuyer: 99m);
 
         var service = CreateService();

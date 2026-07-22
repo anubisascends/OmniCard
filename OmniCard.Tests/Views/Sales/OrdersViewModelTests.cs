@@ -10,7 +10,7 @@ public class OrdersViewModelTests
 {
     private static Customer Cust(int id, string name) => new() { Id = id, Name = name };
 
-    private static Order NewOrder(int id, int customerId, OrderStatus status = OrderStatus.Open) =>
+    private static Order NewOrder(int id, int customerId, OrderStatus status = OrderStatus.Created) =>
         new() { Id = id, CustomerId = customerId, Status = status, OrderNumber = $"ORD-{id}" };
 
     private static OrderLine Line(int id, int orderId, decimal price, int qty = 1) =>
@@ -93,7 +93,7 @@ public class OrdersViewModelTests
     public void AddCard_OnOpenOrder_AddsLine_RefreshesLines_AndRemovesFromAvailable()
     {
         var vm = MakeVm(out var orderService, out _, out _);
-        var order = NewOrder(1, 1, OrderStatus.Open);
+        var order = NewOrder(1, 1, OrderStatus.Created);
         var listing = Listing(10, 5.00m);
 
         orderService.Setup(s => s.AddLine(1, 10, 5.00m)).Returns(Line(1, 1, 5.00m));
@@ -126,14 +126,14 @@ public class OrdersViewModelTests
         vm.AddCard();
 
         orderService.Verify(s => s.AddLine(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<decimal>()), Times.Never);
-        Assert.Equal("Can only edit an Open order.", vm.StatusMessage);
+        Assert.Equal("Can only edit a Created order.", vm.StatusMessage);
     }
 
     [Fact]
     public void RemoveLine_OnOpenOrder_RemovesLine_AndRefreshes()
     {
         var vm = MakeVm(out var orderService, out _, out _);
-        var order = NewOrder(1, 1, OrderStatus.Open);
+        var order = NewOrder(1, 1, OrderStatus.Created);
         var line = Line(1, 1, 5.00m);
 
         orderService.SetupSequence(s => s.GetLines(1))
@@ -161,14 +161,14 @@ public class OrdersViewModelTests
         vm.RemoveLine(line);
 
         orderService.Verify(s => s.RemoveLine(It.IsAny<int>()), Times.Never);
-        Assert.Equal("Can only edit an Open order.", vm.StatusMessage);
+        Assert.Equal("Can only edit a Created order.", vm.StatusMessage);
     }
 
     [Fact]
     public void SetStatus_CallsService_ThenReloadsAndReselectsOrderById()
     {
         var vm = MakeVm(out var orderService, out var customerService, out var listingService);
-        var order = NewOrder(1, 1, OrderStatus.Open);
+        var order = NewOrder(1, 1, OrderStatus.Created);
 
         customerService.Setup(s => s.GetAll()).Returns([]);
         listingService.Setup(s => s.GetActiveListings(null)).Returns([]);
@@ -189,21 +189,21 @@ public class OrdersViewModelTests
     public void SetStatus_Completed_OnOpenOrder_DoesNotCallService_AndSetsStatusMessage()
     {
         var vm = MakeVm(out var orderService, out _, out _);
-        var order = NewOrder(1, 1, OrderStatus.Open);
+        var order = NewOrder(1, 1, OrderStatus.Created);
         orderService.Setup(s => s.GetLines(1)).Returns([]);
 
         vm.SelectedOrder = order;
         vm.SetStatus(OrderStatus.Completed);
 
         orderService.Verify(s => s.SetStatus(It.IsAny<int>(), It.IsAny<OrderStatus>()), Times.Never);
-        Assert.Equal("Can't mark Completed from Open.", vm.StatusMessage);
+        Assert.Equal("Can't mark Completed from Created.", vm.StatusMessage);
     }
 
     [Fact]
     public void SetStatus_Shipped_OnOpenOrder_CallsService()
     {
         var vm = MakeVm(out var orderService, out var customerService, out var listingService);
-        var order = NewOrder(1, 1, OrderStatus.Open);
+        var order = NewOrder(1, 1, OrderStatus.Created);
 
         customerService.Setup(s => s.GetAll()).Returns([]);
         listingService.Setup(s => s.GetActiveListings(null)).Returns([]);

@@ -87,7 +87,7 @@ public class TcgPlayerOrderImportServiceTests : IDisposable
         using (var ctx = new OmniCardDbContext(_opts))
         {
             ctx.Customers.Add(new Customer { Id = 5, Name = "X" });
-            ctx.Orders.Add(new Order { CustomerId = 5, OrderNumber = "ORD-DUP", OrderDate = DateTime.UtcNow, Status = OrderStatus.Open });
+            ctx.Orders.Add(new Order { CustomerId = 5, OrderNumber = "ORD-DUP", OrderDate = DateTime.UtcNow, Status = OrderStatus.Created });
             ctx.SaveChanges();
         }
         var preview = Svc().PreviewImport(WriteCsv(Row("ORD-DUP", "Tad", "Cutright", "98391")));
@@ -109,7 +109,7 @@ public class TcgPlayerOrderImportServiceTests : IDisposable
         {
             var order = ctx.Orders.Single(o => o.OrderNumber == "ORD-100");
             Assert.Equal(SalesChannel.TcgPlayer, order.Channel);
-            Assert.Equal(OrderStatus.Open, order.Status);
+            Assert.Equal(OrderStatus.Created, order.Status);
             Assert.Equal(19.99m, order.ShippingChargedToBuyer);
             Assert.Equal(8, order.ImportedItemCount);
             Assert.Equal(320.00m, order.ImportedProductValue);

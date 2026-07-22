@@ -126,7 +126,7 @@ public class OrderServiceTests : IDisposable
                 CustomerId = cust.Id,
                 Channel = SalesChannel.TcgPlayer,
                 OrderNumber = "TCG-1",
-                Status = OrderStatus.Open,
+                Status = OrderStatus.Created,
                 MarketplaceFees = 1.10m,
                 ShippingCost = 0.63m,
                 ShippingChargedToBuyer = 1.25m,
@@ -148,7 +148,7 @@ public class OrderServiceTests : IDisposable
         using (var ctx = new OmniCardDbContext(_opts))
         {
             var order = Assert.Single(ctx.Orders.ToList());
-            Assert.Equal(OrderStatus.Open, order.Status);
+            Assert.Equal(OrderStatus.Created, order.Status);
             Assert.Equal(1.10m, order.MarketplaceFees);
             var line = Assert.Single(ctx.OrderLines.ToList());
             Assert.Equal("Sol Ring", line.NameSnapshot);
@@ -167,7 +167,7 @@ public class OrderServiceTests : IDisposable
             {
                 CustomerId = 1,
                 Channel = SalesChannel.TcgPlayer,
-                Status = OrderStatus.Open,
+                Status = OrderStatus.Created,
                 OrderNumber = "TCG-1",
                 OrderDate = new DateTime(2026, 7, 17),
                 ImportedItemCount = 8,
