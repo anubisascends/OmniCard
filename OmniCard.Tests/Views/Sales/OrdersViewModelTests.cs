@@ -42,6 +42,22 @@ public class OrdersViewModelTests
             Mock.Of<ITcgPlayerOrderImportService>(), Mock.Of<IDialogService>());
     }
 
+    private static OrdersViewModel MakeVm(
+        out Mock<IOrderService> orderService,
+        out Mock<ICustomerService> customerService,
+        out Mock<IListingService> listingService,
+        out Mock<IDialogService> dialogService)
+    {
+        orderService = new Mock<IOrderService>();
+        customerService = new Mock<ICustomerService>();
+        listingService = new Mock<IListingService>();
+        dialogService = new Mock<IDialogService>();
+        return new OrdersViewModel(
+            orderService.Object, customerService.Object, listingService.Object,
+            new FakeReceiptService(), new FakeReceiptPdfExporter(),
+            Mock.Of<ITcgPlayerOrderImportService>(), dialogService.Object);
+    }
+
     [Fact]
     public void Load_PopulatesOrdersCustomersAndAvailableCards()
     {
@@ -310,13 +326,14 @@ public class OrdersViewModelTests
     [Fact]
     public void DeleteOrder_OnCreatedOrder_CallsService_AndClearsSelectionIfSelected()
     {
-        var vm = MakeVm(out var orderService, out var customerService, out var listingService);
+        var vm = MakeVm(out var orderService, out var customerService, out var listingService, out var dialogService);
         var order = NewOrder(1, 1, OrderStatus.Created);
 
         customerService.Setup(s => s.GetAll()).Returns([]);
         listingService.Setup(s => s.GetActiveListings(null)).Returns([]);
         orderService.Setup(s => s.GetOrders()).Returns([]);
         orderService.Setup(s => s.GetLines(1)).Returns([]);
+        dialogService.Setup(s => s.Confirm(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
 
         vm.SelectedOrder = order;
         vm.DeleteOrder(order);
@@ -324,6 +341,22 @@ public class OrdersViewModelTests
         orderService.Verify(s => s.DeleteOrder(1), Times.Once);
         Assert.Null(vm.SelectedOrder);
         Assert.Equal("Order deleted.", vm.StatusMessage);
+    }
+
+    [Fact]
+    public void DeleteOrder_WhenConfirmDeclined_DoesNotCallService_AndLeavesStateIntact()
+    {
+        var vm = MakeVm(out var orderService, out _, out _, out var dialogService);
+        var order = NewOrder(1, 1, OrderStatus.Created);
+        orderService.Setup(s => s.GetLines(1)).Returns([]);
+        dialogService.Setup(s => s.Confirm(It.IsAny<string>(), It.IsAny<string>())).Returns(false);
+
+        vm.SelectedOrder = order;
+        vm.DeleteOrder(order);
+
+        orderService.Verify(s => s.DeleteOrder(It.IsAny<int>()), Times.Never);
+        Assert.Equal(order, vm.SelectedOrder);
+        Assert.NotEqual("Order deleted.", vm.StatusMessage);
     }
 
     [Fact]
@@ -343,10 +376,11 @@ public class OrdersViewModelTests
     [Fact]
     public void DeleteOrder_WhenServiceThrows_SetsStatusMessage_AndDoesNotReload()
     {
-        var vm = MakeVm(out var orderService, out _, out _);
+        var vm = MakeVm(out var orderService, out _, out _, out var dialogService);
         var order = NewOrder(1, 1, OrderStatus.Created);
         orderService.Setup(s => s.GetLines(1)).Returns([]);
         orderService.Setup(s => s.DeleteOrder(1)).Throws(new InvalidOperationException("Can't delete a Shipped order (its sale is recorded and inventory removed)."));
+        dialogService.Setup(s => s.Confirm(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
 
         vm.SelectedOrder = order;
         vm.DeleteOrder(order);

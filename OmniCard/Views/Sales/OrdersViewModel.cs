@@ -176,6 +176,9 @@ public partial class OrdersViewModel(
             StatusMessage = $"Can't delete a {order.Status} order.";
             return;
         }
+        var label = order.OrderNumber ?? $"#{order.Id}";
+        if (!dialogService.Confirm($"Delete order {label} and its items? This can't be undone.", "Delete order"))
+            return;
         try
         {
             orderService.DeleteOrder(order.Id);

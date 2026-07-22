@@ -217,4 +217,24 @@ public class OrderServiceTests : IDisposable
         var svc = OrderSvc();
         svc.DeleteOrder(999999); // must not throw
     }
+
+    [Fact]
+    public void DeleteOrder_FreesLotBackIntoPicker_WhenPreShip()
+    {
+        var (customerId, lotId) = SeedCustomerAndLot();
+        var listing = new ListingService(new Factory(_opts), new StubSettings());
+        listing.ListForSale([lotId], SalesChannel.TcgPlayer, 3.50m, 1);
+
+        var svc = OrderSvc();
+        var order = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "DEL-3");
+        svc.AddLine(order.Id, lotId, 3.50m);
+
+        // Committed: the lot is on a Created order's line, so the picker must exclude it.
+        Assert.DoesNotContain(listing.GetActiveListings(), a => a.LotId == lotId);
+
+        svc.DeleteOrder(order.Id);
+
+        // Freed: deleting the pre-ship order releases the lot back into the picker.
+        Assert.Contains(listing.GetActiveListings(), a => a.LotId == lotId);
+    }
 }

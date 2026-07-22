@@ -27,4 +27,5 @@ public interface IDialogService
     void OpenMovementHistory();
     ListForSaleResult? PickListForSale(decimal suggestedPrice);
     int ShowTcgOrderImportPreview(TcgOrderImportPreview preview);
+    bool Confirm(string message, string title);
 }

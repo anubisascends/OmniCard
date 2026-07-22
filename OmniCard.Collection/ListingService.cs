@@ -174,11 +174,11 @@ public class ListingService(
     {
         using var ctx = dbContextFactory.CreateDbContext();
 
-        // A lot already sitting on an active (Open/Packed) order's line is "committed" and
+        // A lot already sitting on an active (Created/Packed) order's line is "committed" and
         // must not be offered again in the picker — otherwise it could be added to a second
         // order, and the second ship would silently drop it. Cancelled orders free the lot;
         // Shipped/Completed orders already flip the listing to Sold (excluded by
-        // ActiveStatuses below), so only Open/Packed need to be excluded here.
+        // ActiveStatuses below), so only Created/Packed need to be excluded here.
         var committedLotIds = (
             from line in ctx.OrderLines.AsNoTracking()
             join order in ctx.Orders.AsNoTracking() on line.OrderId equals order.Id

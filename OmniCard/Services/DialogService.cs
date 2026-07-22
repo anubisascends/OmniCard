@@ -232,4 +232,9 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         var result = wnd.ShowDialog();
         return result == true ? wnd.ViewModel.ImportedCount : 0;
     }
+
+    public bool Confirm(string message, string title)
+        => System.Windows.MessageBox.Show(message, title,
+               System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning)
+           == System.Windows.MessageBoxResult.Yes;
 }
