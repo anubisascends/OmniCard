@@ -51,6 +51,23 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     internal static readonly (double X, double Y, double W, double H) OptcgCollectorNumberRegion =
         (0.68, 0.925, 0.24, 0.055);
 
+    // Riftbound collector line — lower-LEFT: "{SET} • {n}/{total}" (e.g. "UNL • 150/219").
+    // Portrait cards (Units/Spells/Legends) vs landscape cards (Battlefields) place it
+    // differently, so we pick a region by the scanned card's aspect ratio.
+    internal static readonly (double X, double Y, double W, double H) RiftboundPortraitRegion =
+        (0.02, 0.945, 0.40, 0.05);
+    internal static readonly (double X, double Y, double W, double H) RiftboundLandscapeRegion =
+        (0.02, 0.93, 0.30, 0.06);
+
+    // Restrict OCR to characters that appear in a Riftbound collector line.
+    private const string RiftboundWhitelist = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789•·./- ";
+
+    // "{SET} [sep] {collector}/{total}". Captures set code + collector number; the /total is
+    // matched only to anchor the pattern and is discarded.
+    private static readonly System.Text.RegularExpressions.Regex RiftboundPattern =
+        new(@"([A-Za-z]{2,4})\s*[•·.\-]{0,2}\s*(\d{1,3})\s*/\s*\d{1,3}",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
     public Dictionary<string, ulong> SymbolHashes { get; set; } = [];
 
     public OcrMatchingService(IPerceptualHashService hashService, ILogger<OcrMatchingService> logger)
@@ -269,6 +286,51 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "OPTCG collector number detection failed");
+            return (null, 0);
+        }
+    }
+
+    // Extracts "{SET}-{collector}" from an OCR'd Riftbound collector line, or false if no match.
+    internal static bool TryExtractRiftboundNumber(string ocrText, out string? formatted)
+    {
+        formatted = null;
+        if (string.IsNullOrWhiteSpace(ocrText)) return false;
+        var m = RiftboundPattern.Match(ocrText);
+        if (!m.Success) return false;
+        formatted = $"{m.Groups[1].Value.ToUpperInvariant()}-{m.Groups[2].Value}";
+        return true;
+    }
+
+    public Task<(string? CollectorNumber, double Confidence)> DetectRiftboundCollectorNumberAsync(byte[] imageData)
+        => Task.Run(() => DetectRiftboundCollectorNumber(imageData));
+
+    private (string? CollectorNumber, double Confidence) DetectRiftboundCollectorNumber(byte[] imageData)
+    {
+        if (!_ocrAvailable) return (null, 0);
+        try
+        {
+            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            // Landscape cards (Battlefields) are wider than tall; portrait cards ~0.72 ratio.
+            var region = bitmap.Width > bitmap.Height ? RiftboundLandscapeRegion : RiftboundPortraitRegion;
+            var rect = ToPixelRect(region, bitmap.Width, bitmap.Height);
+            if (rect.Width < 10 || rect.Height < 5) return (null, 0);
+
+            var (text, confidence) = OcrCroppedRegion(bitmap, rect, PageSegMode.SingleLine, RiftboundWhitelist);
+            if (string.IsNullOrWhiteSpace(text)) return (null, 0);
+
+            if (TryExtractRiftboundNumber(text, out var formatted))
+            {
+                var reported = Math.Max(0.9, confidence);
+                _logger.LogInformation("Riftbound collector detected: {Number} (raw: {Raw}, ocrConf: {Conf:F2})",
+                    formatted, text, confidence);
+                return (formatted, reported);
+            }
+            _logger.LogDebug("Riftbound collector OCR text did not match pattern: {Text}", text);
+            return (null, 0);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Riftbound collector number detection failed");
             return (null, 0);
         }
     }
