@@ -41,6 +41,9 @@ public class RiftboundDbContext : DbContext
         // Reserved for future additive columns (see OptcgDbContext for the pattern).
         AddColumnIfMissing(conn, "EdgeHash INTEGER");
         AddColumnIfMissing(conn, "LocalImagePath TEXT");
+        AddColumnIfMissing(conn, "MarketPrice TEXT");
+        AddColumnIfMissing(conn, "FoilMarketPrice TEXT");
+        AddColumnIfMissing(conn, "PriceUpdatedAt TEXT");
     }
 
     private static void AddColumnIfMissing(System.Data.Common.DbConnection conn, string columnDef)
@@ -66,6 +69,10 @@ public class RiftboundDbContext : DbContext
         card.HasIndex(c => c.CollectorNumber);
         card.HasIndex(c => c.ImageHash);
         card.HasIndex(c => c.EdgeHash);
+        card.Property(c => c.PriceUpdatedAt)
+            .HasConversion(
+                v => v,
+                v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v);
 
         modelBuilder.Entity<HashCorrection>(e =>
         {

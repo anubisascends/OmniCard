@@ -18,6 +18,8 @@ public sealed class RiftboundService : ICardGameService, IDisposable
 {
     private const string ApiBaseUrl = "https://api.riftcodex.com";
     private const int CorrectionTrustBonus = 5;
+    private const string TcgCsvBaseUrl = "https://tcgcsv.com";
+    private const int RiftboundCategoryId = 89;
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IDbContextFactory<RiftboundDbContext> _dbContextFactory;
@@ -34,6 +36,13 @@ public sealed class RiftboundService : ICardGameService, IDisposable
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        NumberHandling = JsonNumberHandling.AllowReadingFromString
+    };
+
+    // TCGCSV returns camelCase JSON — do NOT reuse JsonOptions (SnakeCaseLower).
+    private static readonly JsonSerializerOptions TcgCsvJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         NumberHandling = JsonNumberHandling.AllowReadingFromString
     };
 
@@ -266,12 +275,109 @@ public sealed class RiftboundService : ICardGameService, IDisposable
         return allCards;
     }
 
-    // Riftcodex returns no prices; pricing is out of scope this pass.
-    public Task UpdatePricesAsync(IProgress<PriceUpdateProgress>? progress = null, CancellationToken ct = default)
+    public async Task UpdatePricesAsync(IProgress<PriceUpdateProgress>? progress = null, CancellationToken ct = default)
     {
-        _logger.LogInformation("Riftbound price refresh skipped — pricing is not wired for Riftbound yet");
-        progress?.Report(new PriceUpdateProgress(CardGame.Riftbound, null, 0, 0, "Riftbound pricing not available"));
-        return Task.CompletedTask;
+        await using (var ctx = _dbContextFactory.CreateDbContext())
+        {
+            if (!await ctx.Cards.AnyAsync(ct))
+            {
+                _logger.LogInformation("Skipping Riftbound price refresh: card database is empty (run a full data download first)");
+                return;
+            }
+        }
+
+        _logger.LogInformation("Starting Riftbound price-only refresh via TCGCSV");
+        var client = _httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("OmniCard/1.0");
+
+        var priceMap = await FetchTcgCsvPriceMapAsync(client, progress, ct);
+
+        await using var context = _dbContextFactory.CreateDbContext();
+        context.Database.EnsureCreated();
+
+        var now = DateTime.UtcNow;
+        var updated = 0;
+
+        // Only touch cards whose TcgplayerId parses and exists in the price map.
+        var allCards = await context.Cards
+            .Where(c => c.TcgplayerId != null)
+            .Select(c => new { c.Id, c.TcgplayerId })
+            .ToListAsync(ct);
+
+        var targets = allCards
+            .Select(c => (c.Id, Parsed: int.TryParse(c.TcgplayerId, out var pid) ? pid : (int?)null))
+            .Where(c => c.Parsed is int pid && priceMap.ContainsKey(pid))
+            .ToList();
+
+        foreach (var batch in targets.Chunk(500))
+        {
+            var ids = batch.Select(c => c.Id).ToList();
+            var tracked = await context.Cards
+                .Where(c => ids.Contains(c.Id))
+                .ToDictionaryAsync(c => c.Id, ct);
+
+            foreach (var (id, parsed) in batch)
+            {
+                if (parsed is int pid && tracked.TryGetValue(id, out var existing)
+                    && priceMap.TryGetValue(pid, out var prices))
+                {
+                    existing.MarketPrice = prices.Normal;
+                    existing.FoilMarketPrice = prices.Foil;
+                    existing.PriceUpdatedAt = now;
+                    updated++;
+                }
+            }
+
+            await context.SaveChangesAsync(ct);
+            context.ChangeTracker.Clear();
+        }
+
+        _logger.LogInformation("Riftbound price refresh complete: {Updated} cards updated", updated);
+        progress?.Report(new PriceUpdateProgress(CardGame.Riftbound, null, 0, 0,
+            $"Riftbound prices updated ({updated} cards)"));
+    }
+
+    // Fetches all Riftbound group prices from TCGCSV and folds them into a
+    // productId -> (normal, foil) market-price map.
+    private async Task<Dictionary<int, (decimal? Normal, decimal? Foil)>> FetchTcgCsvPriceMapAsync(
+        HttpClient client, IProgress<PriceUpdateProgress>? progress, CancellationToken ct)
+    {
+        var groups = await client.GetFromJsonAsync<TcgCsvGroupsResponse>(
+            $"{TcgCsvBaseUrl}/tcgplayer/{RiftboundCategoryId}/groups", TcgCsvJsonOptions, ct);
+
+        var map = new Dictionary<int, (decimal? Normal, decimal? Foil)>();
+        var groupList = groups?.Results ?? [];
+        var done = 0;
+
+        foreach (var group in groupList)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                var prices = await client.GetFromJsonAsync<TcgCsvPricesResponse>(
+                    $"{TcgCsvBaseUrl}/tcgplayer/{RiftboundCategoryId}/{group.GroupId}/prices", TcgCsvJsonOptions, ct);
+
+                foreach (var row in prices?.Results ?? [])
+                {
+                    map.TryGetValue(row.ProductId, out var entry);
+                    if (string.Equals(row.SubTypeName, "Foil", StringComparison.OrdinalIgnoreCase))
+                        entry.Foil = row.MarketPrice;
+                    else if (string.Equals(row.SubTypeName, "Normal", StringComparison.OrdinalIgnoreCase))
+                        entry.Normal = row.MarketPrice;
+                    map[row.ProductId] = entry;
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Failed to fetch Riftbound prices for group {GroupId}; skipping", group.GroupId);
+            }
+
+            done++;
+            progress?.Report(new PriceUpdateProgress(CardGame.Riftbound, null, done, groupList.Count,
+                $"Riftbound prices: {done}/{groupList.Count} groups"));
+        }
+
+        return map;
     }
 
     internal static RiftboundCard MapCard(RiftboundApiCard c) => new()
@@ -691,9 +797,47 @@ public sealed class RiftboundService : ICardGameService, IDisposable
             .AsEnumerable().Select(c => ToMatch(c)).ToList();
     }
 
-    // Riftcodex provides no prices.
-    public decimal? GetCurrentPrice(string gameCardId, bool isFoil) => null;
-    public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil) => [];
+    // Prices come from TCGCSV (see UpdatePricesAsync). Foil-aware with fallback to the
+    // other subtype so a card resolves a price whenever any subtype has one.
+    public decimal? GetCurrentPrice(string gameCardId, bool isFoil)
+    {
+        var row = _readContext.Cards.AsNoTracking()
+            .Where(c => c.Id == gameCardId)
+            .Select(c => new { c.MarketPrice, c.FoilMarketPrice })
+            .FirstOrDefault();
+        if (row is null) return null;
+        return isFoil
+            ? row.FoilMarketPrice ?? row.MarketPrice
+            : row.MarketPrice ?? row.FoilMarketPrice;
+    }
+
+    public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil)
+    {
+        var ids = gameCardIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return [];
+
+        var result = new Dictionary<string, decimal>(ids.Count);
+
+        foreach (var chunk in ids.Chunk(500))
+        {
+            var rows = _readContext.Cards.AsNoTracking()
+                .Where(c => chunk.Contains(c.Id))
+                .Select(c => new { c.Id, c.MarketPrice, c.FoilMarketPrice })
+                .ToList();
+
+            foreach (var row in rows)
+            {
+                var price = isFoil
+                    ? row.FoilMarketPrice ?? row.MarketPrice
+                    : row.MarketPrice ?? row.FoilMarketPrice;
+                if (price.HasValue)
+                    result[row.Id] = price.Value;
+            }
+        }
+
+        return result;
+    }
 
     public void RecordCorrection(ulong scanHash, string correctCardId, ulong? artScanHash = null)
     {
@@ -734,4 +878,26 @@ public sealed class RiftboundService : ICardGameService, IDisposable
     }
 
     public void Dispose() => _readContext.Dispose();
+
+    private sealed class TcgCsvGroupsResponse
+    {
+        public List<TcgCsvGroup> Results { get; set; } = [];
+    }
+
+    private sealed class TcgCsvGroup
+    {
+        public int GroupId { get; set; }
+    }
+
+    private sealed class TcgCsvPricesResponse
+    {
+        public List<TcgCsvPrice> Results { get; set; } = [];
+    }
+
+    private sealed class TcgCsvPrice
+    {
+        public int ProductId { get; set; }
+        public decimal? MarketPrice { get; set; }
+        public string? SubTypeName { get; set; }
+    }
 }
