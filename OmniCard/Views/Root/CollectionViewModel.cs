@@ -257,12 +257,22 @@ public sealed partial class CollectionViewModel : ViewModel
         _ = LoadOverviewAsync();
     }
 
+    private int _overviewGeneration;
+
     private async Task LoadOverviewAsync()
     {
-        LocationSummaries.Clear();
-        BulkSummary = null;
+        var generation = ++_overviewGeneration;
 
         var overviews = await _collectionQueryService.GetLocationOverviewsAsync(_selectedGame);
+
+        // A newer overview load started while we awaited (e.g. the startup load racing the
+        // initial SetGame, or a rapid game switch)? Drop this stale result. Clearing only
+        // after the guard prevents overlapping loads from clear-then-double-populating the tiles.
+        if (generation != _overviewGeneration)
+            return;
+
+        LocationSummaries.Clear();
+        BulkSummary = null;
 
         foreach (var summary in overviews)
         {
@@ -871,6 +881,13 @@ public sealed partial class CollectionViewModel : ViewModel
     {
         _selectedGame = game;
         LoadPresets();
+
+        // Reflect the new game in whichever view is showing. Every other data-changing
+        // operation refreshes this way; without it a game switch left stale cards/tiles.
+        if (ShowCardList)
+            _ = SearchCollection();
+        else
+            LoadOverview();
     }
 
     public void LoadPresets()
