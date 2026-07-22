@@ -407,9 +407,194 @@ public sealed class RiftboundService : ICardGameService, IDisposable
         }
     }
 
-    // === Matching (Task 6 fills the body) ===
+    // === Matching ===
+
+    // Parses OCR collector text of the form "{SET}-{number}" (e.g. "OGN-310"). The printed
+    // "/total" has already been stripped by the OCR detector.
+    internal static bool TryParseOcrCollectorNumber(string? ocr, out string setId, out int number)
+    {
+        setId = ""; number = 0;
+        if (string.IsNullOrWhiteSpace(ocr)) return false;
+        var dash = ocr.LastIndexOf('-');
+        if (dash <= 0 || dash == ocr.Length - 1) return false;
+        setId = ocr[..dash].ToUpperInvariant();
+        return int.TryParse(ocr[(dash + 1)..], out number);
+    }
+
+    private RiftboundCard? LookupById(string id)
+        => _readContext.Cards.AsNoTracking().FirstOrDefault(c => c.Id == id);
+
     public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14, ulong? scanEdgeHash = null)
-        => throw new NotImplementedException("Implemented in Task 6");
+    {
+        LastMatchDiagnostics = new MatchDiagnostics { SetFilterActive = setFilter is not null };
+
+        // Phase 0: OCR collector-number lookup. Set+number can map to multiple printings
+        // (alt arts share a collector number) — disambiguate the candidate set by pHash.
+        if (ocrResult?.CollectorNumber is not null && ocrResult.CollectorNumberConfidence >= 0.5
+            && TryParseOcrCollectorNumber(ocrResult.CollectorNumber, out var ocrSet, out var ocrNum))
+        {
+            var candidates = _readContext.Cards.AsNoTracking()
+                .Where(c => c.SetId == ocrSet && c.CollectorNumber == ocrNum)
+                .ToList();
+
+            if (setFilter is not null)
+                candidates = candidates.Where(c => setFilter.Contains(c.SetId)).ToList();
+
+            if (candidates.Count == 1)
+            {
+                LastMatchDiagnostics.DecisionPhase = "OcrCollectorNumber";
+                return ToMatch(candidates[0], confidence: 100);
+            }
+            if (candidates.Count > 1)
+            {
+                var hashed = candidates.Where(c => c.ImageHash != null).ToList();
+                RiftboundCard best;
+                if (hashed.Count > 0)
+                {
+                    best = hashed
+                        .OrderBy(c => PerceptualHashService.HammingDistance(imageHash, c.ImageHash!.Value))
+                        .First();
+                }
+                else
+                {
+                    best = candidates[0];
+                }
+                LastMatchDiagnostics.DecisionPhase = "OcrCollectorNumber";
+                return ToMatch(best, confidence: 100);
+            }
+        }
+
+        // Foil path: match on the color-robust edge hash instead of the luminance pHash.
+        if (scanEdgeHash is ulong scanEdge)
+        {
+            _edgeHashCache ??= _readContext.Cards
+                .Where(c => c.EdgeHash != null)
+                .Select(c => new { c.Id, Edge = c.EdgeHash!.Value, c.SetId })
+                .AsNoTracking().AsEnumerable()
+                .Select(c => (c.Id, c.Edge, c.SetId)).ToList();
+
+            string bestEdgeId = "";
+            int bestEdgeDist = int.MaxValue;
+            foreach (var (id, edge, setId) in _edgeHashCache)
+            {
+                if (setFilter is not null && !setFilter.Contains(setId)) continue;
+                var dist = PerceptualHashService.HammingDistance(scanEdge, edge);
+                if (dist < bestEdgeDist) { bestEdgeDist = dist; bestEdgeId = id; }
+            }
+            if (bestEdgeId.Length > 0 && bestEdgeDist <= maxDistance)
+            {
+                LastMatchDiagnostics.DecisionPhase = "EdgeHashFoil";
+                LastMatchDiagnostics.PHashDistance = bestEdgeDist;
+                var conf = Math.Max(0, 1.0 - (double)bestEdgeDist / maxDistance) * 100;
+                var card = LookupById(bestEdgeId);
+                return card is null ? null : ToMatch(card, conf);
+            }
+            LastMatchDiagnostics.DecisionPhase = "NoMatch";
+            return null;
+        }
+
+        // Build caches.
+        if (_hashCache is null)
+        {
+            var entries = _readContext.Cards
+                .Where(c => c.ImageHash != null)
+                .Select(c => new { c.Id, Hash = c.ImageHash!.Value, c.SetId })
+                .AsNoTracking().AsEnumerable().ToList();
+            _hashCache = entries.Select(c => (c.Id, c.Hash)).ToList();
+            _hashSetLookup = entries.ToDictionary(c => c.Id, c => c.SetId);
+        }
+        if (_correctionsCache is null)
+        {
+            using var ctx = _dbContextFactory.CreateDbContext();
+            _correctionsCache = ctx.HashCorrections.AsNoTracking()
+                .Select(h => new { h.ScanHash, h.CorrectCardId }).AsEnumerable()
+                .Select(h => (h.ScanHash, h.CorrectCardId)).ToList();
+        }
+
+        // Phase 1: exact correction.
+        var exact = _correctionsCache.FirstOrDefault(c => c.ScanHash == imageHash);
+        if (exact.CorrectCardId is not null)
+        {
+            var corrected = LookupById(exact.CorrectCardId);
+            if (corrected is not null && (setFilter is null || setFilter.Contains(corrected.SetId)))
+            {
+                LastMatchDiagnostics.DecisionPhase = "ExactCorrection";
+                return ToMatch(corrected, confidence: 100);
+            }
+        }
+
+        if (_hashCache.Count == 0)
+        {
+            LastMatchDiagnostics.DecisionPhase = "NoMatch";
+            return null;
+        }
+
+        // Phase 2: nearest pHash + fuzzy corrections.
+        string bestId = "";
+        int bestDist = int.MaxValue;
+        foreach (var (id, hash) in _hashCache)
+        {
+            if (setFilter is not null && !setFilter.Contains(_hashSetLookup![id])) continue;
+            var dist = PerceptualHashService.HammingDistance(imageHash, hash);
+            if (dist < bestDist) { bestDist = dist; bestId = id; }
+        }
+
+        string? bestCorrId = null;
+        int bestCorrAdjusted = int.MaxValue;
+        foreach (var (scanHash, correctCardId) in _correctionsCache)
+        {
+            if (setFilter is not null)
+            {
+                var corrSet = _hashSetLookup!.GetValueOrDefault(correctCardId);
+                if (corrSet is null || !setFilter.Contains(corrSet)) continue;
+            }
+            var dist = PerceptualHashService.HammingDistance(imageHash, scanHash);
+            if (dist <= maxDistance)
+            {
+                var adjusted = Math.Max(0, dist - CorrectionTrustBonus);
+                if (adjusted < bestCorrAdjusted) { bestCorrAdjusted = adjusted; bestCorrId = correctCardId; }
+            }
+        }
+
+        if (bestCorrId is not null && bestCorrAdjusted <= bestDist)
+        {
+            var conf = Math.Max(0, 1.0 - (double)bestCorrAdjusted / maxDistance) * 100;
+            var corrected = LookupById(bestCorrId);
+            if (corrected is not null)
+            {
+                LastMatchDiagnostics.DecisionPhase = "PHashConfident";
+                LastMatchDiagnostics.PHashDistance = bestCorrAdjusted;
+                return ToMatch(corrected, conf);
+            }
+        }
+
+        if (bestDist > maxDistance)
+        {
+            LastMatchDiagnostics.DecisionPhase = "NoMatch";
+            return null;
+        }
+
+        if (setFilter is not null)
+        {
+            var bestSet = _hashSetLookup!.GetValueOrDefault(bestId);
+            if (bestSet is null || !setFilter.Contains(bestSet))
+            {
+                LastMatchDiagnostics.DecisionPhase = "NoMatch";
+                return null;
+            }
+        }
+
+        var bestCard = LookupById(bestId);
+        if (bestCard is null)
+        {
+            LastMatchDiagnostics.DecisionPhase = "NoMatch";
+            return null;
+        }
+        LastMatchDiagnostics.DecisionPhase = "PHashConfident";
+        LastMatchDiagnostics.PHashDistance = bestDist;
+        var confidence = Math.Max(0, 1.0 - (double)bestDist / maxDistance) * 100;
+        return ToMatch(bestCard, confidence);
+    }
 
     // === Query surface ===
     public IReadOnlyList<SetInfo> GetAvailableSets()
