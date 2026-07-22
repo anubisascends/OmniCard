@@ -327,6 +327,11 @@ public sealed partial class RootViewModel(
 
     partial void OnShowScannerUIChanged(bool value) => PersistDisplaySettings();
 
+    [ObservableProperty]
+    public partial bool IsSidebarExpanded { get; set; } = displaySettings.Value.SidebarExpanded;
+
+    partial void OnIsSidebarExpandedChanged(bool value) => PersistDisplaySettings();
+
     private void PersistDisplaySettings()
     {
         try
@@ -390,6 +395,7 @@ public sealed partial class RootViewModel(
 
         writer.WriteString("ScanQuality", ScanQuality.ToString());
         writer.WriteBoolean("ShowScannerUI", ShowScannerUI);
+        writer.WriteBoolean("SidebarExpanded", IsSidebarExpanded);
 
         writer.WriteEndObject();
     }
@@ -2213,6 +2219,15 @@ public sealed partial class RootViewModel(
 
     [RelayCommand]
     public void RefreshHomeTab() => InvalidateHomeTab();
+
+    /// <summary>Single Refresh for the merged Dashboard view: recomputes the collection stats
+    /// (Home section) and the financial valuation (Dashboard section) together.</summary>
+    [RelayCommand]
+    private async Task RefreshDashboard()
+    {
+        RefreshHomeTab();                                  // recompute collection stats (fires now; index 0)
+        await Dashboard.RefreshCommand.ExecuteAsync(null); // recompute financial valuation
+    }
 
     [RelayCommand]
     public async Task CalculateSetCompletion()
