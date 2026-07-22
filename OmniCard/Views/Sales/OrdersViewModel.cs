@@ -20,6 +20,11 @@ public partial class OrdersViewModel(
     IDialogService dialogService) : ObservableObject
 {
     public ObservableCollection<Order> Orders { get; } = [];
+    public ObservableCollection<Order> CreatedOrders { get; } = [];
+    public ObservableCollection<Order> PackedOrders { get; } = [];
+    public ObservableCollection<Order> ShippedOrders { get; } = [];
+    public ObservableCollection<Order> CompletedOrders { get; } = [];
+    public ObservableCollection<Order> CancelledOrders { get; } = [];
     public ObservableCollection<Customer> Customers { get; } = [];
     public ObservableCollection<OrderLine> Lines { get; } = [];
     public ObservableCollection<ActiveListing> AvailableCards { get; } = [];
@@ -37,6 +42,8 @@ public partial class OrdersViewModel(
     public partial string? StatusMessage { get; set; }
 
     public decimal OrderTotal => Lines.Sum(l => l.Quantity * l.UnitSalePrice);
+
+    public bool IsEditable => SelectedOrder?.Status == OrderStatus.Created;
 
     public bool HasReconciliation =>
         SelectedOrder?.ImportedItemCount is not null || SelectedOrder?.ImportedProductValue is not null;
@@ -62,7 +69,20 @@ public partial class OrdersViewModel(
     public void Load()
     {
         Orders.Clear();
-        foreach (var o in orderService.GetOrders()) Orders.Add(o);
+        CreatedOrders.Clear(); PackedOrders.Clear(); ShippedOrders.Clear();
+        CompletedOrders.Clear(); CancelledOrders.Clear();
+        foreach (var o in orderService.GetOrders())
+        {
+            Orders.Add(o);
+            (o.Status switch
+            {
+                OrderStatus.Created => CreatedOrders,
+                OrderStatus.Packed => PackedOrders,
+                OrderStatus.Shipped => ShippedOrders,
+                OrderStatus.Completed => CompletedOrders,
+                _ => CancelledOrders,
+            }).Add(o);
+        }
         Customers.Clear();
         foreach (var c in customerService.GetAll()) Customers.Add(c);
         AvailableCards.Clear();
@@ -78,6 +98,7 @@ public partial class OrdersViewModel(
         OnPropertyChanged(nameof(OrderTotal));
         OnPropertyChanged(nameof(HasReconciliation));
         OnPropertyChanged(nameof(ReconciliationHint));
+        OnPropertyChanged(nameof(IsEditable));
     }
 
     [RelayCommand]
@@ -93,7 +114,7 @@ public partial class OrdersViewModel(
     public void AddCard()
     {
         if (SelectedOrder is null || SelectedAvailableCard is null) return;
-        if (SelectedOrder.Status != OrderStatus.Created) { StatusMessage = "Can only edit a Created order."; return; }
+        if (!IsEditable) { StatusMessage = "Only a Created order can be edited."; return; }
         orderService.AddLine(SelectedOrder.Id, SelectedAvailableCard.LotId, SelectedAvailableCard.ListedPrice);
         RefreshLines();
         AvailableCards.Remove(SelectedAvailableCard);
@@ -103,7 +124,7 @@ public partial class OrdersViewModel(
     public void RemoveLine(OrderLine? line)
     {
         if (SelectedOrder is null || line is null) return;
-        if (SelectedOrder.Status != OrderStatus.Created) { StatusMessage = "Can only edit a Created order."; return; }
+        if (!IsEditable) { StatusMessage = "Only a Created order can be edited."; return; }
         orderService.RemoveLine(line.Id);
         RefreshLines();
     }
@@ -116,20 +137,58 @@ public partial class OrdersViewModel(
         StatusMessage = "Saved.";
     }
 
-    [RelayCommand]
-    public void SetStatus(OrderStatus status)
+    /// <summary>Applies a drag-drop status move (or programmatic move). Validates the transition;
+    /// on Packed→Shipped this runs the existing ship accounting via OrderService.SetStatus.</summary>
+    public void MoveOrder(Order? order, OrderStatus target)
     {
-        if (SelectedOrder is null) return;
-        if (!IsValidTransition(SelectedOrder.Status, status))
+        if (order is null) return;
+        if (order.Status == target) return;
+        if (!IsValidTransition(order.Status, target))
         {
-            StatusMessage = $"Can't mark {status} from {SelectedOrder.Status}.";
+            StatusMessage = $"Can't move {order.Status} → {target}.";
             return;
         }
-        orderService.SetStatus(SelectedOrder.Id, status);
-        var id = SelectedOrder.Id;
+        orderService.SetStatus(order.Id, target);
+        var id = order.Id;
         Load();
         SelectedOrder = Orders.FirstOrDefault(o => o.Id == id);
-        StatusMessage = $"Order marked {status}.";
+        StatusMessage = $"Order moved to {target}.";
+    }
+
+    [RelayCommand]
+    public void CancelOrder(Order? order)
+    {
+        if (order is null) return;
+        if (!IsValidTransition(order.Status, OrderStatus.Cancelled))
+        {
+            StatusMessage = $"Can't cancel a {order.Status} order.";
+            return;
+        }
+        MoveOrder(order, OrderStatus.Cancelled);
+    }
+
+    [RelayCommand]
+    public void DeleteOrder(Order? order)
+    {
+        if (order is null) return;
+        if (order.Status is OrderStatus.Shipped or OrderStatus.Completed)
+        {
+            StatusMessage = $"Can't delete a {order.Status} order.";
+            return;
+        }
+        try
+        {
+            orderService.DeleteOrder(order.Id);
+        }
+        catch (InvalidOperationException ex)
+        {
+            StatusMessage = ex.Message;
+            return;
+        }
+        var wasSelected = SelectedOrder?.Id == order.Id;
+        Load();
+        if (wasSelected) SelectedOrder = null;
+        StatusMessage = "Order deleted.";
     }
 
     [RelayCommand]
@@ -213,19 +272,20 @@ public partial class OrdersViewModel(
         }
     }
 
-    /// <summary>Enforces a forward-only order status flow so inventory/sale accounting
-    /// (which only runs on the Created/Packed → Shipped transition) can't be skipped by
-    /// jumping straight to Completed, and so Shipped/Completed orders can't be cancelled
-    /// (no restock support).</summary>
+    /// <summary>Enforces the kanban board's move rules: Created ⇄ Packed (un-pack allowed),
+    /// Packed → Shipped (runs ship accounting), Shipped → Completed, and Cancel only from
+    /// Created or Packed (no restock support once Shipped/Completed).</summary>
     private static bool IsValidTransition(OrderStatus from, OrderStatus to) => to switch
     {
+        OrderStatus.Created => from is OrderStatus.Packed,          // un-pack
         OrderStatus.Packed => from is OrderStatus.Created,
-        OrderStatus.Shipped => from is OrderStatus.Created or OrderStatus.Packed,
+        OrderStatus.Shipped => from is OrderStatus.Packed,
         OrderStatus.Completed => from is OrderStatus.Shipped,
         OrderStatus.Cancelled => from is OrderStatus.Created or OrderStatus.Packed,
-        OrderStatus.Created => false,
         _ => false,
     };
+
+    internal static bool IsValidTransitionPublic(OrderStatus from, OrderStatus to) => IsValidTransition(from, to);
 
     private void RefreshLines()
     {
