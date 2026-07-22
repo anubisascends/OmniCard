@@ -37,6 +37,10 @@ public class SalesSettingsViewModelTests
         public ReceiptSettings GetReceipt() => StoredReceipt;
         public void SaveReceipt(ReceiptSettings receipt) => StoredReceipt = receipt;
         public string SetLogo(string sourcePath) { LastLogoSource = sourcePath; return "company-logo.png"; }
+        public double? OrdersEditorWidth => null;
+        public void SetOrdersEditorWidth(double width) { }
+        public bool OrdersEditorCollapsed => false;
+        public void SetOrdersEditorCollapsed(bool collapsed) { }
     }
 
     [Fact]

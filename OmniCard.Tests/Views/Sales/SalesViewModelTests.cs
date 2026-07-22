@@ -20,7 +20,8 @@ public class SalesViewModelTests
     private static OrdersViewModel NewOrdersViewModel() =>
         new(Mock.Of<IOrderService>(), Mock.Of<ICustomerService>(), Mock.Of<IListingService>(),
             Mock.Of<IReceiptService>(), Mock.Of<IReceiptPdfExporter>(),
-            Mock.Of<ITcgPlayerOrderImportService>(), Mock.Of<IDialogService>());
+            Mock.Of<ITcgPlayerOrderImportService>(), Mock.Of<IDialogService>(),
+            Mock.Of<ISalesSettingsService>());
 
     private static CustomersViewModel NewCustomersViewModel() =>
         new(Mock.Of<ICustomerService>());

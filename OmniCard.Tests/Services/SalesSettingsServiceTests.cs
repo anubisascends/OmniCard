@@ -21,6 +21,39 @@ public class SalesSettingsServiceTests
     }
 
     [Fact]
+    public void OrdersEditorWidthAndCollapsed_Persist_AcrossInstances()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "omnicard-sales-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var dps = new DataPathServiceStub(dir);
+            var svc = new SalesSettingsService(dps);
+            svc.SetOrdersEditorWidth(432);
+            svc.SetOrdersEditorCollapsed(true);
+
+            var reloaded = new SalesSettingsService(dps);
+            Assert.Equal(432, reloaded.OrdersEditorWidth);
+            Assert.True(reloaded.OrdersEditorCollapsed);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
+    public void OrdersEditor_Defaults_WhenUnset()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "omnicard-sales-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var svc = new SalesSettingsService(new DataPathServiceStub(dir));
+            Assert.Null(svc.OrdersEditorWidth);
+            Assert.False(svc.OrdersEditorCollapsed);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
     public void ForSaleLocationId_Returns_Null_OnCorruptJson()
     {
         var dir = Path.Combine(Path.GetTempPath(), "omnicard-sales-" + Guid.NewGuid().ToString("N"));
