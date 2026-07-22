@@ -70,6 +70,23 @@ public class RiftboundDownloadTests : IDisposable
         """
     };
 
+    // TCGCSV: one group (24344). Prices cover:
+    //   653002 -> Normal 1.50 + Foil 3.00 (both subtypes)
+    //   685522 -> Foil 542.31 only (foil-only)
+    //   999999 -> present but matches no seeded card
+    private const string TcgCsvGroupsJson = """
+    {"results":[{"groupId":24344,"name":"Origins","abbreviation":"OGN"}],"success":true,"errors":[]}
+    """;
+
+    private const string TcgCsvPricesJson = """
+    {"results":[
+      {"productId":653002,"lowPrice":1.0,"midPrice":1.4,"highPrice":2.0,"marketPrice":1.50,"directLowPrice":null,"subTypeName":"Normal"},
+      {"productId":653002,"lowPrice":2.5,"midPrice":3.1,"highPrice":5.0,"marketPrice":3.00,"directLowPrice":null,"subTypeName":"Foil"},
+      {"productId":685522,"lowPrice":600.0,"midPrice":625.0,"highPrice":1299.0,"marketPrice":542.31,"directLowPrice":null,"subTypeName":"Foil"},
+      {"productId":999999,"lowPrice":1.0,"midPrice":1.0,"highPrice":1.0,"marketPrice":9.99,"directLowPrice":null,"subTypeName":"Normal"}
+    ],"success":true,"errors":[]}
+    """;
+
     private RiftboundService CreateService()
     {
         var handler = new RoutingHandler(uri =>
@@ -80,6 +97,27 @@ public class RiftboundDownloadTests : IDisposable
                 var page = uri.Contains("page=2") ? 2 : 1;
                 return CardsPage(page);
             }
+            return null;
+        });
+        var dataPath = new Moq.Mock<IDataPathService>();
+        dataPath.Setup(d => d.DataDirectory).Returns(_dataDir);
+        return new RiftboundService(
+            new FakeHttpClientFactory(handler),
+            _factory,
+            new PerceptualHashService(NullLogger<PerceptualHashService>.Instance),
+            dataPath.Object,
+            NullLogger<RiftboundService>.Instance);
+    }
+
+    private RiftboundService CreateServiceWithPricing()
+    {
+        var handler = new RoutingHandler(uri =>
+        {
+            if (uri.Contains("/sets")) return SetListJson;
+            if (uri.Contains("/cards"))
+                return CardsPage(uri.Contains("page=2") ? 2 : 1);
+            if (uri.Contains("/prices")) return TcgCsvPricesJson;
+            if (uri.Contains("/groups")) return TcgCsvGroupsJson;
             return null;
         });
         var dataPath = new Moq.Mock<IDataPathService>();
@@ -159,14 +197,40 @@ public class RiftboundDownloadTests : IDisposable
     }
 
     [Fact]
-    public async Task UpdatePrices_IsNoOp()
+    public async Task UpdatePrices_WritesMarketPrices_FromTcgCsv()
     {
-        var svc = CreateService();
-        await svc.DownloadBulkDataAsync();
-        // Should not throw and should not alter rows.
+        // Seed three cards: both-subtypes, foil-only, and one with no matching price row.
+        using (var seed = _factory.CreateDbContext())
+        {
+            seed.Cards.AddRange(
+                new RiftboundCard { Id = "c1", Name = "Cull the Weak", SetId = "OGN", TcgplayerId = "653002" },
+                new RiftboundCard { Id = "c2", Name = "Vi", SetId = "UNL", TcgplayerId = "685522" },
+                new RiftboundCard { Id = "c3", Name = "Orphan", SetId = "OGN", TcgplayerId = "111111" },
+                new RiftboundCard { Id = "c4", Name = "NoTcg", SetId = "OGN", TcgplayerId = null });
+            seed.SaveChanges();
+        }
+
+        var svc = CreateServiceWithPricing();
         await svc.UpdatePricesAsync();
+
         using var ctx = _factory.CreateDbContext();
-        Assert.Equal(2, ctx.Cards.Count());
+        var c1 = ctx.Cards.Single(c => c.Id == "c1");
+        Assert.Equal(1.50m, c1.MarketPrice);
+        Assert.Equal(3.00m, c1.FoilMarketPrice);
+        Assert.NotNull(c1.PriceUpdatedAt);
+
+        var c2 = ctx.Cards.Single(c => c.Id == "c2");
+        Assert.Null(c2.MarketPrice);
+        Assert.Equal(542.31m, c2.FoilMarketPrice);
+
+        var c3 = ctx.Cards.Single(c => c.Id == "c3");
+        Assert.Null(c3.MarketPrice);
+        Assert.Null(c3.FoilMarketPrice);
+        Assert.Null(c3.PriceUpdatedAt);
+
+        var c4 = ctx.Cards.Single(c => c.Id == "c4");
+        Assert.Null(c4.MarketPrice);
+        Assert.Null(c4.FoilMarketPrice);
     }
 
     private class RoutingHandler(Func<string, string?> route) : HttpMessageHandler
