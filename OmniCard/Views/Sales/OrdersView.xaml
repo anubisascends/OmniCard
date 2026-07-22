@@ -23,6 +23,9 @@
                       DisplayMemberPath="Name"/>
             <Button DockPanel.Dock="Top" Content="New Order" Command="{Binding NewOrderCommand}"
                     Padding="12,4" Margin="0,0,0,8" HorizontalAlignment="Left"/>
+            <Button DockPanel.Dock="Top" Content="Import from TCGPlayer CSV…"
+                    Command="{Binding ImportTcgPlayerCommand}"
+                    Padding="12,4" Margin="0,0,0,8" HorizontalAlignment="Left"/>
             <ListBox ItemsSource="{Binding Orders}" SelectedItem="{Binding SelectedOrder}">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
@@ -93,6 +96,10 @@
                 <Button Content="Print Receipt" Command="{Binding PrintReceiptCommand}" Padding="12,4" Margin="0,0,8,0"/>
                 <Button Content="Export PDF" Command="{Binding ExportPdfCommand}" Padding="12,4" Margin="0,0,16,0"/>
                 <TextBlock Text="{Binding OrderTotal, StringFormat=C}" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                <TextBlock Text="{Binding ReconciliationHint}"
+                           Visibility="{Binding HasReconciliation, Converter={conv:BoolToVisibilityConverter}}"
+                           VerticalAlignment="Center" Margin="16,0,0,0"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
                 <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center"/>
             </StackPanel>
 

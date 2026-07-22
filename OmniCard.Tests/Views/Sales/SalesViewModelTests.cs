@@ -19,7 +19,8 @@ public class SalesViewModelTests
     // construct off mocked interfaces and are never invoked here.
     private static OrdersViewModel NewOrdersViewModel() =>
         new(Mock.Of<IOrderService>(), Mock.Of<ICustomerService>(), Mock.Of<IListingService>(),
-            Mock.Of<IReceiptService>(), Mock.Of<IReceiptPdfExporter>());
+            Mock.Of<IReceiptService>(), Mock.Of<IReceiptPdfExporter>(),
+            Mock.Of<ITcgPlayerOrderImportService>(), Mock.Of<IDialogService>());
 
     private static CustomersViewModel NewCustomersViewModel() =>
         new(Mock.Of<ICustomerService>());

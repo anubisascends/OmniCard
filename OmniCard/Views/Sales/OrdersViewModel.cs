@@ -15,7 +15,9 @@ public partial class OrdersViewModel(
     ICustomerService customerService,
     IListingService listingService,
     IReceiptService receiptService,
-    IReceiptPdfExporter receiptPdfExporter) : ObservableObject
+    IReceiptPdfExporter receiptPdfExporter,
+    ITcgPlayerOrderImportService importService,
+    IDialogService dialogService) : ObservableObject
 {
     public ObservableCollection<Order> Orders { get; } = [];
     public ObservableCollection<Customer> Customers { get; } = [];
@@ -36,6 +38,25 @@ public partial class OrdersViewModel(
 
     public decimal OrderTotal => Lines.Sum(l => l.Quantity * l.UnitSalePrice);
 
+    public bool HasReconciliation =>
+        SelectedOrder?.ImportedItemCount is not null || SelectedOrder?.ImportedProductValue is not null;
+
+    public string ReconciliationHint
+    {
+        get
+        {
+            if (SelectedOrder is null) return "";
+            var addedItems = Lines.Sum(l => l.Quantity);
+            var itemPart = SelectedOrder.ImportedItemCount is int ic
+                ? $"added {addedItems} of {ic} items"
+                : $"added {addedItems} items";
+            var valuePart = SelectedOrder.ImportedProductValue is decimal pv
+                ? $"{OrderTotal:C} of {pv:C}"
+                : $"{OrderTotal:C}";
+            return $"{itemPart} · {valuePart}";
+        }
+    }
+
     /// <summary>Loads orders, customers and active listings. Safe to call repeatedly (e.g. on
     /// every tab activation).</summary>
     public void Load()
@@ -55,6 +76,8 @@ public partial class OrdersViewModel(
             foreach (var l in orderService.GetLines(value.Id)) Lines.Add(l);
         SelectedCustomer = value is null ? null : Customers.FirstOrDefault(c => c.Id == value.CustomerId);
         OnPropertyChanged(nameof(OrderTotal));
+        OnPropertyChanged(nameof(HasReconciliation));
+        OnPropertyChanged(nameof(ReconciliationHint));
     }
 
     [RelayCommand]
@@ -152,6 +175,42 @@ public partial class OrdersViewModel(
         }
     }
 
+    [RelayCommand]
+    public void ImportTcgPlayer()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Import TCGPlayer Shipping Export",
+            Filter = "CSV files|*.csv|All files|*.*",
+        };
+        if (dialog.ShowDialog() != true) return;
+
+        try
+        {
+            var preview = importService.PreviewImport(dialog.FileName);
+            if (preview.Rows.Count == 0)
+            {
+                StatusMessage = "No orders found in that file.";
+                return;
+            }
+
+            var imported = dialogService.ShowTcgOrderImportPreview(preview);
+            if (imported > 0)
+            {
+                Load();
+                StatusMessage = $"Imported {imported} order(s).";
+            }
+            else
+            {
+                StatusMessage = "Import cancelled.";
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Import failed: {ex.Message}";
+        }
+    }
+
     /// <summary>Enforces a forward-only order status flow so inventory/sale accounting
     /// (which only runs on the Open/Packed → Shipped transition) can't be skipped by
     /// jumping straight to Completed, and so Shipped/Completed orders can't be cancelled
@@ -172,5 +231,7 @@ public partial class OrdersViewModel(
         if (SelectedOrder is not null)
             foreach (var l in orderService.GetLines(SelectedOrder.Id)) Lines.Add(l);
         OnPropertyChanged(nameof(OrderTotal));
+        OnPropertyChanged(nameof(HasReconciliation));
+        OnPropertyChanged(nameof(ReconciliationHint));
     }
 }

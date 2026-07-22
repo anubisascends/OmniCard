@@ -38,7 +38,8 @@ public class OrdersViewModelTests
         listingService = new Mock<IListingService>();
         return new OrdersViewModel(
             orderService.Object, customerService.Object, listingService.Object,
-            new FakeReceiptService(), new FakeReceiptPdfExporter());
+            new FakeReceiptService(), new FakeReceiptPdfExporter(),
+            Mock.Of<ITcgPlayerOrderImportService>(), Mock.Of<IDialogService>());
     }
 
     [Fact]
@@ -237,7 +238,8 @@ public class OrdersViewModelTests
         var listingService = new Mock<IListingService>();
         var vm = new OrdersViewModel(
             orderService.Object, customerService.Object, listingService.Object,
-            new FakeReceiptService(throwOnBuild: true), new FakeReceiptPdfExporter());
+            new FakeReceiptService(throwOnBuild: true), new FakeReceiptPdfExporter(),
+            Mock.Of<ITcgPlayerOrderImportService>(), Mock.Of<IDialogService>());
         var order = NewOrder(1, 1);
         orderService.Setup(s => s.GetLines(1)).Returns([]);
         vm.SelectedOrder = order;
@@ -258,5 +260,31 @@ public class OrdersViewModelTests
         vm.SelectedOrder = order;
 
         Assert.Equal(8.00m, vm.OrderTotal);
+    }
+
+    [Fact]
+    public void ReconciliationHint_ShownForImportedOrder_HiddenOtherwise()
+    {
+        var vm = MakeVm(out var orderService, out var customerService, out var listingService);
+        var plainOrder = NewOrder(1, 1);
+        orderService.Setup(s => s.GetOrders()).Returns([plainOrder]);
+        customerService.Setup(s => s.GetAll()).Returns([]);
+        listingService.Setup(s => s.GetActiveListings(null)).Returns([]);
+        orderService.Setup(s => s.GetLines(1)).Returns([]);
+
+        vm.Load();
+
+        // Non-imported order: hint hidden.
+        var plain = vm.Orders.First();
+        vm.SelectedOrder = plain;
+        Assert.False(vm.HasReconciliation);
+
+        // Imported order: hint shown and references the target counts.
+        var imported = new Order { Id = 999, ImportedItemCount = 8, ImportedProductValue = 320.00m };
+        orderService.Setup(s => s.GetLines(999)).Returns([]);
+        vm.Orders.Add(imported);
+        vm.SelectedOrder = imported;
+        Assert.True(vm.HasReconciliation);
+        Assert.Contains("of 8 items", vm.ReconciliationHint);
     }
 }
