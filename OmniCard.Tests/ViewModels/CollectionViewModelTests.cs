@@ -66,10 +66,19 @@ public class CollectionViewModelTests
     {
         var vm = CreateVm();
         vm.ShowCardList = true;       // simulate viewing the card list
+
+        // The card-list search runs its DB query inside Task.Run (a background thread), so a bare
+        // yield can't guarantee it has executed before Verify. Signal from the mock and wait for it.
+        var searched = new TaskCompletionSource();
+        _card.Setup(c => c.SearchCollection(
+                It.IsAny<string>(), It.IsAny<CardGame>(), It.IsAny<int?>(),
+                It.IsAny<SortPreset?>(), It.IsAny<FilterPreset?>(), It.IsAny<bool>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<ObservableCollection<CollectionCard>>()))
+             .Callback(() => searched.TrySetResult());
         _card.Invocations.Clear();
 
         vm.SetGame(CardGame.OnePiece);
-        await Task.Yield();           // let the fire-and-forget search run
+        await searched.Task.WaitAsync(TimeSpan.FromSeconds(5)); // deterministic: throws if never called
 
         _card.Verify(c => c.SearchCollection(
             It.IsAny<string>(), CardGame.OnePiece, It.IsAny<int?>(),
