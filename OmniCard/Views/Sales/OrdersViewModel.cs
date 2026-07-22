@@ -190,7 +190,9 @@ public partial class OrdersViewModel(
             var preview = importService.PreviewImport(dialog.FileName);
             if (preview.Rows.Count == 0)
             {
-                StatusMessage = "No orders found in that file.";
+                StatusMessage = preview.Warnings.Count > 0
+                    ? preview.Warnings[0]
+                    : "No orders found in that file.";
                 return;
             }
 

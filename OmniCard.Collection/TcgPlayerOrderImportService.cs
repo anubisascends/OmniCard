@@ -20,6 +20,15 @@ public class TcgPlayerOrderImportService(IDbContextFactory<OmniCardDbContext> db
         csv.Read();
         csv.ReadHeader();
 
+        var preview = new TcgOrderImportPreview();
+        var headers = csv.HeaderRecord ?? [];
+        if (!headers.Contains("Order #", StringComparer.OrdinalIgnoreCase))
+        {
+            preview.Warnings.Add(
+                "This file doesn't look like a TCGPlayer Shipping Export (missing the 'Order #' column).");
+            return preview;
+        }
+
         using var ctx = dbContextFactory.CreateDbContext();
         var customers = ctx.Customers.AsNoTracking().ToList();
         var existingOrderNumbers = ctx.Orders.AsNoTracking()
@@ -27,14 +36,13 @@ public class TcgPlayerOrderImportService(IDbContextFactory<OmniCardDbContext> db
             .Select(o => o.OrderNumber!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var preview = new TcgOrderImportPreview();
         var rowNum = 0;
         while (csv.Read())
         {
             rowNum++;
             try
             {
-                var row = ParseRow(csv);
+                var row = ParseRow(csv, rowNum, preview.Warnings);
                 var match = customers.FirstOrDefault(c => IsSameCustomer(c, row));
                 row.MatchedCustomerId = match?.Id;
                 row.IsNewCustomer = match is null;
@@ -116,15 +124,25 @@ public class TcgPlayerOrderImportService(IDbContextFactory<OmniCardDbContext> db
         c.Country = row.Country;
     }
 
-    private static TcgOrderImportRow ParseRow(CsvReader csv)
+    private static TcgOrderImportRow ParseRow(CsvReader csv, int rowNum, List<string> warnings)
     {
         var first = csv.GetField("FirstName")?.Trim() ?? "";
         var last = csv.GetField("LastName")?.Trim() ?? "";
         var name = string.Join(" ", new[] { first, last }.Where(s => !string.IsNullOrWhiteSpace(s)));
 
+        var orderNumber = csv.GetField("Order #")?.Trim() ?? "";
+        var rawDate = csv.GetField("Order Date");
+        var dateParsed = DateTime.TryParse(rawDate, CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out var d);
+        if (!dateParsed)
+        {
+            var label = string.IsNullOrWhiteSpace(orderNumber) ? $"Row {rowNum}" : $"Order {orderNumber}";
+            warnings.Add($"{label}: couldn't parse Order Date \"{rawDate}\"; defaulted to today.");
+        }
+
         return new TcgOrderImportRow
         {
-            OrderNumber = csv.GetField("Order #")?.Trim() ?? "",
+            OrderNumber = orderNumber,
             CustomerName = name,
             AddressLine1 = NullIfBlank(csv.GetField("Address1")),
             AddressLine2 = NullIfBlank(csv.GetField("Address2")),
@@ -132,8 +150,7 @@ public class TcgPlayerOrderImportService(IDbContextFactory<OmniCardDbContext> db
             State = NullIfBlank(csv.GetField("State")),
             PostalCode = NullIfBlank(csv.GetField("PostalCode")),
             Country = NullIfBlank(csv.GetField("Country")),
-            OrderDate = DateTime.TryParse(csv.GetField("Order Date"), CultureInfo.InvariantCulture,
-                DateTimeStyles.None, out var d) ? d : DateTime.UtcNow.Date,
+            OrderDate = dateParsed ? d : DateTime.UtcNow.Date,
             ShippingFeePaid = ParseDecimal(csv.GetField("Shipping Fee Paid")),
             ItemCount = int.TryParse(csv.GetField("Item Count"), NumberStyles.Integer,
                 CultureInfo.InvariantCulture, out var ic) ? ic : 0,

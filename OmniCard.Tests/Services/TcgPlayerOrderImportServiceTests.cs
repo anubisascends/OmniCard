@@ -138,4 +138,32 @@ public class TcgPlayerOrderImportServiceTests : IDisposable
         Assert.Single(ctx.Customers.Where(c => c.Name == "Tad Cutright"));
         Assert.Equal(2, ctx.Orders.Count(o => o.OrderNumber == "ORD-A" || o.OrderNumber == "ORD-B"));
     }
+
+    [Fact]
+    public void PreviewImport_WrongHeader_ReturnsNoRows_AndWarns()
+    {
+        var path = Path.Combine(_dir, "wrong-" + Guid.NewGuid().ToString("N") + ".csv");
+        File.WriteAllLines(path, new[]
+        {
+            "Name,Set Name,Number,Condition",
+            "\"Black Lotus\",\"Alpha\",\"1\",\"Near Mint\"",
+        });
+
+        var preview = Svc().PreviewImport(path);
+
+        Assert.Empty(preview.Rows);
+        Assert.NotEmpty(preview.Warnings);
+        Assert.Contains(preview.Warnings, w => w.Contains("Order #", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void PreviewImport_UnparseableOrderDate_KeepsRow_AndWarns()
+    {
+        var path = WriteCsv(Row("ORD-BADDATE", "Tad", "Cutright", "98391-8194", date: "not-a-date"));
+        var preview = Svc().PreviewImport(path);
+
+        var row = Assert.Single(preview.Rows);
+        Assert.Equal(DateTime.UtcNow.Date, row.OrderDate);
+        Assert.Contains(preview.Warnings, w => w.Contains("ORD-BADDATE", StringComparison.OrdinalIgnoreCase));
+    }
 }
