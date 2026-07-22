@@ -20,6 +20,7 @@ using OmniCard.Views.Inventory;
 using OmniCard.Views.MovementHistory;
 using OmniCard.Views.SalesListing;
 using OmniCard.Views.Settings;
+using OmniCard.Views.TcgOrderImport;
 
 namespace OmniCard.Services;
 
@@ -222,4 +223,18 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         var result = wnd.ShowDialog();
         return result == true ? vm.ToResult() : null;
     }
+
+    public int ShowTcgOrderImportPreview(TcgOrderImportPreview preview)
+    {
+        var wnd = Services.GetRequiredService<TcgOrderImportView>();
+        wnd.ViewModel.LoadPreview(preview);
+        SetOwner(wnd);
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.ImportedCount : 0;
+    }
+
+    public bool Confirm(string message, string title)
+        => System.Windows.MessageBox.Show(message, title,
+               System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning)
+           == System.Windows.MessageBoxResult.Yes;
 }

@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Markup;
+using System.Windows.Media;
 using OmniCard.Models;
 
 namespace OmniCard.Controls.Converters;
@@ -451,4 +452,53 @@ public class ShareBarWidthConverter : MarkupExtension, IMultiValueConverter
         => throw new NotSupportedException();
 
     public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
+
+/// <summary>Maps a <see cref="SalesChannel"/> to its display label for order cards/badges.</summary>
+public class SalesChannelDisplayConverter : MarkupExtension, IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value switch
+    {
+        SalesChannel.TcgPlayer => "TCGplayer",
+        SalesChannel.Ebay => "eBay",
+        SalesChannel.Manual => "Manual",
+        _ => value?.ToString() ?? "",
+    };
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
+
+/// <summary>Maps an <see cref="OrderStatus"/> to the kanban accent colour used on card stripes.
+/// Kept in sync with the per-column header accents in OrdersView.xaml.</summary>
+public class OrderStatusToAccentBrushConverter : MarkupExtension, IValueConverter
+{
+    private static readonly SolidColorBrush Created = Frozen(0x21, 0x96, 0xF3);   // blue
+    private static readonly SolidColorBrush Packed = Frozen(0xFF, 0x98, 0x00);    // amber
+    private static readonly SolidColorBrush Shipped = Frozen(0x00, 0x96, 0x88);   // teal
+    private static readonly SolidColorBrush Completed = Frozen(0x4C, 0xAF, 0x50); // green
+    private static readonly SolidColorBrush Cancelled = Frozen(0x9E, 0x9E, 0x9E); // grey
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value switch
+    {
+        OrderStatus.Created => Created,
+        OrderStatus.Packed => Packed,
+        OrderStatus.Shipped => Shipped,
+        OrderStatus.Completed => Completed,
+        _ => Cancelled,
+    };
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+
+    private static SolidColorBrush Frozen(byte r, byte g, byte b)
+    {
+        var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+        brush.Freeze();
+        return brush;
+    }
 }

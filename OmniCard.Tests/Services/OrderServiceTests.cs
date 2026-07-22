@@ -54,6 +54,24 @@ public class OrderServiceTests : IDisposable
     }
 
     [Fact]
+    public void GetOrderLineSummaries_AggregatesItemCountAndTotal_PerOrder_AndOmitsEmptyOrders()
+    {
+        var (customerId, lotId) = SeedCustomerAndLot();
+        var svc = OrderSvc();
+        var order = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "SUM-1");
+        svc.AddLine(order.Id, lotId, 3.50m);   // qty 1
+        svc.AddLine(order.Id, lotId, 2.00m);   // qty 1
+        var empty = svc.CreateOrder(customerId, SalesChannel.Manual, "SUM-EMPTY");
+
+        var summaries = svc.GetOrderLineSummaries();
+
+        var s = Assert.Single(summaries, x => x.OrderId == order.Id);
+        Assert.Equal(2, s.ItemCount);
+        Assert.Equal(5.50m, s.Total);
+        Assert.DoesNotContain(summaries, x => x.OrderId == empty.Id);
+    }
+
+    [Fact]
     public void CreateOrder_AddLine_SnapshotsCardAndRemoveLine()
     {
         var (customerId, lotId) = SeedCustomerAndLot();
@@ -126,7 +144,7 @@ public class OrderServiceTests : IDisposable
                 CustomerId = cust.Id,
                 Channel = SalesChannel.TcgPlayer,
                 OrderNumber = "TCG-1",
-                Status = OrderStatus.Open,
+                Status = OrderStatus.Created,
                 MarketplaceFees = 1.10m,
                 ShippingCost = 0.63m,
                 ShippingChargedToBuyer = 1.25m,
@@ -148,11 +166,93 @@ public class OrderServiceTests : IDisposable
         using (var ctx = new OmniCardDbContext(_opts))
         {
             var order = Assert.Single(ctx.Orders.ToList());
-            Assert.Equal(OrderStatus.Open, order.Status);
+            Assert.Equal(OrderStatus.Created, order.Status);
             Assert.Equal(1.10m, order.MarketplaceFees);
             var line = Assert.Single(ctx.OrderLines.ToList());
             Assert.Equal("Sol Ring", line.NameSnapshot);
             Assert.Equal(2.50m, line.UnitSalePrice);
         }
+    }
+
+    [Fact]
+    public void Order_ImportedReconciliationFields_RoundTrip()
+    {
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            ctx.Customers.Add(new Customer { Id = 1, Name = "Ada" });
+            ctx.SaveChanges();
+            ctx.Orders.Add(new Order
+            {
+                CustomerId = 1,
+                Channel = SalesChannel.TcgPlayer,
+                Status = OrderStatus.Created,
+                OrderNumber = "TCG-1",
+                OrderDate = new DateTime(2026, 7, 17),
+                ImportedItemCount = 8,
+                ImportedProductValue = 320.00m,
+            });
+            ctx.SaveChanges();
+        }
+
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            var order = ctx.Orders.Single(o => o.OrderNumber == "TCG-1");
+            Assert.Equal(8, order.ImportedItemCount);
+            Assert.Equal(320.00m, order.ImportedProductValue);
+        }
+    }
+
+    [Fact]
+    public void DeleteOrder_RemovesOrderAndLines_WhenPreShip()
+    {
+        var (customerId, lotId) = SeedCustomerAndLot();
+        var svc = OrderSvc();
+        var order = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "DEL-1");
+        svc.AddLine(order.Id, lotId, 3.50m);
+
+        svc.DeleteOrder(order.Id);
+
+        Assert.Null(svc.GetOrder(order.Id));
+        Assert.Empty(svc.GetLines(order.Id));
+    }
+
+    [Fact]
+    public void DeleteOrder_Throws_WhenShippedOrCompleted()
+    {
+        var (customerId, lotId) = SeedCustomerAndLot();
+        var svc = OrderSvc();
+        var order = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "DEL-2");
+        svc.AddLine(order.Id, lotId, 3.50m);
+        svc.SetStatus(order.Id, OrderStatus.Shipped);
+
+        Assert.Throws<InvalidOperationException>(() => svc.DeleteOrder(order.Id));
+        Assert.NotNull(svc.GetOrder(order.Id));
+    }
+
+    [Fact]
+    public void DeleteOrder_NoOp_WhenMissing()
+    {
+        var svc = OrderSvc();
+        svc.DeleteOrder(999999); // must not throw
+    }
+
+    [Fact]
+    public void DeleteOrder_FreesLotBackIntoPicker_WhenPreShip()
+    {
+        var (customerId, lotId) = SeedCustomerAndLot();
+        var listing = new ListingService(new Factory(_opts), new StubSettings());
+        listing.ListForSale([lotId], SalesChannel.TcgPlayer, 3.50m, 1);
+
+        var svc = OrderSvc();
+        var order = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "DEL-3");
+        svc.AddLine(order.Id, lotId, 3.50m);
+
+        // Committed: the lot is on a Created order's line, so the picker must exclude it.
+        Assert.DoesNotContain(listing.GetActiveListings(), a => a.LotId == lotId);
+
+        svc.DeleteOrder(order.Id);
+
+        // Freed: deleting the pre-ship order releases the lot back into the picker.
+        Assert.Contains(listing.GetActiveListings(), a => a.LotId == lotId);
     }
 }

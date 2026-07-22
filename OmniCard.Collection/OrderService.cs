@@ -27,6 +27,19 @@ public class OrderService(
         return ctx.OrderLines.AsNoTracking().Where(l => l.OrderId == orderId).ToList();
     }
 
+    public List<OrderLineSummary> GetOrderLineSummaries()
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        // Aggregate client-side: SQLite stores decimal as TEXT, so SUM(decimal) can't be
+        // translated server-side. Volumes (order lines) are small.
+        return ctx.OrderLines.AsNoTracking()
+            .Select(l => new { l.OrderId, l.Quantity, l.UnitSalePrice })
+            .AsEnumerable()
+            .GroupBy(l => l.OrderId)
+            .Select(g => new OrderLineSummary(g.Key, g.Sum(l => l.Quantity), g.Sum(l => l.Quantity * l.UnitSalePrice)))
+            .ToList();
+    }
+
     public Order CreateOrder(int customerId, SalesChannel channel, string? orderNumber)
     {
         using var ctx = dbContextFactory.CreateDbContext();
@@ -35,7 +48,7 @@ public class OrderService(
             CustomerId = customerId,
             Channel = channel,
             OrderNumber = orderNumber,
-            Status = OrderStatus.Open,
+            Status = OrderStatus.Created,
             OrderDate = DateTime.UtcNow,
         };
         ctx.Orders.Add(order);
@@ -130,5 +143,20 @@ public class OrderService(
         {
             ctx.SaveChanges();
         }
+    }
+
+    public void DeleteOrder(int orderId)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var order = ctx.Orders.FirstOrDefault(o => o.Id == orderId);
+        if (order is null) return;
+        if (order.Status is OrderStatus.Shipped or OrderStatus.Completed)
+            throw new InvalidOperationException(
+                $"Can't delete a {order.Status} order (its sale is recorded and inventory removed).");
+
+        var lines = ctx.OrderLines.Where(l => l.OrderId == orderId).ToList();
+        ctx.OrderLines.RemoveRange(lines);
+        ctx.Orders.Remove(order);
+        ctx.SaveChanges();
     }
 }

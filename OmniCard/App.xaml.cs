@@ -125,6 +125,7 @@ public partial class App : Application
             services.AddSingleton<ICustomerService, CustomerService>();
             services.AddSingleton<IOrderService, OrderService>();
             services.AddSingleton<IReceiptService, ReceiptService>();
+            services.AddSingleton<ITcgPlayerOrderImportService, TcgPlayerOrderImportService>();
 
             // Sort/filter presets
             services.AddSingleton<ICollectionPresetService, CollectionPresetService>();
@@ -171,6 +172,8 @@ public partial class App : Application
             services.AddTransient<EbayAuthViewModel>();
             services.AddTransient<CsvImportView>();
             services.AddTransient<CsvImportViewModel>();
+            services.AddTransient<Views.TcgOrderImport.TcgOrderImportView>();
+            services.AddTransient<Views.TcgOrderImport.TcgOrderImportViewModel>();
             services.AddTransient<SortFilterBuilderView>();
             services.AddTransient<SortFilterBuilderViewModel>();
             services.AddTransient<SetFilterBuilderView>();
