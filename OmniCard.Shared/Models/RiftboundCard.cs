@@ -39,4 +39,9 @@ public class RiftboundCard
     public ulong? ImageHash { get; set; }
     public ulong? EdgeHash { get; set; }
     public string? LocalImagePath { get; set; }
+
+    // Pricing — populated by RiftboundService.UpdatePricesAsync from TCGCSV, keyed by TcgplayerId.
+    public decimal? MarketPrice { get; set; }        // TCGCSV "Normal" subtype market price
+    public decimal? FoilMarketPrice { get; set; }    // TCGCSV "Foil" subtype market price
+    public DateTime? PriceUpdatedAt { get; set; }     // UTC timestamp of last successful price write
 }

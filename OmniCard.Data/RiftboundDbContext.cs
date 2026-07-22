@@ -41,6 +41,9 @@ public class RiftboundDbContext : DbContext
         // Reserved for future additive columns (see OptcgDbContext for the pattern).
         AddColumnIfMissing(conn, "EdgeHash INTEGER");
         AddColumnIfMissing(conn, "LocalImagePath TEXT");
+        AddColumnIfMissing(conn, "MarketPrice TEXT");
+        AddColumnIfMissing(conn, "FoilMarketPrice TEXT");
+        AddColumnIfMissing(conn, "PriceUpdatedAt TEXT");
     }
 
     private static void AddColumnIfMissing(System.Data.Common.DbConnection conn, string columnDef)
