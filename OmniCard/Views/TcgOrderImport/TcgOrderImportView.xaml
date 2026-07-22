@@ -27,8 +27,15 @@
         <DataGrid ItemsSource="{Binding ViewModel.Rows}" AutoGenerateColumns="False"
                   CanUserAddRows="False" Style="{StaticResource {x:Type DataGrid}}">
             <DataGrid.Columns>
-                <DataGridCheckBoxColumn Header="Import" Binding="{Binding Include, UpdateSourceTrigger=PropertyChanged}"
-                                        IsReadOnly="False"/>
+                <DataGridTemplateColumn Header="Import">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding Include, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      IsEnabled="{Binding CanInclude}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTextColumn Header="Order #" Binding="{Binding OrderNumber}" IsReadOnly="True"/>
                 <DataGridTextColumn Header="Buyer" Binding="{Binding CustomerName}" IsReadOnly="True"/>
                 <DataGridTextColumn Header="City" Binding="{Binding City}" IsReadOnly="True"/>
