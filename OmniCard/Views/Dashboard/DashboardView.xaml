@@ -3,11 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:OmniCard.Views.Dashboard"
              xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
+             xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
+             xmlns:models="clr-namespace:OmniCard.Models;assembly=OmniCard.Shared"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             mc:Ignorable="d"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             d:DataContext="{d:DesignInstance {x:Type local:DashboardViewModel}}">
+             mc:Ignorable="d">
 
     <UserControl.Resources>
         <Style x:Key="TileBorderStyle" TargetType="Border">
@@ -54,18 +55,17 @@
 
     <Grid Margin="8">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>  <!-- Refresh + busy -->
+            <RowDefinition Height="Auto"/>  <!-- progress bar -->
+            <RowDefinition Height="Auto"/>  <!-- status message -->
+            <RowDefinition Height="*"/>     <!-- unified scroll -->
         </Grid.RowDefinitions>
 
-        <!-- Toolbar: Refresh + busy indicator -->
+        <!-- Single Refresh (refreshes both sections) + busy indicator -->
         <DockPanel Grid.Row="0" Margin="0,0,0,4">
             <Button DockPanel.Dock="Left"
                     Content="Refresh"
-                    Command="{Binding RefreshCommand}"
+                    Command="{Binding ViewModel.RefreshDashboardCommand}"
                     Padding="12,4"
                     FontWeight="SemiBold"/>
             <TextBlock DockPanel.Dock="Left"
@@ -74,356 +74,551 @@
                        Margin="12,0,0,0"
                        FontStyle="Italic"
                        Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
-                       Visibility="{Binding IsBusy, Converter={conv:BoolToVisibilityConverter}}"/>
+                       Visibility="{Binding ViewModel.Dashboard.IsBusy, Converter={conv:BoolToVisibilityConverter}}"/>
         </DockPanel>
 
         <ProgressBar Grid.Row="1"
                      Height="4"
                      Margin="0,0,0,8"
                      IsIndeterminate="True"
-                     Visibility="{Binding IsBusy, Converter={conv:BoolToVisibilityConverter}}"/>
+                     Visibility="{Binding ViewModel.Dashboard.IsBusy, Converter={conv:BoolToVisibilityConverter}}"/>
 
         <TextBlock Grid.Row="2"
-                   Text="{Binding StatusMessage}"
+                   Text="{Binding ViewModel.Dashboard.StatusMessage}"
                    Margin="0,0,0,8"
                    FontStyle="Italic"
                    Foreground="OrangeRed"
-                   Visibility="{Binding StatusMessage, Converter={conv:StringToVisibilityConverter}}"/>
+                   Visibility="{Binding ViewModel.Dashboard.StatusMessage, Converter={conv:StringToVisibilityConverter}}"/>
 
-        <!-- Summary tiles -->
-        <Grid Grid.Row="3">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <Border Grid.Column="0" Style="{StaticResource TileBorderStyle}">
-                <StackPanel>
-                    <TextBlock Text="Cost Basis"
-                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
-                    <TextBlock Text="{Binding TotalCost, StringFormat='${0:N2}'}"
-                               FontSize="24" FontWeight="Bold" Margin="0,4,0,0"/>
-                </StackPanel>
-            </Border>
-
-            <Border Grid.Column="1" Style="{StaticResource TileBorderStyle}">
-                <StackPanel>
-                    <TextBlock Text="Market Value"
-                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
-                    <TextBlock Text="{Binding TotalMarket, StringFormat='${0:N2}'}"
-                               FontSize="24" FontWeight="Bold" Margin="0,4,0,0"/>
-                </StackPanel>
-            </Border>
-
-            <Border Grid.Column="2" Style="{StaticResource TileBorderStyle}">
-                <StackPanel>
-                    <TextBlock Text="Unrealized Gain"
-                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
-                    <TextBlock Text="{Binding UnrealizedGain, Converter={conv:SignedMoneyConverter}}"
-                               Foreground="{Binding UnrealizedGain, Converter={conv:GainLossColorConverter}}"
-                               FontSize="24" FontWeight="Bold" Margin="0,4,0,0"/>
-                </StackPanel>
-            </Border>
-
-            <Border Grid.Column="3" Style="{StaticResource TileBorderStyle}">
-                <StackPanel>
-                    <TextBlock Text="Realized Profit"
-                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
-                    <TextBlock Text="{Binding RealizedProfit, Converter={conv:SignedMoneyConverter}}"
-                               Foreground="{Binding RealizedProfit, Converter={conv:GainLossColorConverter}}"
-                               FontSize="24" FontWeight="Bold" Margin="0,4,0,0"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                        <RadioButton Content="All Time" GroupName="RealizedPeriod"
-                                     IsChecked="{Binding RealizedPeriod, Converter={conv:EnumBoolConverter}, ConverterParameter=AllTime}"
-                                     Margin="0,0,10,0"/>
-                        <RadioButton Content="This Year" GroupName="RealizedPeriod"
-                                     IsChecked="{Binding RealizedPeriod, Converter={conv:EnumBoolConverter}, ConverterParameter=ThisYear}"
-                                     Margin="0,0,10,0"/>
-                        <RadioButton Content="This Month" GroupName="RealizedPeriod"
-                                     IsChecked="{Binding RealizedPeriod, Converter={conv:EnumBoolConverter}, ConverterParameter=ThisMonth}"/>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-
-            <Border Grid.Column="4" Style="{StaticResource TileBorderStyle}">
-                <StackPanel>
-                    <TextBlock Text="Realized (net)"
-                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
-                    <TextBlock Text="{Binding RealizedNet, Converter={conv:SignedMoneyConverter}}"
-                               Foreground="{Binding RealizedNet, Converter={conv:GainLossColorConverter}}"
-                               FontSize="24" FontWeight="Bold" Margin="0,4,0,0"/>
-                </StackPanel>
-            </Border>
-        </Grid>
-
-        <!-- Breakdown tables -->
-        <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="4,0,4,8">
 
-                <!-- Charts -->
-                <TextBlock Text="Charts" Style="{StaticResource BreakdownHeaderStyle}" Margin="0,4,0,8" FontSize="16"/>
+                <!-- ============ FINANCIALS (scoped to Dashboard VM) ============ -->
+                <StackPanel DataContext="{Binding ViewModel.Dashboard}">
 
-                <TextBlock Text="Market Value by Game" Style="{StaticResource BreakdownHeaderStyle}"/>
-                <ItemsControl ItemsSource="{Binding MarketByGameRows}" AlternationCount="8">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="0,1">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="160"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="90"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Style="{StaticResource ChartRowLabelStyle}"
-                                           Text="{Binding Key, Converter={conv:BreakdownKeyDisplayConverter}}"/>
-                                <Border Grid.Column="1" Style="{StaticResource ChartBarStyle}"
-                                        Background="{Binding Path=(ItemsControl.AlternationIndex),
-                                                     RelativeSource={RelativeSource TemplatedParent},
-                                                     Converter={conv:SeriesIndexBrushConverter}}">
-                                    <Border.Width>
-                                        <MultiBinding Converter="{conv:ShareBarWidthConverter}" ConverterParameter="220">
-                                            <Binding Path="Value"/>
-                                            <Binding Path="DataContext.MarketByGameMax"
-                                                     RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
-                                        </MultiBinding>
-                                    </Border.Width>
-                                </Border>
-                                <TextBlock Grid.Column="2" Style="{StaticResource ChartRowValueStyle}"
-                                           Text="{Binding Value, StringFormat='${0:N2}'}"/>
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                    <!-- Summary tiles -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                <TextBlock Text="Market Value by Category" Style="{StaticResource BreakdownHeaderStyle}"/>
-                <ItemsControl ItemsSource="{Binding MarketByCategoryRows}" AlternationCount="8">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="0,1">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="160"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="90"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Style="{StaticResource ChartRowLabelStyle}"
-                                           Text="{Binding Key, Converter={conv:BreakdownKeyDisplayConverter}}"/>
-                                <Border Grid.Column="1" Style="{StaticResource ChartBarStyle}"
-                                        Background="{Binding Path=(ItemsControl.AlternationIndex),
-                                                     RelativeSource={RelativeSource TemplatedParent},
-                                                     Converter={conv:SeriesIndexBrushConverter}}">
-                                    <Border.Width>
-                                        <MultiBinding Converter="{conv:ShareBarWidthConverter}" ConverterParameter="220">
-                                            <Binding Path="Value"/>
-                                            <Binding Path="DataContext.MarketByCategoryMax"
-                                                     RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
-                                        </MultiBinding>
-                                    </Border.Width>
-                                </Border>
-                                <TextBlock Grid.Column="2" Style="{StaticResource ChartRowValueStyle}"
-                                           Text="{Binding Value, StringFormat='${0:N2}'}"/>
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                        <Border Grid.Column="0" Style="{StaticResource TileBorderStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Cost Basis"
+                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                                <TextBlock Text="{Binding TotalCost, StringFormat='${0:N2}'}"
+                                           FontSize="24" FontWeight="Bold" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
 
-                <TextBlock Text="Realized Profit by Game" Style="{StaticResource BreakdownHeaderStyle}"/>
-                <ItemsControl ItemsSource="{Binding RealizedProfitByGameRows}" AlternationCount="8">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="0,1">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="160"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="90"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Style="{StaticResource ChartRowLabelStyle}"
-                                           Text="{Binding Key, Converter={conv:BreakdownKeyDisplayConverter}}"/>
-                                <!-- Negative (loss) values render a zero-width bar (ShareBarWidthConverter
-                                     clamps non-positive amounts to 0) — the signed label is the signal. -->
-                                <Border Grid.Column="1" Style="{StaticResource ChartBarStyle}"
-                                        Background="{Binding Path=(ItemsControl.AlternationIndex),
-                                                     RelativeSource={RelativeSource TemplatedParent},
-                                                     Converter={conv:SeriesIndexBrushConverter}}">
-                                    <Border.Width>
-                                        <MultiBinding Converter="{conv:ShareBarWidthConverter}" ConverterParameter="220">
-                                            <Binding Path="Value"/>
-                                            <Binding Path="DataContext.RealizedProfitByGameMax"
-                                                     RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
-                                        </MultiBinding>
-                                    </Border.Width>
-                                </Border>
-                                <TextBlock Grid.Column="2" Style="{StaticResource ChartRowValueStyle}"
-                                           Text="{Binding Value, Converter={conv:SignedMoneyConverter}}"
-                                           Foreground="{Binding Value, Converter={conv:GainLossColorConverter}}"/>
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                        <Border Grid.Column="1" Style="{StaticResource TileBorderStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Market Value"
+                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                                <TextBlock Text="{Binding TotalMarket, StringFormat='${0:N2}'}"
+                                           FontSize="24" FontWeight="Bold" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
 
-                <TextBlock Text="Holdings by Game" Style="{StaticResource BreakdownHeaderStyle}"/>
-                <DataGrid Style="{StaticResource BreakdownGridStyle}"
-                          ItemsSource="{Binding Holdings.ByGame}">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Game" Width="*"
-                                             Binding="{Binding Key, Converter={conv:BreakdownKeyDisplayConverter}}"/>
-                        <DataGridTextColumn Header="Units" Width="70" Binding="{Binding Units}"/>
-                        <DataGridTextColumn Header="Cost" Width="100" Binding="{Binding Cost, StringFormat='${0:N2}'}"/>
-                        <DataGridTextColumn Header="Market" Width="100" Binding="{Binding Market, StringFormat='${0:N2}'}"/>
-                        <DataGridTemplateColumn Header="Unrealized" Width="100">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <TextBlock VerticalAlignment="Center">
-                                        <TextBlock.Text>
-                                            <MultiBinding Converter="{conv:DeltaMoneyConverter}">
-                                                <Binding Path="Market"/>
-                                                <Binding Path="Cost"/>
-                                            </MultiBinding>
-                                        </TextBlock.Text>
-                                    </TextBlock>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Header="Share" Width="90">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <Border Height="10" Margin="0,0,0,0"
-                                            HorizontalAlignment="Left"
-                                            Background="{DynamicResource MaterialDesign.Brush.Primary}">
+                        <Border Grid.Column="2" Style="{StaticResource TileBorderStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Unrealized Gain"
+                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                                <TextBlock Text="{Binding UnrealizedGain, Converter={conv:SignedMoneyConverter}}"
+                                           Foreground="{Binding UnrealizedGain, Converter={conv:GainLossColorConverter}}"
+                                           FontSize="24" FontWeight="Bold" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="3" Style="{StaticResource TileBorderStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Realized Profit"
+                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                                <TextBlock Text="{Binding RealizedProfit, Converter={conv:SignedMoneyConverter}}"
+                                           Foreground="{Binding RealizedProfit, Converter={conv:GainLossColorConverter}}"
+                                           FontSize="24" FontWeight="Bold" Margin="0,4,0,0"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                    <RadioButton Content="All Time" GroupName="RealizedPeriod"
+                                                 IsChecked="{Binding RealizedPeriod, Converter={conv:EnumBoolConverter}, ConverterParameter=AllTime}"
+                                                 Margin="0,0,10,0"/>
+                                    <RadioButton Content="This Year" GroupName="RealizedPeriod"
+                                                 IsChecked="{Binding RealizedPeriod, Converter={conv:EnumBoolConverter}, ConverterParameter=ThisYear}"
+                                                 Margin="0,0,10,0"/>
+                                    <RadioButton Content="This Month" GroupName="RealizedPeriod"
+                                                 IsChecked="{Binding RealizedPeriod, Converter={conv:EnumBoolConverter}, ConverterParameter=ThisMonth}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="4" Style="{StaticResource TileBorderStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Realized (net)"
+                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                                <TextBlock Text="{Binding RealizedNet, Converter={conv:SignedMoneyConverter}}"
+                                           Foreground="{Binding RealizedNet, Converter={conv:GainLossColorConverter}}"
+                                           FontSize="24" FontWeight="Bold" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- Charts -->
+                    <TextBlock Text="Charts" Style="{StaticResource BreakdownHeaderStyle}" Margin="0,4,0,8" FontSize="16"/>
+
+                    <TextBlock Text="Market Value by Game" Style="{StaticResource BreakdownHeaderStyle}"/>
+                    <ItemsControl ItemsSource="{Binding MarketByGameRows}" AlternationCount="8">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="160"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="90"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Style="{StaticResource ChartRowLabelStyle}"
+                                               Text="{Binding Key, Converter={conv:BreakdownKeyDisplayConverter}}"/>
+                                    <Border Grid.Column="1" Style="{StaticResource ChartBarStyle}"
+                                            Background="{Binding Path=(ItemsControl.AlternationIndex),
+                                                         RelativeSource={RelativeSource TemplatedParent},
+                                                         Converter={conv:SeriesIndexBrushConverter}}">
                                         <Border.Width>
-                                            <MultiBinding Converter="{conv:ShareBarWidthConverter}">
-                                                <Binding Path="Market"/>
-                                                <Binding Path="DataContext.TotalMarket"
+                                            <MultiBinding Converter="{conv:ShareBarWidthConverter}" ConverterParameter="220">
+                                                <Binding Path="Value"/>
+                                                <Binding Path="DataContext.MarketByGameMax"
                                                          RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
                                             </MultiBinding>
                                         </Border.Width>
                                     </Border>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                    </DataGrid.Columns>
-                </DataGrid>
+                                    <TextBlock Grid.Column="2" Style="{StaticResource ChartRowValueStyle}"
+                                               Text="{Binding Value, StringFormat='${0:N2}'}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
-                <TextBlock Text="Holdings by Category" Style="{StaticResource BreakdownHeaderStyle}"/>
-                <DataGrid Style="{StaticResource BreakdownGridStyle}"
-                          ItemsSource="{Binding Holdings.ByCategory}">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Category" Width="*"
-                                             Binding="{Binding Key, Converter={conv:BreakdownKeyDisplayConverter}}"/>
-                        <DataGridTextColumn Header="Units" Width="70" Binding="{Binding Units}"/>
-                        <DataGridTextColumn Header="Cost" Width="100" Binding="{Binding Cost, StringFormat='${0:N2}'}"/>
-                        <DataGridTextColumn Header="Market" Width="100" Binding="{Binding Market, StringFormat='${0:N2}'}"/>
-                        <DataGridTemplateColumn Header="Unrealized" Width="100">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <TextBlock VerticalAlignment="Center">
-                                        <TextBlock.Text>
-                                            <MultiBinding Converter="{conv:DeltaMoneyConverter}">
-                                                <Binding Path="Market"/>
-                                                <Binding Path="Cost"/>
-                                            </MultiBinding>
-                                        </TextBlock.Text>
-                                    </TextBlock>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Header="Share" Width="90">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <Border Height="10"
-                                            HorizontalAlignment="Left"
-                                            Background="{DynamicResource MaterialDesign.Brush.Primary}">
+                    <TextBlock Text="Market Value by Category" Style="{StaticResource BreakdownHeaderStyle}"/>
+                    <ItemsControl ItemsSource="{Binding MarketByCategoryRows}" AlternationCount="8">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="160"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="90"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Style="{StaticResource ChartRowLabelStyle}"
+                                               Text="{Binding Key, Converter={conv:BreakdownKeyDisplayConverter}}"/>
+                                    <Border Grid.Column="1" Style="{StaticResource ChartBarStyle}"
+                                            Background="{Binding Path=(ItemsControl.AlternationIndex),
+                                                         RelativeSource={RelativeSource TemplatedParent},
+                                                         Converter={conv:SeriesIndexBrushConverter}}">
                                         <Border.Width>
-                                            <MultiBinding Converter="{conv:ShareBarWidthConverter}">
-                                                <Binding Path="Market"/>
-                                                <Binding Path="DataContext.TotalMarket"
+                                            <MultiBinding Converter="{conv:ShareBarWidthConverter}" ConverterParameter="220">
+                                                <Binding Path="Value"/>
+                                                <Binding Path="DataContext.MarketByCategoryMax"
                                                          RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
                                             </MultiBinding>
                                         </Border.Width>
                                     </Border>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                    </DataGrid.Columns>
-                </DataGrid>
+                                    <TextBlock Grid.Column="2" Style="{StaticResource ChartRowValueStyle}"
+                                               Text="{Binding Value, StringFormat='${0:N2}'}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
-                <TextBlock Text="Holdings by Location" Style="{StaticResource BreakdownHeaderStyle}"/>
-                <DataGrid Style="{StaticResource BreakdownGridStyle}"
-                          ItemsSource="{Binding Holdings.ByLocation}">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Location" Width="*"
-                                             Binding="{Binding Key, Converter={conv:BreakdownKeyDisplayConverter}}"/>
-                        <DataGridTextColumn Header="Units" Width="70" Binding="{Binding Units}"/>
-                        <DataGridTextColumn Header="Cost" Width="100" Binding="{Binding Cost, StringFormat='${0:N2}'}"/>
-                        <DataGridTextColumn Header="Market" Width="100" Binding="{Binding Market, StringFormat='${0:N2}'}"/>
-                        <DataGridTemplateColumn Header="Unrealized" Width="100">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <TextBlock VerticalAlignment="Center">
-                                        <TextBlock.Text>
-                                            <MultiBinding Converter="{conv:DeltaMoneyConverter}">
-                                                <Binding Path="Market"/>
-                                                <Binding Path="Cost"/>
-                                            </MultiBinding>
-                                        </TextBlock.Text>
-                                    </TextBlock>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Header="Share" Width="90">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <Border Height="10"
-                                            HorizontalAlignment="Left"
-                                            Background="{DynamicResource MaterialDesign.Brush.Primary}">
+                    <TextBlock Text="Realized Profit by Game" Style="{StaticResource BreakdownHeaderStyle}"/>
+                    <ItemsControl ItemsSource="{Binding RealizedProfitByGameRows}" AlternationCount="8">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="160"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="90"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Style="{StaticResource ChartRowLabelStyle}"
+                                               Text="{Binding Key, Converter={conv:BreakdownKeyDisplayConverter}}"/>
+                                    <!-- Negative (loss) values render a zero-width bar (ShareBarWidthConverter
+                                         clamps non-positive amounts to 0) — the signed label is the signal. -->
+                                    <Border Grid.Column="1" Style="{StaticResource ChartBarStyle}"
+                                            Background="{Binding Path=(ItemsControl.AlternationIndex),
+                                                         RelativeSource={RelativeSource TemplatedParent},
+                                                         Converter={conv:SeriesIndexBrushConverter}}">
                                         <Border.Width>
-                                            <MultiBinding Converter="{conv:ShareBarWidthConverter}">
-                                                <Binding Path="Market"/>
-                                                <Binding Path="DataContext.TotalMarket"
+                                            <MultiBinding Converter="{conv:ShareBarWidthConverter}" ConverterParameter="220">
+                                                <Binding Path="Value"/>
+                                                <Binding Path="DataContext.RealizedProfitByGameMax"
                                                          RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
                                             </MultiBinding>
                                         </Border.Width>
                                     </Border>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                    </DataGrid.Columns>
-                </DataGrid>
+                                    <TextBlock Grid.Column="2" Style="{StaticResource ChartRowValueStyle}"
+                                               Text="{Binding Value, Converter={conv:SignedMoneyConverter}}"
+                                               Foreground="{Binding Value, Converter={conv:GainLossColorConverter}}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
-                <TextBlock Text="Realized P&amp;L by Game" Style="{StaticResource BreakdownHeaderStyle}"/>
-                <DataGrid Style="{StaticResource BreakdownGridStyle}"
-                          ItemsSource="{Binding Realized.ByGame}">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Game" Width="*"
-                                             Binding="{Binding Key, Converter={conv:BreakdownKeyDisplayConverter}}"/>
-                        <DataGridTextColumn Header="Sold" Width="70" Binding="{Binding Count}"/>
-                        <DataGridTextColumn Header="Proceeds" Width="100" Binding="{Binding Proceeds, StringFormat='${0:N2}'}"/>
-                        <DataGridTextColumn Header="Cost" Width="100" Binding="{Binding Cost, StringFormat='${0:N2}'}"/>
-                        <DataGridTemplateColumn Header="Profit" Width="100">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <TextBlock VerticalAlignment="Center">
-                                        <TextBlock.Text>
-                                            <MultiBinding Converter="{conv:DeltaMoneyConverter}">
-                                                <Binding Path="Proceeds"/>
-                                                <Binding Path="Cost"/>
-                                            </MultiBinding>
-                                        </TextBlock.Text>
+                    <TextBlock Text="Holdings by Game" Style="{StaticResource BreakdownHeaderStyle}"/>
+                    <DataGrid Style="{StaticResource BreakdownGridStyle}"
+                              ItemsSource="{Binding Holdings.ByGame}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Game" Width="*"
+                                                 Binding="{Binding Key, Converter={conv:BreakdownKeyDisplayConverter}}"/>
+                            <DataGridTextColumn Header="Units" Width="70" Binding="{Binding Units}"/>
+                            <DataGridTextColumn Header="Cost" Width="100" Binding="{Binding Cost, StringFormat='${0:N2}'}"/>
+                            <DataGridTextColumn Header="Market" Width="100" Binding="{Binding Market, StringFormat='${0:N2}'}"/>
+                            <DataGridTemplateColumn Header="Unrealized" Width="100">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock VerticalAlignment="Center">
+                                            <TextBlock.Text>
+                                                <MultiBinding Converter="{conv:DeltaMoneyConverter}">
+                                                    <Binding Path="Market"/>
+                                                    <Binding Path="Cost"/>
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="Share" Width="90">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Height="10" Margin="0,0,0,0"
+                                                HorizontalAlignment="Left"
+                                                Background="{DynamicResource MaterialDesign.Brush.Primary}">
+                                            <Border.Width>
+                                                <MultiBinding Converter="{conv:ShareBarWidthConverter}">
+                                                    <Binding Path="Market"/>
+                                                    <Binding Path="DataContext.TotalMarket"
+                                                             RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
+                                                </MultiBinding>
+                                            </Border.Width>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <TextBlock Text="Holdings by Category" Style="{StaticResource BreakdownHeaderStyle}"/>
+                    <DataGrid Style="{StaticResource BreakdownGridStyle}"
+                              ItemsSource="{Binding Holdings.ByCategory}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Category" Width="*"
+                                                 Binding="{Binding Key, Converter={conv:BreakdownKeyDisplayConverter}}"/>
+                            <DataGridTextColumn Header="Units" Width="70" Binding="{Binding Units}"/>
+                            <DataGridTextColumn Header="Cost" Width="100" Binding="{Binding Cost, StringFormat='${0:N2}'}"/>
+                            <DataGridTextColumn Header="Market" Width="100" Binding="{Binding Market, StringFormat='${0:N2}'}"/>
+                            <DataGridTemplateColumn Header="Unrealized" Width="100">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock VerticalAlignment="Center">
+                                            <TextBlock.Text>
+                                                <MultiBinding Converter="{conv:DeltaMoneyConverter}">
+                                                    <Binding Path="Market"/>
+                                                    <Binding Path="Cost"/>
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="Share" Width="90">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Height="10"
+                                                HorizontalAlignment="Left"
+                                                Background="{DynamicResource MaterialDesign.Brush.Primary}">
+                                            <Border.Width>
+                                                <MultiBinding Converter="{conv:ShareBarWidthConverter}">
+                                                    <Binding Path="Market"/>
+                                                    <Binding Path="DataContext.TotalMarket"
+                                                             RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
+                                                </MultiBinding>
+                                            </Border.Width>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <TextBlock Text="Holdings by Location" Style="{StaticResource BreakdownHeaderStyle}"/>
+                    <DataGrid Style="{StaticResource BreakdownGridStyle}"
+                              ItemsSource="{Binding Holdings.ByLocation}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Location" Width="*"
+                                                 Binding="{Binding Key, Converter={conv:BreakdownKeyDisplayConverter}}"/>
+                            <DataGridTextColumn Header="Units" Width="70" Binding="{Binding Units}"/>
+                            <DataGridTextColumn Header="Cost" Width="100" Binding="{Binding Cost, StringFormat='${0:N2}'}"/>
+                            <DataGridTextColumn Header="Market" Width="100" Binding="{Binding Market, StringFormat='${0:N2}'}"/>
+                            <DataGridTemplateColumn Header="Unrealized" Width="100">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock VerticalAlignment="Center">
+                                            <TextBlock.Text>
+                                                <MultiBinding Converter="{conv:DeltaMoneyConverter}">
+                                                    <Binding Path="Market"/>
+                                                    <Binding Path="Cost"/>
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="Share" Width="90">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Height="10"
+                                                HorizontalAlignment="Left"
+                                                Background="{DynamicResource MaterialDesign.Brush.Primary}">
+                                            <Border.Width>
+                                                <MultiBinding Converter="{conv:ShareBarWidthConverter}">
+                                                    <Binding Path="Market"/>
+                                                    <Binding Path="DataContext.TotalMarket"
+                                                             RelativeSource="{RelativeSource FindAncestor, AncestorType=UserControl}"/>
+                                                </MultiBinding>
+                                            </Border.Width>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <TextBlock Text="Realized P&amp;L by Game" Style="{StaticResource BreakdownHeaderStyle}"/>
+                    <DataGrid Style="{StaticResource BreakdownGridStyle}"
+                              ItemsSource="{Binding Realized.ByGame}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Game" Width="*"
+                                                 Binding="{Binding Key, Converter={conv:BreakdownKeyDisplayConverter}}"/>
+                            <DataGridTextColumn Header="Sold" Width="70" Binding="{Binding Count}"/>
+                            <DataGridTextColumn Header="Proceeds" Width="100" Binding="{Binding Proceeds, StringFormat='${0:N2}'}"/>
+                            <DataGridTextColumn Header="Cost" Width="100" Binding="{Binding Cost, StringFormat='${0:N2}'}"/>
+                            <DataGridTemplateColumn Header="Profit" Width="100">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock VerticalAlignment="Center">
+                                            <TextBlock.Text>
+                                                <MultiBinding Converter="{conv:DeltaMoneyConverter}">
+                                                    <Binding Path="Proceeds"/>
+                                                    <Binding Path="Cost"/>
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <!-- Empty state -->
+                    <TextBlock Text="No holdings yet — scan or import cards, or add sealed inventory, to see valuation here."
+                               HorizontalAlignment="Center"
+                               Margin="0,24,0,0"
+                               FontStyle="Italic"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                               Visibility="{Binding HasNoHoldings, Converter={conv:BoolToVisibilityConverter}}"/>
+                </StackPanel>
+
+                <Separator Margin="0,16,0,8"/>
+
+                <!-- ============ COLLECTION STATS (RootView DataContext) ============ -->
+
+                <!-- Loading indicator (from HomeTabView.xaml lines 19-25) -->
+                <StackPanel Margin="8"
+                            Visibility="{Binding ViewModel.IsCalculatingCompletion, Converter={StaticResource BoolToVis}}">
+                    <ProgressBar IsIndeterminate="True" Height="4" Margin="0,0,0,4"/>
+                    <TextBlock Text="{Binding ViewModel.CompletionStatusMessage}"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                               HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                </StackPanel>
+
+                <!-- Collection Stats Dashboard -->
+                <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                        CornerRadius="4" Padding="12" Margin="8,4,8,4"
+                        Visibility="{Binding ViewModel.IsCalculatingCompletion, Converter={conv:InverseBoolToVisibilityConverter}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Row 1: Key stats -->
+                        <StackPanel Grid.Column="0" HorizontalAlignment="Center" Margin="8,4">
+                            <TextBlock Text="{Binding ViewModel.StatTotalCards}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Total Cards" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" HorizontalAlignment="Center" Margin="8,4">
+                            <TextBlock Text="{Binding ViewModel.StatTotalSets}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Sets" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" HorizontalAlignment="Center" Margin="8,4">
+                            <TextBlock Text="{Binding ViewModel.StatFoilCount}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Foils" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="3" HorizontalAlignment="Center" Margin="8,4">
+                            <TextBlock Text="{Binding ViewModel.StatTotalValue, StringFormat='${0:F2}'}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Total Value" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- Row 2: Rarity breakdown -->
+                        <StackPanel Grid.Row="1" Grid.ColumnSpan="4" Orientation="Horizontal"
+                                    HorizontalAlignment="Center" Margin="0,8,0,0">
+                            <Border Background="#555555" CornerRadius="3" Padding="8,4" Margin="4,0">
+                                <TextBlock><Run Text="{Binding ViewModel.StatCommonCount, Mode=OneWay}"/><Run Text=" Common"/></TextBlock>
+                            </Border>
+                            <Border Background="#C0C0C0" CornerRadius="3" Padding="8,4" Margin="4,0">
+                                <TextBlock Foreground="Black"><Run Text="{Binding ViewModel.StatUncommonCount, Mode=OneWay}"/><Run Text=" Uncommon"/></TextBlock>
+                            </Border>
+                            <Border Background="#FFD700" CornerRadius="3" Padding="8,4" Margin="4,0">
+                                <TextBlock Foreground="Black"><Run Text="{Binding ViewModel.StatRareCount, Mode=OneWay}"/><Run Text=" Rare"/></TextBlock>
+                            </Border>
+                            <Border Background="#F05030" CornerRadius="3" Padding="8,4" Margin="4,0">
+                                <TextBlock><Run Text="{Binding ViewModel.StatMythicCount, Mode=OneWay}"/><Run Text=" Mythic"/></TextBlock>
+                            </Border>
+                            <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                                    BorderBrush="{DynamicResource MaterialDesign.Brush.TextBox.HoverBorder}"
+                                    BorderThickness="1" CornerRadius="3" Padding="8,4" Margin="4,0"
+                                    Visibility="{Binding ViewModel.StatOtherRarityCount, Converter={conv:NullToCollapsedConverter}}">
+                                <TextBlock><Run Text="{Binding ViewModel.StatOtherRarityCount, Mode=OneWay}"/><Run Text=" Other"/></TextBlock>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Sets-in-collection header (no per-section refresh button; unified Refresh is at top) -->
+                <TextBlock Text="Sets in Collection"
+                           FontWeight="SemiBold" FontSize="14" Margin="0,8,0,4"
+                           Visibility="{Binding ViewModel.IsCalculatingCompletion, Converter={conv:InverseBoolToVisibilityConverter}}"/>
+
+                <!-- Set-completion list: inner scroll DISABLED so the outer ScrollViewer pages it,
+                     while SelectedItem -> ExpandSetCompletionCommand click-to-expand is preserved. -->
+                <ListView ItemsSource="{Binding ViewModel.SetCompletionResults}"
+                          SelectedItem="{Binding ViewModel.SelectedSetCompletion}"
+                          ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                          BorderThickness="0"
+                          HorizontalContentAlignment="Stretch">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem" BasedOn="{StaticResource {x:Type ListViewItem}}">
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Margin" Value="0"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+
+                    <ListView.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ListView.ItemsPanel>
+
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{StaticResource MaterialDesignLightSeparatorBackground}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Width="240"
+                                    Margin="6"
+                                    Padding="10,12">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Offset="0" Color="#33FFFFFF"/>
+                                        <GradientStop Offset="1" Color="#0DFFFFFF"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <StackPanel>
+                                    <!-- [Set Name] ([set code]) -->
+                                    <TextBlock HorizontalAlignment="Center"
+                                               TextAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               FontFamily="{StaticResource AppFont}"
+                                               FontSize="18"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource MaterialDesign.Brush.Primary}">
+                                        <Run Text="{Binding SetName, Mode=OneWay}"/><Run Text=" ("/><Run Text="{Binding SetCode, Mode=OneWay}"/><Run Text=")"/>
                                     </TextBlock>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                    </DataGrid.Columns>
-                </DataGrid>
 
-                <!-- Empty state -->
-                <TextBlock Text="No holdings yet — scan or import cards, or add sealed inventory, to see valuation here."
-                           HorizontalAlignment="Center"
-                           Margin="0,24,0,0"
-                           FontStyle="Italic"
-                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
-                           Visibility="{Binding HasNoHoldings, Converter={conv:BoolToVisibilityConverter}}"/>
+                                    <!-- Set symbol (MTG) or set code in large font (One Piece) -->
+                                    <Grid Height="48" Margin="0,10">
+                                        <!-- MTG: common-shape SVG tinted light so it reads on the dark tile -->
+                                        <Border Width="44" Height="44"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                helpers:SetSymbol.SetCode="{Binding SetCode}"
+                                                helpers:SetSymbol.Rarity="common"
+                                                helpers:SetSymbol.Tint="#F0F0F0">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Game}" Value="{x:Static models:CardGame.Mtg}">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                        </Border>
+
+                                        <!-- One Piece: no symbol, show the set code larger -->
+                                        <TextBlock Text="{Binding SetCode}"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   TextAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   FontFamily="{StaticResource AppFont}"
+                                                   FontSize="28"
+                                                   FontWeight="Bold"
+                                                   Foreground="White">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Game}" Value="{x:Static models:CardGame.OnePiece}">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
+
+                                    <!-- [owned] / [total] ([percent]%) — distinct cards toward completion -->
+                                    <TextBlock Text="{Binding Converter={conv:CompletionPercentConverter}}"
+                                               HorizontalAlignment="Center"
+                                               TextAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               FontFamily="{StaticResource AppFont}"
+                                               Foreground="White"/>
+
+                                    <!-- Total physical copies (shown only when duplicates exist) -->
+                                    <TextBlock Text="{Binding CopiesDisplay}"
+                                               HorizontalAlignment="Center"
+                                               TextAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               FontFamily="{StaticResource AppFont}"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                               Visibility="{Binding HasDuplicateCopies, Converter={StaticResource BoolToVis}}"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
             </StackPanel>
         </ScrollViewer>
     </Grid>

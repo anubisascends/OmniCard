@@ -168,9 +168,9 @@
                     Grid.Row="2"
                     SelectedIndex="{Binding ViewModel.SelectedTabIndex}">
 
-            <TabItem Header="Home"
-                     x:Name="tabItemHome">
-                <local:HomeTabView/>
+            <TabItem Header="Dashboard"
+                     x:Name="tabItemDashboard">
+                <dashboard:DashboardView x:Name="DashboardTab"/>
             </TabItem>
 
             <TabItem Header="Collection"
@@ -181,11 +181,6 @@
             <TabItem Header="Scanner"
                      x:Name="tabItemScanner">
                 <local:ScannerTabView x:Name="ScannerTab"/>
-            </TabItem>
-
-            <TabItem Header="Dashboard"
-                     x:Name="tabItemDashboard">
-                <dashboard:DashboardView x:Name="DashboardTab"/>
             </TabItem>
 
             <TabItem Header="Sales"
