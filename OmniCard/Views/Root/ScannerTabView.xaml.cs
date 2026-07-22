@@ -168,9 +168,9 @@ public partial class ScannerTabView : UserControl
         }
         else if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control)
         {
-            // Ctrl+C: copy card identifier (CardSetId for OPTCG, SetCode for MTG)
-            var value = ViewModel.SelectedGame == CardGame.OnePiece
-                ? ViewModel.SharedCollectorNumber  // OPTCG CardSetId (e.g. OP15-041)
+            // Ctrl+C: copy card identifier (CardSetId for OPTCG/Riftbound, SetCode for MTG)
+            var value = ViewModel.SelectedGame is CardGame.OnePiece or CardGame.Riftbound
+                ? ViewModel.SharedCollectorNumber  // OPTCG CardSetId (e.g. OP15-041) / Riftbound collector number
                 : ViewModel.SharedSetCode;
             if (value is not null)
                 Clipboard.SetText(value);

@@ -44,6 +44,7 @@ public class IndexModel : PageModel
         {
             "mtg" => CardGame.Mtg,
             "optcg" => CardGame.OnePiece,
+            "riftbound" => CardGame.Riftbound,
             _ => null
         };
     }
