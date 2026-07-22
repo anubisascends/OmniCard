@@ -123,6 +123,42 @@ public class RiftboundDownloadTests : IDisposable
     }
 
     [Fact]
+    public async Task DownloadBulkData_ExistingRow_RefreshesMetadata_PreservesHashAndImagePath()
+    {
+        using (var seedCtx = _factory.CreateDbContext())
+        {
+            seedCtx.Cards.Add(new RiftboundCard
+            {
+                Id = "c1",
+                Name = "Stale",
+                SetId = "OGN",
+                SetName = "Origins (stale)",
+                CollectorNumber = 999,
+                CardType = "Spell",
+                CardImageUri = "https://stale/url",
+                ImageHash = 12345UL,
+                LocalImagePath = "riftbound-art/c1.png",
+            });
+            seedCtx.SaveChanges();
+        }
+
+        var svc = CreateService();
+        await svc.DownloadBulkDataAsync();
+
+        using var ctx = _factory.CreateDbContext();
+        var row = ctx.Cards.Single(c => c.Id == "c1");
+
+        // Metadata refreshed from the API.
+        Assert.Equal("Cull the Weak", row.Name);
+        Assert.Equal(209, row.CollectorNumber);
+        Assert.Equal("https://cdn/c1.png", row.CardImageUri);
+
+        // Computed/backfilled fields preserved, not nulled by the update.
+        Assert.Equal(12345UL, row.ImageHash);
+        Assert.Equal("riftbound-art/c1.png", row.LocalImagePath);
+    }
+
+    [Fact]
     public async Task UpdatePrices_IsNoOp()
     {
         var svc = CreateService();
