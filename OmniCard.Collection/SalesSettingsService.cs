@@ -53,6 +53,24 @@ public class SalesSettingsService : ISalesSettingsService
         return destName;
     }
 
+    public double? OrdersEditorWidth => Load().OrdersEditorWidth;
+
+    public void SetOrdersEditorWidth(double width)
+    {
+        var settings = Load();
+        settings.OrdersEditorWidth = width;
+        Save(settings);
+    }
+
+    public bool OrdersEditorCollapsed => Load().OrdersEditorCollapsed;
+
+    public void SetOrdersEditorCollapsed(bool collapsed)
+    {
+        var settings = Load();
+        settings.OrdersEditorCollapsed = collapsed;
+        Save(settings);
+    }
+
     private SalesSettings Load()
     {
         SalesSettings settings;

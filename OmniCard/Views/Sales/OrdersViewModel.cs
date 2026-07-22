@@ -17,8 +17,38 @@ public partial class OrdersViewModel(
     IReceiptService receiptService,
     IReceiptPdfExporter receiptPdfExporter,
     ITcgPlayerOrderImportService importService,
-    IDialogService dialogService) : ObservableObject
+    IDialogService dialogService,
+    ISalesSettingsService salesSettings) : ObservableObject
 {
+    /// <summary>Minimum usable width (px) for the editor panel.</summary>
+    public const double MinEditorWidth = 280;
+    private double _editorWidth = salesSettings.OrdersEditorWidth is double w and >= MinEditorWidth ? w : 360;
+
+    /// <summary>Editor panel width (px), persisted. Clamped to <see cref="MinEditorWidth"/>.</summary>
+    public double EditorWidth
+    {
+        get => _editorWidth;
+        set
+        {
+            var clamped = value < MinEditorWidth ? MinEditorWidth : value;
+            if (clamped == _editorWidth) return;
+            _editorWidth = clamped;
+            salesSettings.SetOrdersEditorWidth(clamped);
+        }
+    }
+
+    /// <summary>Whether the editor panel is collapsed (board full-width). Persisted.</summary>
+    [ObservableProperty]
+    public partial bool IsEditorCollapsed { get; set; } = salesSettings.OrdersEditorCollapsed;
+
+    partial void OnIsEditorCollapsedChanged(bool value) => salesSettings.SetOrdersEditorCollapsed(value);
+
+    [RelayCommand]
+    public void CollapseEditor() => IsEditorCollapsed = true;
+
+    [RelayCommand]
+    public void ExpandEditor() => IsEditorCollapsed = false;
+
     public ObservableCollection<Order> Orders { get; } = [];
     public ObservableCollection<Order> CreatedOrders { get; } = [];
     public ObservableCollection<Order> PackedOrders { get; } = [];
@@ -106,6 +136,10 @@ public partial class OrdersViewModel(
 
     partial void OnSelectedOrderChanged(Order? value)
     {
+        // Selecting a card re-opens the editor if it was collapsed (Jira-style).
+        if (value is not null && IsEditorCollapsed)
+            IsEditorCollapsed = false;
+
         Lines.Clear();
         if (value is not null)
             foreach (var l in orderService.GetLines(value.Id)) Lines.Add(l);

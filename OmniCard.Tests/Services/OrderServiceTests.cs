@@ -37,6 +37,10 @@ public class OrderServiceTests : IDisposable
         public OmniCard.Models.ReceiptSettings GetReceipt() => new();
         public void SaveReceipt(OmniCard.Models.ReceiptSettings receipt) { }
         public string SetLogo(string sourcePath) => "company-logo.png";
+        public double? OrdersEditorWidth => null;
+        public void SetOrdersEditorWidth(double width) { }
+        public bool OrdersEditorCollapsed => false;
+        public void SetOrdersEditorCollapsed(bool collapsed) { }
     }
 
     private (int customerId, int lotId) SeedCustomerAndLot()
