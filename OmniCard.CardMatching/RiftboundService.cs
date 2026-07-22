@@ -790,9 +790,47 @@ public sealed class RiftboundService : ICardGameService, IDisposable
             .AsEnumerable().Select(c => ToMatch(c)).ToList();
     }
 
-    // Riftcodex provides no prices.
-    public decimal? GetCurrentPrice(string gameCardId, bool isFoil) => null;
-    public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil) => [];
+    // Prices come from TCGCSV (see UpdatePricesAsync). Foil-aware with fallback to the
+    // other subtype so a card resolves a price whenever any subtype has one.
+    public decimal? GetCurrentPrice(string gameCardId, bool isFoil)
+    {
+        var row = _readContext.Cards.AsNoTracking()
+            .Where(c => c.Id == gameCardId)
+            .Select(c => new { c.MarketPrice, c.FoilMarketPrice })
+            .FirstOrDefault();
+        if (row is null) return null;
+        return isFoil
+            ? row.FoilMarketPrice ?? row.MarketPrice
+            : row.MarketPrice ?? row.FoilMarketPrice;
+    }
+
+    public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil)
+    {
+        var ids = gameCardIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return [];
+
+        var result = new Dictionary<string, decimal>(ids.Count);
+
+        foreach (var chunk in ids.Chunk(500))
+        {
+            var rows = _readContext.Cards.AsNoTracking()
+                .Where(c => chunk.Contains(c.Id))
+                .Select(c => new { c.Id, c.MarketPrice, c.FoilMarketPrice })
+                .ToList();
+
+            foreach (var row in rows)
+            {
+                var price = isFoil
+                    ? row.FoilMarketPrice ?? row.MarketPrice
+                    : row.MarketPrice ?? row.FoilMarketPrice;
+                if (price.HasValue)
+                    result[row.Id] = price.Value;
+            }
+        }
+
+        return result;
+    }
 
     public void RecordCorrection(ulong scanHash, string correctCardId, ulong? artScanHash = null)
     {

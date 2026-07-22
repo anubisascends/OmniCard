@@ -233,6 +233,39 @@ public class RiftboundDownloadTests : IDisposable
         Assert.Null(c4.FoilMarketPrice);
     }
 
+    [Fact]
+    public void GetCurrentPrice_IsFoilAware_WithFallback()
+    {
+        using (var seed = _factory.CreateDbContext())
+        {
+            seed.Cards.AddRange(
+                new RiftboundCard { Id = "both", Name = "Both", SetId = "OGN", MarketPrice = 1.50m, FoilMarketPrice = 3.00m },
+                new RiftboundCard { Id = "foilonly", Name = "FoilOnly", SetId = "OGN", MarketPrice = null, FoilMarketPrice = 9.00m },
+                new RiftboundCard { Id = "normalonly", Name = "NormalOnly", SetId = "OGN", MarketPrice = 2.00m, FoilMarketPrice = null },
+                new RiftboundCard { Id = "none", Name = "None", SetId = "OGN", MarketPrice = null, FoilMarketPrice = null });
+            seed.SaveChanges();
+        }
+
+        var svc = CreateService(); // read path uses the DB, not HTTP
+
+        // Foil requested
+        Assert.Equal(3.00m, svc.GetCurrentPrice("both", isFoil: true));
+        Assert.Equal(9.00m, svc.GetCurrentPrice("foilonly", isFoil: true));
+        Assert.Equal(2.00m, svc.GetCurrentPrice("normalonly", isFoil: true));   // falls back to normal
+        Assert.Null(svc.GetCurrentPrice("none", isFoil: true));
+
+        // Non-foil requested
+        Assert.Equal(1.50m, svc.GetCurrentPrice("both", isFoil: false));
+        Assert.Equal(9.00m, svc.GetCurrentPrice("foilonly", isFoil: false));    // falls back to foil
+        Assert.Equal(2.00m, svc.GetCurrentPrice("normalonly", isFoil: false));
+
+        // Bulk
+        var prices = svc.GetCurrentPrices(new[] { "both", "foilonly", "none" }, isFoil: true);
+        Assert.Equal(3.00m, prices["both"]);
+        Assert.Equal(9.00m, prices["foilonly"]);
+        Assert.False(prices.ContainsKey("none"));   // no value for either subtype
+    }
+
     private class RoutingHandler(Func<string, string?> route) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
