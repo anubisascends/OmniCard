@@ -31,7 +31,7 @@ public sealed class RiftboundService : ICardGameService, IDisposable
     private Dictionary<string, string>? _hashSetLookup;
     private List<(ulong ScanHash, string CorrectCardId)>? _correctionsCache;
 
-    private static JsonSerializerOptions JsonOptions => new()
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         NumberHandling = JsonNumberHandling.AllowReadingFromString

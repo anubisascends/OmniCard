@@ -66,7 +66,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     // matched only to anchor the pattern and is discarded.
     private static readonly System.Text.RegularExpressions.Regex RiftboundPattern =
         new(@"([A-Za-z]{2,4})\s*[•·.\-]{0,2}\s*(\d{1,3})\s*/\s*\d{1,3}",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+            System.Text.RegularExpressions.RegexOptions.Compiled);
 
     public Dictionary<string, ulong> SymbolHashes { get; set; } = [];
 

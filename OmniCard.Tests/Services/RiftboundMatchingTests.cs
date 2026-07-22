@@ -82,6 +82,40 @@ public class RiftboundMatchingTests : IDisposable
         Assert.Null(match);
     }
 
+    [Fact]
+    public void Ocr_SingleCandidate_ReturnsExactMatch()
+    {
+        var ocr = new OcrMatchResult { CollectorNumber = "OGN-5", CollectorNumberConfidence = 0.95 };
+        var match = _svc.FindClosestMatch(0xDEADBEEFUL, ocrResult: ocr);
+        Assert.NotNull(match);
+        Assert.Equal("solo", match!.GameSpecificId);
+        Assert.Equal(100, match.Confidence);
+    }
+
+    [Fact]
+    public void Ocr_CandidatesWithoutImageHash_FallsBackToFirstCandidate()
+    {
+        // Phase 0's OCR-collector-number branch queries _readContext fresh on every call
+        // (unlike the pHash caches, which are memoized in _hashCache/_edgeHashCache), so a
+        // row inserted through a new context sharing the same in-memory Sqlite connection
+        // is visible to _svc without reconstructing the service.
+        using (var ctx = _factory.CreateDbContext())
+        {
+            ctx.Cards.Add(new RiftboundCard { Id = "fallback1", CollectorNumber = 99, SetId = "OGN", SetName = "Origins",
+                Name = "Nohash1", Rarity = "Common", CardType = "Unit", ImageHash = null, CardImageUri = "u" });
+            ctx.Cards.Add(new RiftboundCard { Id = "fallback2", CollectorNumber = 99, SetId = "OGN", SetName = "Origins",
+                Name = "Nohash2", Rarity = "Common", CardType = "Unit", ImageHash = null, CardImageUri = "u" });
+            ctx.SaveChanges();
+        }
+
+        var ocr = new OcrMatchResult { CollectorNumber = "OGN-99", CollectorNumberConfidence = 0.95 };
+        var match = _svc.FindClosestMatch(0x0UL, ocrResult: ocr);
+
+        Assert.NotNull(match);
+        Assert.Contains(match!.GameSpecificId, new[] { "fallback1", "fallback2" });
+        Assert.Equal(100, match.Confidence);
+    }
+
     private class NullFactory : IHttpClientFactory
     { public HttpClient CreateClient(string name) => new(); }
     private class Factory(DbContextOptions<RiftboundDbContext> o) : IDbContextFactory<RiftboundDbContext>
