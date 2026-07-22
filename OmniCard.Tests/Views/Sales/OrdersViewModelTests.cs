@@ -40,7 +40,8 @@ public class OrdersViewModelTests
         return new OrdersViewModel(
             orderService.Object, customerService.Object, listingService.Object,
             new FakeReceiptService(), new FakeReceiptPdfExporter(),
-            Mock.Of<ITcgPlayerOrderImportService>(), Mock.Of<IDialogService>());
+            Mock.Of<ITcgPlayerOrderImportService>(), Mock.Of<IDialogService>(),
+            Mock.Of<ISalesSettingsService>());
     }
 
     private static OrdersViewModel MakeVm(
@@ -57,7 +58,62 @@ public class OrdersViewModelTests
         return new OrdersViewModel(
             orderService.Object, customerService.Object, listingService.Object,
             new FakeReceiptService(), new FakeReceiptPdfExporter(),
-            Mock.Of<ITcgPlayerOrderImportService>(), dialogService.Object);
+            Mock.Of<ITcgPlayerOrderImportService>(), dialogService.Object,
+            Mock.Of<ISalesSettingsService>());
+    }
+
+    private static OrdersViewModel MakeVmWithSettings(Mock<ISalesSettingsService> settings)
+    {
+        var orderService = new Mock<IOrderService>();
+        orderService.Setup(s => s.GetOrderLineSummaries()).Returns(new List<OrderLineSummary>());
+        orderService.Setup(s => s.GetLines(It.IsAny<int>())).Returns(new List<OrderLine>());
+        return new OrdersViewModel(
+            orderService.Object, Mock.Of<ICustomerService>(), Mock.Of<IListingService>(),
+            new FakeReceiptService(), new FakeReceiptPdfExporter(),
+            Mock.Of<ITcgPlayerOrderImportService>(), Mock.Of<IDialogService>(), settings.Object);
+    }
+
+    [Fact]
+    public void EditorCollapsed_RestoredFromSettings_AndSelectingOrderReopens()
+    {
+        var settings = new Mock<ISalesSettingsService>();
+        settings.Setup(s => s.OrdersEditorCollapsed).Returns(true);
+        var vm = MakeVmWithSettings(settings);
+
+        Assert.True(vm.IsEditorCollapsed);          // restored from settings
+
+        vm.SelectedOrder = NewOrder(1, 1);
+        Assert.False(vm.IsEditorCollapsed);         // reopened on select (Jira-style)
+    }
+
+    [Fact]
+    public void CollapseAndExpand_PersistState()
+    {
+        var settings = new Mock<ISalesSettingsService>();
+        var vm = MakeVmWithSettings(settings);
+
+        vm.CollapseEditorCommand.Execute(null);
+        Assert.True(vm.IsEditorCollapsed);
+        settings.Verify(s => s.SetOrdersEditorCollapsed(true), Times.AtLeastOnce);
+
+        vm.ExpandEditorCommand.Execute(null);
+        Assert.False(vm.IsEditorCollapsed);
+        settings.Verify(s => s.SetOrdersEditorCollapsed(false), Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public void EditorWidth_ClampsToMinimum_AndPersists()
+    {
+        var settings = new Mock<ISalesSettingsService>();
+        var vm = MakeVmWithSettings(settings);
+
+        vm.EditorWidth = 520;
+        Assert.Equal(520, vm.EditorWidth);
+        settings.Verify(s => s.SetOrdersEditorWidth(520), Times.Once);
+
+        vm.EditorWidth = 50;    // below the minimum
+        Assert.Equal(OrdersViewModel.MinEditorWidth, vm.EditorWidth);
+        settings.Verify(s => s.SetOrdersEditorWidth(OrdersViewModel.MinEditorWidth), Times.Once);
     }
 
     [Fact]
@@ -414,7 +470,8 @@ public class OrdersViewModelTests
         var vm = new OrdersViewModel(
             orderService.Object, customerService.Object, listingService.Object,
             new FakeReceiptService(throwOnBuild: true), new FakeReceiptPdfExporter(),
-            Mock.Of<ITcgPlayerOrderImportService>(), Mock.Of<IDialogService>());
+            Mock.Of<ITcgPlayerOrderImportService>(), Mock.Of<IDialogService>(),
+            Mock.Of<ISalesSettingsService>());
         var order = NewOrder(1, 1);
         orderService.Setup(s => s.GetLines(1)).Returns([]);
         vm.SelectedOrder = order;

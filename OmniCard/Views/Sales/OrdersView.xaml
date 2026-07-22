@@ -122,8 +122,10 @@
 
     <Grid Margin="8">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="2*"/>
-            <ColumnDefinition Width="360"/>
+            <ColumnDefinition Width="*" MinWidth="400"/>
+            <ColumnDefinition x:Name="SplitterColumn" Width="Auto"/>
+            <!-- Editor width + visibility are driven from code-behind (ApplyEditorLayout). -->
+            <ColumnDefinition x:Name="EditorColumn" Width="0" MinWidth="0"/>
         </Grid.ColumnDefinitions>
 
         <!-- Board -->
@@ -270,9 +272,22 @@
             </UniformGrid>
         </DockPanel>
 
+        <!-- Resizable divider between board and editor (shown only when the panel is open) -->
+        <GridSplitter x:Name="EditorSplitter" Grid.Column="1" Width="6" Visibility="Collapsed"
+                      HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                      ResizeBehavior="PreviousAndNext" ResizeDirection="Columns"
+                      Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                      DragCompleted="EditorSplitter_DragCompleted"/>
+
         <!-- Editor -->
-        <DockPanel Grid.Column="1"
-                   Visibility="{Binding SelectedOrder, Converter={conv:NullToVisibilityConverter}}">
+        <DockPanel x:Name="EditorPanel" Grid.Column="2" Visibility="Collapsed" Margin="6,0,0,0">
+
+            <!-- Panel title + collapse button -->
+            <DockPanel DockPanel.Dock="Top" LastChildFill="False" Margin="0,0,0,6">
+                <TextBlock DockPanel.Dock="Left" Text="Order details" FontWeight="Bold" VerticalAlignment="Center"/>
+                <Button DockPanel.Dock="Right" Content="›" FontSize="15" Padding="8,0" MinWidth="28"
+                        Command="{Binding CollapseEditorCommand}" ToolTip="Collapse panel"/>
+            </DockPanel>
 
             <!-- Header fields -->
             <Grid DockPanel.Dock="Top" Margin="0,0,0,8" IsEnabled="{Binding IsEditable}">
@@ -370,5 +385,11 @@
                 </DataGrid.Columns>
             </DataGrid>
         </DockPanel>
+
+        <!-- Reopen handle, shown at the board's right edge only when the panel is collapsed -->
+        <Button x:Name="ExpandHandle" Grid.Column="0" Visibility="Collapsed"
+                HorizontalAlignment="Right" VerticalAlignment="Center"
+                Width="16" Height="64" Content="‹" FontSize="15" Padding="0"
+                Command="{Binding ExpandEditorCommand}" ToolTip="Show order details"/>
     </Grid>
 </UserControl>
