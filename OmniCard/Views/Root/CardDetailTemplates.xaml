@@ -372,4 +372,90 @@
         </StackPanel>
     </DataTemplate>
 
+    <!-- TCGCSV-backed games detail template (Pokémon, Yu-Gi-Oh!, Final Fantasy TCG, ...) -->
+    <DataTemplate DataType="{x:Type models:TcgCsvCard}">
+        <StackPanel>
+            <TextBlock Text="{Binding Name}"
+                       FontSize="20"
+                       FontWeight="Bold"
+                       Margin="0,0,0,4"/>
+
+            <Separator Margin="0,4"/>
+
+            <Grid Margin="0,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Set:"
+                           FontWeight="SemiBold"
+                           Margin="0,2,8,2"/>
+                <TextBlock Grid.Column="1"
+                           Margin="0,2">
+                    <Run Text="{Binding SetName, Mode=OneWay}"/>
+                    <Run Text=" ("/><Run Text="{Binding SetCode, Mode=OneWay}"/><Run Text=")"/>
+                </TextBlock>
+
+                <TextBlock Grid.Row="1"
+                           Text="Collector #:"
+                           FontWeight="SemiBold"
+                           Margin="0,2,8,2"/>
+                <TextBlock Grid.Row="1"
+                           Grid.Column="1"
+                           Text="{Binding CollectorNumber}"
+                           Margin="0,2"/>
+
+                <TextBlock Grid.Row="2"
+                           Text="Rarity:"
+                           FontWeight="SemiBold"
+                           Margin="0,2,8,2"/>
+                <TextBlock Grid.Row="2"
+                           Grid.Column="1"
+                           Text="{Binding Rarity}"
+                           Margin="0,2"/>
+            </Grid>
+
+            <Separator Margin="0,4"/>
+            <TextBlock Text="Prices"
+                       FontWeight="SemiBold"
+                       Margin="0,4,0,2"/>
+            <Grid Margin="0,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                </Grid.RowDefinitions>
+                <TextBlock Text="Market:"
+                           FontWeight="SemiBold"
+                           Margin="0,2,8,2"/>
+                <TextBlock Grid.Column="1"
+                           Text="{Binding MarketPrice, StringFormat='${0:F2}', TargetNullValue='-'}"
+                           Margin="0,2"/>
+                <TextBlock Grid.Row="1"
+                           Text="Foil Market:"
+                           FontWeight="SemiBold"
+                           Margin="0,2,8,2"/>
+                <TextBlock Grid.Row="1"
+                           Grid.Column="1"
+                           Text="{Binding FoilMarketPrice, StringFormat='${0:F2}', TargetNullValue='-'}"
+                           Margin="0,2"/>
+            </Grid>
+
+            <Separator Margin="0,4"/>
+            <TextBlock Text="Card Details"
+                       FontWeight="SemiBold"
+                       Margin="0,4,0,2"/>
+            <helpers:ExtendedDataView Json="{Binding ExtendedDataJson}"/>
+        </StackPanel>
+    </DataTemplate>
+
 </ResourceDictionary>
