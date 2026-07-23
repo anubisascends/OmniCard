@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -12,6 +13,7 @@ namespace OmniCard.Data;
 /// </summary>
 public sealed partial class LogFileParser
 {
+    public sealed record LogFileInfo(string FullPath, string DisplayName);
     // Matches: 2026-07-23 10:30:45.123 +00:00 [INF] Source.Context: message
     [GeneratedRegex(
         @"^(?<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} [+-]\d{2}:\d{2}) \[(?<lvl>[A-Z]{3})\] (?<src>.*?): (?<msg>.*)$")]
@@ -74,5 +76,36 @@ public sealed partial class LogFileParser
 
         Flush();
         return entries;
+    }
+
+    public IReadOnlyList<LogFileInfo> ListFiles(string logsDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(logsDirectory) || !Directory.Exists(logsDirectory))
+            return [];
+
+        return new DirectoryInfo(logsDirectory)
+            .GetFiles("tcgcardscanner-*.log")
+            .OrderByDescending(f => f.LastWriteTimeUtc)
+            .Select(f => new LogFileInfo(f.FullName, f.Name))
+            .ToList();
+    }
+
+    public IReadOnlyList<LogEntry> ParseFile(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(
+                path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = new StreamReader(stream);
+            return Parse(reader.ReadToEnd());
+        }
+        catch (IOException)
+        {
+            return [];
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return [];
+        }
     }
 }

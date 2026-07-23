@@ -93,4 +93,50 @@ public class LogFileParserTests
         Assert.Empty(Parser.Parse(""));
         Assert.Empty(Parser.Parse("   \n  \n"));
     }
+
+    [Fact]
+    public void ListFiles_MissingDirectory_ReturnsEmpty()
+    {
+        var missing = Path.Combine(Path.GetTempPath(), "no-such-omnicard-logs-" + Guid.NewGuid());
+        Assert.Empty(Parser.ListFiles(missing));
+    }
+
+    [Fact]
+    public void ListFiles_ReturnsOnlyMatchingFiles()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "omnicard-logs-" + Guid.NewGuid());
+        Directory.CreateDirectory(dir);
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "tcgcardscanner-20260722.log"), "x");
+            File.WriteAllText(Path.Combine(dir, "tcgcardscanner-20260723.log"), "x");
+            File.WriteAllText(Path.Combine(dir, "notes.txt"), "x");
+
+            var files = Parser.ListFiles(dir);
+
+            Assert.Equal(2, files.Count);
+            Assert.All(files, f => Assert.StartsWith("tcgcardscanner-", f.DisplayName));
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
+    public void ParseFile_ReadsAndParses()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "tcgcardscanner-" + Guid.NewGuid() + ".log");
+        File.WriteAllText(path, "2026-07-23 10:30:45.123 +00:00 [WRN] Src: heads up");
+        try
+        {
+            var entry = Assert.Single(Parser.ParseFile(path));
+            Assert.Equal(LogEntryLevel.Warning, entry.Level);
+            Assert.Equal("heads up", entry.Message);
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    public void ParseFile_MissingFile_ReturnsEmpty()
+    {
+        Assert.Empty(Parser.ParseFile(Path.Combine(Path.GetTempPath(), "nope-" + Guid.NewGuid() + ".log")));
+    }
 }
