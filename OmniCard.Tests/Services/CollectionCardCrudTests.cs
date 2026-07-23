@@ -254,6 +254,7 @@ public class CollectionCardCrudTests : IDisposable
         public (List<string> SetCodes, double Confidence) DetectSetSymbol(byte[] imageData) => ([], 0);
         public Task<(string? CollectorNumber, double Confidence)> DetectOptcgCollectorNumberAsync(byte[] imageData) => Task.FromResult<(string?, double)>((null, 0));
         public Task<(string? CollectorNumber, double Confidence)> DetectRiftboundCollectorNumberAsync(byte[] imageData) => Task.FromResult<(string?, double)>((null, 0));
+        public Task<(string? CollectorNumber, double Confidence)> DetectCollectorNumberAsync(byte[] imageData, OcrCollectorSpec spec) => Task.FromResult<(string?, double)>((null, 0));
     }
 
     private class NullScanDiagnosticService : IScanDiagnosticService

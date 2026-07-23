@@ -23,6 +23,9 @@ public static class CardAttributeExtractor
             CardGame.Mtg => ExtractMtgColor(match.Source as Card),
             CardGame.OnePiece => (match.Source as OptcgCard)?.CardColor,
             CardGame.Riftbound => (match.Source as RiftboundCard)?.Domain,
+            CardGame.Pokemon => (match.Source as TcgCsvCard)?.CardType,
+            CardGame.YuGiOh => (match.Source as TcgCsvCard)?.CardType,
+            CardGame.FinalFantasy => (match.Source as TcgCsvCard)?.CardType,
             _ => null
         };
     }
@@ -34,6 +37,9 @@ public static class CardAttributeExtractor
             CardGame.Mtg => ExtractMtgCardType(match.Source as Card),
             CardGame.OnePiece => (match.Source as OptcgCard)?.CardType,
             CardGame.Riftbound => (match.Source as RiftboundCard)?.CardType,
+            CardGame.Pokemon => (match.Source as TcgCsvCard)?.CardType,
+            CardGame.YuGiOh => (match.Source as TcgCsvCard)?.CardType,
+            CardGame.FinalFantasy => (match.Source as TcgCsvCard)?.CardType,
             _ => null
         };
     }

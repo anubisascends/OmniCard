@@ -153,6 +153,9 @@ public class CardGameDisplayConverter : MarkupExtension, IValueConverter
             CardGame.Mtg => "Magic: The Gathering",
             CardGame.OnePiece => "One Piece TCG",
             CardGame.Riftbound => "Riftbound",
+            CardGame.Pokemon => "Pokémon",
+            CardGame.YuGiOh => "Yu-Gi-Oh!",
+            CardGame.FinalFantasy => "Final Fantasy TCG",
             _ => value?.ToString() ?? ""
         };
 
@@ -304,6 +307,9 @@ public class BreakdownKeyDisplayConverter : MarkupExtension, IValueConverter
                 CardGame.Mtg => "Magic: The Gathering",
                 CardGame.OnePiece => "One Piece TCG",
                 CardGame.Riftbound => "Riftbound",
+                CardGame.Pokemon => "Pokémon",
+                CardGame.YuGiOh => "Yu-Gi-Oh!",
+                CardGame.FinalFantasy => "Final Fantasy TCG",
                 _ => key
             };
         }

@@ -180,7 +180,8 @@ public sealed class CardService : ICardService
         // Foil cards scan with a holographic color shift that corrupts the luminance pHash;
         // compute a color-robust edge hash so matching can use it (One Piece, Riftbound).
         ulong? scanEdgeHash = null;
-        if (DefaultIsFoil && (SelectedGame == CardGame.OnePiece || SelectedGame == CardGame.Riftbound))
+        if (DefaultIsFoil && (SelectedGame == CardGame.OnePiece || SelectedGame == CardGame.Riftbound
+            || SelectedGame == CardGame.Pokemon || SelectedGame == CardGame.YuGiOh || SelectedGame == CardGame.FinalFantasy))
         {
             scanEdgeHash = _hashService.ComputeEdgeHash(new MemoryStream(rawBytes));
         }
@@ -322,6 +323,29 @@ public sealed class CardService : ICardService
                             }
                         }
                     }
+                    else if (game == CardGame.Pokemon || game == CardGame.YuGiOh || game == CardGame.FinalFantasy)
+                    {
+                        var spec = game switch
+                        {
+                            CardGame.Pokemon => PokemonService.OcrSpec,
+                            CardGame.YuGiOh => YugiohService.OcrSpec,
+                            _ => FinalFantasyService.OcrSpec
+                        };
+                        var (collectorNumber, conf) = await _ocrService.DetectCollectorNumberAsync(rawBytes, spec);
+                        if (collectorNumber is not null && conf >= 0.5)
+                        {
+                            ocrResult = new OcrMatchResult { CollectorNumber = collectorNumber, CollectorNumberConfidence = conf };
+                            _logger.LogInformation("{Game} collector detected: {Number} (confidence {Conf:F2})", game, collectorNumber, conf);
+                            var (ocrMatch, ocrGame) = FindBestMatch(capturedHash, scannedCard.ArtHashes, ocrResult, capturedSetFilter, null, scannedCard.ScanEdgeHash);
+                            if (ocrMatch is not null && (scannedCard.Match is null || ocrMatch.GameSpecificId != scannedCard.Match?.GameSpecificId))
+                            {
+                                scannedCard.Match = ocrMatch;
+                                scannedCard.Game = ocrGame;
+                                scannedCard.FlagReason = FlagReason.None;
+                                _logger.LogInformation("OCR matched to \"{CardName}\" ({SetCode} #{Number})", ocrMatch.Name, ocrMatch.SetCode, ocrMatch.CollectorNumber);
+                            }
+                        }
+                    }
                     else
                     {
                         // MTG: name recognition + symbol detection
@@ -394,10 +418,23 @@ public sealed class CardService : ICardService
                             if (cn is not null && cnConf >= 0.5)
                                 rotatedOcr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = cnConf };
                         }
+                        else if (game == CardGame.Pokemon || game == CardGame.YuGiOh || game == CardGame.FinalFantasy)
+                        {
+                            var spec = game switch
+                            {
+                                CardGame.Pokemon => PokemonService.OcrSpec,
+                                CardGame.YuGiOh => YugiohService.OcrSpec,
+                                _ => FinalFantasyService.OcrSpec
+                            };
+                            var (cn, cnConf) = await _ocrService.DetectCollectorNumberAsync(rotatedBytes, spec);
+                            if (cn is not null && cnConf >= 0.5)
+                                rotatedOcr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = cnConf };
+                        }
 
                         // Structure rotates too — recompute the edge hash on the rotated bytes for foil One Piece/Riftbound scans
                         ulong? rotatedEdgeHash = null;
-                        if (scannedCard.IsFoil && (game == CardGame.OnePiece || game == CardGame.Riftbound))
+                        if (scannedCard.IsFoil && (game == CardGame.OnePiece || game == CardGame.Riftbound
+                            || game == CardGame.Pokemon || game == CardGame.YuGiOh || game == CardGame.FinalFantasy))
                             rotatedEdgeHash = _hashService.ComputeEdgeHash(new MemoryStream(rotatedBytes));
 
                         var (rotatedMatch, rotatedGame) = FindBestMatch(rotatedHash, null, rotatedOcr, capturedSetFilter, null, rotatedEdgeHash);

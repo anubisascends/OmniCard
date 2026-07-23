@@ -57,6 +57,10 @@
             {
                 <tr><th>Section</th><td>@Model.Card.Section</td></tr>
             }
+            @foreach (var kv in ExtendedDataParser.Parse(Model.ExtendedDataJson))
+            {
+                <tr><th>@kv.Key</th><td>@kv.Value</td></tr>
+            }
         </table>
     </main>
 </body>

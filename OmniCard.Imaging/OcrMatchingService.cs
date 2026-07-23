@@ -32,6 +32,9 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         new(@"([A-Za-z]{2,4}\d{2})\s*[-—]\s*(\d{2,3})",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
 
+    // Compiled-regex cache for per-game OcrCollectorSpec patterns (Pokémon, Yu-Gi-Oh!, FFTCG, etc.).
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, System.Text.RegularExpressions.Regex> _specRegexCache = new();
+
     // Name crop regions as percentage of card image: (X%, Y%, Width%, Height%)
     internal static readonly (double X, double Y, double W, double H)[] NameCropRegions =
     [
@@ -331,6 +334,53 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Riftbound collector number detection failed");
+            return (null, 0);
+        }
+    }
+
+    // Applies a spec's regex to OCR text; returns the first capture group, whitespace-stripped and upper-cased.
+    internal static bool TryExtractCollectorNumber(string ocrText, string pattern, out string? formatted)
+    {
+        formatted = null;
+        if (string.IsNullOrWhiteSpace(ocrText)) return false;
+        var rx = _specRegexCache.GetOrAdd(pattern, p =>
+            new System.Text.RegularExpressions.Regex(p,
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled));
+        var m = rx.Match(ocrText);
+        if (!m.Success) return false;
+        var raw = (m.Groups.Count > 1 ? m.Groups[1].Value : m.Value);
+        formatted = System.Text.RegularExpressions.Regex.Replace(raw, @"\s+", "").ToUpperInvariant();
+        return formatted.Length > 0;
+    }
+
+    public Task<(string? CollectorNumber, double Confidence)> DetectCollectorNumberAsync(byte[] imageData, OcrCollectorSpec spec)
+        => Task.Run(() => DetectCollectorNumber(imageData, spec));
+
+    private (string? CollectorNumber, double Confidence) DetectCollectorNumber(byte[] imageData, OcrCollectorSpec spec)
+    {
+        if (!_ocrAvailable) return (null, 0);
+        try
+        {
+            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            var region = bitmap.Width > bitmap.Height ? spec.LandscapeRegion : spec.PortraitRegion;
+            var rect = ToPixelRect(region, bitmap.Width, bitmap.Height);
+            if (rect.Width < 10 || rect.Height < 5) return (null, 0);
+
+            var (text, confidence) = OcrCroppedRegion(bitmap, rect, PageSegMode.SingleLine, spec.Whitelist);
+            if (string.IsNullOrWhiteSpace(text)) return (null, 0);
+
+            if (TryExtractCollectorNumber(text, spec.RegexPattern, out var formatted))
+            {
+                var reported = Math.Max(0.9, confidence);
+                _logger.LogInformation("Collector number detected: {Number} (raw: {Raw}, ocrConf: {Conf:F2})", formatted, text, confidence);
+                return (formatted, reported);
+            }
+            _logger.LogDebug("Collector OCR text did not match spec pattern: {Text}", text);
+            return (null, 0);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Collector number detection failed");
             return (null, 0);
         }
     }
