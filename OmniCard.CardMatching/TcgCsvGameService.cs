@@ -444,14 +444,284 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
         return File.Exists(full) ? full : null;
     }
 
-    public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14, ulong? scanEdgeHash = null) => throw new NotImplementedException();
-    public List<CardMatch> SearchCards(string query, int maxResults = 20) => throw new NotImplementedException();
-    public List<CardMatch> GetPrintings(string cardName) => throw new NotImplementedException();
-    public decimal? GetCurrentPrice(string gameCardId, bool isFoil) => throw new NotImplementedException();
-    public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil) => throw new NotImplementedException();
-    public void RecordCorrection(ulong scanHash, string correctCardId, ulong? artScanHash = null) => throw new NotImplementedException();
-    public IReadOnlyList<SetInfo> GetAvailableSets() => throw new NotImplementedException();
-    public Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null) => throw new NotImplementedException();
-    public List<MissingCard> GetMissingCards(string setCode, IEnumerable<string> ownedCollectorNumbers) => throw new NotImplementedException();
-    public object? FindCardById(string gameCardId) => throw new NotImplementedException();
+    private TcgCsvCard? LookupById(int id) => _readContext.Cards.AsNoTracking().FirstOrDefault(c => c.ProductId == id);
+
+    internal static string NormalizeNumber(string s) => s.Trim().ToUpperInvariant();
+
+    public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null,
+        IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14, ulong? scanEdgeHash = null)
+    {
+        LastMatchDiagnostics = new MatchDiagnostics { SetFilterActive = setFilter is not null };
+
+        // Phase 0: OCR collector-number lookup. Number is ground truth from extendedData.
+        if (ocrResult?.CollectorNumber is not null && ocrResult.CollectorNumberConfidence >= 0.5)
+        {
+            var num = NormalizeNumber(ocrResult.CollectorNumber);
+            var candidates = _readContext.Cards.AsNoTracking()
+                .Where(c => c.CollectorNumber.ToUpper() == num).ToList();
+            if (setFilter is not null) candidates = candidates.Where(c => setFilter.Contains(c.SetCode)).ToList();
+
+            if (candidates.Count == 1)
+            {
+                LastMatchDiagnostics.DecisionPhase = "OcrCollectorNumber";
+                return ToMatch(candidates[0], 100);
+            }
+            if (candidates.Count > 1)
+            {
+                var hashed = candidates.Where(c => c.ImageHash != null).ToList();
+                var best = hashed.Count > 0
+                    ? hashed.OrderBy(c => PerceptualHashService.HammingDistance(imageHash, c.ImageHash!.Value)).First()
+                    : candidates[0];
+                LastMatchDiagnostics.DecisionPhase = "OcrCollectorNumber";
+                return ToMatch(best, 100);
+            }
+        }
+
+        // Foil path: color-robust edge hash.
+        if (scanEdgeHash is ulong scanEdge)
+        {
+            _edgeHashCache ??= _readContext.Cards.Where(c => c.EdgeHash != null)
+                .Select(c => new { c.ProductId, Edge = c.EdgeHash!.Value, c.SetCode })
+                .AsNoTracking().AsEnumerable().Select(c => (c.ProductId, c.Edge, c.SetCode)).ToList();
+
+            int bestEdgeId = -1; int bestEdgeDist = int.MaxValue;
+            foreach (var (id, edge, setCode) in _edgeHashCache)
+            {
+                if (setFilter is not null && !setFilter.Contains(setCode)) continue;
+                var dist = PerceptualHashService.HammingDistance(scanEdge, edge);
+                if (dist < bestEdgeDist) { bestEdgeDist = dist; bestEdgeId = id; }
+            }
+            if (bestEdgeId >= 0 && bestEdgeDist <= maxDistance)
+            {
+                LastMatchDiagnostics.DecisionPhase = "EdgeHashFoil";
+                LastMatchDiagnostics.PHashDistance = bestEdgeDist;
+                var conf = Math.Max(0, 1.0 - (double)bestEdgeDist / maxDistance) * 100;
+                var card = LookupById(bestEdgeId);
+                return card is null ? null : ToMatch(card, conf);
+            }
+            LastMatchDiagnostics.DecisionPhase = "NoMatch";
+            return null;
+        }
+
+        if (_hashCache is null)
+        {
+            var entries = _readContext.Cards.Where(c => c.ImageHash != null)
+                .Select(c => new { c.ProductId, Hash = c.ImageHash!.Value, c.SetCode })
+                .AsNoTracking().AsEnumerable().ToList();
+            _hashCache = entries.Select(c => (c.ProductId, c.Hash)).ToList();
+            _hashSetLookup = entries.ToDictionary(c => c.ProductId, c => c.SetCode);
+        }
+        if (_correctionsCache is null)
+        {
+            using var ctx = _dbContextFactory.CreateDbContext();
+            _correctionsCache = ctx.HashCorrections.AsNoTracking()
+                .Select(h => new { h.ScanHash, h.CorrectCardId }).AsEnumerable()
+                .Select(h => (h.ScanHash, h.CorrectCardId)).ToList();
+        }
+
+        // Phase 1: exact correction.
+        var exact = _correctionsCache.FirstOrDefault(c => c.ScanHash == imageHash);
+        if (exact.CorrectCardId is not null && int.TryParse(exact.CorrectCardId, out var exactId))
+        {
+            var corrected = LookupById(exactId);
+            if (corrected is not null && (setFilter is null || setFilter.Contains(corrected.SetCode)))
+            {
+                LastMatchDiagnostics.DecisionPhase = "ExactCorrection";
+                return ToMatch(corrected, 100);
+            }
+        }
+
+        if (_hashCache.Count == 0) { LastMatchDiagnostics.DecisionPhase = "NoMatch"; return null; }
+
+        // Phase 2: nearest pHash + fuzzy corrections.
+        int bestId = -1; int bestDist = int.MaxValue;
+        foreach (var (id, hash) in _hashCache)
+        {
+            if (setFilter is not null && !setFilter.Contains(_hashSetLookup![id])) continue;
+            var dist = PerceptualHashService.HammingDistance(imageHash, hash);
+            if (dist < bestDist) { bestDist = dist; bestId = id; }
+        }
+
+        int? bestCorrId = null; int bestCorrAdjusted = int.MaxValue;
+        foreach (var (scanHash, correctCardId) in _correctionsCache)
+        {
+            if (!int.TryParse(correctCardId, out var cid)) continue;
+            if (setFilter is not null)
+            {
+                var corrSet = _hashSetLookup!.GetValueOrDefault(cid);
+                if (corrSet is null || !setFilter.Contains(corrSet)) continue;
+            }
+            var dist = PerceptualHashService.HammingDistance(imageHash, scanHash);
+            if (dist <= maxDistance)
+            {
+                var adjusted = Math.Max(0, dist - CorrectionTrustBonus);
+                if (adjusted < bestCorrAdjusted) { bestCorrAdjusted = adjusted; bestCorrId = cid; }
+            }
+        }
+
+        if (bestCorrId is int corrId && bestCorrAdjusted <= bestDist)
+        {
+            var conf = Math.Max(0, 1.0 - (double)bestCorrAdjusted / maxDistance) * 100;
+            var corrected = LookupById(corrId);
+            if (corrected is not null)
+            {
+                LastMatchDiagnostics.DecisionPhase = "PHashConfident";
+                LastMatchDiagnostics.PHashDistance = bestCorrAdjusted;
+                return ToMatch(corrected, conf);
+            }
+        }
+
+        if (bestDist > maxDistance) { LastMatchDiagnostics.DecisionPhase = "NoMatch"; return null; }
+
+        var bestCard = bestId >= 0 ? LookupById(bestId) : null;
+        if (bestCard is null) { LastMatchDiagnostics.DecisionPhase = "NoMatch"; return null; }
+        LastMatchDiagnostics.DecisionPhase = "PHashConfident";
+        LastMatchDiagnostics.PHashDistance = bestDist;
+        var confidence = Math.Max(0, 1.0 - (double)bestDist / maxDistance) * 100;
+        return ToMatch(bestCard, confidence);
+    }
+
+    public IReadOnlyList<SetInfo> GetAvailableSets()
+        => _readContext.Cards.AsNoTracking()
+            .Select(c => new { c.SetCode, c.SetName }).Distinct()
+            .OrderBy(s => s.SetName).AsEnumerable()
+            .Select(s => new SetInfo(s.SetCode, s.SetName)).ToList();
+
+    public Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null)
+    {
+        var setTotals = _readContext.Cards.AsNoTracking()
+            .Select(c => new { c.SetCode, c.SetName, c.CollectorNumber }).Distinct()
+            .AsEnumerable()
+            .GroupBy(c => new { c.SetCode, c.SetName })
+            .Select(g => new { g.Key.SetCode, g.Key.SetName, Total = g.Count() })
+            .ToDictionary(s => s.SetCode, s => (s.SetName, s.Total));
+
+        var ownedPerSet = ownedCards.GroupBy(c => c.SetCode)
+            .ToDictionary(g => g.Key, g => (Distinct: g.Select(c => c.Number).Distinct().Count(), Physical: g.Count()));
+
+        var results = new List<SetCompletionSummary>();
+        foreach (var (setCode, (setName, total)) in setTotals)
+        {
+            ownedPerSet.TryGetValue(setCode, out var owned);
+            results.Add(new SetCompletionSummary
+            {
+                SetCode = setCode, SetName = setName,
+                OwnedCount = owned.Distinct, OwnedPhysicalCount = owned.Physical,
+                TotalCount = total, Game = Game,
+            });
+        }
+        return Task.FromResult(results);
+    }
+
+    public List<MissingCard> GetMissingCards(string setCode, IEnumerable<string> ownedCollectorNumbers)
+    {
+        var ownedSet = ownedCollectorNumbers.ToHashSet();
+        return _readContext.Cards.AsNoTracking()
+            .Where(c => c.SetCode == setCode).AsEnumerable()
+            .Where(c => !ownedSet.Contains(c.CollectorNumber))
+            .GroupBy(c => c.CollectorNumber)
+            .Select(g => g.First())
+            .Select(c => new MissingCard
+            {
+                Name = c.Name, CollectorNumber = c.CollectorNumber, SetCode = c.SetCode,
+                Rarity = c.Rarity, ImageUri = c.ImageUrl, TypeLine = c.CardType,
+            })
+            .OrderBy(m => m.CollectorNumber).ToList();
+    }
+
+    public List<CardMatch> SearchCards(string query, int maxResults = 20)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return [];
+        IQueryable<TcgCsvCard> cards = _readContext.Cards.AsNoTracking();
+        foreach (var term in query.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var t = term;
+            if (t.StartsWith("set:", StringComparison.OrdinalIgnoreCase))
+            {
+                var val = t[4..];
+                cards = cards.Where(c => EF.Functions.Like(c.SetCode, $"%{val}%") || EF.Functions.Like(c.SetName, $"%{val}%"));
+            }
+            else if (t.StartsWith("type:", StringComparison.OrdinalIgnoreCase) || t.StartsWith("t:", StringComparison.OrdinalIgnoreCase))
+            {
+                var val = t[(t.IndexOf(':') + 1)..];
+                cards = cards.Where(c => EF.Functions.Like(c.CardType, $"%{val}%"));
+            }
+            else if (t.StartsWith("cn:", StringComparison.OrdinalIgnoreCase))
+            {
+                var val = t[3..];
+                cards = cards.Where(c => EF.Functions.Like(c.CollectorNumber, $"%{val}%"));
+            }
+            else
+            {
+                cards = cards.Where(c => EF.Functions.Like(c.Name, $"%{t}%"));
+            }
+        }
+        return cards.OrderBy(c => c.Name).Take(maxResults).AsEnumerable().Select(c => ToMatch(c)).ToList();
+    }
+
+    public List<CardMatch> GetPrintings(string cardName)
+    {
+        if (string.IsNullOrWhiteSpace(cardName)) return [];
+        return _readContext.Cards.AsNoTracking()
+            .Where(c => c.Name == cardName)
+            .OrderBy(c => c.SetName).ThenBy(c => c.CollectorNumber)
+            .AsEnumerable().Select(c => ToMatch(c)).ToList();
+    }
+
+    public decimal? GetCurrentPrice(string gameCardId, bool isFoil)
+    {
+        if (!int.TryParse(gameCardId, out var id)) return null;
+        var row = _readContext.Cards.AsNoTracking().Where(c => c.ProductId == id)
+            .Select(c => new { c.MarketPrice, c.FoilMarketPrice }).FirstOrDefault();
+        if (row is null) return null;
+        return isFoil ? row.FoilMarketPrice ?? row.MarketPrice : row.MarketPrice ?? row.FoilMarketPrice;
+    }
+
+    public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil)
+    {
+        var ids = gameCardIds.Select(s => int.TryParse(s, out var i) ? i : (int?)null).OfType<int>().Distinct().ToList();
+        if (ids.Count == 0) return [];
+        var result = new Dictionary<string, decimal>(ids.Count);
+        foreach (var chunk in ids.Chunk(500))
+        {
+            var rows = _readContext.Cards.AsNoTracking().Where(c => chunk.Contains(c.ProductId))
+                .Select(c => new { c.ProductId, c.MarketPrice, c.FoilMarketPrice }).ToList();
+            foreach (var row in rows)
+            {
+                var price = isFoil ? row.FoilMarketPrice ?? row.MarketPrice : row.MarketPrice ?? row.FoilMarketPrice;
+                if (price.HasValue) result[row.ProductId.ToString()] = price.Value;
+            }
+        }
+        return result;
+    }
+
+    public void RecordCorrection(ulong scanHash, string correctCardId, ulong? artScanHash = null)
+    {
+        using var ctx = _dbContextFactory.CreateDbContext();
+        ctx.Database.ExecuteSqlRaw(
+            "INSERT OR REPLACE INTO HashCorrections (ScanHash, CorrectCardId, CreatedAt) VALUES ({0}, {1}, {2})",
+            (long)scanHash, correctCardId, DateTime.UtcNow.ToString("o"));
+        _correctionsCache = null;
+    }
+
+    public object? FindCardById(string gameCardId)
+    {
+        if (!int.TryParse(gameCardId, out var id)) return null;
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking().FirstOrDefault(c => c.ProductId == id);
+    }
+
+    internal CardMatch ToMatch(TcgCsvCard c, double? confidence = null) => new()
+    {
+        Name = c.Name,
+        SetCode = c.SetCode,
+        SetName = c.SetName,
+        CollectorNumber = c.CollectorNumber,
+        Rarity = c.Rarity,
+        ImageUri = c.ImageUrl,
+        GameSpecificId = c.ProductId.ToString(),
+        LocalImagePath = ResolveLocalArtPath(c.LocalImagePath),
+        Confidence = confidence,
+        Source = c
+    };
 }

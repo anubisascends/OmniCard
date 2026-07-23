@@ -269,6 +269,76 @@ public class TcgCsvDownloadTests : IDisposable
         m.Setup(d => d.DataDirectory).Returns(_dataDir);
         return m.Object;
     }
+
+    [Fact]
+    public void FindClosestMatch_OcrCollectorNumber_ReturnsExactCard()
+    {
+        using (var seed = _factory.CreateDbContext())
+        {
+            seed.Cards.AddRange(
+                new TcgCsvCard { ProductId = 1, Game = CardGame.Pokemon, Name = "A", SetCode = "OP1", CollectorNumber = "1-001H", ImageHash = 1UL },
+                new TcgCsvCard { ProductId = 2, Game = CardGame.Pokemon, Name = "B", SetCode = "OP1", CollectorNumber = "1-002R", ImageHash = 2UL });
+            seed.SaveChanges();
+        }
+        var svc = CreateService();
+        var ocr = new OcrMatchResult { CollectorNumber = "1-002R", CollectorNumberConfidence = 0.95 };
+        var match = svc.FindClosestMatch(imageHash: 999UL, ocrResult: ocr);
+        Assert.NotNull(match);
+        Assert.Equal("2", match!.GameSpecificId);
+        Assert.Equal(100, match.Confidence);
+    }
+
+    [Fact]
+    public void FindClosestMatch_PHash_ReturnsNearest()
+    {
+        using (var seed = _factory.CreateDbContext())
+        {
+            seed.Cards.AddRange(
+                new TcgCsvCard { ProductId = 10, Game = CardGame.Pokemon, Name = "Near", SetCode = "S", ImageHash = 0b1111UL },
+                new TcgCsvCard { ProductId = 11, Game = CardGame.Pokemon, Name = "Far", SetCode = "S", ImageHash = 0xFFFFFFFFUL });
+            seed.SaveChanges();
+        }
+        var svc = CreateService();
+        var match = svc.FindClosestMatch(imageHash: 0b1110UL);
+        Assert.Equal("10", match!.GameSpecificId);
+    }
+
+    [Fact]
+    public void GetCurrentPrice_IsFoilAware_WithFallback()
+    {
+        using (var seed = _factory.CreateDbContext())
+        {
+            seed.Cards.AddRange(
+                new TcgCsvCard { ProductId = 1, Game = CardGame.Pokemon, Name = "Both", SetCode = "S", MarketPrice = 1.50m, FoilMarketPrice = 3.00m },
+                new TcgCsvCard { ProductId = 2, Game = CardGame.Pokemon, Name = "FoilOnly", SetCode = "S", FoilMarketPrice = 9.00m },
+                new TcgCsvCard { ProductId = 3, Game = CardGame.Pokemon, Name = "None", SetCode = "S" });
+            seed.SaveChanges();
+        }
+        var svc = CreateService();
+        Assert.Equal(3.00m, svc.GetCurrentPrice("1", isFoil: true));
+        Assert.Equal(9.00m, svc.GetCurrentPrice("2", isFoil: false)); // falls back to foil
+        Assert.Null(svc.GetCurrentPrice("3", isFoil: true));
+
+        var bulk = svc.GetCurrentPrices(new[] { "1", "2", "3" }, isFoil: false);
+        Assert.Equal(1.50m, bulk["1"]);
+        Assert.False(bulk.ContainsKey("3"));
+    }
+
+    [Fact]
+    public void SearchCards_And_GetAvailableSets_Work()
+    {
+        using (var seed = _factory.CreateDbContext())
+        {
+            seed.Cards.AddRange(
+                new TcgCsvCard { ProductId = 1, Game = CardGame.Pokemon, Name = "Charizard", SetCode = "BS", SetName = "Base Set", CardType = "Fire" },
+                new TcgCsvCard { ProductId = 2, Game = CardGame.Pokemon, Name = "Blastoise", SetCode = "BS", SetName = "Base Set", CardType = "Water" });
+            seed.SaveChanges();
+        }
+        var svc = CreateService();
+        Assert.Single(svc.SearchCards("Charizard"));
+        Assert.Single(svc.SearchCards("type:Water"));
+        Assert.Single(svc.GetAvailableSets());
+    }
 }
 
 file class RoutingHandler(Func<string, string?> route) : System.Net.Http.HttpMessageHandler
