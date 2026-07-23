@@ -123,6 +123,11 @@ public partial class App : Application
                 options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "yugioh.db")}"));
             services.AddSingleton<ICardGameService, YugiohService>();
 
+            // Final Fantasy TCG (TCGCSV)
+            services.AddDbContextFactory<FinalFantasyDbContext>(options =>
+                options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "fftcg.db")}"));
+            services.AddSingleton<ICardGameService, FinalFantasyService>();
+
             services.AddSingleton<Services.PriceUpdateService>();
 
             // Inventory (unified product model) — now the app-wide OmniCardDbContext
