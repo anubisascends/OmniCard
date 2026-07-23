@@ -19,15 +19,16 @@ public sealed partial class LogFileParser
 
     private const string TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff zzz";
 
-    /// <summary>Parses Serilog text log content into structured entries, preserving each entry's verbatim line endings in <see cref="LogEntry.Raw"/>.</summary>
+    /// <summary>Parses Serilog text log content into structured entries. Line endings in <see cref="LogEntry.Raw"/> and <see cref="LogEntry.Detail"/> are normalized to \n (LF).</summary>
     public IReadOnlyList<LogEntry> Parse(string content)
     {
         var entries = new List<LogEntry>();
         if (string.IsNullOrWhiteSpace(content))
             return entries;
 
-        // Split on '\n' only (do NOT normalize) so original CRLF endings survive into Raw.
-        var lines = content.Split('\n');
+        // Normalize all line endings to '\n' before splitting so Raw/Detail carry no stray '\r'
+        // (a trailing CRLF would otherwise leave a dangling lone '\r' after TrimEnd('\n')).
+        var lines = content.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
 
         Match? headerMatch = null;
         var raw = new StringBuilder();
@@ -55,10 +56,7 @@ public sealed partial class LogFileParser
 
         foreach (var line in lines)
         {
-            // Match on a CR-trimmed copy so the captured msg never carries a trailing '\r',
-            // but append the ORIGINAL line to raw/detail to reconstruct '\r\n' exactly.
-            var lineForMatch = line.TrimEnd('\r');
-            var match = HeaderRegex().Match(lineForMatch);
+            var match = HeaderRegex().Match(line);
             if (match.Success)
             {
                 Flush();

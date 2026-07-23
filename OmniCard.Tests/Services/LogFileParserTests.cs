@@ -44,15 +44,20 @@ public class LogFileParserTests
     }
 
     [Fact]
-    public void Parse_CrlfMultiLineException_RawRoundTripsVerbatim()
+    public void Parse_CrlfInput_NormalizesLineEndingsToLf()
     {
         var content =
             "2026-07-23 10:30:45.123 +00:00 [ERR] Src: boom\r\n" +
             "System.Exception: nope\r\n" +
-            "   at Foo.Bar()";
+            "   at Foo.Bar()\r\n";      // trailing CRLF, like a real file
         var entry = Assert.Single(Parser.Parse(content));
-        Assert.Equal(content, entry.Raw);
-        Assert.Equal("boom", entry.Message);            // no trailing \r in message
+        Assert.DoesNotContain('\r', entry.Raw);
+        Assert.Equal(
+            "2026-07-23 10:30:45.123 +00:00 [ERR] Src: boom\n" +
+            "System.Exception: nope\n" +
+            "   at Foo.Bar()",
+            entry.Raw);
+        Assert.Equal("boom", entry.Message);
         Assert.Contains("System.Exception: nope", entry.Detail);
     }
 

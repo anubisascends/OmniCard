@@ -12,8 +12,9 @@ public enum LogEntryLevel
 }
 
 /// <summary>
-/// One parsed log entry. <see cref="Raw"/> is the verbatim original text (header line plus any
-/// continuation lines such as an exception/stack trace) and is what the viewer copies to the clipboard.
+/// One parsed log entry. <see cref="Raw"/> is the entry's original text (header line plus any
+/// continuation lines such as an exception/stack trace), with line endings normalized to \n,
+/// and is what the viewer copies to the clipboard.
 /// </summary>
 public sealed record LogEntry
 {
@@ -25,7 +26,7 @@ public sealed record LogEntry
     /// <summary>Continuation lines (exception text / stack trace) joined by newlines; empty when none.</summary>
     public string Detail { get; init; } = "";
 
-    /// <summary>Verbatim original text of the whole entry.</summary>
+    /// <summary>The entry's original text (header line plus any continuation lines), with line endings normalized to \n. This is what the viewer copies to the clipboard.</summary>
     public required string Raw { get; init; }
 }
 
