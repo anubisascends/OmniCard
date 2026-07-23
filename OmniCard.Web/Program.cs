@@ -52,6 +52,8 @@ builder.Services.AddDbContextFactory<RiftboundDbContext>(options =>
     options.UseSqlite($"Data Source={Path.Combine(dataDir, "riftbound.db")};Mode=ReadOnly"));
 builder.Services.AddDbContextFactory<PokemonDbContext>(options =>
     options.UseSqlite($"Data Source={Path.Combine(dataDir, "pokemon.db")};Mode=ReadOnly"));
+builder.Services.AddDbContextFactory<YugiohDbContext>(options =>
+    options.UseSqlite($"Data Source={Path.Combine(dataDir, "yugioh.db")};Mode=ReadOnly"));
 
 // Infrastructure services needed by game services
 builder.Services.AddSingleton<IDataPathService>(new WebDataPathService(dataDir));
@@ -68,6 +70,8 @@ builder.Services.AddSingleton<RiftboundService>();
 builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<RiftboundService>());
 builder.Services.AddSingleton<PokemonService>();
 builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<PokemonService>());
+builder.Services.AddSingleton<YugiohService>();
+builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<YugiohService>());
 
 // Card & decklist services
 builder.Services.AddSingleton<ICardService, WebCardService>();

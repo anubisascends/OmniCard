@@ -118,6 +118,11 @@ public partial class App : Application
                 options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "pokemon.db")}"));
             services.AddSingleton<ICardGameService, PokemonService>();
 
+            // Yu-Gi-Oh! (TCGCSV)
+            services.AddDbContextFactory<YugiohDbContext>(options =>
+                options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "yugioh.db")}"));
+            services.AddSingleton<ICardGameService, YugiohService>();
+
             services.AddSingleton<Services.PriceUpdateService>();
 
             // Inventory (unified product model) — now the app-wide OmniCardDbContext
