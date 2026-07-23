@@ -22,8 +22,8 @@ public static class ExtendedDataParser
             {
                 var name = el.TryGetProperty("displayName", out var dn) && dn.ValueKind == JsonValueKind.String
                     ? dn.GetString()
-                    : el.TryGetProperty("name", out var n) ? n.GetString() : null;
-                var value = el.TryGetProperty("value", out var v) ? v.GetString() : null;
+                    : el.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() : null;
+                var value = el.TryGetProperty("value", out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
                 if (!string.IsNullOrEmpty(name))
                     result.Add(new KeyValuePair<string, string>(name!, value ?? ""));
             }

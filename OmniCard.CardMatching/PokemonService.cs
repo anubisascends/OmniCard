@@ -18,8 +18,10 @@ public sealed class PokemonService : TcgCsvGameService<PokemonDbContext>
     public override CardGame Game => CardGame.Pokemon;
     protected override string GameKey => "pokemon";
 
+    protected override (decimal? Normal, decimal? Foil) MapSubtypePrices(List<TcgCsvPrice> rows) => MapSubtypePricesForTest(rows);
+
     // Pokémon prices: Normal + (Holofoil preferred over Reverse Holofoil) as the single foil slot.
-    protected override (decimal? Normal, decimal? Foil) MapSubtypePrices(List<TcgCsvPrice> rows)
+    internal static (decimal? Normal, decimal? Foil) MapSubtypePricesForTest(List<TcgCsvPrice> rows)
     {
         decimal? P(string name) => rows.FirstOrDefault(r =>
             string.Equals(r.SubTypeName, name, StringComparison.OrdinalIgnoreCase))?.MarketPrice;

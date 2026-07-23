@@ -18,6 +18,33 @@ public class PokemonServiceTests
         Assert.Equal(CardGame.Pokemon, svc.Game);
     }
 
+    [Fact]
+    public void SubtypePrices_PrefersHolofoil_OverReverseHolofoil_ForFoil()
+    {
+        var rows = new List<TcgCsvPrice>
+        {
+            new() { ProductId = 1, SubTypeName = "Normal", MarketPrice = 1.00m },
+            new() { ProductId = 1, SubTypeName = "Holofoil", MarketPrice = 5.00m },
+            new() { ProductId = 1, SubTypeName = "Reverse Holofoil", MarketPrice = 3.00m },
+        };
+        var (normal, foil) = PokemonService.MapSubtypePricesForTest(rows);
+        Assert.Equal(1.00m, normal);
+        Assert.Equal(5.00m, foil);   // Holofoil preferred over Reverse Holofoil
+    }
+
+    [Fact]
+    public void SubtypePrices_FallsBackToReverseHolofoil_WhenNoHolofoil()
+    {
+        var rows = new List<TcgCsvPrice>
+        {
+            new() { ProductId = 1, SubTypeName = "Normal", MarketPrice = 1.00m },
+            new() { ProductId = 1, SubTypeName = "Reverse Holofoil", MarketPrice = 3.00m },
+        };
+        var (normal, foil) = PokemonService.MapSubtypePricesForTest(rows);
+        Assert.Equal(1.00m, normal);
+        Assert.Equal(3.00m, foil);
+    }
+
     private static PokemonService Create()
     {
         var conn = new SqliteConnection("Data Source=:memory:");
