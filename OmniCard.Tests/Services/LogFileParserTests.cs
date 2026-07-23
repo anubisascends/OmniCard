@@ -43,6 +43,19 @@ public class LogFileParserTests
         Assert.Equal("", entries[1].Detail);
     }
 
+    [Fact]
+    public void Parse_CrlfMultiLineException_RawRoundTripsVerbatim()
+    {
+        var content =
+            "2026-07-23 10:30:45.123 +00:00 [ERR] Src: boom\r\n" +
+            "System.Exception: nope\r\n" +
+            "   at Foo.Bar()";
+        var entry = Assert.Single(Parser.Parse(content));
+        Assert.Equal(content, entry.Raw);
+        Assert.Equal("boom", entry.Message);            // no trailing \r in message
+        Assert.Contains("System.Exception: nope", entry.Detail);
+    }
+
     [Theory]
     [InlineData("VRB", LogEntryLevel.Verbose)]
     [InlineData("DBG", LogEntryLevel.Debug)]
