@@ -82,23 +82,25 @@
                 <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="240"/>
                 <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
             </DataGrid.Columns>
-            <!-- Color-code rows by level -->
-            <DataGrid.RowStyle>
-                <Style TargetType="DataGridRow">
+            <!-- Color-code cells by level. BasedOn the themed DataGridCell style so the
+                 base theme (background, selection, default foreground) is preserved; only
+                 the foreground is overridden per level. Colors chosen to read on the dark theme. -->
+            <DataGrid.CellStyle>
+                <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding Level}" Value="Warning">
-                            <Setter Property="Foreground" Value="DarkOrange"/>
+                            <Setter Property="Foreground" Value="#FFB300"/>
                         </DataTrigger>
                         <DataTrigger Binding="{Binding Level}" Value="Error">
-                            <Setter Property="Foreground" Value="OrangeRed"/>
+                            <Setter Property="Foreground" Value="#FF5252"/>
                         </DataTrigger>
                         <DataTrigger Binding="{Binding Level}" Value="Fatal">
-                            <Setter Property="Foreground" Value="Red"/>
+                            <Setter Property="Foreground" Value="#FF1744"/>
                             <Setter Property="FontWeight" Value="SemiBold"/>
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
-            </DataGrid.RowStyle>
+            </DataGrid.CellStyle>
             <!-- Exception / detail shown when a row is selected -->
             <DataGrid.RowDetailsTemplate>
                 <DataTemplate>
@@ -106,6 +108,7 @@
                              IsReadOnly="True"
                              BorderThickness="0"
                              Background="Transparent"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                              FontFamily="Consolas"
                              TextWrapping="NoWrap"
                              HorizontalScrollBarVisibility="Auto"
