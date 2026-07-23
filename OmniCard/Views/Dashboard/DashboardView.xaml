@@ -594,6 +594,15 @@
                                                         <DataTrigger Binding="{Binding Game}" Value="{x:Static models:CardGame.Riftbound}">
                                                             <Setter Property="Visibility" Value="Visible"/>
                                                         </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Game}" Value="{x:Static models:CardGame.Pokemon}">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Game}" Value="{x:Static models:CardGame.YuGiOh}">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Game}" Value="{x:Static models:CardGame.FinalFantasy}">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </TextBlock.Style>
