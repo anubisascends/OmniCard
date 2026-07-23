@@ -25,6 +25,7 @@ public interface IDialogService
     (int Quantity, decimal? UnitCost, int? LocationId, string? Source, DateTime AcquisitionDate)? AddLotDialog(int productId);
     bool OpenUnitsDialog(Product product);
     void OpenMovementHistory();
+    void OpenLogViewer();
     ListForSaleResult? PickListForSale(decimal suggestedPrice);
     int ShowTcgOrderImportPreview(TcgOrderImportPreview preview);
     bool Confirm(string message, string title);

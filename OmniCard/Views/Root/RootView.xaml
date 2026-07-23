@@ -222,6 +222,9 @@
                           Command="{Binding ViewModel.CheckDecklistCommand}"/>
                 <MenuItem Header="_Movement History..."
                           Command="{Binding ViewModel.OpenMovementHistoryCommand}"/>
+                <Separator/>
+                <MenuItem Header="View _Logs..."
+                          Command="{Binding ViewModel.OpenLogViewerCommand}"/>
             </MenuItem>
         </Menu>
 
