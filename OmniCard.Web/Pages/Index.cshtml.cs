@@ -45,6 +45,9 @@ public class IndexModel : PageModel
             "mtg" => CardGame.Mtg,
             "optcg" => CardGame.OnePiece,
             "riftbound" => CardGame.Riftbound,
+            "pokemon" => CardGame.Pokemon,
+            "yugioh" => CardGame.YuGiOh,
+            "fftcg" => CardGame.FinalFantasy,
             _ => null
         };
     }
