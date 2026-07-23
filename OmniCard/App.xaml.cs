@@ -221,6 +221,9 @@ public partial class App : Application
             services.AddTransient<Views.Inventory.OpenUnitsViewModel>();
             services.AddTransient<Views.MovementHistory.MovementHistoryView>();
             services.AddTransient<Views.MovementHistory.MovementHistoryViewModel>();
+            services.AddTransient<Views.LogViewer.LogViewerView>();
+            services.AddTransient<Views.LogViewer.LogViewerViewModel>();
+            services.AddSingleton<OmniCard.Data.LogFileParser>();
         })
         .Build();
 

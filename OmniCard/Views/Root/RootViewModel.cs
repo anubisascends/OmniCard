@@ -1865,6 +1865,9 @@ public sealed partial class RootViewModel(
     public void OpenMovementHistory() => DialogService.OpenMovementHistory();
 
     [RelayCommand]
+    public void OpenLogViewer() => DialogService.OpenLogViewer();
+
+    [RelayCommand]
     public void CardDoubleClick()
     {
         if (SelectedScannedCard is not null)
