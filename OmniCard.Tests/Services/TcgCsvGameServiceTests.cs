@@ -176,6 +176,58 @@ public class TcgCsvDownloadTests : IDisposable
         Assert.Equal("pokemon-art/132375.png", row.LocalImagePath);
         Assert.Equal(7.77m, row.MarketPrice);           // price not clobbered by catalog re-download
     }
+
+    [Fact]
+    public async Task UpdatePrices_WritesMarketPrices_FoilFromHolofoil()
+    {
+        using (var seed = _factory.CreateDbContext())
+        {
+            seed.Cards.AddRange(
+                new TcgCsvCard { ProductId = 132375, Game = CardGame.Pokemon, Name = "Auron (Hero)" },
+                new TcgCsvCard { ProductId = 132376, Game = CardGame.Pokemon, Name = "Auron (Rare)" });
+            seed.SaveChanges();
+        }
+        var svc = CreateService();
+        await svc.UpdatePricesAsync();
+
+        using var ctx = _factory.CreateDbContext();
+        var hero = ctx.Cards.Single(c => c.ProductId == 132375);
+        Assert.Equal(1.50m, hero.MarketPrice);           // Normal
+        Assert.Equal(3.00m, hero.FoilMarketPrice);       // Holofoil
+        Assert.NotNull(hero.PriceUpdatedAt);
+
+        var rare = ctx.Cards.Single(c => c.ProductId == 132376);
+        Assert.Null(rare.MarketPrice);                   // no Normal row
+        Assert.Equal(0.12m, rare.FoilMarketPrice);       // Reverse Holofoil fallback
+    }
+
+    [Fact]
+    public async Task UpdatePrices_OneGroupFails_StillAppliesOtherGroupPrices()
+    {
+        using (var seed = _factory.CreateDbContext())
+        {
+            seed.Cards.Add(new TcgCsvCard { ProductId = 700001, Game = CardGame.Pokemon, Name = "GoodCard", SetCode = "GOOD" });
+            seed.SaveChanges();
+        }
+        var svc = CreateService(uri =>
+        {
+            if (uri.Contains("/groups")) return """{"results":[{"groupId":1,"name":"Bad"},{"groupId":2,"name":"Good"}],"success":true,"errors":[]}""";
+            if (uri.Contains("/3/1/prices")) return null;  // group 1 fails
+            if (uri.Contains("/3/2/prices")) return """{"results":[{"productId":700001,"marketPrice":5.25,"subTypeName":"Normal"}],"success":true,"errors":[]}""";
+            return null;
+        });
+        await svc.UpdatePricesAsync();
+
+        using var ctx = _factory.CreateDbContext();
+        Assert.Equal(5.25m, ctx.Cards.Single(c => c.ProductId == 700001).MarketPrice);
+    }
+
+    [Fact]
+    public async Task UpdatePrices_EmptyDb_NoThrow()
+    {
+        var svc = CreateService();
+        await svc.UpdatePricesAsync();   // no cards seeded; should bail quietly
+    }
 }
 
 file class RoutingHandler(Func<string, string?> route) : System.Net.Http.HttpMessageHandler

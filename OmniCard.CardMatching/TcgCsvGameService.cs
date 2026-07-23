@@ -268,7 +268,86 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
     public void Dispose() => _readContext.Dispose();
 
     // Methods added in Tasks 5-8:
-    public Task UpdatePricesAsync(IProgress<PriceUpdateProgress>? progress = null, CancellationToken ct = default) => throw new NotImplementedException();
+    public async Task UpdatePricesAsync(IProgress<PriceUpdateProgress>? progress = null, CancellationToken ct = default)
+    {
+        await using (var ctx = _dbContextFactory.CreateDbContext())
+        {
+            if (!await ctx.Cards.AnyAsync(ct))
+            {
+                _logger.LogInformation("Skipping {Game} price refresh: card database is empty", Game);
+                return;
+            }
+        }
+
+        _logger.LogInformation("Starting {Game} price refresh via TCGCSV", Game);
+        var client = CreateClient();
+        var priceMap = await FetchTcgCsvPriceMapAsync(client, progress, ct);
+
+        await using var context = _dbContextFactory.CreateDbContext();
+        context.Database.EnsureCreated();
+        var now = DateTime.UtcNow;
+        var updated = 0;
+
+        var targetIds = (await context.Cards.Select(c => c.ProductId).ToListAsync(ct))
+            .Where(priceMap.ContainsKey).ToList();
+
+        foreach (var batch in targetIds.Chunk(500))
+        {
+            var tracked = await context.Cards.Where(c => batch.Contains(c.ProductId))
+                .ToDictionaryAsync(c => c.ProductId, ct);
+            foreach (var pid in batch)
+            {
+                if (tracked.TryGetValue(pid, out var existing) && priceMap.TryGetValue(pid, out var prices))
+                {
+                    existing.MarketPrice = prices.Normal;
+                    existing.FoilMarketPrice = prices.Foil;
+                    existing.PriceUpdatedAt = now;
+                    updated++;
+                }
+            }
+            await context.SaveChangesAsync(ct);
+            context.ChangeTracker.Clear();
+        }
+
+        _logger.LogInformation("{Game} price refresh complete: {Updated} cards updated", Game, updated);
+        progress?.Report(new PriceUpdateProgress(Game, null, 0, 0, $"{Game} prices updated ({updated} cards)"));
+    }
+
+    private async Task<Dictionary<int, (decimal? Normal, decimal? Foil)>> FetchTcgCsvPriceMapAsync(
+        HttpClient client, IProgress<PriceUpdateProgress>? progress, CancellationToken ct)
+    {
+        var groups = await client.GetFromJsonAsync<TcgCsvGroupsResponse>(
+            $"{TcgCsvBaseUrl}/tcgplayer/{CategoryId}/groups", TcgCsvJsonOptions, ct);
+        var groupList = groups?.Results ?? [];
+        var rowsByProduct = new Dictionary<int, List<TcgCsvPrice>>();
+        var done = 0;
+
+        foreach (var group in groupList)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                var prices = await client.GetFromJsonAsync<TcgCsvPricesResponse>(
+                    $"{TcgCsvBaseUrl}/tcgplayer/{CategoryId}/{group.GroupId}/prices", TcgCsvJsonOptions, ct);
+                foreach (var row in prices?.Results ?? [])
+                {
+                    if (!rowsByProduct.TryGetValue(row.ProductId, out var list))
+                        rowsByProduct[row.ProductId] = list = [];
+                    list.Add(row);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Failed to fetch {Game} prices for group {GroupId}; skipping", Game, group.GroupId);
+            }
+            done++;
+            progress?.Report(new PriceUpdateProgress(Game, null, done, groupList.Count, $"{Game} prices: {done}/{groupList.Count} groups"));
+        }
+
+        var map = new Dictionary<int, (decimal? Normal, decimal? Foil)>(rowsByProduct.Count);
+        foreach (var (pid, rows) in rowsByProduct) map[pid] = MapSubtypePrices(rows);
+        return map;
+    }
     public Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default) => throw new NotImplementedException();
     public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14, ulong? scanEdgeHash = null) => throw new NotImplementedException();
     public List<CardMatch> SearchCards(string query, int maxResults = 20) => throw new NotImplementedException();
