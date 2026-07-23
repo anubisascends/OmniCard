@@ -228,6 +228,47 @@ public class TcgCsvDownloadTests : IDisposable
         var svc = CreateService();
         await svc.UpdatePricesAsync();   // no cards seeded; should bail quietly
     }
+
+    [Fact]
+    public async Task ComputeImageHashes_DownloadsAndHashes()
+    {
+        // 2x2 PNG bytes (base64) served for any image URL.
+        var pngBytes = Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD8GO2jAAAAE0lEQVR4nGP8z8Dwn4EIwDiqEAD6/AeR6qKYFwAAAABJRU5ErkJggg==");
+
+        using (var seed = _factory.CreateDbContext())
+        {
+            seed.Cards.Add(new TcgCsvCard { ProductId = 42, Game = CardGame.Pokemon, Name = "Pic", ImageUrl = "https://cdn/42_200w.jpg" });
+            seed.SaveChanges();
+        }
+
+        var svc = CreateService(uri =>
+        {
+            if (uri.Contains("42_400w") || uri.Contains("42_200w")) return null; // handled by binary route below
+            return null;
+        });
+        // Route binary image responses through a dedicated handler:
+        svc = new TestTcgCsvService(
+            new FakeHttpClientFactory(new BinaryRoutingHandler(pngBytes)),
+            _factory,
+            new PerceptualHashService(NullLogger<PerceptualHashService>.Instance),
+            MockDataPath(), NullLogger<TestTcgCsvService>.Instance);
+
+        await svc.ComputeImageHashesAsync(forceAll: true);
+
+        using var ctx = _factory.CreateDbContext();
+        var row = ctx.Cards.Single(c => c.ProductId == 42);
+        Assert.NotNull(row.ImageHash);
+        Assert.NotNull(row.EdgeHash);
+        Assert.Equal("pokemon-art/42.png", row.LocalImagePath);
+    }
+
+    private IDataPathService MockDataPath()
+    {
+        var m = new Moq.Mock<IDataPathService>();
+        m.Setup(d => d.DataDirectory).Returns(_dataDir);
+        return m.Object;
+    }
 }
 
 file class RoutingHandler(Func<string, string?> route) : System.Net.Http.HttpMessageHandler
@@ -246,6 +287,13 @@ file class RoutingHandler(Func<string, string?> route) : System.Net.Http.HttpMes
 file class FakeHttpClientFactory(System.Net.Http.HttpMessageHandler handler) : IHttpClientFactory
 {
     public HttpClient CreateClient(string name) => new(handler);
+}
+
+file class BinaryRoutingHandler(byte[] payload) : System.Net.Http.HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        { Content = new ByteArrayContent(payload) });
 }
 
 file class TestFactory(Microsoft.EntityFrameworkCore.DbContextOptions<PokemonDbContext> options)

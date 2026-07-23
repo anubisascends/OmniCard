@@ -240,10 +240,7 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
         _logger.LogInformation("{Game} download complete: {Ins} new, {Upd} updated in {Sec:F1}s", Game, inserted, updated, sw.Elapsed.TotalSeconds);
         progress?.Report($"Download complete — {inserted} new, {updated} updated.");
 
-        // NOTE: intentionally not auto-invoking ComputeImageHashesAsync here yet — it's still a
-        // NotImplementedException stub in this task. Task 5 (which implements it for real) must
-        // reinstate `if (inserted > 0) await ComputeImageHashesAsync(forceAll: false, progress, ct);`
-        // here, matching OptcgService/RiftboundService's pattern.
+        if (inserted > 0) await ComputeImageHashesAsync(forceAll: false, progress, ct);
     }
 
     protected TcgCsvCard MapProduct(TcgCsvProduct p, string setCode, string setName)
@@ -348,7 +345,105 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
         foreach (var (pid, rows) in rowsByProduct) map[pid] = MapSubtypePrices(rows);
         return map;
     }
-    public Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default) => throw new NotImplementedException();
+    public async Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Starting {Game} image hash computation (forceAll: {ForceAll})", Game, forceAll);
+        var sw = Stopwatch.StartNew();
+
+        await using var context = _dbContextFactory.CreateDbContext();
+        var query = context.Cards.Where(c => c.ImageUrl != null);
+        if (!forceAll) query = query.Where(c => c.ImageHash == null || c.EdgeHash == null);
+        var cards = await query.Select(c => new { c.ProductId, c.ImageUrl }).ToListAsync(ct);
+        progress?.Report($"Computing hashes for {cards.Count} cards...");
+
+        var client = CreateClient();
+        using var throttle = new SemaphoreSlim(8);
+        var completed = 0; var failed = 0;
+        var results = new List<(int Id, ulong Hash, ulong EdgeHash)>();
+        var saveLock = new object();
+
+        await Parallel.ForEachAsync(cards, new ParallelOptions { MaxDegreeOfParallelism = 8, CancellationToken = ct },
+            async (card, token) =>
+            {
+                var url = UpgradeImageUrl(card.ImageUrl);
+                if (url is null) { Interlocked.Increment(ref failed); return; }
+                try
+                {
+                    await throttle.WaitAsync(token);
+                    try
+                    {
+                        var artFullPath = GetLocalArtFullPath(card.ProductId);
+                        byte[] imageBytes;
+                        if (File.Exists(artFullPath))
+                        {
+                            imageBytes = await File.ReadAllBytesAsync(artFullPath, token);
+                        }
+                        else
+                        {
+                            using var response = await client.GetAsync(url, token);
+                            response.EnsureSuccessStatusCode();
+                            imageBytes = await response.Content.ReadAsByteArrayAsync(token);
+                            Directory.CreateDirectory(Path.GetDirectoryName(artFullPath)!);
+                            await File.WriteAllBytesAsync(artFullPath, imageBytes, token);
+                        }
+
+                        using var buffer = new MemoryStream(imageBytes);
+                        var hash = _hashService.ComputeHash(buffer);
+                        buffer.Position = 0;
+                        var edgeHash = _hashService.ComputeEdgeHash(buffer);
+                        lock (saveLock) results.Add((card.ProductId, hash, edgeHash));
+                    }
+                    finally { throttle.Release(); await Task.Delay(50, token); }
+                }
+                catch (Exception ex) when (!token.IsCancellationRequested)
+                {
+                    _logger.LogWarning(ex, "Failed to compute hash for {Game} card {Id}", Game, card.ProductId);
+                    Interlocked.Increment(ref failed);
+                }
+
+                var d = Interlocked.Increment(ref completed);
+                if (d % 100 == 0) progress?.Report($"Hashed {d}/{cards.Count} cards ({failed} failed)...");
+
+                List<(int, ulong, ulong)>? toSave = null;
+                lock (saveLock) { if (results.Count >= 200) { toSave = [.. results]; results.Clear(); } }
+                if (toSave is not null) await SaveHashBatchAsync(toSave, ct);
+            });
+
+        if (results.Count > 0) await SaveHashBatchAsync(results, ct);
+
+        var oldContext = _readContext;
+        _readContext = _dbContextFactory.CreateDbContext();
+        _hashCache = null; _edgeHashCache = null; _hashSetLookup = null;
+        oldContext.Dispose();
+
+        sw.Stop();
+        _logger.LogInformation("{Game} hash computation complete: {Hashed} hashed, {Failed} failed in {Sec:F1}s", Game, completed - failed, failed, sw.Elapsed.TotalSeconds);
+        progress?.Report($"Done — hashed {completed - failed} cards ({failed} failed).");
+    }
+
+    private async Task SaveHashBatchAsync(List<(int Id, ulong Hash, ulong EdgeHash)> batch, CancellationToken ct)
+    {
+        await using var context = _dbContextFactory.CreateDbContext();
+        foreach (var (id, hash, edgeHash) in batch)
+        {
+            var rel = GetLocalArtRelativePath(id);
+            await context.Cards.Where(c => c.ProductId == id)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(c => c.ImageHash, hash)
+                    .SetProperty(c => c.EdgeHash, edgeHash)
+                    .SetProperty(c => c.LocalImagePath, rel), ct);
+        }
+    }
+
+    protected string GetLocalArtRelativePath(int id) => $"{GameKey}-art/{id}.png";
+    protected string GetLocalArtFullPath(int id) => Path.Combine(_dataDirectory, $"{GameKey}-art", $"{id}.png");
+    protected string? ResolveLocalArtPath(string? relativePath)
+    {
+        if (relativePath is null) return null;
+        var full = Path.Combine(_dataDirectory, relativePath);
+        return File.Exists(full) ? full : null;
+    }
+
     public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14, ulong? scanEdgeHash = null) => throw new NotImplementedException();
     public List<CardMatch> SearchCards(string query, int maxResults = 20) => throw new NotImplementedException();
     public List<CardMatch> GetPrintings(string cardName) => throw new NotImplementedException();
