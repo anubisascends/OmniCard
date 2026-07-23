@@ -121,6 +121,27 @@ public class LogFileParserTests
     }
 
     [Fact]
+    public void ListFiles_ReturnsNewestFirst()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "omnicard-logs-" + Guid.NewGuid());
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var older = Path.Combine(dir, "tcgcardscanner-20260701.log");
+            var newer = Path.Combine(dir, "tcgcardscanner-20260702.log");
+            File.WriteAllText(older, "x");
+            File.WriteAllText(newer, "x");
+            File.SetLastWriteTimeUtc(older, new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc));
+            File.SetLastWriteTimeUtc(newer, new DateTime(2026, 7, 2, 0, 0, 0, DateTimeKind.Utc));
+
+            var files = new LogFileParser().ListFiles(dir);
+
+            Assert.Equal("tcgcardscanner-20260702.log", files[0].DisplayName);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
     public void ParseFile_ReadsAndParses()
     {
         var path = Path.Combine(Path.GetTempPath(), "tcgcardscanner-" + Guid.NewGuid() + ".log");

@@ -45,6 +45,8 @@ public sealed partial class LogViewerViewModel(
 
     [ObservableProperty] public partial bool IsBusy { get; set; }
     [ObservableProperty] public partial string? StatusMessage { get; set; }
+    [ObservableProperty]
+    public partial bool ShowNoMatchOverlay { get; set; }
 
     partial void OnShowVerboseChanged(bool value) => ApplyFilters();
     partial void OnShowDebugChanged(bool value) => ApplyFilters();
@@ -76,28 +78,49 @@ public sealed partial class LogViewerViewModel(
     private async Task Refresh()
     {
         var current = SelectedFile?.FullPath;
-        Load();
-        // If the same file still exists, Load re-selected newest; re-parse current if unchanged.
-        if (current is not null && SelectedFile?.FullPath == current)
-            await ReparseAsync(current);
+        AvailableFiles.Clear();
+        foreach (var f in parser.ListFiles(dataPathService.LogsDirectory))
+            AvailableFiles.Add(f);
+
+        if (AvailableFiles.Count == 0)
+        {
+            StatusMessage = "No log files found.";
+            _allEntries.Clear();
+            ApplyFilters();
+            return;
+        }
+
+        var target = AvailableFiles.FirstOrDefault(f => f.FullPath == current) ?? AvailableFiles[0];
+        SelectedFile = target;            // updates the combo; may or may not raise the change handler
+        await ReparseAsync(target.FullPath); // explicit reparse always refreshes (coalesced if one is running)
     }
+
+    private string? _pendingPath;
+    private bool _isParsing;
 
     private async Task ReparseAsync(string path)
     {
-        if (IsBusy) return;
+        _pendingPath = path;
+        if (_isParsing) return;   // an in-flight loop will pick up the latest _pendingPath
+        _isParsing = true;
         IsBusy = true;
-        StatusMessage = null;
         try
         {
-            var parsed = await Task.Run(() => parser.ParseFile(path));
-            _allEntries.Clear();
-            _allEntries.AddRange(parsed);
-            if (parsed.Count == 0)
-                StatusMessage = "No log entries in this file (or it could not be read).";
-            ApplyFilters();
+            while (_pendingPath is { } next)
+            {
+                _pendingPath = null;
+                StatusMessage = null;
+                var parsed = await Task.Run(() => parser.ParseFile(next));
+                _allEntries.Clear();
+                _allEntries.AddRange(parsed);
+                if (parsed.Count == 0)
+                    StatusMessage = "No log entries in this file (or it could not be read).";
+                ApplyFilters();
+            }
         }
         finally
         {
+            _isParsing = false;
             IsBusy = false;
         }
     }
@@ -107,6 +130,7 @@ public sealed partial class LogViewerViewModel(
         Entries.Clear();
         foreach (var e in FilterFor(_allEntries))
             Entries.Add(e);
+        ShowNoMatchOverlay = _allEntries.Count > 0 && Entries.Count == 0;
     }
 
     /// <summary>Applies the current level/time/text filters. Exposed for unit tests.</summary>
@@ -157,7 +181,7 @@ public sealed partial class LogViewerViewModel(
         }
     }
 
-    /// <summary>Joins entries' verbatim raw text with a blank-line separator. Exposed for tests.</summary>
+    /// <summary>Joins entries' raw text with a blank-line separator. Exposed for tests.</summary>
     public static string BuildClipboardText(IEnumerable<LogEntry> entries) =>
         string.Join("\n\n", entries.Select(e => e.Raw));
 }
