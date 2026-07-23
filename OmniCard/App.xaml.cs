@@ -113,6 +113,11 @@ public partial class App : Application
                 options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "riftbound.db")}"));
             services.AddSingleton<ICardGameService, RiftboundService>();
 
+            // Pokémon (TCGCSV)
+            services.AddDbContextFactory<PokemonDbContext>(options =>
+                options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "pokemon.db")}"));
+            services.AddSingleton<ICardGameService, PokemonService>();
+
             services.AddSingleton<Services.PriceUpdateService>();
 
             // Inventory (unified product model) — now the app-wide OmniCardDbContext
