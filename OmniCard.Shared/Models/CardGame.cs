@@ -4,5 +4,8 @@ public enum CardGame
 {
     Mtg,
     OnePiece,
-    Riftbound
+    Riftbound,
+    Pokemon,
+    YuGiOh,
+    FinalFantasy
 }
