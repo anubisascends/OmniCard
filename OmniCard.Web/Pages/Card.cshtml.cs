@@ -76,11 +76,20 @@ public class CardModel : PageModel
     private static string? QueryExtendedData<TContext>(IDbContextFactory<TContext> factory, int productId)
         where TContext : TcgCsvDbContext
     {
-        using var db = factory.CreateDbContext();
-        return db.Cards.AsNoTracking()
-            .Where(c => c.ProductId == productId)
-            .Select(c => c.ExtendedDataJson)
-            .FirstOrDefault();
+        try
+        {
+            using var db = factory.CreateDbContext();
+            return db.Cards.AsNoTracking()
+                .Where(c => c.ProductId == productId)
+                .Select(c => c.ExtendedDataJson)
+                .FirstOrDefault();
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException)
+        {
+            // Catalog DB (pokemon.db/yugioh.db/fftcg.db) missing, locked, or corrupt — render
+            // the card page without the extended-data section rather than 500ing.
+            return null;
+        }
     }
 
     public string? ImageUrl

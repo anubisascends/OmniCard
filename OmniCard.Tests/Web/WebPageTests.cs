@@ -311,6 +311,43 @@ public class WebPageTests : IDisposable
         Assert.Null(model.ExtendedDataJson);
     }
 
+    [Fact]
+    public void CardModel_OnGet_MissingCatalogDb_DoesNotThrow_ExtendedDataJsonNull()
+    {
+        // Simulate a missing pokemon.db: a read-only connection string pointing at a file
+        // that doesn't exist. SQLite refuses to create the file in Mode=ReadOnly, so opening
+        // it throws SqliteException (SQLITE_CANTOPEN) — this is what QueryExtendedData must
+        // catch instead of letting bubble up into a 500.
+        var missingDbPath = Path.Combine(Path.GetTempPath(), $"omnicard-missing-{Guid.NewGuid():N}.db");
+        Assert.False(File.Exists(missingDbPath));
+
+        var options = new DbContextOptionsBuilder<PokemonDbContext>()
+            .UseSqlite($"Data Source={missingDbPath};Mode=ReadOnly")
+            .Options;
+        var pokemonFactory = new TestPokemonDbContextFactory(options);
+
+        int lotId;
+        using (var ctx = _factory.CreateDbContext())
+        {
+            var product = NewSingle("12345", "Pikachu", "Base Set", "BS", "58", "common");
+            product.Game = CardGame.Pokemon;
+            ctx.Products.Add(product);
+            ctx.SaveChanges();
+
+            var lot = new InventoryLot { ProductId = product.Id };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            lotId = lot.Id;
+        }
+
+        var model = new CardModel(_factory, pokemonFactory) { PageContext = CreatePageContext() };
+
+        var exception = Record.Exception(() => model.OnGet(lotId));
+
+        Assert.Null(exception);
+        Assert.Null(model.ExtendedDataJson);
+    }
+
     private class TestDbContextFactory(DbContextOptions<OmniCardDbContext> options)
         : IDbContextFactory<OmniCardDbContext>
     {
