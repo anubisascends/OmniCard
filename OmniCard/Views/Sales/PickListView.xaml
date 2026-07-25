@@ -8,13 +8,14 @@
              d:DataContext="{d:DesignInstance {x:Type local:SalesViewModel}}">
     <DockPanel Margin="8">
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
-            <TextBlock Text="For-Sale location:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBlock Text="For-Sale location:" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBlock Text="{Binding ForSaleLocation.Name, TargetNullValue='(set in Settings ▸ Sales &amp; Receipts)'}"
-                       VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,12,0"/>
+                       VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,12,0"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <Button Content="Refresh" Margin="0,0,0,0" Command="{Binding RefreshPickListCommand}"/>
             <Button Content="Mark All Picked" Margin="6,0,0,0" Command="{Binding MarkAllPickedCommand}"/>
             <Button Content="Print Pick List" Margin="6,0,0,0" Command="{Binding PrintPickListCommand}"/>
-            <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+            <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center" Margin="12,0,0,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
         </StackPanel>
         <DataGrid ItemsSource="{Binding PickList}" AutoGenerateColumns="False" IsReadOnly="True"
                   Style="{StaticResource {x:Type DataGrid}}">

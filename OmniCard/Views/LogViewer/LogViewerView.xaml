@@ -26,6 +26,7 @@
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
             <TextBlock Text="File:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
             <ComboBox Width="220" VerticalAlignment="Center" Margin="0,0,16,0"
+                      Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                       ItemsSource="{Binding AvailableFiles}"
                       SelectedItem="{Binding SelectedFile}"
                       DisplayMemberPath="DisplayName"/>

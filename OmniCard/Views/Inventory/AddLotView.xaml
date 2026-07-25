@@ -20,7 +20,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="{Binding ViewModel.ProductName}" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,8"/>
+        <TextBlock Text="{Binding ViewModel.ProductName}" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,8" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
@@ -35,25 +35,26 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <TextBlock Text="Quantity:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+            <TextBlock Text="Quantity:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Grid.Column="1" Margin="0,4"
                      Text="{Binding ViewModel.Quantity, UpdateSourceTrigger=PropertyChanged}"/>
 
-            <TextBlock Grid.Row="1" Text="Unit Cost $:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+            <TextBlock Grid.Row="1" Text="Unit Cost $:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4"
                      Text="{Binding ViewModel.UnitCost, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}"/>
 
-            <TextBlock Grid.Row="2" Text="Location:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+            <TextBlock Grid.Row="2" Text="Location:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <ComboBox Grid.Row="2" Grid.Column="1" Margin="0,4"
+                      Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                       ItemsSource="{Binding ViewModel.AvailableContainers}"
                       SelectedItem="{Binding ViewModel.SelectedContainer}"
                       DisplayMemberPath="Name"/>
 
-            <TextBlock Grid.Row="3" Text="Source:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+            <TextBlock Grid.Row="3" Text="Source:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Grid.Row="3" Grid.Column="1" Margin="0,4"
                      Text="{Binding ViewModel.Source, UpdateSourceTrigger=PropertyChanged}"/>
 
-            <TextBlock Grid.Row="4" Text="Date:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+            <TextBlock Grid.Row="4" Text="Date:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <DatePicker Grid.Row="4" Grid.Column="1" Margin="0,4"
                         SelectedDate="{Binding ViewModel.AcquisitionDate}"/>
         </Grid>

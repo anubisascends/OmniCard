@@ -23,7 +23,7 @@
                 <Border Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"
                         Background="#1A1A1A"
                         OpacityMask="{Binding Symbol, Converter={StaticResource SymbolToBrush}}"/>
-                <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             </StackPanel>
         </DataTemplate>
     </Window.Resources>
@@ -44,7 +44,7 @@
 
             <!-- Left panel: Available Sets -->
             <DockPanel>
-                <TextBlock DockPanel.Dock="Top" Text="Available Sets" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <TextBlock DockPanel.Dock="Top" Text="Available Sets" FontWeight="SemiBold" Margin="0,0,0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox DockPanel.Dock="Top"
                          Text="{Binding ViewModel.SearchText, UpdateSourceTrigger=PropertyChanged}"
                          Margin="0,0,0,4"
@@ -71,7 +71,7 @@
             <!-- Right panel: Selected Sets -->
             <DockPanel Grid.Column="2">
                 <TextBlock DockPanel.Dock="Top" Text="{Binding ViewModel.SelectedCountText}"
-                           FontWeight="SemiBold" Margin="0,0,0,4"/>
+                           FontWeight="SemiBold" Margin="0,0,0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <ListBox ItemsSource="{Binding ViewModel.SelectedSets}"
                          SelectedItem="{Binding ViewModel.SelectedSelectedItem}"
                          MouseDoubleClick="SelectedList_MouseDoubleClick"

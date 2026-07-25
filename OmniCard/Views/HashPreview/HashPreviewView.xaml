@@ -30,6 +30,7 @@
                         <Image Source="{Binding Image}" Width="100" Height="100"
                                Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
                         <TextBlock Text="{Binding StageName}" HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                    FontSize="11" Margin="0,4,0,0"/>
                     </StackPanel>
                 </DataTemplate>
@@ -37,6 +38,7 @@
         </ItemsControl>
 
         <TextBlock Text="{Binding ViewModel.HashText}" FontFamily="Consolas" FontSize="14"
+                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                    HorizontalAlignment="Center" Margin="0,8,0,0"/>
     </StackPanel>
 </Window>

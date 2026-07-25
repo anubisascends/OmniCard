@@ -57,12 +57,14 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <TextBlock Text="{Binding ViewModel.Result.DeckName}" FontSize="16" FontWeight="Bold"/>
+                <TextBlock Text="{Binding ViewModel.Result.DeckName}" FontSize="16" FontWeight="Bold"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
 
                 <ScrollViewer Grid.Row="1" Margin="0,8,0,0" VerticalScrollBarVisibility="Auto">
                     <StackPanel>
                         <!-- Owned cards -->
-                        <TextBlock FontWeight="Bold" Margin="0,0,0,4">
+                        <TextBlock FontWeight="Bold" Margin="0,0,0,4"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                             <Run Text="Cards You Own: "/>
                             <Run Text="{Binding ViewModel.Result.TotalOwned, Mode=OneWay}"
                                  Foreground="{DynamicResource MaterialDesign.Brush.Primary}"/>
@@ -70,7 +72,8 @@
                         <ItemsControl ItemsSource="{Binding ViewModel.Result.OwnedEntries}" Margin="8,0,0,0">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock TextWrapping="Wrap" Margin="0,1">
+                                    <TextBlock TextWrapping="Wrap" Margin="0,1"
+                                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                                         <Run Text="{Binding QuantityNeeded, StringFormat='{}{0}x ', Mode=OneWay}"/>
                                         <Run Text="{Binding CardName, Mode=OneWay}" FontWeight="SemiBold"/>
                                     </TextBlock>
@@ -86,7 +89,8 @@
                         <ItemsControl ItemsSource="{Binding ViewModel.Result.MissingEntries}" Margin="8,0,0,0">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock TextWrapping="Wrap" Margin="0,1">
+                                    <TextBlock TextWrapping="Wrap" Margin="0,1"
+                                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                                         <Run Text="{Binding QuantityNeeded, StringFormat='{}{0}x ', Mode=OneWay}"/>
                                         <Run Text="{Binding CardName, Mode=OneWay}" FontWeight="SemiBold"/>
                                         <Run Text="{Binding MarketPrice, StringFormat=' (${0:N2})', Mode=OneWay, TargetNullValue=''}"

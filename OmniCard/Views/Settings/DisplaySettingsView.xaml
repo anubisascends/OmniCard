@@ -7,34 +7,34 @@
     <!-- DataContext is the RootViewModel (set by SettingsView host). -->
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="16" MaxWidth="520" HorizontalAlignment="Left">
-            <TextBlock Text="Display" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,12"/>
+            <TextBlock Text="Display" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,12" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
 
             <CheckBox Content="Dark theme" IsChecked="{Binding IsDarkTheme}" Margin="0,0,0,12"/>
 
-            <TextBlock Text="Card detail font size" Margin="0,0,0,4"/>
+            <TextBlock Text="Card detail font size" Margin="0,0,0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                 <Slider Width="200" Minimum="10" Maximum="24" TickFrequency="1" IsSnapToTickEnabled="True"
                         Value="{Binding CardDetailFontSize}" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding CardDetailFontSize, StringFormat='{}{0:F0}'}"
-                           VerticalAlignment="Center" Margin="8,0,0,0"/>
+                           VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             </StackPanel>
 
-            <TextBlock Text="Card preview size" Margin="0,0,0,4"/>
+            <TextBlock Text="Card preview size" Margin="0,0,0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                 <Slider Width="200" Minimum="100" Maximum="175" TickFrequency="25" IsSnapToTickEnabled="True"
                         Value="{Binding CardPreviewScale}" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding CardPreviewScale, StringFormat='{}{0:F0}%'}"
-                           VerticalAlignment="Center" Margin="8,0,0,0"/>
+                           VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             </StackPanel>
 
             <CheckBox Content="Stack duplicates" IsChecked="{Binding Collection.IsStacked}" Margin="0,0,0,12"/>
 
-            <TextBlock Text="Scanner font size" Margin="0,0,0,4"/>
+            <TextBlock Text="Scanner font size" Margin="0,0,0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                 <Slider Width="200" Minimum="10" Maximum="24" TickFrequency="1" IsSnapToTickEnabled="True"
                         Value="{Binding ScannerFontSize}" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding ScannerFontSize, StringFormat='{}{0:F0}'}"
-                           VerticalAlignment="Center" Margin="8,0,0,0"/>
+                           VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

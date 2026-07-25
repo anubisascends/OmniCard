@@ -62,6 +62,7 @@
                     <TextBlock Text="{Binding DataContext.ViewModel.Collection.CurrentLocationName,
                                    RelativeSource={RelativeSource AncestorType=Window}}"
                                FontWeight="SemiBold"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                VerticalAlignment="Center"
                                Margin="0,0,12,0"
                                Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
@@ -127,12 +128,14 @@
 
                     <!-- Sort/Filter presets -->
                     <TextBlock Text="Sort:"
+                            Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                             VerticalAlignment="Center"
                             Margin="4,0,4,0"
                             Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
                                 RelativeSource={RelativeSource AncestorType=Window},
                                 Converter={conv:BoolToVisibilityConverter}}"/>
-                    <ComboBox ItemsSource="{Binding DataContext.ViewModel.Collection.AvailableSortPresets,
+                    <ComboBox Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                              ItemsSource="{Binding DataContext.ViewModel.Collection.AvailableSortPresets,
                                   RelativeSource={RelativeSource AncestorType=Window}}"
                               SelectedItem="{Binding DataContext.ViewModel.Collection.SelectedSortPreset,
                                   RelativeSource={RelativeSource AncestorType=Window}}"
@@ -153,12 +156,14 @@
                                 Converter={conv:BoolToVisibilityConverter}}"/>
 
                     <TextBlock Text="Filter:"
+                            Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                             VerticalAlignment="Center"
                             Margin="4,0,4,0"
                             Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
                                 RelativeSource={RelativeSource AncestorType=Window},
                                 Converter={conv:BoolToVisibilityConverter}}"/>
-                    <ComboBox ItemsSource="{Binding DataContext.ViewModel.Collection.AvailableFilterPresets,
+                    <ComboBox Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                              ItemsSource="{Binding DataContext.ViewModel.Collection.AvailableFilterPresets,
                                   RelativeSource={RelativeSource AncestorType=Window}}"
                               SelectedItem="{Binding DataContext.ViewModel.Collection.SelectedFilterPreset,
                                   RelativeSource={RelativeSource AncestorType=Window}}"
@@ -213,20 +218,22 @@
                 </Style>
             </Border.Style>
             <StackPanel Orientation="Horizontal">
-                <TextBlock Margin="0,0,20,0">
+                <TextBlock Margin="0,0,20,0"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                     <Run Text="Cards:"
                             FontWeight="SemiBold"/>
                     <Run Text="{Binding DataContext.ViewModel.Collection.FilteredCardCount,
                              RelativeSource={RelativeSource AncestorType=Window}, Mode=OneWay}"/>
                 </TextBlock>
-                <TextBlock Margin="0,0,20,0">
+                <TextBlock Margin="0,0,20,0"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                     <Run Text="Value:"
                             FontWeight="SemiBold"/>
                     <Run Text="{Binding DataContext.ViewModel.Collection.FilteredMarketValue,
                              RelativeSource={RelativeSource AncestorType=Window},
                              StringFormat='${0:N2}', Mode=OneWay}"/>
                 </TextBlock>
-                <TextBlock>
+                <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                     <Run Text="Selected:"
                             FontWeight="SemiBold"/>
                     <Run Text="{Binding DataContext.ViewModel.Collection.SelectedCardCount,

@@ -9,8 +9,8 @@
                         <ColumnDefinition Width="120"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="{Binding Key}" FontWeight="SemiBold" Opacity="0.7" TextWrapping="Wrap"/>
-                    <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap"/>
+                    <TextBlock Grid.Column="0" Text="{Binding Key}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" FontWeight="SemiBold" Opacity="0.7" TextWrapping="Wrap"/>
+                    <TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" TextWrapping="Wrap"/>
                 </Grid>
             </DataTemplate>
         </ItemsControl.ItemTemplate>

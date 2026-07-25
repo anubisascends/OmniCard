@@ -11,7 +11,7 @@
     </UserControl.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="16" MaxWidth="560" HorizontalAlignment="Left">
-            <TextBlock Text="Data Location" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,12"/>
+            <TextBlock Text="Data Location" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,12" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
 
             <Grid Margin="0,0,0,8">
                 <Grid.ColumnDefinitions>
@@ -19,7 +19,7 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Current path:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <TextBlock Grid.Column="0" Text="Current path:" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox Grid.Column="1" Text="{Binding CurrentPath, Mode=OneWay}"
                          IsReadOnly="True" Margin="0,0,8,0" VerticalAlignment="Center"/>
                 <Button Grid.Column="2" Content="Browse..." Command="{Binding BrowseCommand}"
@@ -27,15 +27,15 @@
             </Grid>
 
             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                <TextBlock Text="Status:" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                <TextBlock Text="Status:" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             </StackPanel>
 
             <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
                     CornerRadius="4" Padding="12" Margin="0,0,0,8"
                     Visibility="{Binding IsMigrationPending, Converter={StaticResource BoolToVis}}">
                 <StackPanel>
-                    <TextBlock TextWrapping="Wrap" Margin="0,0,0,8">
+                    <TextBlock TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                         <Run Text="Target: "/>
                         <Run Text="{Binding PendingPath, Mode=OneWay}" FontWeight="SemiBold"/>
                     </TextBlock>
@@ -54,7 +54,7 @@
                 <StackPanel>
                     <ProgressBar Value="{Binding MigrationProgress}" Minimum="0" Maximum="100"
                                  Height="20" Margin="0,0,0,8"/>
-                    <TextBlock Text="{Binding MigrationStatusText}" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding MigrationStatusText}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <Button Content="Cancel Migration" Command="{Binding CancelMigrationCommand}"
                             Padding="12,4" Margin="0,8,0,0" HorizontalAlignment="Left"/>
                 </StackPanel>

@@ -131,6 +131,7 @@
                     <DataTemplate>
                         <Expander Header="{Binding Key, Converter={conv:ContainerTypeDisplayConverter}}"
                                   IsExpanded="True"
+                                  Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                   Margin="0,0,0,8">
                             <ItemsControl ItemsSource="{Binding}">
                                 <ItemsControl.ItemsPanel>
