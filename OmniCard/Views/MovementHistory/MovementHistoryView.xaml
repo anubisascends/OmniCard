@@ -24,12 +24,15 @@
 
         <!-- Filter bar -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-            <TextBlock Text="Type:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBlock Text="Type:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <ComboBox Width="120" VerticalAlignment="Center" Margin="0,0,16,0"
+                      Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                       ItemsSource="{Binding TypeOptions}"
                       SelectedItem="{Binding SelectedTypeOption}"/>
 
-            <TextBlock Text="Period:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBlock Text="Period:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <RadioButton Content="All Time" GroupName="Period" VerticalAlignment="Center" Margin="0,0,10,0"
                          IsChecked="{Binding Period, Converter={conv:EnumBoolConverter}, ConverterParameter=AllTime}"/>
             <RadioButton Content="This Year" GroupName="Period" VerticalAlignment="Center" Margin="0,0,10,0"
@@ -37,7 +40,8 @@
             <RadioButton Content="This Month" GroupName="Period" VerticalAlignment="Center" Margin="0,0,16,0"
                          IsChecked="{Binding Period, Converter={conv:EnumBoolConverter}, ConverterParameter=ThisMonth}"/>
 
-            <TextBlock Text="Product:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBlock Text="Product:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Width="220" VerticalAlignment="Center" Margin="0,0,8,0"
                      Text="{Binding ProductQuery, UpdateSourceTrigger=PropertyChanged}">
                 <TextBox.InputBindings>

@@ -37,7 +37,8 @@
                 <ToolBar>
                     <TextBlock Text="Only match from set(s):"
                                VerticalAlignment="Center"
-                               Margin="8,0,4,0"/>
+                               Margin="8,0,4,0"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <TextBox x:Name="SetFilterTextBox"
                              Text="{Binding ViewModel.SetFilterText, UpdateSourceTrigger=PropertyChanged}"
                              MinWidth="200"
@@ -69,6 +70,7 @@
                     <TextBlock Text="Location:"
                                VerticalAlignment="Center"
                                Margin="0,0,4,0"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                     <ComboBox ItemsSource="{Binding ViewModel.GroupedContainers}"
                               SelectedItem="{Binding ViewModel.ActiveContainer}"
@@ -76,6 +78,7 @@
                               Width="150"
                               VerticalAlignment="Center"
                               Margin="0,0,4,0"
+                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                               Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}">
                         <ComboBox.GroupStyle>
                             <GroupStyle>
@@ -97,6 +100,7 @@
                         <TextBlock Text="Page:"
                                    VerticalAlignment="Center"
                                    Margin="4,0,4,0"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                    Visibility="{Binding ViewModel.ShowBinderFields, Converter={StaticResource BoolToVis}}"/>
                         <TextBox Text="{Binding ViewModel.ActivePage, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
                                  Width="40"
@@ -106,6 +110,7 @@
                         <TextBlock Text="Slot:"
                                    VerticalAlignment="Center"
                                    Margin="0,0,4,0"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                    Visibility="{Binding ViewModel.ShowBinderFields, Converter={StaticResource BoolToVis}}"/>
                         <TextBox Text="{Binding ViewModel.ActiveSlot, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
                                  Width="40"
@@ -120,6 +125,7 @@
                         <TextBlock Text="Section:"
                                    VerticalAlignment="Center"
                                    Margin="4,0,4,0"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                    Visibility="{Binding ViewModel.ShowBoxFields, Converter={StaticResource BoolToVis}}"/>
                         <TextBox Text="{Binding ViewModel.ActiveSection, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}"
                                  Width="100"
@@ -133,6 +139,7 @@
                     <TextBlock VerticalAlignment="Center"
                                Text="Is Foil"
                                Margin="4,0,4,0"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                     <CheckBox IsChecked="{Binding ViewModel.DefaultIsFoil}"
                               VerticalAlignment="Center"
@@ -142,6 +149,7 @@
                     <TextBlock Text="Purchase Price $:"
                                VerticalAlignment="Center"
                                Margin="0,0,4,0"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                     <TextBox Text="{Binding ViewModel.DefaultPurchasePrice, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
                              Width="60"
@@ -155,14 +163,17 @@
 
                     <TextBlock Text="Scan Quality:"
                                VerticalAlignment="Center"
-                               Margin="0,0,4,0"/>
+                               Margin="0,0,4,0"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <ComboBox SelectedItem="{Binding ViewModel.ScanQuality}"
                               Width="140"
                               VerticalAlignment="Center"
-                              Margin="0,0,8,0">
+                              Margin="0,0,8,0"
+                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding Converter={conv:ScanQualityDisplayConverter}}"/>
+                                <TextBlock Text="{Binding Converter={conv:ScanQualityDisplayConverter}}"
+                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
                         <Models:ScanQuality>Fast</Models:ScanQuality>
@@ -272,10 +283,12 @@
                                     Orientation="Horizontal">
                             <TextBlock Text="Sort:"
                                        VerticalAlignment="Center"
-                                       Margin="0,0,4,0"/>
+                                       Margin="0,0,4,0"
+                                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                             <ComboBox SelectedItem="{Binding ViewModel.ScanSortField}"
                                       Width="110"
                                       VerticalAlignment="Center"
+                                      Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                       Margin="0,0,4,0">
                                 <Models:ScanSortField>None</Models:ScanSortField>
                                 <Models:ScanSortField>Confidence</Models:ScanSortField>
@@ -287,7 +300,7 @@
                                           ToolTip="Toggle ascending/descending"
                                           Style="{StaticResource MaterialDesignFlatPrimaryToggleButton}">
                                 <ToggleButton.Content>
-                                    <TextBlock>
+                                    <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
                                                 <Setter Property="Text"
@@ -322,7 +335,8 @@
                             <Button.CommandParameter>
                                 <Models:ScanFilterMode>None</Models:ScanFilterMode>
                             </Button.CommandParameter>
-                            <TextBlock FontSize="11">
+                            <TextBlock FontSize="11"
+                                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                                 <Run Text="Scanned:"/>
                                 <Run Text="{Binding ViewModel.ScanCount, Mode=OneWay}" FontWeight="SemiBold"/>
                             </TextBlock>
@@ -547,6 +561,7 @@
                                     <!-- Card Name -->
                                     <TextBlock Text="{Binding Match.Name}"
                                                FontWeight="Bold"
+                                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                                FontSize="{Binding DataContext.ViewModel.ScannerFontSize,
                                                    RelativeSource={RelativeSource AncestorType=ListView}}"/>
 
@@ -585,6 +600,7 @@
 
                                     <!-- Match Confidence -->
                                     <TextBlock Margin="0,2,0,0"
+                                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                                FontSize="{Binding DataContext.ViewModel.ScannerFontSizeSmall,
                                                    RelativeSource={RelativeSource AncestorType=ListView}}"
                                                Visibility="{Binding Match.Confidence, Converter={conv:NullToCollapsedConverter}}">
@@ -616,7 +632,7 @@
                                                 CommandParameter="{Binding}"
                                                 Style="{StaticResource MaterialDesignFlatButton}">
                                             <Button.Content>
-                                                <TextBlock>
+                                                <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                                                     <TextBlock.Style>
                                                         <Style TargetType="TextBlock">
                                                             <Setter Property="Text"

@@ -32,8 +32,8 @@
 
         <!-- Format + counts -->
         <StackPanel Margin="0,0,0,8">
-            <TextBlock Text="{Binding ViewModel.FormatLabel}" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,4"/>
-            <TextBlock Text="{Binding ViewModel.CardCountLabel}" Margin="0,0,0,2"/>
+            <TextBlock Text="{Binding ViewModel.FormatLabel}" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            <TextBlock Text="{Binding ViewModel.CardCountLabel}" Margin="0,0,0,2" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBlock Text="{Binding ViewModel.WarningLabel}" Foreground="OrangeRed"
                        Visibility="{Binding ViewModel.HasWarnings, Converter={StaticResource BoolToVis}}"/>
         </StackPanel>
@@ -50,8 +50,9 @@
         <!-- Location assignment -->
         <GroupBox Grid.Row="2" Header="Assign to Location" Margin="0,0,0,8" Padding="4">
             <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Location:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <TextBlock Text="Location:" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <ComboBox ItemsSource="{Binding ViewModel.AvailableContainers}"
+                          Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                           SelectedItem="{Binding ViewModel.SelectedContainer}"
                           DisplayMemberPath="Name"
                           Width="250"
@@ -60,7 +61,7 @@
         </GroupBox>
 
         <!-- Preview label -->
-        <TextBlock Grid.Row="3" Text="Preview (first 20 rows):" FontWeight="SemiBold" Margin="0,0,0,4"/>
+        <TextBlock Grid.Row="3" Text="Preview (first 20 rows):" FontWeight="SemiBold" Margin="0,0,0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
 
         <!-- Preview grid -->
         <DataGrid Grid.Row="4" ItemsSource="{Binding ViewModel.PreviewCards}"

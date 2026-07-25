@@ -35,7 +35,7 @@
         <TabControl Grid.Row="1" Margin="0,0,0,8">
             <TabItem>
                 <TabItem.Header>
-                    <TextBlock>
+                    <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                         <Run Text="Binders"/>
                         <Run Text="{Binding ViewModel.Binders.Count, Mode=OneWay, StringFormat='({0})'}"
                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
@@ -46,7 +46,7 @@
             </TabItem>
             <TabItem>
                 <TabItem.Header>
-                    <TextBlock>
+                    <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                         <Run Text="Boxes"/>
                         <Run Text="{Binding ViewModel.Boxes.Count, Mode=OneWay, StringFormat='({0})'}"
                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
@@ -57,7 +57,7 @@
             </TabItem>
             <TabItem>
                 <TabItem.Header>
-                    <TextBlock>
+                    <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                         <Run Text="Deck Boxes"/>
                         <Run Text="{Binding ViewModel.DeckBoxes.Count, Mode=OneWay, StringFormat='({0})'}"
                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
@@ -68,7 +68,7 @@
             </TabItem>
             <TabItem>
                 <TabItem.Header>
-                    <TextBlock>
+                    <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                         <Run Text="Display Cases"/>
                         <Run Text="{Binding ViewModel.DisplayCases.Count, Mode=OneWay, StringFormat='({0})'}"
                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
@@ -79,7 +79,7 @@
             </TabItem>
             <TabItem>
                 <TabItem.Header>
-                    <TextBlock>
+                    <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                         <Run Text="Bulk"/>
                         <Run Text="{Binding ViewModel.BulkContainers.Count, Mode=OneWay, StringFormat='({0})'}"
                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
@@ -93,7 +93,7 @@
         <!-- Box section field -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8"
                     Visibility="{Binding ViewModel.ShowBoxFields, Converter={StaticResource BoolToVis}}">
-            <TextBlock Text="Section:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <TextBlock Text="Section:" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" VerticalAlignment="Center" Margin="0,0,8,0"/>
             <TextBox Text="{Binding ViewModel.Section, UpdateSourceTrigger=PropertyChanged}"
                      Width="200" VerticalAlignment="Center"/>
         </StackPanel>

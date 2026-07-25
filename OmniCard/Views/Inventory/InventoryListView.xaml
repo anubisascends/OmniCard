@@ -37,15 +37,15 @@
         <!-- Header totals -->
         <Border Grid.Row="1" Padding="8,4" Background="{DynamicResource MaterialDesign.Brush.Card.Background}">
             <StackPanel Orientation="Horizontal">
-                <TextBlock Margin="0,0,20,0">
+                <TextBlock Margin="0,0,20,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                     <Run Text="Units:" FontWeight="SemiBold"/>
                     <Run Text="{Binding TotalUnits, Mode=OneWay}"/>
                 </TextBlock>
-                <TextBlock Margin="0,0,20,0">
+                <TextBlock Margin="0,0,20,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                     <Run Text="Cost:" FontWeight="SemiBold"/>
                     <Run Text="{Binding TotalCost, StringFormat='${0:N2}', Mode=OneWay}"/>
                 </TextBlock>
-                <TextBlock>
+                <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                     <Run Text="Market:" FontWeight="SemiBold"/>
                     <Run Text="{Binding TotalMarket, StringFormat='${0:N2}', Mode=OneWay}"/>
                 </TextBlock>

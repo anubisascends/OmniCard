@@ -36,11 +36,11 @@
 
                 <!-- Preset selector -->
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                    <TextBlock Text="Preset:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="Preset:" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <ComboBox ItemsSource="{Binding ViewModel.SortPresets}"
                               SelectedItem="{Binding ViewModel.SelectedSortPreset}"
                               DisplayMemberPath="Name"
-                              Width="200" Margin="0,0,8,0"/>
+                              Width="200" Margin="0,0,8,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <TextBox Text="{Binding ViewModel.SortPresetName, UpdateSourceTrigger=PropertyChanged}"
                              Width="200" Margin="0,0,8,0"
                              VerticalContentAlignment="Center"/>
@@ -61,8 +61,8 @@
                                     <StackPanel Orientation="Horizontal">
                                         <ComboBox ItemsSource="{Binding DataContext.ViewModel.AvailableFields, RelativeSource={RelativeSource AncestorType=Window}}"
                                                   SelectedItem="{Binding Field}"
-                                                  Width="130" Margin="0,0,8,0"/>
-                                        <ComboBox SelectedItem="{Binding Direction}" Width="110" Margin="0,0,8,0">
+                                                  Width="130" Margin="0,0,8,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                                        <ComboBox SelectedItem="{Binding Direction}" Width="110" Margin="0,0,8,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                                             <models:SortDirection>Ascending</models:SortDirection>
                                             <models:SortDirection>Descending</models:SortDirection>
                                         </ComboBox>
@@ -112,11 +112,11 @@
 
                 <!-- Preset selector -->
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                    <TextBlock Text="Preset:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="Preset:" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <ComboBox ItemsSource="{Binding ViewModel.FilterPresets}"
                               SelectedItem="{Binding ViewModel.SelectedFilterPreset}"
                               DisplayMemberPath="Name"
-                              Width="200" Margin="0,0,8,0"/>
+                              Width="200" Margin="0,0,8,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <TextBox Text="{Binding ViewModel.FilterPresetName, UpdateSourceTrigger=PropertyChanged}"
                              Width="200" Margin="0,0,8,0"
                              VerticalContentAlignment="Center"/>
@@ -125,7 +125,7 @@
                 <!-- Scryfall query -->
                 <StackPanel Grid.Row="1">
                     <TextBlock Text="Filter Query (Scryfall syntax):" Margin="0,0,0,4"
-                               FontWeight="SemiBold"/>
+                               FontWeight="SemiBold" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <TextBox Text="{Binding ViewModel.FilterQuery, UpdateSourceTrigger=PropertyChanged}"
                              AcceptsReturn="False"
                              FontFamily="Consolas"

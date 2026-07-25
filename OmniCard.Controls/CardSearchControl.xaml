@@ -10,6 +10,7 @@
             Padding="8">
         <StackPanel>
             <TextBlock Text="{Binding Header, ElementName=Self}"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                        FontWeight="SemiBold"
                        FontSize="13"
                        Margin="0,0,0,4"/>
@@ -37,7 +38,7 @@
                                    Visibility="{Binding ImageUri, Converter={conv:NullToCollapsedConverter}}"/>
                             <StackPanel VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Margin="0,0,8,0"/>
+                                    <TextBlock Text="{Binding Name}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" FontWeight="SemiBold" Margin="0,0,8,0"/>
                                     <TextBlock Text="{Binding CollectorNumber}"
                                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
                                 </StackPanel>

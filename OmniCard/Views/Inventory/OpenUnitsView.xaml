@@ -20,7 +20,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="{Binding ViewModel.ProductName}" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,8"/>
+        <TextBlock Text="{Binding ViewModel.ProductName}" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,8" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
@@ -33,13 +33,14 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <TextBlock Text="Lot:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+            <TextBlock Text="Lot:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <ComboBox Grid.Column="1" Margin="0,4"
                       ItemsSource="{Binding ViewModel.Lots}"
-                      SelectedItem="{Binding ViewModel.SelectedLot}">
+                      SelectedItem="{Binding ViewModel.SelectedLot}"
+                      Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                 <ComboBox.ItemTemplate>
                     <DataTemplate>
-                        <TextBlock>
+                        <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                             <Run Text="{Binding Quantity, Mode=OneWay}"/>
                             <Run Text=" unit(s) — "/>
                             <Run Text="{Binding AcquisitionDate, StringFormat=d, Mode=OneWay}"/>
@@ -50,11 +51,11 @@
                 </ComboBox.ItemTemplate>
             </ComboBox>
 
-            <TextBlock Grid.Row="1" Text="Quantity to open:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+            <TextBlock Grid.Row="1" Text="Quantity to open:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4"
                      Text="{Binding ViewModel.Quantity, UpdateSourceTrigger=PropertyChanged}"/>
 
-            <TextBlock Grid.Row="2" Text="Note:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+            <TextBlock Grid.Row="2" Text="Note:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Grid.Row="2" Grid.Column="1" Margin="0,4"
                      Text="{Binding ViewModel.Note, UpdateSourceTrigger=PropertyChanged}"/>
         </Grid>

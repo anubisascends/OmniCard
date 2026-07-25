@@ -37,7 +37,8 @@
                 CornerRadius="4" Padding="10,6" Margin="0,0,0,8">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="{Binding ViewModel.CardName}" FontWeight="SemiBold" FontSize="15"
-                           VerticalAlignment="Center" Margin="0,0,16,0"/>
+                           VerticalAlignment="Center" Margin="0,0,16,0"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <Border Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,4,0"
                         helpers:SetSymbol.SetCode="{Binding ViewModel.SetCode}"
                         helpers:SetSymbol.Rarity="{Binding ViewModel.Rarity}"/>
@@ -204,6 +205,7 @@
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
                                VerticalAlignment="Center" Margin="0,0,6,0"/>
                     <ComboBox SelectedItem="{Binding ViewModel.Condition}"
+                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                               VerticalAlignment="Center" Width="60" Margin="0,0,12,0">
                         <sys:String xmlns:sys="clr-namespace:System;assembly=System.Runtime">NM</sys:String>
                         <sys:String xmlns:sys="clr-namespace:System;assembly=System.Runtime">LP</sys:String>
@@ -230,6 +232,7 @@
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
                                VerticalAlignment="Center" Margin="0,0,6,0"/>
                     <ComboBox ItemsSource="{Binding ViewModel.AvailableContainers}"
+                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                               SelectedItem="{Binding ViewModel.SelectedContainer}"
                               DisplayMemberPath="Name" Width="130" VerticalAlignment="Center" Margin="0,0,8,0"/>
 
@@ -267,6 +270,7 @@
                 <StackPanel Grid.Column="4" VerticalAlignment="Center">
                     <!-- Printing dropdown (quick switch) -->
                     <ComboBox ItemsSource="{Binding ViewModel.AvailablePrintings}"
+                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                               SelectedItem="{Binding ViewModel.SelectedPrinting}"
                               MaxDropDownHeight="300"
                               Visibility="{Binding ViewModel.ShowPrintingSelector, Converter={StaticResource BoolToVis}}"
@@ -277,7 +281,8 @@
                                     <Border Width="12" Height="12" Margin="0,0,4,0"
                                             helpers:SetSymbol.SetCode="{Binding SetCode}"
                                             helpers:SetSymbol.Rarity="{Binding Rarity}"/>
-                                    <TextBlock Text="{Binding SetName}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="{Binding SetName}" VerticalAlignment="Center" Margin="0,0,6,0"
+                                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                                     <TextBlock Text="{Binding CollectorNumber, StringFormat='#{0}'}"
                                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
                                                VerticalAlignment="Center"/>
@@ -326,7 +331,8 @@
                                                    Visibility="{Binding ImageUri, Converter={conv:NullToCollapsedConverter}}"/>
                                             <StackPanel VerticalAlignment="Center">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Margin="0,0,8,0"/>
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Margin="0,0,8,0"
+                                                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                                                     <TextBlock Text="{Binding CollectorNumber, StringFormat='#{0}'}"
                                                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
                                                 </StackPanel>
@@ -356,14 +362,17 @@
                 <TextBlock Text="eBay" FontSize="11" FontWeight="SemiBold"
                            Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
                            VerticalAlignment="Center" Margin="0,0,8,0"/>
-                <TextBlock Text="{Binding ViewModel.EbayStatusDisplay}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <TextBlock Text="{Binding ViewModel.EbayStatusDisplay}" VerticalAlignment="Center" Margin="0,0,12,0"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
 
                 <TextBlock VerticalAlignment="Center" Margin="0,0,12,0"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                            Visibility="{Binding ViewModel.IsEbayActive, Converter={StaticResource BoolToVis}}">
                     <Run Text="$"/><Run Text="{Binding ViewModel.EbayListedPrice, Mode=OneWay, StringFormat=F2}"/>
                 </TextBlock>
 
                 <TextBlock VerticalAlignment="Center" Margin="0,0,12,0"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                            Visibility="{Binding ViewModel.IsEbaySold, Converter={StaticResource BoolToVis}}">
                     <Run Text="Sold $"/><Run Text="{Binding ViewModel.EbaySoldPrice, Mode=OneWay, StringFormat=F2}"/>
                     <Run Text=" to "/><Run Text="{Binding ViewModel.EbayBuyerUsername, Mode=OneWay}"/>

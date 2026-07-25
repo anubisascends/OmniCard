@@ -20,6 +20,7 @@
         <conv:NullToVisibleConverter x:Key="NullToVisible"/>
 
         <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="FontSize" Value="13"/>
         </Style>
@@ -51,6 +52,7 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                     <TextBlock Text="{Binding Report.LocationName, FallbackValue='Location'}"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                FontSize="16" FontWeight="Bold"/>
                     <TextBlock Text="{Binding Report.GeneratedAt, StringFormat='Generated: {0:yyyy-MM-dd HH:mm}'}"
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
@@ -59,6 +61,7 @@
                 <UniformGrid Grid.Column="1" Rows="1" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <StackPanel Margin="12,0" HorizontalAlignment="Center">
                         <TextBlock Text="{Binding Report.ExpectedCount}" FontSize="20" FontWeight="Bold"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                    HorizontalAlignment="Center"/>
                         <TextBlock Text="Expected" FontSize="10"
                                    Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
@@ -66,6 +69,7 @@
                     </StackPanel>
                     <StackPanel Margin="12,0" HorizontalAlignment="Center">
                         <TextBlock Text="{Binding Report.ActualCount}" FontSize="20" FontWeight="Bold"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                    HorizontalAlignment="Center"/>
                         <TextBlock Text="Scanned" FontSize="10"
                                    Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
@@ -94,6 +98,7 @@
                     </StackPanel>
                     <StackPanel Margin="12,0" HorizontalAlignment="Center">
                         <TextBlock Text="{Binding MatchRateText, Mode=OneWay}" FontSize="20" FontWeight="Bold"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                    HorizontalAlignment="Center"/>
                         <TextBlock Text="Match Rate" FontSize="10"
                                    Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
@@ -163,6 +168,7 @@
                                             <DataTemplate>
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBlock Text="{Binding Name, FallbackValue='(unmatched)'}"
+                                                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                                Width="130"/>
                                                     <TextBlock Text=" [Manual]"
@@ -224,6 +230,7 @@
                                             <DataTemplate>
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBlock Text="{Binding Name, FallbackValue='(unmatched)'}"
+                                                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                                Width="130"/>
                                                     <TextBlock Text=" [Manual]"
@@ -274,7 +281,7 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" Text="Assign Card" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                    <TextBlock Grid.Row="0" Text="Assign Card" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" FontWeight="SemiBold" Margin="0,0,0,6"/>
 
                     <TextBlock Grid.Row="1"
                                Text="{Binding SelectedItemForAssignment.Name, StringFormat='Assigning: {0}', FallbackValue='Assigning item'}"
@@ -319,6 +326,7 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Row="0" Grid.Column="0"
                                                Text="{Binding Name}"
+                                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                                FontWeight="SemiBold" FontSize="11"
                                                TextTrimming="CharacterEllipsis"/>
                                     <TextBlock Grid.Row="1" Grid.Column="0"

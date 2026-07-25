@@ -11,11 +11,12 @@
         TextElement.FontSize="13"
         FontFamily="{StaticResource AppFont}">
     <StackPanel Margin="16" MinWidth="260">
-        <TextBlock Text="Channel"/>
-        <ComboBox ItemsSource="{Binding Channels}" SelectedItem="{Binding SelectedChannel}" Margin="0,4,0,8"/>
-        <TextBlock Text="Price"/>
+        <TextBlock Text="Channel" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+        <ComboBox ItemsSource="{Binding Channels}" SelectedItem="{Binding SelectedChannel}" Margin="0,4,0,8"
+                  Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+        <TextBlock Text="Price" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
         <TextBox Text="{Binding Price, StringFormat=F2, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,8"/>
-        <TextBlock Text="Quantity"/>
+        <TextBlock Text="Quantity" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
         <TextBox Text="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,12"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="Cancel" IsCancel="True" MinWidth="72" Margin="0,0,8,0" Padding="16,6"/>

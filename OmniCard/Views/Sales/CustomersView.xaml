@@ -50,47 +50,47 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="Name:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBlock Grid.Row="0" Text="Name:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox Grid.Row="0" Grid.Column="1" Margin="0,4"
                          Text="{Binding SelectedCustomer.Name, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <TextBlock Grid.Row="1" Text="Email:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBlock Grid.Row="1" Text="Email:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4"
                          Text="{Binding SelectedCustomer.Email, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <TextBlock Grid.Row="2" Text="Phone:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBlock Grid.Row="2" Text="Phone:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox Grid.Row="2" Grid.Column="1" Margin="0,4"
                          Text="{Binding SelectedCustomer.Phone, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <TextBlock Grid.Row="3" Text="TCGplayer Username:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBlock Grid.Row="3" Text="TCGplayer Username:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox Grid.Row="3" Grid.Column="1" Margin="0,4"
                          Text="{Binding SelectedCustomer.TcgPlayerUsername, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <TextBlock Grid.Row="4" Text="Address Line 1:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBlock Grid.Row="4" Text="Address Line 1:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox Grid.Row="4" Grid.Column="1" Margin="0,4"
                          Text="{Binding SelectedCustomer.AddressLine1, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <TextBlock Grid.Row="5" Text="Address Line 2:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBlock Grid.Row="5" Text="Address Line 2:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox Grid.Row="5" Grid.Column="1" Margin="0,4"
                          Text="{Binding SelectedCustomer.AddressLine2, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <TextBlock Grid.Row="6" Text="City:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBlock Grid.Row="6" Text="City:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox Grid.Row="6" Grid.Column="1" Margin="0,4"
                          Text="{Binding SelectedCustomer.City, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <TextBlock Grid.Row="7" Text="State:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBlock Grid.Row="7" Text="State:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox Grid.Row="7" Grid.Column="1" Margin="0,4"
                          Text="{Binding SelectedCustomer.State, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <TextBlock Grid.Row="8" Text="Postal Code:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBlock Grid.Row="8" Text="Postal Code:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox Grid.Row="8" Grid.Column="1" Margin="0,4"
                          Text="{Binding SelectedCustomer.PostalCode, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <TextBlock Grid.Row="9" Text="Country:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4"/>
+                <TextBlock Grid.Row="9" Text="Country:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox Grid.Row="9" Grid.Column="1" Margin="0,4"
                          Text="{Binding SelectedCustomer.Country, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <TextBlock Grid.Row="10" Text="Notes:" FontWeight="SemiBold" Margin="0,4,8,4"/>
+                <TextBlock Grid.Row="10" Text="Notes:" FontWeight="SemiBold" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox Grid.Row="10" Grid.Column="1" Margin="0,4"
                          Text="{Binding SelectedCustomer.Notes, UpdateSourceTrigger=PropertyChanged}"
                          AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60"/>

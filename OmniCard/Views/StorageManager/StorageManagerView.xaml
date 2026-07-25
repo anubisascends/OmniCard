@@ -72,9 +72,12 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center"/>
-                        <TextBlock Grid.Column="1" Text="{Binding TypeDisplay}" VerticalAlignment="Center"/>
-                        <TextBlock Grid.Column="2" Text="{Binding CardCount}" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding TypeDisplay}" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                        <TextBlock Grid.Column="2" Text="{Binding CardCount}" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                         <Button Grid.Column="3" Content="QR" ToolTip="Copy barcode text to clipboard"
                                 Command="{Binding DataContext.ViewModel.CopyQrTextCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                 CommandParameter="{Binding Id}"
@@ -101,7 +104,8 @@
 
         <!-- Web app base URL -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,4,0,8">
-            <TextBlock Text="Web App URL:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <TextBlock Text="Web App URL:" VerticalAlignment="Center" Margin="0,0,8,0"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Text="{Binding ViewModel.BaseUrl, UpdateSourceTrigger=PropertyChanged}"
                      Width="260" VerticalAlignment="Center" FontSize="11"/>
             <Button Content="Use My IP" Command="{Binding ViewModel.UseMyIpCommand}"
@@ -114,14 +118,18 @@
         <Border Grid.Row="3" Background="{DynamicResource MaterialDesign.Brush.Card.Background}" CornerRadius="4" Padding="8" Margin="0,0,0,8"
                 Visibility="{Binding ViewModel.IsAdding, Converter={StaticResource BoolToVis}}">
             <StackPanel>
-                <TextBlock Text="Add New Container" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <TextBlock Text="Add New Container" FontWeight="SemiBold" Margin="0,0,0,4"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                    <TextBlock Text="Name:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="Name:" VerticalAlignment="Center" Margin="0,0,8,0"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <TextBox Text="{Binding ViewModel.NewContainerName, UpdateSourceTrigger=PropertyChanged}"
                              Width="180" Margin="0,0,8,0"/>
-                    <TextBlock Text="Type:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="Type:" VerticalAlignment="Center" Margin="0,0,8,0"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <ComboBox SelectedItem="{Binding ViewModel.NewContainerType}" Width="120"
-                              ItemsSource="{Binding Source={x:Static local:StorageManagerView.ContainerTypes}}"/>
+                              ItemsSource="{Binding Source={x:Static local:StorageManagerView.ContainerTypes}}"
+                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal">
                     <Button Content="Create" Command="{Binding ViewModel.ConfirmAddCommand}" Padding="8,2" Margin="0,0,4,0"/>
@@ -134,9 +142,11 @@
         <Border Grid.Row="3" Background="{DynamicResource MaterialDesign.Brush.Card.Background}" CornerRadius="4" Padding="8" Margin="0,0,0,8"
                 Visibility="{Binding ViewModel.IsEditing, Converter={StaticResource BoolToVis}}">
             <StackPanel>
-                <TextBlock Text="Rename Container" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <TextBlock Text="Rename Container" FontWeight="SemiBold" Margin="0,0,0,4"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                    <TextBlock Text="New Name:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="New Name:" VerticalAlignment="Center" Margin="0,0,8,0"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <TextBox Text="{Binding ViewModel.EditName, UpdateSourceTrigger=PropertyChanged}" Width="200"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal">

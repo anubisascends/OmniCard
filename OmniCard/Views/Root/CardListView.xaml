@@ -76,7 +76,8 @@
                                 <TextBlock Text="{Binding Name}"
                                            FontWeight="Bold"
                                            FontSize="14"
-                                           TextWrapping="Wrap"/>
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                                 <TextBlock Margin="0,2,0,0"
                                            Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
                                            TextWrapping="Wrap">
@@ -85,17 +86,18 @@
                                 <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}">
                                     <Run Text="#"/><Run Text="{Binding Number, Mode=OneWay}"/><Run Text="   "/><Run Text="{Binding Rarity, Mode=OneWay}"/>
                                 </TextBlock>
-                                <TextBlock Margin="0,4,0,0">
+                                <TextBlock Margin="0,4,0,0"
+                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                                     <Run Text="Condition: "/><Run Text="{Binding Condition, Mode=OneWay}"/>
                                 </TextBlock>
                                 <TextBlock Text="Foil"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource MaterialDesign.Brush.Primary}"
                                            Visibility="{Binding IsFoil, Converter={conv:BoolToVisibilityConverter}}"/>
-                                <TextBlock>
+                                <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                                     <Run Text="Market: "/><Run Text="{Binding MarketPrice, Converter={conv:MarketPriceDisplayConverter}, Mode=OneWay}"/>
                                 </TextBlock>
-                                <TextBlock>
+                                <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                                     <Run Text="Quantity: "/><Run Text="{Binding Quantity, Mode=OneWay}"/>
                                 </TextBlock>
                             </StackPanel>
@@ -136,7 +138,8 @@
                         <TextBlock Text="{Binding Name}"
                                    FontWeight="Bold"
                                    TextWrapping="NoWrap"
-                                   TextTrimming="CharacterEllipsis"/>
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
 
                         <!-- Set Name (Set Code) -->
                         <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
@@ -146,7 +149,8 @@
 
                         <!-- Market price -->
                         <TextBlock Text="{Binding MarketPrice, Converter={conv:MarketPriceDisplayConverter}}"
-                                   FontWeight="SemiBold"/>
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
 
                         <!-- Quantity (stacked mode only) -->
                         <TextBlock Text="{Binding Quantity, StringFormat=×{0}}"

@@ -21,6 +21,7 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="Margin" Value="0,12,0,4"/>
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesign.Brush.Foreground}"/>
         </Style>
         <Style x:Key="BreakdownGridStyle" TargetType="DataGrid" BasedOn="{StaticResource {x:Type DataGrid}}">
             <Setter Property="AutoGenerateColumns" Value="False"/>
@@ -44,6 +45,7 @@
         <Style x:Key="ChartRowValueStyle" TargetType="TextBlock">
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesign.Brush.Foreground}"/>
         </Style>
         <Style x:Key="ChartBarStyle" TargetType="Border">
             <Setter Property="Height" Value="14"/>
@@ -111,6 +113,7 @@
                                 <TextBlock Text="Cost Basis"
                                            Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
                                 <TextBlock Text="{Binding TotalCost, StringFormat='${0:N2}'}"
+                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                            FontSize="24" FontWeight="Bold" Margin="0,4,0,0"/>
                             </StackPanel>
                         </Border>
@@ -120,6 +123,7 @@
                                 <TextBlock Text="Market Value"
                                            Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
                                 <TextBlock Text="{Binding TotalMarket, StringFormat='${0:N2}'}"
+                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                            FontSize="24" FontWeight="Bold" Margin="0,4,0,0"/>
                             </StackPanel>
                         </Border>
@@ -479,7 +483,7 @@
                         <StackPanel Grid.Row="1" Grid.ColumnSpan="4" Orientation="Horizontal"
                                     HorizontalAlignment="Center" Margin="0,8,0,0">
                             <Border Background="#555555" CornerRadius="3" Padding="8,4" Margin="4,0">
-                                <TextBlock><Run Text="{Binding ViewModel.StatCommonCount, Mode=OneWay}"/><Run Text=" Common"/></TextBlock>
+                                <TextBlock Foreground="White"><Run Text="{Binding ViewModel.StatCommonCount, Mode=OneWay}"/><Run Text=" Common"/></TextBlock>
                             </Border>
                             <Border Background="#C0C0C0" CornerRadius="3" Padding="8,4" Margin="4,0">
                                 <TextBlock Foreground="Black"><Run Text="{Binding ViewModel.StatUncommonCount, Mode=OneWay}"/><Run Text=" Uncommon"/></TextBlock>
@@ -488,13 +492,13 @@
                                 <TextBlock Foreground="Black"><Run Text="{Binding ViewModel.StatRareCount, Mode=OneWay}"/><Run Text=" Rare"/></TextBlock>
                             </Border>
                             <Border Background="#F05030" CornerRadius="3" Padding="8,4" Margin="4,0">
-                                <TextBlock><Run Text="{Binding ViewModel.StatMythicCount, Mode=OneWay}"/><Run Text=" Mythic"/></TextBlock>
+                                <TextBlock Foreground="White"><Run Text="{Binding ViewModel.StatMythicCount, Mode=OneWay}"/><Run Text=" Mythic"/></TextBlock>
                             </Border>
                             <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
                                     BorderBrush="{DynamicResource MaterialDesign.Brush.TextBox.HoverBorder}"
                                     BorderThickness="1" CornerRadius="3" Padding="8,4" Margin="4,0"
                                     Visibility="{Binding ViewModel.StatOtherRarityCount, Converter={conv:NullToCollapsedConverter}}">
-                                <TextBlock><Run Text="{Binding ViewModel.StatOtherRarityCount, Mode=OneWay}"/><Run Text=" Other"/></TextBlock>
+                                <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"><Run Text="{Binding ViewModel.StatOtherRarityCount, Mode=OneWay}"/><Run Text=" Other"/></TextBlock>
                             </Border>
                         </StackPanel>
                     </Grid>
@@ -502,6 +506,7 @@
 
                 <!-- Sets-in-collection header (no per-section refresh button; unified Refresh is at top) -->
                 <TextBlock Text="Sets in Collection"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                            FontWeight="SemiBold" FontSize="14" Margin="0,8,0,4"
                            Visibility="{Binding ViewModel.IsCalculatingCompletion, Converter={conv:InverseBoolToVisibilityConverter}}"/>
 
