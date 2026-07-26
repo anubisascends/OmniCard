@@ -263,7 +263,7 @@ public sealed partial class CollectionViewModel : ViewModel
     {
         var generation = ++_overviewGeneration;
 
-        var overviews = await _collectionQueryService.GetLocationOverviewsAsync(_selectedGame);
+        var overviews = await _collectionQueryService.GetLocationOverviewsAsync(GameFilter);
 
         // A newer overview load started while we awaited (e.g. the startup load racing the
         // initial SetGame, or a rapid game switch)? Drop this stale result. Clearing only
@@ -330,7 +330,7 @@ public sealed partial class CollectionViewModel : ViewModel
     /// </summary>
     public readonly record struct SearchParameters(
         string Query,
-        CardGame Game,
+        CardGame? Game,
         int? ContainerFilter,
         SortPreset? SortPreset,
         FilterPreset? FilterPreset,
@@ -429,7 +429,7 @@ public sealed partial class CollectionViewModel : ViewModel
             else
             {
                 _matchingContainerIds = await Task.Run(() =>
-                    _cardService.GetMatchingContainerIds(overviewQuery, _selectedGame));
+                    _cardService.GetMatchingContainerIds(overviewQuery, GameFilter));
             }
             OnPropertyChanged(nameof(GroupedLocations));
             OnPropertyChanged(nameof(IsBulkVisible));
@@ -448,7 +448,7 @@ public sealed partial class CollectionViewModel : ViewModel
 
         // Capture filter values for background thread and for LoadMore
         var query = CollectionSearchQuery;
-        var game = _selectedGame;
+        var game = GameFilter;
         var filterPreset = SelectedFilterPreset;
         var stacked = IsStacked;
 
@@ -875,12 +875,28 @@ public sealed partial class CollectionViewModel : ViewModel
 
     // --- Game context (set by RootViewModel when game changes) ---
 
-    private CardGame _selectedGame;
+    private CardGame _selectedGame;   // last concrete game (for per-game presets/sort)
+    private bool _allGames;           // true when "All Games" is selected
 
-    public void SetGame(CardGame game)
+    /// <summary>Game filter passed to the card service: null = All Games (no filter).</summary>
+    private CardGame? GameFilter => _allGames ? null : _selectedGame;
+
+    public void SetGame(CardGame? game)
     {
-        _selectedGame = game;
-        LoadPresets();
+        _allGames = game is null;
+        if (game is not null)
+        {
+            _selectedGame = game.Value;
+            LoadPresets();
+        }
+        else
+        {
+            // All Games: sort/filter presets are per-game — clear them.
+            AvailableSortPresets.Clear();
+            AvailableFilterPresets.Clear();
+            SelectedSortPreset = null;
+            SelectedFilterPreset = null;
+        }
 
         // Reflect the new game in whichever view is showing. Every other data-changing
         // operation refreshes this way; without it a game switch left stale cards/tiles.

@@ -29,7 +29,7 @@ public class CollectionViewModelTests
         _query.Setup(q => q.GetLocationOverviewsAsync(It.IsAny<CardGame?>()))
               .ReturnsAsync([]);
         // Card-list search path with an empty result set: count 0, no rows added, empty status map.
-        _card.Setup(c => c.GetSearchCount(It.IsAny<string>(), It.IsAny<CardGame>(), It.IsAny<int?>(),
+        _card.Setup(c => c.GetSearchCount(It.IsAny<string>(), It.IsAny<CardGame?>(), It.IsAny<int?>(),
                                           It.IsAny<FilterPreset?>(), It.IsAny<bool>()))
              .Returns(0);
         _listing.Setup(l => l.GetActiveListingStatusByLot(It.IsAny<IEnumerable<int>>()))
@@ -82,6 +82,29 @@ public class CollectionViewModelTests
 
         _card.Verify(c => c.SearchCollection(
             It.IsAny<string>(), CardGame.OnePiece, It.IsAny<int?>(),
+            It.IsAny<SortPreset?>(), It.IsAny<FilterPreset?>(), It.IsAny<bool>(),
+            0, It.IsAny<int>(), It.IsAny<ObservableCollection<CollectionCard>>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetGame_AllGames_SearchesWithNullGameFilter()
+    {
+        var vm = CreateVm();
+        vm.ShowCardList = true;
+
+        var searched = new TaskCompletionSource();
+        _card.Setup(c => c.SearchCollection(
+                It.IsAny<string>(), It.IsAny<CardGame?>(), It.IsAny<int?>(),
+                It.IsAny<SortPreset?>(), It.IsAny<FilterPreset?>(), It.IsAny<bool>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<ObservableCollection<CollectionCard>>()))
+             .Callback(() => searched.TrySetResult());
+        _card.Invocations.Clear();
+
+        vm.SetGame(null); // All Games
+        await searched.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        _card.Verify(c => c.SearchCollection(
+            It.IsAny<string>(), (CardGame?)null, It.IsAny<int?>(),
             It.IsAny<SortPreset?>(), It.IsAny<FilterPreset?>(), It.IsAny<bool>(),
             0, It.IsAny<int>(), It.IsAny<ObservableCollection<CollectionCard>>()), Times.Once);
     }
