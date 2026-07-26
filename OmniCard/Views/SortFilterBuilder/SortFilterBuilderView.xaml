@@ -43,7 +43,7 @@
                               Width="200" Margin="0,0,8,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <TextBox Text="{Binding ViewModel.SortPresetName, UpdateSourceTrigger=PropertyChanged}"
                              Width="200" Margin="0,0,8,0"
-                             VerticalContentAlignment="Center"/>
+                             VerticalContentAlignment="Center" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 </StackPanel>
 
                 <!-- Add level button -->
@@ -69,7 +69,7 @@
                                         <TextBox Text="{Binding CustomOrder, Converter={StaticResource ListToCommaSeparatedConverter}, UpdateSourceTrigger=LostFocus}"
                                                  Width="150" Margin="0,0,4,0"
                                                  ToolTip="Custom order: comma-separated values (e.g. W,U,B,R,G,Multi,Land,Colorless)"
-                                                 VerticalContentAlignment="Center"/>
+                                                 VerticalContentAlignment="Center" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                                         <Button Content="Fill" Padding="6,2" Margin="0,0,8,0"
                                                 ToolTip="Fill with distinct values from your collection"
                                                 Command="{Binding DataContext.ViewModel.FillSortCustomOrderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -119,7 +119,7 @@
                               Width="200" Margin="0,0,8,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <TextBox Text="{Binding ViewModel.FilterPresetName, UpdateSourceTrigger=PropertyChanged}"
                              Width="200" Margin="0,0,8,0"
-                             VerticalContentAlignment="Center"/>
+                             VerticalContentAlignment="Center" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 </StackPanel>
 
                 <!-- Scryfall query -->
@@ -130,7 +130,7 @@
                              AcceptsReturn="False"
                              FontFamily="Consolas"
                              VerticalContentAlignment="Center"
-                             Margin="0,0,0,8"/>
+                             Margin="0,0,0,8" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 </StackPanel>
 
                 <!-- Syntax help -->

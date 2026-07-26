@@ -49,7 +49,7 @@
                          Text="{Binding ViewModel.SearchText, UpdateSourceTrigger=PropertyChanged}"
                          Margin="0,0,0,4"
                          VerticalContentAlignment="Center"
-                         Tag="Search sets..."/>
+                         Tag="Search sets..." Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <ListBox ItemsSource="{Binding ViewModel.AvailableSets}"
                          SelectedItem="{Binding ViewModel.SelectedAvailableItem}"
                          MouseDoubleClick="AvailableList_MouseDoubleClick"

@@ -87,6 +87,7 @@
                                   Command="{Binding DataContext.ViewModel.ToggleDeckCheckExclusionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                   CommandParameter="{Binding}"
                                   Margin="8,0,0,0" VerticalAlignment="Center"
+                                  Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                   Content="Exclude"/>
                     </Grid>
                 </DataTemplate>
@@ -107,6 +108,7 @@
             <TextBlock Text="Web App URL:" VerticalAlignment="Center" Margin="0,0,8,0"
                        Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Text="{Binding ViewModel.BaseUrl, UpdateSourceTrigger=PropertyChanged}"
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                      Width="260" VerticalAlignment="Center" FontSize="11"/>
             <Button Content="Use My IP" Command="{Binding ViewModel.UseMyIpCommand}"
                     Padding="8,2" Margin="4,0,0,0" FontSize="11"
@@ -124,6 +126,7 @@
                     <TextBlock Text="Name:" VerticalAlignment="Center" Margin="0,0,8,0"
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <TextBox Text="{Binding ViewModel.NewContainerName, UpdateSourceTrigger=PropertyChanged}"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                              Width="180" Margin="0,0,8,0"/>
                     <TextBlock Text="Type:" VerticalAlignment="Center" Margin="0,0,8,0"
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
@@ -147,7 +150,8 @@
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                     <TextBlock Text="New Name:" VerticalAlignment="Center" Margin="0,0,8,0"
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                    <TextBox Text="{Binding ViewModel.EditName, UpdateSourceTrigger=PropertyChanged}" Width="200"/>
+                    <TextBox Text="{Binding ViewModel.EditName, UpdateSourceTrigger=PropertyChanged}"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" Width="200"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal">
                     <Button Content="Save" Command="{Binding ViewModel.ConfirmEditCommand}" Padding="8,2" Margin="0,0,4,0"/>

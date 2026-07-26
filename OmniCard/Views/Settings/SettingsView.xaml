@@ -35,9 +35,9 @@
                  BorderBrush="{DynamicResource MaterialDesign.Brush.Card.Background}"
                  Background="Transparent"
                  SelectedIndex="{Binding Settings.SelectedSectionIndex}">
-            <ListBoxItem Content="Display" Padding="16,10"/>
-            <ListBoxItem Content="Data Location" Padding="16,10"/>
-            <ListBoxItem Content="Sales &amp; Receipts" Padding="16,10"/>
+            <ListBoxItem Content="Display" Padding="16,10" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            <ListBoxItem Content="Data Location" Padding="16,10" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            <ListBoxItem Content="Sales &amp; Receipts" Padding="16,10" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
         </ListBox>
 
         <!-- Section content: the selected group's view is shown; the others are collapsed.

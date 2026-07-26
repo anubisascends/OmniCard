@@ -26,6 +26,7 @@
                 <Button DockPanel.Dock="Right" Content="Fetch" Padding="16,6" Margin="8,0,0,0"
                         Command="{Binding ViewModel.FetchCommand}"/>
                 <TextBox Text="{Binding ViewModel.Url, UpdateSourceTrigger=PropertyChanged}"
+                         Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                          VerticalContentAlignment="Center"/>
             </DockPanel>
         </GroupBox>
@@ -33,6 +34,7 @@
         <!-- Options -->
         <CheckBox Grid.Row="1" Content="Ignore basic lands (Plains, Island, Swamp, Mountain, Forest)"
                   IsChecked="{Binding ViewModel.IgnoreBasicLands}"
+                  Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                   Margin="4,8,0,0"/>
 
         <!-- Fallback text input -->
@@ -44,6 +46,7 @@
                         Command="{Binding ViewModel.ParseTextCommand}"/>
                 <TextBox Text="{Binding ViewModel.FallbackText, UpdateSourceTrigger=PropertyChanged}"
                          AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                         Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                          Height="120" TextWrapping="Wrap"/>
             </DockPanel>
         </GroupBox>

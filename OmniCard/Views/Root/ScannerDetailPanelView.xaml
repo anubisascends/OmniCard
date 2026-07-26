@@ -141,7 +141,8 @@
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                         <TextBox Grid.Column="4" Width="80"
                              Text="{Binding ViewModel.BulkPurchasePrice, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
-                             VerticalAlignment="Center"/>
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     </Grid>
                     <Button Content="Apply to Selected" Padding="12,4" Margin="0,8,0,0"
                         HorizontalAlignment="Left"
@@ -254,13 +255,15 @@
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                         <TextBox Text="{Binding ViewModel.SelectedScannedCard.OverridePage, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
                              Width="50"
-                             Margin="0,0,12,0"/>
+                             Margin="0,0,12,0"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                         <TextBlock Text="Slot:"
                                VerticalAlignment="Center"
                                Margin="0,0,6,0"
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                         <TextBox Text="{Binding ViewModel.SelectedScannedCard.OverrideSlot, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
-                             Width="50"/>
+                             Width="50"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal"
                             Visibility="{Binding ViewModel.ShowOverrideBoxFields, Converter={StaticResource BoolToVis}}">
@@ -269,7 +272,8 @@
                                Margin="0,0,6,0"
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                         <TextBox Text="{Binding ViewModel.SelectedScannedCard.OverrideSection, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}"
-                             Width="160"/>
+                             Width="160"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     </StackPanel>
                 </StackPanel>
             </Border>

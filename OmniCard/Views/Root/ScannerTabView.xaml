@@ -45,6 +45,7 @@
                              VerticalAlignment="Center"
                              VerticalContentAlignment="Center"
                              Margin="0,0,4,0"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                              Tag="All Sets"
                              ToolTip="Comma-separated set codes (e.g. vow, dmu, tla). Press Enter to apply.">
                         <TextBox.InputBindings>
@@ -106,6 +107,7 @@
                                  Width="40"
                                  VerticalAlignment="Center"
                                  Margin="0,0,4,0"
+                                 Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                  Visibility="{Binding ViewModel.ShowBinderFields, Converter={StaticResource BoolToVis}}"/>
                         <TextBlock Text="Slot:"
                                    VerticalAlignment="Center"
@@ -116,6 +118,7 @@
                                  Width="40"
                                  VerticalAlignment="Center"
                                  Margin="0,0,4,0"
+                                 Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                  Visibility="{Binding ViewModel.ShowBinderFields, Converter={StaticResource BoolToVis}}"/>
                     </StackPanel>
 
@@ -131,6 +134,7 @@
                                  Width="100"
                                  VerticalAlignment="Center"
                                  Margin="0,0,4,0"
+                                 Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                  Visibility="{Binding ViewModel.ShowBoxFields, Converter={StaticResource BoolToVis}}"/>
                     </StackPanel>
 
@@ -155,6 +159,7 @@
                              Width="60"
                              VerticalAlignment="Center"
                              Margin="0,0,8,0"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                              Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                 </ToolBar>
             </ToolBarTray>
@@ -366,6 +371,8 @@
                             <TextBlock FontSize="11">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground"
+                                                Value="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding ViewModel.ScanFilterMode}"
                                                          Value="{x:Static Models:ScanFilterMode.HighConfidence}">
@@ -394,6 +401,8 @@
                             <TextBlock FontSize="11">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground"
+                                                Value="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding ViewModel.ScanFilterMode}"
                                                          Value="{x:Static Models:ScanFilterMode.LowConfidence}">
@@ -422,6 +431,8 @@
                             <TextBlock FontSize="11">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground"
+                                                Value="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding ViewModel.ScanFilterMode}"
                                                          Value="{x:Static Models:ScanFilterMode.Flagged}">
@@ -500,20 +511,51 @@
                         </ContextMenu>
                     </ListView.ContextMenu>
 
+                    <!-- Custom container template: selection is a background + border
+                         highlight only, so the item content's own (explicit) foregrounds
+                         are never recolored by the default selected-item chrome. Preserves
+                         the flagged-card orange left border. -->
                     <ListView.ItemContainerStyle>
-                        <Style TargetType="ListViewItem"
-                               BasedOn="{StaticResource {x:Type ListViewItem}}">
+                        <Style TargetType="ListViewItem">
                             <Setter Property="HorizontalContentAlignment"
                                     Value="Stretch"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsFlagged}"
-                                        Value="True">
-                                    <Setter Property="BorderBrush"
-                                            Value="Orange"/>
-                                    <Setter Property="BorderThickness"
-                                            Value="3,0,0,0"/>
-                                </DataTrigger>
-                            </Style.Triggers>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Margin" Value="0"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListViewItem">
+                                        <Border x:Name="SelBorder"
+                                                Background="Transparent"
+                                                BorderBrush="Transparent"
+                                                BorderThickness="0"
+                                                CornerRadius="4">
+                                            <ContentPresenter/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="SelBorder" Property="Background"
+                                                        Value="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"/>
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="SelBorder" Property="Background"
+                                                        Value="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"/>
+                                                <Setter TargetName="SelBorder" Property="BorderBrush"
+                                                        Value="{DynamicResource MaterialDesign.Brush.Primary}"/>
+                                                <Setter TargetName="SelBorder" Property="BorderThickness"
+                                                        Value="1"/>
+                                            </Trigger>
+                                            <!-- Flagged wins the border so the orange marker stays
+                                                 visible even when the item is selected. -->
+                                            <DataTrigger Binding="{Binding IsFlagged}" Value="True">
+                                                <Setter TargetName="SelBorder" Property="BorderBrush"
+                                                        Value="Orange"/>
+                                                <Setter TargetName="SelBorder" Property="BorderThickness"
+                                                        Value="3,0,0,0"/>
+                                            </DataTrigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
                         </Style>
                     </ListView.ItemContainerStyle>
 

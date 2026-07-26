@@ -20,6 +20,7 @@
                          Text="{Binding SearchQuery, ElementName=Self, UpdateSourceTrigger=PropertyChanged}"
                          Width="250"
                          VerticalContentAlignment="Center"
+                         Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                          Margin="0,0,8,0"
                          KeyDown="SearchBox_KeyDown"/>
                 <Button Command="{Binding SearchCommand, ElementName=Self}"
@@ -30,6 +31,35 @@
                       MaxHeight="{Binding ResultsMaxHeight, ElementName=Self}"
                       Margin="0,0,0,4"
                       MouseDoubleClick="SearchResults_MouseDoubleClick">
+                <!-- Border-only selection so the default selected-item chrome never
+                     recolors the (explicitly-themed) result text. -->
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListViewItem">
+                                    <Border x:Name="Bd"
+                                            Background="Transparent"
+                                            CornerRadius="4"
+                                            Padding="2">
+                                        <ContentPresenter/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background"
+                                                    Value="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="Bd" Property="Background"
+                                                    Value="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListView.ItemContainerStyle>
                 <ListView.ItemTemplate>
                     <DataTemplate>
                         <StackPanel Orientation="Horizontal" Margin="2">

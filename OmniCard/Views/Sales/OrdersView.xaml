@@ -140,7 +140,7 @@
             </StackPanel>
 
             <!-- Cancelled strip (collapsible, not a drop target) -->
-            <Expander DockPanel.Dock="Bottom" Header="Cancelled" Margin="0,8,0,0" IsExpanded="False">
+            <Expander DockPanel.Dock="Bottom" Header="Cancelled" Margin="0,8,0,0" IsExpanded="False" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                 <ItemsControl ItemsSource="{Binding CancelledOrders}" Margin="4">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
@@ -307,27 +307,27 @@
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Order #:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox Grid.Row="0" Grid.Column="1" Margin="0,4,16,4"
+                <TextBox Grid.Row="0" Grid.Column="1" Margin="0,4,16,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                          Text="{Binding SelectedOrder.OrderNumber, UpdateSourceTrigger=PropertyChanged}"/>
 
                 <TextBlock Grid.Row="0" Grid.Column="2" Text="Tracking #:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox Grid.Row="0" Grid.Column="3" Margin="0,4"
+                <TextBox Grid.Row="0" Grid.Column="3" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                          Text="{Binding SelectedOrder.TrackingNumber, UpdateSourceTrigger=PropertyChanged}"/>
 
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Carrier:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4,16,4"
+                <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4,16,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                          Text="{Binding SelectedOrder.Carrier, UpdateSourceTrigger=PropertyChanged}"/>
 
                 <TextBlock Grid.Row="1" Grid.Column="2" Text="Marketplace fees:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox Grid.Row="1" Grid.Column="3" Margin="0,4"
+                <TextBox Grid.Row="1" Grid.Column="3" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                          Text="{Binding SelectedOrder.MarketplaceFees, UpdateSourceTrigger=PropertyChanged, StringFormat=F2}"/>
 
                 <TextBlock Grid.Row="2" Grid.Column="0" Text="Shipping cost:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox Grid.Row="2" Grid.Column="1" Margin="0,4,16,4"
+                <TextBox Grid.Row="2" Grid.Column="1" Margin="0,4,16,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                          Text="{Binding SelectedOrder.ShippingCost, UpdateSourceTrigger=PropertyChanged, StringFormat=F2}"/>
 
                 <TextBlock Grid.Row="2" Grid.Column="2" Text="Shipping charged to buyer:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox Grid.Row="2" Grid.Column="3" Margin="0,4"
+                <TextBox Grid.Row="2" Grid.Column="3" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                          Text="{Binding SelectedOrder.ShippingChargedToBuyer, UpdateSourceTrigger=PropertyChanged, StringFormat=F2}"/>
             </Grid>
 

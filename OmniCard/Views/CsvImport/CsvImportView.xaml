@@ -42,8 +42,10 @@
         <GroupBox Grid.Row="1" Header="Duplicate Handling" Margin="0,0,0,8" Padding="4">
             <StackPanel>
                 <RadioButton Content="Skip duplicates (same card, condition, and foil)"
-                             IsChecked="{Binding ViewModel.SkipDuplicates}" Margin="0,2"/>
-                <RadioButton Content="Add all as new cards" Margin="0,2"/>
+                             IsChecked="{Binding ViewModel.SkipDuplicates}"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" Margin="0,2"/>
+                <RadioButton Content="Add all as new cards"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" Margin="0,2"/>
             </StackPanel>
         </GroupBox>
 

@@ -20,11 +20,13 @@
                 BorderThickness="0,0,0,1">
             <StackPanel Orientation="Horizontal">
                 <RadioButton Content="Cards" GroupName="CollectionMode"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                              IsChecked="{Binding DataContext.ViewModel.Inventory.ShowInventory,
                                  RelativeSource={RelativeSource AncestorType=Window},
                                  Converter={conv:InverseBoolConverter}}"
                              Margin="0,0,12,0"/>
                 <RadioButton Content="Inventory" GroupName="CollectionMode"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                              IsChecked="{Binding DataContext.ViewModel.Inventory.ShowInventory,
                                  RelativeSource={RelativeSource AncestorType=Window}}"/>
             </StackPanel>
@@ -111,6 +113,7 @@
                                  UpdateSourceTrigger=PropertyChanged}"
                              Width="200"
                              VerticalContentAlignment="Center"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                              Margin="0,0,4,0">
                         <TextBox.InputBindings>
                             <KeyBinding Key="Return"
@@ -189,6 +192,7 @@
 
                     <!-- Stack duplicates toggle -->
                     <CheckBox Content="Stack Duplicates"
+                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                               IsChecked="{Binding DataContext.ViewModel.Collection.IsStacked,
                                       RelativeSource={RelativeSource AncestorType=Window}}"
                               Padding="8,4"

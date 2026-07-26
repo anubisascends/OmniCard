@@ -15,9 +15,9 @@
         <ComboBox ItemsSource="{Binding Channels}" SelectedItem="{Binding SelectedChannel}" Margin="0,4,0,8"
                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
         <TextBlock Text="Price" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-        <TextBox Text="{Binding Price, StringFormat=F2, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,8"/>
+        <TextBox Text="{Binding Price, StringFormat=F2, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,8" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
         <TextBlock Text="Quantity" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-        <TextBox Text="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,12"/>
+        <TextBox Text="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,12" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="Cancel" IsCancel="True" MinWidth="72" Margin="0,0,8,0" Padding="16,6"/>
             <Button Content="List" IsDefault="True" MinWidth="72" Padding="16,6" FontWeight="SemiBold" Click="OnList"/>

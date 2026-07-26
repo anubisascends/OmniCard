@@ -52,22 +52,27 @@
 
             <TextBlock Grid.Row="2" Text="Name:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Grid.Row="2" Grid.Column="1" Margin="0,4"
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                      Text="{Binding ViewModel.Name, UpdateSourceTrigger=PropertyChanged}"/>
 
             <TextBlock Grid.Row="3" Text="Set Code:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Grid.Row="3" Grid.Column="1" Margin="0,4"
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                      Text="{Binding ViewModel.SetCode, UpdateSourceTrigger=PropertyChanged}"/>
 
             <TextBlock Grid.Row="4" Text="UPC:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Grid.Row="4" Grid.Column="1" Margin="0,4"
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                      Text="{Binding ViewModel.Upc, UpdateSourceTrigger=PropertyChanged}"/>
 
             <TextBlock Grid.Row="5" Text="Market Price $:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Grid.Row="5" Grid.Column="1" Margin="0,4"
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                      Text="{Binding ViewModel.MarketPrice, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}"/>
 
             <TextBlock Grid.Row="6" Text="Image URI:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Grid.Row="6" Grid.Column="1" Margin="0,4"
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                      Text="{Binding ViewModel.ImageUri, UpdateSourceTrigger=PropertyChanged}"/>
         </Grid>
 

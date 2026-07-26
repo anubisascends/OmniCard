@@ -298,6 +298,7 @@
                         <TextBox Grid.Column="0"
                                  Text="{Binding ManualSearchQuery, UpdateSourceTrigger=PropertyChanged}"
                                  Tag="Search cards..."
+                                 Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                  VerticalContentAlignment="Center">
                             <TextBox.InputBindings>
                                 <KeyBinding Key="Return" Command="{Binding SearchForAssignmentCommand}"/>

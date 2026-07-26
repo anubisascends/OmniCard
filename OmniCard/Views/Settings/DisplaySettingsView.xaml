@@ -9,7 +9,7 @@
         <StackPanel Margin="16" MaxWidth="520" HorizontalAlignment="Left">
             <TextBlock Text="Display" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,12" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
 
-            <CheckBox Content="Dark theme" IsChecked="{Binding IsDarkTheme}" Margin="0,0,0,12"/>
+            <CheckBox Content="Dark theme" IsChecked="{Binding IsDarkTheme}" Margin="0,0,0,12" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
 
             <TextBlock Text="Card detail font size" Margin="0,0,0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
@@ -27,7 +27,7 @@
                            VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             </StackPanel>
 
-            <CheckBox Content="Stack duplicates" IsChecked="{Binding Collection.IsStacked}" Margin="0,0,0,12"/>
+            <CheckBox Content="Stack duplicates" IsChecked="{Binding Collection.IsStacked}" Margin="0,0,0,12" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
 
             <TextBlock Text="Scanner font size" Margin="0,0,0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
