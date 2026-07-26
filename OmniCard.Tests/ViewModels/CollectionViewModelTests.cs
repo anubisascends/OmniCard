@@ -134,6 +134,34 @@ public class CollectionViewModelTests
     }
 
     [Fact]
+    public async Task BrowseSet_DoesNotWipeDrilledGamesActivePresets()
+    {
+        var sortPreset = new SortPreset { Name = "MySort", Game = CardGame.OnePiece, SortLevels = [] };
+        var filterPreset = new FilterPreset { Name = "MyFilter", Game = CardGame.OnePiece };
+        _presets.Setup(p => p.GetSortPresets(CardGame.OnePiece)).Returns([sortPreset]);
+        _presets.Setup(p => p.GetFilterPresets(CardGame.OnePiece)).Returns([filterPreset]);
+        _presets.Setup(p => p.GetActiveSortPreset(CardGame.OnePiece)).Returns(sortPreset);
+        _presets.Setup(p => p.GetActiveFilterPreset(CardGame.OnePiece)).Returns(filterPreset);
+
+        var vm = CreateVm();
+
+        var searched = new TaskCompletionSource();
+        _card.Setup(c => c.SearchCollection(
+                It.IsAny<string>(), It.IsAny<CardGame?>(), It.IsAny<int?>(),
+                It.IsAny<SortPreset?>(), It.IsAny<FilterPreset?>(), It.IsAny<bool>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<ObservableCollection<CollectionCard>>()))
+             .Callback(() => searched.TrySetResult());
+        _presets.Invocations.Clear();
+
+        vm.BrowseSet(CardGame.OnePiece, "OP01");   // dashboard tile drill-in
+        await searched.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal("set:OP01", vm.CollectionSearchQuery);
+        _presets.Verify(p => p.SetActiveSortPreset(CardGame.OnePiece, null), Times.Never);
+        _presets.Verify(p => p.SetActiveFilterPreset(CardGame.OnePiece, null), Times.Never);
+    }
+
+    [Fact]
     public void SetGame_ToAllGames_DoesNotWipePreviousGamesActivePresets()
     {
         var sortPreset = new SortPreset { Name = "MySort", Game = CardGame.OnePiece, SortLevels = [] };

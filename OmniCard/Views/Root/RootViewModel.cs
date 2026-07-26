@@ -1173,6 +1173,9 @@ public sealed partial class RootViewModel(
             return;
 
         // Drill into the collection: show this set's owned cards (of its game) as tiles.
+        // Sync the global selector to the tile's game so it doesn't desync from the
+        // collection view (matters under All Games, where the selector is null).
+        SelectedGame = value.Game;
         Collection.BrowseSet(value.Game, value.SetCode);
         SelectedTabIndex = 1; // Collection tab
 
@@ -1377,7 +1380,7 @@ public sealed partial class RootViewModel(
     [RelayCommand]
     public async Task RefreshCardData()
     {
-        _logger.LogInformation("User initiated card data refresh for {Game}", SelectedGame);
+        _logger.LogInformation("User initiated card data refresh for {Game}", CardService.SelectedGame);
 
         if (RefreshCooldownHelper.IsCooldownActive(dataPathService.DataDirectory, CardService.SelectedGame, out var nextAvailable))
         {
@@ -1788,6 +1791,16 @@ public sealed partial class RootViewModel(
     public void StartAudit(int containerId)
     {
         if (IsAuditMode) return;
+
+        if (!SelectedGame.HasValue)
+        {
+            MessageBox.Show(
+                "Select a specific game before starting an audit.",
+                "Audit Blocked",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
 
         // Clear any existing scans
         CardService.ScannedCards.Clear();

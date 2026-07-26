@@ -201,7 +201,18 @@ public sealed partial class CollectionViewModel : ViewModel
         CurrentLocationName = "Entire Collection";
         ShowAllCards = true;
 
-        ResetSearchState();      // clears CollectionSearchQuery — set the query AFTER this
+        // ResetSearchState clears SelectedSortPreset/SelectedFilterPreset to null; suppress
+        // persistence so the change handlers don't overwrite the drilled-into game's saved
+        // active preset (LoadPresets above already applied the real active preset for display).
+        _suppressPresetPersistence = true;
+        try
+        {
+            ResetSearchState();  // clears CollectionSearchQuery — set the query AFTER this
+        }
+        finally
+        {
+            _suppressPresetPersistence = false;
+        }
         ShowCardList = true;
 
         OnPropertyChanged(nameof(ColumnVisibility));
