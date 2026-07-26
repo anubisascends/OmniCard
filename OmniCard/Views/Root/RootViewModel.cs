@@ -1165,10 +1165,21 @@ public sealed partial class RootViewModel(
     [ObservableProperty]
     public partial SetCompletionSummary? SelectedSetCompletion { get; set; }
 
+    private bool _suppressSetSelection;
+
     partial void OnSelectedSetCompletionChanged(SetCompletionSummary? value)
     {
-        if (value is not null)
-            _ = ExpandSetCompletionCommand.ExecuteAsync(value);
+        if (_suppressSetSelection || value is null)
+            return;
+
+        // Drill into the collection: show this set's owned cards (of its game) as tiles.
+        Collection.BrowseSet(value.Game, value.SetCode);
+        SelectedTabIndex = 1; // Collection tab
+
+        // Reset selection so re-clicking the same tile after returning re-triggers navigation.
+        _suppressSetSelection = true;
+        SelectedSetCompletion = null;
+        _suppressSetSelection = false;
     }
 
     [ObservableProperty]
