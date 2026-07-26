@@ -235,7 +235,7 @@
                                VerticalAlignment="Center"
                                Margin="0,0,4,0"
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                    <ComboBox ItemsSource="{Binding ViewModel.AvailableGames}"
+                    <ComboBox ItemsSource="{Binding ViewModel.AvailableGameOptions}"
                               SelectedItem="{Binding ViewModel.SelectedGame}"
                               Width="180"
                               VerticalAlignment="Center"
@@ -279,7 +279,8 @@
                 <local:CollectionTabView x:Name="CollectionTab"/>
             </TabItem>
 
-            <TabItem x:Name="tabItemScanner" Style="{StaticResource SidebarTabItemStyle}">
+            <TabItem x:Name="tabItemScanner" Style="{StaticResource SidebarTabItemStyle}"
+                     IsEnabled="{Binding ViewModel.IsScannerEnabled}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Camera" Width="22" Height="22" VerticalAlignment="Center"/>

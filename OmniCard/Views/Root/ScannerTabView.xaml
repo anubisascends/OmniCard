@@ -720,5 +720,20 @@
             <local:ScannerDetailPanelView x:Name="DetailPanel"
                                           Grid.Column="2"/>
         </Grid>
+
+        <!-- Disabled-scanner placeholder: shown when no specific game is selected ("All Games"). -->
+        <Border Grid.RowSpan="3"
+                Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                Visibility="{Binding ViewModel.IsScannerEnabled, Converter={conv:InverseBoolToVisibilityConverter}}"
+                Panel.ZIndex="100">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="&#xE722;" FontFamily="Segoe MDL2 Assets" FontSize="40"
+                           HorizontalAlignment="Center" Opacity="0.5"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                <TextBlock Text="Select a specific game to scan."
+                           Margin="0,12,0,0" FontSize="16"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+            </StackPanel>
+        </Border>
     </Grid>
 </UserControl>
