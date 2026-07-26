@@ -37,10 +37,12 @@
 
             <TextBlock Text="Quantity:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Grid.Column="1" Margin="0,4"
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                      Text="{Binding ViewModel.Quantity, UpdateSourceTrigger=PropertyChanged}"/>
 
             <TextBlock Grid.Row="1" Text="Unit Cost $:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4"
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                      Text="{Binding ViewModel.UnitCost, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}"/>
 
             <TextBlock Grid.Row="2" Text="Location:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
@@ -52,10 +54,12 @@
 
             <TextBlock Grid.Row="3" Text="Source:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Grid.Row="3" Grid.Column="1" Margin="0,4"
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                      Text="{Binding ViewModel.Source, UpdateSourceTrigger=PropertyChanged}"/>
 
             <TextBlock Grid.Row="4" Text="Date:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <DatePicker Grid.Row="4" Grid.Column="1" Margin="0,4"
+                        Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                         SelectedDate="{Binding ViewModel.AcquisitionDate}"/>
         </Grid>
 

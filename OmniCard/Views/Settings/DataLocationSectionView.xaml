@@ -21,7 +21,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="Current path:" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox Grid.Column="1" Text="{Binding CurrentPath, Mode=OneWay}"
-                         IsReadOnly="True" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                         IsReadOnly="True" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <Button Grid.Column="2" Content="Browse..." Command="{Binding BrowseCommand}"
                         Padding="12,4" IsEnabled="{Binding IsMigrating, Converter={StaticResource InvertBool}}"/>
             </Grid>

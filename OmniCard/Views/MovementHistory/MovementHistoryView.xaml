@@ -34,15 +34,19 @@
             <TextBlock Text="Period:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                        Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <RadioButton Content="All Time" GroupName="Period" VerticalAlignment="Center" Margin="0,0,10,0"
+                         Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                          IsChecked="{Binding Period, Converter={conv:EnumBoolConverter}, ConverterParameter=AllTime}"/>
             <RadioButton Content="This Year" GroupName="Period" VerticalAlignment="Center" Margin="0,0,10,0"
+                         Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                          IsChecked="{Binding Period, Converter={conv:EnumBoolConverter}, ConverterParameter=ThisYear}"/>
             <RadioButton Content="This Month" GroupName="Period" VerticalAlignment="Center" Margin="0,0,16,0"
+                         Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                          IsChecked="{Binding Period, Converter={conv:EnumBoolConverter}, ConverterParameter=ThisMonth}"/>
 
             <TextBlock Text="Product:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                        Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Width="220" VerticalAlignment="Center" Margin="0,0,8,0"
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                      Text="{Binding ProductQuery, UpdateSourceTrigger=PropertyChanged}">
                 <TextBox.InputBindings>
                     <KeyBinding Key="Return" Command="{Binding RefreshCommand}"/>

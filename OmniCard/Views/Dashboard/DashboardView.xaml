@@ -147,12 +147,15 @@
                                            FontSize="24" FontWeight="Bold" Margin="0,4,0,0"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                     <RadioButton Content="All Time" GroupName="RealizedPeriod"
+                                                 Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                                  IsChecked="{Binding RealizedPeriod, Converter={conv:EnumBoolConverter}, ConverterParameter=AllTime}"
                                                  Margin="0,0,10,0"/>
                                     <RadioButton Content="This Year" GroupName="RealizedPeriod"
+                                                 Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                                  IsChecked="{Binding RealizedPeriod, Converter={conv:EnumBoolConverter}, ConverterParameter=ThisYear}"
                                                  Margin="0,0,10,0"/>
                                     <RadioButton Content="This Month" GroupName="RealizedPeriod"
+                                                 Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                                  IsChecked="{Binding RealizedPeriod, Converter={conv:EnumBoolConverter}, ConverterParameter=ThisMonth}"/>
                                 </StackPanel>
                             </StackPanel>
@@ -463,19 +466,19 @@
 
                         <!-- Row 1: Key stats -->
                         <StackPanel Grid.Column="0" HorizontalAlignment="Center" Margin="8,4">
-                            <TextBlock Text="{Binding ViewModel.StatTotalCards}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding ViewModel.StatTotalCards}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                             <TextBlock Text="Total Cards" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" HorizontalAlignment="Center"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" HorizontalAlignment="Center" Margin="8,4">
-                            <TextBlock Text="{Binding ViewModel.StatTotalSets}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding ViewModel.StatTotalSets}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                             <TextBlock Text="Sets" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" HorizontalAlignment="Center"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2" HorizontalAlignment="Center" Margin="8,4">
-                            <TextBlock Text="{Binding ViewModel.StatFoilCount}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding ViewModel.StatFoilCount}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                             <TextBlock Text="Foils" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" HorizontalAlignment="Center"/>
                         </StackPanel>
                         <StackPanel Grid.Column="3" HorizontalAlignment="Center" Margin="8,4">
-                            <TextBlock Text="{Binding ViewModel.StatTotalValue, StringFormat='${0:F2}'}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding ViewModel.StatTotalValue, StringFormat='${0:F2}'}" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                             <TextBlock Text="Total Value" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" HorizontalAlignment="Center"/>
                         </StackPanel>
 

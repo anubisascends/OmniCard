@@ -53,10 +53,12 @@
 
             <TextBlock Grid.Row="1" Text="Quantity to open:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4"
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                      Text="{Binding ViewModel.Quantity, UpdateSourceTrigger=PropertyChanged}"/>
 
             <TextBlock Grid.Row="2" Text="Note:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Grid.Row="2" Grid.Column="1" Margin="0,4"
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                      Text="{Binding ViewModel.Note, UpdateSourceTrigger=PropertyChanged}"/>
         </Grid>
 

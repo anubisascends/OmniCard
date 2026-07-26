@@ -24,24 +24,31 @@
 
         <!-- File + time + search bar -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-            <TextBlock Text="File:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBlock Text="File:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <ComboBox Width="220" VerticalAlignment="Center" Margin="0,0,16,0"
                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                       ItemsSource="{Binding AvailableFiles}"
                       SelectedItem="{Binding SelectedFile}"
                       DisplayMemberPath="DisplayName"/>
 
-            <TextBlock Text="From:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBlock Text="From:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Width="70" VerticalAlignment="Center" Margin="0,0,12,0"
                      ToolTip="HH:mm (24-hour). Leave blank for no lower bound."
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                      Text="{Binding FromTimeText, UpdateSourceTrigger=PropertyChanged}"/>
-            <TextBlock Text="To:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBlock Text="To:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Width="70" VerticalAlignment="Center" Margin="0,0,16,0"
                      ToolTip="HH:mm (24-hour). Leave blank for no upper bound."
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                      Text="{Binding ToTimeText, UpdateSourceTrigger=PropertyChanged}"/>
 
-            <TextBlock Text="Search:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBlock Text="Search:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Width="240" VerticalAlignment="Center" Margin="0,0,12,0"
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
 
             <Button Content="Refresh" Command="{Binding RefreshCommand}" Padding="12,4"/>
@@ -49,13 +56,14 @@
 
         <!-- Level toggles -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
-            <TextBlock Text="Levels:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0"/>
-            <CheckBox Content="Verbose" IsChecked="{Binding ShowVerbose}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-            <CheckBox Content="Debug" IsChecked="{Binding ShowDebug}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-            <CheckBox Content="Information" IsChecked="{Binding ShowInformation}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-            <CheckBox Content="Warning" IsChecked="{Binding ShowWarning}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-            <CheckBox Content="Error" IsChecked="{Binding ShowError}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-            <CheckBox Content="Fatal" IsChecked="{Binding ShowFatal}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <TextBlock Text="Levels:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            <CheckBox Content="Verbose" IsChecked="{Binding ShowVerbose}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <CheckBox Content="Debug" IsChecked="{Binding ShowDebug}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <CheckBox Content="Information" IsChecked="{Binding ShowInformation}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <CheckBox Content="Warning" IsChecked="{Binding ShowWarning}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <CheckBox Content="Error" IsChecked="{Binding ShowError}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <CheckBox Content="Fatal" IsChecked="{Binding ShowFatal}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" VerticalAlignment="Center" Margin="0,0,10,0"/>
         </StackPanel>
 
         <ProgressBar Grid.Row="2"

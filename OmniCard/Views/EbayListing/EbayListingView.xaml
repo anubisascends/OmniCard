@@ -119,14 +119,17 @@
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <RadioButton Content="Buy It Now" GroupName="ListingType"
                                              IsChecked="{Binding ViewModel.ListingType, Converter={conv:EnumBoolConverter}, ConverterParameter=FixedPrice}"
+                                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                              Margin="0,0,16,0"/>
                                 <RadioButton Content="Auction" GroupName="ListingType"
+                                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                              IsChecked="{Binding ViewModel.ListingType, Converter={conv:EnumBoolConverter}, ConverterParameter=Auction}"/>
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                 <TextBlock Text="Price: $" VerticalAlignment="Center" Margin="0,0,4,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                                <TextBox Width="100" Text="{Binding ViewModel.Price, UpdateSourceTrigger=LostFocus, StringFormat=F2}"/>
+                                <TextBox Width="100" Text="{Binding ViewModel.Price, UpdateSourceTrigger=LostFocus, StringFormat=F2}"
+                                         Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,4,0,0"
@@ -149,8 +152,8 @@
                             CornerRadius="4" Padding="12" Margin="0,0,0,8">
                         <StackPanel>
                             <TextBlock Text="Photos" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,8" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                            <CheckBox Content="Include scan image" IsChecked="{Binding ViewModel.IncludeScanImage}" Margin="0,0,0,4"/>
-                            <CheckBox Content="Include stock image" IsChecked="{Binding ViewModel.IncludeStockImage}"/>
+                            <CheckBox Content="Include scan image" IsChecked="{Binding ViewModel.IncludeScanImage}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" Margin="0,0,0,4"/>
+                            <CheckBox Content="Include stock image" IsChecked="{Binding ViewModel.IncludeStockImage}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                         </StackPanel>
                     </Border>
 
@@ -162,11 +165,13 @@
                             <TextBlock Text="Title" FontSize="11"
                                        Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" Margin="0,0,0,4"/>
                             <TextBox Text="{Binding ViewModel.Title, UpdateSourceTrigger=PropertyChanged}"
+                                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                      MaxLength="80" Margin="0,0,0,8"/>
                             <TextBlock Text="Description" FontSize="11"
                                        Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" Margin="0,0,0,4"/>
                             <TextBox Text="{Binding ViewModel.Description, UpdateSourceTrigger=PropertyChanged}"
-                                     AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80"/>
+                                     AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80"
+                                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                         </StackPanel>
                     </Border>
 

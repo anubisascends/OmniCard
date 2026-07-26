@@ -26,6 +26,7 @@
 
         <!-- Filter -->
         <TextBox Text="{Binding ViewModel.FilterText, UpdateSourceTrigger=PropertyChanged}"
+                 Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                  Margin="0,0,12,8"
                  VerticalContentAlignment="Center"
                  Tag="Filter by card name..."/>

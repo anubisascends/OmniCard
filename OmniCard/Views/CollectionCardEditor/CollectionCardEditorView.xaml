@@ -214,11 +214,13 @@
                         <sys:String xmlns:sys="clr-namespace:System;assembly=System.Runtime">D</sys:String>
                     </ComboBox>
                     <CheckBox Content="Foil" IsChecked="{Binding ViewModel.IsFoil}"
+                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                               VerticalAlignment="Center" Margin="0,0,12,0"/>
                     <TextBlock Text="$" FontSize="11"
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
                                VerticalAlignment="Center" Margin="0,0,4,0"/>
                     <TextBox Width="65" VerticalAlignment="Center"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                              Text="{Binding ViewModel.PurchasePrice, TargetNullValue='', UpdateSourceTrigger=LostFocus}"/>
                 </StackPanel>
 
@@ -243,11 +245,13 @@
                                    Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
                                    VerticalAlignment="Center" Margin="0,0,4,0"/>
                         <TextBox Width="40" VerticalAlignment="Center" Margin="0,0,8,0"
+                                 Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                  Text="{Binding ViewModel.Page, TargetNullValue='', UpdateSourceTrigger=LostFocus}"/>
                         <TextBlock Text="Slot" FontSize="11"
                                    Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
                                    VerticalAlignment="Center" Margin="0,0,4,0"/>
                         <TextBox Width="40" VerticalAlignment="Center"
+                                 Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                  Text="{Binding ViewModel.Slot, TargetNullValue='', UpdateSourceTrigger=LostFocus}"/>
                     </StackPanel>
 
@@ -258,6 +262,7 @@
                                    Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
                                    VerticalAlignment="Center" Margin="0,0,4,0"/>
                         <TextBox Width="100" VerticalAlignment="Center"
+                                 Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                  Text="{Binding ViewModel.Section, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}"/>
                     </StackPanel>
                 </StackPanel>
@@ -296,6 +301,7 @@
                                 Visibility="{Binding ViewModel.IsSearchVisible, Converter={StaticResource BoolToVis}}">
                         <TextBox Text="{Binding ViewModel.SearchQuery, UpdateSourceTrigger=PropertyChanged}"
                                  Width="180" VerticalAlignment="Center" Margin="0,0,4,0"
+                                 Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                  materialDesign:HintAssist.Hint="Search for card..."
                                  KeyDown="SearchBox_KeyDown"/>
                         <Button Content="Search" Padding="8,2" VerticalAlignment="Center"
@@ -390,6 +396,7 @@
 
             <CheckBox Content="Apply to all copies in stack"
                       IsChecked="{Binding ViewModel.ApplyToAll}"
+                      Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                       VerticalAlignment="Center"
                       Visibility="{Binding ViewModel.IsStacked, Converter={StaticResource BoolToVis}}"/>
 

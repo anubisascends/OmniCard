@@ -29,23 +29,23 @@
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Name" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox   Grid.Row="0" Grid.Column="1" Margin="0,4" Text="{Binding Company.Name, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBox   Grid.Row="0" Grid.Column="1" Margin="0,4" Text="{Binding Company.Name, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Address line 1" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox   Grid.Row="1" Grid.Column="1" Margin="0,4" Text="{Binding Company.AddressLine1, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBox   Grid.Row="1" Grid.Column="1" Margin="0,4" Text="{Binding Company.AddressLine1, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBlock Grid.Row="2" Grid.Column="0" Text="Address line 2" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox   Grid.Row="2" Grid.Column="1" Margin="0,4" Text="{Binding Company.AddressLine2, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBox   Grid.Row="2" Grid.Column="1" Margin="0,4" Text="{Binding Company.AddressLine2, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBlock Grid.Row="3" Grid.Column="0" Text="City" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox   Grid.Row="3" Grid.Column="1" Margin="0,4" Text="{Binding Company.City, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBox   Grid.Row="3" Grid.Column="1" Margin="0,4" Text="{Binding Company.City, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBlock Grid.Row="4" Grid.Column="0" Text="State" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox   Grid.Row="4" Grid.Column="1" Margin="0,4" Text="{Binding Company.State, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBox   Grid.Row="4" Grid.Column="1" Margin="0,4" Text="{Binding Company.State, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBlock Grid.Row="5" Grid.Column="0" Text="Postal code" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox   Grid.Row="5" Grid.Column="1" Margin="0,4" Text="{Binding Company.PostalCode, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBox   Grid.Row="5" Grid.Column="1" Margin="0,4" Text="{Binding Company.PostalCode, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBlock Grid.Row="6" Grid.Column="0" Text="Country" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox   Grid.Row="6" Grid.Column="1" Margin="0,4" Text="{Binding Company.Country, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBox   Grid.Row="6" Grid.Column="1" Margin="0,4" Text="{Binding Company.Country, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBlock Grid.Row="7" Grid.Column="0" Text="Email" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox   Grid.Row="7" Grid.Column="1" Margin="0,4" Text="{Binding Company.Email, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBox   Grid.Row="7" Grid.Column="1" Margin="0,4" Text="{Binding Company.Email, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBlock Grid.Row="8" Grid.Column="0" Text="Phone" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox   Grid.Row="8" Grid.Column="1" Margin="0,4" Text="{Binding Company.Phone, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBox   Grid.Row="8" Grid.Column="1" Margin="0,4" Text="{Binding Company.Phone, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             </Grid>
 
             <StackPanel Orientation="Horizontal" Margin="0,8,0,16">
@@ -66,19 +66,19 @@
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Width (mm)" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox   Grid.Row="0" Grid.Column="1" Width="80" HorizontalAlignment="Left" Margin="0,4"
-                           Text="{Binding Receipt.WidthMm, UpdateSourceTrigger=PropertyChanged}"/>
+                           Text="{Binding Receipt.WidthMm, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Margin (mm)" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox   Grid.Row="1" Grid.Column="1" Width="80" HorizontalAlignment="Left" Margin="0,4"
-                           Text="{Binding Receipt.MarginMm, UpdateSourceTrigger=PropertyChanged}"/>
+                           Text="{Binding Receipt.MarginMm, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBlock Grid.Row="2" Grid.Column="0" Text="Font size (pt)" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox   Grid.Row="2" Grid.Column="1" Width="80" HorizontalAlignment="Left" Margin="0,4"
-                           Text="{Binding Receipt.FontPointSize, UpdateSourceTrigger=PropertyChanged}"/>
+                           Text="{Binding Receipt.FontPointSize, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <CheckBox  Grid.Row="3" Grid.Column="1" Content="Show prices" Margin="0,4"
-                           IsChecked="{Binding Receipt.ShowPrices}"/>
+                           IsChecked="{Binding Receipt.ShowPrices}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBlock Grid.Row="4" Grid.Column="0" Text="Footer text" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox   Grid.Row="4" Grid.Column="1" Margin="0,4" Text="{Binding Receipt.FooterText, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBox   Grid.Row="4" Grid.Column="1" Margin="0,4" Text="{Binding Receipt.FooterText, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBlock Grid.Row="5" Grid.Column="0" Text="Default printer" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox   Grid.Row="5" Grid.Column="1" Margin="0,4" Text="{Binding Receipt.DefaultPrinterName, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBox   Grid.Row="5" Grid.Column="1" Margin="0,4" Text="{Binding Receipt.DefaultPrinterName, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             </Grid>
 
             <StackPanel Orientation="Horizontal" Margin="0,16,0,0">

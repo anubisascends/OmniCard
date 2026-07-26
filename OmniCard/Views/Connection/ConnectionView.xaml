@@ -46,6 +46,7 @@
             </Grid.ColumnDefinitions>
             <CheckBox Content="Set as default"
                       IsChecked="{Binding ViewModel.SetAsDefault}"
+                      Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                       VerticalAlignment="Center"/>
             <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
