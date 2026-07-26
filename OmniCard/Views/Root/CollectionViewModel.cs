@@ -189,6 +189,27 @@ public sealed partial class CollectionViewModel : ViewModel
         LoadCardList();
     }
 
+    /// <summary>Enter card-tile mode filtered to a single set of a single game (dashboard drill-in).</summary>
+    public void BrowseSet(CardGame game, string setCode)
+    {
+        // Filter to the tile's own game regardless of the global selector.
+        _allGames = false;
+        _selectedGame = game;
+        LoadPresets();
+
+        CurrentLocationId = null;
+        CurrentLocationName = "Entire Collection";
+        ShowAllCards = true;
+
+        ResetSearchState();      // clears CollectionSearchQuery — set the query AFTER this
+        ShowCardList = true;
+
+        OnPropertyChanged(nameof(ColumnVisibility));
+
+        CollectionSearchQuery = $"set:{setCode}";
+        _ = SearchCollection();
+    }
+
     [RelayCommand]
     public void NavigateBack()
     {

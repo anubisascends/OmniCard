@@ -110,6 +110,30 @@ public class CollectionViewModelTests
     }
 
     [Fact]
+    public async Task BrowseSet_FiltersToGameAndSet()
+    {
+        var vm = CreateVm();
+
+        var searched = new TaskCompletionSource();
+        _card.Setup(c => c.SearchCollection(
+                It.IsAny<string>(), It.IsAny<CardGame?>(), It.IsAny<int?>(),
+                It.IsAny<SortPreset?>(), It.IsAny<FilterPreset?>(), It.IsAny<bool>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<ObservableCollection<CollectionCard>>()))
+             .Callback(() => searched.TrySetResult());
+        _card.Invocations.Clear();
+
+        vm.BrowseSet(CardGame.OnePiece, "OP01");
+        await searched.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(vm.ShowCardList);
+        Assert.Equal("set:OP01", vm.CollectionSearchQuery);
+        _card.Verify(c => c.SearchCollection(
+            "set:OP01", CardGame.OnePiece, It.IsAny<int?>(),
+            It.IsAny<SortPreset?>(), It.IsAny<FilterPreset?>(), It.IsAny<bool>(),
+            0, It.IsAny<int>(), It.IsAny<ObservableCollection<CollectionCard>>()), Times.Once);
+    }
+
+    [Fact]
     public void SetGame_ToAllGames_DoesNotWipePreviousGamesActivePresets()
     {
         var sortPreset = new SortPreset { Name = "MySort", Game = CardGame.OnePiece, SortLevels = [] };
