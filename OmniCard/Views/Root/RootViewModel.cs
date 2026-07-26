@@ -1381,7 +1381,7 @@ public sealed partial class RootViewModel(
             _logger.LogInformation("Refresh cooldown active for {Game}, last refresh {TimeAgo}", SelectedGame, timeAgoText);
 
             var result = MessageBox.Show(
-                $"Card data for {SelectedGame} was last refreshed {timeAgoText}.\n\n" +
+                $"Card data for {CardService.SelectedGame} was last refreshed {timeAgoText}.\n\n" +
                 $"Refresh is available once every 24 hours to minimize API load.\n" +
                 $"Next refresh available at {nextAvailable.ToLocalTime():g}.\n\n" +
                 "Click Yes to refresh anyway, or No to cancel.",
@@ -1407,7 +1407,7 @@ public sealed partial class RootViewModel(
         RefreshCooldownHelper.RecordRefresh(dataPathService.DataDirectory, CardService.SelectedGame);
         LoadAvailableSets();
 
-        if (SelectedGame == CardGame.Mtg)
+        if (CardService.SelectedGame == CardGame.Mtg)
         {
             var sets = _allSets.Select(s => (s.SetCode, s.SetName)).ToList();
             await setSymbolCache.PreloadSymbolsAsync(sets, progress);
