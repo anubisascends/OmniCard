@@ -10,8 +10,9 @@ visual **tile grid**, mirroring the desktop app's collection tile view
 ([CardListView.xaml](../../../OmniCard/Views/Root/CardListView.xaml)). Each tile
 shows card art, name, set name (code), price (when available), and quantity.
 
-Scope is limited to the **search-results view** on the Index page. The default
-(non-search) storage-location view is untouched.
+Scope covers every page that lists cards: the **search-results view** on the
+Index page and the **storage-location card list** (`/location/{id}`). The Home
+page's list of storage *containers* is unchanged.
 
 ## Decisions
 
@@ -122,17 +123,22 @@ Global `body { max-width:800px }` stays as-is (layout consistent site-wide).
   quantity grouping and representative price/image selection. Confirm harness
   availability during planning; do not add a new test project solely for this.
 
+The same enrichment + tile treatment applies to the storage-location card list
+(`LocationModel.StackedCard` / `Location.cshtml`), reusing the `.card-tiles` CSS.
+
 ## Out of Scope
 
 - Live/market price refresh (uses the already-persisted `LastMarketPrice`).
 - Tile/table toggle (explicitly replaced).
-- Changes to the storage-location default view, the Card detail page (beyond the
-  helper extraction), or any new API endpoints.
+- The Home page's storage-*container* list, and the Card detail page (beyond the
+  helper extraction). No new API endpoints.
 
 ## Files Touched
 
-- `OmniCard.Web/Pages/Index.cshtml.cs` — projection enrichment.
+- `OmniCard.Web/Pages/Index.cshtml.cs` — search projection enrichment.
 - `OmniCard.Web/Pages/Index.cshtml` — table → tile grid.
+- `OmniCard.Web/Pages/Location.cshtml.cs` — location card projection enrichment.
+- `OmniCard.Web/Pages/Location.cshtml` — table → tile grid (drops `table-sort.js`).
 - `OmniCard.Web/Pages/Card.cshtml.cs` — use shared resolver.
 - `OmniCard.Web/` — new `CardImageUrl` helper (+ its unit test).
 - `OmniCard.Web/wwwroot/css/site.css` — tile styles.

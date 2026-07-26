@@ -92,17 +92,5 @@ public class CardModel : PageModel
         }
     }
 
-    public string? ImageUrl
-    {
-        get
-        {
-            if (Card.ScanImagePath is not null)
-            {
-                // ScanImagePath is "scans/123.jpg" — serve from /scans/123.jpg
-                var filename = Path.GetFileName(Card.ScanImagePath);
-                return $"/scans/{filename}";
-            }
-            return Card.ImageUri;
-        }
-    }
+    public string? ImageUrl => CardImageUrl.Resolve(Card.ScanImagePath, Card.ImageUri);
 }

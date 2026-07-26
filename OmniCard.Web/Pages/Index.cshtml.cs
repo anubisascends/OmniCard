@@ -104,7 +104,7 @@ public class IndexModel : PageModel
             .Include(l => l.Product)
             .Where(l => l.Product.Category == ProductCategory.Single)
             .ToList()
-            .Select(l => CollectionCardMapper.ToDto(l, l.Product, 0m));
+            .Select(l => CollectionCardMapper.ToDto(l, l.Product, l.Product.LastMarketPrice ?? 0m));
 
         if (gameFilter.HasValue)
             query = query.Where(c => c.Game == gameFilter.Value);
@@ -161,15 +161,23 @@ public class IndexModel : PageModel
 
         SearchResults = query
             .GroupBy(c => new { c.Name, c.SetCode })
-            .Select(g => new CardSearchResult
+            .Select(g =>
             {
-                Id = g.Min(c => c.Id),
-                Name = g.Key.Name,
-                SetCode = g.Key.SetCode,
-                Number = g.Min(c => c.Number),
-                Rarity = g.Min(c => c.Rarity),
-                Color = g.Min(c => c.Color),
-                Quantity = g.Count(),
+                // Representative copy (lowest Id) supplies set name, art, and price.
+                var rep = g.OrderBy(c => c.Id).First();
+                return new CardSearchResult
+                {
+                    Id = rep.Id,
+                    Name = g.Key.Name,
+                    SetName = rep.SetName,
+                    SetCode = g.Key.SetCode,
+                    Number = rep.Number,
+                    Rarity = rep.Rarity,
+                    Color = rep.Color,
+                    Quantity = g.Count(),
+                    ImageUrl = CardImageUrl.Resolve(rep.ScanImagePath, rep.ImageUri),
+                    MarketPrice = rep.MarketPrice > 0m ? rep.MarketPrice : null,
+                };
             })
             .OrderBy(r => r.Name)
             .ThenBy(r => r.SetCode)
@@ -201,10 +209,13 @@ public class IndexModel : PageModel
     {
         public int Id { get; init; }
         public string Name { get; init; } = "";
+        public string SetName { get; init; } = "";
         public string SetCode { get; init; } = "";
         public string Number { get; init; } = "";
         public string Rarity { get; init; } = "";
         public string? Color { get; init; }
         public int Quantity { get; init; }
+        public string? ImageUrl { get; init; }
+        public decimal? MarketPrice { get; init; }
     }
 }

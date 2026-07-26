@@ -80,6 +80,69 @@ tr:active { background: var(--surface); }
 
 .empty { color: var(--text-muted); font-style: italic; }
 
+/* Search-result tiles (mirrors the desktop collection tile view) */
+.card-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+}
+
+.card-tile {
+    display: block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    color: var(--text);
+    transition: border-color 0.15s, transform 0.15s;
+}
+
+.card-tile:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    text-decoration: none;
+}
+
+.card-tile img,
+.card-tile .no-image {
+    width: 100%;
+    aspect-ratio: 63 / 88;
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+.card-tile img { object-fit: contain; background: var(--bg); }
+
+.card-tile .no-image {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.85rem;
+}
+
+.card-tile .name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.card-tile .set {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.card-tile .price { font-weight: 600; font-size: 0.85rem; margin-top: 2px; }
+
+.card-tile .qty { color: var(--accent); font-weight: 600; font-size: 0.85rem; }
+
 .back-link { display: inline-block; margin-bottom: 16px; font-size: 0.9rem; }
 
 .card-image {

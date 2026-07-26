@@ -47,31 +47,31 @@
             }
             else
             {
-                <table>
-                    <thead>
-                        <tr>
-                            <th class="sortable" data-sort-numeric>Qty</th>
-                            <th class="sortable">Name</th>
-                            <th class="sortable">Set</th>
-                            <th class="sortable">#</th>
-                            <th class="sortable">Rarity</th>
-                            <th class="sortable">Color</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var r in Model.SearchResults)
-                        {
-                            <tr>
-                                <td>@r.Quantity</td>
-                                <td><a href="/card/@r.Id">@r.Name</a></td>
-                                <td>@r.SetCode</td>
-                                <td>@r.Number</td>
-                                <td>@r.Rarity</td>
-                                <td>@(r.Color ?? "—")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                <div class="card-tiles">
+                    @foreach (var r in Model.SearchResults)
+                    {
+                        <a href="/card/@r.Id" class="card-tile">
+                            @if (r.ImageUrl is not null)
+                            {
+                                <img src="@r.ImageUrl" loading="lazy" alt="@r.Name"/>
+                            }
+                            else
+                            {
+                                <div class="no-image">No Image</div>
+                            }
+                            <div class="name" title="@r.Name">@r.Name</div>
+                            <div class="set">@r.SetName (@r.SetCode)</div>
+                            @if (r.MarketPrice is not null)
+                            {
+                                <div class="price">@r.MarketPrice.Value.ToString("C")</div>
+                            }
+                            @if (r.Quantity > 1)
+                            {
+                                <div class="qty">&times;@r.Quantity</div>
+                            }
+                        </a>
+                    }
+                </div>
             }
         }
         else

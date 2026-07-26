@@ -87,6 +87,59 @@ public class WebPageTests : IDisposable
         Assert.Equal("Zebra Box", model.Containers[2].Name);
     }
 
+    [Fact]
+    public void IndexModel_Search_ProjectsTileFields_GroupedByNameAndSet()
+    {
+        using (var ctx = _factory.CreateDbContext())
+        {
+            // Two printings of the same Name+SetCode. The representative (lowest lot Id)
+            // supplies SetName, image, and price; Quantity is the group count.
+            var rep = NewSingle("rep", "Lightning Bolt", "Alpha", "LEA", "161", "common");
+            rep.ImageUri = "https://img/bolt-rep.jpg";
+            rep.LastMarketPrice = 12.50m;
+            var other = NewSingle("other", "Lightning Bolt", "Alpha", "LEA", "161", "common");
+            other.ImageUri = "https://img/bolt-other.jpg";
+            other.LastMarketPrice = 99.00m;
+            ctx.Products.AddRange(rep, other);
+            ctx.SaveChanges();
+
+            ctx.Lots.AddRange(
+                new InventoryLot { ProductId = rep.Id },
+                new InventoryLot { ProductId = other.Id });
+            ctx.SaveChanges();
+        }
+
+        var model = new IndexModel(_factory) { PageContext = CreatePageContext(), Q = "bolt" };
+        model.OnGet();
+
+        var result = Assert.Single(model.SearchResults);
+        Assert.Equal("Lightning Bolt", result.Name);
+        Assert.Equal("Alpha", result.SetName);
+        Assert.Equal("LEA", result.SetCode);
+        Assert.Equal(2, result.Quantity);
+        Assert.Equal("https://img/bolt-rep.jpg", result.ImageUrl);
+        Assert.Equal(12.50m, result.MarketPrice);
+    }
+
+    [Fact]
+    public void IndexModel_Search_NoPrice_YieldsNullMarketPrice()
+    {
+        using (var ctx = _factory.CreateDbContext())
+        {
+            var p = NewSingle("np", "Counterspell", "Alpha", "LEA", "54", "common");
+            ctx.Products.Add(p);
+            ctx.SaveChanges();
+            ctx.Lots.Add(new InventoryLot { ProductId = p.Id });
+            ctx.SaveChanges();
+        }
+
+        var model = new IndexModel(_factory) { PageContext = CreatePageContext(), Q = "counterspell" };
+        model.OnGet();
+
+        var result = Assert.Single(model.SearchResults);
+        Assert.Null(result.MarketPrice);
+    }
+
     // --- LocationModel ---
 
     [Fact]
@@ -121,6 +174,45 @@ public class WebPageTests : IDisposable
         Assert.Equal(2, model.Sets.Count);
         Assert.Contains(model.Sets, s => s.SetCode == "LEA" && s.Count == 2);
         Assert.Contains(model.Sets, s => s.SetCode == "LEB" && s.Count == 1);
+    }
+
+    [Fact]
+    public void LocationModel_OnGet_ProjectsTileFields()
+    {
+        int containerId;
+        using (var ctx = _factory.CreateDbContext())
+        {
+            var container = new StorageContainer { Name = "Box", ContainerType = ContainerType.Box };
+            ctx.StorageContainers.Add(container);
+            ctx.SaveChanges();
+            containerId = container.Id;
+
+            var bolt = NewSingle("b1", "Lightning Bolt", "Alpha", "LEA", "161", "common");
+            bolt.ImageUri = "https://img/bolt.jpg";
+            bolt.LastMarketPrice = 12.50m;
+            var counter = NewSingle("c1", "Counterspell", "Alpha", "LEA", "54", "common");
+            ctx.Products.AddRange(bolt, counter);
+            ctx.SaveChanges();
+
+            ctx.Lots.AddRange(
+                new InventoryLot { ProductId = bolt.Id, LocationId = containerId },
+                new InventoryLot { ProductId = bolt.Id, LocationId = containerId },
+                new InventoryLot { ProductId = counter.Id, LocationId = containerId });
+            ctx.SaveChanges();
+        }
+
+        var model = new LocationModel(_factory) { PageContext = CreatePageContext() };
+        model.OnGet(containerId);
+
+        var boltCard = Assert.Single(model.Cards, c => c.Name == "Lightning Bolt");
+        Assert.Equal("Alpha", boltCard.SetName);
+        Assert.Equal(2, boltCard.Quantity);
+        Assert.Equal("https://img/bolt.jpg", boltCard.ImageUrl);
+        Assert.Equal(12.50m, boltCard.MarketPrice);
+
+        var counterCard = Assert.Single(model.Cards, c => c.Name == "Counterspell");
+        Assert.Null(counterCard.ImageUrl);
+        Assert.Null(counterCard.MarketPrice);
     }
 
     [Fact]
