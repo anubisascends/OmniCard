@@ -85,6 +85,9 @@
                         <Image x:Name="ScanImageElement"
                                Source="{Binding ViewModel.ScanImage}"
                                Stretch="Uniform"
+                               StretchDirection="DownOnly"
+                               MaxWidth="{Binding ActualWidth, ElementName=ScanScrollViewer}"
+                               MaxHeight="{Binding ActualHeight, ElementName=ScanScrollViewer}"
                                RenderOptions.BitmapScalingMode="HighQuality"
                                RenderTransformOrigin="0,0">
                             <Image.RenderTransform>
@@ -172,6 +175,9 @@
                         <Image x:Name="ApiImageElement"
                                Source="{Binding ViewModel.ApiImage}"
                                Stretch="Uniform"
+                               StretchDirection="DownOnly"
+                               MaxWidth="{Binding ActualWidth, ElementName=ApiScrollViewer}"
+                               MaxHeight="{Binding ActualHeight, ElementName=ApiScrollViewer}"
                                RenderOptions.BitmapScalingMode="HighQuality"
                                RenderTransformOrigin="0,0">
                             <Image.RenderTransform>
