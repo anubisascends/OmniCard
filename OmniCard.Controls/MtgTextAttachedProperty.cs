@@ -88,6 +88,11 @@ public static class MtgText
         };
         richTextBox.Document = doc;
 
+        // A FlowDocument's text defaults to black and does NOT inherit the RichTextBox's
+        // themed Foreground, so oracle/mana text rendered black on the dark theme. Bind the
+        // document foreground to the theme brush so it stays readable (and tracks theme changes).
+        doc.SetResourceReference(FlowDocument.ForegroundProperty, "MaterialDesign.Brush.Foreground");
+
         // Re-render when font size changes so symbols scale with text
         var dpd = System.ComponentModel.DependencyPropertyDescriptor.FromProperty(
             Control.FontSizeProperty, typeof(RichTextBox));
