@@ -108,4 +108,24 @@ public class CollectionViewModelTests
             It.IsAny<SortPreset?>(), It.IsAny<FilterPreset?>(), It.IsAny<bool>(),
             0, It.IsAny<int>(), It.IsAny<ObservableCollection<CollectionCard>>()), Times.Once);
     }
+
+    [Fact]
+    public void SetGame_ToAllGames_DoesNotWipePreviousGamesActivePresets()
+    {
+        var sortPreset = new SortPreset { Name = "MySort", Game = CardGame.OnePiece, SortLevels = [] };
+        var filterPreset = new FilterPreset { Name = "MyFilter", Game = CardGame.OnePiece };
+        _presets.Setup(p => p.GetSortPresets(CardGame.OnePiece)).Returns([sortPreset]);
+        _presets.Setup(p => p.GetFilterPresets(CardGame.OnePiece)).Returns([filterPreset]);
+        _presets.Setup(p => p.GetActiveSortPreset(CardGame.OnePiece)).Returns(sortPreset);
+        _presets.Setup(p => p.GetActiveFilterPreset(CardGame.OnePiece)).Returns(filterPreset);
+
+        var vm = CreateVm();
+        vm.SetGame(CardGame.OnePiece);   // concrete game with active sort + filter presets
+        _presets.Invocations.Clear();    // ignore the persistence from loading the concrete game
+
+        vm.SetGame(null);                // switch to All Games — must not persist a null over the saved presets
+
+        _presets.Verify(p => p.SetActiveSortPreset(It.IsAny<CardGame>(), null), Times.Never);
+        _presets.Verify(p => p.SetActiveFilterPreset(It.IsAny<CardGame>(), null), Times.Never);
+    }
 }

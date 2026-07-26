@@ -657,10 +657,13 @@ public sealed partial class CollectionViewModel : ViewModel
     {
         IsAdHocSortActive = false;
         _adHocSortLevels.Clear();
-        if (value is not null)
-            _presetService.SetActiveSortPreset(_selectedGame, value.Name);
-        else
-            _presetService.SetActiveSortPreset(_selectedGame, null);
+        if (!_suppressPresetPersistence)
+        {
+            if (value is not null)
+                _presetService.SetActiveSortPreset(_selectedGame, value.Name);
+            else
+                _presetService.SetActiveSortPreset(_selectedGame, null);
+        }
         if (ShowCardList) _ = SearchCollectionCore(forceRefresh: false);
     }
 
@@ -672,10 +675,13 @@ public sealed partial class CollectionViewModel : ViewModel
 
     partial void OnSelectedFilterPresetChanged(FilterPreset? value)
     {
-        if (value is not null)
-            _presetService.SetActiveFilterPreset(_selectedGame, value.Name);
-        else
-            _presetService.SetActiveFilterPreset(_selectedGame, null);
+        if (!_suppressPresetPersistence)
+        {
+            if (value is not null)
+                _presetService.SetActiveFilterPreset(_selectedGame, value.Name);
+            else
+                _presetService.SetActiveFilterPreset(_selectedGame, null);
+        }
         if (ShowCardList) _ = SearchCollectionCore(forceRefresh: false);
     }
 
@@ -878,6 +884,10 @@ public sealed partial class CollectionViewModel : ViewModel
     private CardGame _selectedGame;   // last concrete game (for per-game presets/sort)
     private bool _allGames;           // true when "All Games" is selected
 
+    // Set while clearing preset selections for the All-Games view so the change-handlers
+    // don't persist the null back onto the previous game's saved active preset.
+    private bool _suppressPresetPersistence;
+
     /// <summary>Game filter passed to the card service: null = All Games (no filter).</summary>
     private CardGame? GameFilter => _allGames ? null : _selectedGame;
 
@@ -891,11 +901,21 @@ public sealed partial class CollectionViewModel : ViewModel
         }
         else
         {
-            // All Games: sort/filter presets are per-game — clear them.
+            // All Games: sort/filter presets are per-game — clear the dropdowns and the
+            // selection for display, but suppress persistence so we don't wipe the
+            // previous game's saved active preset (_selectedGame still points at it).
             AvailableSortPresets.Clear();
             AvailableFilterPresets.Clear();
-            SelectedSortPreset = null;
-            SelectedFilterPreset = null;
+            _suppressPresetPersistence = true;
+            try
+            {
+                SelectedSortPreset = null;
+                SelectedFilterPreset = null;
+            }
+            finally
+            {
+                _suppressPresetPersistence = false;
+            }
         }
 
         // Reflect the new game in whichever view is showing. Every other data-changing
