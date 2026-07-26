@@ -33,6 +33,8 @@ public interface ICardService
     void UpdateCollectionCard(CollectionCard card);
     void DeleteCollectionCard(int id);
     Task<List<SetCompletionSummary>> CalculateSetCompletionAsync(CardGame game, IProgress<string>? progress = null);
+    Task<List<SetCompletionSummary>> CalculateSetCompletionAsync(CardGame? game, IProgress<string>? progress = null);
+    IReadOnlyDictionary<string, decimal> GetCurrentPrices(CardGame game, IEnumerable<string> gameCardIds, bool foil);
     List<string> GetDistinctFieldValues(string field, CardGame game);
     List<MissingCard> GetMissingCardsForSet(CardGame game, string setCode);
     void RemoveTempFile(ScannedCard card);

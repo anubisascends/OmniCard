@@ -1781,6 +1781,21 @@ public sealed class CardService : ICardService
         return await service.GetSetCompletionAsync(ownedCards, progress);
     }
 
+    public async Task<List<SetCompletionSummary>> CalculateSetCompletionAsync(CardGame? game, IProgress<string>? progress = null)
+    {
+        if (game is not null)
+            return await CalculateSetCompletionAsync(game.Value, progress);
+
+        // All Games: aggregate each supported game's set completion.
+        var all = new List<SetCompletionSummary>();
+        foreach (var g in AvailableGames)
+            all.AddRange(await CalculateSetCompletionAsync(g, progress));
+        return all;
+    }
+
+    public IReadOnlyDictionary<string, decimal> GetCurrentPrices(CardGame game, IEnumerable<string> gameCardIds, bool foil)
+        => _gameServices[game].GetCurrentPrices(gameCardIds, foil);
+
     public List<MissingCard> GetMissingCardsForSet(CardGame game, string setCode)
     {
         _logger.LogDebug("Getting missing cards for {Game} set {SetCode}", game, setCode);

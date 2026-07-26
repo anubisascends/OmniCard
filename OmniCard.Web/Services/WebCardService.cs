@@ -88,6 +88,8 @@ public sealed class WebCardService : ICardService
     public void UpdateCollectionCard(CollectionCard card) => throw new NotSupportedException();
     public void DeleteCollectionCard(int id) => throw new NotSupportedException();
     public Task<List<SetCompletionSummary>> CalculateSetCompletionAsync(CardGame game, IProgress<string>? progress = null) => throw new NotSupportedException();
+    public Task<List<SetCompletionSummary>> CalculateSetCompletionAsync(CardGame? game, IProgress<string>? progress = null) => throw new NotSupportedException();
+    public IReadOnlyDictionary<string, decimal> GetCurrentPrices(CardGame game, IEnumerable<string> gameCardIds, bool foil) => throw new NotSupportedException();
     public List<string> GetDistinctFieldValues(string field, CardGame game) => throw new NotSupportedException();
     public List<MissingCard> GetMissingCardsForSet(CardGame game, string setCode) => throw new NotSupportedException();
     public void RemoveTempFile(ScannedCard card) => throw new NotSupportedException();
