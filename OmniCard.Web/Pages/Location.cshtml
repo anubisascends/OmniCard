@@ -36,33 +36,32 @@
         }
         else
         {
-            <table>
-                <thead>
-                    <tr>
-                        <th class="sortable" data-sort-numeric>Qty</th>
-                        <th class="sortable">Name</th>
-                        <th class="sortable">Set</th>
-                        <th class="sortable">#</th>
-                        <th class="sortable">Rarity</th>
-                        <th class="sortable">Color</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var card in Model.Cards)
-                    {
-                        <tr>
-                            <td>@card.Quantity</td>
-                            <td><a href="/card/@card.Id">@card.Name</a></td>
-                            <td>@card.SetCode</td>
-                            <td>@card.Number</td>
-                            <td>@card.Rarity</td>
-                            <td>@card.Color</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <div class="card-tiles">
+                @foreach (var card in Model.Cards)
+                {
+                    <a href="/card/@card.Id" class="card-tile">
+                        @if (card.ImageUrl is not null)
+                        {
+                            <img src="@card.ImageUrl" loading="lazy" alt="@card.Name"/>
+                        }
+                        else
+                        {
+                            <div class="no-image">No Image</div>
+                        }
+                        <div class="name" title="@card.Name">@card.Name</div>
+                        <div class="set">@card.SetName (@card.SetCode)</div>
+                        @if (card.MarketPrice is not null)
+                        {
+                            <div class="price">@card.MarketPrice.Value.ToString("C")</div>
+                        }
+                        @if (card.Quantity > 1)
+                        {
+                            <div class="qty">&times;@card.Quantity</div>
+                        }
+                    </a>
+                }
+            </div>
         }
     </main>
-    <script src="/js/table-sort.js"></script>
 </body>
 </html>

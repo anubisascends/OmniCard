@@ -39,7 +39,7 @@ public class LocationModel : PageModel
             .Include(l => l.Product)
             .Where(l => l.LocationId == id && l.Product.Category == ProductCategory.Single)
             .ToList()
-            .Select(l => CollectionCardMapper.ToDto(l, l.Product, 0m))
+            .Select(l => CollectionCardMapper.ToDto(l, l.Product, l.Product.LastMarketPrice ?? 0m))
             .OrderBy(c => c.Name)
             .ToList();
 
@@ -49,15 +49,19 @@ public class LocationModel : PageModel
             .GroupBy(c => new { c.Name, c.SetCode })
             .Select(g =>
             {
-                var first = g.First();
+                // Representative copy (lowest Id) supplies set name, art, and price.
+                var rep = g.OrderBy(c => c.Id).First();
                 return new StackedCard(
-                    first.Id,
-                    first.Name,
-                    first.SetCode,
-                    first.Number,
-                    first.Rarity,
-                    first.Color,
-                    g.Count());
+                    rep.Id,
+                    rep.Name,
+                    rep.SetName,
+                    rep.SetCode,
+                    rep.Number,
+                    rep.Rarity,
+                    rep.Color,
+                    g.Count(),
+                    CardImageUrl.Resolve(rep.ScanImagePath, rep.ImageUri),
+                    rep.MarketPrice > 0m ? rep.MarketPrice : null);
             })
             .OrderBy(c => c.Name)
             .ToList();
@@ -96,9 +100,12 @@ public class LocationModel : PageModel
     public record StackedCard(
         int Id,
         string Name,
+        string SetName,
         string SetCode,
         string Number,
         string Rarity,
         string? Color,
-        int Quantity);
+        int Quantity,
+        string? ImageUrl,
+        decimal? MarketPrice);
 }
