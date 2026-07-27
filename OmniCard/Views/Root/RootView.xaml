@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:OmniCard.Views.Root"
         xmlns:dashboard="clr-namespace:OmniCard.Views.Dashboard"
         xmlns:sales="clr-namespace:OmniCard.Views.Sales"
+        xmlns:lists="clr-namespace:OmniCard.Views.Lists"
         xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
@@ -300,6 +301,17 @@
                     </StackPanel>
                 </TabItem.Header>
                 <sales:SalesView DataContext="{Binding ViewModel.Sales}"/>
+            </TabItem>
+
+            <TabItem x:Name="tabItemLists" Style="{StaticResource SidebarTabItemStyle}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="FormatListBulleted" Width="22" Height="22" VerticalAlignment="Center"/>
+                        <TextBlock Text="Lists" Margin="12,0,0,0" VerticalAlignment="Center"
+                                   Visibility="{Binding ViewModel.IsSidebarExpanded, Converter={conv:BoolToVisibilityConverter}}"/>
+                    </StackPanel>
+                </TabItem.Header>
+                <lists:ListsView DataContext="{Binding ViewModel.Lists}"/>
             </TabItem>
 
         </TabControl>
