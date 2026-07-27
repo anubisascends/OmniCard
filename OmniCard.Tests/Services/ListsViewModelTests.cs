@@ -92,6 +92,8 @@ public class ListsViewModelTests
             => Task.FromResult<(string, List<DecklistEntry>)?>(null);
         public (string DeckName, List<DecklistEntry> Entries) ParseDecklistText(string text)
             => ("Pasted", []);
+        public List<DecklistEntry> ParseDecklistPrintings(string text)
+            => [];
         public DecklistCheckResult CheckAgainstCollection(string deckName, string deckSource, List<DecklistEntry> entries, CardGame game)
             => new() { DeckName = deckName, DeckSource = deckSource, OwnedEntries = [], MissingEntries = [] };
     }

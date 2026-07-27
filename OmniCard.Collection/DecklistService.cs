@@ -13,8 +13,8 @@ public sealed partial class DecklistService(
     IHttpClientFactory httpClientFactory,
     ICardService cardService) : IDecklistService
 {
-    // Regex: "1 Card Name" or "1 Card Name (SET) 123" or "1x Card Name"
-    [GeneratedRegex(@"^(\d+)x?\s+(.+?)(?:\s+\(([A-Za-z0-9]+)\)\s+(\S+))?$")]
+    // Regex: "1 Card Name" | "1x Card Name" | "1 Card Name (SET) 123" | "1 Card Name (SET) 123 *E*"
+    [GeneratedRegex(@"^(\d+)x?\s+(.+?)(?:\s+\(([A-Za-z0-9]+)\)\s+(\S+)(?:\s+.*)?)?$")]
     private static partial Regex DecklistLineRegex();
 
     // Known section headers to skip (Moxfield/Archidekt text export)
@@ -74,6 +74,38 @@ public sealed partial class DecklistService(
         }
 
         return ("Pasted Decklist", entries.Values.ToList());
+    }
+
+    public List<DecklistEntry> ParseDecklistPrintings(string text)
+    {
+        var entries = new Dictionary<string, DecklistEntry>(StringComparer.OrdinalIgnoreCase);
+        var regex = DecklistLineRegex();
+
+        foreach (var rawLine in text.Split('\n'))
+        {
+            var line = rawLine.Trim();
+            if (string.IsNullOrEmpty(line) || line.StartsWith("//"))
+                continue;
+            if (SectionHeaders.Contains(line))
+                continue;
+
+            var match = regex.Match(line);
+            if (!match.Success)
+                continue;
+
+            var qty = int.Parse(match.Groups[1].Value);
+            var name = match.Groups[2].Value.Trim();
+            var setCode = match.Groups[3].Success ? match.Groups[3].Value.ToUpperInvariant() : null;
+            var collectorNumber = match.Groups[4].Success ? match.Groups[4].Value : null;
+
+            var key = $"{name.ToUpperInvariant()}|{setCode}|{collectorNumber}";
+            if (entries.TryGetValue(key, out var existing))
+                entries[key] = existing with { Quantity = existing.Quantity + qty };
+            else
+                entries[key] = new DecklistEntry(qty, name, setCode, collectorNumber);
+        }
+
+        return entries.Values.ToList();
     }
 
     public async Task<(string DeckName, List<DecklistEntry> Entries)?> FetchDecklistAsync(string url)
