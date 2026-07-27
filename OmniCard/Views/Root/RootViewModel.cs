@@ -38,6 +38,7 @@ public sealed partial class RootViewModel(
     Views.Inventory.InventoryViewModel inventory,
     Views.Dashboard.DashboardViewModel dashboard,
     Views.Sales.SalesViewModel sales,
+    Views.Lists.ListsViewModel lists,
     Views.Settings.SettingsViewModel settings,
     IMismatchLogService mismatchLogService,
     SetSymbolCache setSymbolCache,
@@ -172,6 +173,9 @@ public sealed partial class RootViewModel(
 
     /// <summary>The nested SalesViewModel that owns the location-grouped pick list + For-Sale location state.</summary>
     public Views.Sales.SalesViewModel Sales { get; } = sales;
+
+    /// <summary>The nested ListsViewModel that owns the user-defined card lists.</summary>
+    public Views.Lists.ListsViewModel Lists { get; } = lists;
 
     /// <summary>The nested SettingsViewModel that composes the Settings tab's section view-models.</summary>
     public Views.Settings.SettingsViewModel Settings { get; } = settings;
@@ -561,6 +565,7 @@ public sealed partial class RootViewModel(
 
         OnPropertyChanged(nameof(IsScannerEnabled));
         Collection.SetGame(value);
+        Lists.SetGame(value);
         InvalidateHomeTab();
 
         // Keep the ComboBox selection in sync when SelectedGame changes programmatically

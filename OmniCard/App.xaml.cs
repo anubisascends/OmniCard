@@ -36,6 +36,7 @@ using OmniCard.Views.StorageManager;
 using OmniCard.Views.EbayListing;
 using OmniCard.Views.ManualAdd;
 using OmniCard.Views.DecklistCheck;
+using OmniCard.Views.Lists;
 
 namespace OmniCard;
 
@@ -165,6 +166,10 @@ public partial class App : Application
             // Decklist check
             services.AddSingleton<IDecklistService, DecklistService>();
             services.AddSingleton<IDecklistPdfExporter, DecklistPdfExporter>();
+
+            // Lists
+            services.AddSingleton<IListService, ListService>();
+            services.AddSingleton<ListsViewModel>();
 
             // Receipt export
             services.AddSingleton<IReceiptPdfExporter, ReceiptPdfExporter>();
