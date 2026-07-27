@@ -481,9 +481,27 @@ public sealed partial class RootViewModel(
     // Game selection
     public IReadOnlyList<CardGame> AvailableGames => CardService.AvailableGames;
 
-    /// <summary>ComboBox source: null (All Games) followed by each supported game.</summary>
-    public IReadOnlyList<CardGame?> AvailableGameOptions =>
-        new CardGame?[] { null }.Concat(CardService.AvailableGames.Select(g => (CardGame?)g)).ToList();
+    /// <summary>ComboBox source: an "All Games" sentinel (Game == null) followed by each supported
+    /// game. Cached so the bound <see cref="SelectedGameOption"/> holds the same instances the
+    /// ComboBox lists.</summary>
+    private List<GameOption>? _gameOptions;
+    public IReadOnlyList<GameOption> AvailableGameOptions =>
+        _gameOptions ??= new[] { new GameOption { Game = null } }
+            .Concat(CardService.AvailableGames.Select(g => new GameOption { Game = g }))
+            .ToList();
+
+    private GameOption OptionFor(CardGame? game) =>
+        AvailableGameOptions.First(o => o.Game == game);
+
+    /// <summary>The ComboBox-bound selection. Mirrors <see cref="SelectedGame"/> through a non-null
+    /// wrapper so the "All Games" (null) choice can actually hold selection in the WPF Selector.</summary>
+    [ObservableProperty]
+    public partial GameOption? SelectedGameOption { get; set; }
+
+    partial void OnSelectedGameOptionChanged(GameOption? value)
+    {
+        SelectedGame = value?.Game;
+    }
 
     [ObservableProperty]
     public partial CardGame? SelectedGame { get; set; }
@@ -515,6 +533,7 @@ public sealed partial class RootViewModel(
 
             _suppressGameChangeHandler = true;
             SelectedGame = _previousGame;
+            SelectedGameOption = OptionFor(_previousGame);   // snap the ComboBox back too
             _suppressGameChangeHandler = false;
             return;
         }
@@ -540,6 +559,11 @@ public sealed partial class RootViewModel(
         OnPropertyChanged(nameof(IsScannerEnabled));
         Collection.SetGame(value);
         InvalidateHomeTab();
+
+        // Keep the ComboBox selection in sync when SelectedGame changes programmatically
+        // (Initialize, dashboard tile drill-in, guard revert). No-op when the change
+        // originated from the ComboBox itself.
+        SelectedGameOption = OptionFor(value);
     }
 
     // Set filter — comma-separated set codes
