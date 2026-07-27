@@ -140,6 +140,8 @@
                 <MenuItem Header="_Import..."
                           Command="{Binding ViewModel.ImportCollectionCommand}"
                           InputGestureText="Ctrl+I"/>
+                <MenuItem Header="Import _Decklist File..."
+                          Command="{Binding ViewModel.ImportDecklistFileCommand}"/>
                 <Separator />
                 <MenuItem Header="Clear Scan _Cache"
                           Command="{Binding ViewModel.ClearScanCacheCommand}"/>

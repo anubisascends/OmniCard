@@ -2266,6 +2266,38 @@ public sealed partial class RootViewModel(
         }
     }
 
+    [RelayCommand]
+    public void ImportDecklistFile()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "Decklist files (*.txt)|*.txt|All files (*.*)|*.*",
+            Title = "Import Decklist File",
+        };
+        if (dialog.ShowDialog() != true)
+            return;
+
+        try
+        {
+            var text = System.IO.File.ReadAllText(dialog.FileName);
+            var summary = dialogService.ShowDecklistImport(
+                System.IO.Path.GetFileName(dialog.FileName), text, Collection.CurrentLocationId);
+            if (summary is not null)
+            {
+                Message = summary.Unresolved > 0
+                    ? $"Imported {summary.Added} cards to {summary.TargetName}. {summary.Unresolved} unresolved."
+                    : $"Imported {summary.Added} cards to {summary.TargetName}.";
+                _ = Collection.SearchCollection();
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to import decklist file");
+            System.Windows.MessageBox.Show($"Failed to import: {ex.Message}", "Import Error",
+                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+        }
+    }
+
     private List<CollectionCard> GetAllCollectionCards()
     {
         var results = new System.Collections.ObjectModel.ObservableCollection<CollectionCard>();
