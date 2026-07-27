@@ -17,9 +17,6 @@ public sealed partial class DecklistCheckViewModel(
     public partial string FallbackText { get; set; } = "";
 
     [ObservableProperty]
-    public partial bool ShowFallback { get; set; }
-
-    [ObservableProperty]
     public partial string StatusMessage { get; set; } = "";
 
     [ObservableProperty]
@@ -65,7 +62,6 @@ public sealed partial class DecklistCheckViewModel(
 
             if (fetched is null)
             {
-                ShowFallback = true;
                 StatusMessage = "Couldn't reach the site. Paste your decklist below instead.";
                 logger.LogWarning("Failed to fetch decklist from {Url}", Url);
                 return;
@@ -83,7 +79,6 @@ public sealed partial class DecklistCheckViewModel(
         }
         catch (Exception ex)
         {
-            ShowFallback = true;
             StatusMessage = "Couldn't reach the site. Paste your decklist below instead.";
             logger.LogWarning(ex, "Error fetching decklist from {Url}", Url);
         }
