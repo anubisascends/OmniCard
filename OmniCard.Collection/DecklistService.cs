@@ -238,7 +238,7 @@ public sealed partial class DecklistService(
 
             // Look up card details from Scryfall DB for type/image/detail info
             var gameService = cardService.GetGameService(game);
-            var searchResults = gameService.SearchCards($"name:{entry.CardName}");
+            var searchResults = gameService.GetPrintings(entry.CardName);
             CardMatch? cardInfo = null;
             if (searchResults.Count > 0)
             {

@@ -154,7 +154,7 @@ public class ListService(
                 ctx.CardListItems.Add(newItem);
                 pendingByGameCardId[printing.GameSpecificId] = newItem;
             }
-            added++;
+            added += entry.Quantity;
         }
 
         ctx.SaveChanges();

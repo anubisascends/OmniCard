@@ -192,12 +192,13 @@ public class ListServiceTests : IDisposable
         var svc = CreateService(cards);
         var list = svc.CreateList("L", CardGame.Mtg);
 
-        svc.AddCardsByName(list.Id, new[]
+        var result = svc.AddCardsByName(list.Id, new[]
         {
             new DecklistEntry(3, "Island", null, null),
             new DecklistEntry(2, "Island", null, null),
         });
 
+        Assert.Equal(5, result.AddedCount);         // counts copies, not lines
         var item = Assert.Single(svc.GetItems(list.Id));
         Assert.Equal(5, item.Quantity);
     }
