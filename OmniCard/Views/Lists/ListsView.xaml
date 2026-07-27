@@ -7,6 +7,31 @@
              mc:Ignorable="d"
              d:DesignHeight="600" d:DesignWidth="900"
              TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
+    <UserControl.Resources>
+        <!-- Strip the default ListBoxItem chrome (which recolors selected text near-black on the
+             dark theme) and show a primary outline when selected; no text recolor. -->
+        <Style x:Key="ListItemContainerStyle" TargetType="ListBoxItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="wrap" CornerRadius="4" BorderThickness="2" BorderBrush="Transparent">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="wrap" Property="BorderBrush"
+                                        Value="{DynamicResource MaterialDesign.Brush.Primary}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
     <Grid Margin="12">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="240"/>
@@ -24,8 +49,15 @@
             <Button DockPanel.Dock="Bottom" Content="Delete List" Margin="0,8,0,0"
                     Command="{Binding DeleteListCommand}"/>
             <ListBox ItemsSource="{Binding Lists}" SelectedItem="{Binding SelectedList}"
-                     DisplayMemberPath="Name"
-                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                     ItemContainerStyle="{StaticResource ListItemContainerStyle}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Name}"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
         </DockPanel>
 
         <!-- Right: selected list -->
@@ -49,7 +81,8 @@
                 </DockPanel>
                 <ListBox ItemsSource="{Binding SearchResults}" SelectedItem="{Binding SelectedSearchResult}"
                          MaxHeight="120"
-                         Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
+                         Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                         ItemContainerStyle="{StaticResource ListItemContainerStyle}">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
