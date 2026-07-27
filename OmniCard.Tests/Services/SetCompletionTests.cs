@@ -7,8 +7,169 @@ using OmniCard.Data;
 using OmniCard.Imaging;
 using OmniCard.Models;
 using OmniCard.CardMatching;
+using OmniCard.Collection;
+using OmniCard.Interfaces;
 
 namespace OmniCard.Tests.Services;
+
+public class CardServiceAllGamesSetCompletionTests : IDisposable
+{
+    private readonly SqliteConnection _omniConnection;
+    private readonly DbContextOptions<OmniCardDbContext> _omniOptions;
+
+    public CardServiceAllGamesSetCompletionTests()
+    {
+        _omniConnection = new SqliteConnection("Data Source=:memory:");
+        _omniConnection.Open();
+        _omniOptions = new DbContextOptionsBuilder<OmniCardDbContext>()
+            .UseSqlite(_omniConnection)
+            .Options;
+        using var omniCtx = new OmniCardDbContext(_omniOptions);
+        omniCtx.Database.EnsureCreated();
+    }
+
+    public void Dispose() => _omniConnection.Dispose();
+
+    [Fact]
+    public async Task CalculateSetCompletionAsync_NullGame_AggregatesAllGames()
+    {
+        var mtgService = new StubGameService(CardGame.Mtg, new SetCompletionSummary
+        {
+            SetCode = "seta",
+            SetName = "Set A",
+            Game = CardGame.Mtg,
+            OwnedCount = 1,
+            TotalCount = 3,
+        });
+        var onePieceService = new StubGameService(CardGame.OnePiece, new SetCompletionSummary
+        {
+            SetCode = "OP01",
+            SetName = "Romance Dawn",
+            Game = CardGame.OnePiece,
+            OwnedCount = 2,
+            TotalCount = 5,
+        });
+
+        var service = new CardService(
+            new StubHashService(),
+            [mtgService, onePieceService],
+            new MockOmniDbContextFactory(_omniOptions),
+            new StubOcrService(),
+            new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
+            NullLogger<CardService>.Instance,
+            new DataPathService(Path.GetTempPath()),
+            new NullScanDiagnosticService(),
+            new NullAuditService());
+
+        var all = await service.CalculateSetCompletionAsync((CardGame?)null);
+
+        Assert.Contains(all, s => s.Game == CardGame.Mtg && s.SetCode == "seta");
+        Assert.Contains(all, s => s.Game == CardGame.OnePiece && s.SetCode == "OP01");
+        Assert.Equal(1, mtgService.CallCount);
+        Assert.Equal(1, onePieceService.CallCount);
+    }
+
+    [Fact]
+    public void GetCurrentPrices_RoutesToGameService()
+    {
+        var mtgService = new StubGameService(CardGame.Mtg, new SetCompletionSummary { SetCode = "seta", Game = CardGame.Mtg });
+        var service = new CardService(
+            new StubHashService(),
+            [mtgService],
+            new MockOmniDbContextFactory(_omniOptions),
+            new StubOcrService(),
+            new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
+            NullLogger<CardService>.Instance,
+            new DataPathService(Path.GetTempPath()),
+            new NullScanDiagnosticService(),
+            new NullAuditService());
+
+        var prices = service.GetCurrentPrices(CardGame.Mtg, ["id1", "id2"], foil: true);
+
+        Assert.Equal(2, prices.Count);
+        Assert.Equal(1.23m, prices["id1"]);
+        Assert.True(mtgService.LastGetCurrentPricesFoil);
+    }
+
+    private class StubGameService(CardGame game, SetCompletionSummary summary) : ICardGameService
+    {
+        public int CallCount { get; private set; }
+        public bool LastGetCurrentPricesFoil { get; private set; }
+
+        public CardGame Game => game;
+        public MatchDiagnostics? LastMatchDiagnostics => null;
+        public Task DownloadBulkDataAsync(IProgress<string>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
+        public Task UpdatePricesAsync(IProgress<PriceUpdateProgress>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
+        public Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
+        public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14, ulong? scanEdgeHash = null) => null;
+        public List<CardMatch> SearchCards(string query, int maxResults = 20) => [];
+        public List<CardMatch> GetPrintings(string cardName) => [];
+        public decimal? GetCurrentPrice(string gameCardId, bool isFoil) => null;
+        public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil)
+        {
+            LastGetCurrentPricesFoil = isFoil;
+            var i = 0;
+            var result = new Dictionary<string, decimal>();
+            foreach (var id in gameCardIds)
+                result[id] = 1.23m + i++;
+            return result;
+        }
+        public void RecordCorrection(ulong scanHash, string correctCardId, ulong? artScanHash = null) { }
+        public IReadOnlyList<SetInfo> GetAvailableSets() => [];
+        public Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null)
+        {
+            CallCount++;
+            return Task.FromResult(new List<SetCompletionSummary> { summary });
+        }
+        public List<MissingCard> GetMissingCards(string setCode, IEnumerable<string> ownedCollectorNumbers) => [];
+        public object? FindCardById(string gameCardId) => null;
+    }
+
+    private class StubHashService : IPerceptualHashService
+    {
+        public ulong ComputeHash(Stream imageStream, Action<HashStageResult>? onStage = null) => 0;
+        public ulong ComputeEdgeHash(Stream imageStream, Action<HashStageResult>? onStage = null) => 0;
+        public ulong[] ComputeArtHash(Stream imageStream, (double X, double Y, double W, double H)[] cropRegions, Action<HashStageResult>? onStage = null) => new ulong[cropRegions.Length];
+    }
+
+    private class StubOcrService : IOcrMatchingService
+    {
+        public Dictionary<string, ulong> SymbolHashes { get; set; } = [];
+        public Task<OcrMatchResult> AnalyzeCardAsync(byte[] imageData) => Task.FromResult(new OcrMatchResult());
+        public (List<string> SetCodes, double Confidence) DetectSetSymbol(byte[] imageData) => ([], 0);
+        public Task<(string? CollectorNumber, double Confidence)> DetectOptcgCollectorNumberAsync(byte[] imageData) => Task.FromResult<(string?, double)>((null, 0));
+        public Task<(string? CollectorNumber, double Confidence)> DetectRiftboundCollectorNumberAsync(byte[] imageData) => Task.FromResult<(string?, double)>((null, 0));
+        public Task<(string? CollectorNumber, double Confidence)> DetectCollectorNumberAsync(byte[] imageData, OcrCollectorSpec spec) => Task.FromResult<(string?, double)>((null, 0));
+    }
+
+    private class NullScanDiagnosticService : IScanDiagnosticService
+    {
+        public void LogScanCompleted(string sessionId, ulong scanHash, CardMatch? match, MatchDiagnostics? diagnostics, ulong[]? artHashes, OcrMatchResult? ocrResult, FlagReason autoFlagReason) { }
+        public void LogUserFlagged(ulong scanHash, ScannedCard card) { }
+        public void LogUserConfirmed(ulong scanHash, ScannedCard card) { }
+        public void LogUserCorrected(ulong scanHash, ScannedCard card, CardMatch newMatch) { }
+        public void LogUserUnflagged(ulong scanHash, ScannedCard card, FlagReason previousReason) { }
+        public void ExportDiagnostics(string filePath) { }
+        public void ClearDiagnostics() { }
+        public int GetEventCount() => 0;
+    }
+
+    private class MockOmniDbContextFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
+    {
+        public OmniCardDbContext CreateDbContext() => new(options);
+    }
+
+    private class NullAuditService : IAuditService
+    {
+        public bool IsAuditActive => false;
+        public int? AuditLocationId => null;
+        public string? AuditLocationName => null;
+        public void StartAudit(int containerId) { }
+        public void EndAudit() { }
+        public CardMatch? FindScopedMatch(ulong hash, ulong[]? artHashes) => null;
+        public AuditReport GenerateReport(IEnumerable<ScannedCard> scannedCards) => throw new NotImplementedException();
+    }
+}
 
 public class ScryfallSetCompletionTests : IDisposable
 {

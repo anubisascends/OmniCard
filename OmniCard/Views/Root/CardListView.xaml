@@ -71,7 +71,14 @@
                         CornerRadius="6">
                     <!-- Full card details on hover (the tile itself trims to fit). -->
                     <Border.ToolTip>
-                        <ToolTip MaxWidth="340">
+                        <!-- ToolTips render in their own popup outside the themed window, so the
+                             default (light) tooltip background blends with the theme's light
+                             foreground text. Pin a themed dark surface + border for contrast. -->
+                        <ToolTip MaxWidth="340"
+                                 Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                                 Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                                 BorderBrush="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"
+                                 BorderThickness="1">
                             <StackPanel>
                                 <TextBlock Text="{Binding Name}"
                                            FontWeight="Bold"

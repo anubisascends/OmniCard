@@ -150,6 +150,7 @@ public class CardGameDisplayConverter : MarkupExtension, IValueConverter
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => value switch
         {
+            null => "All Games",
             CardGame.Mtg => "Magic: The Gathering",
             CardGame.OnePiece => "One Piece TCG",
             CardGame.Riftbound => "Riftbound",

@@ -189,6 +189,38 @@ public sealed partial class CollectionViewModel : ViewModel
         LoadCardList();
     }
 
+    /// <summary>Enter card-tile mode filtered to a single set of a single game (dashboard drill-in).</summary>
+    public void BrowseSet(CardGame game, string setCode)
+    {
+        // Filter to the tile's own game regardless of the global selector.
+        _allGames = false;
+        _selectedGame = game;
+        LoadPresets();
+
+        CurrentLocationId = null;
+        CurrentLocationName = "Entire Collection";
+        ShowAllCards = true;
+
+        // ResetSearchState clears SelectedSortPreset/SelectedFilterPreset to null; suppress
+        // persistence so the change handlers don't overwrite the drilled-into game's saved
+        // active preset (LoadPresets above already applied the real active preset for display).
+        _suppressPresetPersistence = true;
+        try
+        {
+            ResetSearchState();  // clears CollectionSearchQuery — set the query AFTER this
+        }
+        finally
+        {
+            _suppressPresetPersistence = false;
+        }
+        ShowCardList = true;
+
+        OnPropertyChanged(nameof(ColumnVisibility));
+
+        CollectionSearchQuery = $"set:{setCode}";
+        _ = SearchCollection();
+    }
+
     [RelayCommand]
     public void NavigateBack()
     {
@@ -263,7 +295,7 @@ public sealed partial class CollectionViewModel : ViewModel
     {
         var generation = ++_overviewGeneration;
 
-        var overviews = await _collectionQueryService.GetLocationOverviewsAsync(_selectedGame);
+        var overviews = await _collectionQueryService.GetLocationOverviewsAsync(GameFilter);
 
         // A newer overview load started while we awaited (e.g. the startup load racing the
         // initial SetGame, or a rapid game switch)? Drop this stale result. Clearing only
@@ -330,7 +362,7 @@ public sealed partial class CollectionViewModel : ViewModel
     /// </summary>
     public readonly record struct SearchParameters(
         string Query,
-        CardGame Game,
+        CardGame? Game,
         int? ContainerFilter,
         SortPreset? SortPreset,
         FilterPreset? FilterPreset,
@@ -429,7 +461,7 @@ public sealed partial class CollectionViewModel : ViewModel
             else
             {
                 _matchingContainerIds = await Task.Run(() =>
-                    _cardService.GetMatchingContainerIds(overviewQuery, _selectedGame));
+                    _cardService.GetMatchingContainerIds(overviewQuery, GameFilter));
             }
             OnPropertyChanged(nameof(GroupedLocations));
             OnPropertyChanged(nameof(IsBulkVisible));
@@ -448,7 +480,7 @@ public sealed partial class CollectionViewModel : ViewModel
 
         // Capture filter values for background thread and for LoadMore
         var query = CollectionSearchQuery;
-        var game = _selectedGame;
+        var game = GameFilter;
         var filterPreset = SelectedFilterPreset;
         var stacked = IsStacked;
 
@@ -657,10 +689,13 @@ public sealed partial class CollectionViewModel : ViewModel
     {
         IsAdHocSortActive = false;
         _adHocSortLevels.Clear();
-        if (value is not null)
-            _presetService.SetActiveSortPreset(_selectedGame, value.Name);
-        else
-            _presetService.SetActiveSortPreset(_selectedGame, null);
+        if (!_suppressPresetPersistence)
+        {
+            if (value is not null)
+                _presetService.SetActiveSortPreset(_selectedGame, value.Name);
+            else
+                _presetService.SetActiveSortPreset(_selectedGame, null);
+        }
         if (ShowCardList) _ = SearchCollectionCore(forceRefresh: false);
     }
 
@@ -672,10 +707,13 @@ public sealed partial class CollectionViewModel : ViewModel
 
     partial void OnSelectedFilterPresetChanged(FilterPreset? value)
     {
-        if (value is not null)
-            _presetService.SetActiveFilterPreset(_selectedGame, value.Name);
-        else
-            _presetService.SetActiveFilterPreset(_selectedGame, null);
+        if (!_suppressPresetPersistence)
+        {
+            if (value is not null)
+                _presetService.SetActiveFilterPreset(_selectedGame, value.Name);
+            else
+                _presetService.SetActiveFilterPreset(_selectedGame, null);
+        }
         if (ShowCardList) _ = SearchCollectionCore(forceRefresh: false);
     }
 
@@ -875,12 +913,42 @@ public sealed partial class CollectionViewModel : ViewModel
 
     // --- Game context (set by RootViewModel when game changes) ---
 
-    private CardGame _selectedGame;
+    private CardGame _selectedGame;   // last concrete game (for per-game presets/sort)
+    private bool _allGames;           // true when "All Games" is selected
 
-    public void SetGame(CardGame game)
+    // Set while clearing preset selections for the All-Games view so the change-handlers
+    // don't persist the null back onto the previous game's saved active preset.
+    private bool _suppressPresetPersistence;
+
+    /// <summary>Game filter passed to the card service: null = All Games (no filter).</summary>
+    private CardGame? GameFilter => _allGames ? null : _selectedGame;
+
+    public void SetGame(CardGame? game)
     {
-        _selectedGame = game;
-        LoadPresets();
+        _allGames = game is null;
+        if (game is not null)
+        {
+            _selectedGame = game.Value;
+            LoadPresets();
+        }
+        else
+        {
+            // All Games: sort/filter presets are per-game — clear the dropdowns and the
+            // selection for display, but suppress persistence so we don't wipe the
+            // previous game's saved active preset (_selectedGame still points at it).
+            AvailableSortPresets.Clear();
+            AvailableFilterPresets.Clear();
+            _suppressPresetPersistence = true;
+            try
+            {
+                SelectedSortPreset = null;
+                SelectedFilterPreset = null;
+            }
+            finally
+            {
+                _suppressPresetPersistence = false;
+            }
+        }
 
         // Reflect the new game in whichever view is showing. Every other data-changing
         // operation refreshes this way; without it a game switch left stale cards/tiles.

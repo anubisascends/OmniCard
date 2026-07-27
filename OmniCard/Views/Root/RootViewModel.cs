@@ -53,7 +53,7 @@ public sealed partial class RootViewModel(
     private NotifyCollectionChangedEventHandler? _scannedCardsHandler;
     private System.Windows.Threading.DispatcherTimer? _ebaySyncTimer;
     private bool _suppressGameChangeHandler;
-    private CardGame _previousGame;
+    private CardGame? _previousGame;
 
     public PriceUpdateService PriceUpdates => priceUpdateService;
 
@@ -481,15 +481,40 @@ public sealed partial class RootViewModel(
     // Game selection
     public IReadOnlyList<CardGame> AvailableGames => CardService.AvailableGames;
 
-    [ObservableProperty]
-    public partial CardGame SelectedGame { get; set; }
+    /// <summary>ComboBox source: an "All Games" sentinel (Game == null) followed by each supported
+    /// game. Cached so the bound <see cref="SelectedGameOption"/> holds the same instances the
+    /// ComboBox lists.</summary>
+    private List<GameOption>? _gameOptions;
+    public IReadOnlyList<GameOption> AvailableGameOptions =>
+        _gameOptions ??= new[] { new GameOption { Game = null } }
+            .Concat(CardService.AvailableGames.Select(g => new GameOption { Game = g }))
+            .ToList();
 
-    partial void OnSelectedGameChanging(CardGame value)
+    private GameOption OptionFor(CardGame? game) =>
+        AvailableGameOptions.First(o => o.Game == game);
+
+    /// <summary>The ComboBox-bound selection. Mirrors <see cref="SelectedGame"/> through a non-null
+    /// wrapper so the "All Games" (null) choice can actually hold selection in the WPF Selector.</summary>
+    [ObservableProperty]
+    public partial GameOption? SelectedGameOption { get; set; }
+
+    partial void OnSelectedGameOptionChanged(GameOption? value)
+    {
+        SelectedGame = value?.Game;
+    }
+
+    [ObservableProperty]
+    public partial CardGame? SelectedGame { get; set; }
+
+    /// <summary>Scanner is single-game; disabled while "All Games" is active.</summary>
+    public bool IsScannerEnabled => SelectedGame.HasValue;
+
+    partial void OnSelectedGameChanging(CardGame? value)
     {
         _previousGame = SelectedGame;
     }
 
-    partial void OnSelectedGameChanged(CardGame value)
+    partial void OnSelectedGameChanged(CardGame? value)
     {
         if (_suppressGameChangeHandler)
             return;
@@ -506,18 +531,42 @@ public sealed partial class RootViewModel(
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
 
+            // Capture the target first: assigning SelectedGame below re-enters
+            // OnSelectedGameChanging, which overwrites _previousGame with the rejected value.
+            var revertTo = _previousGame;
             _suppressGameChangeHandler = true;
-            SelectedGame = _previousGame;
+            SelectedGame = revertTo;
+            SelectedGameOption = OptionFor(revertTo);   // snap the ComboBox back too
             _suppressGameChangeHandler = false;
             return;
         }
 
-        _logger.LogInformation("Switched active game to {Game}", value);
-        CardService.SelectedGame = value;
-        SetFilterText = "";
-        LoadAvailableSets();
+        if (value.HasValue)
+        {
+            _logger.LogInformation("Switched active game to {Game}", value.Value);
+            CardService.SelectedGame = value.Value;   // scanner routing stays concrete
+            SetFilterText = "";
+            LoadAvailableSets();
+        }
+        else
+        {
+            _logger.LogInformation("Switched to All Games (scanner disabled)");
+            SetFilterText = "";
+            _allSets = [];
+            UpdateSetFilter();
+            // If the scanner tab is active, move off it (it is about to be disabled).
+            if (SelectedTabIndex == 2)
+                SelectedTabIndex = 0;
+        }
+
+        OnPropertyChanged(nameof(IsScannerEnabled));
         Collection.SetGame(value);
         InvalidateHomeTab();
+
+        // Keep the ComboBox selection in sync when SelectedGame changes programmatically
+        // (Initialize, dashboard tile drill-in, guard revert). No-op when the change
+        // originated from the ComboBox itself.
+        SelectedGameOption = OptionFor(value);
     }
 
     // Set filter — comma-separated set codes
@@ -1143,10 +1192,24 @@ public sealed partial class RootViewModel(
     [ObservableProperty]
     public partial SetCompletionSummary? SelectedSetCompletion { get; set; }
 
+    private bool _suppressSetSelection;
+
     partial void OnSelectedSetCompletionChanged(SetCompletionSummary? value)
     {
-        if (value is not null)
-            _ = ExpandSetCompletionCommand.ExecuteAsync(value);
+        if (_suppressSetSelection || value is null)
+            return;
+
+        // Drill into the collection: show this set's owned cards (of its game) as tiles.
+        // Sync the global selector to the tile's game so it doesn't desync from the
+        // collection view (matters under All Games, where the selector is null).
+        SelectedGame = value.Game;
+        Collection.BrowseSet(value.Game, value.SetCode);
+        SelectedTabIndex = 1; // Collection tab
+
+        // Reset selection so re-clicking the same tile after returning re-triggers navigation.
+        _suppressSetSelection = true;
+        SelectedSetCompletion = null;
+        _suppressSetSelection = false;
     }
 
     [ObservableProperty]
@@ -1344,11 +1407,11 @@ public sealed partial class RootViewModel(
     [RelayCommand]
     public async Task RefreshCardData()
     {
-        _logger.LogInformation("User initiated card data refresh for {Game}", SelectedGame);
+        _logger.LogInformation("User initiated card data refresh for {Game}", CardService.SelectedGame);
 
-        if (RefreshCooldownHelper.IsCooldownActive(dataPathService.DataDirectory, SelectedGame, out var nextAvailable))
+        if (RefreshCooldownHelper.IsCooldownActive(dataPathService.DataDirectory, CardService.SelectedGame, out var nextAvailable))
         {
-            var lastRefresh = RefreshCooldownHelper.GetLastRefresh(dataPathService.DataDirectory, SelectedGame);
+            var lastRefresh = RefreshCooldownHelper.GetLastRefresh(dataPathService.DataDirectory, CardService.SelectedGame);
             var timeAgo = DateTime.UtcNow - lastRefresh.GetValueOrDefault(DateTime.UtcNow);
             var timeAgoText = timeAgo.TotalHours >= 1
                 ? $"{(int)timeAgo.TotalHours}h {timeAgo.Minutes}m ago"
@@ -1359,7 +1422,7 @@ public sealed partial class RootViewModel(
             _logger.LogInformation("Refresh cooldown active for {Game}, last refresh {TimeAgo}", SelectedGame, timeAgoText);
 
             var result = MessageBox.Show(
-                $"Card data for {SelectedGame} was last refreshed {timeAgoText}.\n\n" +
+                $"Card data for {CardService.SelectedGame} was last refreshed {timeAgoText}.\n\n" +
                 $"Refresh is available once every 24 hours to minimize API load.\n" +
                 $"Next refresh available at {nextAvailable.ToLocalTime():g}.\n\n" +
                 "Click Yes to refresh anyway, or No to cancel.",
@@ -1382,10 +1445,10 @@ public sealed partial class RootViewModel(
         });
 
         await CardService.ActiveGameService.DownloadBulkDataAsync(progress);
-        RefreshCooldownHelper.RecordRefresh(dataPathService.DataDirectory, SelectedGame);
+        RefreshCooldownHelper.RecordRefresh(dataPathService.DataDirectory, CardService.SelectedGame);
         LoadAvailableSets();
 
-        if (SelectedGame == CardGame.Mtg)
+        if (CardService.SelectedGame == CardGame.Mtg)
         {
             var sets = _allSets.Select(s => (s.SetCode, s.SetName)).ToList();
             await setSymbolCache.PreloadSymbolsAsync(sets, progress);
@@ -1755,6 +1818,16 @@ public sealed partial class RootViewModel(
     public void StartAudit(int containerId)
     {
         if (IsAuditMode) return;
+
+        if (!SelectedGame.HasValue)
+        {
+            MessageBox.Show(
+                "Select a specific game before starting an audit.",
+                "Audit Blocked",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
 
         // Clear any existing scans
         CardService.ScannedCards.Clear();
@@ -2260,15 +2333,14 @@ public sealed partial class RootViewModel(
 
             // Calculate total value: use purchase price if set, otherwise look up market price
             decimal totalValue = 0;
-            var gameService = CardService.ActiveGameService;
             var cardsNeedingPrice = allCards.Where(c => !c.PurchasePrice.HasValue).ToList();
-            var batchPrices = new Dictionary<(string, bool), decimal>();
-            foreach (var foilGroup in cardsNeedingPrice.GroupBy(c => c.IsFoil))
+            var batchPrices = new Dictionary<(string GameCardId, bool Foil), decimal>();
+            foreach (var grp in cardsNeedingPrice.GroupBy(c => (c.Game, c.IsFoil)))
             {
-                var prices = gameService.GetCurrentPrices(
-                    foilGroup.Select(c => c.GameCardId).Distinct(), foilGroup.Key);
+                var prices = CardService.GetCurrentPrices(
+                    grp.Key.Game, grp.Select(c => c.GameCardId).Distinct(), grp.Key.IsFoil);
                 foreach (var kvp in prices)
-                    batchPrices.TryAdd((kvp.Key, foilGroup.Key), kvp.Value);
+                    batchPrices.TryAdd((kvp.Key, grp.Key.IsFoil), kvp.Value);
             }
             foreach (var card in allCards)
             {
@@ -2327,7 +2399,7 @@ public sealed partial class RootViewModel(
         try
         {
             var missing = await Task.Run(() =>
-                CardService.GetMissingCardsForSet(SelectedGame, summary.SetCode));
+                CardService.GetMissingCardsForSet(summary.Game, summary.SetCode));
             summary.MissingCards = new(missing);
         }
         catch (Exception ex)

@@ -29,7 +29,7 @@ public class CollectionViewModelTests
         _query.Setup(q => q.GetLocationOverviewsAsync(It.IsAny<CardGame?>()))
               .ReturnsAsync([]);
         // Card-list search path with an empty result set: count 0, no rows added, empty status map.
-        _card.Setup(c => c.GetSearchCount(It.IsAny<string>(), It.IsAny<CardGame>(), It.IsAny<int?>(),
+        _card.Setup(c => c.GetSearchCount(It.IsAny<string>(), It.IsAny<CardGame?>(), It.IsAny<int?>(),
                                           It.IsAny<FilterPreset?>(), It.IsAny<bool>()))
              .Returns(0);
         _listing.Setup(l => l.GetActiveListingStatusByLot(It.IsAny<IEnumerable<int>>()))
@@ -84,5 +84,100 @@ public class CollectionViewModelTests
             It.IsAny<string>(), CardGame.OnePiece, It.IsAny<int?>(),
             It.IsAny<SortPreset?>(), It.IsAny<FilterPreset?>(), It.IsAny<bool>(),
             0, It.IsAny<int>(), It.IsAny<ObservableCollection<CollectionCard>>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetGame_AllGames_SearchesWithNullGameFilter()
+    {
+        var vm = CreateVm();
+        vm.ShowCardList = true;
+
+        var searched = new TaskCompletionSource();
+        _card.Setup(c => c.SearchCollection(
+                It.IsAny<string>(), It.IsAny<CardGame?>(), It.IsAny<int?>(),
+                It.IsAny<SortPreset?>(), It.IsAny<FilterPreset?>(), It.IsAny<bool>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<ObservableCollection<CollectionCard>>()))
+             .Callback(() => searched.TrySetResult());
+        _card.Invocations.Clear();
+
+        vm.SetGame(null); // All Games
+        await searched.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        _card.Verify(c => c.SearchCollection(
+            It.IsAny<string>(), (CardGame?)null, It.IsAny<int?>(),
+            It.IsAny<SortPreset?>(), It.IsAny<FilterPreset?>(), It.IsAny<bool>(),
+            0, It.IsAny<int>(), It.IsAny<ObservableCollection<CollectionCard>>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task BrowseSet_FiltersToGameAndSet()
+    {
+        var vm = CreateVm();
+
+        var searched = new TaskCompletionSource();
+        _card.Setup(c => c.SearchCollection(
+                It.IsAny<string>(), It.IsAny<CardGame?>(), It.IsAny<int?>(),
+                It.IsAny<SortPreset?>(), It.IsAny<FilterPreset?>(), It.IsAny<bool>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<ObservableCollection<CollectionCard>>()))
+             .Callback(() => searched.TrySetResult());
+        _card.Invocations.Clear();
+
+        vm.BrowseSet(CardGame.OnePiece, "OP01");
+        await searched.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(vm.ShowCardList);
+        Assert.Equal("set:OP01", vm.CollectionSearchQuery);
+        _card.Verify(c => c.SearchCollection(
+            "set:OP01", CardGame.OnePiece, It.IsAny<int?>(),
+            It.IsAny<SortPreset?>(), It.IsAny<FilterPreset?>(), It.IsAny<bool>(),
+            0, It.IsAny<int>(), It.IsAny<ObservableCollection<CollectionCard>>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task BrowseSet_DoesNotWipeDrilledGamesActivePresets()
+    {
+        var sortPreset = new SortPreset { Name = "MySort", Game = CardGame.OnePiece, SortLevels = [] };
+        var filterPreset = new FilterPreset { Name = "MyFilter", Game = CardGame.OnePiece };
+        _presets.Setup(p => p.GetSortPresets(CardGame.OnePiece)).Returns([sortPreset]);
+        _presets.Setup(p => p.GetFilterPresets(CardGame.OnePiece)).Returns([filterPreset]);
+        _presets.Setup(p => p.GetActiveSortPreset(CardGame.OnePiece)).Returns(sortPreset);
+        _presets.Setup(p => p.GetActiveFilterPreset(CardGame.OnePiece)).Returns(filterPreset);
+
+        var vm = CreateVm();
+
+        var searched = new TaskCompletionSource();
+        _card.Setup(c => c.SearchCollection(
+                It.IsAny<string>(), It.IsAny<CardGame?>(), It.IsAny<int?>(),
+                It.IsAny<SortPreset?>(), It.IsAny<FilterPreset?>(), It.IsAny<bool>(),
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<ObservableCollection<CollectionCard>>()))
+             .Callback(() => searched.TrySetResult());
+        _presets.Invocations.Clear();
+
+        vm.BrowseSet(CardGame.OnePiece, "OP01");   // dashboard tile drill-in
+        await searched.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal("set:OP01", vm.CollectionSearchQuery);
+        _presets.Verify(p => p.SetActiveSortPreset(CardGame.OnePiece, null), Times.Never);
+        _presets.Verify(p => p.SetActiveFilterPreset(CardGame.OnePiece, null), Times.Never);
+    }
+
+    [Fact]
+    public void SetGame_ToAllGames_DoesNotWipePreviousGamesActivePresets()
+    {
+        var sortPreset = new SortPreset { Name = "MySort", Game = CardGame.OnePiece, SortLevels = [] };
+        var filterPreset = new FilterPreset { Name = "MyFilter", Game = CardGame.OnePiece };
+        _presets.Setup(p => p.GetSortPresets(CardGame.OnePiece)).Returns([sortPreset]);
+        _presets.Setup(p => p.GetFilterPresets(CardGame.OnePiece)).Returns([filterPreset]);
+        _presets.Setup(p => p.GetActiveSortPreset(CardGame.OnePiece)).Returns(sortPreset);
+        _presets.Setup(p => p.GetActiveFilterPreset(CardGame.OnePiece)).Returns(filterPreset);
+
+        var vm = CreateVm();
+        vm.SetGame(CardGame.OnePiece);   // concrete game with active sort + filter presets
+        _presets.Invocations.Clear();    // ignore the persistence from loading the concrete game
+
+        vm.SetGame(null);                // switch to All Games — must not persist a null over the saved presets
+
+        _presets.Verify(p => p.SetActiveSortPreset(It.IsAny<CardGame>(), null), Times.Never);
+        _presets.Verify(p => p.SetActiveFilterPreset(It.IsAny<CardGame>(), null), Times.Never);
     }
 }
