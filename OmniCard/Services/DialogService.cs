@@ -7,6 +7,7 @@ using OmniCard.Views.CollectionCardEditor;
 using OmniCard.Views.Connection;
 using OmniCard.Views.CoverArtPicker;
 using OmniCard.Views.CsvImport;
+using OmniCard.Views.DecklistImport;
 using OmniCard.Views.EbayAuth;
 using OmniCard.Views.SetFilterBuilder;
 using OmniCard.Views.SortFilterBuilder;
@@ -105,6 +106,15 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         wnd.ViewModel.LoadPreview(preview);
         var result = wnd.ShowDialog();
         return result == true ? wnd.ViewModel.ImportedCount : null;
+    }
+
+    public DecklistImportSummary? ShowDecklistImport(string sourceName, string fileText, int? defaultContainerId)
+    {
+        var wnd = Services.GetRequiredService<DecklistImportView>();
+        SetOwner(wnd);
+        wnd.ViewModel.Load(sourceName, fileText, defaultContainerId);
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.Result : null;
     }
 
     public bool OpenSortFilterBuilder(CardGame game)
