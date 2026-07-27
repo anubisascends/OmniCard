@@ -242,6 +242,36 @@ public static class UnifiedMigrationService
         cmd.ExecuteNonQuery();
 
         cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS CardLists (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL DEFAULT '',
+                Game TEXT NOT NULL DEFAULT 'Mtg',
+                CreatedUtc TEXT NOT NULL,
+                Notes TEXT
+            )
+            """;
+        cmd.ExecuteNonQuery();
+
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS CardListItems (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CardListId INTEGER NOT NULL,
+                Quantity INTEGER NOT NULL DEFAULT 1,
+                GameCardId TEXT NOT NULL DEFAULT '',
+                CardName TEXT NOT NULL DEFAULT '',
+                SetCode TEXT,
+                CollectorNumber TEXT,
+                IsFoil INTEGER NOT NULL DEFAULT 0,
+                AddedMarketPrice TEXT,
+                IsUnpriced INTEGER NOT NULL DEFAULT 0,
+                Source TEXT NOT NULL DEFAULT 'Manual'
+            )
+            """;
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_CardListItems_CardListId ON CardListItems(CardListId)";
+        cmd.ExecuteNonQuery();
+
+        cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS MismatchLogs (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ScanHash INTEGER NOT NULL,
