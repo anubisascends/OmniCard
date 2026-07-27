@@ -531,9 +531,12 @@ public sealed partial class RootViewModel(
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
 
+            // Capture the target first: assigning SelectedGame below re-enters
+            // OnSelectedGameChanging, which overwrites _previousGame with the rejected value.
+            var revertTo = _previousGame;
             _suppressGameChangeHandler = true;
-            SelectedGame = _previousGame;
-            SelectedGameOption = OptionFor(_previousGame);   // snap the ComboBox back too
+            SelectedGame = revertTo;
+            SelectedGameOption = OptionFor(revertTo);   // snap the ComboBox back too
             _suppressGameChangeHandler = false;
             return;
         }
