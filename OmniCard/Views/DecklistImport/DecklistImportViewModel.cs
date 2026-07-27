@@ -120,4 +120,45 @@ public sealed partial class DecklistImportViewModel(
 
     [RelayCommand]
     public void Cancel() => CloseDialog?.Invoke(false);
+
+    [RelayCommand]
+    public void Import()
+    {
+        var resolved = Rows.Where(r => r.IsResolved).ToList();
+        var addedQty = 0;
+        var unresolved = Rows.Count - resolved.Count;
+        var game = cardService.ActiveGameService.Game;
+        string targetName;
+
+        if (TargetIsList)
+        {
+            var listId = CreateNew
+                ? listService.CreateList(NewName.Trim(), game).Id
+                : SelectedList!.Id;
+            targetName = CreateNew ? NewName.Trim() : SelectedList!.Name;
+
+            foreach (var row in resolved)
+            {
+                listService.AddPrinting(listId, row.Match!, isFoil: false, row.Quantity, ListItemSource.File);
+                addedQty += row.Quantity;
+            }
+        }
+        else
+        {
+            var container = CreateNew
+                ? containerService.Create(NewName.Trim(), NewLocationType)
+                : SelectedLocation!;
+            targetName = container.Name;
+
+            foreach (var row in resolved)
+            {
+                cardService.AddCardToCollection(row.Match!, game, condition: "Near Mint", isFoil: false,
+                    purchasePrice: null, quantity: row.Quantity, container, page: null, slot: null, section: null);
+                addedQty += row.Quantity;
+            }
+        }
+
+        Result = new DecklistImportSummary(addedQty, unresolved, targetName);
+        CloseDialog?.Invoke(true);
+    }
 }
