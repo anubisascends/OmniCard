@@ -130,6 +130,131 @@ public class ListServiceTests : IDisposable
         Assert.Empty(svc.GetItems(list.Id));
     }
 
+    private static CardMatch Printing(string name, string id, string set, string cn = "1")
+        => new() { Name = name, GameSpecificId = id, SetCode = set, CollectorNumber = cn };
+
+    [Fact]
+    public void AddCardsByName_PicksCheapestNonFoilPrinting()
+    {
+        var cards = new FakeCardService();
+        cards.Game.Printings.Add(Printing("Sol Ring", "a", "C16"));
+        cards.Game.Printings.Add(Printing("Sol Ring", "b", "C21"));
+        cards.Game.Prices["a"] = 5.00m;
+        cards.Game.Prices["b"] = 1.50m;
+        var svc = CreateService(cards);
+        var list = svc.CreateList("L", CardGame.Mtg);
+
+        var result = svc.AddCardsByName(list.Id, new[] { new DecklistEntry(1, "Sol Ring", null, null) });
+
+        Assert.Equal(1, result.AddedCount);
+        Assert.Empty(result.UnresolvedNames);
+        var item = Assert.Single(svc.GetItems(list.Id));
+        Assert.Equal("b", item.GameCardId);        // cheapest
+        Assert.Equal(1.50m, item.AddedMarketPrice);
+        Assert.False(item.IsUnpriced);
+    }
+
+    [Fact]
+    public void AddCardsByName_NoPrice_FallsBackToFirst_AndFlagsUnpriced()
+    {
+        var cards = new FakeCardService();
+        cards.Game.Printings.Add(Printing("Rare Card", "a", "SET"));
+        var svc = CreateService(cards);
+        var list = svc.CreateList("L", CardGame.Mtg);
+
+        svc.AddCardsByName(list.Id, new[] { new DecklistEntry(1, "Rare Card", null, null) });
+
+        var item = Assert.Single(svc.GetItems(list.Id));
+        Assert.Equal("a", item.GameCardId);
+        Assert.Null(item.AddedMarketPrice);
+        Assert.True(item.IsUnpriced);
+    }
+
+    [Fact]
+    public void AddCardsByName_UnknownCard_ReportedUnresolved()
+    {
+        var svc = CreateService(new FakeCardService());
+        var list = svc.CreateList("L", CardGame.Mtg);
+
+        var result = svc.AddCardsByName(list.Id, new[] { new DecklistEntry(1, "Ghost", null, null) });
+
+        Assert.Equal(0, result.AddedCount);
+        Assert.Equal(new[] { "Ghost" }, result.UnresolvedNames);
+        Assert.Empty(svc.GetItems(list.Id));
+    }
+
+    [Fact]
+    public void AddCardsByName_MergesQuantityForSameResolvedPrinting()
+    {
+        var cards = new FakeCardService();
+        cards.Game.Printings.Add(Printing("Island", "isl", "SET"));
+        cards.Game.Prices["isl"] = 0.10m;
+        var svc = CreateService(cards);
+        var list = svc.CreateList("L", CardGame.Mtg);
+
+        svc.AddCardsByName(list.Id, new[]
+        {
+            new DecklistEntry(3, "Island", null, null),
+            new DecklistEntry(2, "Island", null, null),
+        });
+
+        var item = Assert.Single(svc.GetItems(list.Id));
+        Assert.Equal(5, item.Quantity);
+    }
+
+    [Fact]
+    public void ToDecklistEntries_ProjectsQuantityAndSet()
+    {
+        var cards = new FakeCardService();
+        cards.Game.Prices["x"] = 1m;
+        var svc = CreateService(cards);
+        var list = svc.CreateList("L", CardGame.Mtg);
+        svc.AddPrinting(list.Id, Printing("Sol Ring", "x", "C21", "1"), false, 2, ListItemSource.Manual);
+
+        var entries = svc.ToDecklistEntries(list.Id);
+
+        var e = Assert.Single(entries);
+        Assert.Equal(2, e.Quantity);
+        Assert.Equal("Sol Ring", e.CardName);
+        Assert.Equal("C21", e.SetCode);
+    }
+
+    [Fact]
+    public void RefreshPrices_Manual_UpdatesPriceKeepsPrinting()
+    {
+        var cards = new FakeCardService();
+        cards.Game.Prices["x"] = 1.00m;
+        var svc = CreateService(cards);
+        var list = svc.CreateList("L", CardGame.Mtg);
+        svc.AddPrinting(list.Id, Printing("Sol Ring", "x", "C21"), false, 1, ListItemSource.Manual);
+
+        cards.Game.Prices["x"] = 3.00m;
+        svc.RefreshPrices(list.Id);
+
+        var item = Assert.Single(svc.GetItems(list.Id));
+        Assert.Equal("x", item.GameCardId);           // printing unchanged
+        Assert.Equal(3.00m, item.AddedMarketPrice);
+    }
+
+    [Fact]
+    public void RefreshPrices_Paste_ReResolvesCheapest()
+    {
+        var cards = new FakeCardService();
+        cards.Game.Printings.Add(Printing("Sol Ring", "a", "C16"));
+        cards.Game.Printings.Add(Printing("Sol Ring", "b", "C21"));
+        cards.Game.Prices["a"] = 5m; cards.Game.Prices["b"] = 2m;
+        var svc = CreateService(cards);
+        var list = svc.CreateList("L", CardGame.Mtg);
+        svc.AddCardsByName(list.Id, new[] { new DecklistEntry(1, "Sol Ring", null, null) }); // picks "b" @2
+
+        cards.Game.Prices["a"] = 1m; // now "a" is cheapest
+        svc.RefreshPrices(list.Id);
+
+        var item = Assert.Single(svc.GetItems(list.Id));
+        Assert.Equal("a", item.GameCardId);
+        Assert.Equal(1m, item.AddedMarketPrice);
+    }
+
     private class FakeCardService : ICardService
     {
         public ObservableCollection<ScannedCard> ScannedCards { get; } = [];

@@ -109,9 +109,113 @@ public class ListService(
         ctx.SaveChanges();
     }
 
-    // ---- Task 3 implements these ----
     public AddCardsResult AddCardsByName(int listId, IEnumerable<DecklistEntry> entries)
-        => throw new NotImplementedException();
-    public void RefreshPrices(int listId) => throw new NotImplementedException();
-    public List<DecklistEntry> ToDecklistEntries(int listId) => throw new NotImplementedException();
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var list = ctx.CardLists.AsNoTracking().FirstOrDefault(l => l.Id == listId)
+                   ?? throw new InvalidOperationException($"List {listId} not found.");
+        var gs = cardService.GetGameService(list.Game);
+
+        var unresolved = new List<string>();
+        var added = 0;
+        // Tracks items added earlier in this same call: a plain query wouldn't see them
+        // until SaveChanges, so repeated names within one call would otherwise duplicate rows.
+        var pendingByGameCardId = new Dictionary<string, CardListItem>();
+
+        foreach (var entry in entries)
+        {
+            var resolved = ResolveCheapest(gs, entry.CardName);
+            if (resolved is null) { unresolved.Add(entry.CardName); continue; }
+            var (printing, price, unpriced) = resolved.Value;
+
+            var existing = pendingByGameCardId.TryGetValue(printing.GameSpecificId, out var pending)
+                ? pending
+                : ctx.CardListItems.FirstOrDefault(i =>
+                    i.CardListId == listId && i.GameCardId == printing.GameSpecificId && !i.IsFoil);
+            if (existing is not null)
+            {
+                existing.Quantity += entry.Quantity;
+            }
+            else
+            {
+                var newItem = new CardListItem
+                {
+                    CardListId = listId,
+                    Quantity = entry.Quantity,
+                    GameCardId = printing.GameSpecificId,
+                    CardName = printing.Name,
+                    SetCode = string.IsNullOrEmpty(printing.SetCode) ? null : printing.SetCode,
+                    CollectorNumber = string.IsNullOrEmpty(printing.CollectorNumber) ? null : printing.CollectorNumber,
+                    IsFoil = false,
+                    AddedMarketPrice = price,
+                    IsUnpriced = unpriced,
+                    Source = ListItemSource.Paste,
+                };
+                ctx.CardListItems.Add(newItem);
+                pendingByGameCardId[printing.GameSpecificId] = newItem;
+            }
+            added++;
+        }
+
+        ctx.SaveChanges();
+        return new AddCardsResult(added, unresolved);
+    }
+
+    public void RefreshPrices(int listId)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var list = ctx.CardLists.AsNoTracking().FirstOrDefault(l => l.Id == listId);
+        if (list is null) return;
+        var gs = cardService.GetGameService(list.Game);
+
+        foreach (var item in ctx.CardListItems.Where(i => i.CardListId == listId).ToList())
+        {
+            if (item.Source == ListItemSource.Manual)
+            {
+                item.AddedMarketPrice = gs.GetCurrentPrice(item.GameCardId, item.IsFoil);
+                item.IsUnpriced = item.AddedMarketPrice is null;
+            }
+            else
+            {
+                var resolved = ResolveCheapest(gs, item.CardName);
+                if (resolved is null) continue; // leave as-is if no longer resolvable
+                var (printing, price, unpriced) = resolved.Value;
+                item.GameCardId = printing.GameSpecificId;
+                item.SetCode = string.IsNullOrEmpty(printing.SetCode) ? null : printing.SetCode;
+                item.CollectorNumber = string.IsNullOrEmpty(printing.CollectorNumber) ? null : printing.CollectorNumber;
+                item.AddedMarketPrice = price;
+                item.IsUnpriced = unpriced;
+            }
+        }
+        ctx.SaveChanges();
+    }
+
+    public List<DecklistEntry> ToDecklistEntries(int listId)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        return ctx.CardListItems.AsNoTracking()
+            .Where(i => i.CardListId == listId)
+            .AsEnumerable()
+            .Select(i => new DecklistEntry(i.Quantity, i.CardName, i.SetCode, i.CollectorNumber))
+            .ToList();
+    }
+
+    /// <summary>Cheapest non-foil printing of the named card. Returns null if no printing exists;
+    /// on no-price, returns the first printing flagged unpriced.</summary>
+    private static (CardMatch Printing, decimal? Price, bool Unpriced)? ResolveCheapest(
+        ICardGameService gs, string cardName)
+    {
+        var printings = gs.GetPrintings(cardName);
+        if (printings.Count == 0) return null;
+
+        var prices = gs.GetCurrentPrices(printings.Select(p => p.GameSpecificId), isFoil: false);
+        var priced = printings
+            .Where(p => prices.ContainsKey(p.GameSpecificId))
+            .OrderBy(p => prices[p.GameSpecificId])
+            .ToList();
+
+        if (priced.Count > 0)
+            return (priced[0], prices[priced[0].GameSpecificId], false);
+        return (printings[0], null, true);
+    }
 }
