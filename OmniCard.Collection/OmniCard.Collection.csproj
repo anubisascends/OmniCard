@@ -12,6 +12,9 @@
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.9" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="OmniCard.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\OmniCard.Shared\OmniCard.Shared.csproj" />
     <ProjectReference Include="..\OmniCard.Data\OmniCard.Data.csproj" />
     <ProjectReference Include="..\OmniCard.Imaging\OmniCard.Imaging.csproj" />

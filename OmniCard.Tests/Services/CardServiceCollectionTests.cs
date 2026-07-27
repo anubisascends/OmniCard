@@ -67,6 +67,66 @@ public class CardServiceCollectionTests : IDisposable
         new NullAuditService());
 
     [Fact]
+    public void ChunkedByIdLookup_ReturnsAllRows_AcrossChunkBoundaries()
+    {
+        // The crux of the "too many SQL variables" fix: the id-keyed lookup must return every row
+        // even when the id count exceeds the chunk size (i.e. it must not stop after the first
+        // chunk or drop the remainder). Uses a tiny chunk size so 5 ids span 3 chunks (2,2,1).
+        var rows = Enumerable.Range(1, 5).Select(i => new { Id = i, Val = $"v{i}" }).ToList();
+        var ids = rows.Select(r => r.Id).ToList();
+
+        var map = CardService.ChunkedByIdLookup(
+            ids,
+            chunk => rows.Where(r => chunk.Contains(r.Id)),
+            r => r.Id,
+            chunkSize: 2);
+
+        Assert.Equal(5, map.Count);
+        Assert.All(ids, id => Assert.Equal($"v{id}", map[id].Val));
+    }
+
+    [Fact]
+    public void SearchCollection_AllGames_CrossesChunkBoundary_AttachesEveryListing()
+    {
+        // Integration guard: "All Games" (gameFilter == null) loads the whole collection unpaginated
+        // (take == int.MaxValue), then AttachEbayListings looks up eBay rows by lot id. That lookup
+        // is now chunked (see ChunkedByIdLookup) to avoid SQLite's "too many SQL variables" cap.
+        // Seed enough cards to cross the 500-id chunk boundary and verify EF translates the
+        // per-chunk `int[].Contains(...)` and that no listing is dropped across chunks.
+        const int count = 1100;
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+        {
+            var products = Enumerable.Range(0, count).Select(i => new Product
+            {
+                Game = i % 2 == 0 ? CardGame.Mtg : CardGame.Pokemon,
+                Category = ProductCategory.Single,
+                GameCardId = $"c{i}",
+                Name = $"Card {i}",
+                SetName = "Set",
+            }).ToList();
+            ctx.Products.AddRange(products);
+            ctx.SaveChanges();
+
+            var lots = products.Select(p => new InventoryLot { ProductId = p.Id }).ToList();
+            ctx.Lots.AddRange(lots);
+            ctx.SaveChanges();
+
+            var listings = lots.Select(l => new EbayListing { LotId = l.Id }).ToList();
+            ctx.EbayListings.AddRange(listings);
+            ctx.SaveChanges();
+        }
+
+        var service = CreateService();
+        var results = new ObservableCollection<CollectionCard>();
+
+        var ex = Record.Exception(() => service.SearchCollection("", null, results));
+
+        Assert.Null(ex);
+        Assert.Equal(count, results.Count);
+        Assert.All(results, c => Assert.NotNull(c.EbayListing));
+    }
+
+    [Fact]
     public void SearchCollection_NoFilter_ReturnsAllGames()
     {
         using (var ctx = new OmniCardDbContext(_omniOptions))

@@ -986,9 +986,13 @@ public sealed class CardService : ICardService
                 .GroupBy(c => (c.GameCardId, c.IsFoil, c.Condition))
                 .ToDictionary(g => g.Key, g => g.Select(c => c.Id).ToList());
 
-            // Load only the representative cards
-            var repIds = groups.Select(g => g.RepId).ToHashSet();
-            var repCards = cards.Where(c => repIds.Contains(c.Id)).ToDictionary(c => c.Id);
+            // Load only the representative cards (chunked so an "All Games" load with thousands of
+            // stacked groups doesn't overflow SQLite's host-parameter cap).
+            var repIds = groups.Select(g => g.RepId).ToList();
+            var repCards = ChunkedByIdLookup(
+                repIds,
+                chunk => cards.Where(c => chunk.Contains(c.Id)).ToList(),
+                c => c.Id);
 
             // Build stacked results
             var stackedResults = new List<CollectionCard>(groups.Count);
@@ -1250,13 +1254,33 @@ public sealed class CardService : ICardService
             return;
 
         var lotIds = cards.Select(c => c.Id).ToList();
-        var listingsByLotId = context.EbayListings
-            .AsNoTracking()
-            .Where(l => lotIds.Contains(l.LotId))
-            .ToDictionary(l => l.LotId);
+        var listingsByLotId = ChunkedByIdLookup(
+            lotIds,
+            chunk => context.EbayListings.AsNoTracking().Where(l => chunk.Contains(l.LotId)).ToList(),
+            l => l.LotId);
 
         foreach (var card in cards)
             card.EbayListing = listingsByLotId.GetValueOrDefault(card.Id);
+    }
+
+    /// <summary>SQLite caps host parameters per statement (the bundled build's default is large but
+    /// finite), so a single <c>WHERE Id IN (@p0..@pN)</c> over a big id list — e.g. an "All Games"
+    /// whole-collection load — can throw "too many SQL variables". This runs an id-keyed lookup in
+    /// chunks and merges the results, so the query never carries more than <see cref="SqlInParameterChunkSize"/>
+    /// parameters at once.</summary>
+    internal const int SqlInParameterChunkSize = 500;
+
+    internal static Dictionary<int, T> ChunkedByIdLookup<T>(
+        IReadOnlyCollection<int> ids,
+        Func<int[], IEnumerable<T>> queryChunk,
+        Func<T, int> keySelector,
+        int chunkSize = SqlInParameterChunkSize)
+    {
+        var result = new Dictionary<int, T>(ids.Count);
+        foreach (var chunk in ids.Chunk(chunkSize))
+            foreach (var row in queryChunk(chunk))
+                result[keySelector(row)] = row;
+        return result;
     }
 
     public List<string> GetDistinctFieldValues(string field, CardGame game)
