@@ -43,9 +43,10 @@ public sealed partial class DecklistService(
         return "Other";
     }
 
-    public (string DeckName, List<DecklistEntry> Entries) ParseDecklistText(string text)
+    // Shared line scanner: split/trim, skip comments + section headers, match the
+    // decklist regex, and yield the parsed fields. Callers apply their own dedupe.
+    private static IEnumerable<(int Qty, string Name, string? SetCode, string? CollectorNumber)> ParseLines(string text)
     {
-        var entries = new Dictionary<string, DecklistEntry>(StringComparer.OrdinalIgnoreCase);
         var regex = DecklistLineRegex();
 
         foreach (var rawLine in text.Split('\n'))
@@ -53,7 +54,6 @@ public sealed partial class DecklistService(
             var line = rawLine.Trim();
             if (string.IsNullOrEmpty(line) || line.StartsWith("//"))
                 continue;
-
             if (SectionHeaders.Contains(line))
                 continue;
 
@@ -66,6 +66,16 @@ public sealed partial class DecklistService(
             var setCode = match.Groups[3].Success ? match.Groups[3].Value.ToUpperInvariant() : null;
             var collectorNumber = match.Groups[4].Success ? match.Groups[4].Value : null;
 
+            yield return (qty, name, setCode, collectorNumber);
+        }
+    }
+
+    public (string DeckName, List<DecklistEntry> Entries) ParseDecklistText(string text)
+    {
+        var entries = new Dictionary<string, DecklistEntry>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (qty, name, setCode, collectorNumber) in ParseLines(text))
+        {
             var key = name.ToUpperInvariant();
             if (entries.TryGetValue(key, out var existing))
                 entries[key] = existing with { Quantity = existing.Quantity + qty };
@@ -79,25 +89,9 @@ public sealed partial class DecklistService(
     public List<DecklistEntry> ParseDecklistPrintings(string text)
     {
         var entries = new Dictionary<string, DecklistEntry>(StringComparer.OrdinalIgnoreCase);
-        var regex = DecklistLineRegex();
 
-        foreach (var rawLine in text.Split('\n'))
+        foreach (var (qty, name, setCode, collectorNumber) in ParseLines(text))
         {
-            var line = rawLine.Trim();
-            if (string.IsNullOrEmpty(line) || line.StartsWith("//"))
-                continue;
-            if (SectionHeaders.Contains(line))
-                continue;
-
-            var match = regex.Match(line);
-            if (!match.Success)
-                continue;
-
-            var qty = int.Parse(match.Groups[1].Value);
-            var name = match.Groups[2].Value.Trim();
-            var setCode = match.Groups[3].Success ? match.Groups[3].Value.ToUpperInvariant() : null;
-            var collectorNumber = match.Groups[4].Success ? match.Groups[4].Value : null;
-
             var key = $"{name.ToUpperInvariant()}|{setCode}|{collectorNumber}";
             if (entries.TryGetValue(key, out var existing))
                 entries[key] = existing with { Quantity = existing.Quantity + qty };
