@@ -80,7 +80,7 @@ public class DecklistMatchingTests : IDisposable
 
         var service = CreateService();
         var entries = new List<DecklistEntry> { new(1, "Lightning Bolt", "M11", "149") };
-        var result = service.CheckAgainstCollection("Test", "Test", entries);
+        var result = service.CheckAgainstCollection("Test", "Test", entries, CardGame.Mtg);
 
         Assert.Equal(1, result.TotalOwned);
         Assert.Equal(0, result.TotalMissing);
@@ -98,7 +98,7 @@ public class DecklistMatchingTests : IDisposable
     {
         var service = CreateService();
         var entries = new List<DecklistEntry> { new(1, "Ragavan, Nimble Pilferer", "MH2", "138") };
-        var result = service.CheckAgainstCollection("Test", "Test", entries);
+        var result = service.CheckAgainstCollection("Test", "Test", entries, CardGame.Mtg);
 
         Assert.Equal(0, result.TotalOwned);
         Assert.Equal(1, result.TotalMissing);
@@ -113,7 +113,7 @@ public class DecklistMatchingTests : IDisposable
 
         var service = CreateService();
         var entries = new List<DecklistEntry> { new(3, "Lightning Bolt", "M11", "149") };
-        var result = service.CheckAgainstCollection("Test", "Test", entries);
+        var result = service.CheckAgainstCollection("Test", "Test", entries, CardGame.Mtg);
 
         // Owned 1 copy, missing 2
         Assert.Equal(1, result.TotalOwned);
@@ -127,7 +127,7 @@ public class DecklistMatchingTests : IDisposable
 
         var service = CreateService();
         var entries = new List<DecklistEntry> { new(1, "Lightning Bolt", "M11", "149") };
-        var result = service.CheckAgainstCollection("Test", "Test", entries);
+        var result = service.CheckAgainstCollection("Test", "Test", entries, CardGame.Mtg);
 
         Assert.Equal(1, result.TotalOwned);
         var loc = Assert.Single(result.OwnedEntries.Single().Locations);
@@ -143,7 +143,7 @@ public class DecklistMatchingTests : IDisposable
 
         var service = CreateService();
         var entries = new List<DecklistEntry> { new(1, "Lightning Bolt", "M11", "149") };
-        var result = service.CheckAgainstCollection("Test", "Test", entries);
+        var result = service.CheckAgainstCollection("Test", "Test", entries, CardGame.Mtg);
 
         Assert.Equal(1, result.TotalOwned);
         var owned = Assert.Single(result.OwnedEntries);

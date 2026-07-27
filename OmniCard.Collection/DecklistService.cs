@@ -184,13 +184,13 @@ public sealed partial class DecklistService(
         return (deckName, entries);
     }
 
-    public DecklistCheckResult CheckAgainstCollection(string deckName, string deckSource, List<DecklistEntry> entries)
+    public DecklistCheckResult CheckAgainstCollection(string deckName, string deckSource, List<DecklistEntry> entries, CardGame game)
     {
         using var ctx = dbContextFactory.CreateDbContext();
         var allCards =
             (from l in ctx.Lots.AsNoTracking()
              join p in ctx.Products.AsNoTracking() on l.ProductId equals p.Id
-             where p.Category == ProductCategory.Single
+             where p.Category == ProductCategory.Single && p.Game == game
              join sc in ctx.StorageContainers.AsNoTracking() on l.LocationId equals sc.Id into containerJoin
              from sc in containerJoin.DefaultIfEmpty()
              where sc == null || !sc.ExcludeFromDeckCheck
@@ -237,7 +237,7 @@ public sealed partial class DecklistService(
             var missingCount = entry.Quantity - ownedCount;
 
             // Look up card details from Scryfall DB for type/image/detail info
-            var gameService = cardService.GetGameService(CardGame.Mtg);
+            var gameService = cardService.GetGameService(game);
             var searchResults = gameService.SearchCards($"name:{entry.CardName}");
             CardMatch? cardInfo = null;
             if (searchResults.Count > 0)

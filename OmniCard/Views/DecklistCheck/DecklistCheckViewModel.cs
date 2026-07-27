@@ -72,7 +72,7 @@ public sealed partial class DecklistCheckViewModel(
             StatusMessage = $"Fetched \"{deckName}\" ({entries.Count} cards). Checking collection...";
 
             var source = Url.Contains("moxfield", StringComparison.OrdinalIgnoreCase) ? "Moxfield" : "Archidekt";
-            Result = decklistService.CheckAgainstCollection(deckName, source, entries);
+            Result = decklistService.CheckAgainstCollection(deckName, source, entries, CardGame.Mtg);
             StatusMessage = $"Owned: {Result.TotalOwned}/{Result.TotalCards} | Missing: {Result.TotalMissing} | Cost: ${Result.EstimatedCost:N2}";
             logger.LogInformation("Decklist check complete: {Owned}/{Total} owned, {Missing} missing",
                 Result.TotalOwned, Result.TotalCards, Result.TotalMissing);
@@ -106,7 +106,7 @@ public sealed partial class DecklistCheckViewModel(
         }
 
         StatusMessage = $"Parsed {entries.Count} cards. Checking collection...";
-        Result = decklistService.CheckAgainstCollection(deckName, "Text", entries);
+        Result = decklistService.CheckAgainstCollection(deckName, "Text", entries, CardGame.Mtg);
         StatusMessage = $"Owned: {Result.TotalOwned}/{Result.TotalCards} | Missing: {Result.TotalMissing} | Cost: ${Result.EstimatedCost:N2}";
     }
 
