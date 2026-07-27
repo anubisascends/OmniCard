@@ -83,6 +83,27 @@ public class RiftboundMatchingTests : IDisposable
     }
 
     [Fact]
+    public void SearchCards_CnTerm_FiltersToExactCollectorNumber()
+    {
+        // Regression: cn: previously fell through to the default name-LIKE branch and
+        // never matched, so decklist set+cn resolution silently failed for Riftbound.
+        var results = _svc.SearchCards("cn:5");
+
+        Assert.Single(results);
+        Assert.Equal("solo", results[0].GameSpecificId);
+    }
+
+    [Fact]
+    public void SearchCards_SetAndCnTerms_MirrorsDecklistResolverQuery()
+    {
+        // Mirrors the exact query DecklistPrintingResolver rung-1 issues: "set:XXX cn:NNN".
+        var results = _svc.SearchCards("set:OGN cn:310");
+
+        Assert.Equal(2, results.Count);
+        Assert.All(results, r => Assert.Equal("310", r.CollectorNumber));
+    }
+
+    [Fact]
     public void Ocr_SingleCandidate_ReturnsExactMatch()
     {
         var ocr = new OcrMatchResult { CollectorNumber = "OGN-5", CollectorNumberConfidence = 0.95 };

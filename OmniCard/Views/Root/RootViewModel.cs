@@ -2285,7 +2285,7 @@ public sealed partial class RootViewModel(
             if (summary is not null)
             {
                 Message = summary.Unresolved > 0
-                    ? $"Imported {summary.Added} cards to {summary.TargetName}. {summary.Unresolved} unresolved."
+                    ? $"Imported {summary.Added} cards to {summary.TargetName}. {summary.Unresolved} lines unresolved."
                     : $"Imported {summary.Added} cards to {summary.TargetName}.";
                 _ = Collection.SearchCollection();
             }

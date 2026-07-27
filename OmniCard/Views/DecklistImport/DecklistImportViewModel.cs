@@ -109,11 +109,15 @@ public sealed partial class DecklistImportViewModel(
             AvailableLocations.Add(c);
 
         // Default target: current Location if provided, else the Bulk container.
+        // Always prefer the instance already in AvailableLocations (ComboBox selects by
+        // reference) — only fall back to the raw GetBulk()/GetAll() instances if no
+        // matching Id is found in the list at all.
         TargetIsList = false;
         var bulk = containerService.GetBulk();
+        var bulkInList = AvailableLocations.FirstOrDefault(c => c.Id == bulk.Id);
         SelectedLocation = defaultContainerId is int id
-            ? AvailableLocations.FirstOrDefault(c => c.Id == id) ?? bulk
-            : AvailableLocations.FirstOrDefault(c => c.Id == bulk.Id) ?? bulk;
+            ? AvailableLocations.FirstOrDefault(c => c.Id == id) ?? bulkInList ?? bulk
+            : bulkInList ?? bulk;
 
         OnPropertyChanged(nameof(CanImport));
     }
