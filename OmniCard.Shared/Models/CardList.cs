@@ -1,6 +1,6 @@
 namespace OmniCard.Models;
 
-public enum ListItemSource { Manual, Url, Paste }
+public enum ListItemSource { Manual, Url, Paste, File }
 
 public class CardList
 {
