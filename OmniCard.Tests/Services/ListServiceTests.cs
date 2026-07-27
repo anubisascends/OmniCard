@@ -1,6 +1,9 @@
+using System.Collections.ObjectModel;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using OmniCard.Collection;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 using Xunit;
 
@@ -57,5 +60,143 @@ public class ListServiceTests : IDisposable
             Assert.Equal(1.23m, item.AddedMarketPrice);
             Assert.Equal(ListItemSource.Paste, item.Source);
         }
+    }
+
+    private ListService CreateService(FakeCardService? cards = null)
+        => new(_dbFactory, cards ?? new FakeCardService());
+
+    [Fact]
+    public void CreateList_Then_GetLists_FiltersByGame()
+    {
+        var svc = CreateService();
+        svc.CreateList("MTG list", CardGame.Mtg);
+        svc.CreateList("PKM list", CardGame.Pokemon);
+
+        var mtg = svc.GetLists(CardGame.Mtg);
+        Assert.Single(mtg);
+        Assert.Equal("MTG list", mtg[0].Name);
+    }
+
+    [Fact]
+    public void RenameList_UpdatesName()
+    {
+        var svc = CreateService();
+        var list = svc.CreateList("old", CardGame.Mtg);
+        svc.RenameList(list.Id, "new");
+        Assert.Equal("new", svc.GetLists(CardGame.Mtg).Single().Name);
+    }
+
+    [Fact]
+    public void DeleteList_RemovesListAndItems()
+    {
+        var svc = CreateService();
+        var list = svc.CreateList("L", CardGame.Mtg);
+        svc.AddPrinting(list.Id, new CardMatch { Name = "Sol Ring", GameSpecificId = "x" },
+            isFoil: false, quantity: 1, ListItemSource.Manual);
+
+        svc.DeleteList(list.Id);
+
+        Assert.Empty(svc.GetLists(CardGame.Mtg));
+        using var ctx = _dbFactory.CreateDbContext();
+        Assert.Empty(ctx.CardListItems.AsNoTracking().ToList());
+    }
+
+    [Fact]
+    public void AddPrinting_CapturesPrice_AndMergesDuplicate()
+    {
+        var cards = new FakeCardService();
+        cards.Game.Prices["x"] = 2.50m;
+        var svc = CreateService(cards);
+        var list = svc.CreateList("L", CardGame.Mtg);
+        var match = new CardMatch { Name = "Sol Ring", GameSpecificId = "x", SetCode = "C21", CollectorNumber = "1" };
+
+        svc.AddPrinting(list.Id, match, isFoil: false, quantity: 1, ListItemSource.Manual);
+        svc.AddPrinting(list.Id, match, isFoil: false, quantity: 2, ListItemSource.Manual);
+
+        var item = Assert.Single(svc.GetItems(list.Id));
+        Assert.Equal(3, item.Quantity);          // merged
+        Assert.Equal(2.50m, item.AddedMarketPrice);
+        Assert.Equal("Sol Ring", item.CardName);
+    }
+
+    [Fact]
+    public void SetQuantity_Zero_RemovesItem()
+    {
+        var svc = CreateService();
+        var list = svc.CreateList("L", CardGame.Mtg);
+        var item = svc.AddPrinting(list.Id, new CardMatch { Name = "A", GameSpecificId = "x" },
+            false, 1, ListItemSource.Manual);
+        svc.SetQuantity(item.Id, 0);
+        Assert.Empty(svc.GetItems(list.Id));
+    }
+
+    private class FakeCardService : ICardService
+    {
+        public ObservableCollection<ScannedCard> ScannedCards { get; } = [];
+        public CardGame SelectedGame { get; set; }
+        public HashSet<string>? SelectedSetFilter { get; set; }
+        public bool DefaultIsFoil { get; set; }
+        public decimal? DefaultPurchasePrice { get; set; }
+        public IReadOnlyList<CardGame> AvailableGames => [];
+        public ICardGameService ActiveGameService => null!;
+        public Action<HashStageResult>? OnHashStage { get; set; }
+        public ulong LastComputedHash => 0;
+        public FakeGameService Game { get; } = new();
+        public ICardGameService GetGameService(CardGame game) => Game;
+        public void AddFromStream(Stream stream) { }
+        public void ReprocessScans() { }
+        public void CommitScans(IEnumerable<ScannedCard> scannedCards) { }
+        public void CommitScans(IEnumerable<ScannedCard> scannedCards, StorageContainer? activeContainer, int? page, int? slot, string? section, IProgress<string>? progress = null) { }
+        public void SearchCollection(string query, CardGame? gameFilter, ObservableCollection<CollectionCard> results) { }
+        public void SearchCollection(string query, CardGame? gameFilter, int? containerFilter, ObservableCollection<CollectionCard> results) { }
+        public void SearchCollection(string query, CardGame? gameFilter, int? containerFilter, SortPreset? sortPreset, FilterPreset? filterPreset, ObservableCollection<CollectionCard> results) { }
+        public void SearchCollection(string query, CardGame? gameFilter, int? containerFilter, SortPreset? sortPreset, FilterPreset? filterPreset, bool stacked, ObservableCollection<CollectionCard> results) { }
+        public void SearchCollection(string query, CardGame? gameFilter, int? containerFilter, SortPreset? sortPreset, FilterPreset? filterPreset, bool stacked, int skip, int take, ObservableCollection<CollectionCard> results) { }
+        public int GetSearchCount(string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset, bool stacked) => 0;
+        public HashSet<int> GetMatchingContainerIds(string query, CardGame? gameFilter = null) => [];
+        public void MoveCardsToContainer(IEnumerable<int> cardIds, int containerId, string? section = null) { }
+        public void BulkUpdateField(IEnumerable<int> cardIds, Action<CollectionCard> update) { }
+        public List<CollectionCard> GetCollectionCards(IEnumerable<int> cardIds) => [];
+        public void UpdateCollectionCard(CollectionCard card) { }
+        public void DeleteCollectionCard(int id) { }
+        public Task<List<SetCompletionSummary>> CalculateSetCompletionAsync(CardGame game, IProgress<string>? progress = null) => Task.FromResult(new List<SetCompletionSummary>());
+        public Task<List<SetCompletionSummary>> CalculateSetCompletionAsync(CardGame? game, IProgress<string>? progress = null) => Task.FromResult(new List<SetCompletionSummary>());
+        public IReadOnlyDictionary<string, decimal> GetCurrentPrices(CardGame game, IEnumerable<string> gameCardIds, bool foil) => new Dictionary<string, decimal>();
+        public List<string> GetDistinctFieldValues(string field, CardGame game) => [];
+        public List<MissingCard> GetMissingCardsForSet(CardGame game, string setCode) => [];
+        public void RemoveTempFile(ScannedCard card) { }
+        public void ClearTempFiles() { }
+        public void StartNewDiagnosticSession() { }
+        public (int FlagResolutions, int MismatchLogs, int DiagnosticEvents) ClearDiagnosticLogs() => (0, 0, 0);
+        public (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null) => (0, 0);
+        public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section) { }
+        public int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates) => 0;
+        public ulong ComputeHashFromStream(System.IO.Stream stream) => 0;
+        public ulong ComputeEdgeHashFromStream(System.IO.Stream stream) => 0;
+        public IOcrMatchingService OcrService => null!;
+        public (CardMatch? Match, CardGame Game) FindBestMatch(ulong hash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, ulong? scanEdgeHash = null) => (null, CardGame.Mtg);
+    }
+
+    private class FakeGameService : ICardGameService
+    {
+        public List<CardMatch> Printings { get; } = [];
+        public Dictionary<string, decimal> Prices { get; } = new();
+
+        public CardGame Game => CardGame.Mtg;
+        public MatchDiagnostics? LastMatchDiagnostics => null;
+        public Task DownloadBulkDataAsync(IProgress<string>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
+        public Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
+        public Task UpdatePricesAsync(IProgress<PriceUpdateProgress>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
+        public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14, ulong? scanEdgeHash = null) => null;
+        public List<CardMatch> SearchCards(string query, int maxResults = 20) => [];
+        public List<CardMatch> GetPrintings(string cardName) => Printings.Where(p => p.Name == cardName).ToList();
+        public decimal? GetCurrentPrice(string gameCardId, bool isFoil) => Prices.TryGetValue(gameCardId, out var v) ? v : null;
+        public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil) =>
+            gameCardIds.Where(Prices.ContainsKey).ToDictionary(id => id, id => Prices[id]);
+        public void RecordCorrection(ulong scanHash, string correctCardId, ulong? artScanHash = null) { }
+        public IReadOnlyList<SetInfo> GetAvailableSets() => [];
+        public Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null) => Task.FromResult(new List<SetCompletionSummary>());
+        public List<MissingCard> GetMissingCards(string setCode, IEnumerable<string> ownedCollectorNumbers) => [];
+        public object? FindCardById(string gameCardId) => null;
     }
 }
