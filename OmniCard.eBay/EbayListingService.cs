@@ -82,40 +82,65 @@ public class EbayListingService : IEbayListingService
                 return false;
             }
 
-            // Step 2: Create offer
-            var offer = BuildOffer(sku, options, selling);
-            var offerJson = JsonSerializer.Serialize(offer);
+            // Step 2: Create or update the offer. eBay allows only ONE offer per SKU, so a
+            // prior attempt that created an offer but didn't publish leaves one behind that we
+            // must update (with current pricing/policies/location) rather than recreate —
+            // otherwise createOffer fails with errorId 25002 "Offer entity already exists".
+            var existingOfferId = await FindExistingOfferAsync(client, sku);
 
-            var offerResponse = await client.PostAsync(
-                $"{_settings.ApiBaseUrl}/sell/inventory/v1/offer",
-                JsonContent(offerJson));
-
-            if (!offerResponse.IsSuccessStatusCode)
+            string offerId;
+            if (existingOfferId is null)
             {
-                var error = await offerResponse.Content.ReadAsStringAsync();
-                _logger.LogWarning("Failed to create offer: {Status} — {Error}", offerResponse.StatusCode, error);
-                await SaveListingError(card.Id, options, $"Offer creation failed: {offerResponse.StatusCode}");
-                return false;
+                var offerJson = JsonSerializer.Serialize(BuildOffer(sku, options, selling));
+                var offerResponse = await client.PostAsync(
+                    $"{_settings.ApiBaseUrl}/sell/inventory/v1/offer",
+                    JsonContent(offerJson));
+
+                if (!offerResponse.IsSuccessStatusCode)
+                {
+                    var error = await offerResponse.Content.ReadAsStringAsync();
+                    _logger.LogWarning("Failed to create offer: {Status} — {Error}", offerResponse.StatusCode, error);
+                    await SaveListingError(card.Id, options, $"Offer creation failed: {offerResponse.StatusCode}");
+                    return false;
+                }
+
+                var offerResponseJson = await offerResponse.Content.ReadAsStringAsync();
+                using var offerDoc = JsonDocument.Parse(offerResponseJson);
+
+                // If the offer response already contains listingId, treat as published
+                if (offerDoc.RootElement.TryGetProperty("listingId", out var directListingId))
+                {
+                    var ebayItemIdDirect = directListingId.GetString() ?? "";
+                    await SaveActiveListing(card.Id, options, ebayItemIdDirect);
+                    _logger.LogInformation("Created eBay listing {ItemId} for card {CardId} ({CardName})",
+                        ebayItemIdDirect, card.Id, card.Name);
+                    return true;
+                }
+
+                offerId = offerDoc.RootElement.TryGetProperty("offerId", out var offerIdEl)
+                    ? offerIdEl.GetString() ?? ""
+                    : "";
             }
-
-            var offerResponseJson = await offerResponse.Content.ReadAsStringAsync();
-            using var offerDoc = JsonDocument.Parse(offerResponseJson);
-
-            // If the offer response already contains listingId, treat as published
-            if (offerDoc.RootElement.TryGetProperty("listingId", out var directListingId))
+            else
             {
-                var ebayItemIdDirect = directListingId.GetString() ?? "";
-                await SaveActiveListing(card.Id, options, ebayItemIdDirect);
-                _logger.LogInformation("Created eBay listing {ItemId} for card {CardId} ({CardName})",
-                    ebayItemIdDirect, card.Id, card.Name);
-                return true;
+                // Update the existing offer so stale data from an earlier failed attempt
+                // (e.g. empty policies before setup ran) is replaced with current values.
+                offerId = existingOfferId;
+                var updateJson = JsonSerializer.Serialize(BuildOfferUpdate(options, selling));
+                var updateResponse = await client.PutAsync(
+                    $"{_settings.ApiBaseUrl}/sell/inventory/v1/offer/{Uri.EscapeDataString(offerId)}",
+                    JsonContent(updateJson));
+
+                if (!updateResponse.IsSuccessStatusCode)
+                {
+                    var error = await updateResponse.Content.ReadAsStringAsync();
+                    _logger.LogWarning("Failed to update existing offer {OfferId}: {Status} — {Error}", offerId, updateResponse.StatusCode, error);
+                    await SaveListingError(card.Id, options, $"Offer update failed: {updateResponse.StatusCode}");
+                    return false;
+                }
             }
 
             // Step 3: Publish offer
-            var offerId = offerDoc.RootElement.TryGetProperty("offerId", out var offerIdEl)
-                ? offerIdEl.GetString() ?? ""
-                : "";
-
             var publishResponse = await client.PostAsync(
                 $"{_settings.ApiBaseUrl}/sell/inventory/v1/offer/{Uri.EscapeDataString(offerId)}/publish",
                 JsonContent("{}"));
@@ -357,6 +382,55 @@ public class EbayListingService : IEbayListingService
             },
             categoryId = options.EbayCategoryId ?? "38292",
         };
+    }
+
+    // updateOffer payload: same as create minus the immutable sku/marketplaceId/format fields.
+    private object BuildOfferUpdate(EbayListingOptions options, EbaySellingSettings selling)
+    {
+        return new
+        {
+            listingDescription = options.Description,
+            merchantLocationKey = selling.MerchantLocationKey,
+            pricingSummary = new
+            {
+                price = new { value = options.Price.ToString("F2", CultureInfo.InvariantCulture), currency = "USD" },
+                auctionStartPrice = options.ListingType == EbayListingType.Auction
+                    ? new { value = options.Price.ToString("F2", CultureInfo.InvariantCulture), currency = "USD" }
+                    : null,
+            },
+            listingDuration = options.ListingType == EbayListingType.Auction && options.AuctionDuration.HasValue
+                ? $"DAYS_{options.AuctionDuration.Value}"
+                : null,
+            listingPolicies = new
+            {
+                fulfillmentPolicyId = options.ShippingPolicyId ?? selling.FulfillmentPolicyId,
+                returnPolicyId = options.ReturnPolicyId ?? selling.ReturnPolicyId,
+                paymentPolicyId = options.PaymentPolicyId ?? selling.PaymentPolicyId,
+            },
+            categoryId = options.EbayCategoryId ?? "38292",
+        };
+    }
+
+    // Returns the offerId of an existing offer for this SKU (eBay allows one per SKU), or null.
+    private async Task<string?> FindExistingOfferAsync(HttpClient client, string sku)
+    {
+        var response = await client.GetAsync(
+            $"{_settings.ApiBaseUrl}/sell/inventory/v1/offer?sku={Uri.EscapeDataString(sku)}&marketplace_id=EBAY_US");
+
+        // 404 = no offers for this SKU yet.
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+        if (doc.RootElement.TryGetProperty("offers", out var offers)
+            && offers.ValueKind == JsonValueKind.Array
+            && offers.GetArrayLength() > 0
+            && offers[0].TryGetProperty("offerId", out var offerIdEl))
+        {
+            return offerIdEl.GetString();
+        }
+        return null;
     }
 
     private async Task SaveActiveListing(int lotId, EbayListingOptions options, string ebayItemId)

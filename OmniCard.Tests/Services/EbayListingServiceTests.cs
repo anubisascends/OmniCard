@@ -286,6 +286,48 @@ public class EbayListingServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateListingAsync_UpdatesAndPublishesExistingOffer_WhenOfferAlreadyExists()
+    {
+        // Regression: eBay allows one offer per SKU. A prior unpublished attempt leaves an
+        // offer behind; recreating fails with 25002 "Offer entity already exists". The service
+        // must find that offer, update it, and publish — not POST a new one.
+        var dbFactory = CreateDbFactory();
+        int lotId;
+        using (var ctx = dbFactory.CreateDbContext()) lotId = SeedLot(ctx);
+
+        var handler = new RoutingRecordingHttpHandler((method, uri) =>
+        {
+            if (method == HttpMethod.Get && uri.Contains("/offer?sku="))
+                return (HttpStatusCode.OK, JsonSerializer.Serialize(new { offers = new[] { new { offerId = "existing-9" } } }));
+            if (method == HttpMethod.Put && uri.Contains("/inventory_item/"))
+                return (HttpStatusCode.OK, "{}");
+            if (method == HttpMethod.Put && uri.Contains("/offer/existing-9"))
+                return (HttpStatusCode.NoContent, "");
+            if (method == HttpMethod.Post && uri.Contains("/offer/existing-9/publish"))
+                return (HttpStatusCode.OK, JsonSerializer.Serialize(new { listingId = "LPUB" }));
+            return (HttpStatusCode.OK, "{}");
+        });
+
+        var svc = new EbayListingService(
+            Options.Create(_settings), new FakeHttpClientFactory(handler),
+            new FakeEbayAuthService("t"), dbFactory, CompleteSellingSettings(),
+            NullLogger<EbayListingService>.Instance);
+
+        var ok = await svc.CreateListingAsync(new CollectionCard { Id = lotId, Name = "n" },
+            new EbayListingOptions { Title = "t", Description = "d", Price = 5m, ListingType = EbayListingType.FixedPrice });
+
+        Assert.True(ok);
+        Assert.Contains(handler.Requests, r => r.Method == HttpMethod.Put && r.Uri!.ToString().Contains("/offer/existing-9"));
+        Assert.DoesNotContain(handler.Requests, r => r.Method == HttpMethod.Post && r.Uri!.ToString().EndsWith("/offer"));
+        Assert.Contains(handler.Requests, r => r.Method == HttpMethod.Post && r.Uri!.ToString().Contains("/offer/existing-9/publish"));
+
+        using var verifyCtx = dbFactory.CreateDbContext();
+        var listing = verifyCtx.EbayListings.First(l => l.LotId == lotId);
+        Assert.Equal(EbayListingStatus.Active, listing.Status);
+        Assert.Equal("LPUB", listing.EbayItemId);
+    }
+
+    [Fact]
     public void DeletingLot_CascadesEbayListing()
     {
         var dbFactory = CreateDbFactory();
@@ -341,6 +383,29 @@ public class RecordingHttpHandler : HttpMessageHandler
 }
 
 public record RecordedRequest(HttpMethod Method, Uri? Uri, List<string> ContentLanguage, string? Body = null);
+
+/// <summary>
+/// Records requests and returns a per-request routed response keyed by (method, uri).
+/// </summary>
+public class RoutingRecordingHttpHandler : HttpMessageHandler
+{
+    private readonly Func<HttpMethod, string, (HttpStatusCode, string)> _route;
+    public List<RecordedRequest> Requests { get; } = [];
+
+    public RoutingRecordingHttpHandler(Func<HttpMethod, string, (HttpStatusCode, string)> route) => _route = route;
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var contentLanguage = request.Content?.Headers.ContentLanguage.ToList() ?? [];
+        var body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
+        Requests.Add(new RecordedRequest(request.Method, request.RequestUri, contentLanguage, body));
+        var (code, resp) = _route(request.Method, request.RequestUri!.ToString());
+        return new HttpResponseMessage(code)
+        {
+            Content = new System.Net.Http.StringContent(resp, System.Text.Encoding.UTF8, "application/json"),
+        };
+    }
+}
 
 public class TestDbContextFactory : IDbContextFactory<OmniCardDbContext>
 {
