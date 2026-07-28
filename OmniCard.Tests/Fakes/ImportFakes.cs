@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using OmniCard.Interfaces;
 using OmniCard.Models;
+using OmniCard.Services;
+using OmniCard.Views.DecklistImport;
 
 namespace OmniCard.Tests.Fakes;
 
@@ -151,4 +153,28 @@ public sealed class FakeDecklistParseService : IDecklistService
     public (string DeckName, List<DecklistEntry> Entries) ParseDecklistText(string text) => throw new NotImplementedException();
     public Task<(string DeckName, List<DecklistEntry> Entries)?> FetchDecklistAsync(string url) => throw new NotImplementedException();
     public DecklistCheckResult CheckAgainstCollection(string deckName, string deckSource, List<DecklistEntry> entries, CardGame game) => throw new NotImplementedException();
+}
+
+/// <summary>IDecklistImportService returning canned rows and recording commits.</summary>
+public sealed class FakeDecklistImportService : IDecklistImportService
+{
+    public Func<string, List<DecklistImportRow>> OnResolve = _ => [];
+    public List<(int ListId, int Count)> ListCommits { get; } = [];
+    public List<(StorageContainer Container, int Count)> LocationCommits { get; } = [];
+
+    public IReadOnlyList<DecklistImportRow> ResolveFile(string fileText) => OnResolve(fileText);
+
+    public int CommitToList(int listId, IEnumerable<DecklistImportRow> resolvedRows)
+    {
+        var rows = resolvedRows.ToList();
+        ListCommits.Add((listId, rows.Count));
+        return rows.Sum(r => r.Quantity);
+    }
+
+    public int CommitToLocation(StorageContainer container, IEnumerable<DecklistImportRow> resolvedRows)
+    {
+        var rows = resolvedRows.ToList();
+        LocationCommits.Add((container, rows.Count));
+        return rows.Sum(r => r.Quantity);
+    }
 }
