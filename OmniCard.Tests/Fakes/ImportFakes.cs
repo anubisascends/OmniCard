@@ -150,8 +150,10 @@ public sealed class FakeDecklistParseService : IDecklistService
     public List<DecklistEntry> Printings { get; set; } = [];
     public List<DecklistEntry> ParseDecklistPrintings(string text) => Printings;
 
+    public Func<string, (string DeckName, List<DecklistEntry> Entries)?> OnFetch = _ => null;
+    public Task<(string DeckName, List<DecklistEntry> Entries)?> FetchDecklistAsync(string url) => Task.FromResult(OnFetch(url));
+
     public (string DeckName, List<DecklistEntry> Entries) ParseDecklistText(string text) => throw new NotImplementedException();
-    public Task<(string DeckName, List<DecklistEntry> Entries)?> FetchDecklistAsync(string url) => throw new NotImplementedException();
     public DecklistCheckResult CheckAgainstCollection(string deckName, string deckSource, List<DecklistEntry> entries, CardGame game) => throw new NotImplementedException();
 }
 

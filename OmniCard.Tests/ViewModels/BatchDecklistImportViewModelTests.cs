@@ -1,3 +1,4 @@
+using System.IO;
 using OmniCard.Models;
 using OmniCard.Tests.Fakes;
 using OmniCard.Views.BatchDecklistImport;
@@ -13,107 +14,142 @@ public class BatchDecklistImportViewModelTests
                 Match = resolved ? new CardMatch { GameSpecificId = "a", Name = "Island" } : null };
 
     private static (BatchDecklistImportViewModel vm, FakeDecklistImportService imp,
-        RecordingListService lists, RecordingContainerService containers, RecordingCardService cards) Build()
+        RecordingListService lists, RecordingContainerService containers, RecordingCardService cards,
+        FakeDecklistParseService decks) Build()
     {
         var gs = new ConfigurableGameService();
         var cards = new RecordingCardService(gs);
         var lists = new RecordingListService();
         var containers = new RecordingContainerService();
         var imp = new FakeDecklistImportService();
-        var vm = new BatchDecklistImportViewModel(imp, cards, lists, containers);
-        return (vm, imp, lists, containers, cards);
+        var decks = new FakeDecklistParseService();
+        var vm = new BatchDecklistImportViewModel(imp, cards, lists, containers, decks);
+        vm.Load();
+        return (vm, imp, lists, containers, cards, decks);
+    }
+
+    private static string TempFile(string content)
+    {
+        var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        File.WriteAllText(path, content);
+        return path;
     }
 
     [Fact]
-    public void Load_BuildsOneItemPerFile_WithCountsAndDefaultName_AndNoTarget()
+    public async Task AddUrls_FetchSucceeds_AddsRowNamedByDeck()
     {
-        var (vm, imp, _, containers, _) = Build();
-        containers.Containers.Add(new StorageContainer { Id = 7, Name = "Box" });
-        imp.OnResolve = t => t == "A"
-            ? [Row(4, true), Row(1, false)]
-            : [Row(2, true)];
+        var (vm, imp, _, _, _, decks) = Build();
+        decks.OnFetch = url => ("First Flight", new List<DecklistEntry> { new(1, "Sol Ring", "SCD", "276") });
+        imp.OnResolveEntries = _ => [Row(1, true)];
+        vm.UrlText = "https://moxfield.com/decks/abc";
 
-        vm.Load([("deckA.txt", "A"), ("deckB.txt", "B")]);
+        await vm.AddUrlsCommand.ExecuteAsync(null);
 
-        Assert.Equal(2, vm.Files.Count);
-        Assert.Equal("deckA", vm.Files[0].DefaultNewName);
-        Assert.Equal(1, vm.Files[0].ResolvedCount);   // 1 resolved row
-        Assert.Equal(1, vm.Files[0].UnresolvedCount);
-        Assert.False(vm.Files[0].HasTarget);           // force-choose: nothing selected
-        Assert.Same(vm.Files[0], vm.SelectedFile);     // first file selected for detail pane
-        Assert.False(vm.CanImport);
+        var file = Assert.Single(vm.Files);
+        Assert.Equal("First Flight", file.SourceName);
+        Assert.Equal("First Flight", file.DefaultNewName);   // deck name pre-fills the new-target name
+        Assert.Equal("", vm.UrlText);                        // consumed
     }
 
     [Fact]
-    public void CanImport_TrueOnlyWhenAllFilesHaveTargets()
+    public async Task AddUrls_FetchFails_SkipsAndReports_KeepsUrl()
     {
-        var (vm, imp, _, containers, _) = Build();
+        var (vm, _, _, _, _, decks) = Build();
+        decks.OnFetch = _ => null;   // unreachable/unsupported
+        vm.UrlText = "https://example.com/bad";
+
+        await vm.AddUrlsCommand.ExecuteAsync(null);
+
+        Assert.Empty(vm.Files);
+        Assert.Contains("bad", vm.UrlText);                  // failed URL retained
+        Assert.Contains("fetch", vm.StatusMessage, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AddPaths_DecklistFile_AddsRow()
+    {
+        var (vm, imp, _, _, _, _) = Build();
+        imp.OnResolve = _ => [Row(4, true), Row(1, false)];
+        var path = TempFile("1 Island (SCD) 337\n");
+
+        vm.AddPaths([path]);
+
+        var file = Assert.Single(vm.Files);
+        Assert.Equal(1, file.ResolvedCount);
+        Assert.Equal(1, file.UnresolvedCount);
+    }
+
+    [Fact]
+    public void AddPaths_CsvFile_ImportsViaCallback_NoRow()
+    {
+        var (vm, _, _, _, _, _) = Build();
+        vm.ImportCsvFile = _ => 5;
+        var path = TempFile("GameCardId,Name,SetCode\n");   // AppNative CSV header
+
+        vm.AddPaths([path]);
+
+        Assert.Empty(vm.Files);
+        Assert.Equal(5, vm.CsvImportedCount);
+    }
+
+    [Fact]
+    public void AddPaths_UnknownFile_SkipsWithMessage()
+    {
+        var (vm, _, _, _, _, _) = Build();
+        var path = TempFile("just some prose\n");
+
+        vm.AddPaths([path]);
+
+        Assert.Empty(vm.Files);
+        Assert.Contains("unrecognized", vm.StatusMessage, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CanImport_FalseUntilAllRowsHaveTargets()
+    {
+        var (vm, imp, _, containers, _, _) = Build();
         var box = new StorageContainer { Id = 7, Name = "Box" };
         containers.Containers.Add(box);
         imp.OnResolve = _ => [Row(1, true)];
-        vm.Load([("a.txt", "a"), ("b.txt", "b")]);
+        vm.AddPaths([TempFile("1 Island (SCD) 337\n"), TempFile("1 Plains (SCD) 333\n")]);
 
-        vm.Files[0].SelectedLocation = box;            // file 0 → existing location
-        Assert.False(vm.CanImport);                    // file 1 still unset
-        vm.Files[1].TargetIsList = true;
-        vm.Files[1].CreateNew = true;
-        vm.Files[1].NewName = "New List";              // file 1 → new list
+        vm.Files[0].SelectedLocation = box;
+        Assert.False(vm.CanImport);
+        vm.Files[1].SelectedLocation = box;
         Assert.True(vm.CanImport);
     }
 
     [Fact]
-    public void Import_RoutesEachFileToItsOwnTarget_AndAggregatesSummary()
+    public void Import_SummaryIncludesCsvCount_AndTargetFlags()
     {
-        var (vm, imp, lists, containers, _) = Build();
+        var (vm, imp, _, containers, _, _) = Build();
         var box = new StorageContainer { Id = 7, Name = "Box" };
         containers.Containers.Add(box);
-        imp.OnResolve = t => t == "a" ? [Row(4, true), Row(1, false)] : [Row(2, true)];
-        vm.Load([("a.txt", "a"), ("b.txt", "b")]);
-
-        vm.Files[0].SelectedLocation = box;                    // location target
-        vm.Files[1].TargetIsList = true;
-        vm.Files[1].CreateNew = true;
-        vm.Files[1].NewName = "Fresh";                          // new-list target
+        imp.OnResolve = _ => [Row(4, true)];
+        vm.ImportCsvFile = _ => 5;
+        vm.AddPaths([TempFile("GameCardId,Name\n")]);            // CSV → immediate import
+        vm.AddPaths([TempFile("1 Island (SCD) 337\n")]);        // decklist → row
+        vm.Files[0].SelectedLocation = box;
 
         vm.ImportCommand.Execute(null);
 
-        Assert.Single(imp.LocationCommits);
-        Assert.Equal(7, imp.LocationCommits[0].Container.Id);
-        Assert.Single(imp.ListCommits);
-        var created = Assert.Single(lists.Lists);
-        Assert.Equal("Fresh", created.Name);
-        Assert.Equal(created.Id, imp.ListCommits[0].ListId);
-
-        Assert.Equal(2, vm.Result!.FileCount);
-        Assert.Equal(6, vm.Result.TotalAdded);                 // 4 + 2 resolved quantities
-        Assert.Equal(1, vm.Result.TotalUnresolved);
-        Assert.True(vm.Result.AnyListTarget);
+        Assert.Equal(1, vm.Result!.FileCount);
+        Assert.Equal(4, vm.Result.TotalAdded);
+        Assert.Equal(5, vm.Result.CsvImportedCount);
         Assert.True(vm.Result.AnyLocationTarget);
+        Assert.Single(imp.LocationCommits);
     }
 
     [Fact]
-    public void Import_CreateNewLocation_CreatesContainer_AndCommitsToIt()
+    public void Cancel_WithCsvImported_SetsResultSoCallerRefreshes()
     {
-        var (vm, imp, _, containers, _) = Build();
-        imp.OnResolve = _ => [Row(3, true)];
-        vm.Load([("a.txt", "a")]);
+        var (vm, _, _, _, _, _) = Build();
+        vm.ImportCsvFile = _ => 3;
+        vm.AddPaths([TempFile("GameCardId,Name\n")]);
 
-        vm.Files[0].TargetIsList = false;
-        vm.Files[0].CreateNew = true;
-        vm.Files[0].NewName = "New Binder";
-        vm.Files[0].NewLocationType = ContainerType.Binder;
+        vm.CancelCommand.Execute(null);
 
-        vm.ImportCommand.Execute(null);
-
-        var created = Assert.Single(containers.Created);
-        Assert.Equal("New Binder", created.Name);
-        Assert.Equal(ContainerType.Binder, created.Type);
-
-        Assert.Single(imp.LocationCommits);
-        Assert.Equal(created.Name, imp.LocationCommits[0].Container.Name);
-        Assert.Equal(ContainerType.Binder, imp.LocationCommits[0].Container.ContainerType);
-
-        Assert.True(vm.Result!.AnyLocationTarget);
-        Assert.False(vm.Result.AnyListTarget);
+        Assert.NotNull(vm.Result);
+        Assert.Equal(3, vm.Result!.CsvImportedCount);
     }
 }

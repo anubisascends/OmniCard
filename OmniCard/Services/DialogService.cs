@@ -108,13 +108,25 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         return result == true ? wnd.ViewModel.ImportedCount : null;
     }
 
-    public BatchDecklistImportSummary? ShowBatchDecklistImport(IReadOnlyList<(string Name, string Text)> files)
+    public BatchDecklistImportSummary? ShowBatchDecklistImport()
     {
         var wnd = Services.GetRequiredService<BatchDecklistImportView>();
         SetOwner(wnd);
-        wnd.ViewModel.Load(files);
-        var result = wnd.ShowDialog();
-        return result == true ? wnd.ViewModel.Result : null;
+        var csv = Services.GetRequiredService<ICsvExportImportService>();
+        wnd.ViewModel.ImportCsvFile = path => ShowImportPreview(csv.PreviewImport(path));
+        wnd.ViewModel.PickFiles = () =>
+        {
+            var d = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "Import files (*.csv;*.txt)|*.csv;*.txt|All files (*.*)|*.*",
+                Title = "Add files",
+                Multiselect = true,
+            };
+            return d.ShowDialog() == true ? d.FileNames : null;
+        };
+        wnd.ViewModel.Load();
+        wnd.ShowDialog();
+        return wnd.ViewModel.Result;   // set on Import, or on Cancel when CSVs were imported
     }
 
     public bool OpenSortFilterBuilder(CardGame game)

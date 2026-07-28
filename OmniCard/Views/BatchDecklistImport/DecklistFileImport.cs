@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using OmniCard.Models;
 using OmniCard.Views.DecklistImport;
@@ -10,14 +9,15 @@ namespace OmniCard.Views.BatchDecklistImport;
 public sealed partial class DecklistFileImport : ObservableObject
 {
     public DecklistFileImport(
-        string sourceName,
+        string displayName,
+        string defaultNewName,
         IReadOnlyList<DecklistImportRow> rows,
         IReadOnlyList<CardList> availableLists,
         IReadOnlyList<StorageContainer> availableLocations)
     {
-        SourceName = sourceName;
-        DefaultNewName = Path.GetFileNameWithoutExtension(sourceName);
-        NewName = DefaultNewName;
+        SourceName = displayName;
+        DefaultNewName = defaultNewName;
+        NewName = defaultNewName;
         AvailableLists = availableLists;
         AvailableLocations = availableLocations;
         foreach (var r in rows) Rows.Add(r);

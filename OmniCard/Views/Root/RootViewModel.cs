@@ -13,7 +13,6 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Data;
 using OmniCard.CardMatching;
-using OmniCard.Collection;
 using OmniCard.Helpers;
 using OmniCard.Controls.Converters;
 using OmniCard.Controls.Themes;
@@ -2240,109 +2239,30 @@ public sealed partial class RootViewModel(
     [RelayCommand]
     public void Import()
     {
-        var dialog = new Microsoft.Win32.OpenFileDialog
-        {
-            Filter = "Import files (*.csv;*.txt)|*.csv;*.txt|All files (*.*)|*.*",
-            Title = "Import",
-            Multiselect = true,
-        };
-        if (dialog.ShowDialog() != true)
-            return;
-
         try
         {
-            var csvFiles = new List<string>();
-            var decklistFiles = new List<string>();
-            var unknownFiles = new List<string>();
-            var failedFiles = new List<string>();
-            foreach (var path in dialog.FileNames)
-            {
-                ImportKind kind;
-                try
-                {
-                    kind = ImportFileClassifier.ClassifyFile(path);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Failed to classify import file {Path}", path);
-                    failedFiles.Add(path);
-                    continue;
-                }
+            var summary = dialogService.ShowBatchDecklistImport();
+            if (summary is null)
+                return;
 
-                switch (kind)
-                {
-                    case ImportKind.Csv: csvFiles.Add(path); break;
-                    case ImportKind.Decklist: decklistFiles.Add(path); break;
-                    default: unknownFiles.Add(path); break;
-                }
-            }
-
-            var messages = new List<string>();
-            var containersChanged = false;
-            var listsChanged = false;
-
-            // CSV collections first (each its own preview dialog).
-            foreach (var path in csvFiles)
-            {
-                var preview = csvService.PreviewImport(path);
-                var imported = dialogService.ShowImportPreview(preview);
-                if (imported.HasValue)
-                {
-                    messages.Add($"Imported {imported.Value} cards from {System.IO.Path.GetFileName(path)}");
-                    containersChanged = true;   // app-native CSV import can create containers
-                }
-            }
-
-            // Decklists in one batch dialog.
-            if (decklistFiles.Count > 0)
-            {
-                var files = new List<(string Name, string Text)>();
-                foreach (var p in decklistFiles)
-                {
-                    try
-                    {
-                        files.Add((System.IO.Path.GetFileName(p), System.IO.File.ReadAllText(p)));
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogWarning(ex, "Failed to read decklist file {Path}", p);
-                        failedFiles.Add(p);
-                    }
-                }
-
-                if (files.Count > 0)
-                {
-                    var summary = dialogService.ShowBatchDecklistImport(files);
-                    if (summary is not null)
-                    {
-                        messages.Add($"Imported {summary.TotalAdded} cards across {summary.FileCount} file(s)"
-                            + (summary.TotalUnresolved > 0 ? $"; {summary.TotalUnresolved} lines unresolved" : ""));
-                        containersChanged |= summary.AnyLocationTarget;
-                        listsChanged |= summary.AnyListTarget;
-                    }
-                }
-            }
-
-            if (unknownFiles.Count > 0)
-                messages.Add($"Skipped {unknownFiles.Count} unrecognized file(s): "
-                    + string.Join(", ", unknownFiles.Select(System.IO.Path.GetFileName)));
-
-            if (failedFiles.Count > 0)
-                messages.Add($"Failed to read {failedFiles.Count} file(s): "
-                    + string.Join(", ", failedFiles.Select(System.IO.Path.GetFileName)));
-
-            // Refresh: container dropdowns + overview tiles (new locations), lists sidebar (new lists), card grid.
+            var containersChanged = summary.AnyLocationTarget || summary.CsvImportedCount > 0;
             if (containersChanged)
                 LoadContainers();
             if (Collection.ShowCardList)
                 _ = Collection.SearchCollection();
             else
                 Collection.LoadOverview();
-            if (listsChanged)
+            if (summary.AnyListTarget)
                 Lists.Refresh();
 
-            if (messages.Count > 0)
-                Message = string.Join(" · ", messages);
+            var parts = new List<string>();
+            if (summary.FileCount > 0)
+                parts.Add($"Imported {summary.TotalAdded} cards across {summary.FileCount} deck(s)"
+                    + (summary.TotalUnresolved > 0 ? $"; {summary.TotalUnresolved} lines unresolved" : ""));
+            if (summary.CsvImportedCount > 0)
+                parts.Add($"Imported {summary.CsvImportedCount} cards from CSV");
+            if (parts.Count > 0)
+                Message = string.Join(" · ", parts);
         }
         catch (Exception ex)
         {

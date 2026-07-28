@@ -8,4 +8,5 @@ public record BatchDecklistImportSummary(
     int TotalUnresolved,
     bool AnyListTarget,
     bool AnyLocationTarget,
+    int CsvImportedCount,
     IReadOnlyList<BatchFileResult> Files);
