@@ -21,14 +21,38 @@
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="{Binding ViewModel.HeaderLabel}" FontWeight="SemiBold" FontSize="14"
+        <!-- Toolbar: Add files + Add URLs -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                <Button Content="Add files…" Command="{Binding ViewModel.AddFilesCommand}" Padding="12,4" Margin="0,0,8,0"/>
+            </StackPanel>
+            <TextBlock Text="Add decks by URL (Moxfield / Archidekt, one per line):"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" Margin="0,0,0,2"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" Text="{Binding ViewModel.UrlText, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True" MinLines="2" MaxLines="4" VerticalScrollBarVisibility="Auto"
+                         Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" Margin="0,0,8,0"/>
+                <Button Grid.Column="1" Content="Fetch" VerticalAlignment="Top" Padding="12,4"
+                        Command="{Binding ViewModel.AddUrlsCommand}"
+                        IsEnabled="{Binding ViewModel.NotBusy}"/>
+            </Grid>
+            <TextBlock Text="{Binding ViewModel.StatusMessage}" TextWrapping="Wrap"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="1" Text="{Binding ViewModel.HeaderLabel}" FontWeight="SemiBold" FontSize="14"
                    Margin="0,0,0,8" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
 
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="440"/>
                 <ColumnDefinition Width="*"/>
@@ -93,7 +117,7 @@
             </DataGrid>
         </Grid>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button Content="Import" Command="{Binding ViewModel.ImportCommand}"
                     IsEnabled="{Binding ViewModel.CanImport}" Padding="16,4" Margin="0,0,8,0"/>
             <Button Content="Cancel" Command="{Binding ViewModel.CancelCommand}" Padding="16,4" IsCancel="True"/>
