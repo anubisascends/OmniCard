@@ -30,4 +30,5 @@ public interface IDialogService
     int ShowTcgOrderImportPreview(TcgOrderImportPreview preview);
     bool Confirm(string message, string title);
     DecklistImportSummary? ShowDecklistImport(string sourceName, string fileText, int? defaultContainerId);
+    BatchDecklistImportSummary? ShowBatchDecklistImport(IReadOnlyList<(string Name, string Text)> files);
 }

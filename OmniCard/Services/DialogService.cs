@@ -6,6 +6,7 @@ using OmniCard.Views.Card;
 using OmniCard.Views.CollectionCardEditor;
 using OmniCard.Views.Connection;
 using OmniCard.Views.CoverArtPicker;
+using OmniCard.Views.BatchDecklistImport;
 using OmniCard.Views.CsvImport;
 using OmniCard.Views.DecklistImport;
 using OmniCard.Views.EbayAuth;
@@ -113,6 +114,15 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         var wnd = Services.GetRequiredService<DecklistImportView>();
         SetOwner(wnd);
         wnd.ViewModel.Load(sourceName, fileText, defaultContainerId);
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.Result : null;
+    }
+
+    public BatchDecklistImportSummary? ShowBatchDecklistImport(IReadOnlyList<(string Name, string Text)> files)
+    {
+        var wnd = Services.GetRequiredService<BatchDecklistImportView>();
+        SetOwner(wnd);
+        wnd.ViewModel.Load(files);
         var result = wnd.ShowDialog();
         return result == true ? wnd.ViewModel.Result : null;
     }
