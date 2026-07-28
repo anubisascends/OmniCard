@@ -172,7 +172,9 @@ public class EbaySellerSetupService : IEbaySellerSetupService
                             {
                                 sortOrder = 1,
                                 shippingCarrierCode = "USPS",
-                                shippingServiceCode = "USPSGround",
+                                // USPS retired USPSGround/First-Class/Parcel Select in favor of Ground Advantage;
+                                // the old codes now fail fulfillment-policy creation with "select a valid shipping service".
+                                shippingServiceCode = "USPSGroundAdvantage",
                                 freeShipping = s.FreeShipping,
                                 shippingCost = new { value = (s.FreeShipping ? 0m : s.ShippingCost).ToString("F2", CultureInfo.InvariantCulture), currency = "USD" },
                             }
@@ -187,15 +189,27 @@ public class EbaySellerSetupService : IEbaySellerSetupService
                 categoryTypes,
                 paymentMethods = Array.Empty<object>(),
             },
-            "return" => (object)new
-            {
-                name = PolicyName,
-                marketplaceId = Marketplace,
-                categoryTypes,
-                returnsAccepted = s.ReturnsAccepted,
-                returnPeriod = new { unit = "DAY", value = s.ReturnWindowDays },
-                returnShippingCostPayer = s.ReturnShippingPaidBy == ReturnShippingPayer.Seller ? "SELLER" : "BUYER",
-            },
+            // When returns are accepted eBay requires refundMethod + returnPeriod + returnShippingCostPayer
+            // together (omitting refundMethod triggers "some fields missed" / policy-dependency errors).
+            // When returns are NOT accepted, those fields must be omitted or they trip the same dependency error.
+            "return" => s.ReturnsAccepted
+                ? (object)new
+                {
+                    name = PolicyName,
+                    marketplaceId = Marketplace,
+                    categoryTypes,
+                    returnsAccepted = true,
+                    refundMethod = "MONEY_BACK",
+                    returnPeriod = new { unit = "DAY", value = s.ReturnWindowDays },
+                    returnShippingCostPayer = s.ReturnShippingPaidBy == ReturnShippingPayer.Seller ? "SELLER" : "BUYER",
+                }
+                : new
+                {
+                    name = PolicyName,
+                    marketplaceId = Marketplace,
+                    categoryTypes,
+                    returnsAccepted = false,
+                },
             _ => new { name = PolicyName, marketplaceId = Marketplace, categoryTypes },
         };
     }

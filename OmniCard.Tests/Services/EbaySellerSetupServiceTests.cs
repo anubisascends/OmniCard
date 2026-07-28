@@ -89,6 +89,65 @@ public class EbaySellerSetupServiceTests
     }
 
     [Fact]
+    public async Task RunSetup_PolicyPayloads_UseValidEbayFields()
+    {
+        // Regression for live-sandbox failures: fulfillment must use USPSGroundAdvantage
+        // (USPSGround was retired) and the return policy must include refundMethod=MONEY_BACK
+        // (omitting it caused "some fields missed" / policy-dependency errors).
+        var settings = WithValidAddress();
+        settings.Current.ReturnsAccepted = true;
+        var handler = new RoutingHandler((req, body) =>
+        {
+            var u = req.RequestUri!.AbsolutePath;
+            if (u.Contains("/program/opt_in")) return (HttpStatusCode.OK, "{}");
+            if (u.Contains("/location/") && req.Method == HttpMethod.Get) return (HttpStatusCode.NotFound, "{}");
+            if (u.Contains("/location/") && req.Method == HttpMethod.Post) return (HttpStatusCode.NoContent, "");
+            if (u.EndsWith("_policy") && req.Method == HttpMethod.Get) return (HttpStatusCode.OK, "{}");
+            if (u.Contains("fulfillment_policy")) return (HttpStatusCode.Created, JsonSerializer.Serialize(new { fulfillmentPolicyId = "fp-1" }));
+            if (u.Contains("return_policy")) return (HttpStatusCode.Created, JsonSerializer.Serialize(new { returnPolicyId = "rp-1" }));
+            if (u.Contains("payment_policy")) return (HttpStatusCode.Created, JsonSerializer.Serialize(new { paymentPolicyId = "pp-1" }));
+            return (HttpStatusCode.OK, "{}");
+        });
+        var svc = Create(handler, settings);
+
+        await svc.RunSetupAsync();
+
+        var fulfillmentPost = handler.Requests.Single(r => r.Method == HttpMethod.Post && r.Uri.EndsWith("fulfillment_policy"));
+        Assert.Contains("USPSGroundAdvantage", fulfillmentPost.Body);
+
+        var returnPost = handler.Requests.Single(r => r.Method == HttpMethod.Post && r.Uri.EndsWith("return_policy"));
+        Assert.Contains("MONEY_BACK", returnPost.Body);
+        Assert.Contains("returnShippingCostPayer", returnPost.Body);
+    }
+
+    [Fact]
+    public async Task RunSetup_ReturnPolicy_OmitsPeriodAndPayer_WhenReturnsNotAccepted()
+    {
+        var settings = WithValidAddress();
+        settings.Current.ReturnsAccepted = false;
+        var handler = new RoutingHandler((req, body) =>
+        {
+            var u = req.RequestUri!.AbsolutePath;
+            if (u.Contains("/program/opt_in")) return (HttpStatusCode.OK, "{}");
+            if (u.Contains("/location/") && req.Method == HttpMethod.Get) return (HttpStatusCode.NotFound, "{}");
+            if (u.Contains("/location/") && req.Method == HttpMethod.Post) return (HttpStatusCode.NoContent, "");
+            if (u.EndsWith("_policy") && req.Method == HttpMethod.Get) return (HttpStatusCode.OK, "{}");
+            if (u.Contains("fulfillment_policy")) return (HttpStatusCode.Created, JsonSerializer.Serialize(new { fulfillmentPolicyId = "fp-1" }));
+            if (u.Contains("return_policy")) return (HttpStatusCode.Created, JsonSerializer.Serialize(new { returnPolicyId = "rp-1" }));
+            if (u.Contains("payment_policy")) return (HttpStatusCode.Created, JsonSerializer.Serialize(new { paymentPolicyId = "pp-1" }));
+            return (HttpStatusCode.OK, "{}");
+        });
+        var svc = Create(handler, settings);
+
+        await svc.RunSetupAsync();
+
+        var returnPost = handler.Requests.Single(r => r.Method == HttpMethod.Post && r.Uri.EndsWith("return_policy"));
+        Assert.Contains("\"returnsAccepted\":false", returnPost.Body!.Replace(" ", ""));
+        Assert.DoesNotContain("returnShippingCostPayer", returnPost.Body);
+        Assert.DoesNotContain("returnPeriod", returnPost.Body);
+    }
+
+    [Fact]
     public async Task RunSetup_LocationStepFails_WhenAddressMissing()
     {
         var settings = new MemSettings(); // no address
