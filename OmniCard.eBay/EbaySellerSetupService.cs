@@ -54,16 +54,150 @@ public class EbaySellerSetupService : IEbaySellerSetupService
         progress?.Report("Ensuring inventory location…");
         result.Steps.Add(await EnsureLocationAsync(client, s));
 
-        // Policy steps are added by Task 3.
         await FinalizeAsync(client, s, result, progress);
 
         _sellingSettings.Save(s);
         return result;
     }
 
-    // Task 3 replaces this stub with real policy steps + Success calculation.
-    protected virtual Task FinalizeAsync(HttpClient client, EbaySellingSettings s, EbaySetupResult result, IProgress<string>? progress)
-        => Task.CompletedTask;
+    private async Task FinalizeAsync(HttpClient client, EbaySellingSettings s, EbaySetupResult result, IProgress<string>? progress)
+    {
+        progress?.Report("Ensuring fulfillment (shipping) policy…");
+        var fulfillment = await EnsurePolicyAsync(client, s, "fulfillment");
+        result.Steps.Add(fulfillment);
+
+        progress?.Report("Ensuring payment policy…");
+        result.Steps.Add(await EnsurePolicyAsync(client, s, "payment"));
+
+        progress?.Report("Ensuring return policy…");
+        var ret = await EnsurePolicyAsync(client, s, "return");
+        result.Steps.Add(ret);
+
+        var locationOk = s.LocationProvisioned;
+        result.Success = locationOk
+            && !string.IsNullOrEmpty(s.FulfillmentPolicyId)
+            && !string.IsNullOrEmpty(s.ReturnPolicyId);
+        if (result.Success)
+            s.SetupCompletedAt = DateTime.UtcNow;
+    }
+
+    private async Task<EbaySetupStep> EnsurePolicyAsync(HttpClient client, EbaySellingSettings s, string policyType)
+    {
+        var stepName = policyType switch
+        {
+            "fulfillment" => "Fulfillment (shipping) policy",
+            "payment" => "Payment policy",
+            "return" => "Return policy",
+            _ => policyType,
+        };
+        try
+        {
+            // 1. Look for an existing policy named PolicyName.
+            var listUrl = $"{_settings.ApiBaseUrl}/sell/account/v1/{policyType}_policy?marketplace_id={Marketplace}";
+            var listResp = await client.GetAsync(listUrl);
+            if (listResp.IsSuccessStatusCode)
+            {
+                var listJson = await listResp.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(listJson);
+                if (doc.RootElement.TryGetProperty($"{policyType}Policies", out var arr) && arr.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var p in arr.EnumerateArray())
+                    {
+                        if (p.TryGetProperty("name", out var n) && n.GetString() == PolicyName
+                            && p.TryGetProperty($"{policyType}PolicyId", out var idEl))
+                        {
+                            StorePolicyId(s, policyType, idEl.GetString());
+                            return new EbaySetupStep(stepName, EbaySetupStepStatus.SkippedExisting, null);
+                        }
+                    }
+                }
+            }
+
+            // 2. Create it.
+            var payload = BuildPolicyPayload(policyType, s);
+            var createResp = await client.PostAsync(
+                $"{_settings.ApiBaseUrl}/sell/account/v1/{policyType}_policy",
+                new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
+            if (!createResp.IsSuccessStatusCode)
+            {
+                var err = await createResp.Content.ReadAsStringAsync();
+                _logger.LogWarning("Create {PolicyType} policy failed: {Status} — {Error}", policyType, createResp.StatusCode, err);
+                return new EbaySetupStep(stepName, EbaySetupStepStatus.Failed, $"{createResp.StatusCode}: {err}");
+            }
+
+            var createJson = await createResp.Content.ReadAsStringAsync();
+            using var created = JsonDocument.Parse(createJson);
+            var id = created.RootElement.TryGetProperty($"{policyType}PolicyId", out var cid) ? cid.GetString() : null;
+            StorePolicyId(s, policyType, id);
+            return new EbaySetupStep(stepName, EbaySetupStepStatus.Ok, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ensure {PolicyType} policy threw", policyType);
+            return new EbaySetupStep(stepName, EbaySetupStepStatus.Failed, ex.Message);
+        }
+    }
+
+    private static void StorePolicyId(EbaySellingSettings s, string policyType, string? id)
+    {
+        switch (policyType)
+        {
+            case "fulfillment": s.FulfillmentPolicyId = id; break;
+            case "payment": s.PaymentPolicyId = id; break;
+            case "return": s.ReturnPolicyId = id; break;
+        }
+    }
+
+    private static object BuildPolicyPayload(string policyType, EbaySellingSettings s)
+    {
+        var categoryTypes = new[] { new { name = "ALL_EXCLUDING_MOTORS_VEHICLES" } };
+        return policyType switch
+        {
+            "fulfillment" => new
+            {
+                name = PolicyName,
+                marketplaceId = Marketplace,
+                categoryTypes,
+                handlingTime = new { unit = "DAY", value = s.HandlingTimeDays },
+                shippingOptions = new[]
+                {
+                    new
+                    {
+                        costType = "FLAT_RATE",
+                        optionType = "DOMESTIC",
+                        shippingServices = new[]
+                        {
+                            new
+                            {
+                                sortOrder = 1,
+                                shippingCarrierCode = "USPS",
+                                shippingServiceCode = "USPSGround",
+                                freeShipping = s.FreeShipping,
+                                shippingCost = new { value = (s.FreeShipping ? 0m : s.ShippingCost).ToString("F2"), currency = "USD" },
+                            }
+                        }
+                    }
+                },
+            },
+            "payment" => new
+            {
+                name = PolicyName,
+                marketplaceId = Marketplace,
+                categoryTypes,
+                paymentMethods = Array.Empty<object>(),
+            },
+            "return" => (object)new
+            {
+                name = PolicyName,
+                marketplaceId = Marketplace,
+                categoryTypes,
+                returnsAccepted = s.ReturnsAccepted,
+                returnPeriod = new { unit = "DAY", value = s.ReturnWindowDays },
+                returnShippingCostPayer = s.ReturnShippingPaidBy == ReturnShippingPayer.Seller ? "SELLER" : "BUYER",
+            },
+            _ => new { name = PolicyName, marketplaceId = Marketplace, categoryTypes },
+        };
+    }
 
     private async Task<EbaySetupStep> OptInAsync(HttpClient client)
     {

@@ -82,7 +82,7 @@ public class EbaySellerSetupServiceTests
 
         var result = await svc.RunSetupAsync();
 
-        // Policy steps + result.Success are implemented in Task 3 (FinalizeAsync is a stub here).
+        Assert.True(result.Success);
         Assert.True(settings.Current.LocationProvisioned);
         // Location POST was made to the merchant key
         Assert.Contains(handler.Requests, r => r.Method == HttpMethod.Post && r.Uri.Contains("/location/omnicard-primary"));
@@ -152,5 +152,81 @@ public class EbaySellerSetupServiceTests
         var loc = result.Steps.Single(s => s.Name == "Inventory location");
         Assert.Equal(EbaySetupStepStatus.SkippedExisting, loc.Status);
         Assert.DoesNotContain(handler.Requests, r => r.Method == HttpMethod.Post && r.Uri.Contains("/location/"));
+    }
+
+    [Fact]
+    public async Task RunSetup_CreatesPolicies_AndStoresIds()
+    {
+        var settings = WithValidAddress();
+        var handler = new RoutingHandler((req, body) =>
+        {
+            var u = req.RequestUri!.AbsolutePath;
+            if (u.Contains("/program/opt_in")) return (HttpStatusCode.OK, "{}");
+            if (u.Contains("/location/") && req.Method == HttpMethod.Get) return (HttpStatusCode.NotFound, "{}");
+            if (u.Contains("/location/") && req.Method == HttpMethod.Post) return (HttpStatusCode.NoContent, "");
+            if (u.EndsWith("fulfillment_policy") && req.Method == HttpMethod.Get) return (HttpStatusCode.OK, JsonSerializer.Serialize(new { fulfillmentPolicies = Array.Empty<object>() }));
+            if (u.EndsWith("return_policy") && req.Method == HttpMethod.Get) return (HttpStatusCode.OK, JsonSerializer.Serialize(new { returnPolicies = Array.Empty<object>() }));
+            if (u.EndsWith("payment_policy") && req.Method == HttpMethod.Get) return (HttpStatusCode.OK, JsonSerializer.Serialize(new { paymentPolicies = Array.Empty<object>() }));
+            if (u.EndsWith("fulfillment_policy") && req.Method == HttpMethod.Post) return (HttpStatusCode.Created, JsonSerializer.Serialize(new { fulfillmentPolicyId = "fp-1" }));
+            if (u.EndsWith("return_policy") && req.Method == HttpMethod.Post) return (HttpStatusCode.Created, JsonSerializer.Serialize(new { returnPolicyId = "rp-1" }));
+            if (u.EndsWith("payment_policy") && req.Method == HttpMethod.Post) return (HttpStatusCode.Created, JsonSerializer.Serialize(new { paymentPolicyId = "pp-1" }));
+            return (HttpStatusCode.OK, "{}");
+        });
+        var svc = Create(handler, settings);
+
+        var result = await svc.RunSetupAsync();
+
+        Assert.True(result.Success);
+        Assert.Equal("fp-1", settings.Current.FulfillmentPolicyId);
+        Assert.Equal("rp-1", settings.Current.ReturnPolicyId);
+        Assert.Equal("pp-1", settings.Current.PaymentPolicyId);
+        Assert.NotNull(settings.Current.SetupCompletedAt);
+    }
+
+    [Fact]
+    public async Task RunSetup_ReusesExistingPolicy_ByName()
+    {
+        var settings = WithValidAddress();
+        var handler = new RoutingHandler((req, body) =>
+        {
+            var u = req.RequestUri!.AbsolutePath;
+            if (u.Contains("/program/opt_in")) return (HttpStatusCode.OK, "{}");
+            if (u.Contains("/location/")) return (req.Method == HttpMethod.Get) ? (HttpStatusCode.OK, JsonSerializer.Serialize(new { merchantLocationKey = "omnicard-primary" })) : (HttpStatusCode.NoContent, "");
+            if (u.EndsWith("fulfillment_policy") && req.Method == HttpMethod.Get) return (HttpStatusCode.OK, JsonSerializer.Serialize(new { fulfillmentPolicies = new[] { new { fulfillmentPolicyId = "fp-existing", name = "OmniCard Default" } } }));
+            if (u.EndsWith("return_policy") && req.Method == HttpMethod.Get) return (HttpStatusCode.OK, JsonSerializer.Serialize(new { returnPolicies = new[] { new { returnPolicyId = "rp-existing", name = "OmniCard Default" } } }));
+            if (u.EndsWith("payment_policy") && req.Method == HttpMethod.Get) return (HttpStatusCode.OK, JsonSerializer.Serialize(new { paymentPolicies = new[] { new { paymentPolicyId = "pp-existing", name = "OmniCard Default" } } }));
+            return (HttpStatusCode.OK, "{}");
+        });
+        var svc = Create(handler, settings);
+
+        var result = await svc.RunSetupAsync();
+
+        Assert.Equal("fp-existing", settings.Current.FulfillmentPolicyId);
+        Assert.DoesNotContain(handler.Requests, r => r.Method == HttpMethod.Post && r.Uri.EndsWith("fulfillment_policy"));
+    }
+
+    [Fact]
+    public async Task RunSetup_PaymentPolicyFailure_IsNonFatal()
+    {
+        var settings = WithValidAddress();
+        var handler = new RoutingHandler((req, body) =>
+        {
+            var u = req.RequestUri!.AbsolutePath;
+            if (u.Contains("/program/opt_in")) return (HttpStatusCode.OK, "{}");
+            if (u.Contains("/location/")) return (req.Method == HttpMethod.Get) ? (HttpStatusCode.NotFound, "{}") : (HttpStatusCode.NoContent, "");
+            if (u.EndsWith("_policy") && req.Method == HttpMethod.Get) return (HttpStatusCode.OK, "{}");
+            if (u.EndsWith("fulfillment_policy") && req.Method == HttpMethod.Post) return (HttpStatusCode.Created, JsonSerializer.Serialize(new { fulfillmentPolicyId = "fp-1" }));
+            if (u.EndsWith("return_policy") && req.Method == HttpMethod.Post) return (HttpStatusCode.Created, JsonSerializer.Serialize(new { returnPolicyId = "rp-1" }));
+            if (u.EndsWith("payment_policy") && req.Method == HttpMethod.Post) return (HttpStatusCode.BadRequest, JsonSerializer.Serialize(new { errors = new[] { new { message = "not eligible for managed payments" } } }));
+            return (HttpStatusCode.OK, "{}");
+        });
+        var svc = Create(handler, settings);
+
+        var result = await svc.RunSetupAsync();
+
+        var pay = result.Steps.Single(s => s.Name == "Payment policy");
+        Assert.Equal(EbaySetupStepStatus.Failed, pay.Status);
+        Assert.True(result.Success); // location + fulfillment + return succeeded
+        Assert.Null(settings.Current.PaymentPolicyId);
     }
 }
