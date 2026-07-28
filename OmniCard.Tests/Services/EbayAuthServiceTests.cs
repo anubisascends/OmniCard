@@ -113,6 +113,108 @@ public class EbayAuthServiceTests
     }
 
     [Fact]
+    public void GetMissingConfiguration_ReturnsEmpty_WhenAllRequiredFieldsSet()
+    {
+        var settings = new EbaySettings
+        {
+            AppId = "app",
+            CertId = "cert",
+            RuName = "ru",
+            AcceptUrl = "https://example.com/accept",
+            Environment = "sandbox",
+        };
+        var svc = new EbayAuthService(
+            Options.Create(settings),
+            new StubHttpClientFactory(),
+            new InMemoryCredentialStore(),
+            NullLogger<EbayAuthService>.Instance);
+
+        Assert.Empty(svc.GetMissingConfiguration());
+    }
+
+    [Fact]
+    public void GetMissingConfiguration_ReportsAcceptUrl_WhenMissing()
+    {
+        // Mirrors the real-world failure: everything set except AcceptUrl,
+        // which silently disables the OAuth redirect capture.
+        var settings = new EbaySettings
+        {
+            AppId = "app",
+            CertId = "cert",
+            RuName = "ru",
+            AcceptUrl = "",
+            Environment = "sandbox",
+        };
+        var svc = new EbayAuthService(
+            Options.Create(settings),
+            new StubHttpClientFactory(),
+            new InMemoryCredentialStore(),
+            NullLogger<EbayAuthService>.Instance);
+
+        Assert.Contains("AcceptUrl", svc.GetMissingConfiguration());
+    }
+
+    [Fact]
+    public void GetMissingConfiguration_ReportsAllRequiredFields_WhenEmpty()
+    {
+        var svc = new EbayAuthService(
+            Options.Create(new EbaySettings()),
+            new StubHttpClientFactory(),
+            new InMemoryCredentialStore(),
+            NullLogger<EbayAuthService>.Instance);
+
+        var missing = svc.GetMissingConfiguration();
+
+        Assert.Contains("AppId", missing);
+        Assert.Contains("CertId", missing);
+        Assert.Contains("RuName", missing);
+        Assert.Contains("AcceptUrl", missing);
+    }
+
+    [Fact]
+    public void GetMissingConfiguration_DoesNotRequireDevId()
+    {
+        // DevId is not used by the OAuth authorization-code flow, so it must
+        // not block connecting even when blank.
+        var settings = new EbaySettings
+        {
+            AppId = "app",
+            CertId = "cert",
+            RuName = "ru",
+            AcceptUrl = "https://example.com/accept",
+            DevId = "",
+            Environment = "sandbox",
+        };
+        var svc = new EbayAuthService(
+            Options.Create(settings),
+            new StubHttpClientFactory(),
+            new InMemoryCredentialStore(),
+            NullLogger<EbayAuthService>.Instance);
+
+        Assert.DoesNotContain("DevId", svc.GetMissingConfiguration());
+    }
+
+    [Fact]
+    public void GetMissingConfiguration_TreatsWhitespaceAsMissing()
+    {
+        var settings = new EbaySettings
+        {
+            AppId = "   ",
+            CertId = "cert",
+            RuName = "ru",
+            AcceptUrl = "https://example.com/accept",
+            Environment = "sandbox",
+        };
+        var svc = new EbayAuthService(
+            Options.Create(settings),
+            new StubHttpClientFactory(),
+            new InMemoryCredentialStore(),
+            NullLogger<EbayAuthService>.Instance);
+
+        Assert.Contains("AppId", svc.GetMissingConfiguration());
+    }
+
+    [Fact]
     public async Task GetAccessTokenAsync_ReturnsToken_WhenNotExpired()
     {
         var store = new InMemoryCredentialStore();

@@ -99,6 +99,49 @@ public class EbayListingServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateListingAsync_SendsContentLanguageHeader_OnInventoryAndOffer()
+    {
+        // Regression: eBay's Inventory API rejects createOffer with errorId 25709
+        // ("Invalid value for header Content-Language") unless the header is set.
+        var dbFactory = CreateDbFactory();
+        int lotId;
+        using (var ctx = dbFactory.CreateDbContext())
+            lotId = SeedLot(ctx);
+
+        var responseJson = JsonSerializer.Serialize(new { listingId = "ebay-item-12345" });
+        var handler = new RecordingHttpHandler(HttpStatusCode.OK, responseJson);
+        var factory = new FakeHttpClientFactory(handler);
+        var authService = new FakeEbayAuthService("test-token");
+
+        var svc = new EbayListingService(
+            Options.Create(_settings), factory, authService, dbFactory,
+            NullLogger<EbayListingService>.Instance);
+
+        var options = new EbayListingOptions
+        {
+            Title = "MTG Black Lotus [LEA] #232 NM",
+            Description = "Near Mint Black Lotus from Alpha",
+            Price = 5000m,
+            ListingType = EbayListingType.FixedPrice,
+        };
+        var card = new CollectionCard { Id = lotId, Name = "Black Lotus" };
+
+        var result = await svc.CreateListingAsync(card, options);
+        Assert.True(result);
+
+        var mutating = handler.Requests
+            .Where(r => r.Method == HttpMethod.Put || r.Method == HttpMethod.Post)
+            .ToList();
+        Assert.NotEmpty(mutating);
+        foreach (var req in mutating)
+        {
+            Assert.True(
+                req.ContentLanguage.Contains("en-US"),
+                $"{req.Method} {req.Uri} is missing Content-Language: en-US");
+        }
+    }
+
+    [Fact]
     public async Task EndListingAsync_UpdatesStatusToEnded()
     {
         var dbFactory = CreateDbFactory();
@@ -191,6 +234,35 @@ public class EbayListingServiceTests : IDisposable
         Assert.Empty(verifyCtx.EbayListings.Where(l => l.LotId == lotId));
     }
 }
+
+/// <summary>
+/// Captures a snapshot of each outgoing request (method, uri, Content-Language)
+/// so assertions can inspect headers after HttpClient has disposed the content.
+/// </summary>
+public class RecordingHttpHandler : HttpMessageHandler
+{
+    private readonly HttpStatusCode _status;
+    private readonly string _body;
+    public List<RecordedRequest> Requests { get; } = [];
+
+    public RecordingHttpHandler(HttpStatusCode status, string body)
+    {
+        _status = status;
+        _body = body;
+    }
+
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var contentLanguage = request.Content?.Headers.ContentLanguage.ToList() ?? [];
+        Requests.Add(new RecordedRequest(request.Method, request.RequestUri, contentLanguage));
+        return Task.FromResult(new HttpResponseMessage(_status)
+        {
+            Content = new System.Net.Http.StringContent(_body, System.Text.Encoding.UTF8, "application/json"),
+        });
+    }
+}
+
+public record RecordedRequest(HttpMethod Method, Uri? Uri, List<string> ContentLanguage);
 
 public class TestDbContextFactory : IDbContextFactory<OmniCardDbContext>
 {

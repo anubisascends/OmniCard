@@ -413,11 +413,27 @@ public sealed partial class RootViewModel(
     [RelayCommand]
     public void ConnectToEbay()
     {
+        var missing = ebayAuthService.GetMissingConfiguration();
+        if (missing.Count > 0)
+        {
+            var fields = string.Join(", ", missing);
+            _logger.LogWarning("eBay connect blocked — missing configuration: {Missing}", fields);
+            Message = $"eBay is not configured. Missing setting(s): {fields}. " +
+                "Set these under the \"eBay\" section in user secrets or appsettings.json, then try again.";
+            return;
+        }
+
         var result = dialogService.ConnectToEbay();
         if (result == true)
         {
             IsEbayConnected = ebayAuthService.IsConnected;
             Message = "Connected to eBay.";
+        }
+        else if (!ebayAuthService.IsConnected)
+        {
+            // Dialog closed without a persisted connection (cancelled, or the token
+            // exchange failed). Surface it rather than leaving the user guessing.
+            Message = "eBay connection was not completed.";
         }
     }
 

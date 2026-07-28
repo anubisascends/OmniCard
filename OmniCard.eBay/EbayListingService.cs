@@ -58,12 +58,9 @@ public class EbayListingService : IEbayListingService
             var inventoryItem = BuildInventoryItem(card, options);
             var inventoryJson = JsonSerializer.Serialize(inventoryItem);
 
-            var inventoryContent = new StringContent(inventoryJson, Encoding.UTF8, "application/json");
-            inventoryContent.Headers.Add("Content-Language", "en-US");
-
             var inventoryResponse = await client.PutAsync(
                 $"{_settings.ApiBaseUrl}/sell/inventory/v1/inventory_item/{Uri.EscapeDataString(sku)}",
-                inventoryContent);
+                JsonContent(inventoryJson));
 
             if (!inventoryResponse.IsSuccessStatusCode)
             {
@@ -79,7 +76,7 @@ public class EbayListingService : IEbayListingService
 
             var offerResponse = await client.PostAsync(
                 $"{_settings.ApiBaseUrl}/sell/inventory/v1/offer",
-                new StringContent(offerJson, Encoding.UTF8, "application/json"));
+                JsonContent(offerJson));
 
             if (!offerResponse.IsSuccessStatusCode)
             {
@@ -109,7 +106,7 @@ public class EbayListingService : IEbayListingService
 
             var publishResponse = await client.PostAsync(
                 $"{_settings.ApiBaseUrl}/sell/inventory/v1/offer/{Uri.EscapeDataString(offerId)}/publish",
-                new StringContent("{}", Encoding.UTF8, "application/json"));
+                JsonContent("{}"));
 
             string ebayItemId;
             if (publishResponse.IsSuccessStatusCode)
@@ -157,7 +154,7 @@ public class EbayListingService : IEbayListingService
 
             var response = await client.PutAsync(
                 $"{_settings.ApiBaseUrl}/sell/inventory/v1/inventory_item/{Uri.EscapeDataString(sku)}",
-                new StringContent(inventoryJson, Encoding.UTF8, "application/json"));
+                JsonContent(inventoryJson));
 
             if (!response.IsSuccessStatusCode)
             {
@@ -243,7 +240,8 @@ public class EbayListingService : IEbayListingService
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Failed to fetch {PolicyType} policies: {Status}", policyType, response.StatusCode);
+                var error = await response.Content.ReadAsStringAsync();
+                _logger.LogWarning("Failed to fetch {PolicyType} policies: {Status} — {Error}", policyType, response.StatusCode, error);
                 return [];
             }
 
@@ -273,6 +271,15 @@ public class EbayListingService : IEbayListingService
             _logger.LogError(ex, "Failed to fetch {PolicyType} policies", policyType);
             return [];
         }
+    }
+
+    // eBay's Inventory API requires a Content-Language header on inventory_item and
+    // offer requests; omitting it fails createOffer with errorId 25709.
+    private static StringContent JsonContent(string json)
+    {
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        content.Headers.Add("Content-Language", "en-US");
+        return content;
     }
 
     private static object BuildInventoryItem(CollectionCard? card, EbayListingOptions options)

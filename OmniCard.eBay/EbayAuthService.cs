@@ -60,6 +60,20 @@ public partial class EbayAuthService : ObservableObject, IEbayAuthService
         }
     }
 
+    public IReadOnlyList<string> GetMissingConfiguration()
+    {
+        // Only the fields the OAuth authorization-code flow actually consumes are required.
+        // DevId is unused by this flow, so a blank DevId must not block connecting.
+        var missing = new List<string>();
+        if (string.IsNullOrWhiteSpace(_settings.AppId)) missing.Add(nameof(_settings.AppId));
+        if (string.IsNullOrWhiteSpace(_settings.CertId)) missing.Add(nameof(_settings.CertId));
+        if (string.IsNullOrWhiteSpace(_settings.RuName)) missing.Add(nameof(_settings.RuName));
+        // AcceptUrl is what the auth WebView matches to capture the returned code;
+        // without it the redirect is silently ignored and no tokens are ever saved.
+        if (string.IsNullOrWhiteSpace(_settings.AcceptUrl)) missing.Add(nameof(_settings.AcceptUrl));
+        return missing;
+    }
+
     public string GetAuthorizationUrl()
     {
         var scopes = Uri.EscapeDataString(string.Join(" ", OAuthScopes));
