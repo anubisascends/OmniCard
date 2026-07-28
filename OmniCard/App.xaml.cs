@@ -25,7 +25,6 @@ using OmniCard.Views.Connection;
 using OmniCard.Views.CoverArtPicker;
 using OmniCard.Views.BatchDecklistImport;
 using OmniCard.Views.CsvImport;
-using OmniCard.Views.DecklistImport;
 using OmniCard.Views.HashPreview;
 using OmniCard.Views.Root;
 using OmniCard.Views.Splash;
@@ -201,8 +200,6 @@ public partial class App : Application
             services.AddTransient<EbayAuthViewModel>();
             services.AddTransient<CsvImportView>();
             services.AddTransient<CsvImportViewModel>();
-            services.AddTransient<DecklistImportView>();
-            services.AddTransient<DecklistImportViewModel>();
             services.AddTransient<BatchDecklistImportView>();
             services.AddTransient<BatchDecklistImportViewModel>();
             services.AddTransient<Views.TcgOrderImport.TcgOrderImportView>();
