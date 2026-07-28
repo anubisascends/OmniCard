@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -340,9 +341,9 @@ public class EbayListingService : IEbayListingService
             merchantLocationKey = selling.MerchantLocationKey,
             pricingSummary = new
             {
-                price = new { value = options.Price.ToString("F2"), currency = "USD" },
+                price = new { value = options.Price.ToString("F2", CultureInfo.InvariantCulture), currency = "USD" },
                 auctionStartPrice = options.ListingType == EbayListingType.Auction
-                    ? new { value = options.Price.ToString("F2"), currency = "USD" }
+                    ? new { value = options.Price.ToString("F2", CultureInfo.InvariantCulture), currency = "USD" }
                     : null,
             },
             listingDuration = options.ListingType == EbayListingType.Auction && options.AuctionDuration.HasValue

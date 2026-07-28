@@ -42,7 +42,7 @@
             </Grid>
 
             <TextBlock Text="Shipping" FontWeight="SemiBold" FontSize="14" Margin="0,16,0,12" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-            <CheckBox Content="Free shipping" Margin="0,4" IsChecked="{Binding Settings.FreeShipping}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            <CheckBox Content="Free shipping" Margin="0,4" IsChecked="{Binding FreeShipping}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="140"/>
@@ -54,6 +54,7 @@
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Shipping cost" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox   Grid.Row="0" Grid.Column="1" Width="80" HorizontalAlignment="Left" Margin="0,4"
+                           IsEnabled="{Binding NotFreeShipping}"
                            Text="{Binding Settings.ShippingCost, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Handling time (days)" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox   Grid.Row="1" Grid.Column="1" Width="80" HorizontalAlignment="Left" Margin="0,4"
@@ -68,16 +69,20 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Return window (days)" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox   Grid.Row="0" Grid.Column="1" Width="80" HorizontalAlignment="Left" Margin="0,4"
                            Text="{Binding Settings.ReturnWindowDays, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Return shipping paid by" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                <ComboBox  Grid.Row="1" Grid.Column="1" Width="120" HorizontalAlignment="Left" Margin="0,4"
+                           ItemsSource="{Binding ReturnShippingPayerValues}"
+                           SelectedItem="{Binding Settings.ReturnShippingPaidBy}"/>
             </Grid>
 
             <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
-                <Button Content="Save" Command="{Binding SaveCommand}" Padding="16,4" Margin="0,0,12,0"/>
+                <Button Content="Save" Command="{Binding SaveCommand}" IsEnabled="{Binding NotBusy}" Padding="16,4" Margin="0,0,12,0"/>
                 <Button Content="Run eBay Setup" Command="{Binding RunSetupCommand}" IsEnabled="{Binding NotBusy}" Padding="16,4"/>
             </StackPanel>
 

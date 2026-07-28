@@ -206,6 +206,32 @@ public class EbaySellerSetupServiceTests
     }
 
     [Fact]
+    public async Task RunSetup_OptIn_AlreadyOptedIn_IsSkippedExisting_NotFailed()
+    {
+        var settings = WithValidAddress();
+        var handler = new RoutingHandler((req, body) =>
+        {
+            var u = req.RequestUri!.AbsolutePath;
+            if (u.Contains("/program/opt_in"))
+                return (HttpStatusCode.Conflict, JsonSerializer.Serialize(new { errors = new[] { new { message = "User has already opted in to the program" } } }));
+            if (u.Contains("/location/") && req.Method == HttpMethod.Get) return (HttpStatusCode.NotFound, "{}");
+            if (u.Contains("/location/") && req.Method == HttpMethod.Post) return (HttpStatusCode.NoContent, "");
+            if (u.EndsWith("_policy") && req.Method == HttpMethod.Get) return (HttpStatusCode.OK, "{}");
+            if (u.Contains("fulfillment_policy") && req.Method == HttpMethod.Post) return (HttpStatusCode.Created, JsonSerializer.Serialize(new { fulfillmentPolicyId = "fp-1" }));
+            if (u.Contains("return_policy") && req.Method == HttpMethod.Post) return (HttpStatusCode.Created, JsonSerializer.Serialize(new { returnPolicyId = "rp-1" }));
+            if (u.Contains("payment_policy") && req.Method == HttpMethod.Post) return (HttpStatusCode.Created, JsonSerializer.Serialize(new { paymentPolicyId = "pp-1" }));
+            return (HttpStatusCode.OK, "{}");
+        });
+        var svc = Create(handler, settings);
+
+        var result = await svc.RunSetupAsync();
+
+        var optIn = result.Steps.Single(s => s.Name == "Business Policies opt-in");
+        Assert.Equal(EbaySetupStepStatus.SkippedExisting, optIn.Status);
+        Assert.True(result.Success);
+    }
+
+    [Fact]
     public async Task RunSetup_PaymentPolicyFailure_IsNonFatal()
     {
         var settings = WithValidAddress();

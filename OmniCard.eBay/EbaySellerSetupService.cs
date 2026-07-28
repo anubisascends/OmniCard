@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -173,7 +174,7 @@ public class EbaySellerSetupService : IEbaySellerSetupService
                                 shippingCarrierCode = "USPS",
                                 shippingServiceCode = "USPSGround",
                                 freeShipping = s.FreeShipping,
-                                shippingCost = new { value = (s.FreeShipping ? 0m : s.ShippingCost).ToString("F2"), currency = "USD" },
+                                shippingCost = new { value = (s.FreeShipping ? 0m : s.ShippingCost).ToString("F2", CultureInfo.InvariantCulture), currency = "USD" },
                             }
                         }
                     }

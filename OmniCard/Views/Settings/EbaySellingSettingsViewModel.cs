@@ -19,6 +19,34 @@ public partial class EbaySellingSettingsViewModel(
     [ObservableProperty]
     public partial EbaySellingSettings Settings { get; set; } = new();
 
+    public IReadOnlyList<ReturnShippingPayer> ReturnShippingPayerValues { get; } = Enum.GetValues<ReturnShippingPayer>();
+
+    /// <summary>
+    /// Proxies <see cref="EbaySellingSettings.FreeShipping"/>. <see cref="EbaySellingSettings"/> is a
+    /// plain POCO with no change notification, so the shipping-cost TextBox's IsEnabled binding
+    /// (bound to <see cref="NotFreeShipping"/>) wouldn't live-update if the "Free shipping" CheckBox
+    /// bound straight to Settings.FreeShipping — this wrapper raises PropertyChanged on toggle.
+    /// </summary>
+    public bool FreeShipping
+    {
+        get => Settings.FreeShipping;
+        set
+        {
+            if (Settings.FreeShipping == value) return;
+            Settings.FreeShipping = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(NotFreeShipping));
+        }
+    }
+
+    public bool NotFreeShipping => !Settings.FreeShipping;
+
+    partial void OnSettingsChanged(EbaySellingSettings value)
+    {
+        OnPropertyChanged(nameof(FreeShipping));
+        OnPropertyChanged(nameof(NotFreeShipping));
+    }
+
     [ObservableProperty]
     public partial bool IsBusy { get; set; }
 
