@@ -1,4 +1,5 @@
 using System.IO;
+using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Models;
 using OmniCard.Tests.Fakes;
 using OmniCard.Views.BatchDecklistImport;
@@ -23,7 +24,8 @@ public class BatchDecklistImportViewModelTests
         var containers = new RecordingContainerService();
         var imp = new FakeDecklistImportService();
         var decks = new FakeDecklistParseService();
-        var vm = new BatchDecklistImportViewModel(imp, cards, lists, containers, decks);
+        var vm = new BatchDecklistImportViewModel(imp, cards, lists, containers, decks,
+            NullLogger<BatchDecklistImportViewModel>.Instance);
         vm.Load();
         return (vm, imp, lists, containers, cards, decks);
     }

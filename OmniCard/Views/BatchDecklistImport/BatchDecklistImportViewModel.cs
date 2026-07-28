@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
 using OmniCard.Collection;
 using OmniCard.Interfaces;
 using OmniCard.Models;
@@ -16,7 +17,8 @@ public sealed partial class BatchDecklistImportViewModel(
     ICardService cardService,
     IListService listService,
     IStorageContainerService containerService,
-    IDecklistService decklistService) : ViewModel
+    IDecklistService decklistService,
+    ILogger<BatchDecklistImportViewModel> logger) : ViewModel
 {
     public ObservableCollection<DecklistFileImport> Files { get; } = [];
     public ObservableCollection<CardList> AvailableLists { get; } = [];
@@ -29,6 +31,7 @@ public sealed partial class BatchDecklistImportViewModel(
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NotBusy))]
+    [NotifyPropertyChangedFor(nameof(CanImportNow))]
     public partial bool IsBusy { get; set; }
 
     public bool NotBusy => !IsBusy;
@@ -36,6 +39,7 @@ public sealed partial class BatchDecklistImportViewModel(
     public int CsvImportedCount { get; private set; }
 
     public bool CanImport => Files.Count > 0 && Files.All(f => f.HasTarget);
+    public bool CanImportNow => CanImport && NotBusy;
 
     public BatchDecklistImportSummary? Result { get; private set; }
     public Action<bool>? CloseDialog { get; set; }
@@ -91,9 +95,10 @@ public sealed partial class BatchDecklistImportViewModel(
                     notes.Add($"Skipped {Path.GetFileName(path)} (unrecognized)");
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                notes.Add($"Failed to read {Path.GetFileName(path)}");
+                logger.LogWarning(ex, "Failed to process import path {Path}", path);
+                notes.Add($"Failed to process {Path.GetFileName(path)}");
             }
         }
         if (notes.Count > 0) StatusMessage = string.Join(" · ", notes);
@@ -107,6 +112,7 @@ public sealed partial class BatchDecklistImportViewModel(
         if (urls.Count == 0) { StatusMessage = "Paste one or more deck URLs (one per line)."; return; }
 
         IsBusy = true;
+        StatusMessage = "Fetching…";
         try
         {
             var failed = new List<string>();
@@ -143,12 +149,16 @@ public sealed partial class BatchDecklistImportViewModel(
     {
         HeaderLabel = $"{Files.Count} deck(s) · {Files.Sum(f => f.ResolvedCount)} resolved · {Files.Sum(f => f.UnresolvedCount)} unresolved";
         OnPropertyChanged(nameof(CanImport));
+        OnPropertyChanged(nameof(CanImportNow));
     }
 
     private void OnItemChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(DecklistFileImport.HasTarget))
+        {
             OnPropertyChanged(nameof(CanImport));
+            OnPropertyChanged(nameof(CanImportNow));
+        }
     }
 
     [RelayCommand]

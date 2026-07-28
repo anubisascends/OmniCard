@@ -29,7 +29,8 @@
         <!-- Toolbar: Add files + Add URLs -->
         <StackPanel Grid.Row="0" Margin="0,0,0,8">
             <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                <Button Content="Add files…" Command="{Binding ViewModel.AddFilesCommand}" Padding="12,4" Margin="0,0,8,0"/>
+                <Button Content="Add files…" Command="{Binding ViewModel.AddFilesCommand}" Padding="12,4" Margin="0,0,8,0"
+                        IsEnabled="{Binding ViewModel.NotBusy}"/>
             </StackPanel>
             <TextBlock Text="Add decks by URL (Moxfield / Archidekt, one per line):"
                        Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" Margin="0,0,0,2"/>
@@ -119,8 +120,9 @@
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button Content="Import" Command="{Binding ViewModel.ImportCommand}"
-                    IsEnabled="{Binding ViewModel.CanImport}" Padding="16,4" Margin="0,0,8,0"/>
-            <Button Content="Cancel" Command="{Binding ViewModel.CancelCommand}" Padding="16,4" IsCancel="True"/>
+                    IsEnabled="{Binding ViewModel.CanImportNow}" Padding="16,4" Margin="0,0,8,0"/>
+            <Button Content="Cancel" Command="{Binding ViewModel.CancelCommand}" Padding="16,4" IsCancel="True"
+                    IsEnabled="{Binding ViewModel.NotBusy}"/>
         </StackPanel>
     </Grid>
 </Window>
