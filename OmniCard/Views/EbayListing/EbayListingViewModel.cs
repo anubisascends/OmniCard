@@ -10,6 +10,7 @@ namespace OmniCard.Views.EbayListing;
 public sealed partial class EbayListingViewModel(
     IEbayCatalogService catalogService,
     IEbayListingService listingService,
+    IEbaySellingSettingsService sellingSettings,
     ILogger<EbayListingViewModel> logger) : ViewModel
 {
     private CollectionCard _card = null!;
@@ -157,6 +158,12 @@ public sealed partial class EbayListingViewModel(
     [RelayCommand]
     public async Task CreateListing()
     {
+        if (!sellingSettings.IsSetupComplete())
+        {
+            ErrorMessage = "eBay setup incomplete. Open Settings ▸ eBay Selling and click Run eBay Setup first.";
+            return;
+        }
+
         IsLoading = true;
         ErrorMessage = null;
 

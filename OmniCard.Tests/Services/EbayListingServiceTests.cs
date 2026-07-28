@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 using OmniCard.eBay;
 using System.Net;
@@ -12,6 +13,25 @@ namespace OmniCard.Tests.Services;
 
 public class EbayListingServiceTests : IDisposable
 {
+    private sealed class StubSellingSettings : IEbaySellingSettingsService
+    {
+        private readonly EbaySellingSettings _s;
+        public StubSellingSettings(EbaySellingSettings s) => _s = s;
+        public EbaySellingSettings Get() => _s;
+        public void Save(EbaySellingSettings settings) { }
+        public bool IsSetupComplete() =>
+            _s.LocationProvisioned && !string.IsNullOrEmpty(_s.FulfillmentPolicyId) && !string.IsNullOrEmpty(_s.ReturnPolicyId);
+    }
+
+    private static StubSellingSettings CompleteSellingSettings() => new(new EbaySellingSettings
+    {
+        MerchantLocationKey = "omnicard-primary",
+        LocationProvisioned = true,
+        FulfillmentPolicyId = "fp-1",
+        ReturnPolicyId = "rp-1",
+        PaymentPolicyId = "pp-1",
+    });
+
     private readonly EbaySettings _settings = new()
     {
         AppId = "test-app-id",
@@ -74,6 +94,7 @@ public class EbayListingServiceTests : IDisposable
             factory,
             authService,
             dbFactory,
+            CompleteSellingSettings(),
             NullLogger<EbayListingService>.Instance);
 
         var options = new EbayListingOptions
@@ -115,6 +136,7 @@ public class EbayListingServiceTests : IDisposable
 
         var svc = new EbayListingService(
             Options.Create(_settings), factory, authService, dbFactory,
+            CompleteSellingSettings(),
             NullLogger<EbayListingService>.Instance);
 
         var options = new EbayListingOptions
@@ -166,6 +188,7 @@ public class EbayListingServiceTests : IDisposable
             factory,
             authService,
             dbFactory,
+            CompleteSellingSettings(),
             NullLogger<EbayListingService>.Instance);
 
         var listing = dbFactory.CreateDbContext().EbayListings.First(l => l.LotId == lotId);
@@ -199,6 +222,7 @@ public class EbayListingServiceTests : IDisposable
             factory,
             authService,
             dbFactory,
+            CompleteSellingSettings(),
             NullLogger<EbayListingService>.Instance);
 
         var policies = await svc.GetSellerPoliciesAsync("fulfillment");
@@ -206,6 +230,59 @@ public class EbayListingServiceTests : IDisposable
         Assert.Single(policies);
         Assert.Equal("policy-1", policies[0].PolicyId);
         Assert.Equal("Standard Shipping", policies[0].Name);
+    }
+
+    [Fact]
+    public async Task CreateListingAsync_OfferIncludesMerchantLocationKey_AndStoredPolicies()
+    {
+        var dbFactory = CreateDbFactory();
+        int lotId;
+        using (var ctx = dbFactory.CreateDbContext()) lotId = SeedLot(ctx);
+
+        var handler = new RecordingHttpHandler(HttpStatusCode.OK, JsonSerializer.Serialize(new { listingId = "L1" }));
+        var selling = new StubSellingSettings(new EbaySellingSettings
+        {
+            MerchantLocationKey = "omnicard-primary",
+            LocationProvisioned = true,
+            FulfillmentPolicyId = "fp-1",
+            ReturnPolicyId = "rp-1",
+            PaymentPolicyId = "pp-1",
+        });
+
+        var svc = new EbayListingService(
+            Options.Create(_settings), new FakeHttpClientFactory(handler),
+            new FakeEbayAuthService("t"), dbFactory, selling,
+            NullLogger<EbayListingService>.Instance);
+
+        var options = new EbayListingOptions { Title = "t", Description = "d", Price = 5m, ListingType = EbayListingType.FixedPrice };
+        var ok = await svc.CreateListingAsync(new CollectionCard { Id = lotId, Name = "n" }, options);
+
+        Assert.True(ok);
+        var offerReq = handler.Requests.First(r => r.Method == HttpMethod.Post && r.Uri!.ToString().EndsWith("/offer"));
+        Assert.Contains("omnicard-primary", offerReq.Body);
+        Assert.Contains("fp-1", offerReq.Body);
+    }
+
+    [Fact]
+    public async Task CreateListingAsync_Fails_WhenSetupIncomplete()
+    {
+        var dbFactory = CreateDbFactory();
+        int lotId;
+        using (var ctx = dbFactory.CreateDbContext()) lotId = SeedLot(ctx);
+
+        var handler = new RecordingHttpHandler(HttpStatusCode.OK, "{}");
+        var selling = new StubSellingSettings(new EbaySellingSettings()); // not provisioned
+
+        var svc = new EbayListingService(
+            Options.Create(_settings), new FakeHttpClientFactory(handler),
+            new FakeEbayAuthService("t"), dbFactory, selling,
+            NullLogger<EbayListingService>.Instance);
+
+        var ok = await svc.CreateListingAsync(new CollectionCard { Id = lotId, Name = "n" },
+            new EbayListingOptions { Title = "t", Price = 5m });
+
+        Assert.False(ok);
+        Assert.Empty(handler.Requests.Where(r => r.Uri!.ToString().Contains("inventory_item")));
     }
 
     [Fact]
@@ -251,18 +328,19 @@ public class RecordingHttpHandler : HttpMessageHandler
         _body = body;
     }
 
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var contentLanguage = request.Content?.Headers.ContentLanguage.ToList() ?? [];
-        Requests.Add(new RecordedRequest(request.Method, request.RequestUri, contentLanguage));
-        return Task.FromResult(new HttpResponseMessage(_status)
+        var body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
+        Requests.Add(new RecordedRequest(request.Method, request.RequestUri, contentLanguage, body));
+        return new HttpResponseMessage(_status)
         {
             Content = new System.Net.Http.StringContent(_body, System.Text.Encoding.UTF8, "application/json"),
-        });
+        };
     }
 }
 
-public record RecordedRequest(HttpMethod Method, Uri? Uri, List<string> ContentLanguage);
+public record RecordedRequest(HttpMethod Method, Uri? Uri, List<string> ContentLanguage, string? Body = null);
 
 public class TestDbContextFactory : IDbContextFactory<OmniCardDbContext>
 {

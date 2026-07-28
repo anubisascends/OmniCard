@@ -17,6 +17,7 @@ public class EbayListingService : IEbayListingService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IEbayAuthService _ebayAuthService;
     private readonly IDbContextFactory<OmniCardDbContext> _dbContextFactory;
+    private readonly IEbaySellingSettingsService _sellingSettings;
     private readonly ILogger<EbayListingService> _logger;
 
     private static readonly Dictionary<string, int> ConditionMap = new()
@@ -33,12 +34,14 @@ public class EbayListingService : IEbayListingService
         IHttpClientFactory httpClientFactory,
         IEbayAuthService ebayAuthService,
         IDbContextFactory<OmniCardDbContext> dbContextFactory,
+        IEbaySellingSettingsService sellingSettings,
         ILogger<EbayListingService> logger)
     {
         _settings = settings.Value;
         _httpClientFactory = httpClientFactory;
         _ebayAuthService = ebayAuthService;
         _dbContextFactory = dbContextFactory;
+        _sellingSettings = sellingSettings;
         _logger = logger;
     }
 
@@ -47,6 +50,14 @@ public class EbayListingService : IEbayListingService
         var token = await _ebayAuthService.GetAccessTokenAsync();
         if (token is null)
             return false;
+
+        var selling = _sellingSettings.Get();
+        if (!_sellingSettings.IsSetupComplete())
+        {
+            _logger.LogWarning("eBay listing blocked — seller setup incomplete for card {CardId}", card.Id);
+            await SaveListingError(card.Id, options, "eBay setup incomplete — run Settings ▸ eBay Selling ▸ Run eBay Setup.");
+            return false;
+        }
 
         try
         {
@@ -71,7 +82,7 @@ public class EbayListingService : IEbayListingService
             }
 
             // Step 2: Create offer
-            var offer = BuildOffer(sku, options);
+            var offer = BuildOffer(sku, options, selling);
             var offerJson = JsonSerializer.Serialize(offer);
 
             var offerResponse = await client.PostAsync(
@@ -318,7 +329,7 @@ public class EbayListingService : IEbayListingService
         };
     }
 
-    private object BuildOffer(string sku, EbayListingOptions options)
+    private object BuildOffer(string sku, EbayListingOptions options, EbaySellingSettings selling)
     {
         return new
         {
@@ -326,6 +337,7 @@ public class EbayListingService : IEbayListingService
             marketplaceId = "EBAY_US",
             format = options.ListingType == EbayListingType.Auction ? "AUCTION" : "FIXED_PRICE",
             listingDescription = options.Description,
+            merchantLocationKey = selling.MerchantLocationKey,
             pricingSummary = new
             {
                 price = new { value = options.Price.ToString("F2"), currency = "USD" },
@@ -338,9 +350,9 @@ public class EbayListingService : IEbayListingService
                 : null,
             listingPolicies = new
             {
-                fulfillmentPolicyId = options.ShippingPolicyId,
-                returnPolicyId = options.ReturnPolicyId,
-                paymentPolicyId = options.PaymentPolicyId,
+                fulfillmentPolicyId = options.ShippingPolicyId ?? selling.FulfillmentPolicyId,
+                returnPolicyId = options.ReturnPolicyId ?? selling.ReturnPolicyId,
+                paymentPolicyId = options.PaymentPolicyId ?? selling.PaymentPolicyId,
             },
             categoryId = options.EbayCategoryId ?? "38292",
         };

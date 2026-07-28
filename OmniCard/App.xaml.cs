@@ -144,6 +144,7 @@ public partial class App : Application
 
             // Sales & fulfillment
             services.AddSingleton<ISalesSettingsService, SalesSettingsService>();
+            services.AddSingleton<IEbaySellingSettingsService, EbaySellingSettingsService>();
             services.AddSingleton<IListingService, ListingService>();
             services.AddSingleton<ICustomerService, CustomerService>();
             services.AddSingleton<IOrderService, OrderService>();
