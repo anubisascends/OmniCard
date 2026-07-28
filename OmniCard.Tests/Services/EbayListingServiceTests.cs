@@ -95,6 +95,7 @@ public class EbayListingServiceTests : IDisposable
             authService,
             dbFactory,
             CompleteSellingSettings(),
+            new RecordingListingService(),
             NullLogger<EbayListingService>.Instance);
 
         var options = new EbayListingOptions
@@ -137,6 +138,7 @@ public class EbayListingServiceTests : IDisposable
         var svc = new EbayListingService(
             Options.Create(_settings), factory, authService, dbFactory,
             CompleteSellingSettings(),
+            new RecordingListingService(),
             NullLogger<EbayListingService>.Instance);
 
         var options = new EbayListingOptions
@@ -189,6 +191,7 @@ public class EbayListingServiceTests : IDisposable
             authService,
             dbFactory,
             CompleteSellingSettings(),
+            new RecordingListingService(),
             NullLogger<EbayListingService>.Instance);
 
         var listing = dbFactory.CreateDbContext().EbayListings.First(l => l.LotId == lotId);
@@ -223,6 +226,7 @@ public class EbayListingServiceTests : IDisposable
             authService,
             dbFactory,
             CompleteSellingSettings(),
+            new RecordingListingService(),
             NullLogger<EbayListingService>.Instance);
 
         var policies = await svc.GetSellerPoliciesAsync("fulfillment");
@@ -252,6 +256,7 @@ public class EbayListingServiceTests : IDisposable
         var svc = new EbayListingService(
             Options.Create(_settings), new FakeHttpClientFactory(handler),
             new FakeEbayAuthService("t"), dbFactory, selling,
+            new RecordingListingService(),
             NullLogger<EbayListingService>.Instance);
 
         var options = new EbayListingOptions { Title = "t", Description = "d", Price = 5m, ListingType = EbayListingType.FixedPrice };
@@ -276,6 +281,7 @@ public class EbayListingServiceTests : IDisposable
         var svc = new EbayListingService(
             Options.Create(_settings), new FakeHttpClientFactory(handler),
             new FakeEbayAuthService("t"), dbFactory, CompleteSellingSettings(),
+            new RecordingListingService(),
             NullLogger<EbayListingService>.Instance);
 
         var ok = await svc.CreateListingAsync(new CollectionCard { Id = lotId, Name = "n" },
@@ -294,6 +300,55 @@ public class EbayListingServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateListingAsync_MarksLotListed_ForBadgeAndPickList()
+    {
+        // Regression: a published eBay listing must also create a Listing row (SalesChannel.Ebay)
+        // so the card shows the LISTED badge and appears on the pick list.
+        var dbFactory = CreateDbFactory();
+        int lotId;
+        using (var ctx = dbFactory.CreateDbContext()) lotId = SeedLot(ctx);
+
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, JsonSerializer.Serialize(new { listingId = "L1" }));
+        var listingSvc = new RecordingListingService();
+        var svc = new EbayListingService(
+            Options.Create(_settings), new FakeHttpClientFactory(handler),
+            new FakeEbayAuthService("t"), dbFactory, CompleteSellingSettings(),
+            listingSvc, NullLogger<EbayListingService>.Instance);
+
+        var ok = await svc.CreateListingAsync(new CollectionCard { Id = lotId, Name = "n" },
+            new EbayListingOptions { Title = "t", Description = "d", Price = 12.5m, ListingType = EbayListingType.FixedPrice });
+
+        Assert.True(ok);
+        var call = Assert.Single(listingSvc.ListForSaleCalls);
+        Assert.Contains(lotId, call.LotIds);
+        Assert.Equal(SalesChannel.Ebay, call.Channel);
+        Assert.Equal(12.5m, call.Price);
+    }
+
+    [Fact]
+    public async Task CreateListingAsync_SendsStockImageUrl_WhenAvailable()
+    {
+        var dbFactory = CreateDbFactory();
+        int lotId;
+        using (var ctx = dbFactory.CreateDbContext()) lotId = SeedLot(ctx);
+
+        var handler = new RecordingHttpHandler(HttpStatusCode.OK, JsonSerializer.Serialize(new { listingId = "L1" }));
+        var svc = new EbayListingService(
+            Options.Create(_settings), new FakeHttpClientFactory(handler),
+            new FakeEbayAuthService("t"), dbFactory, CompleteSellingSettings(),
+            new RecordingListingService(), NullLogger<EbayListingService>.Instance);
+
+        var card = new CollectionCard { Id = lotId, Name = "n", ImageUri = "https://cards.example/x.jpg" };
+        var ok = await svc.CreateListingAsync(card,
+            new EbayListingOptions { Title = "t", Description = "d", Price = 5m, IncludeStockImage = true, ListingType = EbayListingType.FixedPrice });
+
+        Assert.True(ok);
+        var inv = handler.Requests.First(r => r.Method == HttpMethod.Put && r.Uri!.ToString().Contains("/inventory_item/"));
+        Assert.Contains("imageUrls", inv.Body);
+        Assert.Contains("https://cards.example/x.jpg", inv.Body);
+    }
+
+    [Fact]
     public async Task CreateListingAsync_Fails_WhenSetupIncomplete()
     {
         var dbFactory = CreateDbFactory();
@@ -306,6 +361,7 @@ public class EbayListingServiceTests : IDisposable
         var svc = new EbayListingService(
             Options.Create(_settings), new FakeHttpClientFactory(handler),
             new FakeEbayAuthService("t"), dbFactory, selling,
+            new RecordingListingService(),
             NullLogger<EbayListingService>.Instance);
 
         var ok = await svc.CreateListingAsync(new CollectionCard { Id = lotId, Name = "n" },
@@ -341,6 +397,7 @@ public class EbayListingServiceTests : IDisposable
         var svc = new EbayListingService(
             Options.Create(_settings), new FakeHttpClientFactory(handler),
             new FakeEbayAuthService("t"), dbFactory, CompleteSellingSettings(),
+            new RecordingListingService(),
             NullLogger<EbayListingService>.Instance);
 
         var ok = await svc.CreateListingAsync(new CollectionCard { Id = lotId, Name = "n" },
@@ -435,6 +492,26 @@ public class RoutingRecordingHttpHandler : HttpMessageHandler
             Content = new System.Net.Http.StringContent(resp, System.Text.Encoding.UTF8, "application/json"),
         };
     }
+}
+
+public class RecordingListingService : IListingService
+{
+    public List<(List<int> LotIds, SalesChannel Channel, decimal Price)> ListForSaleCalls { get; } = [];
+    public List<List<int>> UnlistCalls { get; } = [];
+
+    public int ListForSale(IEnumerable<int> lotIds, SalesChannel channel, decimal price, int quantity, string? note = null)
+    {
+        var ids = lotIds.ToList();
+        ListForSaleCalls.Add((ids, channel, price));
+        return ids.Count;
+    }
+
+    public void Unlist(IEnumerable<int> lotIds) => UnlistCalls.Add(lotIds.ToList());
+    public int MarkPicked(IEnumerable<int> lotIds) => 0;
+    public List<PickListEntry> GetPickList(CardGame? game = null) => [];
+    public Dictionary<int, ListingStatus> GetActiveListingStatusByLot(IEnumerable<int> lotIds) => [];
+    public List<ActiveListing> GetActiveListings(CardGame? game = null) => [];
+    public void MarkSold(int lotId, int orderLineId) { }
 }
 
 public class TestDbContextFactory : IDbContextFactory<OmniCardDbContext>

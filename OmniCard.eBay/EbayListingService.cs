@@ -19,6 +19,7 @@ public class EbayListingService : IEbayListingService
     private readonly IEbayAuthService _ebayAuthService;
     private readonly IDbContextFactory<OmniCardDbContext> _dbContextFactory;
     private readonly IEbaySellingSettingsService _sellingSettings;
+    private readonly IListingService _listingService;
     private readonly ILogger<EbayListingService> _logger;
 
     // Trading-card singles (category 183454) accept only USED_VERY_GOOD (ungraded) or
@@ -39,6 +40,7 @@ public class EbayListingService : IEbayListingService
         IEbayAuthService ebayAuthService,
         IDbContextFactory<OmniCardDbContext> dbContextFactory,
         IEbaySellingSettingsService sellingSettings,
+        IListingService listingService,
         ILogger<EbayListingService> logger)
     {
         _settings = settings.Value;
@@ -46,6 +48,7 @@ public class EbayListingService : IEbayListingService
         _ebayAuthService = ebayAuthService;
         _dbContextFactory = dbContextFactory;
         _sellingSettings = sellingSettings;
+        _listingService = listingService;
         _logger = logger;
     }
 
@@ -254,6 +257,9 @@ public class EbayListingService : IEbayListingService
                 await ctx.SaveChangesAsync();
             }
 
+            // Keep the general listing/pick-list system in sync — remove it from the pick list.
+            _listingService.Unlist([listing.LotId]);
+
             _logger.LogInformation("Ended eBay listing {ItemId}", listing.EbayItemId);
             return true;
         }
@@ -348,6 +354,16 @@ public class EbayListingService : IEbayListingService
             ["Language"] = ["English"],
         };
 
+        // eBay fetches listing images from public URLs. The card's catalog image (Scryfall etc.)
+        // is already a public HTTPS URL. Scan images are local files and would need the
+        // WebCompanion served on a public host, so they are not included here yet.
+        string[]? imageUrls =
+            options.IncludeStockImage
+            && card?.ImageUri is { Length: > 0 } stockUrl
+            && stockUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                ? [stockUrl]
+                : null;
+
         return new
         {
             availability = new
@@ -366,6 +382,7 @@ public class EbayListingService : IEbayListingService
                 title = options.Title,
                 description = options.Description,
                 aspects,
+                imageUrls,
             },
         };
     }
@@ -478,6 +495,11 @@ public class EbayListingService : IEbayListingService
             });
         }
         await ctx.SaveChangesAsync();
+
+        // Bridge into the general listing/pick-list system so the card shows the "LISTED"
+        // badge and appears on the pick list. ListForSale is idempotent (skips lots already
+        // actively listed), so re-listing the same card won't create duplicate rows.
+        _listingService.ListForSale([lotId], SalesChannel.Ebay, options.Price, quantity: 1);
     }
 
     private async Task SaveListingError(int lotId, EbayListingOptions options, string error)
