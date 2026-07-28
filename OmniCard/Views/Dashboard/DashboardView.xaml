@@ -625,15 +625,17 @@
                                                FontFamily="{StaticResource AppFont}"
                                                Foreground="White"/>
 
-                                    <!-- Total physical copies (shown only when duplicates exist) -->
+                                    <!-- Total physical copies (text only when duplicates exist). The line
+                                         is ALWAYS laid out (MinHeight reserves it) so every tile is the same
+                                         height whether or not it shows copies — uniform tiles, no ragged rows. -->
                                     <TextBlock Text="{Binding CopiesDisplay}"
                                                HorizontalAlignment="Center"
                                                TextAlignment="Center"
                                                TextTrimming="CharacterEllipsis"
                                                FontFamily="{StaticResource AppFont}"
                                                FontSize="11"
-                                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
-                                               Visibility="{Binding HasDuplicateCopies, Converter={StaticResource BoolToVis}}"/>
+                                               MinHeight="16"
+                                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
                                 </StackPanel>
                             </Border>
                         </DataTemplate>
