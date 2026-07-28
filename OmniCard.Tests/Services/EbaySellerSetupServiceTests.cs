@@ -91,9 +91,10 @@ public class EbaySellerSetupServiceTests
     [Fact]
     public async Task RunSetup_PolicyPayloads_UseValidEbayFields()
     {
-        // Regression for live-sandbox failures: fulfillment must use USPSGroundAdvantage
-        // (USPSGround was retired) and the return policy must include refundMethod=MONEY_BACK
-        // (omitting it caused "some fields missed" / policy-dependency errors).
+        // Regression for live-sandbox failures: fulfillment uses the configured shipping-service
+        // code (default USPSPriority; USPSGround/USPSGroundAdvantage were rejected in sandbox) and
+        // the return policy must include refundMethod=MONEY_BACK (omitting it caused
+        // "some fields missed" / policy-dependency errors).
         var settings = WithValidAddress();
         settings.Current.ReturnsAccepted = true;
         var handler = new RoutingHandler((req, body) =>
@@ -113,7 +114,7 @@ public class EbaySellerSetupServiceTests
         await svc.RunSetupAsync();
 
         var fulfillmentPost = handler.Requests.Single(r => r.Method == HttpMethod.Post && r.Uri.EndsWith("fulfillment_policy"));
-        Assert.Contains("USPSGroundAdvantage", fulfillmentPost.Body);
+        Assert.Contains("USPSPriority", fulfillmentPost.Body);
 
         var returnPost = handler.Requests.Single(r => r.Method == HttpMethod.Post && r.Uri.EndsWith("return_policy"));
         Assert.Contains("MONEY_BACK", returnPost.Body);
@@ -145,6 +146,34 @@ public class EbaySellerSetupServiceTests
         Assert.Contains("\"returnsAccepted\":false", returnPost.Body!.Replace(" ", ""));
         Assert.DoesNotContain("returnShippingCostPayer", returnPost.Body);
         Assert.DoesNotContain("returnPeriod", returnPost.Body);
+    }
+
+    [Fact]
+    public async Task RunSetup_OptIn_AlreadyExists_25804_IsSkippedNotFailed()
+    {
+        // Live sandbox returns errorId 25804 "programType already exists" (not the phrase
+        // "already opted in") when the account is already enrolled — must be SkippedExisting.
+        var settings = WithValidAddress();
+        var handler = new RoutingHandler((req, body) =>
+        {
+            var u = req.RequestUri!.AbsolutePath;
+            if (u.Contains("/program/opt_in"))
+                return (HttpStatusCode.Conflict, JsonSerializer.Serialize(new { errors = new[] { new { errorId = 25804, message = "programType already exists" } } }));
+            if (u.Contains("/location/") && req.Method == HttpMethod.Get) return (HttpStatusCode.NotFound, "{}");
+            if (u.Contains("/location/") && req.Method == HttpMethod.Post) return (HttpStatusCode.NoContent, "");
+            if (u.EndsWith("_policy") && req.Method == HttpMethod.Get) return (HttpStatusCode.OK, "{}");
+            if (u.Contains("fulfillment_policy")) return (HttpStatusCode.Created, JsonSerializer.Serialize(new { fulfillmentPolicyId = "fp-1" }));
+            if (u.Contains("return_policy")) return (HttpStatusCode.Created, JsonSerializer.Serialize(new { returnPolicyId = "rp-1" }));
+            if (u.Contains("payment_policy")) return (HttpStatusCode.Created, JsonSerializer.Serialize(new { paymentPolicyId = "pp-1" }));
+            return (HttpStatusCode.OK, "{}");
+        });
+        var svc = Create(handler, settings);
+
+        var result = await svc.RunSetupAsync();
+
+        var optIn = result.Steps.Single(s => s.Name == "Business Policies opt-in");
+        Assert.Equal(EbaySetupStepStatus.SkippedExisting, optIn.Status);
+        Assert.True(result.Success);
     }
 
     [Fact]

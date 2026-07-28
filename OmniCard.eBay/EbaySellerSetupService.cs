@@ -172,9 +172,9 @@ public class EbaySellerSetupService : IEbaySellerSetupService
                             {
                                 sortOrder = 1,
                                 shippingCarrierCode = "USPS",
-                                // USPS retired USPSGround/First-Class/Parcel Select in favor of Ground Advantage;
-                                // the old codes now fail fulfillment-policy creation with "select a valid shipping service".
-                                shippingServiceCode = "USPSGroundAdvantage",
+                                // Configurable — eBay's valid shipping-service enum differs by environment
+                                // (sandbox rejects newer codes like USPSGroundAdvantage). Default USPSPriority.
+                                shippingServiceCode = s.ShippingServiceCode,
                                 freeShipping = s.FreeShipping,
                                 shippingCost = new { value = (s.FreeShipping ? 0m : s.ShippingCost).ToString("F2", CultureInfo.InvariantCulture), currency = "USD" },
                             }
@@ -225,8 +225,11 @@ public class EbaySellerSetupService : IEbaySellerSetupService
                 return new EbaySetupStep("Business Policies opt-in", EbaySetupStepStatus.Ok, null);
 
             var err = await resp.Content.ReadAsStringAsync();
-            // Already opted in is reported as an error by eBay; treat as existing.
-            if (err.Contains("already opted in", StringComparison.OrdinalIgnoreCase))
+            // Already opted in is reported as an error by eBay. It surfaces either as the
+            // phrase "already opted in" or as errorId 25804 "programType already exists".
+            if (err.Contains("already opted in", StringComparison.OrdinalIgnoreCase)
+                || err.Contains("already exists", StringComparison.OrdinalIgnoreCase)
+                || err.Contains("\"errorId\":25804", StringComparison.OrdinalIgnoreCase))
                 return new EbaySetupStep("Business Policies opt-in", EbaySetupStepStatus.SkippedExisting, null);
 
             _logger.LogWarning("Opt-in failed: {Status} — {Error}", resp.StatusCode, err);

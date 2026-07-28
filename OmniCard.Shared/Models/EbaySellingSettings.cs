@@ -20,6 +20,11 @@ public class EbaySellingSettings
     public bool FreeShipping { get; set; } = true;
     public decimal ShippingCost { get; set; }
     public int HandlingTimeDays { get; set; } = 1;
+    // eBay's valid shipping-service enum is environment-specific (sandbox lags production,
+    // and USPS retired several codes). Configurable so it can be set without a code change.
+    // "USPSPriority" is valid in both sandbox and production; production sellers may prefer
+    // "USPSGroundAdvantage".
+    public string ShippingServiceCode { get; set; } = "USPSPriority";
 
     // Return policy inputs
     public bool ReturnsAccepted { get; set; } = true;
