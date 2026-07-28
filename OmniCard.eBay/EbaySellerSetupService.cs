@@ -110,6 +110,16 @@ public class EbaySellerSetupService : IEbaySellerSetupService
                 return new EbaySetupStep("Inventory location", EbaySetupStepStatus.SkippedExisting, null);
             }
 
+            // Only a 404 means "location does not exist yet, create it". Any other
+            // non-success (401 expired/insufficient-scope, 5xx, rate-limiting) is a real
+            // error and must NOT fall through to a create that would mask it.
+            if (existing.StatusCode != System.Net.HttpStatusCode.NotFound)
+            {
+                var getErr = await existing.Content.ReadAsStringAsync();
+                _logger.LogWarning("Get location failed: {Status} — {Error}", existing.StatusCode, getErr);
+                return new EbaySetupStep("Inventory location", EbaySetupStepStatus.Failed, $"{existing.StatusCode}: {getErr}");
+            }
+
             var payload = new
             {
                 location = new

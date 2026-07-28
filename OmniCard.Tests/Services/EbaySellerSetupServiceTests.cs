@@ -109,6 +109,28 @@ public class EbaySellerSetupServiceTests
     }
 
     [Fact]
+    public async Task RunSetup_LocationStepFails_WhenLocationGetErrors()
+    {
+        var settings = WithValidAddress(); // valid address → not the missing-address short-circuit
+        var handler = new RoutingHandler((req, body) =>
+        {
+            var u = req.RequestUri!.AbsolutePath;
+            if (u.Contains("/program/opt_in")) return (HttpStatusCode.OK, "{}");
+            // GET location returns a real error (not 404) — must fail closed, not create.
+            if (u.Contains("/location/") && req.Method == HttpMethod.Get) return (HttpStatusCode.InternalServerError, "{\"errors\":[]}");
+            return (HttpStatusCode.OK, "{}");
+        });
+        var svc = Create(handler, settings);
+
+        var result = await svc.RunSetupAsync();
+
+        var loc = result.Steps.Single(s => s.Name == "Inventory location");
+        Assert.Equal(EbaySetupStepStatus.Failed, loc.Status);
+        // A non-404 GET error must NOT fall through to a create POST.
+        Assert.DoesNotContain(handler.Requests, r => r.Method == HttpMethod.Post && r.Uri.Contains("/location/"));
+    }
+
+    [Fact]
     public async Task RunSetup_SkipsLocationCreate_WhenAlreadyExists()
     {
         var settings = WithValidAddress();
