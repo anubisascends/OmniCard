@@ -2254,9 +2254,22 @@ public sealed partial class RootViewModel(
             var csvFiles = new List<string>();
             var decklistFiles = new List<string>();
             var unknownFiles = new List<string>();
+            var failedFiles = new List<string>();
             foreach (var path in dialog.FileNames)
             {
-                switch (ImportFileClassifier.ClassifyFile(path))
+                ImportKind kind;
+                try
+                {
+                    kind = ImportFileClassifier.ClassifyFile(path);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to classify import file {Path}", path);
+                    failedFiles.Add(path);
+                    continue;
+                }
+
+                switch (kind)
                 {
                     case ImportKind.Csv: csvFiles.Add(path); break;
                     case ImportKind.Decklist: decklistFiles.Add(path); break;
@@ -2283,22 +2296,40 @@ public sealed partial class RootViewModel(
             // Decklists in one batch dialog.
             if (decklistFiles.Count > 0)
             {
-                var files = decklistFiles
-                    .Select(p => (Name: System.IO.Path.GetFileName(p), Text: System.IO.File.ReadAllText(p)))
-                    .ToList();
-                var summary = dialogService.ShowBatchDecklistImport(files);
-                if (summary is not null)
+                var files = new List<(string Name, string Text)>();
+                foreach (var p in decklistFiles)
                 {
-                    messages.Add($"Imported {summary.TotalAdded} cards across {summary.FileCount} file(s)"
-                        + (summary.TotalUnresolved > 0 ? $"; {summary.TotalUnresolved} lines unresolved" : ""));
-                    containersChanged |= summary.AnyLocationTarget;
-                    listsChanged |= summary.AnyListTarget;
+                    try
+                    {
+                        files.Add((System.IO.Path.GetFileName(p), System.IO.File.ReadAllText(p)));
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "Failed to read decklist file {Path}", p);
+                        failedFiles.Add(p);
+                    }
+                }
+
+                if (files.Count > 0)
+                {
+                    var summary = dialogService.ShowBatchDecklistImport(files);
+                    if (summary is not null)
+                    {
+                        messages.Add($"Imported {summary.TotalAdded} cards across {summary.FileCount} file(s)"
+                            + (summary.TotalUnresolved > 0 ? $"; {summary.TotalUnresolved} lines unresolved" : ""));
+                        containersChanged |= summary.AnyLocationTarget;
+                        listsChanged |= summary.AnyListTarget;
+                    }
                 }
             }
 
             if (unknownFiles.Count > 0)
                 messages.Add($"Skipped {unknownFiles.Count} unrecognized file(s): "
                     + string.Join(", ", unknownFiles.Select(System.IO.Path.GetFileName)));
+
+            if (failedFiles.Count > 0)
+                messages.Add($"Failed to read {failedFiles.Count} file(s): "
+                    + string.Join(", ", failedFiles.Select(System.IO.Path.GetFileName)));
 
             // Refresh: container dropdowns + overview tiles (new locations), lists sidebar (new lists), card grid.
             if (containersChanged)

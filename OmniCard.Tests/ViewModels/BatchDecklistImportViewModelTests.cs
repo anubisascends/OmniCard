@@ -90,4 +90,30 @@ public class BatchDecklistImportViewModelTests
         Assert.True(vm.Result.AnyListTarget);
         Assert.True(vm.Result.AnyLocationTarget);
     }
+
+    [Fact]
+    public void Import_CreateNewLocation_CreatesContainer_AndCommitsToIt()
+    {
+        var (vm, imp, _, containers, _) = Build();
+        imp.OnResolve = _ => [Row(3, true)];
+        vm.Load([("a.txt", "a")]);
+
+        vm.Files[0].TargetIsList = false;
+        vm.Files[0].CreateNew = true;
+        vm.Files[0].NewName = "New Binder";
+        vm.Files[0].NewLocationType = ContainerType.Binder;
+
+        vm.ImportCommand.Execute(null);
+
+        var created = Assert.Single(containers.Created);
+        Assert.Equal("New Binder", created.Name);
+        Assert.Equal(ContainerType.Binder, created.Type);
+
+        Assert.Single(imp.LocationCommits);
+        Assert.Equal(created.Name, imp.LocationCommits[0].Container.Name);
+        Assert.Equal(ContainerType.Binder, imp.LocationCommits[0].Container.ContainerType);
+
+        Assert.True(vm.Result!.AnyLocationTarget);
+        Assert.False(vm.Result.AnyListTarget);
+    }
 }

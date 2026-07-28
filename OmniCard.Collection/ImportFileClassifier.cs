@@ -25,9 +25,13 @@ public static class ImportFileClassifier
     }
 
     /// <summary>Reads the first non-ignorable line of the file and classifies it. Unknown on empty/unreadable content.</summary>
-    public static ImportKind ClassifyFile(string path)
+    public static ImportKind ClassifyFile(string path) => Classify(File.ReadLines(path));
+
+    /// <summary>Skips ignorable lines (blank/comment/section header) and classifies the first content line.
+    /// Unknown if every line is ignorable or the sequence is empty.</summary>
+    internal static ImportKind Classify(IEnumerable<string> lines)
     {
-        foreach (var raw in File.ReadLines(path))
+        foreach (var raw in lines)
         {
             if (DecklistService.IsIgnorableLine(raw))
                 continue;
