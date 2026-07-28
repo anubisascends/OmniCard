@@ -116,6 +116,7 @@ public class FakeEbayAuthService : IEbayAuthService
     public Task<bool> ExchangeCodeForTokensAsync(string authCode) => Task.FromResult(true);
     public void Disconnect() { }
     public string GetAuthorizationUrl() => "";
+    public IReadOnlyList<string> GetMissingConfiguration() => [];
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 }
 

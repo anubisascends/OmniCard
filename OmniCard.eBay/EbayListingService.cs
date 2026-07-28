@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -17,15 +18,20 @@ public class EbayListingService : IEbayListingService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IEbayAuthService _ebayAuthService;
     private readonly IDbContextFactory<OmniCardDbContext> _dbContextFactory;
+    private readonly IEbaySellingSettingsService _sellingSettings;
+    private readonly IListingService _listingService;
     private readonly ILogger<EbayListingService> _logger;
 
-    private static readonly Dictionary<string, int> ConditionMap = new()
+    // Trading-card singles (category 183454) accept only USED_VERY_GOOD (ungraded) or
+    // LIKE_NEW (graded). Ungraded cards additionally carry a "Card Condition" descriptor
+    // (name 40001) whose value encodes the grade (400010 = Near Mint or Better … 400013 = Poor).
+    private static readonly Dictionary<string, string> CardConditionDescriptorMap = new()
     {
-        ["NM"] = 3000, // Near Mint
-        ["LP"] = 4000, // Lightly Played
-        ["MP"] = 5000, // Moderately Played
-        ["HP"] = 6000, // Heavily Played
-        ["D"] = 7000,  // Damaged
+        ["NM"] = "400010", // Near Mint or Better
+        ["LP"] = "400011", // Excellent
+        ["MP"] = "400012", // Very Good
+        ["HP"] = "400013", // Poor
+        ["D"] = "400013",  // Poor (no distinct ungraded "damaged" grade)
     };
 
     public EbayListingService(
@@ -33,12 +39,16 @@ public class EbayListingService : IEbayListingService
         IHttpClientFactory httpClientFactory,
         IEbayAuthService ebayAuthService,
         IDbContextFactory<OmniCardDbContext> dbContextFactory,
+        IEbaySellingSettingsService sellingSettings,
+        IListingService listingService,
         ILogger<EbayListingService> logger)
     {
         _settings = settings.Value;
         _httpClientFactory = httpClientFactory;
         _ebayAuthService = ebayAuthService;
         _dbContextFactory = dbContextFactory;
+        _sellingSettings = sellingSettings;
+        _listingService = listingService;
         _logger = logger;
     }
 
@@ -47,6 +57,14 @@ public class EbayListingService : IEbayListingService
         var token = await _ebayAuthService.GetAccessTokenAsync();
         if (token is null)
             return false;
+
+        var selling = _sellingSettings.Get();
+        if (!_sellingSettings.IsSetupComplete())
+        {
+            _logger.LogWarning("eBay listing blocked — seller setup incomplete for card {CardId}", card.Id);
+            await SaveListingError(card.Id, options, "eBay setup incomplete — run Settings ▸ eBay Selling ▸ Run eBay Setup.");
+            return false;
+        }
 
         try
         {
@@ -58,12 +76,9 @@ public class EbayListingService : IEbayListingService
             var inventoryItem = BuildInventoryItem(card, options);
             var inventoryJson = JsonSerializer.Serialize(inventoryItem);
 
-            var inventoryContent = new StringContent(inventoryJson, Encoding.UTF8, "application/json");
-            inventoryContent.Headers.Add("Content-Language", "en-US");
-
             var inventoryResponse = await client.PutAsync(
                 $"{_settings.ApiBaseUrl}/sell/inventory/v1/inventory_item/{Uri.EscapeDataString(sku)}",
-                inventoryContent);
+                JsonContent(inventoryJson));
 
             if (!inventoryResponse.IsSuccessStatusCode)
             {
@@ -73,43 +88,68 @@ public class EbayListingService : IEbayListingService
                 return false;
             }
 
-            // Step 2: Create offer
-            var offer = BuildOffer(sku, options);
-            var offerJson = JsonSerializer.Serialize(offer);
+            // Step 2: Create or update the offer. eBay allows only ONE offer per SKU, so a
+            // prior attempt that created an offer but didn't publish leaves one behind that we
+            // must update (with current pricing/policies/location) rather than recreate —
+            // otherwise createOffer fails with errorId 25002 "Offer entity already exists".
+            var existingOfferId = await FindExistingOfferAsync(client, sku);
 
-            var offerResponse = await client.PostAsync(
-                $"{_settings.ApiBaseUrl}/sell/inventory/v1/offer",
-                new StringContent(offerJson, Encoding.UTF8, "application/json"));
-
-            if (!offerResponse.IsSuccessStatusCode)
+            string offerId;
+            if (existingOfferId is null)
             {
-                var error = await offerResponse.Content.ReadAsStringAsync();
-                _logger.LogWarning("Failed to create offer: {Status} — {Error}", offerResponse.StatusCode, error);
-                await SaveListingError(card.Id, options, $"Offer creation failed: {offerResponse.StatusCode}");
-                return false;
+                var offerJson = JsonSerializer.Serialize(BuildOffer(sku, options, selling));
+                var offerResponse = await client.PostAsync(
+                    $"{_settings.ApiBaseUrl}/sell/inventory/v1/offer",
+                    JsonContent(offerJson));
+
+                if (!offerResponse.IsSuccessStatusCode)
+                {
+                    var error = await offerResponse.Content.ReadAsStringAsync();
+                    _logger.LogWarning("Failed to create offer: {Status} — {Error}", offerResponse.StatusCode, error);
+                    await SaveListingError(card.Id, options, $"Offer creation failed: {offerResponse.StatusCode}");
+                    return false;
+                }
+
+                var offerResponseJson = await offerResponse.Content.ReadAsStringAsync();
+                using var offerDoc = JsonDocument.Parse(offerResponseJson);
+
+                // If the offer response already contains listingId, treat as published
+                if (offerDoc.RootElement.TryGetProperty("listingId", out var directListingId))
+                {
+                    var ebayItemIdDirect = directListingId.GetString() ?? "";
+                    await SaveActiveListing(card.Id, options, ebayItemIdDirect);
+                    _logger.LogInformation("Created eBay listing {ItemId} for card {CardId} ({CardName})",
+                        ebayItemIdDirect, card.Id, card.Name);
+                    return true;
+                }
+
+                offerId = offerDoc.RootElement.TryGetProperty("offerId", out var offerIdEl)
+                    ? offerIdEl.GetString() ?? ""
+                    : "";
             }
-
-            var offerResponseJson = await offerResponse.Content.ReadAsStringAsync();
-            using var offerDoc = JsonDocument.Parse(offerResponseJson);
-
-            // If the offer response already contains listingId, treat as published
-            if (offerDoc.RootElement.TryGetProperty("listingId", out var directListingId))
+            else
             {
-                var ebayItemIdDirect = directListingId.GetString() ?? "";
-                await SaveActiveListing(card.Id, options, ebayItemIdDirect);
-                _logger.LogInformation("Created eBay listing {ItemId} for card {CardId} ({CardName})",
-                    ebayItemIdDirect, card.Id, card.Name);
-                return true;
+                // Update the existing offer so stale data from an earlier failed attempt
+                // (e.g. empty policies before setup ran) is replaced with current values.
+                offerId = existingOfferId;
+                var updateJson = JsonSerializer.Serialize(BuildOfferUpdate(options, selling));
+                var updateResponse = await client.PutAsync(
+                    $"{_settings.ApiBaseUrl}/sell/inventory/v1/offer/{Uri.EscapeDataString(offerId)}",
+                    JsonContent(updateJson));
+
+                if (!updateResponse.IsSuccessStatusCode)
+                {
+                    var error = await updateResponse.Content.ReadAsStringAsync();
+                    _logger.LogWarning("Failed to update existing offer {OfferId}: {Status} — {Error}", offerId, updateResponse.StatusCode, error);
+                    await SaveListingError(card.Id, options, $"Offer update failed: {updateResponse.StatusCode}");
+                    return false;
+                }
             }
 
             // Step 3: Publish offer
-            var offerId = offerDoc.RootElement.TryGetProperty("offerId", out var offerIdEl)
-                ? offerIdEl.GetString() ?? ""
-                : "";
-
             var publishResponse = await client.PostAsync(
                 $"{_settings.ApiBaseUrl}/sell/inventory/v1/offer/{Uri.EscapeDataString(offerId)}/publish",
-                new StringContent("{}", Encoding.UTF8, "application/json"));
+                JsonContent("{}"));
 
             string ebayItemId;
             if (publishResponse.IsSuccessStatusCode)
@@ -157,7 +197,7 @@ public class EbayListingService : IEbayListingService
 
             var response = await client.PutAsync(
                 $"{_settings.ApiBaseUrl}/sell/inventory/v1/inventory_item/{Uri.EscapeDataString(sku)}",
-                new StringContent(inventoryJson, Encoding.UTF8, "application/json"));
+                JsonContent(inventoryJson));
 
             if (!response.IsSuccessStatusCode)
             {
@@ -217,6 +257,9 @@ public class EbayListingService : IEbayListingService
                 await ctx.SaveChangesAsync();
             }
 
+            // Keep the general listing/pick-list system in sync — remove it from the pick list.
+            _listingService.Unlist([listing.LotId]);
+
             _logger.LogInformation("Ended eBay listing {ItemId}", listing.EbayItemId);
             return true;
         }
@@ -243,7 +286,8 @@ public class EbayListingService : IEbayListingService
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Failed to fetch {PolicyType} policies: {Status}", policyType, response.StatusCode);
+                var error = await response.Content.ReadAsStringAsync();
+                _logger.LogWarning("Failed to fetch {PolicyType} policies: {Status} — {Error}", policyType, response.StatusCode, error);
                 return [];
             }
 
@@ -275,9 +319,50 @@ public class EbayListingService : IEbayListingService
         }
     }
 
+    // eBay's Inventory API requires a Content-Language header on inventory_item and
+    // offer requests; omitting it fails createOffer with errorId 25709.
+    private static StringContent JsonContent(string json)
+    {
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        content.Headers.Add("Content-Language", "en-US");
+        return content;
+    }
+
+    // eBay's "Game" item specific for CCG singles (183454) is a constrained aspect; these are
+    // the values eBay accepts (which differ from the app's in-app display names for some games).
+    private static string EbayGameAspect(CardGame game) => game switch
+    {
+        CardGame.Mtg => "Magic: The Gathering",
+        CardGame.Pokemon => "Pokémon TCG",
+        CardGame.YuGiOh => "Yu-Gi-Oh! TCG",
+        CardGame.OnePiece => "One Piece Card Game",
+        CardGame.FinalFantasy => "Final Fantasy Trading Card Game",
+        CardGame.Riftbound => "Riftbound",
+        _ => "Magic: The Gathering",
+    };
+
     private static object BuildInventoryItem(CollectionCard? card, EbayListingOptions options)
     {
-        var conditionCode = ConditionMap.GetValueOrDefault(options.Condition, 3000);
+        var descriptorValue = CardConditionDescriptorMap.GetValueOrDefault(options.Condition, "400010");
+
+        // Category 183454 requires item specifics (aspects). "Game" is mandatory; Card Name and
+        // Language round out the commonly-required set. Values come from the card being listed.
+        Dictionary<string, string[]>? aspects = card is null ? null : new()
+        {
+            ["Game"] = [EbayGameAspect(card.Game)],
+            ["Card Name"] = [string.IsNullOrWhiteSpace(card.Name) ? options.Title : card.Name],
+            ["Language"] = ["English"],
+        };
+
+        // eBay fetches listing images from public URLs. The card's catalog image (Scryfall etc.)
+        // is already a public HTTPS URL. Scan images are local files and would need the
+        // WebCompanion served on a public host, so they are not included here yet.
+        string[]? imageUrls =
+            options.IncludeStockImage
+            && card?.ImageUri is { Length: > 0 } stockUrl
+            && stockUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                ? [stockUrl]
+                : null;
 
         return new
         {
@@ -285,33 +370,24 @@ public class EbayListingService : IEbayListingService
             {
                 shipToLocationAvailability = new { quantity = 1 }
             },
-            condition = conditionCode switch
+            // Ungraded card. The granular grade (NM/LP/…) is carried by the Card Condition
+            // descriptor below, which category 183454 requires.
+            condition = "USED_VERY_GOOD",
+            conditionDescriptors = new[]
             {
-                3000 => "NEW_OTHER",
-                4000 => "USED_GOOD",
-                5000 => "USED_ACCEPTABLE",
-                6000 => "USED_ACCEPTABLE",
-                7000 => "FOR_PARTS_OR_NOT_WORKING",
-                _ => "NEW_OTHER",
-            },
-            conditionDescription = options.Condition switch
-            {
-                "NM" => "Near Mint",
-                "LP" => "Lightly Played",
-                "MP" => "Moderately Played",
-                "HP" => "Heavily Played",
-                "D" => "Damaged",
-                _ => options.Condition,
+                new { name = "40001", values = new[] { descriptorValue } }
             },
             product = new
             {
                 title = options.Title,
                 description = options.Description,
+                aspects,
+                imageUrls,
             },
         };
     }
 
-    private object BuildOffer(string sku, EbayListingOptions options)
+    private object BuildOffer(string sku, EbayListingOptions options, EbaySellingSettings selling)
     {
         return new
         {
@@ -319,11 +395,12 @@ public class EbayListingService : IEbayListingService
             marketplaceId = "EBAY_US",
             format = options.ListingType == EbayListingType.Auction ? "AUCTION" : "FIXED_PRICE",
             listingDescription = options.Description,
+            merchantLocationKey = selling.MerchantLocationKey,
             pricingSummary = new
             {
-                price = new { value = options.Price.ToString("F2"), currency = "USD" },
+                price = new { value = options.Price.ToString("F2", CultureInfo.InvariantCulture), currency = "USD" },
                 auctionStartPrice = options.ListingType == EbayListingType.Auction
-                    ? new { value = options.Price.ToString("F2"), currency = "USD" }
+                    ? new { value = options.Price.ToString("F2", CultureInfo.InvariantCulture), currency = "USD" }
                     : null,
             },
             listingDuration = options.ListingType == EbayListingType.Auction && options.AuctionDuration.HasValue
@@ -331,12 +408,61 @@ public class EbayListingService : IEbayListingService
                 : null,
             listingPolicies = new
             {
-                fulfillmentPolicyId = options.ShippingPolicyId,
-                returnPolicyId = options.ReturnPolicyId,
-                paymentPolicyId = options.PaymentPolicyId,
+                fulfillmentPolicyId = options.ShippingPolicyId ?? selling.FulfillmentPolicyId,
+                returnPolicyId = options.ReturnPolicyId ?? selling.ReturnPolicyId,
+                paymentPolicyId = options.PaymentPolicyId ?? selling.PaymentPolicyId,
             },
             categoryId = options.EbayCategoryId ?? "38292",
         };
+    }
+
+    // updateOffer payload: same as create minus the immutable sku/marketplaceId/format fields.
+    private object BuildOfferUpdate(EbayListingOptions options, EbaySellingSettings selling)
+    {
+        return new
+        {
+            listingDescription = options.Description,
+            merchantLocationKey = selling.MerchantLocationKey,
+            pricingSummary = new
+            {
+                price = new { value = options.Price.ToString("F2", CultureInfo.InvariantCulture), currency = "USD" },
+                auctionStartPrice = options.ListingType == EbayListingType.Auction
+                    ? new { value = options.Price.ToString("F2", CultureInfo.InvariantCulture), currency = "USD" }
+                    : null,
+            },
+            listingDuration = options.ListingType == EbayListingType.Auction && options.AuctionDuration.HasValue
+                ? $"DAYS_{options.AuctionDuration.Value}"
+                : null,
+            listingPolicies = new
+            {
+                fulfillmentPolicyId = options.ShippingPolicyId ?? selling.FulfillmentPolicyId,
+                returnPolicyId = options.ReturnPolicyId ?? selling.ReturnPolicyId,
+                paymentPolicyId = options.PaymentPolicyId ?? selling.PaymentPolicyId,
+            },
+            categoryId = options.EbayCategoryId ?? "38292",
+        };
+    }
+
+    // Returns the offerId of an existing offer for this SKU (eBay allows one per SKU), or null.
+    private async Task<string?> FindExistingOfferAsync(HttpClient client, string sku)
+    {
+        var response = await client.GetAsync(
+            $"{_settings.ApiBaseUrl}/sell/inventory/v1/offer?sku={Uri.EscapeDataString(sku)}&marketplace_id=EBAY_US");
+
+        // 404 = no offers for this SKU yet.
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+        if (doc.RootElement.TryGetProperty("offers", out var offers)
+            && offers.ValueKind == JsonValueKind.Array
+            && offers.GetArrayLength() > 0
+            && offers[0].TryGetProperty("offerId", out var offerIdEl))
+        {
+            return offerIdEl.GetString();
+        }
+        return null;
     }
 
     private async Task SaveActiveListing(int lotId, EbayListingOptions options, string ebayItemId)
@@ -369,6 +495,11 @@ public class EbayListingService : IEbayListingService
             });
         }
         await ctx.SaveChangesAsync();
+
+        // Bridge into the general listing/pick-list system so the card shows the "LISTED"
+        // badge and appears on the pick list. ListForSale is idempotent (skips lots already
+        // actively listed), so re-listing the same card won't create duplicate rows.
+        _listingService.ListForSale([lotId], SalesChannel.Ebay, options.Price, quantity: 1);
     }
 
     private async Task SaveListingError(int lotId, EbayListingOptions options, string error)
