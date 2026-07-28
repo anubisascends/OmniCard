@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -119,16 +120,17 @@ public sealed partial class DecklistService(
         if (source is null || deckId is null)
             return null;
 
-        var client = httpClientFactory.CreateClient();
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("OmniCard/1.0");
-        client.Timeout = TimeSpan.FromSeconds(10);
-
         try
         {
             return source switch
             {
-                "Moxfield" => await FetchMoxfieldAsync(client, deckId),
-                "Archidekt" => await FetchArchidektAsync(client, deckId),
+                // Moxfield's API (api2.moxfield.com) is behind Cloudflare, which 403s .NET's
+                // HttpClient by TLS/handshake fingerprint regardless of headers. Windows' built-in
+                // curl.exe presents a different TLS stack and passes, so shell out for Moxfield.
+                // Archidekt has no such protection and works fine on HttpClient.
+                "Moxfield" => ParseMoxfieldJson(
+                    await CurlGetStringAsync($"https://api2.moxfield.com/v2/decks/all/{deckId}")),
+                "Archidekt" => await FetchArchidektAsync(deckId),
                 _ => null
             };
         }
@@ -136,6 +138,37 @@ public sealed partial class DecklistService(
         {
             return null;
         }
+    }
+
+    /// <summary>Fetch a URL's body via the OS curl.exe (bypasses Cloudflare TLS fingerprinting that
+    /// blocks .NET's HttpClient). Throws if curl.exe is unavailable or the request fails.</summary>
+    private static async Task<string> CurlGetStringAsync(string url)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = "curl.exe",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        psi.ArgumentList.Add("-s");                 // silent
+        psi.ArgumentList.Add("-f");                 // fail (non-zero exit) on HTTP >= 400
+        psi.ArgumentList.Add("-A");
+        psi.ArgumentList.Add("OmniCard/1.0");
+        psi.ArgumentList.Add("--max-time");
+        psi.ArgumentList.Add("15");
+        psi.ArgumentList.Add(url);
+
+        using var proc = Process.Start(psi)
+            ?? throw new InvalidOperationException("curl.exe could not be started.");
+        var stdout = await proc.StandardOutput.ReadToEndAsync();
+        await proc.WaitForExitAsync();
+
+        if (proc.ExitCode != 0 || string.IsNullOrWhiteSpace(stdout))
+            throw new InvalidOperationException($"curl.exe request failed (exit code {proc.ExitCode}).");
+
+        return stdout;
     }
 
     private static (string? Source, string? DeckId) ParseUrl(string url)
@@ -155,19 +188,16 @@ public sealed partial class DecklistService(
         return (null, null);
     }
 
-    private static async Task<(string DeckName, List<DecklistEntry> Entries)?> FetchMoxfieldAsync(
-        HttpClient client, string deckId)
+    /// <summary>Parse Moxfield's v2 deck JSON into decklist entries. Boards are objects keyed by card
+    /// name: mainboard, sideboard, commanders, companions.</summary>
+    internal static (string DeckName, List<DecklistEntry> Entries) ParseMoxfieldJson(string json)
     {
-        var response = await client.GetAsync($"https://api2.moxfield.com/v2/decks/all/{deckId}");
-        response.EnsureSuccessStatusCode();
-
-        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
         var deckName = root.GetProperty("name").GetString() ?? "Moxfield Deck";
 
         var entries = new List<DecklistEntry>();
 
-        // Moxfield stores cards in board objects: mainboard, sideboard, commanders, companions
         foreach (var boardName in new[] { "mainboard", "sideboard", "commanders", "companions" })
         {
             if (!root.TryGetProperty(boardName, out var board) || board.ValueKind != JsonValueKind.Object)
@@ -189,9 +219,12 @@ public sealed partial class DecklistService(
         return (deckName, entries);
     }
 
-    private static async Task<(string DeckName, List<DecklistEntry> Entries)?> FetchArchidektAsync(
-        HttpClient client, string deckId)
+    private async Task<(string DeckName, List<DecklistEntry> Entries)?> FetchArchidektAsync(string deckId)
     {
+        var client = httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("OmniCard/1.0");
+        client.Timeout = TimeSpan.FromSeconds(10);
+
         var response = await client.GetAsync($"https://archidekt.com/api/decks/{deckId}/");
         response.EnsureSuccessStatusCode();
 
