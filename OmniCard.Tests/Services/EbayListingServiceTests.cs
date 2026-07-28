@@ -264,6 +264,32 @@ public class EbayListingServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateListingAsync_InventoryItem_UsesUngradedCardConditionAndGradeDescriptor()
+    {
+        // Regression: category 183454 (CCG singles) rejects NEW_OTHER (1500). Must send
+        // USED_VERY_GOOD (ungraded) plus the Card Condition descriptor (name 40001).
+        var dbFactory = CreateDbFactory();
+        int lotId;
+        using (var ctx = dbFactory.CreateDbContext()) lotId = SeedLot(ctx);
+
+        var handler = new RecordingHttpHandler(HttpStatusCode.OK, JsonSerializer.Serialize(new { listingId = "L1" }));
+        var svc = new EbayListingService(
+            Options.Create(_settings), new FakeHttpClientFactory(handler),
+            new FakeEbayAuthService("t"), dbFactory, CompleteSellingSettings(),
+            NullLogger<EbayListingService>.Instance);
+
+        var ok = await svc.CreateListingAsync(new CollectionCard { Id = lotId, Name = "n" },
+            new EbayListingOptions { Title = "t", Description = "d", Price = 5m, Condition = "NM", ListingType = EbayListingType.FixedPrice });
+
+        Assert.True(ok);
+        var inv = handler.Requests.First(r => r.Method == HttpMethod.Put && r.Uri!.ToString().Contains("/inventory_item/"));
+        Assert.Contains("USED_VERY_GOOD", inv.Body);
+        Assert.Contains("40001", inv.Body);
+        Assert.Contains("400010", inv.Body); // NM → Near Mint or Better
+        Assert.DoesNotContain("NEW_OTHER", inv.Body);
+    }
+
+    [Fact]
     public async Task CreateListingAsync_Fails_WhenSetupIncomplete()
     {
         var dbFactory = CreateDbFactory();

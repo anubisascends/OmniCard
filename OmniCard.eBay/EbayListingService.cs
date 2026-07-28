@@ -21,13 +21,16 @@ public class EbayListingService : IEbayListingService
     private readonly IEbaySellingSettingsService _sellingSettings;
     private readonly ILogger<EbayListingService> _logger;
 
-    private static readonly Dictionary<string, int> ConditionMap = new()
+    // Trading-card singles (category 183454) accept only USED_VERY_GOOD (ungraded) or
+    // LIKE_NEW (graded). Ungraded cards additionally carry a "Card Condition" descriptor
+    // (name 40001) whose value encodes the grade (400010 = Near Mint or Better … 400013 = Poor).
+    private static readonly Dictionary<string, string> CardConditionDescriptorMap = new()
     {
-        ["NM"] = 3000, // Near Mint
-        ["LP"] = 4000, // Lightly Played
-        ["MP"] = 5000, // Moderately Played
-        ["HP"] = 6000, // Heavily Played
-        ["D"] = 7000,  // Damaged
+        ["NM"] = "400010", // Near Mint or Better
+        ["LP"] = "400011", // Excellent
+        ["MP"] = "400012", // Very Good
+        ["HP"] = "400013", // Poor
+        ["D"] = "400013",  // Poor (no distinct ungraded "damaged" grade)
     };
 
     public EbayListingService(
@@ -321,7 +324,7 @@ public class EbayListingService : IEbayListingService
 
     private static object BuildInventoryItem(CollectionCard? card, EbayListingOptions options)
     {
-        var conditionCode = ConditionMap.GetValueOrDefault(options.Condition, 3000);
+        var descriptorValue = CardConditionDescriptorMap.GetValueOrDefault(options.Condition, "400010");
 
         return new
         {
@@ -329,23 +332,12 @@ public class EbayListingService : IEbayListingService
             {
                 shipToLocationAvailability = new { quantity = 1 }
             },
-            condition = conditionCode switch
+            // Ungraded card. The granular grade (NM/LP/…) is carried by the Card Condition
+            // descriptor below, which category 183454 requires.
+            condition = "USED_VERY_GOOD",
+            conditionDescriptors = new[]
             {
-                3000 => "NEW_OTHER",
-                4000 => "USED_GOOD",
-                5000 => "USED_ACCEPTABLE",
-                6000 => "USED_ACCEPTABLE",
-                7000 => "FOR_PARTS_OR_NOT_WORKING",
-                _ => "NEW_OTHER",
-            },
-            conditionDescription = options.Condition switch
-            {
-                "NM" => "Near Mint",
-                "LP" => "Lightly Played",
-                "MP" => "Moderately Played",
-                "HP" => "Heavily Played",
-                "D" => "Damaged",
-                _ => options.Condition,
+                new { name = "40001", values = new[] { descriptorValue } }
             },
             product = new
             {
