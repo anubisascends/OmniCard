@@ -77,4 +77,37 @@ public class DecklistImportServiceTests
         Assert.Equal(3, call.Quantity);
         Assert.Equal(7, call.Container!.Id);
     }
+
+    [Fact]
+    public void ResolveEntries_ResolvesDirectly_WithoutParsing()
+    {
+        var (svc, gs, _, _, _) = Build();
+        gs.OnSearchCards = (q, _) => q.Contains("337") ? [M("a")] : [];
+        var entries = new[]
+        {
+            new DecklistEntry(4, "Island", "SCD", "337"),
+            new DecklistEntry(1, "Nonesuch", "SCD", "999"),
+        };
+
+        var rows = svc.ResolveEntries(entries);
+
+        Assert.Equal(2, rows.Count);
+        Assert.True(rows[0].IsResolved);
+        Assert.Equal(4, rows[0].Quantity);
+        Assert.False(rows[1].IsResolved);
+    }
+
+    [Fact]
+    public void ResolveFile_DelegatesToResolveEntries_ViaParser()
+    {
+        var (svc, gs, _, _, decks) = Build();
+        decks.Printings = [new DecklistEntry(2, "Island", "SCD", "337")];
+        gs.OnSearchCards = (_, _) => [M("a")];
+
+        var rows = svc.ResolveFile("ignored");
+
+        var row = Assert.Single(rows);
+        Assert.True(row.IsResolved);
+        Assert.Equal(2, row.Quantity);
+    }
 }

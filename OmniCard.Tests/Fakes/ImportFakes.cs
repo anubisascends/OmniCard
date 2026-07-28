@@ -159,10 +159,12 @@ public sealed class FakeDecklistParseService : IDecklistService
 public sealed class FakeDecklistImportService : IDecklistImportService
 {
     public Func<string, List<DecklistImportRow>> OnResolve = _ => [];
+    public Func<IEnumerable<DecklistEntry>, List<DecklistImportRow>> OnResolveEntries = _ => [];
     public List<(int ListId, int Count)> ListCommits { get; } = [];
     public List<(StorageContainer Container, int Count)> LocationCommits { get; } = [];
 
     public IReadOnlyList<DecklistImportRow> ResolveFile(string fileText) => OnResolve(fileText);
+    public IReadOnlyList<DecklistImportRow> ResolveEntries(IEnumerable<DecklistEntry> entries) => OnResolveEntries(entries);
 
     public int CommitToList(int listId, IEnumerable<DecklistImportRow> resolvedRows)
     {

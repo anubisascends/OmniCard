@@ -13,10 +13,13 @@ public sealed class DecklistImportService(
     ILogger<DecklistImportService> logger) : IDecklistImportService
 {
     public IReadOnlyList<DecklistImportRow> ResolveFile(string fileText)
+        => ResolveEntries(decklistService.ParseDecklistPrintings(fileText));
+
+    public IReadOnlyList<DecklistImportRow> ResolveEntries(IEnumerable<DecklistEntry> entries)
     {
         var gs = cardService.ActiveGameService;
         var rows = new List<DecklistImportRow>();
-        foreach (var e in decklistService.ParseDecklistPrintings(fileText))
+        foreach (var e in entries)
         {
             CardMatch? match;
             try

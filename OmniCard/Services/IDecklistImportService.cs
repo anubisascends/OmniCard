@@ -8,6 +8,9 @@ public interface IDecklistImportService
     /// <summary>Parse + resolve a decklist file's text against the active game into preview rows.</summary>
     IReadOnlyList<DecklistImportRow> ResolveFile(string fileText);
 
+    /// <summary>Resolve already-parsed decklist entries (e.g. from a URL fetch) into preview rows.</summary>
+    IReadOnlyList<DecklistImportRow> ResolveEntries(IEnumerable<DecklistEntry> entries);
+
     /// <summary>Add resolved rows to a list; returns total cards added (sum of quantities).</summary>
     int CommitToList(int listId, IEnumerable<DecklistImportRow> resolvedRows);
 
