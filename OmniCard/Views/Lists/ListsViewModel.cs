@@ -80,6 +80,16 @@ public sealed partial class ListsViewModel(
             Lists.Add(l);
     }
 
+    /// <summary>Reload the lists for the current game, preserving the current selection by id.
+    /// Call after an external change added/updated lists (e.g. a decklist import).</summary>
+    public void Refresh()
+    {
+        var selectedId = SelectedList?.Id;
+        LoadLists();   // clears SelectedList
+        if (selectedId is int id)
+            SelectedList = Lists.FirstOrDefault(l => l.Id == id);
+    }
+
     partial void OnSelectedListChanged(CardList? value)
     {
         OnPropertyChanged(nameof(CanImportUrl));

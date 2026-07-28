@@ -13,6 +13,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Data;
 using OmniCard.CardMatching;
+using OmniCard.Collection;
 using OmniCard.Helpers;
 using OmniCard.Controls.Converters;
 using OmniCard.Controls.Themes;
@@ -2237,62 +2238,84 @@ public sealed partial class RootViewModel(
     }
 
     [RelayCommand]
-    public void ImportCollection()
+    public void Import()
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Filter = "CSV files (*.csv)|*.csv",
-            Title = "Import Collection",
-        };
-
-        if (dialog.ShowDialog() != true)
-            return;
-
-        try
-        {
-            var preview = csvService.PreviewImport(dialog.FileName);
-            var imported = dialogService.ShowImportPreview(preview);
-            if (imported.HasValue)
-            {
-                Message = $"Imported {imported.Value} cards";
-                _ = Collection.SearchCollection();
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to import collection");
-            System.Windows.MessageBox.Show($"Failed to import: {ex.Message}", "Import Error",
-                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
-        }
-    }
-
-    [RelayCommand]
-    public void ImportDecklistFile()
-    {
-        var dialog = new Microsoft.Win32.OpenFileDialog
-        {
-            Filter = "Decklist files (*.txt)|*.txt|All files (*.*)|*.*",
-            Title = "Import Decklist File",
+            Filter = "Import files (*.csv;*.txt)|*.csv;*.txt|All files (*.*)|*.*",
+            Title = "Import",
+            Multiselect = true,
         };
         if (dialog.ShowDialog() != true)
             return;
 
         try
         {
-            var text = System.IO.File.ReadAllText(dialog.FileName);
-            var summary = dialogService.ShowDecklistImport(
-                System.IO.Path.GetFileName(dialog.FileName), text, Collection.CurrentLocationId);
-            if (summary is not null)
+            var csvFiles = new List<string>();
+            var decklistFiles = new List<string>();
+            var unknownFiles = new List<string>();
+            foreach (var path in dialog.FileNames)
             {
-                Message = summary.Unresolved > 0
-                    ? $"Imported {summary.Added} cards to {summary.TargetName}. {summary.Unresolved} lines unresolved."
-                    : $"Imported {summary.Added} cards to {summary.TargetName}.";
-                _ = Collection.SearchCollection();
+                switch (ImportFileClassifier.ClassifyFile(path))
+                {
+                    case ImportKind.Csv: csvFiles.Add(path); break;
+                    case ImportKind.Decklist: decklistFiles.Add(path); break;
+                    default: unknownFiles.Add(path); break;
+                }
             }
+
+            var messages = new List<string>();
+            var containersChanged = false;
+            var listsChanged = false;
+
+            // CSV collections first (each its own preview dialog).
+            foreach (var path in csvFiles)
+            {
+                var preview = csvService.PreviewImport(path);
+                var imported = dialogService.ShowImportPreview(preview);
+                if (imported.HasValue)
+                {
+                    messages.Add($"Imported {imported.Value} cards from {System.IO.Path.GetFileName(path)}");
+                    containersChanged = true;   // app-native CSV import can create containers
+                }
+            }
+
+            // Decklists in one batch dialog.
+            if (decklistFiles.Count > 0)
+            {
+                var files = decklistFiles
+                    .Select(p => (Name: System.IO.Path.GetFileName(p), Text: System.IO.File.ReadAllText(p)))
+                    .ToList();
+                var summary = dialogService.ShowBatchDecklistImport(files);
+                if (summary is not null)
+                {
+                    messages.Add($"Imported {summary.TotalAdded} cards across {summary.FileCount} file(s)"
+                        + (summary.TotalUnresolved > 0 ? $"; {summary.TotalUnresolved} lines unresolved" : ""));
+                    containersChanged |= summary.AnyLocationTarget;
+                    listsChanged |= summary.AnyListTarget;
+                }
+            }
+
+            if (unknownFiles.Count > 0)
+                messages.Add($"Skipped {unknownFiles.Count} unrecognized file(s): "
+                    + string.Join(", ", unknownFiles.Select(System.IO.Path.GetFileName)));
+
+            // Refresh: container dropdowns + overview tiles (new locations), lists sidebar (new lists), card grid.
+            if (containersChanged)
+                LoadContainers();
+            if (Collection.ShowCardList)
+                _ = Collection.SearchCollection();
+            else
+                Collection.LoadOverview();
+            if (listsChanged)
+                Lists.Refresh();
+
+            if (messages.Count > 0)
+                Message = string.Join(" · ", messages);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to import decklist file");
+            logger.LogWarning(ex, "Failed to import");
             System.Windows.MessageBox.Show($"Failed to import: {ex.Message}", "Import Error",
                 System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
         }

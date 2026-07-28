@@ -107,7 +107,7 @@
         <KeyBinding Gesture="Ctrl+Shift+F" Command="{Binding ViewModel.FocusManualSearchBoxCommand}"/>
         <KeyBinding Gesture="Ctrl+S" Command="{Binding ViewModel.CommitScansCommand}"/>
         <KeyBinding Gesture="Ctrl+N" Command="{Binding ViewModel.ScanCommand}"/>
-        <KeyBinding Gesture="Ctrl+I" Command="{Binding ViewModel.ImportCollectionCommand}"/>
+        <KeyBinding Gesture="Ctrl+I" Command="{Binding ViewModel.ImportCommand}"/>
         <KeyBinding Gesture="Ctrl+E" Command="{Binding ViewModel.ExportAllAppNativeCommand}"/>
         <KeyBinding Key="F5" Command="{Binding ViewModel.ReprocessScansCommand}"/>
         <KeyBinding Gesture="Ctrl+A" Command="{Binding ViewModel.SelectAllCommand}"/>
@@ -137,11 +137,7 @@
                     <MenuItem Header="Export All Ma_nabox/Mythic Tools..."
                               Command="{Binding ViewModel.ExportAllManaboxCommand}"/>
                 </MenuItem>
-                <MenuItem Header="_Import..."
-                          Command="{Binding ViewModel.ImportCollectionCommand}"
-                          InputGestureText="Ctrl+I"/>
-                <MenuItem Header="Import _Decklist File..."
-                          Command="{Binding ViewModel.ImportDecklistFileCommand}"/>
+                <MenuItem Header="_Import..." Command="{Binding ViewModel.ImportCommand}" InputGestureText="Ctrl+I"/>
                 <Separator />
                 <MenuItem Header="Clear Scan _Cache"
                           Command="{Binding ViewModel.ClearScanCacheCommand}"/>

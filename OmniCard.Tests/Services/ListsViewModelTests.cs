@@ -38,6 +38,23 @@ public class ListsViewModelTests
     }
 
     [Fact]
+    public void Refresh_ReloadsLists_PreservingSelection()
+    {
+        var svc = new FakeListService();
+        svc.Seed(new CardList { Id = 1, Name = "A", Game = CardGame.Mtg });
+        var vm = new ListsViewModel(svc, null!, new FakeDecklistService(), NullLogger<ListsViewModel>.Instance);
+        vm.SetGame(CardGame.Mtg);
+        vm.SelectedList = vm.Lists[0];
+
+        // Another list is created out-of-band (e.g. by a batch import), then Refresh.
+        svc.Seed(new CardList { Id = 2, Name = "B", Game = CardGame.Mtg });
+        vm.Refresh();
+
+        Assert.Equal(2, vm.Lists.Count);
+        Assert.Equal(1, vm.SelectedList!.Id);   // selection preserved by id
+    }
+
+    [Fact]
     public void RunSummaryReport_BuildsResult_AndInvokesExport()
     {
         var svc = new FakeListService();
