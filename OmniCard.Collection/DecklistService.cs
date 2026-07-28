@@ -86,6 +86,17 @@ public sealed partial class DecklistService(
         return ("Pasted Decklist", entries.Values.ToList());
     }
 
+    /// <summary>True for lines the decklist parser skips: blank, // comment, or a section header.</summary>
+    public static bool IsIgnorableLine(string line)
+    {
+        var t = line.Trim();
+        return t.Length == 0 || t.StartsWith("//") || SectionHeaders.Contains(t);
+    }
+
+    /// <summary>True if the line looks like a decklist entry ("1 Card", "1x Card (SET) 4 ...").</summary>
+    public static bool LooksLikeDecklistLine(string line)
+        => !IsIgnorableLine(line) && DecklistLineRegex().IsMatch(line.Trim());
+
     public List<DecklistEntry> ParseDecklistPrintings(string text)
     {
         var entries = new Dictionary<string, DecklistEntry>(StringComparer.OrdinalIgnoreCase);

@@ -418,7 +418,7 @@ public class CsvExportImportService(
 
     // ── Format Detection ──
 
-    private static CsvFormat? DetectFormat(HashSet<string> headers)
+    internal static CsvFormat? DetectFormat(HashSet<string> headers)
     {
         if (headers.Contains("GameCardId"))
             return CsvFormat.AppNative;
