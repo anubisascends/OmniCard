@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:OmniCard.Views.Root"
         xmlns:dashboard="clr-namespace:OmniCard.Views.Dashboard"
         xmlns:sales="clr-namespace:OmniCard.Views.Sales"
+        xmlns:lists="clr-namespace:OmniCard.Views.Lists"
         xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
@@ -106,7 +107,7 @@
         <KeyBinding Gesture="Ctrl+Shift+F" Command="{Binding ViewModel.FocusManualSearchBoxCommand}"/>
         <KeyBinding Gesture="Ctrl+S" Command="{Binding ViewModel.CommitScansCommand}"/>
         <KeyBinding Gesture="Ctrl+N" Command="{Binding ViewModel.ScanCommand}"/>
-        <KeyBinding Gesture="Ctrl+I" Command="{Binding ViewModel.ImportCollectionCommand}"/>
+        <KeyBinding Gesture="Ctrl+I" Command="{Binding ViewModel.ImportCommand}"/>
         <KeyBinding Gesture="Ctrl+E" Command="{Binding ViewModel.ExportAllAppNativeCommand}"/>
         <KeyBinding Key="F5" Command="{Binding ViewModel.ReprocessScansCommand}"/>
         <KeyBinding Gesture="Ctrl+A" Command="{Binding ViewModel.SelectAllCommand}"/>
@@ -136,9 +137,7 @@
                     <MenuItem Header="Export All Ma_nabox/Mythic Tools..."
                               Command="{Binding ViewModel.ExportAllManaboxCommand}"/>
                 </MenuItem>
-                <MenuItem Header="_Import..."
-                          Command="{Binding ViewModel.ImportCollectionCommand}"
-                          InputGestureText="Ctrl+I"/>
+                <MenuItem Header="_Import..." Command="{Binding ViewModel.ImportCommand}" InputGestureText="Ctrl+I"/>
                 <Separator />
                 <MenuItem Header="Clear Scan _Cache"
                           Command="{Binding ViewModel.ClearScanCacheCommand}"/>
@@ -300,6 +299,17 @@
                     </StackPanel>
                 </TabItem.Header>
                 <sales:SalesView DataContext="{Binding ViewModel.Sales}"/>
+            </TabItem>
+
+            <TabItem x:Name="tabItemLists" Style="{StaticResource SidebarTabItemStyle}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="FormatListBulleted" Width="22" Height="22" VerticalAlignment="Center"/>
+                        <TextBlock Text="Lists" Margin="12,0,0,0" VerticalAlignment="Center"
+                                   Visibility="{Binding ViewModel.IsSidebarExpanded, Converter={conv:BoolToVisibilityConverter}}"/>
+                    </StackPanel>
+                </TabItem.Header>
+                <lists:ListsView DataContext="{Binding ViewModel.Lists}"/>
             </TabItem>
 
         </TabControl>

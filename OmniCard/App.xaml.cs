@@ -23,6 +23,7 @@ using OmniCard.Views.Card;
 using OmniCard.Views.CollectionCardEditor;
 using OmniCard.Views.Connection;
 using OmniCard.Views.CoverArtPicker;
+using OmniCard.Views.BatchDecklistImport;
 using OmniCard.Views.CsvImport;
 using OmniCard.Views.HashPreview;
 using OmniCard.Views.Root;
@@ -36,6 +37,7 @@ using OmniCard.Views.StorageManager;
 using OmniCard.Views.EbayListing;
 using OmniCard.Views.ManualAdd;
 using OmniCard.Views.DecklistCheck;
+using OmniCard.Views.Lists;
 
 namespace OmniCard;
 
@@ -166,6 +168,11 @@ public partial class App : Application
             services.AddSingleton<IDecklistService, DecklistService>();
             services.AddSingleton<IDecklistPdfExporter, DecklistPdfExporter>();
 
+            // Lists
+            services.AddSingleton<IListService, ListService>();
+            services.AddSingleton<ListsViewModel>();
+            services.AddSingleton<IDecklistImportService, DecklistImportService>();
+
             // Receipt export
             services.AddSingleton<IReceiptPdfExporter, ReceiptPdfExporter>();
 
@@ -193,6 +200,8 @@ public partial class App : Application
             services.AddTransient<EbayAuthViewModel>();
             services.AddTransient<CsvImportView>();
             services.AddTransient<CsvImportViewModel>();
+            services.AddTransient<BatchDecklistImportView>();
+            services.AddTransient<BatchDecklistImportViewModel>();
             services.AddTransient<Views.TcgOrderImport.TcgOrderImportView>();
             services.AddTransient<Views.TcgOrderImport.TcgOrderImportViewModel>();
             services.AddTransient<SortFilterBuilderView>();

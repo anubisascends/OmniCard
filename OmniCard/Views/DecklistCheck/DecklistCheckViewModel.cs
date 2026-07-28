@@ -17,9 +17,6 @@ public sealed partial class DecklistCheckViewModel(
     public partial string FallbackText { get; set; } = "";
 
     [ObservableProperty]
-    public partial bool ShowFallback { get; set; }
-
-    [ObservableProperty]
     public partial string StatusMessage { get; set; } = "";
 
     [ObservableProperty]
@@ -65,7 +62,6 @@ public sealed partial class DecklistCheckViewModel(
 
             if (fetched is null)
             {
-                ShowFallback = true;
                 StatusMessage = "Couldn't reach the site. Paste your decklist below instead.";
                 logger.LogWarning("Failed to fetch decklist from {Url}", Url);
                 return;
@@ -76,14 +72,13 @@ public sealed partial class DecklistCheckViewModel(
             StatusMessage = $"Fetched \"{deckName}\" ({entries.Count} cards). Checking collection...";
 
             var source = Url.Contains("moxfield", StringComparison.OrdinalIgnoreCase) ? "Moxfield" : "Archidekt";
-            Result = decklistService.CheckAgainstCollection(deckName, source, entries);
+            Result = decklistService.CheckAgainstCollection(deckName, source, entries, CardGame.Mtg);
             StatusMessage = $"Owned: {Result.TotalOwned}/{Result.TotalCards} | Missing: {Result.TotalMissing} | Cost: ${Result.EstimatedCost:N2}";
             logger.LogInformation("Decklist check complete: {Owned}/{Total} owned, {Missing} missing",
                 Result.TotalOwned, Result.TotalCards, Result.TotalMissing);
         }
         catch (Exception ex)
         {
-            ShowFallback = true;
             StatusMessage = "Couldn't reach the site. Paste your decklist below instead.";
             logger.LogWarning(ex, "Error fetching decklist from {Url}", Url);
         }
@@ -111,7 +106,7 @@ public sealed partial class DecklistCheckViewModel(
         }
 
         StatusMessage = $"Parsed {entries.Count} cards. Checking collection...";
-        Result = decklistService.CheckAgainstCollection(deckName, "Text", entries);
+        Result = decklistService.CheckAgainstCollection(deckName, "Text", entries, CardGame.Mtg);
         StatusMessage = $"Owned: {Result.TotalOwned}/{Result.TotalCards} | Missing: {Result.TotalMissing} | Cost: ${Result.EstimatedCost:N2}";
     }
 

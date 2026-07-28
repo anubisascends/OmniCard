@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -13,8 +14,8 @@ public sealed partial class DecklistService(
     IHttpClientFactory httpClientFactory,
     ICardService cardService) : IDecklistService
 {
-    // Regex: "1 Card Name" or "1 Card Name (SET) 123" or "1x Card Name"
-    [GeneratedRegex(@"^(\d+)x?\s+(.+?)(?:\s+\(([A-Za-z0-9]+)\)\s+(\S+))?$")]
+    // Regex: "1 Card Name" | "1x Card Name" | "1 Card Name (SET) 123" | "1 Card Name (SET) 123 *E*"
+    [GeneratedRegex(@"^(\d+)x?\s+(.+?)(?:\s+\(([A-Za-z0-9]+)\)\s+(\S+)(?:\s+.*)?)?$")]
     private static partial Regex DecklistLineRegex();
 
     // Known section headers to skip (Moxfield/Archidekt text export)
@@ -43,9 +44,10 @@ public sealed partial class DecklistService(
         return "Other";
     }
 
-    public (string DeckName, List<DecklistEntry> Entries) ParseDecklistText(string text)
+    // Shared line scanner: split/trim, skip comments + section headers, match the
+    // decklist regex, and yield the parsed fields. Callers apply their own dedupe.
+    private static IEnumerable<(int Qty, string Name, string? SetCode, string? CollectorNumber)> ParseLines(string text)
     {
-        var entries = new Dictionary<string, DecklistEntry>(StringComparer.OrdinalIgnoreCase);
         var regex = DecklistLineRegex();
 
         foreach (var rawLine in text.Split('\n'))
@@ -53,7 +55,6 @@ public sealed partial class DecklistService(
             var line = rawLine.Trim();
             if (string.IsNullOrEmpty(line) || line.StartsWith("//"))
                 continue;
-
             if (SectionHeaders.Contains(line))
                 continue;
 
@@ -66,6 +67,16 @@ public sealed partial class DecklistService(
             var setCode = match.Groups[3].Success ? match.Groups[3].Value.ToUpperInvariant() : null;
             var collectorNumber = match.Groups[4].Success ? match.Groups[4].Value : null;
 
+            yield return (qty, name, setCode, collectorNumber);
+        }
+    }
+
+    public (string DeckName, List<DecklistEntry> Entries) ParseDecklistText(string text)
+    {
+        var entries = new Dictionary<string, DecklistEntry>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (qty, name, setCode, collectorNumber) in ParseLines(text))
+        {
             var key = name.ToUpperInvariant();
             if (entries.TryGetValue(key, out var existing))
                 entries[key] = existing with { Quantity = existing.Quantity + qty };
@@ -76,22 +87,50 @@ public sealed partial class DecklistService(
         return ("Pasted Decklist", entries.Values.ToList());
     }
 
+    /// <summary>True for lines the decklist parser skips: blank, // comment, or a section header.</summary>
+    public static bool IsIgnorableLine(string line)
+    {
+        var t = line.Trim();
+        return t.Length == 0 || t.StartsWith("//") || SectionHeaders.Contains(t);
+    }
+
+    /// <summary>True if the line looks like a decklist entry ("1 Card", "1x Card (SET) 4 ...").</summary>
+    public static bool LooksLikeDecklistLine(string line)
+        => !IsIgnorableLine(line) && DecklistLineRegex().IsMatch(line.Trim());
+
+    public List<DecklistEntry> ParseDecklistPrintings(string text)
+    {
+        var entries = new Dictionary<string, DecklistEntry>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (qty, name, setCode, collectorNumber) in ParseLines(text))
+        {
+            var key = $"{name.ToUpperInvariant()}|{setCode}|{collectorNumber}";
+            if (entries.TryGetValue(key, out var existing))
+                entries[key] = existing with { Quantity = existing.Quantity + qty };
+            else
+                entries[key] = new DecklistEntry(qty, name, setCode, collectorNumber);
+        }
+
+        return entries.Values.ToList();
+    }
+
     public async Task<(string DeckName, List<DecklistEntry> Entries)?> FetchDecklistAsync(string url)
     {
         var (source, deckId) = ParseUrl(url);
         if (source is null || deckId is null)
             return null;
 
-        var client = httpClientFactory.CreateClient();
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("OmniCard/1.0");
-        client.Timeout = TimeSpan.FromSeconds(10);
-
         try
         {
             return source switch
             {
-                "Moxfield" => await FetchMoxfieldAsync(client, deckId),
-                "Archidekt" => await FetchArchidektAsync(client, deckId),
+                // Moxfield's API (api2.moxfield.com) is behind Cloudflare, which 403s .NET's
+                // HttpClient by TLS/handshake fingerprint regardless of headers. Windows' built-in
+                // curl.exe presents a different TLS stack and passes, so shell out for Moxfield.
+                // Archidekt has no such protection and works fine on HttpClient.
+                "Moxfield" => ParseMoxfieldJson(
+                    await CurlGetStringAsync($"https://api2.moxfield.com/v2/decks/all/{deckId}")),
+                "Archidekt" => await FetchArchidektAsync(deckId),
                 _ => null
             };
         }
@@ -99,6 +138,37 @@ public sealed partial class DecklistService(
         {
             return null;
         }
+    }
+
+    /// <summary>Fetch a URL's body via the OS curl.exe (bypasses Cloudflare TLS fingerprinting that
+    /// blocks .NET's HttpClient). Throws if curl.exe is unavailable or the request fails.</summary>
+    private static async Task<string> CurlGetStringAsync(string url)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = "curl.exe",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        psi.ArgumentList.Add("-s");                 // silent
+        psi.ArgumentList.Add("-f");                 // fail (non-zero exit) on HTTP >= 400
+        psi.ArgumentList.Add("-A");
+        psi.ArgumentList.Add("OmniCard/1.0");
+        psi.ArgumentList.Add("--max-time");
+        psi.ArgumentList.Add("15");
+        psi.ArgumentList.Add(url);
+
+        using var proc = Process.Start(psi)
+            ?? throw new InvalidOperationException("curl.exe could not be started.");
+        var stdout = await proc.StandardOutput.ReadToEndAsync();
+        await proc.WaitForExitAsync();
+
+        if (proc.ExitCode != 0 || string.IsNullOrWhiteSpace(stdout))
+            throw new InvalidOperationException($"curl.exe request failed (exit code {proc.ExitCode}).");
+
+        return stdout;
     }
 
     private static (string? Source, string? DeckId) ParseUrl(string url)
@@ -118,19 +188,16 @@ public sealed partial class DecklistService(
         return (null, null);
     }
 
-    private static async Task<(string DeckName, List<DecklistEntry> Entries)?> FetchMoxfieldAsync(
-        HttpClient client, string deckId)
+    /// <summary>Parse Moxfield's v2 deck JSON into decklist entries. Boards are objects keyed by card
+    /// name: mainboard, sideboard, commanders, companions.</summary>
+    internal static (string DeckName, List<DecklistEntry> Entries) ParseMoxfieldJson(string json)
     {
-        var response = await client.GetAsync($"https://api2.moxfield.com/v2/decks/all/{deckId}");
-        response.EnsureSuccessStatusCode();
-
-        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
         var deckName = root.GetProperty("name").GetString() ?? "Moxfield Deck";
 
         var entries = new List<DecklistEntry>();
 
-        // Moxfield stores cards in board objects: mainboard, sideboard, commanders, companions
         foreach (var boardName in new[] { "mainboard", "sideboard", "commanders", "companions" })
         {
             if (!root.TryGetProperty(boardName, out var board) || board.ValueKind != JsonValueKind.Object)
@@ -152,9 +219,12 @@ public sealed partial class DecklistService(
         return (deckName, entries);
     }
 
-    private static async Task<(string DeckName, List<DecklistEntry> Entries)?> FetchArchidektAsync(
-        HttpClient client, string deckId)
+    private async Task<(string DeckName, List<DecklistEntry> Entries)?> FetchArchidektAsync(string deckId)
     {
+        var client = httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("OmniCard/1.0");
+        client.Timeout = TimeSpan.FromSeconds(10);
+
         var response = await client.GetAsync($"https://archidekt.com/api/decks/{deckId}/");
         response.EnsureSuccessStatusCode();
 
@@ -184,13 +254,13 @@ public sealed partial class DecklistService(
         return (deckName, entries);
     }
 
-    public DecklistCheckResult CheckAgainstCollection(string deckName, string deckSource, List<DecklistEntry> entries)
+    public DecklistCheckResult CheckAgainstCollection(string deckName, string deckSource, List<DecklistEntry> entries, CardGame game)
     {
         using var ctx = dbContextFactory.CreateDbContext();
         var allCards =
             (from l in ctx.Lots.AsNoTracking()
              join p in ctx.Products.AsNoTracking() on l.ProductId equals p.Id
-             where p.Category == ProductCategory.Single
+             where p.Category == ProductCategory.Single && p.Game == game
              join sc in ctx.StorageContainers.AsNoTracking() on l.LocationId equals sc.Id into containerJoin
              from sc in containerJoin.DefaultIfEmpty()
              where sc == null || !sc.ExcludeFromDeckCheck
@@ -237,8 +307,8 @@ public sealed partial class DecklistService(
             var missingCount = entry.Quantity - ownedCount;
 
             // Look up card details from Scryfall DB for type/image/detail info
-            var gameService = cardService.GetGameService(CardGame.Mtg);
-            var searchResults = gameService.SearchCards($"name:{entry.CardName}");
+            var gameService = cardService.GetGameService(game);
+            var searchResults = gameService.GetPrintings(entry.CardName);
             CardMatch? cardInfo = null;
             if (searchResults.Count > 0)
             {

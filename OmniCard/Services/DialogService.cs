@@ -6,6 +6,7 @@ using OmniCard.Views.Card;
 using OmniCard.Views.CollectionCardEditor;
 using OmniCard.Views.Connection;
 using OmniCard.Views.CoverArtPicker;
+using OmniCard.Views.BatchDecklistImport;
 using OmniCard.Views.CsvImport;
 using OmniCard.Views.EbayAuth;
 using OmniCard.Views.SetFilterBuilder;
@@ -105,6 +106,27 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         wnd.ViewModel.LoadPreview(preview);
         var result = wnd.ShowDialog();
         return result == true ? wnd.ViewModel.ImportedCount : null;
+    }
+
+    public BatchDecklistImportSummary? ShowBatchDecklistImport()
+    {
+        var wnd = Services.GetRequiredService<BatchDecklistImportView>();
+        SetOwner(wnd);
+        var csv = Services.GetRequiredService<ICsvExportImportService>();
+        wnd.ViewModel.ImportCsvFile = path => ShowImportPreview(csv.PreviewImport(path));
+        wnd.ViewModel.PickFiles = () =>
+        {
+            var d = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "Import files (*.csv;*.txt)|*.csv;*.txt|All files (*.*)|*.*",
+                Title = "Add files",
+                Multiselect = true,
+            };
+            return d.ShowDialog() == true ? d.FileNames : null;
+        };
+        wnd.ViewModel.Load();
+        wnd.ShowDialog();
+        return wnd.ViewModel.Result;   // set on Import, or on Cancel when CSVs were imported
     }
 
     public bool OpenSortFilterBuilder(CardGame game)

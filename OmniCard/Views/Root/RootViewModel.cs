@@ -38,6 +38,7 @@ public sealed partial class RootViewModel(
     Views.Inventory.InventoryViewModel inventory,
     Views.Dashboard.DashboardViewModel dashboard,
     Views.Sales.SalesViewModel sales,
+    Views.Lists.ListsViewModel lists,
     Views.Settings.SettingsViewModel settings,
     IMismatchLogService mismatchLogService,
     SetSymbolCache setSymbolCache,
@@ -172,6 +173,9 @@ public sealed partial class RootViewModel(
 
     /// <summary>The nested SalesViewModel that owns the location-grouped pick list + For-Sale location state.</summary>
     public Views.Sales.SalesViewModel Sales { get; } = sales;
+
+    /// <summary>The nested ListsViewModel that owns the user-defined card lists.</summary>
+    public Views.Lists.ListsViewModel Lists { get; } = lists;
 
     /// <summary>The nested SettingsViewModel that composes the Settings tab's section view-models.</summary>
     public Views.Settings.SettingsViewModel Settings { get; } = settings;
@@ -561,6 +565,7 @@ public sealed partial class RootViewModel(
 
         OnPropertyChanged(nameof(IsScannerEnabled));
         Collection.SetGame(value);
+        Lists.SetGame(value);
         InvalidateHomeTab();
 
         // Keep the ComboBox selection in sync when SelectedGame changes programmatically
@@ -2232,30 +2237,36 @@ public sealed partial class RootViewModel(
     }
 
     [RelayCommand]
-    public void ImportCollection()
+    public void Import()
     {
-        var dialog = new Microsoft.Win32.OpenFileDialog
-        {
-            Filter = "CSV files (*.csv)|*.csv",
-            Title = "Import Collection",
-        };
-
-        if (dialog.ShowDialog() != true)
-            return;
-
         try
         {
-            var preview = csvService.PreviewImport(dialog.FileName);
-            var imported = dialogService.ShowImportPreview(preview);
-            if (imported.HasValue)
-            {
-                Message = $"Imported {imported.Value} cards";
+            var summary = dialogService.ShowBatchDecklistImport();
+            if (summary is null)
+                return;
+
+            var containersChanged = summary.AnyLocationTarget || summary.CsvImportedCount > 0;
+            if (containersChanged)
+                LoadContainers();
+            if (Collection.ShowCardList)
                 _ = Collection.SearchCollection();
-            }
+            else
+                Collection.LoadOverview();
+            if (summary.AnyListTarget)
+                Lists.Refresh();
+
+            var parts = new List<string>();
+            if (summary.FileCount > 0)
+                parts.Add($"Imported {summary.TotalAdded} cards across {summary.FileCount} deck(s)"
+                    + (summary.TotalUnresolved > 0 ? $"; {summary.TotalUnresolved} lines unresolved" : ""));
+            if (summary.CsvImportedCount > 0)
+                parts.Add($"Imported {summary.CsvImportedCount} cards from CSV");
+            if (parts.Count > 0)
+                Message = string.Join(" · ", parts);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to import collection");
+            logger.LogWarning(ex, "Failed to import");
             System.Windows.MessageBox.Show($"Failed to import: {ex.Message}", "Import Error",
                 System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
         }

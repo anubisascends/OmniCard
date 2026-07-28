@@ -49,7 +49,7 @@ public class DecklistModel : PageModel
 
             var source = DeckUrl.Contains("moxfield", StringComparison.OrdinalIgnoreCase)
                 ? "Moxfield" : "Archidekt";
-            Result = _decklistService.CheckAgainstCollection(deckName, source, entries);
+            Result = _decklistService.CheckAgainstCollection(deckName, source, entries, CardGame.Mtg);
         }
         catch (HttpRequestException)
         {

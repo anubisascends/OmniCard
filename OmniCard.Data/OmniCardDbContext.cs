@@ -18,6 +18,8 @@ public class OmniCardDbContext : DbContext
     public DbSet<FlagResolution> FlagResolutions => Set<FlagResolution>();
     public DbSet<ScanDiagnosticEvent> ScanDiagnosticEvents => Set<ScanDiagnosticEvent>();
     public DbSet<MigrationState> MigrationState => Set<MigrationState>();
+    public DbSet<CardList> CardLists => Set<CardList>();
+    public DbSet<CardListItem> CardListItems => Set<CardListItem>();
 
     public OmniCardDbContext(DbContextOptions<OmniCardDbContext> options) : base(options) { }
 
@@ -166,6 +168,21 @@ public class OmniCardDbContext : DbContext
             e.HasKey(l => l.Id);
             e.Property(l => l.Id).ValueGeneratedOnAdd();
             e.HasIndex(l => l.OrderId);
+        });
+
+        modelBuilder.Entity<CardList>(e =>
+        {
+            e.HasKey(l => l.Id);
+            e.Property(l => l.Id).ValueGeneratedOnAdd();
+            e.Property(l => l.Game).HasConversion<string>();
+        });
+
+        modelBuilder.Entity<CardListItem>(e =>
+        {
+            e.HasKey(i => i.Id);
+            e.Property(i => i.Id).ValueGeneratedOnAdd();
+            e.Property(i => i.Source).HasConversion<string>();
+            e.HasIndex(i => i.CardListId);
         });
 
         modelBuilder.Entity<MigrationState>(e =>

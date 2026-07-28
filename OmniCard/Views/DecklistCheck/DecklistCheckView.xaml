@@ -37,9 +37,8 @@
                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                   Margin="4,8,0,0"/>
 
-        <!-- Fallback text input -->
-        <GroupBox Grid.Row="2" Header="Paste Decklist" Padding="8" Margin="0,8,0,0"
-                  Visibility="{Binding ViewModel.ShowFallback, Converter={conv:BoolToVisibilityConverter}}">
+        <!-- Paste text input -->
+        <GroupBox Grid.Row="2" Header="Or Paste Cards" Padding="8" Margin="0,8,0,0">
             <DockPanel>
                 <Button DockPanel.Dock="Bottom" Content="Parse" Padding="16,6" Margin="0,8,0,0"
                         HorizontalAlignment="Left"

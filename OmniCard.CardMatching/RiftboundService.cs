@@ -775,6 +775,12 @@ public sealed class RiftboundService : ICardGameService, IDisposable
                 var val = t[4..];
                 cards = cards.Where(c => EF.Functions.Like(c.SetId, $"%{val}%") || EF.Functions.Like(c.SetName, $"%{val}%"));
             }
+            else if (t.StartsWith("cn:", StringComparison.OrdinalIgnoreCase))
+            {
+                var val = t[3..];
+                if (int.TryParse(val, out var cn))
+                    cards = cards.Where(c => c.CollectorNumber == cn);
+            }
             else if (t.StartsWith("type:", StringComparison.OrdinalIgnoreCase) || t.StartsWith("t:", StringComparison.OrdinalIgnoreCase))
             {
                 var val = t[(t.IndexOf(':') + 1)..];
