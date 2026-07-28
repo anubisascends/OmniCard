@@ -287,6 +287,10 @@ public class EbayListingServiceTests : IDisposable
         Assert.Contains("40001", inv.Body);
         Assert.Contains("400010", inv.Body); // NM → Near Mint or Better
         Assert.DoesNotContain("NEW_OTHER", inv.Body);
+        // Required item specifics (aspects) for category 183454.
+        Assert.Contains("Game", inv.Body);
+        Assert.Contains("Magic: The Gathering", inv.Body); // default CardGame.Mtg
+        Assert.Contains("Card Name", inv.Body);
     }
 
     [Fact]

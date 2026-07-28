@@ -322,9 +322,31 @@ public class EbayListingService : IEbayListingService
         return content;
     }
 
+    // eBay's "Game" item specific for CCG singles (183454) is a constrained aspect; these are
+    // the values eBay accepts (which differ from the app's in-app display names for some games).
+    private static string EbayGameAspect(CardGame game) => game switch
+    {
+        CardGame.Mtg => "Magic: The Gathering",
+        CardGame.Pokemon => "Pokémon TCG",
+        CardGame.YuGiOh => "Yu-Gi-Oh! TCG",
+        CardGame.OnePiece => "One Piece Card Game",
+        CardGame.FinalFantasy => "Final Fantasy Trading Card Game",
+        CardGame.Riftbound => "Riftbound",
+        _ => "Magic: The Gathering",
+    };
+
     private static object BuildInventoryItem(CollectionCard? card, EbayListingOptions options)
     {
         var descriptorValue = CardConditionDescriptorMap.GetValueOrDefault(options.Condition, "400010");
+
+        // Category 183454 requires item specifics (aspects). "Game" is mandatory; Card Name and
+        // Language round out the commonly-required set. Values come from the card being listed.
+        Dictionary<string, string[]>? aspects = card is null ? null : new()
+        {
+            ["Game"] = [EbayGameAspect(card.Game)],
+            ["Card Name"] = [string.IsNullOrWhiteSpace(card.Name) ? options.Title : card.Name],
+            ["Language"] = ["English"],
+        };
 
         return new
         {
@@ -343,6 +365,7 @@ public class EbayListingService : IEbayListingService
             {
                 title = options.Title,
                 description = options.Description,
+                aspects,
             },
         };
     }
