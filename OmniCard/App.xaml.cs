@@ -171,6 +171,7 @@ public partial class App : Application
             // Lists
             services.AddSingleton<IListService, ListService>();
             services.AddSingleton<ListsViewModel>();
+            services.AddSingleton<IDecklistImportService, DecklistImportService>();
 
             // Receipt export
             services.AddSingleton<IReceiptPdfExporter, ReceiptPdfExporter>();
