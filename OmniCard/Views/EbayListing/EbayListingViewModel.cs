@@ -80,7 +80,7 @@ public sealed partial class EbayListingViewModel(
 
         // Auto-generate title and description
         var foilStr = card.IsFoil ? " FOIL" : "";
-        Title = $"MTG {card.Name} [{card.SetCode}] #{card.Number} {card.Condition}{foilStr}";
+        Title = $"{GameTitlePrefix(card.Game)} {card.Name} [{card.SetCode}] #{card.Number} {card.Condition}{foilStr}".TrimStart();
         Description = $"{card.Name} from {card.SetName} ({card.SetCode}) #{card.Number}.\n" +
                       $"Condition: {card.Condition}. {(card.IsFoil ? "Foil finish." : "")}";
 
@@ -88,6 +88,18 @@ public sealed partial class EbayListingViewModel(
         _ = SearchCatalogCommand.ExecuteAsync(null);
         _ = LoadPoliciesAsync();
     }
+
+    /// <summary>Short game prefix for the auto-generated eBay listing title (e.g. "MTG").</summary>
+    public static string GameTitlePrefix(CardGame game) => game switch
+    {
+        CardGame.Mtg => "MTG",
+        CardGame.Pokemon => "Pokémon",
+        CardGame.YuGiOh => "Yu-Gi-Oh!",
+        CardGame.OnePiece => "One Piece",
+        CardGame.FinalFantasy => "Final Fantasy",
+        CardGame.Riftbound => "Riftbound",
+        _ => "",
+    };
 
     [RelayCommand]
     public async Task SearchCatalog()
