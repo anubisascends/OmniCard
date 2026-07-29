@@ -1,6 +1,7 @@
 using System.IO;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Collection;
 using OmniCard.Data;
 using OmniCard.Models;
@@ -62,7 +63,8 @@ public class ReceiptServiceTests : IDisposable
         settings.SaveCompany(new CompanyProfile { Name = "Acme Cards", AddressLine1 = "1 Main", City = "Reno", State = "NV", PostalCode = "89501" });
         settings.SaveReceipt(new ReceiptSettings { WidthMm = 80, ShowPrices = true, FooterText = "Thank you!" });
 
-        var orders = new OrderService(new Factory(_opts), new ListingService(new Factory(_opts), settings));
+        var orders = new OrderService(new Factory(_opts), new ListingService(new Factory(_opts), settings),
+            new FakeEbayListingService(), NullLogger<OrderService>.Instance);
         var customers = new CustomerService(new Factory(_opts));
         var order = orders.CreateOrder(1, SalesChannel.TcgPlayer, "TCG-100");
         orders.AddLine(order.Id, 1, 3.50m);

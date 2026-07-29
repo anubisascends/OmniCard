@@ -1,8 +1,10 @@
 using System.Linq;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Collection;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 using Xunit;
 
@@ -24,7 +26,22 @@ public class OrderServiceTests : IDisposable
 
     public void Dispose() => _conn.Dispose();
 
-    private OrderService OrderSvc() => new(new Factory(_opts), new ListingService(new Factory(_opts), new StubSettings()));
+    private OrderService OrderSvc(IEbayListingService? ebay = null) => new(
+        new Factory(_opts),
+        new ListingService(new Factory(_opts), new StubSettings()),
+        ebay ?? new FakeEbayListingService(),
+        NullLogger<OrderService>.Instance);
+
+    private sealed class RecordingEbayListingService : FakeEbayListingService
+    {
+        public List<int> EndedLotIds { get; } = [];
+        public bool EndResult { get; set; } = true;
+        public override Task<bool> EndListingAsync(EbayListing listing)
+        {
+            EndedLotIds.Add(listing.LotId);
+            return Task.FromResult(EndResult);
+        }
+    }
 
     private sealed class Factory(DbContextOptions<OmniCardDbContext> o) : IDbContextFactory<OmniCardDbContext>
     { public OmniCardDbContext CreateDbContext() => new(o); }
@@ -95,7 +112,7 @@ public class OrderServiceTests : IDisposable
     }
 
     [Fact]
-    public void SetStatus_Shipped_RemovesInventory_RecordsSell_MarksListingSold()
+    public async Task SetStatus_Shipped_RemovesInventory_RecordsSell_MarksListingSold()
     {
         var (customerId, lotId) = SeedCustomerAndLot();
         var listing = new ListingService(new Factory(_opts), new StubSettings());
@@ -105,7 +122,7 @@ public class OrderServiceTests : IDisposable
         var order = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "TCG-42");
         var line = svc.AddLine(order.Id, lotId, 3.50m);
 
-        svc.SetStatus(order.Id, OrderStatus.Shipped);
+        await svc.SetStatusAsync(order.Id, OrderStatus.Shipped);
 
         using var ctx = new OmniCardDbContext(_opts);
         // Lot removed (qty 1 -> 0)
@@ -122,17 +139,57 @@ public class OrderServiceTests : IDisposable
     }
 
     [Fact]
-    public void SetStatus_Shipped_IsIdempotent()
+    public async Task SetStatus_Shipped_IsIdempotent()
     {
         var (customerId, lotId) = SeedCustomerAndLot();
         var svc = OrderSvc();
         var order = svc.CreateOrder(customerId, SalesChannel.Manual, null);
         svc.AddLine(order.Id, lotId, 2m);
-        svc.SetStatus(order.Id, OrderStatus.Shipped);
-        svc.SetStatus(order.Id, OrderStatus.Shipped); // second call must not double-decrement
+        await svc.SetStatusAsync(order.Id, OrderStatus.Shipped);
+        await svc.SetStatusAsync(order.Id, OrderStatus.Shipped); // second call must not double-decrement
 
         using var ctx = new OmniCardDbContext(_opts);
         Assert.Single(ctx.Movements.Where(m => m.Type == MovementType.Sell && m.LotId == lotId).ToList());
+    }
+
+    [Fact]
+    public async Task SetStatus_Shipped_EndsActiveEbayListing_ForSoldLot()
+    {
+        var (customerId, lotId) = SeedCustomerAndLot();
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            ctx.EbayListings.Add(new EbayListing { LotId = lotId, EbayItemId = "E-1", Status = EbayListingStatus.Active, ListedPrice = 3m });
+            ctx.SaveChanges();
+        }
+        var ebay = new RecordingEbayListingService();
+        var svc = OrderSvc(ebay);
+        var order = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "TCG-99");
+        svc.AddLine(order.Id, lotId, 3m);
+
+        await svc.SetStatusAsync(order.Id, OrderStatus.Shipped);
+
+        Assert.Contains(lotId, ebay.EndedLotIds);
+    }
+
+    [Fact]
+    public async Task SetStatus_Shipped_EbayEndFailure_DoesNotBlockSale()
+    {
+        var (customerId, lotId) = SeedCustomerAndLot();
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            ctx.EbayListings.Add(new EbayListing { LotId = lotId, EbayItemId = "E-2", Status = EbayListingStatus.Active, ListedPrice = 3m });
+            ctx.SaveChanges();
+        }
+        var ebay = new RecordingEbayListingService { EndResult = false }; // simulate eBay end failing
+        var svc = OrderSvc(ebay);
+        var order = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "TCG-100");
+        svc.AddLine(order.Id, lotId, 3m);
+
+        await svc.SetStatusAsync(order.Id, OrderStatus.Shipped);
+
+        Assert.Contains(lotId, ebay.EndedLotIds); // end was attempted
+        using var verify = new OmniCardDbContext(_opts);
+        Assert.Null(verify.Lots.FirstOrDefault(l => l.Id == lotId)); // sale still completed (lot removed)
     }
 
     [Fact]
@@ -221,13 +278,13 @@ public class OrderServiceTests : IDisposable
     }
 
     [Fact]
-    public void DeleteOrder_Throws_WhenShippedOrCompleted()
+    public async Task DeleteOrder_Throws_WhenShippedOrCompleted()
     {
         var (customerId, lotId) = SeedCustomerAndLot();
         var svc = OrderSvc();
         var order = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "DEL-2");
         svc.AddLine(order.Id, lotId, 3.50m);
-        svc.SetStatus(order.Id, OrderStatus.Shipped);
+        await svc.SetStatusAsync(order.Id, OrderStatus.Shipped);
 
         Assert.Throws<InvalidOperationException>(() => svc.DeleteOrder(order.Id));
         Assert.NotNull(svc.GetOrder(order.Id));

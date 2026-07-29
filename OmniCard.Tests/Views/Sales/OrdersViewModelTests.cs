@@ -239,7 +239,7 @@ public class OrdersViewModelTests
     }
 
     [Fact]
-    public void MoveOrder_PackedToShipped_CallsService_ThenReloadsAndReselectsOrderById()
+    public async Task MoveOrder_PackedToShipped_CallsService_ThenReloadsAndReselectsOrderById()
     {
         // Ported from SetStatus_CallsService_ThenReloadsAndReselectsOrderById: under the new
         // kanban transition rules Created can no longer jump straight to Shipped, so the source
@@ -251,11 +251,12 @@ public class OrdersViewModelTests
         listingService.Setup(s => s.GetActiveListings(null)).Returns([]);
         orderService.Setup(s => s.GetOrders()).Returns([NewOrder(1, 1, OrderStatus.Shipped)]);
         orderService.Setup(s => s.GetLines(1)).Returns([]);
+        orderService.Setup(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>())).Returns(Task.CompletedTask);
 
         vm.SelectedOrder = order;
-        vm.MoveOrder(order, OrderStatus.Shipped);
+        await vm.MoveOrder(order, OrderStatus.Shipped);
 
-        orderService.Verify(s => s.SetStatus(1, OrderStatus.Shipped), Times.Once);
+        orderService.Verify(s => s.SetStatusAsync(1, OrderStatus.Shipped), Times.Once);
         Assert.NotNull(vm.SelectedOrder);
         Assert.Equal(1, vm.SelectedOrder!.Id);
         Assert.Equal(OrderStatus.Shipped, vm.SelectedOrder.Status);
@@ -263,7 +264,7 @@ public class OrdersViewModelTests
     }
 
     [Fact]
-    public void MoveOrder_CreatedToCompleted_DoesNotCallService_AndSetsStatusMessage()
+    public async Task MoveOrder_CreatedToCompleted_DoesNotCallService_AndSetsStatusMessage()
     {
         // Ported from SetStatus_Completed_OnOpenOrder_DoesNotCallService_AndSetsStatusMessage:
         // keeps the intent that an invalid jump straight to Completed never calls SetStatus.
@@ -272,14 +273,14 @@ public class OrdersViewModelTests
         orderService.Setup(s => s.GetLines(1)).Returns([]);
 
         vm.SelectedOrder = order;
-        vm.MoveOrder(order, OrderStatus.Completed);
+        await vm.MoveOrder(order, OrderStatus.Completed);
 
-        orderService.Verify(s => s.SetStatus(It.IsAny<int>(), It.IsAny<OrderStatus>()), Times.Never);
+        orderService.Verify(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>()), Times.Never);
         Assert.Equal("Can't move Created → Completed.", vm.StatusMessage);
     }
 
     [Fact]
-    public void MoveOrder_CreatedToShipped_DoesNotCallService_AndSetsStatusMessage()
+    public async Task MoveOrder_CreatedToShipped_DoesNotCallService_AndSetsStatusMessage()
     {
         // Ported from SetStatus_Shipped_OnOpenOrder_CallsService: under the old forward-only
         // rules Created -> Shipped was valid; under the new kanban rules it is not (Shipped is
@@ -289,9 +290,9 @@ public class OrdersViewModelTests
         orderService.Setup(s => s.GetLines(1)).Returns([]);
 
         vm.SelectedOrder = order;
-        vm.MoveOrder(order, OrderStatus.Shipped);
+        await vm.MoveOrder(order, OrderStatus.Shipped);
 
-        orderService.Verify(s => s.SetStatus(It.IsAny<int>(), It.IsAny<OrderStatus>()), Times.Never);
+        orderService.Verify(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>()), Times.Never);
         Assert.Equal("Can't move Created → Shipped.", vm.StatusMessage);
     }
 
@@ -350,7 +351,7 @@ public class OrdersViewModelTests
     }
 
     [Fact]
-    public void CancelOrder_OnCreatedOrder_CallsMoveOrder_AndSetsStatusMessage()
+    public async Task CancelOrder_OnCreatedOrder_CallsMoveOrder_AndSetsStatusMessage()
     {
         var vm = MakeVm(out var orderService, out var customerService, out var listingService);
         var order = NewOrder(1, 1, OrderStatus.Created);
@@ -359,25 +360,26 @@ public class OrdersViewModelTests
         listingService.Setup(s => s.GetActiveListings(null)).Returns([]);
         orderService.Setup(s => s.GetOrders()).Returns([NewOrder(1, 1, OrderStatus.Cancelled)]);
         orderService.Setup(s => s.GetLines(1)).Returns([]);
+        orderService.Setup(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>())).Returns(Task.CompletedTask);
 
         vm.SelectedOrder = order;
-        vm.CancelOrder(order);
+        await vm.CancelOrder(order);
 
-        orderService.Verify(s => s.SetStatus(1, OrderStatus.Cancelled), Times.Once);
+        orderService.Verify(s => s.SetStatusAsync(1, OrderStatus.Cancelled), Times.Once);
         Assert.Equal("Order moved to Cancelled.", vm.StatusMessage);
     }
 
     [Fact]
-    public void CancelOrder_OnShippedOrder_DoesNotCallService_AndSetsStatusMessage()
+    public async Task CancelOrder_OnShippedOrder_DoesNotCallService_AndSetsStatusMessage()
     {
         var vm = MakeVm(out var orderService, out _, out _);
         var order = NewOrder(1, 1, OrderStatus.Shipped);
         orderService.Setup(s => s.GetLines(1)).Returns([]);
 
         vm.SelectedOrder = order;
-        vm.CancelOrder(order);
+        await vm.CancelOrder(order);
 
-        orderService.Verify(s => s.SetStatus(It.IsAny<int>(), It.IsAny<OrderStatus>()), Times.Never);
+        orderService.Verify(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>()), Times.Never);
         Assert.Equal("Can't cancel a Shipped order.", vm.StatusMessage);
     }
 

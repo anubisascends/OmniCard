@@ -130,14 +130,29 @@
                                    helpers:TileArt.DataDirectory="{Binding DataContext.DataDirectory,
                                        RelativeSource={RelativeSource AncestorType=ListBox}}"/>
 
-                            <!-- "Listed"/"Picked" badge: visible only when the card is on-market -->
+                            <!-- On-market badge: "eBAY" when actively listed on eBay, else "LISTED"/"PICKED";
+                                 visible only when the card is on-market. -->
                             <Border VerticalAlignment="Top" HorizontalAlignment="Left"
                                     Margin="4" Padding="4,1" CornerRadius="3"
-                                    Background="{DynamicResource MaterialDesign.Brush.Primary}"
                                     Visibility="{Binding ListingStatus, Converter={conv:NullToCollapsedConverter}}">
-                                <TextBlock Text="{Binding ListingStatus, Converter={conv:ListingStatusToBadgeConverter}}"
-                                           FontSize="9" FontWeight="Bold"
-                                           Foreground="White"/>
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="{DynamicResource MaterialDesign.Brush.Primary}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text, ElementName=BadgeText}" Value="eBAY">
+                                                <Setter Property="Background" Value="#1E88E5"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock x:Name="BadgeText" FontSize="9" FontWeight="Bold" Foreground="White">
+                                    <TextBlock.Text>
+                                        <MultiBinding Converter="{conv:ListingBadgeConverter}">
+                                            <Binding Path="ListingStatus"/>
+                                            <Binding Path="EbayListing.Status"/>
+                                        </MultiBinding>
+                                    </TextBlock.Text>
+                                </TextBlock>
                             </Border>
                         </Grid>
 

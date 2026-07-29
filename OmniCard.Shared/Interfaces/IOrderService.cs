@@ -15,7 +15,9 @@ public interface IOrderService
     void UpdateOrder(Order order);
     OrderLine AddLine(int orderId, int lotId, decimal unitSalePrice);
     void RemoveLine(int orderLineId);
-    void SetStatus(int orderId, OrderStatus status); // implemented in Task 5
+    /// <summary>Applies a status change. On a transition into Shipped it records the sale,
+    /// marks listings sold, and best-effort auto-ends any active eBay listing for the sold lots.</summary>
+    Task SetStatusAsync(int orderId, OrderStatus status);
 
     /// <summary>Deletes a pre-ship order and its lines. Throws if the order is Shipped or
     /// Completed (its sale is recorded and inventory already removed).</summary>
