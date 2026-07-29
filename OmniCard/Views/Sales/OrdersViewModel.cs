@@ -188,7 +188,7 @@ public partial class OrdersViewModel(
 
     /// <summary>Applies a drag-drop status move (or programmatic move). Validates the transition;
     /// on Packed→Shipped this runs the existing ship accounting via OrderService.SetStatus.</summary>
-    public void MoveOrder(Order? order, OrderStatus target)
+    public async Task MoveOrder(Order? order, OrderStatus target)
     {
         if (order is null) return;
         if (order.Status == target) return;
@@ -197,7 +197,7 @@ public partial class OrdersViewModel(
             StatusMessage = $"Can't move {order.Status} → {target}.";
             return;
         }
-        orderService.SetStatus(order.Id, target);
+        await orderService.SetStatusAsync(order.Id, target);
         var id = order.Id;
         Load();
         SelectedOrder = Orders.FirstOrDefault(o => o.Id == id);
@@ -205,7 +205,7 @@ public partial class OrdersViewModel(
     }
 
     [RelayCommand]
-    public void CancelOrder(Order? order)
+    public async Task CancelOrder(Order? order)
     {
         if (order is null) return;
         if (!IsValidTransition(order.Status, OrderStatus.Cancelled))
@@ -213,7 +213,7 @@ public partial class OrdersViewModel(
             StatusMessage = $"Can't cancel a {order.Status} order.";
             return;
         }
-        MoveOrder(order, OrderStatus.Cancelled);
+        await MoveOrder(order, OrderStatus.Cancelled);
     }
 
     [RelayCommand]

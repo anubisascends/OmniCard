@@ -81,13 +81,14 @@ public partial class OrdersView : UserControl
         e.Handled = true;
     }
 
-    private void Column_Drop(object sender, DragEventArgs e)
+    private async void Column_Drop(object sender, DragEventArgs e)
     {
         if (e.Data.GetData(typeof(Order)) is not Order order) return;
         if ((sender as FrameworkElement)?.Tag is not string statusText) return;
         if (!Enum.TryParse<OrderStatus>(statusText, out var target)) return;
-        (DataContext as OrdersViewModel)?.MoveOrder(order, target);
         e.Handled = true;
+        if (DataContext is OrdersViewModel vm)
+            await vm.MoveOrder(order, target);
     }
 
     private void Card_Select(object sender, MouseButtonEventArgs e)

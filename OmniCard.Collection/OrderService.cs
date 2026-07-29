@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using OmniCard.Data;
 using OmniCard.Interfaces;
 using OmniCard.Models;
@@ -7,7 +8,9 @@ namespace OmniCard.Collection;
 
 public class OrderService(
     IDbContextFactory<OmniCardDbContext> dbContextFactory,
-    IListingService listingService) : IOrderService
+    IListingService listingService,
+    IEbayListingService ebayListingService,
+    ILogger<OrderService> logger) : IOrderService
 {
     public List<Order> GetOrders()
     {
@@ -96,7 +99,7 @@ public class OrderService(
         ctx.SaveChanges();
     }
 
-    public void SetStatus(int orderId, OrderStatus status)
+    public async Task SetStatusAsync(int orderId, OrderStatus status)
     {
         using var ctx = dbContextFactory.CreateDbContext();
         var order = ctx.Orders.FirstOrDefault(o => o.Id == orderId);
@@ -107,41 +110,65 @@ public class OrderService(
 
         order.Status = status;
 
-        if (shipping)
+        if (!shipping)
         {
-            order.ShippedAt = DateTime.UtcNow;
-            var lines = ctx.OrderLines.Where(l => l.OrderId == orderId).ToList();
-            foreach (var line in lines)
-            {
-                if (line.LotId is not int lotId) continue;
-                var lot = ctx.Lots.FirstOrDefault(l => l.Id == lotId);
-                if (lot is null) continue;
-
-                // Record the sale first (scalar values survive the lot removal below).
-                ctx.Movements.Add(new InventoryMovement
-                {
-                    ProductId = lot.ProductId,
-                    LotId = lot.Id,
-                    Type = MovementType.Sell,
-                    Quantity = line.Quantity,
-                    UnitValue = line.UnitSalePrice,
-                    Timestamp = DateTime.UtcNow,
-                    Note = order.OrderNumber ?? $"Order {order.Id}",
-                });
-
-                lot.Quantity -= line.Quantity;
-                if (lot.Quantity <= 0)
-                    ctx.Lots.Remove(lot);
-            }
-            ctx.SaveChanges();
-
-            // Mark each sold lot's active listing Sold (separate context inside the service).
-            foreach (var line in lines.Where(l => l.LotId is not null))
-                listingService.MarkSold(line.LotId!.Value, line.Id);
+            await ctx.SaveChangesAsync();
+            return;
         }
-        else
+
+        order.ShippedAt = DateTime.UtcNow;
+        var lines = ctx.OrderLines.Where(l => l.OrderId == orderId).ToList();
+        var lotIds = lines.Where(l => l.LotId is not null).Select(l => l.LotId!.Value).ToList();
+
+        // Capture active eBay listings BEFORE the lots are removed — removing a lot
+        // cascade-deletes its EbayListing row, so we must grab them first.
+        var ebayToEnd = ctx.EbayListings.AsNoTracking()
+            .Where(e => lotIds.Contains(e.LotId) && e.Status == EbayListingStatus.Active)
+            .ToList();
+
+        foreach (var line in lines)
         {
-            ctx.SaveChanges();
+            if (line.LotId is not int lotId) continue;
+            var lot = ctx.Lots.FirstOrDefault(l => l.Id == lotId);
+            if (lot is null) continue;
+
+            // Record the sale first (scalar values survive the lot removal below).
+            ctx.Movements.Add(new InventoryMovement
+            {
+                ProductId = lot.ProductId,
+                LotId = lot.Id,
+                Type = MovementType.Sell,
+                Quantity = line.Quantity,
+                UnitValue = line.UnitSalePrice,
+                Timestamp = DateTime.UtcNow,
+                Note = order.OrderNumber ?? $"Order {order.Id}",
+            });
+
+            lot.Quantity -= line.Quantity;
+            if (lot.Quantity <= 0)
+                ctx.Lots.Remove(lot);
+        }
+        await ctx.SaveChangesAsync();
+
+        // Mark each sold lot's active listing Sold (separate context inside the service).
+        foreach (var line in lines.Where(l => l.LotId is not null))
+            listingService.MarkSold(line.LotId!.Value, line.Id);
+
+        // Auto-end any active eBay listing for the sold lots so it can't double-sell.
+        // Best-effort: a failure never blocks the sale — it's logged with the item id so
+        // the still-live listing can be ended manually on eBay.
+        foreach (var listing in ebayToEnd)
+        {
+            try
+            {
+                var ended = await ebayListingService.EndListingAsync(listing);
+                if (!ended)
+                    logger.LogError("Auto-end of eBay listing {ItemId} (lot {LotId}) after sale FAILED — end it manually on eBay.", listing.EbayItemId, listing.LotId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Auto-end of eBay listing {ItemId} (lot {LotId}) after sale threw — end it manually on eBay.", listing.EbayItemId, listing.LotId);
+            }
         }
     }
 
