@@ -28,7 +28,24 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         _logger = logger;
 
         _logger.LogInformation("Initializing TWAIN session");
-        AppID = TWIdentity.CreateFromAssembly(DataGroups.Image, Assembly.GetExecutingAssembly());
+        //AppID = TWIdentity.CreateFromAssembly(DataGroups.Image, Assembly.GetExecutingAssembly());
+        AppID = new TWIdentity
+        {
+            Manufacturer = "Andrew Riebe",
+            ProductFamily = "OmniCard",
+            ProductName = "OmniCard Scanner",
+            ProtocolMajor = TwainConst.ProtocolMajor,
+            ProtocolMinor = TwainConst.ProtocolMinor,
+            DataGroup = DataGroups.Image | DataGroups.Control,
+            Version = new TWVersion
+            {
+                Major = 1,
+                Minor = 0,
+                Language = Language.EnglishUSA,
+                Country = Country.Usa,
+                Info = "1.0.0"
+            }
+        };
         Session = new TwainSession(AppID);
 
         Session.TransferReady += Session_TransferReady;

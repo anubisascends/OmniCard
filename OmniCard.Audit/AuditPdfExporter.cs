@@ -11,6 +11,7 @@ public sealed class AuditPdfExporter : IAuditPdfExporter
     public void Export(AuditReport report, string filePath)
     {
         QuestPDF.Settings.License = LicenseType.Community;
+        QuestPDF.Settings.FontDiscoveryPaths.Clear();
 
         Document.Create(container =>
         {

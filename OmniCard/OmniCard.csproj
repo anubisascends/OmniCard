@@ -12,7 +12,8 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <!-- Framework-dependent deployment: target machines need the .NET 10 Desktop Runtime
          installed. Avoids bundling the runtime, keeping the published output minimal. -->
-    <SelfContained>false</SelfContained>
+    <SelfContained>true</SelfContained>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>
@@ -90,7 +91,8 @@
     <Delete Files="@(PublishPdbFiles)" />
     <Delete Files="@(PublishX86Natives)" />
     <RemoveDir Directories="$(PublishDir)x86" />
-    <Message Importance="high" Text="StripPublishSymbols: removed debug symbols and x86 native binaries from publish output." />
+    <Message Importance="high"
+      Text="StripPublishSymbols: removed debug symbols and x86 native binaries from publish output." />
   </Target>
 
   <Target Name="CopyScannerHost" AfterTargets="Build">
@@ -102,7 +104,8 @@
       <ScannerHostFiles Include="$(ScannerHostOutputDir)OmniCard.ScannerHost.*" />
       <ScannerHostFiles Include="$(ScannerHostOutputDir)NTwain.dll" />
     </ItemGroup>
-    <Copy SourceFiles="@(ScannerHostFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ScannerHostFiles)" DestinationFolder="$(OutputPath)"
+      SkipUnchangedFiles="true" />
   </Target>
 
 </Project>
