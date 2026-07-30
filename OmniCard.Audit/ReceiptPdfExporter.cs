@@ -12,6 +12,7 @@ public sealed class ReceiptPdfExporter : IReceiptPdfExporter
     public void Export(ReceiptDocument doc, string filePath)
     {
         QuestPDF.Settings.License = LicenseType.Community;
+        QuestPDF.Settings.FontDiscoveryPaths.Clear();
 
         Document.Create(container =>
         {
