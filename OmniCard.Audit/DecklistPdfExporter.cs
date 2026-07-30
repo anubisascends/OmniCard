@@ -13,6 +13,7 @@ public sealed class DecklistPdfExporter(IHttpClientFactory httpClientFactory) : 
     public void Export(DecklistCheckResult result, string filePath)
     {
         QuestPDF.Settings.License = LicenseType.Community;
+        QuestPDF.Settings.FontDiscoveryPaths.Clear();
 
         Document.Create(container =>
         {
@@ -188,6 +189,7 @@ public sealed class DecklistPdfExporter(IHttpClientFactory httpClientFactory) : 
     public void ExportDetailed(DecklistCheckResult result, string filePath)
     {
         QuestPDF.Settings.License = LicenseType.Community;
+        QuestPDF.Settings.FontDiscoveryPaths.Clear();
 
         Document.Create(container =>
         {
