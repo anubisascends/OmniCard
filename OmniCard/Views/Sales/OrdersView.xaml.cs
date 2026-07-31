@@ -96,4 +96,10 @@ public partial class OrdersView : UserControl
         if (DataContext is OrdersViewModel vm && (sender as FrameworkElement)?.Tag is Order order)
             vm.SelectedOrder = order;
     }
+
+    private void Lines_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+    {
+        if (DataContext is OrdersViewModel vm)
+            Dispatcher.BeginInvoke(vm.OnLineFieldEdited); // after the binding commits
+    }
 }

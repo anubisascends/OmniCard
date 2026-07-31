@@ -22,4 +22,20 @@ public interface IOrderService
     /// <summary>Deletes a pre-ship order and its lines. Throws if the order is Shipped or
     /// Completed (its sale is recorded and inventory already removed).</summary>
     void DeleteOrder(int orderId);
+
+    /// <summary>Applies a fully-audited correction to a Completed order: header fields
+    /// (shipping/fees/tracking/notes) plus per-line quantity decreases, price corrections, line
+    /// removals, and new lines (sourced from an available lot, exactly like AddLine). Requires a
+    /// non-blank reason; throws <see cref="ArgumentException"/> if blank. Throws
+    /// <see cref="InvalidOperationException"/> if the order isn't Completed, if a quantity
+    /// increase is attempted on an existing line (unsupported — add a new line instead), or if a
+    /// line's original Sell movement can't be found via <see cref="InventoryMovement.OrderLineId"/>
+    /// (predates this feature — fail loudly rather than silently desyncing realized gains). Writes
+    /// exactly one <see cref="OrderEdit"/> audit row per call, capturing every changed field.
+    /// Best-effort marks new lines' source listing Sold and ends any active eBay listing (mirrors
+    /// SetStatusAsync's ship block) — failures are logged, never block the save.</summary>
+    Task EditCompletedOrder(int orderId, Order updatedHeader, List<OrderLine> updatedLines, string reason);
+
+    /// <summary>Audit history for an order (newest first).</summary>
+    List<OrderEdit> GetOrderEdits(int orderId);
 }

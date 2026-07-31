@@ -71,9 +71,21 @@ public partial class OrdersViewModel(
     [ObservableProperty]
     public partial string? StatusMessage { get; set; }
 
+    /// <summary>Whether a Completed order is currently unlocked for correction (see
+    /// BeginEditCompletedOrder). While true, AddCard/RemoveLine stage changes locally on
+    /// <see cref="Lines"/> instead of calling the service immediately — the DB write happens once,
+    /// atomically, in SaveEditedOrder.</summary>
+    [ObservableProperty]
+    public partial bool IsEditingCompletedOrder { get; set; }
+
+    private string? _pendingEditReason;
+
     public decimal OrderTotal => Lines.Sum(l => l.Quantity * l.UnitSalePrice);
 
-    public bool IsEditable => SelectedOrder?.Status == OrderStatus.Created;
+    public bool IsEditable => SelectedOrder?.Status == OrderStatus.Created
+        || (SelectedOrder?.Status == OrderStatus.Completed && IsEditingCompletedOrder);
+
+    public bool CanBeginEditCompletedOrder => SelectedOrder?.Status == OrderStatus.Completed && !IsEditingCompletedOrder;
 
     public bool HasReconciliation =>
         SelectedOrder?.ImportedItemCount is not null || SelectedOrder?.ImportedProductValue is not null;
@@ -140,6 +152,11 @@ public partial class OrdersViewModel(
         if (value is not null && IsEditorCollapsed)
             IsEditorCollapsed = false;
 
+        // Switching orders always exits edit mode without saving — any staged edits are
+        // discarded since Lines is about to be reloaded from the DB below anyway.
+        _pendingEditReason = null;
+        IsEditingCompletedOrder = false;
+
         Lines.Clear();
         if (value is not null)
             foreach (var l in orderService.GetLines(value.Id)) Lines.Add(l);
@@ -148,6 +165,61 @@ public partial class OrdersViewModel(
         OnPropertyChanged(nameof(HasReconciliation));
         OnPropertyChanged(nameof(ReconciliationHint));
         OnPropertyChanged(nameof(IsEditable));
+        OnPropertyChanged(nameof(CanBeginEditCompletedOrder));
+    }
+
+    [RelayCommand]
+    public void BeginEditCompletedOrder()
+    {
+        if (SelectedOrder is not { Status: OrderStatus.Completed }) return;
+        var label = SelectedOrder.OrderNumber ?? $"#{SelectedOrder.Id}";
+        var reason = dialogService.RequireReason("Edit Completed Order",
+            $"Editing order {label}. Enter a reason for this correction — it will be recorded in the audit trail.");
+        if (reason is null) return; // cancelled
+
+        _pendingEditReason = reason;
+        IsEditingCompletedOrder = true;
+        OnPropertyChanged(nameof(IsEditable));
+        OnPropertyChanged(nameof(CanBeginEditCompletedOrder));
+    }
+
+    [RelayCommand]
+    public void CancelEditCompletedOrder()
+    {
+        _pendingEditReason = null;
+        IsEditingCompletedOrder = false;
+        var id = SelectedOrder?.Id;
+        Load(); // discards any staged header edits by reloading fresh POCOs from the DB
+        SelectedOrder = Orders.FirstOrDefault(o => o.Id == id);
+        RefreshLines(); // explicit: SelectedOrder may be the same reference (no-op set), but staged line edits must still be discarded
+        OnPropertyChanged(nameof(IsEditable));
+        OnPropertyChanged(nameof(CanBeginEditCompletedOrder));
+        StatusMessage = "Edit cancelled.";
+    }
+
+    [RelayCommand]
+    public async Task SaveEditedOrder()
+    {
+        if (SelectedOrder is null || _pendingEditReason is null) return;
+        try
+        {
+            await orderService.EditCompletedOrder(SelectedOrder.Id, SelectedOrder, [.. Lines], _pendingEditReason);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            StatusMessage = ex.Message;
+            return; // stay in edit mode so the user can fix the offending change
+        }
+
+        _pendingEditReason = null;
+        IsEditingCompletedOrder = false;
+        var id = SelectedOrder.Id;
+        Load();
+        SelectedOrder = Orders.FirstOrDefault(o => o.Id == id);
+        RefreshLines(); // explicit: SelectedOrder may be the same reference (no-op set) — force the corrected lines to load
+        OnPropertyChanged(nameof(IsEditable));
+        OnPropertyChanged(nameof(CanBeginEditCompletedOrder));
+        StatusMessage = "Order updated.";
     }
 
     [RelayCommand]
@@ -163,7 +235,29 @@ public partial class OrdersViewModel(
     public void AddCard()
     {
         if (SelectedOrder is null || SelectedAvailableCard is null) return;
-        if (!IsEditable) { StatusMessage = "Only a Created order can be edited."; return; }
+        if (!IsEditable) { StatusMessage = "Only a Created order (or an order in edit mode) can be edited."; return; }
+
+        if (IsEditingCompletedOrder)
+        {
+            // Staged locally (Id = 0 marks "new" for EditCompletedOrder's diff) — no DB write
+            // until SaveEditedOrder commits the whole edit session atomically.
+            Lines.Add(new OrderLine
+            {
+                Id = 0,
+                OrderId = SelectedOrder.Id,
+                LotId = SelectedAvailableCard.LotId,
+                NameSnapshot = SelectedAvailableCard.Name,
+                SetSnapshot = SelectedAvailableCard.SetName,
+                ConditionSnapshot = SelectedAvailableCard.Condition,
+                IsFoilSnapshot = SelectedAvailableCard.IsFoil,
+                Quantity = 1,
+                UnitSalePrice = SelectedAvailableCard.ListedPrice,
+            });
+            AvailableCards.Remove(SelectedAvailableCard);
+            OnPropertyChanged(nameof(OrderTotal));
+            return;
+        }
+
         orderService.AddLine(SelectedOrder.Id, SelectedAvailableCard.LotId, SelectedAvailableCard.ListedPrice);
         RefreshLines();
         AvailableCards.Remove(SelectedAvailableCard);
@@ -173,10 +267,23 @@ public partial class OrdersViewModel(
     public void RemoveLine(OrderLine? line)
     {
         if (SelectedOrder is null || line is null) return;
-        if (!IsEditable) { StatusMessage = "Only a Created order can be edited."; return; }
+        if (!IsEditable) { StatusMessage = "Only a Created order (or an order in edit mode) can be edited."; return; }
+
+        if (IsEditingCompletedOrder)
+        {
+            Lines.Remove(line);
+            OnPropertyChanged(nameof(OrderTotal));
+            return;
+        }
+
         orderService.RemoveLine(line.Id);
         RefreshLines();
     }
+
+    /// <summary>Re-announces derived state after an in-place DataGrid cell edit (Qty/Price) commits
+    /// during Completed-order edit mode — OrderLine is a plain POCO with no INotifyPropertyChanged,
+    /// so nothing else observes the mutation.</summary>
+    public void OnLineFieldEdited() => OnPropertyChanged(nameof(OrderTotal));
 
     [RelayCommand]
     public void SaveOrder()

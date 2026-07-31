@@ -535,6 +535,68 @@ public class AnalyticsServiceTests : IDisposable
         public object? FindCardById(string gameCardId) => null;
     }
 
+    [Fact]
+    public async Task GetRealized_ReflectsCorrectedNumbers_AfterCompletedOrderEdit()
+    {
+        using (var seedCtx = new OmniCardDbContext(_options))
+        {
+            var product = SeedProduct(seedCtx, CardGame.Mtg, ProductCategory.Single, "Sol Ring", "sol-1");
+            var lot = SeedLot(seedCtx, product.Id, 2, null, null);
+            SeedMovement(seedCtx, product.Id, lot.Id, MovementType.Acquire, 2, 4.00m); // cost $4/unit
+
+            var customer = new Customer { Name = "Ada" };
+            seedCtx.Customers.Add(customer);
+            seedCtx.SaveChanges();
+
+            var order = new Order { CustomerId = customer.Id, Channel = SalesChannel.Manual, Status = OrderStatus.Created };
+            seedCtx.Orders.Add(order);
+            seedCtx.SaveChanges();
+
+            var line = new OrderLine { OrderId = order.Id, LotId = lot.Id, ProductId = product.Id, Quantity = 2, UnitSalePrice = 10.00m, NameSnapshot = "Sol Ring" };
+            seedCtx.OrderLines.Add(line);
+            seedCtx.SaveChanges();
+
+            var orderSvc = new OrderService(new MockFactory(_options),
+                new ListingService(new MockFactory(_options), new StubSalesSettings()),
+                new FakeEbayListingService(), Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderService>.Instance);
+            await orderSvc.SetStatusAsync(order.Id, OrderStatus.Shipped);
+            await orderSvc.SetStatusAsync(order.Id, OrderStatus.Completed);
+
+            var analytics = CreateService();
+            var before = analytics.GetRealized();
+            Assert.Equal(2, before.TotalSold);
+            Assert.Equal(20.00m, before.TotalProceeds); // 2 * 10
+            Assert.Equal(8.00m, before.TotalCost);      // 2 * 4
+
+            // Correction: buyer only actually got 1 unit (the other was damaged) at a renegotiated
+            // price of $8 for the unit that did ship.
+            var shippedLine = orderSvc.GetLines(order.Id).Single();
+            var updatedLine = new OrderLine { Id = shippedLine.Id, OrderId = order.Id, Quantity = 1, UnitSalePrice = 8.00m };
+            var reloadedOrder = orderSvc.GetOrder(order.Id)!;
+            await orderSvc.EditCompletedOrder(order.Id, reloadedOrder, [updatedLine], "One unit arrived damaged, refunded and adjusted price on the remaining unit");
+
+            var after = analytics.GetRealized();
+            Assert.Equal(1, after.TotalSold);
+            Assert.Equal(8.00m, after.TotalProceeds); // 1 * 8
+            Assert.Equal(4.00m, after.TotalCost);     // 1 * 4
+        }
+    }
+
+    private sealed class StubSalesSettings : ISalesSettingsService
+    {
+        public int? ForSaleLocationId => 99;
+        public void SetForSaleLocationId(int? id) { }
+        public CompanyProfile GetCompany() => new();
+        public void SaveCompany(CompanyProfile company) { }
+        public ReceiptSettings GetReceipt() => new();
+        public void SaveReceipt(ReceiptSettings receipt) { }
+        public string SetLogo(string sourcePath) => "company-logo.png";
+        public double? OrdersEditorWidth => null;
+        public void SetOrdersEditorWidth(double width) { }
+        public bool OrdersEditorCollapsed => false;
+        public void SetOrdersEditorCollapsed(bool collapsed) { }
+    }
+
     private class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
         public OmniCardDbContext CreateDbContext() => new(options);

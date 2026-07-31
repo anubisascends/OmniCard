@@ -164,4 +164,64 @@ public class OmniCardDbContextTests : IDisposable
         Assert.Equal(productId, reloadedMovement.ProductId);
         Assert.Equal(MovementType.Acquire, reloadedMovement.Type);
     }
+
+    [Fact]
+    public void Movement_OrderLineId_RoundTrips_AndIsNullableForHistoricalRows()
+    {
+        int productId;
+        int movementWithLineId;
+        int movementWithoutLineId;
+        using (var ctx = new OmniCardDbContext(_options))
+        {
+            var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, Name = "Lightning Bolt" };
+            ctx.Products.Add(product);
+            ctx.SaveChanges();
+            productId = product.Id;
+
+            var linked = new InventoryMovement { ProductId = productId, Type = MovementType.Sell, Quantity = 1, OrderLineId = 42 };
+            var unlinked = new InventoryMovement { ProductId = productId, Type = MovementType.Sell, Quantity = 1 };
+            ctx.Movements.AddRange(linked, unlinked);
+            ctx.SaveChanges();
+            movementWithLineId = linked.Id;
+            movementWithoutLineId = unlinked.Id;
+        }
+
+        using var readCtx = new OmniCardDbContext(_options);
+        Assert.Equal(42, readCtx.Movements.AsNoTracking().Single(m => m.Id == movementWithLineId).OrderLineId);
+        Assert.Null(readCtx.Movements.AsNoTracking().Single(m => m.Id == movementWithoutLineId).OrderLineId);
+    }
+
+    [Fact]
+    public void OrderEdit_RoundTrips_ReasonAndChangesJson()
+    {
+        int orderId;
+        int editId;
+        using (var ctx = new OmniCardDbContext(_options))
+        {
+            var customer = new Customer { Name = "Test Buyer" };
+            ctx.Customers.Add(customer);
+            ctx.SaveChanges();
+
+            var order = new Order { CustomerId = customer.Id, Status = OrderStatus.Completed };
+            ctx.Orders.Add(order);
+            ctx.SaveChanges();
+            orderId = order.Id;
+
+            var edit = new OrderEdit
+            {
+                OrderId = orderId,
+                Reason = "Item arrived damaged",
+                ChangesJson = """[{"Field":"Quantity","OldValue":"2","NewValue":"1"}]""",
+            };
+            ctx.OrderEdits.Add(edit);
+            ctx.SaveChanges();
+            editId = edit.Id;
+        }
+
+        using var readCtx = new OmniCardDbContext(_options);
+        var reloaded = readCtx.OrderEdits.AsNoTracking().Single(e => e.Id == editId);
+        Assert.Equal(orderId, reloaded.OrderId);
+        Assert.Equal("Item arrived damaged", reloaded.Reason);
+        Assert.Contains("Quantity", reloaded.ChangesJson);
+    }
 }

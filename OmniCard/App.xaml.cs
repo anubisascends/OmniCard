@@ -231,6 +231,8 @@ public partial class App : Application
             services.AddTransient<Views.Inventory.AddLotViewModel>();
             services.AddTransient<Views.Inventory.OpenUnitsView>();
             services.AddTransient<Views.Inventory.OpenUnitsViewModel>();
+            services.AddTransient<Views.Sales.RequireReasonView>();
+            services.AddTransient<Views.Sales.RequireReasonViewModel>();
             services.AddTransient<Views.MovementHistory.MovementHistoryView>();
             services.AddTransient<Views.MovementHistory.MovementHistoryViewModel>();
             services.AddTransient<Views.LogViewer.LogViewerView>();

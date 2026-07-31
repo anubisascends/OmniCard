@@ -14,6 +14,7 @@ public class OmniCardDbContext : DbContext
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderLine> OrderLines => Set<OrderLine>();
+    public DbSet<OrderEdit> OrderEdits => Set<OrderEdit>();
     public DbSet<MismatchLog> MismatchLogs => Set<MismatchLog>();
     public DbSet<FlagResolution> FlagResolutions => Set<FlagResolution>();
     public DbSet<ScanDiagnosticEvent> ScanDiagnosticEvents => Set<ScanDiagnosticEvent>();
@@ -76,6 +77,7 @@ public class OmniCardDbContext : DbContext
             e.Property(m => m.Id).ValueGeneratedOnAdd();
             e.Property(m => m.Type).HasConversion<string>();
             e.HasIndex(m => new { m.ProductId, m.Timestamp });
+            e.HasIndex(m => m.OrderLineId);
         });
 
         modelBuilder.Entity<StorageContainer>(e =>
@@ -168,6 +170,13 @@ public class OmniCardDbContext : DbContext
             e.HasKey(l => l.Id);
             e.Property(l => l.Id).ValueGeneratedOnAdd();
             e.HasIndex(l => l.OrderId);
+        });
+
+        modelBuilder.Entity<OrderEdit>(e =>
+        {
+            e.HasKey(oe => oe.Id);
+            e.Property(oe => oe.Id).ValueGeneratedOnAdd();
+            e.HasIndex(oe => oe.OrderId);
         });
 
         modelBuilder.Entity<CardList>(e =>
