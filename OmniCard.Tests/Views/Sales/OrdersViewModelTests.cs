@@ -200,7 +200,7 @@ public class OrdersViewModelTests
         vm.AddCard();
 
         orderService.Verify(s => s.AddLine(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<decimal>()), Times.Never);
-        Assert.Equal("Only a Created order can be edited.", vm.StatusMessage);
+        Assert.Equal("Only a Created order (or an order in edit mode) can be edited.", vm.StatusMessage);
     }
 
     [Fact]
@@ -235,7 +235,7 @@ public class OrdersViewModelTests
         vm.RemoveLine(line);
 
         orderService.Verify(s => s.RemoveLine(It.IsAny<int>()), Times.Never);
-        Assert.Equal("Only a Created order can be edited.", vm.StatusMessage);
+        Assert.Equal("Only a Created order (or an order in edit mode) can be edited.", vm.StatusMessage);
     }
 
     [Fact]
@@ -520,5 +520,152 @@ public class OrdersViewModelTests
         vm.SelectedOrder = imported;
         Assert.True(vm.HasReconciliation);
         Assert.Contains("of 8 items", vm.ReconciliationHint);
+    }
+
+    // ---------------------------------------------------------------------
+    // Completed-order edit flow
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void BeginEditCompletedOrder_PromptsReason_UnlocksEditing_WhenConfirmed()
+    {
+        var vm = MakeVm(out var orderService, out _, out _, out var dialogService);
+        var order = NewOrder(1, 1, OrderStatus.Completed);
+        orderService.Setup(s => s.GetLines(1)).Returns([]);
+        dialogService.Setup(s => s.RequireReason(It.IsAny<string>(), It.IsAny<string>())).Returns("Item damaged");
+
+        vm.SelectedOrder = order;
+        Assert.True(vm.CanBeginEditCompletedOrder);
+
+        vm.BeginEditCompletedOrder();
+
+        Assert.True(vm.IsEditingCompletedOrder);
+        Assert.True(vm.IsEditable);
+        Assert.False(vm.CanBeginEditCompletedOrder);
+    }
+
+    [Fact]
+    public void BeginEditCompletedOrder_DoesNothing_WhenReasonDialogCancelled()
+    {
+        var vm = MakeVm(out var orderService, out _, out _, out var dialogService);
+        var order = NewOrder(1, 1, OrderStatus.Completed);
+        orderService.Setup(s => s.GetLines(1)).Returns([]);
+        dialogService.Setup(s => s.RequireReason(It.IsAny<string>(), It.IsAny<string>())).Returns((string?)null);
+
+        vm.SelectedOrder = order;
+        vm.BeginEditCompletedOrder();
+
+        Assert.False(vm.IsEditingCompletedOrder);
+        Assert.False(vm.IsEditable);
+    }
+
+    [Fact]
+    public void AddCard_InEditMode_StagesLineLocally_WithoutCallingAddLine()
+    {
+        var vm = MakeVm(out var orderService, out _, out _, out var dialogService);
+        var order = NewOrder(1, 1, OrderStatus.Completed);
+        var listing = Listing(10, 5.00m);
+        orderService.Setup(s => s.GetLines(1)).Returns([]);
+        dialogService.Setup(s => s.RequireReason(It.IsAny<string>(), It.IsAny<string>())).Returns("Missed a line item");
+
+        vm.SelectedOrder = order;
+        vm.BeginEditCompletedOrder();
+        vm.AvailableCards.Add(listing);
+        vm.SelectedAvailableCard = listing;
+
+        vm.AddCard();
+
+        orderService.Verify(s => s.AddLine(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<decimal>()), Times.Never);
+        var staged = Assert.Single(vm.Lines);
+        Assert.Equal(0, staged.Id);
+        Assert.Equal(10, staged.LotId);
+        Assert.Equal(5.00m, staged.UnitSalePrice);
+        Assert.Empty(vm.AvailableCards);
+    }
+
+    [Fact]
+    public void RemoveLine_InEditMode_RemovesLineLocally_WithoutCallingRemoveLine()
+    {
+        var vm = MakeVm(out var orderService, out _, out _, out var dialogService);
+        var order = NewOrder(1, 1, OrderStatus.Completed);
+        var line = Line(1, 1, 5.00m);
+        orderService.Setup(s => s.GetLines(1)).Returns([line]);
+        dialogService.Setup(s => s.RequireReason(It.IsAny<string>(), It.IsAny<string>())).Returns("Refund");
+
+        vm.SelectedOrder = order;
+        vm.BeginEditCompletedOrder();
+        Assert.Single(vm.Lines);
+
+        vm.RemoveLine(line);
+
+        orderService.Verify(s => s.RemoveLine(It.IsAny<int>()), Times.Never);
+        Assert.Empty(vm.Lines);
+    }
+
+    [Fact]
+    public void CancelEditCompletedOrder_DiscardsStagedChanges_AndReloadsFromDb()
+    {
+        var vm = MakeVm(out var orderService, out var customerService, out var listingService, out var dialogService);
+        var order = NewOrder(1, 1, OrderStatus.Completed);
+        var line = Line(1, 1, 5.00m);
+        orderService.Setup(s => s.GetOrders()).Returns([order]);
+        orderService.Setup(s => s.GetLines(1)).Returns([line]);
+        customerService.Setup(s => s.GetAll()).Returns([]);
+        listingService.Setup(s => s.GetActiveListings(null)).Returns([]);
+        dialogService.Setup(s => s.RequireReason(It.IsAny<string>(), It.IsAny<string>())).Returns("Refund");
+
+        vm.SelectedOrder = order;
+        vm.BeginEditCompletedOrder();
+        vm.RemoveLine(line); // stage a change
+        Assert.Empty(vm.Lines);
+
+        vm.CancelEditCompletedOrder();
+
+        Assert.False(vm.IsEditingCompletedOrder);
+        Assert.Single(vm.Lines); // reloaded fresh from the (mocked) DB — staged removal discarded
+        Assert.Equal("Edit cancelled.", vm.StatusMessage);
+    }
+
+    [Fact]
+    public async Task SaveEditedOrder_CallsService_WithReasonAndStagedLines_ThenReloads()
+    {
+        var vm = MakeVm(out var orderService, out var customerService, out var listingService, out var dialogService);
+        var order = NewOrder(1, 1, OrderStatus.Completed);
+        var line = Line(1, 1, 5.00m);
+        orderService.Setup(s => s.GetOrders()).Returns([order]);
+        orderService.Setup(s => s.GetLines(1)).Returns([line]);
+        customerService.Setup(s => s.GetAll()).Returns([]);
+        listingService.Setup(s => s.GetActiveListings(null)).Returns([]);
+        dialogService.Setup(s => s.RequireReason(It.IsAny<string>(), It.IsAny<string>())).Returns("Item damaged");
+        orderService.Setup(s => s.EditCompletedOrder(1, order, It.IsAny<List<OrderLine>>(), "Item damaged"))
+            .Returns(Task.CompletedTask);
+
+        vm.SelectedOrder = order;
+        vm.BeginEditCompletedOrder();
+
+        await vm.SaveEditedOrder();
+
+        orderService.Verify(s => s.EditCompletedOrder(1, order, It.Is<List<OrderLine>>(l => l.Count == 1), "Item damaged"), Times.Once);
+        Assert.False(vm.IsEditingCompletedOrder);
+        Assert.Equal("Order updated.", vm.StatusMessage);
+    }
+
+    [Fact]
+    public async Task SaveEditedOrder_WhenServiceThrows_SetsStatusMessage_AndStaysInEditMode()
+    {
+        var vm = MakeVm(out var orderService, out _, out _, out var dialogService);
+        var order = NewOrder(1, 1, OrderStatus.Completed);
+        orderService.Setup(s => s.GetLines(1)).Returns([]);
+        dialogService.Setup(s => s.RequireReason(It.IsAny<string>(), It.IsAny<string>())).Returns("Item damaged");
+        orderService.Setup(s => s.EditCompletedOrder(1, order, It.IsAny<List<OrderLine>>(), "Item damaged"))
+            .ThrowsAsync(new InvalidOperationException("no linked sale record"));
+
+        vm.SelectedOrder = order;
+        vm.BeginEditCompletedOrder();
+
+        await vm.SaveEditedOrder();
+
+        Assert.Equal("no linked sale record", vm.StatusMessage);
+        Assert.True(vm.IsEditingCompletedOrder); // stays in edit mode so the user can fix it
     }
 }

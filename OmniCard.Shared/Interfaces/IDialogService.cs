@@ -30,4 +30,8 @@ public interface IDialogService
     int ShowTcgOrderImportPreview(TcgOrderImportPreview preview);
     bool Confirm(string message, string title);
     BatchDecklistImportSummary? ShowBatchDecklistImport();
+
+    /// <summary>Required-reason modal: Confirm is disabled while the reason field is blank.
+    /// Returns the trimmed reason on confirm, or null if cancelled.</summary>
+    string? RequireReason(string title, string message);
 }

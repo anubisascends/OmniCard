@@ -288,6 +288,9 @@
             <DockPanel DockPanel.Dock="Top" LastChildFill="False" Margin="0,0,0,6">
                 <TextBlock DockPanel.Dock="Left" Text="Order details" FontWeight="Bold" VerticalAlignment="Center"
                            Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                <Button DockPanel.Dock="Left" Content="Edit Order…" Command="{Binding BeginEditCompletedOrderCommand}"
+                        Padding="10,3" Margin="12,0,0,0"
+                        Visibility="{Binding CanBeginEditCompletedOrder, Converter={conv:BoolToVisibilityConverter}}"/>
                 <Button DockPanel.Dock="Right" Content="›" FontSize="15" Padding="8,0" MinWidth="28"
                         Command="{Binding CollapseEditorCommand}" ToolTip="Collapse panel"/>
             </DockPanel>
@@ -333,7 +336,12 @@
 
             <!-- Save/Receipt/Export + total + status message -->
             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
-                <Button Content="Save" Command="{Binding SaveOrderCommand}" Padding="12,4" Margin="0,0,8,0"/>
+                <Button Content="Save" Command="{Binding SaveOrderCommand}" Padding="12,4" Margin="0,0,8,0"
+                        Visibility="{Binding IsEditingCompletedOrder, Converter={conv:InverseBoolToVisibilityConverter}}"/>
+                <Button Content="Save Changes" Command="{Binding SaveEditedOrderCommand}" Padding="12,4" Margin="0,0,8,0"
+                        Visibility="{Binding IsEditingCompletedOrder, Converter={conv:BoolToVisibilityConverter}}"/>
+                <Button Content="Cancel Edit" Command="{Binding CancelEditCompletedOrderCommand}" Padding="12,4" Margin="0,0,8,0"
+                        Visibility="{Binding IsEditingCompletedOrder, Converter={conv:BoolToVisibilityConverter}}"/>
                 <Button Content="Print Receipt" Command="{Binding PrintReceiptCommand}" Padding="12,4" Margin="0,0,8,0"/>
                 <Button Content="Export PDF" Command="{Binding ExportPdfCommand}" Padding="12,4" Margin="0,0,16,0"/>
                 <TextBlock Text="{Binding OrderTotal, StringFormat=C}" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,16,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
@@ -366,16 +374,21 @@
                 </ComboBox>
             </DockPanel>
 
-            <!-- Lines -->
-            <DataGrid ItemsSource="{Binding Lines}" AutoGenerateColumns="False" IsReadOnly="True"
+            <!-- Lines. Qty/Price are editable only in Completed-edit-mode (IsReadOnly is bound so
+                 a Created order's grid behaves exactly as before — IsEditingCompletedOrder is
+                 always false there). -->
+            <DataGrid ItemsSource="{Binding Lines}" AutoGenerateColumns="False"
+                      CanUserAddRows="False" CanUserDeleteRows="False"
+                      IsReadOnly="{Binding IsEditingCompletedOrder, Converter={conv:InverseBoolConverter}}"
                       IsEnabled="{Binding IsEditable}"
+                      CellEditEnding="Lines_CellEditEnding"
                       Style="{StaticResource {x:Type DataGrid}}">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Name" Binding="{Binding NameSnapshot}" Width="*"/>
-                    <DataGridTextColumn Header="Set" Binding="{Binding SetSnapshot}"/>
-                    <DataGridTextColumn Header="Condition" Binding="{Binding ConditionSnapshot}"/>
-                    <DataGridTextColumn Header="Qty" Binding="{Binding Quantity}"/>
-                    <DataGridTextColumn Header="Price" Binding="{Binding UnitSalePrice, StringFormat=C}"/>
+                    <DataGridTextColumn Header="Name" Binding="{Binding NameSnapshot}" Width="*" IsReadOnly="True"/>
+                    <DataGridTextColumn Header="Set" Binding="{Binding SetSnapshot}" IsReadOnly="True"/>
+                    <DataGridTextColumn Header="Condition" Binding="{Binding ConditionSnapshot}" IsReadOnly="True"/>
+                    <DataGridTextColumn Header="Qty" Binding="{Binding Quantity, UpdateSourceTrigger=LostFocus}"/>
+                    <DataGridTextColumn Header="Price" Binding="{Binding UnitSalePrice, StringFormat=C, UpdateSourceTrigger=LostFocus}"/>
                     <DataGridTemplateColumn Header="">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>

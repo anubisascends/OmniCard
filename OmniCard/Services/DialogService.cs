@@ -20,6 +20,7 @@ using OmniCard.Views.DecklistCheck;
 using OmniCard.Views.Inventory;
 using OmniCard.Views.LogViewer;
 using OmniCard.Views.MovementHistory;
+using OmniCard.Views.Sales;
 using OmniCard.Views.SalesListing;
 using OmniCard.Views.Settings;
 using OmniCard.Views.TcgOrderImport;
@@ -268,4 +269,13 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         => System.Windows.MessageBox.Show(message, title,
                System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning)
            == System.Windows.MessageBoxResult.Yes;
+
+    public string? RequireReason(string title, string message)
+    {
+        var wnd = Services.GetRequiredService<RequireReasonView>();
+        SetOwner(wnd);
+        wnd.ViewModel.Load(title, message);
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.Result : null;
+    }
 }

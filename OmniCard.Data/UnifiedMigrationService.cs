@@ -108,6 +108,13 @@ public static class UnifiedMigrationService
             cmd.ExecuteNonQuery();
         }
 
+        if (TableExists(cmd, "Movements"))
+        {
+            AddColumnIfMissing(cmd, "Movements", "OrderLineId", "INTEGER");
+            cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_Movements_OrderLineId ON Movements(OrderLineId)";
+            cmd.ExecuteNonQuery();
+        }
+
         // New tables added to OmniCardDbContext after Phase 1.
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS StorageContainers (
@@ -239,6 +246,19 @@ public static class UnifiedMigrationService
             """;
         cmd.ExecuteNonQuery();
         cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_OrderLines_OrderId ON OrderLines(OrderId)";
+        cmd.ExecuteNonQuery();
+
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS OrderEdits (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                OrderId INTEGER NOT NULL,
+                Timestamp TEXT NOT NULL,
+                Reason TEXT NOT NULL DEFAULT '',
+                ChangesJson TEXT NOT NULL DEFAULT '[]'
+            )
+            """;
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_OrderEdits_OrderId ON OrderEdits(OrderId)";
         cmd.ExecuteNonQuery();
 
         cmd.CommandText = """
