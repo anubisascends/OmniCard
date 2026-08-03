@@ -43,6 +43,8 @@ public interface ICardService
     (int FlagResolutions, int MismatchLogs, int DiagnosticEvents) ClearDiagnosticLogs();
     (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null);
     void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section);
+    bool IsFirstCopy(CardGame game, string gameCardId, bool isFoil);
+    void AnnotateScan(ScannedCard scan);
     int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates);
     ulong ComputeHashFromStream(Stream stream);
     ulong ComputeEdgeHashFromStream(Stream stream);

@@ -296,6 +296,8 @@ public class ListServiceTests : IDisposable
         public (int FlagResolutions, int MismatchLogs, int DiagnosticEvents) ClearDiagnosticLogs() => (0, 0, 0);
         public (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null) => (0, 0);
         public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section) { }
+        public bool IsFirstCopy(CardGame game, string gameCardId, bool isFoil) => throw new NotImplementedException();
+        public void AnnotateScan(ScannedCard scan) => throw new NotImplementedException();
         public int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates) => 0;
         public ulong ComputeHashFromStream(System.IO.Stream stream) => 0;
         public ulong ComputeEdgeHashFromStream(System.IO.Stream stream) => 0;

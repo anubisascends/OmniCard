@@ -131,6 +131,8 @@ public sealed class CardService : ICardService
                     _logger.LogInformation("Reprocess matched \"{CardName}\" in {Game}", match.Name, game);
                 }
             }
+
+            AnnotateScan(scan);
         }
     }
 
@@ -278,6 +280,7 @@ public sealed class CardService : ICardService
         var capturedSetFilter = SelectedSetFilter;
         Application.Current.Dispatcher.BeginInvoke(async () =>
         {
+            AnnotateScan(scannedCard);
             ScannedCards.Add(scannedCard);
 
             if (!_auditService.IsAuditActive)
@@ -478,6 +481,9 @@ public sealed class CardService : ICardService
                     _diagnosticService.LogScanCompleted(_currentSessionId, capturedHash, scannedCard.Match, ocrDiag, scannedCard.ArtHashes, ocrResult, scannedCard.FlagReason);
                 }
                 catch { }
+
+                // Re-annotate: OCR/rotation may have changed the match since the initial add above.
+                AnnotateScan(scannedCard);
             }
         });
 
@@ -872,6 +878,29 @@ public sealed class CardService : ICardService
         context.SaveChanges();
 
         _logger.LogInformation("Manually added {Quantity}x {Name} ({SetCode}) to collection", quantity, match.Name, match.SetCode);
+    }
+
+    public bool IsFirstCopy(CardGame game, string gameCardId, bool isFoil)
+    {
+        using var context = _omniDbContextFactory.CreateDbContext();
+        return !context.Lots.Any(l =>
+            l.Product.Game == game && l.Product.GameCardId == gameCardId && l.Product.Foil == isFoil);
+    }
+
+    /// <summary>Sets <see cref="ScannedCard.IsFirstCopy"/>/<see cref="ScannedCard.CurrentPrice"/> from
+    /// the current match. Called whenever a scan's match is set or cleared — initial auto-match,
+    /// reprocessing, or a manual correction — so the scan-tile badges stay in sync with the DB.</summary>
+    public void AnnotateScan(ScannedCard scan)
+    {
+        if (scan.Match is null)
+        {
+            scan.IsFirstCopy = false;
+            scan.CurrentPrice = null;
+            return;
+        }
+
+        scan.IsFirstCopy = IsFirstCopy(scan.Game, scan.Match.GameSpecificId, scan.IsFoil);
+        scan.CurrentPrice = GetGameService(scan.Game).GetCurrentPrice(scan.Match.GameSpecificId, scan.IsFoil);
     }
 
     /// <summary>

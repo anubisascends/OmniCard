@@ -42,6 +42,16 @@ public partial class ScannedCard : ObservableObject
     [ObservableProperty]
     public partial FlagReason FlagReason { get; set; }
 
+    /// <summary>True when the DB has zero copies of this exact (Game, GameCardId, Foil) print —
+    /// set by <see cref="OmniCard.Interfaces.ICardService.AnnotateScan"/>, not computed locally.</summary>
+    [ObservableProperty]
+    public partial bool IsFirstCopy { get; set; }
+
+    /// <summary>Current market price for the matched print, set by
+    /// <see cref="OmniCard.Interfaces.ICardService.AnnotateScan"/>.</summary>
+    [ObservableProperty]
+    public partial decimal? CurrentPrice { get; set; }
+
     public bool IsFlagged => FlagReason != FlagReason.None;
 
     partial void OnFlagReasonChanged(FlagReason value)
