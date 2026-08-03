@@ -155,7 +155,7 @@ public class InventoryService(IDbContextFactory<OmniCardDbContext> dbContextFact
     public InventoryValuation GetValuation(CardGame? game = null, ProductCategory? category = null)
     {
         using var ctx = dbContextFactory.CreateDbContext();
-        var query = ctx.Lots.AsNoTracking().Include(l => l.Product).AsQueryable();
+        var query = ctx.Lots.AsNoTracking().Include(l => l.Product).Where(l => !l.IsTraded).AsQueryable();
         if (game.HasValue) query = query.Where(l => l.Product.Game == game.Value);
         if (category.HasValue) query = query.Where(l => l.Product.Category == category.Value);
 

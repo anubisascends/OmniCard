@@ -1254,6 +1254,8 @@ public sealed class CardService : ICardService
                 CardType = p.CardType,
                 IsMissing = l.IsMissing,
                 FlagReason = l.FlagReason,
+                IsTraded = l.IsTraded,
+                TradeNote = l.TradeNote,
             };
 
         if (gameFilter.HasValue)

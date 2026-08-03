@@ -139,6 +139,7 @@ public partial class App : Application
             services.AddSingleton<IInventoryService, InventoryService>();
             services.AddSingleton<IAnalyticsService, AnalyticsService>();
             services.AddSingleton<ISealedPriceUpdateService, SealedPriceUpdateService>();
+            services.AddSingleton<ITradeImportService, TradeImportService>();
 
             // Storage containers
             services.AddSingleton<IStorageContainerService, StorageContainerService>();
@@ -328,6 +329,19 @@ public partial class App : Application
             catch (Exception ex)
             {
                 migrationLogger.LogError(ex, "Unified data migration failed; continuing startup without it (will retry on next launch)");
+            }
+
+            splash.SetStatus("Importing trades...");
+            try
+            {
+                var tradeImportService = Host.Services.GetRequiredService<ITradeImportService>();
+                var importedCount = tradeImportService.ImportPendingTrades();
+                if (importedCount > 0)
+                    migrationLogger.LogInformation("Applied {Count} pending trade(s)", importedCount);
+            }
+            catch (Exception ex)
+            {
+                migrationLogger.LogError(ex, "Trade import failed; continuing startup without it (will retry on next launch)");
             }
 
             splash.SetStatus("Preparing scan cache...");

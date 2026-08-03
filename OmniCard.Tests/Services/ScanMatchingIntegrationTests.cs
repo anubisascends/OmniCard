@@ -200,6 +200,7 @@ public class ScanMatchingIntegrationTests : IDisposable
         public string TempScansDirectory => Path.Combine(dataDir, "temp");
         public string SymbolsCacheDirectory => Path.Combine(dataDir, "symbols");
         public string LogsDirectory => Path.Combine(dataDir, "logs");
+        public string TradesDirectory => Path.Combine(dataDir, "trades");
         public string? PendingDataDirectory => null;
         public bool IsMigrationPending => false;
         public void SetPendingDataDirectory(string path) { }

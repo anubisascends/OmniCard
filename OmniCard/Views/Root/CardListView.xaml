@@ -154,6 +154,15 @@
                                     </TextBlock.Text>
                                 </TextBlock>
                             </Border>
+
+                            <!-- Traded badge: this physical copy was marked traded from the web app -->
+                            <Border VerticalAlignment="Top" HorizontalAlignment="Right"
+                                    Margin="4" Padding="4,1" CornerRadius="3"
+                                    Background="#6D4C41"
+                                    Visibility="{Binding IsTraded, Converter={conv:BoolToVisibilityConverter}}"
+                                    ToolTip="{Binding TradeNote}">
+                                <TextBlock Text="TRADED" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                            </Border>
                         </Grid>
 
                         <!-- Name: single line, ellipsis when too long (full name in the tile tooltip) -->

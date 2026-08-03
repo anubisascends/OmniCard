@@ -13,6 +13,7 @@ public sealed class WebDataPathService(string dataDirectory) : IDataPathService
     public string TempScansDirectory => Path.Combine(dataDirectory, "temp_scans");
     public string SymbolsCacheDirectory => Path.Combine(dataDirectory, "symbols", "sets");
     public string LogsDirectory => Path.Combine(dataDirectory, "logs");
+    public string TradesDirectory => Path.Combine(dataDirectory, "trades");
 
     public string? PendingDataDirectory => null;
     public bool IsMigrationPending => false;

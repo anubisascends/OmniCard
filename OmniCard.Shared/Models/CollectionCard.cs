@@ -30,6 +30,8 @@ public class CollectionCard : INotifyPropertyChanged
     public bool IsMissing { get; set; }
     public FlagReason? FlagReason { get; set; }
     public EbayListing? EbayListing { get; set; }
+    public bool IsTraded { get; set; }
+    public string? TradeNote { get; set; }
 
     /// <summary>Cached market price for display and sorting. Not persisted.</summary>
     [NotMapped]

@@ -13,6 +13,7 @@ public class LogViewerViewModelTests
         public string TempScansDirectory => "";
         public string SymbolsCacheDirectory => "";
         public string LogsDirectory => "";
+        public string TradesDirectory => "";
         public string? PendingDataDirectory => null;
         public bool IsMigrationPending => false;
         public void SetPendingDataDirectory(string path) { }

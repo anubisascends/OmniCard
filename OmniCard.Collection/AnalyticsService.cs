@@ -23,7 +23,7 @@ public class AnalyticsService : IAnalyticsService
     public HoldingsValuation GetHoldings()
     {
         using var ctx = _dbContextFactory.CreateDbContext();
-        var lots = ctx.Lots.AsNoTracking().Include(l => l.Product).ToList();
+        var lots = ctx.Lots.AsNoTracking().Include(l => l.Product).Where(l => !l.IsTraded).ToList();
         var containerNames = ctx.StorageContainers.AsNoTracking().ToDictionary(c => c.Id, c => c.Name);
 
         var marketByLotId = new Dictionary<int, decimal>(lots.Count);

@@ -39,6 +39,7 @@ public class ReceiptServiceTests : IDisposable
         public string TempScansDirectory => dir;
         public string SymbolsCacheDirectory => dir;
         public string LogsDirectory => dir;
+        public string TradesDirectory => dir;
         public string? PendingDataDirectory => null;
         public bool IsMigrationPending => false;
         public void SetPendingDataDirectory(string path) { }

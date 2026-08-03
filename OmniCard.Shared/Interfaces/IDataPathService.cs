@@ -7,6 +7,7 @@ public interface IDataPathService
     string TempScansDirectory { get; }
     string SymbolsCacheDirectory { get; }
     string LogsDirectory { get; }
+    string TradesDirectory { get; }
 
     string? PendingDataDirectory { get; }
     bool IsMigrationPending { get; }

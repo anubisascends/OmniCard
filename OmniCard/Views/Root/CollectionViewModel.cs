@@ -651,7 +651,7 @@ public sealed partial class CollectionViewModel : ViewModel
             Application.Current?.Dispatcher.Invoke(() =>
             {
                 foreach (var c in results)
-                    if (prices.TryGetValue(c.Id, out var p)) c.MarketPrice = p;
+                    if (!c.IsTraded && prices.TryGetValue(c.Id, out var p)) c.MarketPrice = p;
                 MarketPrices = prices;
                 OnPropertyChanged(nameof(FilteredMarketValue));
             });
@@ -670,7 +670,7 @@ public sealed partial class CollectionViewModel : ViewModel
                     foilGroup.Select(c => c.GameCardId), foilGroup.Key);
                 foreach (var card in foilGroup)
                 {
-                    var price = batchPrices.GetValueOrDefault(card.GameCardId);
+                    var price = card.IsTraded ? 0m : batchPrices.GetValueOrDefault(card.GameCardId);
                     card.MarketPrice = price;
                     priceCache[card.Id] = price;
                 }

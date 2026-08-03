@@ -38,6 +38,7 @@ public sealed class DataPathService : IDataPathService
     public string TempScansDirectory => Path.Combine(_dataDirectory, "temp_scans");
     public string SymbolsCacheDirectory => Path.Combine(_dataDirectory, "symbols", "sets");
     public string LogsDirectory => Path.Combine(_dataDirectory, "logs");
+    public string TradesDirectory => Path.Combine(_dataDirectory, "trades");
 
     public string? PendingDataDirectory => _pendingDataDirectory;
     public bool IsMigrationPending => _pendingDataDirectory is not null;

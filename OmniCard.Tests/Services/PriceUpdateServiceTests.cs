@@ -29,6 +29,7 @@ public class PriceUpdateServiceTests : IDisposable
         public string TempScansDirectory => throw new NotImplementedException();
         public string SymbolsCacheDirectory => throw new NotImplementedException();
         public string LogsDirectory => throw new NotImplementedException();
+        public string TradesDirectory => throw new NotImplementedException();
         public string? PendingDataDirectory => throw new NotImplementedException();
         public bool IsMigrationPending => throw new NotImplementedException();
         public void SetPendingDataDirectory(string path) => throw new NotImplementedException();

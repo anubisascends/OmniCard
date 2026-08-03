@@ -23,12 +23,26 @@
 
     <header>
         <h1>@Model.Card.Name</h1>
+        @if (Model.Card.IsTraded)
+        {
+            <p><span class="badge trade-badge">TRADED</span></p>
+        }
     </header>
 
     <main>
+        @if (Model.TradeMessage is not null)
+        {
+            <p class="badge trade-badge">@Model.TradeMessage</p>
+        }
+
         @if (Model.ImageUrl is not null)
         {
             <img src="@Model.ImageUrl" alt="@Model.Card.Name" class="card-image"/>
+        }
+
+        @if (!Model.Card.IsTraded)
+        {
+            <p><a href="/Trade?lotId=@Model.Card.Id" class="trade-button">Trade this card&hellip;</a></p>
         }
 
         <table class="detail-table">

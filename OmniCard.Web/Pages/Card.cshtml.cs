@@ -37,6 +37,9 @@ public class CardModel : PageModel
     /// </summary>
     public string? ExtendedDataJson { get; set; }
 
+    [TempData]
+    public string? TradeMessage { get; set; }
+
     public IActionResult OnGet(int id)
     {
         using var db = _dbFactory.CreateDbContext();
