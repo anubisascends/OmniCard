@@ -5,6 +5,23 @@
              xmlns:inv="clr-namespace:OmniCard.Views.Inventory"
              xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls">
 
+    <UserControl.Resources>
+        <!-- Visible only when viewing a single location's card list (not the overview, not "all cards") -->
+        <Style x:Key="SingleLocationButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Margin" Value="4,0,0,0"/>
+            <Setter Property="Visibility" Value="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                RelativeSource={RelativeSource AncestorType=Window},
+                Converter={conv:BoolToVisibilityConverter}}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.ViewModel.Collection.ShowAllCards,
+                    RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -76,26 +93,11 @@
 
                     <!-- Audit button (single location only) -->
                     <Button Content="Audit"
+                            Style="{StaticResource SingleLocationButtonStyle}"
                             Command="{Binding DataContext.ViewModel.StartAuditCommand,
                                 RelativeSource={RelativeSource AncestorType=Window}}"
                             CommandParameter="{Binding DataContext.ViewModel.Collection.CurrentLocationId,
-                                RelativeSource={RelativeSource AncestorType=Window}}"
-                            Padding="8,4"
-                            Margin="4,0,0,0">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                                <Setter Property="Visibility" Value="{Binding DataContext.ViewModel.Collection.ShowCardList,
-                                    RelativeSource={RelativeSource AncestorType=Window},
-                                    Converter={conv:BoolToVisibilityConverter}}"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding DataContext.ViewModel.Collection.ShowAllCards,
-                                        RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
+                                RelativeSource={RelativeSource AncestorType=Window}}"/>
 
                     <!-- Add card manually -->
                     <Button Content="Add Card"
@@ -104,6 +106,31 @@
                             Padding="8,4"
                             Margin="4,0,0,0"
                             ToolTip="Search and add a card without scanning"/>
+
+                    <!-- Change cover art (single location only) -->
+                    <Button Content="Cover Art..."
+                            Style="{StaticResource SingleLocationButtonStyle}"
+                            Command="{Binding DataContext.ViewModel.Collection.SetCoverArtCommand,
+                                RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding DataContext.ViewModel.Collection.CurrentLocationId,
+                                RelativeSource={RelativeSource AncestorType=Window}}"
+                            ToolTip="Change this location's cover art"/>
+
+                    <!-- Export this location to Manabox (single location only) -->
+                    <Button Content="Export to Manabox..."
+                            Style="{StaticResource SingleLocationButtonStyle}"
+                            Command="{Binding DataContext.ViewModel.ExportLocationManaboxCommand,
+                                RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding DataContext.ViewModel.Collection.CurrentLocationId,
+                                RelativeSource={RelativeSource AncestorType=Window}}"/>
+
+                    <!-- Create a priced PDF sheet for this location (single location only) -->
+                    <Button Content="Price Sheet..."
+                            Style="{StaticResource SingleLocationButtonStyle}"
+                            Command="{Binding DataContext.ViewModel.CreatePriceSheetCommand,
+                                RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding DataContext.ViewModel.Collection.CurrentLocationId,
+                                RelativeSource={RelativeSource AncestorType=Window}}"/>
                     <Separator/>
 
                     <!-- Search -->

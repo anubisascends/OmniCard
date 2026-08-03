@@ -186,6 +186,45 @@
                 <MenuItem Header="Recompute _All Hashes..."
                           Command="{Binding ViewModel.ComputeImageHashesCommand}"/>
             </MenuItem>
+            <MenuItem Header="Se_lection">
+                <MenuItem Header="_Open Card Editor"
+                          Command="{Binding ViewModel.Collection.CollectionCardDoubleClickCommand}"/>
+                <MenuItem Header="_Copy Card Name(s)"
+                          Command="{Binding ViewModel.Collection.CopyCollectionCardNamesCommand}"/>
+                <Separator/>
+                <MenuItem Header="_Move to Location..."
+                          Command="{Binding ViewModel.Collection.MoveSelectedToLocationCommand}"/>
+                <MenuItem Header="_List for Sale..."
+                          Command="{Binding ViewModel.Collection.ListForSaleCommand}"/>
+                <MenuItem Header="Mark _Picked"
+                          Command="{Binding ViewModel.Collection.MarkPickedCommand}"/>
+                <MenuItem Header="_Unlist"
+                          Command="{Binding ViewModel.Collection.UnlistForSaleCommand}"/>
+                <Separator/>
+                <MenuItem Header="Set _Condition">
+                    <MenuItem Header="NM" Command="{Binding ViewModel.Collection.BulkSetCollectionConditionCommand}" CommandParameter="NM"/>
+                    <MenuItem Header="LP" Command="{Binding ViewModel.Collection.BulkSetCollectionConditionCommand}" CommandParameter="LP"/>
+                    <MenuItem Header="MP" Command="{Binding ViewModel.Collection.BulkSetCollectionConditionCommand}" CommandParameter="MP"/>
+                    <MenuItem Header="HP" Command="{Binding ViewModel.Collection.BulkSetCollectionConditionCommand}" CommandParameter="HP"/>
+                    <MenuItem Header="D"  Command="{Binding ViewModel.Collection.BulkSetCollectionConditionCommand}" CommandParameter="D"/>
+                </MenuItem>
+                <MenuItem Header="Set _Foil"
+                          Command="{Binding ViewModel.Collection.BulkSetCollectionFoilCommand}"
+                          CommandParameter="True"/>
+                <MenuItem Header="Set Non-F_oil"
+                          Command="{Binding ViewModel.Collection.BulkSetCollectionFoilCommand}"
+                          CommandParameter="False"/>
+                <Separator/>
+                <MenuItem Header="List on _eBay"
+                          Command="{Binding ViewModel.Collection.ListOnEbayCommand}"/>
+                <MenuItem Header="_View on eBay"
+                          Command="{Binding ViewModel.Collection.ViewOnEbayCommand}"/>
+                <MenuItem Header="_End eBay Listing"
+                          Command="{Binding ViewModel.Collection.EndEbayListingCommand}"/>
+                <Separator/>
+                <MenuItem Header="_Delete Selected"
+                          Command="{Binding ViewModel.Collection.BulkDeleteCollectionCommand}"/>
+            </MenuItem>
             <MenuItem Header="_Scanner">
                 <MenuItem Header="Search _Scanner"
                           Command="{Binding ViewModel.FocusManualSearchBoxCommand}"
@@ -208,6 +247,28 @@
                           InputGestureText="F5"/>
                 <MenuItem Header="C_lear Queue"
                           Command="{Binding ViewModel.ClearScansCommand}"/>
+                <Separator/>
+                <MenuItem Header="Open Card _Detail"
+                          Command="{Binding ViewModel.CardDoubleClickCommand}"/>
+                <MenuItem Header="Cop_y Card Name(s)"
+                          Command="{Binding ViewModel.CopyScannedCardNamesCommand}"/>
+                <MenuItem Header="Set Condition (Queue)">
+                    <MenuItem Header="NM" Command="{Binding ViewModel.SetScannedConditionCommand}" CommandParameter="NM"/>
+                    <MenuItem Header="LP" Command="{Binding ViewModel.SetScannedConditionCommand}" CommandParameter="LP"/>
+                    <MenuItem Header="MP" Command="{Binding ViewModel.SetScannedConditionCommand}" CommandParameter="MP"/>
+                    <MenuItem Header="HP" Command="{Binding ViewModel.SetScannedConditionCommand}" CommandParameter="HP"/>
+                    <MenuItem Header="D"  Command="{Binding ViewModel.SetScannedConditionCommand}" CommandParameter="D"/>
+                </MenuItem>
+                <MenuItem Header="Set Foil (Queue)"
+                          Command="{Binding ViewModel.SetScannedFoilCommand}"
+                          CommandParameter="True"/>
+                <MenuItem Header="Set Non-Foil (Queue)"
+                          Command="{Binding ViewModel.SetScannedFoilCommand}"
+                          CommandParameter="False"/>
+                <MenuItem Header="_Assign Match"
+                          Command="{Binding ViewModel.AssignMatchCommand}"/>
+                <MenuItem Header="Remove from _Queue"
+                          Command="{Binding ViewModel.RemoveScannedCardCommand}"/>
             </MenuItem>
             <MenuItem Header="_Tools">
                 <MenuItem Header="Connect to _eBay..."

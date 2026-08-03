@@ -44,7 +44,7 @@ public partial class LocationOverviewView : UserControl
         if (menuItem.DataContext is not LocationTileSummary summary) return;
 
         var rootView = (RootView)Window.GetWindow(this)!;
-        rootView.ViewModel.ExportLocationManabox(summary.Container.Id, summary.Container.Name);
+        rootView.ViewModel.ExportLocationManabox(summary.Container.Id);
     }
 
     private async void CreatePriceSheet_Click(object sender, RoutedEventArgs e)
@@ -53,7 +53,7 @@ public partial class LocationOverviewView : UserControl
         if (menuItem.DataContext is not LocationTileSummary summary) return;
 
         var rootView = (RootView)Window.GetWindow(this)!;
-        await rootView.ViewModel.CreatePriceSheet(summary.Container.Id, summary.Container.Name);
+        await rootView.ViewModel.CreatePriceSheet(summary.Container.Id);
     }
 
     private void ToggleDeckCheckExclusion_Click(object sender, RoutedEventArgs e)

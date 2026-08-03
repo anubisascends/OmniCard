@@ -343,7 +343,11 @@
                 <Button Content="Cancel Edit" Command="{Binding CancelEditCompletedOrderCommand}" Padding="12,4" Margin="0,0,8,0"
                         Visibility="{Binding IsEditingCompletedOrder, Converter={conv:BoolToVisibilityConverter}}"/>
                 <Button Content="Print Receipt" Command="{Binding PrintReceiptCommand}" Padding="12,4" Margin="0,0,8,0"/>
-                <Button Content="Export PDF" Command="{Binding ExportPdfCommand}" Padding="12,4" Margin="0,0,16,0"/>
+                <Button Content="Export PDF" Command="{Binding ExportPdfCommand}" Padding="12,4" Margin="0,0,8,0"/>
+                <Button Content="Cancel Order" Command="{Binding CancelOrderCommand}" CommandParameter="{Binding SelectedOrder}"
+                        Padding="12,4" Margin="0,0,8,0"/>
+                <Button Content="Delete Order…" Command="{Binding DeleteOrderCommand}" CommandParameter="{Binding SelectedOrder}"
+                        Padding="12,4" Margin="0,0,16,0"/>
                 <TextBlock Text="{Binding OrderTotal, StringFormat=C}" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,16,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBlock Text="{Binding ReconciliationHint}"
                            Visibility="{Binding HasReconciliation, Converter={conv:BoolToVisibilityConverter}}"
