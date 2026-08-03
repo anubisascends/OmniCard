@@ -40,8 +40,11 @@ public static class CollectionCardMapper
             ContainerId = lot.LocationId,
             IsMissing = lot.IsMissing,
             FlagReason = lot.FlagReason,
+            IsTraded = lot.IsTraded,
+            TradeNote = lot.TradeNote,
 
-            MarketPrice = marketPrice,
+            // Traded cards no longer contribute to any displayed/summed total.
+            MarketPrice = lot.IsTraded ? 0m : marketPrice,
         };
     }
 }

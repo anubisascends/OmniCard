@@ -97,6 +97,11 @@ public static class UnifiedMigrationService
             AddColumnIfMissing(cmd, "Lots", "LocationId", "INTEGER");
             cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_Lots_LocationId ON Lots(LocationId)";
             cmd.ExecuteNonQuery();
+
+            // Trade-a-card: applied by TradeImportService from a web-app trade record.
+            AddColumnIfMissing(cmd, "Lots", "IsTraded", "INTEGER NOT NULL DEFAULT 0");
+            AddColumnIfMissing(cmd, "Lots", "TradeNote", "TEXT");
+            AddColumnIfMissing(cmd, "Lots", "TradePhotoPath", "TEXT");
         }
 
         if (TableExists(cmd, "Orders"))

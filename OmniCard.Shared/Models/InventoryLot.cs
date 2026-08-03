@@ -20,4 +20,9 @@ public class InventoryLot
     // CollectionCard.IsMissing/FlagReason faithfully.
     public bool IsMissing { get; set; }
     public FlagReason? FlagReason { get; set; }
+
+    // Set by TradeImportService when a web-app trade record for this lot is applied.
+    public bool IsTraded { get; set; }
+    public string? TradeNote { get; set; }
+    public string? TradePhotoPath { get; set; }
 }

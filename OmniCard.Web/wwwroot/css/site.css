@@ -18,6 +18,13 @@ body {
     padding: 16px;
     max-width: 800px;
     margin: 0 auto;
+    -webkit-tap-highlight-color: rgba(124, 77, 255, 0.35);
+}
+
+/* Touch targets: every tappable control gets a real hitbox (44px is the standard iOS/Android
+   minimum) and immediate :active feedback, since :hover doesn't fire on touch. */
+a, button, input, select, summary {
+    touch-action: manipulation;
 }
 
 header h1 {
@@ -143,7 +150,19 @@ tr:active { background: var(--surface); }
 
 .card-tile .qty { color: var(--accent); font-weight: 600; font-size: 0.85rem; }
 
-.back-link { display: inline-block; margin-bottom: 16px; font-size: 0.9rem; }
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 14px;
+    margin: -8px 0 12px -8px;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.back-link:hover { text-decoration: none; background: var(--surface); }
+.back-link:active { background: var(--border); }
 
 .card-image {
     max-width: 300px;
@@ -171,8 +190,19 @@ tr:active { background: var(--surface); }
 
 .badge.foil { background: #4a148c; color: #e1bee7; }
 
-.nav-links { margin-bottom: 12px; }
-.nav-links a { margin-right: 16px; }
+.nav-links { display: flex; flex-wrap: wrap; gap: 4px; margin: -8px 0 12px -8px; }
+
+.nav-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 10px;
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+.nav-links a:hover { text-decoration: none; background: var(--surface); }
+.nav-links a:active { background: var(--border); }
 
 .search-bar {
     display: flex;
@@ -184,41 +214,56 @@ tr:active { background: var(--surface); }
 .search-bar input[type="text"] {
     flex: 1;
     min-width: 200px;
-    padding: 8px 12px;
+    min-height: 44px;
+    padding: 8px 14px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: 6px;
     color: var(--text);
-    font-size: 0.9rem;
+    /* 16px (1rem) minimum stops iOS Safari auto-zooming the page when the field gets focus. */
+    font-size: 1rem;
 }
 
 .search-bar select {
-    padding: 8px 12px;
+    min-height: 44px;
+    padding: 8px 14px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: 6px;
     color: var(--text);
-    font-size: 0.9rem;
+    font-size: 1rem;
 }
 
 .search-bar button {
-    padding: 8px 16px;
+    min-height: 44px;
+    padding: 8px 20px;
     background: var(--accent);
     color: #fff;
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
+    font-weight: 600;
 }
 
 .search-bar button:hover {
     opacity: 0.9;
 }
 
-.clear-link {
-    font-size: 0.85rem;
-    align-self: center;
+.search-bar button:active {
+    opacity: 0.75;
 }
+
+.clear-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 12px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.clear-link:active { opacity: 0.7; }
 
 .decklist-form {
     display: flex;
@@ -228,25 +273,29 @@ tr:active { background: var(--surface); }
 
 .decklist-form input[type="text"] {
     flex: 1;
-    padding: 8px 12px;
+    min-height: 44px;
+    padding: 8px 14px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: 6px;
     color: var(--text);
-    font-size: 0.95rem;
+    font-size: 1rem;
 }
 
 .decklist-form button {
-    padding: 8px 16px;
+    min-height: 44px;
+    padding: 8px 20px;
     background: var(--accent);
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     color: white;
     cursor: pointer;
     font-size: 0.95rem;
+    font-weight: 600;
 }
 
 .decklist-form button:hover { opacity: 0.85; }
+.decklist-form button:active { opacity: 0.7; }
 
 .error-message {
     color: #ef5350;
@@ -302,7 +351,8 @@ tr:active { background: var(--surface); }
 }
 
 .location-section summary {
-    padding: 10px 14px;
+    min-height: 44px;
+    padding: 12px 14px;
     background: var(--surface);
     cursor: pointer;
     font-weight: 600;
@@ -312,6 +362,18 @@ tr:active { background: var(--surface); }
     align-items: center;
     gap: 8px;
 }
+
+.location-section summary:active { background: #363636; }
+
+/* Fill the whole cell so the tap target isn't just the underlined text. */
+.location-section table td a {
+    display: block;
+    margin: -10px -12px;
+    padding: 10px 12px;
+    min-height: 24px;
+}
+
+.location-section table td a:active { background: var(--surface); }
 
 .location-section summary::-webkit-details-marker { display: none; }
 
@@ -338,4 +400,78 @@ tr:active { background: var(--surface); }
 
 .location-section table {
     border-top: 1px solid var(--border);
+}
+
+.trade-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 20px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.trade-button:hover { opacity: 0.9; text-decoration: none; }
+.trade-button:active { opacity: 0.75; }
+
+.trade-badge { background: #6d4c41; color: #fff; }
+
+.trade-form { display: flex; flex-direction: column; gap: 14px; max-width: 400px; }
+
+.trade-form label { font-size: 0.85rem; color: var(--text-muted); }
+
+.trade-form textarea,
+.trade-form input[type="file"] {
+    min-height: 44px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 1rem;
+    font-family: inherit;
+}
+
+.trade-form textarea { resize: vertical; min-height: 90px; }
+
+.trade-form button {
+    align-self: stretch;
+    min-height: 48px;
+    padding: 8px 20px;
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.trade-form button:hover { opacity: 0.9; }
+.trade-form button:active { opacity: 0.75; }
+
+/* Narrow phones: stack the search/decklist controls instead of leaving a cramped, wrapped row. */
+@media (max-width: 480px) {
+    .search-bar,
+    .decklist-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .search-bar input[type="text"],
+    .search-bar select,
+    .search-bar button,
+    .decklist-form input[type="text"],
+    .decklist-form button {
+        width: 100%;
+    }
+
+    .clear-link {
+        align-self: flex-start;
+    }
 }

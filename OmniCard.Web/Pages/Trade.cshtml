@@ -1,0 +1,44 @@
+@page "/Trade"
+@model OmniCard.Web.Pages.TradeModel
+@{
+    ViewData["Title"] = "Trade " + Model.Card.Name;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>@ViewData["Title"] — OmniCard</title>
+    <link rel="stylesheet" href="/css/site.css"/>
+</head>
+<body>
+    <a href="/card/@Model.Card.Id" class="back-link">&larr; Back to @Model.Card.Name</a>
+
+    <header>
+        <h1>Trade @Model.Card.Name</h1>
+    </header>
+
+    <main>
+        @if (Model.ImageUrl is not null)
+        {
+            <img src="@Model.ImageUrl" alt="@Model.Card.Name" class="card-image"/>
+        }
+
+        <form method="post" enctype="multipart/form-data" class="trade-form">
+            <input type="hidden" name="lotId" value="@Model.Card.Id"/>
+
+            <div>
+                <label for="note">What did you trade it for?</label>
+                <textarea id="note" name="note" placeholder="e.g. 2x Fire Lotus, local trade with Dave"></textarea>
+            </div>
+
+            <div>
+                <label for="photo">Photo of what you received</label>
+                <input type="file" id="photo" name="photo" accept="image/*" capture="environment"/>
+            </div>
+
+            <button type="submit">Record trade</button>
+        </form>
+    </main>
+</body>
+</html>

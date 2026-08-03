@@ -34,6 +34,15 @@ if (!File.Exists(dbPath))
     return 1;
 }
 
+// Patch any schema drift on the shared inventory.db — new columns get added to the EF model
+// over time, and normally the desktop app's own startup (UnifiedMigrationService) is what
+// applies them to the on-disk file. The web app can run for long stretches without the desktop
+// ever restarting, so without this it 500s on "no such column" until the desktop happens to
+// launch first. This opens its own short-lived, writable connection to the raw file — separate
+// from (and unaffected by) the Mode=ReadOnly connections registered below.
+using (var schemaLoggerFactory = LoggerFactory.Create(b => b.AddConsole()))
+    UnifiedMigrationService.EnsureUnifiedSchema(dataDir, schemaLoggerFactory.CreateLogger("SchemaCheck"));
+
 var scansDir = Path.Combine(dataDir, "scans");
 
 builder.Services.AddRazorPages();
