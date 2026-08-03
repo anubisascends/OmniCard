@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.IO.Compression;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -932,14 +933,16 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         bulkDataResponse.EnsureSuccessStatusCode();
         var bulkData = await bulkDataResponse.Content.ReadFromJsonAsync<BulkDataInfo>(ScryfallJsonOptions, ct)
             ?? throw new InvalidOperationException("Failed to fetch bulk data info from Scryfall.");
-        _logger.LogInformation("Bulk data download URI obtained: {Uri}", bulkData.DownloadUri);
+        _logger.LogInformation("Bulk data download URI obtained: {Uri}", bulkData.JsonlDownloadUri);
 
-        // 2. Stream the card data
+        // 2. Stream the card data (gzip-compressed JSON-Lines: one Card object per line)
         progress?.Report("Downloading card data...");
-        using var cardResponse = await client.GetAsync(bulkData.DownloadUri,
+        using var cardResponse = await client.GetAsync(bulkData.JsonlDownloadUri,
             HttpCompletionOption.ResponseHeadersRead, ct);
         cardResponse.EnsureSuccessStatusCode();
         using var stream = await cardResponse.Content.ReadAsStreamAsync(ct);
+        using var gzipStream = new GZipStream(stream, CompressionMode.Decompress);
+        using var reader = new StreamReader(gzipStream);
 
         // 3. Upsert into database (preserves ImageHash / HashedIllustrationId)
         await using var importContext = _dbContextFactory.CreateDbContext();
@@ -955,8 +958,12 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         var updated = 0;
         var batch = new List<Card>(1000);
 
-        await foreach (var card in JsonSerializer.DeserializeAsyncEnumerable<Card>(stream, ScryfallJsonOptions, ct))
+        string? line;
+        while ((line = await reader.ReadLineAsync(ct)) != null)
         {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            var card = JsonSerializer.Deserialize<Card>(line, ScryfallJsonOptions);
             if (card is null) continue;
 
             // Filter by configured languages
@@ -1434,6 +1441,8 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
 
     private class BulkDataInfo
     {
-        public string DownloadUri { get; set; } = "";
+        // Scryfall's bulk-data API serves a gzip-compressed JSON-Lines file (one Card object
+        // per line) at this URI — the older "download_uri" plain-JSON-array field is gone.
+        public string JsonlDownloadUri { get; set; } = "";
     }
 }

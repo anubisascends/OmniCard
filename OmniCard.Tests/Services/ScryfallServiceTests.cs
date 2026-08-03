@@ -1,4 +1,5 @@
 using System.IO;
+using System.IO.Compression;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -166,11 +167,10 @@ public class ScryfallServiceTests : IDisposable
         // Arrange: mock HTTP responses
         var bulkDataJson = JsonSerializer.Serialize(new
         {
-            download_uri = "https://data.scryfall.io/default-cards/test.json"
+            jsonl_download_uri = "https://data.scryfall.io/default-cards/test.jsonl.gz"
         });
 
-        var cardsJson = """
-        [
+        var cardJsonLine = """
             {
                 "id": "0000579f-7b35-4ed3-b44c-db2a538066fe",
                 "oracle_id": "44623693-51d6-49ad-8cd7-140505caf02f",
@@ -221,13 +221,15 @@ public class ScryfallServiceTests : IDisposable
                 "related_uris": {},
                 "purchase_uris": {}
             }
-        ]
-        """;
+            """;
+        // JSON-Lines format requires exactly one line per record — collapse the pretty-printed
+        // fixture above onto a single line, same as the real Scryfall export.
+        var cardsJsonl = JsonSerializer.Serialize(JsonDocument.Parse(cardJsonLine).RootElement);
 
         var handler = new MockHttpMessageHandler(new Dictionary<string, string>
         {
             ["https://api.scryfall.com/bulk-data/default_cards"] = bulkDataJson,
-            ["https://data.scryfall.io/default-cards/test.json"] = cardsJson
+            ["https://data.scryfall.io/default-cards/test.jsonl.gz"] = cardsJsonl
         });
 
         var httpClientFactory = new MockHttpClientFactory(handler);
@@ -281,10 +283,20 @@ public class ScryfallServiceTests : IDisposable
             var url = request.RequestUri!.ToString();
             if (_responses.TryGetValue(url, out var body))
             {
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                HttpContent content;
+                if (url.EndsWith(".gz"))
                 {
-                    Content = new StringContent(body, Encoding.UTF8, "application/json")
-                });
+                    var ms = new MemoryStream();
+                    using (var gzip = new GZipStream(ms, CompressionMode.Compress, leaveOpen: true))
+                    using (var writer = new StreamWriter(gzip))
+                        writer.Write(body);
+                    content = new ByteArrayContent(ms.ToArray());
+                }
+                else
+                {
+                    content = new StringContent(body, Encoding.UTF8, "application/json");
+                }
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
             }
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
         }

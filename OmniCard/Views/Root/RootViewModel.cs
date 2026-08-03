@@ -47,6 +47,9 @@ public sealed partial class RootViewModel(
     IDataPathService dataPathService,
     IOptionsMonitor<WebCompanionSettings> webCompanionSettings,
     PriceUpdateService priceUpdateService,
+    IPriceSheetService priceSheetService,
+    IPriceSheetPdfExporter priceSheetPdfExporter,
+    ISealedPriceUpdateService sealedPriceUpdateService,
     ILogger<RootViewModel> logger) : ViewModel
 {
     private readonly ILogger<RootViewModel> _logger = logger;
@@ -2174,6 +2177,47 @@ public sealed partial class RootViewModel(
         {
             csvService.ExportManabox(path, cards);
             Message = $"Exported {cards.Count} cards from \"{containerName}\" to {System.IO.Path.GetFileName(path)}";
+        }
+    }
+
+    public async Task CreatePriceSheet(int containerId, string containerName)
+    {
+        if (!priceSheetService.HasAnyProduct(containerId))
+        {
+            Message = $"No cards or sealed product in \"{containerName}\" to create a price sheet from.";
+            return;
+        }
+
+        var promptResult = MessageBox.Show(
+            "Update prices before creating the price sheet?\n\n" +
+            "Yes refreshes prices for the games/products stored in this location first. " +
+            "No builds the sheet from the last-known prices.",
+            "Create Price Sheet",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question);
+
+        if (promptResult == MessageBoxResult.Cancel)
+            return;
+
+        if (promptResult == MessageBoxResult.Yes)
+        {
+            var progress = new Progress<PriceUpdateProgress>(p => Message = p.Message);
+
+            foreach (var game in priceSheetService.GetGamesPresent(containerId))
+                await CardService.GetGameService(game).UpdatePricesAsync(progress);
+
+            if (priceSheetService.HasSealedProduct(containerId))
+                await sealedPriceUpdateService.RefreshSealedPricesAsync(progress);
+        }
+
+        var report = priceSheetService.BuildReport(containerId, containerName);
+        var lineCount = report.Sections.Sum(s => s.Lines.Count);
+
+        var safeName = string.Join("_", containerName.Split(System.IO.Path.GetInvalidFileNameChars()));
+        if (ExportToFile($"{safeName}-price-sheet.pdf", "PDF files|*.pdf", out var path))
+        {
+            priceSheetPdfExporter.Export(report, path);
+            Message = $"Created price sheet for \"{containerName}\" ({lineCount} line(s)) → {System.IO.Path.GetFileName(path)}";
         }
     }
 

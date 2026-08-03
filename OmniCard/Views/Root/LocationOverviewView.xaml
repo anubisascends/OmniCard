@@ -92,6 +92,9 @@
                         <MenuItem Header="Export to Manabox..."
                                   Click="ExportLocationManabox_Click"/>
                         <Separator/>
+                        <MenuItem Header="Create Price Sheet..."
+                                  Click="CreatePriceSheet_Click"/>
+                        <Separator/>
                         <MenuItem Header="Exclude from Deck Check"
                                   IsCheckable="True"
                                   IsChecked="{Binding Container.ExcludeFromDeckCheck, Mode=OneWay}"
