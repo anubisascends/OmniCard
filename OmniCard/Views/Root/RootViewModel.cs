@@ -339,6 +339,26 @@ public sealed partial class RootViewModel(
 
     partial void OnIsSidebarExpandedChanged(bool value) => PersistDisplaySettings();
 
+    [ObservableProperty]
+    public partial decimal NonBulkPriceThreshold { get; set; } = displaySettings.Value.NonBulkPriceThreshold;
+
+    partial void OnNonBulkPriceThresholdChanged(decimal value) => PersistDisplaySettings();
+
+    [ObservableProperty]
+    public partial decimal HighValuePriceThreshold { get; set; } = displaySettings.Value.HighValuePriceThreshold;
+
+    partial void OnHighValuePriceThresholdChanged(decimal value) => PersistDisplaySettings();
+
+    [ObservableProperty]
+    public partial string NonBulkIndicatorColor { get; set; } = displaySettings.Value.NonBulkIndicatorColor;
+
+    partial void OnNonBulkIndicatorColorChanged(string value) => PersistDisplaySettings();
+
+    [ObservableProperty]
+    public partial string HighValueIndicatorColor { get; set; } = displaySettings.Value.HighValueIndicatorColor;
+
+    partial void OnHighValueIndicatorColorChanged(string value) => PersistDisplaySettings();
+
     private void PersistDisplaySettings()
     {
         try
@@ -403,6 +423,10 @@ public sealed partial class RootViewModel(
         writer.WriteString("ScanQuality", ScanQuality.ToString());
         writer.WriteBoolean("ShowScannerUI", ShowScannerUI);
         writer.WriteBoolean("SidebarExpanded", IsSidebarExpanded);
+        writer.WriteNumber("NonBulkPriceThreshold", NonBulkPriceThreshold);
+        writer.WriteNumber("HighValuePriceThreshold", HighValuePriceThreshold);
+        writer.WriteString("NonBulkIndicatorColor", NonBulkIndicatorColor);
+        writer.WriteString("HighValueIndicatorColor", HighValueIndicatorColor);
 
         writer.WriteEndObject();
     }
@@ -955,6 +979,7 @@ public sealed partial class RootViewModel(
 
         card.Match = null;
         card.FlagReason = FlagReason.MissingFromDatabase;
+        CardService.AnnotateScan(card);
 
         try { _diagnosticService.LogUserFlagged(card.Hash, card); } catch { }
 
@@ -1630,6 +1655,8 @@ public sealed partial class RootViewModel(
                     _logger.LogWarning(ex, "Failed to record hash correction for {Hash:X16}", card.Hash);
                 }
             }
+
+            CardService.AnnotateScan(card);
         }
 
         ManualSearchResults.Clear();
@@ -1745,6 +1772,7 @@ public sealed partial class RootViewModel(
             Confidence = 100,
             Source = match.Source
         };
+        CardService.AnnotateScan(card);
 
         Message = $"Confirmed match for \"{match.Name}\".";
     }

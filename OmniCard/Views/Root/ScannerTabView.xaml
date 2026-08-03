@@ -5,7 +5,8 @@
              xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
              xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
              xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
-             xmlns:Models="clr-namespace:OmniCard.Models;assembly=OmniCard.Shared">
+             xmlns:Models="clr-namespace:OmniCard.Models;assembly=OmniCard.Shared"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -524,13 +525,38 @@
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="ListViewItem">
-                                        <Border x:Name="SelBorder"
-                                                Background="Transparent"
-                                                BorderBrush="Transparent"
-                                                BorderThickness="0"
-                                                CornerRadius="4">
-                                            <ContentPresenter/>
-                                        </Border>
+                                        <Grid>
+                                            <Border x:Name="SelBorder"
+                                                    Background="Transparent"
+                                                    BorderBrush="Transparent"
+                                                    BorderThickness="0"
+                                                    CornerRadius="4">
+                                                <ContentPresenter/>
+                                            </Border>
+
+                                            <!-- Price-tier accent: a separate strip (not part of
+                                                 SelBorder) since a Border can only paint one color
+                                                 across all edges, and the left edge is already used
+                                                 by the flagged indicator above. -->
+                                            <Border Width="4"
+                                                    HorizontalAlignment="Right"
+                                                    CornerRadius="0,4,4,0"
+                                                    IsHitTestVisible="False">
+                                                <Border.Background>
+                                                    <MultiBinding Converter="{conv:PriceTierAccentConverter}">
+                                                        <Binding Path="CurrentPrice"/>
+                                                        <Binding Path="DataContext.ViewModel.NonBulkPriceThreshold"
+                                                                 RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                                        <Binding Path="DataContext.ViewModel.HighValuePriceThreshold"
+                                                                 RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                                        <Binding Path="DataContext.ViewModel.NonBulkIndicatorColor"
+                                                                 RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                                        <Binding Path="DataContext.ViewModel.HighValueIndicatorColor"
+                                                                 RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                                    </MultiBinding>
+                                                </Border.Background>
+                                            </Border>
+                                        </Grid>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
                                                 <Setter TargetName="SelBorder" Property="Background"
@@ -580,6 +606,21 @@
                                        VerticalAlignment="Top"
                                        Stretch="Uniform"
                                        Margin="0,0,4,0"/>
+
+                                <!-- First-copy badge: overlaid on the scanned image's top-left corner -->
+                                <materialDesign:PackIcon Grid.Row="0" Grid.Column="0"
+                                                          Kind="Star"
+                                                          Width="18" Height="18"
+                                                          HorizontalAlignment="Left"
+                                                          VerticalAlignment="Top"
+                                                          Margin="2"
+                                                          Foreground="Gold"
+                                                          Visibility="{Binding IsFirstCopy, Converter={conv:BoolToVisibilityConverter}}"
+                                                          ToolTip="First copy in your collection">
+                                    <materialDesign:PackIcon.Effect>
+                                        <DropShadowEffect BlurRadius="3" ShadowDepth="0" Opacity="0.9" Color="Black"/>
+                                    </materialDesign:PackIcon.Effect>
+                                </materialDesign:PackIcon>
 
                                 <!-- Matched card art (top right) -->
                                 <Image Grid.Row="0" Grid.Column="1"

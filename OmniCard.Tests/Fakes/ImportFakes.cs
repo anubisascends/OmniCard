@@ -83,6 +83,8 @@ public sealed class RecordingCardService(ICardGameService active) : ICardService
     public ulong ComputeHashFromStream(Stream stream) => throw new NotImplementedException();
     public ulong ComputeEdgeHashFromStream(Stream stream) => throw new NotImplementedException();
     public (CardMatch? Match, CardGame Game) FindBestMatch(ulong hash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, ulong? scanEdgeHash = null) => throw new NotImplementedException();
+    public bool IsFirstCopy(CardGame game, string gameCardId, bool isFoil) => throw new NotImplementedException();
+    public void AnnotateScan(ScannedCard scan) => throw new NotImplementedException();
 }
 
 /// <summary>IListService that records AddPrinting/CreateList calls.</summary>

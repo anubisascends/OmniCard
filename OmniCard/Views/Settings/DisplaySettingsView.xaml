@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
              mc:Ignorable="d">
     <!-- DataContext is the RootViewModel (set by SettingsView host). -->
     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -35,6 +36,30 @@
                         Value="{Binding ScannerFontSize}" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding ScannerFontSize, StringFormat='{}{0:F0}'}"
                            VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            </StackPanel>
+
+            <TextBlock Text="Scan tile price indicators" FontWeight="SemiBold" FontSize="16" Margin="0,8,0,12" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+
+            <TextBlock Text="Non-bulk price threshold" Margin="0,0,0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <TextBlock Text="$" VerticalAlignment="Center" Margin="0,0,4,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                <TextBox Width="80" Text="{Binding NonBulkPriceThreshold, StringFormat=F2, UpdateSourceTrigger=PropertyChanged}"
+                         Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                <Rectangle Width="16" Height="16" Margin="12,0,4,0" RadiusX="2" RadiusY="2"
+                           Fill="{Binding NonBulkIndicatorColor, Converter={conv:HexColorToBrushConverter}}"/>
+                <TextBox Width="90" Text="{Binding NonBulkIndicatorColor, UpdateSourceTrigger=PropertyChanged}"
+                         Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            </StackPanel>
+
+            <TextBlock Text="High-value price threshold" Margin="0,0,0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <TextBlock Text="$" VerticalAlignment="Center" Margin="0,0,4,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                <TextBox Width="80" Text="{Binding HighValuePriceThreshold, StringFormat=F2, UpdateSourceTrigger=PropertyChanged}"
+                         Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                <Rectangle Width="16" Height="16" Margin="12,0,4,0" RadiusX="2" RadiusY="2"
+                           Fill="{Binding HighValueIndicatorColor, Converter={conv:HexColorToBrushConverter}}"/>
+                <TextBox Width="90" Text="{Binding HighValueIndicatorColor, UpdateSourceTrigger=PropertyChanged}"
+                         Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

@@ -511,3 +511,58 @@ public class OrderStatusToAccentBrushConverter : MarkupExtension, IValueConverte
         return brush;
     }
 }
+
+/// <summary>Converts a "#RRGGBB" hex string setting into a frozen <see cref="SolidColorBrush"/> —
+/// used for the color-preview swatches in Settings. Falls back to Gray for invalid/empty input.</summary>
+public class HexColorToBrushConverter : MarkupExtension, IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => TryParseColor(value as string, out var brush) ? brush : Brushes.Gray;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+
+    internal static bool TryParseColor(string? hex, out SolidColorBrush brush)
+    {
+        brush = Brushes.Gray;
+        if (string.IsNullOrWhiteSpace(hex)) return false;
+        try
+        {
+            var color = (Color)ColorConverter.ConvertFromString(hex);
+            brush = new SolidColorBrush(color);
+            brush.Freeze();
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+}
+
+/// <summary>Scan-tile right-edge price-tier accent. Values: [CurrentPrice (decimal?),
+/// NonBulkPriceThreshold (decimal), HighValuePriceThreshold (decimal), NonBulkIndicatorColor
+/// (hex string), HighValueIndicatorColor (hex string)]. Transparent below the non-bulk threshold
+/// or when there's no price yet (unmatched scan).</summary>
+public class PriceTierAccentConverter : MarkupExtension, IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (values is not [decimal price, decimal nonBulkThreshold, decimal highValueThreshold, string nonBulkHex, string highValueHex])
+            return Brushes.Transparent;
+
+        if (price >= highValueThreshold && HexColorToBrushConverter.TryParseColor(highValueHex, out var highBrush))
+            return highBrush;
+        if (price >= nonBulkThreshold && HexColorToBrushConverter.TryParseColor(nonBulkHex, out var nonBulkBrush))
+            return nonBulkBrush;
+
+        return Brushes.Transparent;
+    }
+
+    public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
