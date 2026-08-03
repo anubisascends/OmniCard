@@ -737,6 +737,12 @@ public sealed partial class RootViewModel(
         OnPropertyChanged(nameof(ShowPrintingSelector));
         ConfirmMatchCommand.NotifyCanExecuteChanged();
         ClearMatchCommand.NotifyCanExecuteChanged();
+        CardDoubleClickCommand.NotifyCanExecuteChanged();
+        AssignMatchCommand.NotifyCanExecuteChanged();
+        RemoveScannedCardCommand.NotifyCanExecuteChanged();
+        SetScannedConditionCommand.NotifyCanExecuteChanged();
+        SetScannedFoilCommand.NotifyCanExecuteChanged();
+        CopyScannedCardNamesCommand.NotifyCanExecuteChanged();
         RefreshAvailablePrintings();
 
         if (DialogService.IsCardPreviewOpen)
@@ -1124,6 +1130,10 @@ public sealed partial class RootViewModel(
 
     [ObservableProperty]
     public partial CardMatch? SelectedManualSearchResult { get; set; }
+
+    public bool CanAssignMatch => HasSelection && SelectedManualSearchResult is not null;
+
+    partial void OnSelectedManualSearchResultChanged(CardMatch? value) => AssignMatchCommand.NotifyCanExecuteChanged();
 
     // Printing selector
     public ObservableCollection<CardMatch> AvailablePrintings { get; } = [];
@@ -1574,7 +1584,7 @@ public sealed partial class RootViewModel(
             ManualSearchResults.Add(match);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanAssignMatch))]
     public void AssignMatch()
     {
         if (SelectedScannedCards.Count == 0 || SelectedManualSearchResult is null)
@@ -1964,7 +1974,7 @@ public sealed partial class RootViewModel(
     [RelayCommand]
     public void OpenLogViewer() => DialogService.OpenLogViewer();
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSingleSelection))]
     public void CardDoubleClick()
     {
         if (SelectedScannedCard is not null)
@@ -2046,7 +2056,7 @@ public sealed partial class RootViewModel(
         Message = $"Deleted {deleted} orphaned scan(s)" + (errors > 0 ? $" ({errors} error(s))" : "") + ".";
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSelection))]
     public void RemoveScannedCard()
     {
         if (SelectedScannedCards.Count == 0) return;
@@ -2078,7 +2088,7 @@ public sealed partial class RootViewModel(
 
     // Scanner context menu commands
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSelection))]
     public void SetScannedCondition(string condition)
     {
         foreach (var card in SelectedScannedCards)
@@ -2086,7 +2096,7 @@ public sealed partial class RootViewModel(
         Message = $"Set condition to {condition} on {SelectedScannedCards.Count} card(s).";
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSelection))]
     public void SetScannedFoil(string isFoilStr)
     {
         var isFoil = isFoilStr == "True";
@@ -2095,7 +2105,7 @@ public sealed partial class RootViewModel(
         Message = $"Set {(isFoil ? "Foil" : "Non-Foil")} on {SelectedScannedCards.Count} card(s).";
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSelection))]
     public void CopyScannedCardNames()
     {
         var names = string.Join(Environment.NewLine, SelectedScannedCards.Where(s => s.Match is not null).Select(s => s.Match!.Name));
@@ -2160,8 +2170,10 @@ public sealed partial class RootViewModel(
         }
     }
 
-    public void ExportLocationManabox(int containerId, string containerName)
+    [RelayCommand]
+    public void ExportLocationManabox(int containerId)
     {
+        var containerName = containerService.GetAll().FirstOrDefault(c => c.Id == containerId)?.Name ?? "";
         var results = new System.Collections.ObjectModel.ObservableCollection<CollectionCard>();
         CardService.SearchCollection("", null, containerId, results);
         var cards = results.ToList();
@@ -2180,8 +2192,10 @@ public sealed partial class RootViewModel(
         }
     }
 
-    public async Task CreatePriceSheet(int containerId, string containerName)
+    [RelayCommand]
+    public async Task CreatePriceSheet(int containerId)
     {
+        var containerName = containerService.GetAll().FirstOrDefault(c => c.Id == containerId)?.Name ?? "";
         if (!priceSheetService.HasAnyProduct(containerId))
         {
             Message = $"No cards or sealed product in \"{containerName}\" to create a price sheet from.";

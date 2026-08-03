@@ -166,7 +166,15 @@ public partial class OrdersViewModel(
         OnPropertyChanged(nameof(ReconciliationHint));
         OnPropertyChanged(nameof(IsEditable));
         OnPropertyChanged(nameof(CanBeginEditCompletedOrder));
+        CancelOrderCommand.NotifyCanExecuteChanged();
+        DeleteOrderCommand.NotifyCanExecuteChanged();
     }
+
+    // Parameterized (not SelectedOrder-based) so both the detail-panel toolbar (CommandParameter=
+    // SelectedOrder) and each kanban card's context menu (CommandParameter=that card's own Order)
+    // enable/disable independently and correctly.
+    public static bool CanCancelOrder(Order? order) => order is not null && IsValidTransitionPublic(order.Status, OrderStatus.Cancelled);
+    public static bool CanDeleteOrder(Order? order) => order is not null && order.Status is not (OrderStatus.Shipped or OrderStatus.Completed);
 
     [RelayCommand]
     public void BeginEditCompletedOrder()
@@ -311,7 +319,7 @@ public partial class OrdersViewModel(
         StatusMessage = $"Order moved to {target}.";
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanCancelOrder))]
     public async Task CancelOrder(Order? order)
     {
         if (order is null) return;
@@ -323,7 +331,7 @@ public partial class OrdersViewModel(
         await MoveOrder(order, OrderStatus.Cancelled);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanDeleteOrder))]
     public void DeleteOrder(Order? order)
     {
         if (order is null) return;

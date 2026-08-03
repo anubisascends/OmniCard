@@ -341,6 +341,7 @@ public sealed partial class CollectionViewModel : ViewModel
         LoadOverview();
     }
 
+    [RelayCommand]
     public void SetCoverArt(int containerId)
     {
         var container = _containerService.GetAll().FirstOrDefault(c => c.Id == containerId);
@@ -374,6 +375,11 @@ public sealed partial class CollectionViewModel : ViewModel
     [ObservableProperty]
     public partial CollectionCard? SelectedCollectionCard { get; set; }
 
+    public bool HasSingleSelection => SelectedCollectionCard is not null;
+
+    partial void OnSelectedCollectionCardChanged(CollectionCard? value) =>
+        CollectionCardDoubleClickCommand.NotifyCanExecuteChanged();
+
     [ObservableProperty]
     public partial string CollectionSearchQuery { get; set; } = "";
 
@@ -386,6 +392,28 @@ public sealed partial class CollectionViewModel : ViewModel
 
     [ObservableProperty]
     public partial int SelectedCardCount { get; set; }
+
+    /// <summary>Gates the bulk selection actions (Selection menu, context menu) — true once at
+    /// least one row is selected in the collection grid.</summary>
+    public bool HasSelection => SelectedCardCount > 0;
+
+    /// <summary>Gates the eBay actions, which only operate on a single card at a time.</summary>
+    public bool HasExactlyOneSelected => SelectedCardCount == 1;
+
+    partial void OnSelectedCardCountChanged(int value)
+    {
+        MoveSelectedToLocationCommand.NotifyCanExecuteChanged();
+        ListForSaleCommand.NotifyCanExecuteChanged();
+        UnlistForSaleCommand.NotifyCanExecuteChanged();
+        MarkPickedCommand.NotifyCanExecuteChanged();
+        BulkSetCollectionConditionCommand.NotifyCanExecuteChanged();
+        BulkSetCollectionFoilCommand.NotifyCanExecuteChanged();
+        BulkDeleteCollectionCommand.NotifyCanExecuteChanged();
+        CopyCollectionCardNamesCommand.NotifyCanExecuteChanged();
+        ListOnEbayCommand.NotifyCanExecuteChanged();
+        ViewOnEbayCommand.NotifyCanExecuteChanged();
+        EndEbayListingCommand.NotifyCanExecuteChanged();
+    }
 
     /// <summary>Total matching cards (including not-yet-loaded rows).</summary>
     [ObservableProperty]
@@ -767,7 +795,7 @@ public sealed partial class CollectionViewModel : ViewModel
         return selected.SelectMany(c => c.StackedIds ?? [c.Id]).ToList();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSingleSelection))]
     public void CollectionCardDoubleClick()
     {
         if (SelectedCollectionCard is null) return;
@@ -776,7 +804,7 @@ public sealed partial class CollectionViewModel : ViewModel
         if (result.HasValue) _ = SearchCollection();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSelection))]
     public void MoveSelectedToLocation()
     {
         var ids = GetAllSelectedCardIds();
@@ -790,7 +818,7 @@ public sealed partial class CollectionViewModel : ViewModel
         _ = SearchCollection();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSelection))]
     public void ListForSale()
     {
         var ids = GetAllSelectedCardIds();
@@ -811,7 +839,7 @@ public sealed partial class CollectionViewModel : ViewModel
         _ = SearchCollection();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSelection))]
     public void UnlistForSale()
     {
         var ids = GetAllSelectedCardIds();
@@ -821,7 +849,7 @@ public sealed partial class CollectionViewModel : ViewModel
         _ = SearchCollection();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSelection))]
     public void MarkPicked()
     {
         var ids = GetAllSelectedCardIds();
@@ -838,7 +866,7 @@ public sealed partial class CollectionViewModel : ViewModel
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSelection))]
     public void BulkSetCollectionCondition(string condition)
     {
         var ids = GetAllSelectedCardIds();
@@ -848,7 +876,7 @@ public sealed partial class CollectionViewModel : ViewModel
         _ = SearchCollection();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSelection))]
     public void BulkSetCollectionFoil(string isFoilStr)
     {
         var isFoil = isFoilStr == "True";
@@ -859,7 +887,7 @@ public sealed partial class CollectionViewModel : ViewModel
         _ = SearchCollection();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSelection))]
     public void BulkDeleteCollection()
     {
         var ids = GetAllSelectedCardIds();
@@ -872,7 +900,7 @@ public sealed partial class CollectionViewModel : ViewModel
         CollectionChanged?.Invoke();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasSelection))]
     public void CopyCollectionCardNames()
     {
         var selected = GetSelectedCards?.Invoke();
@@ -974,7 +1002,7 @@ public sealed partial class CollectionViewModel : ViewModel
 
     // --- eBay commands ---
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasExactlyOneSelected))]
     public void ListOnEbay()
     {
         var selected = GetSelectedCards?.Invoke();
@@ -990,7 +1018,7 @@ public sealed partial class CollectionViewModel : ViewModel
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasExactlyOneSelected))]
     public void ViewOnEbay()
     {
         var selected = GetSelectedCards?.Invoke();
@@ -1009,7 +1037,7 @@ public sealed partial class CollectionViewModel : ViewModel
         });
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(HasExactlyOneSelected))]
     public async Task EndEbayListing()
     {
         var selected = GetSelectedCards?.Invoke();
