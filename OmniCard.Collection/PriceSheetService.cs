@@ -84,7 +84,7 @@ public sealed class PriceSheetService(
                 GameDisplayName = GameDisplayName(g.Key),
                 Lines = g.Select(x => x.Line)
                     .OrderBy(l => l.SetCode ?? "", StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(l => l.Name, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(l => l.Name, StringComparer.OrdinalIgnoreCase)
                     .ToList(),
             })
             .OrderBy(s => s.GameDisplayName, StringComparer.Ordinal)

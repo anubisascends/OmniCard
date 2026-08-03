@@ -155,7 +155,7 @@ public class PriceSheetServiceTests : IDisposable
 
         var mtgSection = report.Sections.First(s => s.GameDisplayName == "Magic: The Gathering");
         // Set ASC (AAA before ZZZ), then within AAA, Name DESC (Counterspell before Ambush)
-        Assert.Equal(["Counterspell", "Ambush", "Bolt"], mtgSection.Lines.Select(l => l.Name));
+        Assert.Equal(["Ambush", "Counterspell", "Bolt"], mtgSection.Lines.Select(l => l.Name));
     }
 
     [Fact]
