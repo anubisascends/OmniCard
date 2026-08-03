@@ -143,6 +143,10 @@ public partial class App : Application
             // Storage containers
             services.AddSingleton<IStorageContainerService, StorageContainerService>();
 
+            // Location price sheet
+            services.AddSingleton<IPriceSheetService, PriceSheetService>();
+            services.AddSingleton<IPriceSheetPdfExporter, PriceSheetPdfExporter>();
+
             // Sales & fulfillment
             services.AddSingleton<ISalesSettingsService, SalesSettingsService>();
             services.AddSingleton<IEbaySellingSettingsService, EbaySellingSettingsService>();

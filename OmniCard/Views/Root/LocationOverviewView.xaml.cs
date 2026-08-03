@@ -47,6 +47,15 @@ public partial class LocationOverviewView : UserControl
         rootView.ViewModel.ExportLocationManabox(summary.Container.Id, summary.Container.Name);
     }
 
+    private async void CreatePriceSheet_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem) return;
+        if (menuItem.DataContext is not LocationTileSummary summary) return;
+
+        var rootView = (RootView)Window.GetWindow(this)!;
+        await rootView.ViewModel.CreatePriceSheet(summary.Container.Id, summary.Container.Name);
+    }
+
     private void ToggleDeckCheckExclusion_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem menuItem) return;
