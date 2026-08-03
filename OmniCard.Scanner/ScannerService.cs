@@ -28,7 +28,7 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         _logger = logger;
 
         _logger.LogInformation("Initializing TWAIN session");
-        //AppID = TWIdentity.CreateFromAssembly(DataGroups.Image, Assembly.GetExecutingAssembly());
+
         AppID = new TWIdentity
         {
             Manufacturer = "Andrew Riebe",
@@ -37,6 +37,7 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
             ProtocolMajor = TwainConst.ProtocolMajor,
             ProtocolMinor = TwainConst.ProtocolMinor,
             DataGroup = DataGroups.Image | DataGroups.Control,
+            DataFunctionalities = DataFunctionalities.App2,
             Version = new TWVersion
             {
                 Major = 1,
