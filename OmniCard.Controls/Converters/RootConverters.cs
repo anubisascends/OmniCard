@@ -1,10 +1,12 @@
 using System.Collections;
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Markup;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using OmniCard.Models;
 
 namespace OmniCard.Controls.Converters;
@@ -123,6 +125,17 @@ public class NullToVisibleConverter : MarkupExtension, IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => value is null ? Visibility.Visible : Visibility.Collapsed;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
+
+public class ZeroToVisibleConverter : MarkupExtension, IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is int i && i == 0 ? Visibility.Visible : Visibility.Collapsed;
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
@@ -249,6 +262,19 @@ public class FoilToFinishConverter : MarkupExtension, IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => value is true ? "Foil" : "Normal";
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
+
+/// <summary>" (Foil)" suffix when true, "" otherwise — for appending to a card name inline
+/// (e.g. in a Run, which has no Visibility property to gate a separate element on).</summary>
+public class FoilSuffixConverter : MarkupExtension, IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? " (Foil)" : "";
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
@@ -510,6 +536,38 @@ public class OrderStatusToAccentBrushConverter : MarkupExtension, IValueConverte
         brush.Freeze();
         return brush;
     }
+}
+
+/// <summary>Loads a local file path (e.g. a trade photo) into a <see cref="BitmapImage"/> for
+/// display. Returns null (placeholder shows) for a missing/empty path or a file that fails to
+/// load. Not for card art — see TileArt for the cached/async art-resolution pipeline.</summary>
+public class LocalFilePathToImageConverter : MarkupExtension, IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is not string path || string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            return null;
+
+        try
+        {
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.UriSource = new Uri(path, UriKind.Absolute);
+            bitmap.EndInit();
+            bitmap.Freeze();
+            return bitmap;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
 }
 
 /// <summary>Converts a "#RRGGBB" hex string setting into a frozen <see cref="SolidColorBrush"/> —

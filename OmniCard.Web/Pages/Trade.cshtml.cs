@@ -46,12 +46,14 @@ public class TradeModel : PageModel
 
     public async Task<IActionResult> OnPostAsync(int lotId, string note, IFormFile? photo)
     {
+        CollectionCard card;
         using (var db = _dbFactory.CreateDbContext())
         {
-            var exists = db.Lots.AsNoTracking()
-                .Any(l => l.Id == lotId && l.Product.Category == ProductCategory.Single);
-            if (!exists)
+            var lot = db.Lots.AsNoTracking().Include(l => l.Product)
+                .FirstOrDefault(l => l.Id == lotId && l.Product.Category == ProductCategory.Single);
+            if (lot is null)
                 return NotFound();
+            card = CollectionCardMapper.ToDto(lot, lot.Product, 0m);
         }
 
         var tradeId = Guid.NewGuid();
@@ -71,6 +73,12 @@ public class TradeModel : PageModel
         {
             TradeId = tradeId,
             LotId = lotId,
+            Game = card.Game,
+            CardName = card.Name,
+            SetCode = card.SetCode,
+            SetName = card.SetName,
+            CollectorNumber = card.Number,
+            Foil = card.IsFoil,
             Note = note ?? "",
             PhotoFileName = photoFileName,
         };

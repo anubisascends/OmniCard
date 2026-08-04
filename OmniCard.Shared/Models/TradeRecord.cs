@@ -14,6 +14,16 @@ public class TradeRecord
     /// <summary>The <see cref="InventoryLot"/> being traded away.</summary>
     public int LotId { get; init; }
 
+    // Snapshot of the traded-away card's identity, captured on the web app at trade-creation
+    // time (from the CollectionCard it already has loaded) — survives the lot itself being
+    // deleted once a replacement is scanned in and committed, so trade history stays reviewable.
+    public CardGame Game { get; init; }
+    public string CardName { get; init; } = "";
+    public string? SetCode { get; init; }
+    public string? SetName { get; init; }
+    public string? CollectorNumber { get; init; }
+    public bool Foil { get; init; }
+
     public string Note { get; init; } = "";
 
     /// <summary>File name of the trade photo within the same folder as this record.</summary>

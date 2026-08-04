@@ -102,6 +102,7 @@ public static class UnifiedMigrationService
             AddColumnIfMissing(cmd, "Lots", "IsTraded", "INTEGER NOT NULL DEFAULT 0");
             AddColumnIfMissing(cmd, "Lots", "TradeNote", "TEXT");
             AddColumnIfMissing(cmd, "Lots", "TradePhotoPath", "TEXT");
+            AddColumnIfMissing(cmd, "Lots", "FulfilledTradeId", "INTEGER");
         }
 
         if (TableExists(cmd, "Orders"))
@@ -195,6 +196,29 @@ public static class UnifiedMigrationService
         cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_Listings_LotId ON Listings(LotId)";
         cmd.ExecuteNonQuery();
         cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_Listings_Status ON Listings(Status)";
+        cmd.ExecuteNonQuery();
+
+        // Trade-a-card: permanent trade record, independent of the traded-away lot's lifecycle
+        // (OriginalLotId is cleared once that lot is deleted on the first fulfilling commit, but
+        // the row itself is never removed — see TradeImportService and CardService.CommitScans).
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS Trades (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                TradeRecordId TEXT NOT NULL,
+                Game TEXT NOT NULL,
+                CardName TEXT NOT NULL DEFAULT '',
+                SetCode TEXT, SetName TEXT, CollectorNumber TEXT,
+                Foil INTEGER NOT NULL DEFAULT 0,
+                Note TEXT NOT NULL DEFAULT '',
+                PhotoPath TEXT,
+                OriginalLotId INTEGER,
+                CreatedAt TEXT NOT NULL,
+                ImportedAt TEXT NOT NULL,
+                FirstFulfilledAt TEXT
+            )
+            """;
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS IX_Trades_TradeRecordId ON Trades(TradeRecordId)";
         cmd.ExecuteNonQuery();
 
         cmd.CommandText = """

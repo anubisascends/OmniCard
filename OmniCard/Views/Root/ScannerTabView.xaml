@@ -507,6 +507,13 @@
                             <MenuItem Header="Assign Match"
                                       Command="{Binding ViewModel.AssignMatchCommand}"/>
                             <Separator/>
+                            <MenuItem Header="Link to Trade..."
+                                      Command="{Binding ViewModel.LinkToTradeCommand}"
+                                      Visibility="{Binding ViewModel.SelectedScannedCard.LinkedTradeId, Converter={conv:NullToVisibleConverter}}"/>
+                            <MenuItem Header="Unlink from Trade"
+                                      Command="{Binding ViewModel.UnlinkFromTradeCommand}"
+                                      Visibility="{Binding ViewModel.SelectedScannedCard.LinkedTradeId, Converter={conv:NullToCollapsedConverter}}"/>
+                            <Separator/>
                             <MenuItem Header="Remove from Queue"
                                       Command="{Binding ViewModel.RemoveScannedCardCommand}"/>
                         </ContextMenu>
@@ -679,6 +686,17 @@
                                                Margin="0,2,0,0">
                                         <Run Text="#:"/>
                                         <Run Text="{Binding Match.CollectorNumber, Mode=OneWay}"/>
+                                    </TextBlock>
+
+                                    <!-- Linked trade: this scan will fulfill an existing trade on commit -->
+                                    <TextBlock Margin="0,2,0,0"
+                                               FontSize="{Binding DataContext.ViewModel.ScannerFontSizeSmall,
+                                                   RelativeSource={RelativeSource AncestorType=ListView}}"
+                                               Foreground="#8D6E63"
+                                               FontWeight="Bold"
+                                               Visibility="{Binding LinkedTradeId, Converter={conv:NullToCollapsedConverter}}">
+                                        <Run Text="&#8596; Trade: "/>
+                                        <Run Text="{Binding LinkedTradeLabel, Mode=OneWay}"/>
                                     </TextBlock>
 
                                     <!-- Match Confidence -->

@@ -83,6 +83,38 @@ public class TradeImportServiceTests : IDisposable
     }
 
     [Fact]
+    public void ImportPendingTrades_CreatesTradeRow_WithSnapshotFieldsAndOriginalLotId()
+    {
+        var lotId = SeedLot();
+        var tradeId = Guid.NewGuid();
+        WriteTradeRecord(new TradeRecord
+        {
+            TradeId = tradeId,
+            LotId = lotId,
+            Game = CardGame.Mtg,
+            CardName = "Lightning Bolt",
+            SetCode = "LEA",
+            SetName = "Limited Edition Alpha",
+            CollectorNumber = "161",
+            Foil = true,
+            Note = "2x Fire Lotus",
+            PhotoFileName = "photo.jpg",
+        });
+
+        CreateService().ImportPendingTrades();
+
+        using var ctx = _factory.CreateDbContext();
+        var trade = Assert.Single(ctx.Trades);
+        Assert.Equal(tradeId, trade.TradeRecordId);
+        Assert.Equal("Lightning Bolt", trade.CardName);
+        Assert.Equal("LEA", trade.SetCode);
+        Assert.True(trade.Foil);
+        Assert.Equal("2x Fire Lotus", trade.Note);
+        Assert.Equal(lotId, trade.OriginalLotId);
+        Assert.Null(trade.FirstFulfilledAt);
+    }
+
+    [Fact]
     public void ImportPendingTrades_AddsInventoryMovement()
     {
         var lotId = SeedLot();
@@ -133,6 +165,58 @@ public class TradeImportServiceTests : IDisposable
         var record = JsonSerializer.Deserialize<TradeRecord>(File.ReadAllText(jsonPath));
         Assert.NotNull(record!.ProcessedAt);
         Assert.NotNull(record.ProcessingError);
+    }
+
+    [Fact]
+    public void ImportPendingTrades_BackfillsTradeRow_FromLiveLot_ForPreSnapshotRecordAlreadyProcessed()
+    {
+        // Simulates a trade.json written/applied before TradeRecord had snapshot fields and
+        // before the Trade table existed: already ProcessedAt, CardName/etc. all empty, no Trade
+        // row — but the lot is still sitting there with IsTraded=true from the old code path.
+        var lotId = SeedLot();
+        using (var ctx = _factory.CreateDbContext())
+        {
+            ctx.Lots.Single(l => l.Id == lotId).IsTraded = true;
+            ctx.SaveChanges();
+        }
+        var tradeId = Guid.NewGuid();
+        WriteTradeRecord(new TradeRecord
+        {
+            TradeId = tradeId,
+            LotId = lotId,
+            Note = "old-format trade",
+            PhotoFileName = "photo.jpg",
+            ProcessedAt = DateTime.UtcNow,
+        });
+
+        var count = CreateService().ImportPendingTrades();
+
+        Assert.Equal(0, count); // backfill isn't a fresh "import"
+        using var verifyCtx = _factory.CreateDbContext();
+        var trade = Assert.Single(verifyCtx.Trades);
+        Assert.Equal(tradeId, trade.TradeRecordId);
+        Assert.Equal("Test Card", trade.CardName); // pulled from the live Product, not the (empty) JSON
+        Assert.Equal(lotId, trade.OriginalLotId);
+    }
+
+    [Fact]
+    public void ImportPendingTrades_BackfillDoesNotDuplicate_OnRepeatedRuns()
+    {
+        var lotId = SeedLot();
+        WriteTradeRecord(new TradeRecord
+        {
+            LotId = lotId,
+            Note = "trade",
+            PhotoFileName = "photo.jpg",
+            ProcessedAt = DateTime.UtcNow,
+        });
+
+        var svc = CreateService();
+        svc.ImportPendingTrades();
+        svc.ImportPendingTrades();
+
+        using var ctx = _factory.CreateDbContext();
+        Assert.Single(ctx.Trades);
     }
 
     [Fact]
