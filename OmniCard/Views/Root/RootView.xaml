@@ -267,6 +267,12 @@
                           CommandParameter="False"/>
                 <MenuItem Header="_Assign Match"
                           Command="{Binding ViewModel.AssignMatchCommand}"/>
+                <MenuItem Header="_Link to Trade..."
+                          Command="{Binding ViewModel.LinkToTradeCommand}"
+                          Visibility="{Binding ViewModel.SelectedScannedCard.LinkedTradeId, Converter={conv:NullToVisibleConverter}}"/>
+                <MenuItem Header="Unlin_k from Trade"
+                          Command="{Binding ViewModel.UnlinkFromTradeCommand}"
+                          Visibility="{Binding ViewModel.SelectedScannedCard.LinkedTradeId, Converter={conv:NullToCollapsedConverter}}"/>
                 <MenuItem Header="Remove from _Queue"
                           Command="{Binding ViewModel.RemoveScannedCardCommand}"/>
             </MenuItem>

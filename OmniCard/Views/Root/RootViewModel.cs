@@ -767,6 +767,10 @@ public sealed partial class RootViewModel(
         SetScannedConditionCommand.NotifyCanExecuteChanged();
         SetScannedFoilCommand.NotifyCanExecuteChanged();
         CopyScannedCardNamesCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CanLinkToTrade));
+        OnPropertyChanged(nameof(CanUnlinkFromTrade));
+        LinkToTradeCommand.NotifyCanExecuteChanged();
+        UnlinkFromTradeCommand.NotifyCanExecuteChanged();
         RefreshAvailablePrintings();
 
         if (DialogService.IsCardPreviewOpen)
@@ -810,7 +814,7 @@ public sealed partial class RootViewModel(
     private void OnScannedCardPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(ScannedCard.OverrideContainer) or nameof(ScannedCard.Match)
-            or nameof(ScannedCard.Condition) or nameof(ScannedCard.IsFoil))
+            or nameof(ScannedCard.Condition) or nameof(ScannedCard.IsFoil) or nameof(ScannedCard.LinkedTradeId))
         {
             NotifySelectionChanged();
         }
@@ -2139,6 +2143,32 @@ public sealed partial class RootViewModel(
         var names = string.Join(Environment.NewLine, SelectedScannedCards.Where(s => s.Match is not null).Select(s => s.Match!.Name));
         if (!string.IsNullOrEmpty(names))
             System.Windows.Clipboard.SetText(names);
+    }
+
+    public bool CanLinkToTrade => HasSingleSelection && SelectedScannedCard?.LinkedTradeId is null;
+    public bool CanUnlinkFromTrade => HasSingleSelection && SelectedScannedCard?.LinkedTradeId is not null;
+
+    /// <summary>Marks this scan as the replacement for a picked trade — on commit, its new lot
+    /// fulfills that trade (see CardService.CommitScans), deleting the traded-away card on the
+    /// first fulfillment.</summary>
+    [RelayCommand(CanExecute = nameof(CanLinkToTrade))]
+    public void LinkToTrade()
+    {
+        if (SelectedScannedCard is null) return;
+        var trade = DialogService.PickTrade();
+        if (trade is null) return;
+
+        SelectedScannedCard.LinkedTradeId = trade.Id;
+        SelectedScannedCard.LinkedTradeLabel = trade.CardName;
+        Message = $"Linked to trade for \"{trade.CardName}\".";
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUnlinkFromTrade))]
+    public void UnlinkFromTrade()
+    {
+        if (SelectedScannedCard is null) return;
+        SelectedScannedCard.LinkedTradeId = null;
+        SelectedScannedCard.LinkedTradeLabel = null;
     }
 
     // Export / Import commands

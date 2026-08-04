@@ -12,6 +12,7 @@ using OmniCard.Views.EbayAuth;
 using OmniCard.Views.SetFilterBuilder;
 using OmniCard.Views.SortFilterBuilder;
 using OmniCard.Views.MoveToLocation;
+using OmniCard.Views.PickTrade;
 using OmniCard.Views.AuditReport;
 using OmniCard.Views.StorageManager;
 using OmniCard.Views.EbayListing;
@@ -167,6 +168,15 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
     public MoveToLocationResult? PickMoveToLocation()
     {
         var wnd = Services.GetRequiredService<MoveToLocationView>();
+        SetOwner(wnd);
+        wnd.ViewModel.Load();
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.Result : null;
+    }
+
+    public TradeSummary? PickTrade()
+    {
+        var wnd = Services.GetRequiredService<PickTradeView>();
         SetOwner(wnd);
         wnd.ViewModel.Load();
         var result = wnd.ShowDialog();

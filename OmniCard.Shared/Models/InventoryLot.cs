@@ -25,4 +25,8 @@ public class InventoryLot
     public bool IsTraded { get; set; }
     public string? TradeNote { get; set; }
     public string? TradePhotoPath { get; set; }
+
+    /// <summary>Set when this lot was added as the replacement for a linked scan at commit time
+    /// (see CardService.CommitScans) — the <see cref="Trade"/> this card came in for.</summary>
+    public int? FulfilledTradeId { get; set; }
 }

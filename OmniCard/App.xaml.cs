@@ -140,6 +140,7 @@ public partial class App : Application
             services.AddSingleton<IAnalyticsService, AnalyticsService>();
             services.AddSingleton<ISealedPriceUpdateService, SealedPriceUpdateService>();
             services.AddSingleton<ITradeImportService, TradeImportService>();
+            services.AddSingleton<ITradeService, TradeService>();
 
             // Storage containers
             services.AddSingleton<IStorageContainerService, StorageContainerService>();
@@ -222,6 +223,8 @@ public partial class App : Application
             services.AddTransient<CoverArtPickerViewModel>();
             services.AddTransient<OmniCard.Views.MoveToLocation.MoveToLocationView>();
             services.AddTransient<OmniCard.Views.MoveToLocation.MoveToLocationViewModel>();
+            services.AddTransient<OmniCard.Views.PickTrade.PickTradeView>();
+            services.AddTransient<OmniCard.Views.PickTrade.PickTradeViewModel>();
             services.AddTransient<AuditReportView>();
             services.AddTransient<AuditReportViewModel>();
             services.AddTransient<EbayListingViewModel>();

@@ -579,6 +579,9 @@ public sealed class CardService : ICardService
                 UnitValue = lot.UnitCost,
             });
 
+            if (scan.LinkedTradeId is int linkedTradeId)
+                lot.FulfilledTradeId = linkedTradeId;
+
             if (scan.FlagFix is not null)
             {
                 context.FlagResolutions.Add(new FlagResolution
@@ -634,6 +637,38 @@ public sealed class CardService : ICardService
         // Second save to persist movements, flag resolutions, and ScanImagePath values
         progress?.Report("Finalizing...");
         context.SaveChanges();
+
+        // Trade fulfillment: delete the traded-away lot on a trade's first fulfillment. Further
+        // replacements linked to the same trade (this commit or a later one) just carry
+        // FulfilledTradeId (set above) — there's nothing left to delete a second time.
+        var linkedTradeIds = committed
+            .Select(c => c.Scan.LinkedTradeId)
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToList();
+
+        if (linkedTradeIds.Count > 0)
+        {
+            var lotsToDelete = new List<int>();
+            using (var tradeContext = _omniDbContextFactory.CreateDbContext())
+            {
+                foreach (var trade in tradeContext.Trades.Where(t => linkedTradeIds.Contains(t.Id)))
+                {
+                    if (trade.OriginalLotId is int originalLotId)
+                    {
+                        lotsToDelete.Add(originalLotId);
+                        trade.OriginalLotId = null;
+                    }
+                    trade.FirstFulfilledAt ??= DateTime.UtcNow;
+                }
+                tradeContext.SaveChanges();
+            }
+
+            foreach (var lotId in lotsToDelete)
+                DeleteCollectionCard(lotId);
+        }
+
         _logger.LogInformation("Committed {Committed} cards to collection ({Skipped} skipped)", committed.Count, skipped);
     }
 

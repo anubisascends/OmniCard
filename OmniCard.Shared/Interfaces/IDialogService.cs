@@ -27,6 +27,7 @@ public interface IDialogService
     void OpenMovementHistory();
     void OpenLogViewer();
     ListForSaleResult? PickListForSale(decimal suggestedPrice);
+    TradeSummary? PickTrade();
     int ShowTcgOrderImportPreview(TcgOrderImportPreview preview);
     bool Confirm(string message, string title);
     BatchDecklistImportSummary? ShowBatchDecklistImport();
