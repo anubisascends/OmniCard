@@ -71,6 +71,20 @@
             {
                 <tr><th>Section</th><td>@Model.Card.Section</td></tr>
             }
+            @if (Model.Card.Tags.Count > 0)
+            {
+                <tr>
+                    <th>Tags</th>
+                    <td>
+                        <div class="tag-list">
+                            @foreach (var t in Model.Card.Tags)
+                            {
+                                <span class="tag-chip">@t</span>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
             @foreach (var kv in ExtendedDataParser.Parse(Model.ExtendedDataJson))
             {
                 <tr><th>@kv.Key</th><td>@kv.Value</td></tr>

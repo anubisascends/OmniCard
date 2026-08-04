@@ -28,6 +28,7 @@
             <RowDefinition Height="Auto"/>  <!-- Card identity -->
             <RowDefinition Height="*"/>     <!-- Images -->
             <RowDefinition Height="Auto"/>  <!-- Properties / Location / Reassign -->
+            <RowDefinition Height="Auto"/>  <!-- Tags -->
             <RowDefinition Height="Auto"/>  <!-- eBay Status -->
             <RowDefinition Height="Auto"/>  <!-- Actions -->
         </Grid.RowDefinitions>
@@ -367,8 +368,21 @@
             </Grid>
         </Border>
 
-        <!-- eBay Status -->
+        <!-- Tags -->
         <Border Grid.Row="3" Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                CornerRadius="4" Padding="10,8" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Tags" FontSize="11" FontWeight="SemiBold"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                           VerticalAlignment="Top" Margin="0,4,8,0"/>
+                <helpers:TagEditor Tags="{Binding ViewModel.Tags}"
+                                AllTagSuggestions="{Binding ViewModel.AllTagSuggestions}"
+                                Width="500" HorizontalAlignment="Left"/>
+            </StackPanel>
+        </Border>
+
+        <!-- eBay Status -->
+        <Border Grid.Row="4" Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
                 CornerRadius="4" Padding="10,8" Margin="0,0,0,8">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="eBay" FontSize="11" FontWeight="SemiBold"
@@ -393,7 +407,7 @@
         </Border>
 
         <!-- Action Buttons -->
-        <Grid Grid.Row="4">
+        <Grid Grid.Row="5">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>

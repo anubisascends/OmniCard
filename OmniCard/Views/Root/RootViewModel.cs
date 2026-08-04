@@ -50,6 +50,7 @@ public sealed partial class RootViewModel(
     IPriceSheetService priceSheetService,
     IPriceSheetPdfExporter priceSheetPdfExporter,
     ISealedPriceUpdateService sealedPriceUpdateService,
+    ITagService tagService,
     ILogger<RootViewModel> logger) : ViewModel
 {
     private readonly ILogger<RootViewModel> _logger = logger;
@@ -1157,6 +1158,17 @@ public sealed partial class RootViewModel(
 
     public ObservableCollection<CardMatch> ManualSearchResults { get; } = [];
 
+    /// <summary>Every known tag name, for the scan-panel TagEditor's autocomplete. Refreshed
+    /// whenever a scan is committed (which may introduce new tag names).</summary>
+    public ObservableCollection<string> AllTagNames { get; } = [];
+
+    public void RefreshTagSuggestions()
+    {
+        AllTagNames.Clear();
+        foreach (var tag in tagService.GetAllTags())
+            AllTagNames.Add(tag.Name);
+    }
+
     [ObservableProperty]
     public partial CardMatch? SelectedManualSearchResult { get; set; }
 
@@ -1336,6 +1348,7 @@ public sealed partial class RootViewModel(
         LoadContainers(); // also calls Collection.LoadContainers()
         Collection.SetGame(SelectedGame);
         Collection.Initialize();
+        RefreshTagSuggestions();
 
         IsEbayConnected = ebayAuthService.IsConnected;
         InvalidateHomeTab();
@@ -1957,6 +1970,8 @@ public sealed partial class RootViewModel(
             {
                 CardService.CommitScans(scans, container, page, slot, section, progress);
             });
+
+            RefreshTagSuggestions(); // committed scans may have introduced new tag names
 
             // Auto-increment slot for binders
             if (container?.ContainerType == ContainerType.Binder && ActiveSlot.HasValue)

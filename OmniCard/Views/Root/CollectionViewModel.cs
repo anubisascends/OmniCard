@@ -23,6 +23,7 @@ public sealed partial class CollectionViewModel : ViewModel
     private readonly IEbayListingService _ebayListingService;
     private readonly EbaySettings _ebaySettings;
     private readonly IListingService _listingService;
+    private readonly ITagService _tagService;
 
     /// <summary>Set by RootViewModel to delegate settings persistence.</summary>
     public Action? PersistSettings { get; set; }
@@ -53,7 +54,8 @@ public sealed partial class CollectionViewModel : ViewModel
         ILogger<CollectionViewModel> logger,
         IEbayListingService ebayListingService,
         IOptions<EbaySettings> ebaySettings,
-        IListingService listingService)
+        IListingService listingService,
+        ITagService tagService)
     {
         _cardService = cardService;
         _containerService = containerService;
@@ -65,6 +67,7 @@ public sealed partial class CollectionViewModel : ViewModel
         _ebayListingService = ebayListingService;
         _ebaySettings = ebaySettings.Value;
         _listingService = listingService;
+        _tagService = tagService;
 
         // Initialize column visibility from settings
         var saved = displaySettings.Value.CollectionColumnVisibility;
@@ -403,6 +406,7 @@ public sealed partial class CollectionViewModel : ViewModel
     partial void OnSelectedCardCountChanged(int value)
     {
         MoveSelectedToLocationCommand.NotifyCanExecuteChanged();
+        AddTagsToSelectedCommand.NotifyCanExecuteChanged();
         ListForSaleCommand.NotifyCanExecuteChanged();
         UnlistForSaleCommand.NotifyCanExecuteChanged();
         MarkPickedCommand.NotifyCanExecuteChanged();
@@ -551,6 +555,10 @@ public sealed partial class CollectionViewModel : ViewModel
                 var statusByLot = _listingService.GetActiveListingStatusByLot(results.Select(c => c.Id));
                 foreach (var card in results)
                     card.ListingStatus = statusByLot.TryGetValue(card.Id, out var st) ? st : null;
+
+                var tagsByLot = _tagService.GetTagsByLots(results.Select(c => c.Id));
+                foreach (var card in results)
+                    card.Tags = tagsByLot.TryGetValue(card.Id, out var tags) ? tags : [];
 
                 // MarketPrice and Quantity are not DB columns (fetched/computed after the
                 // query), so the DB sort can't order by them. When the primary sort level is
@@ -815,6 +823,29 @@ public sealed partial class CollectionViewModel : ViewModel
 
         _cardService.MoveCardsToContainer(ids, result.Container.Id, result.Section);
         ReportMessage?.Invoke($"Moved {ids.Count} card(s) to {result.Container.Name}.");
+        _ = SearchCollection();
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    public void AddTagsToSelected()
+    {
+        var ids = GetAllSelectedCardIds();
+        if (ids.Count == 0) return;
+
+        var tags = _dialogService.PickTags();
+        if (tags is null or { Count: 0 }) return;
+
+        foreach (var tag in tags)
+            _tagService.AddTagToLots(ids, tag);
+
+        ReportMessage?.Invoke($"Added {tags.Count} tag(s) to {ids.Count} card(s).");
+        _ = SearchCollection();
+    }
+
+    [RelayCommand]
+    public void ManageTags()
+    {
+        _dialogService.ManageTags();
         _ = SearchCollection();
     }
 

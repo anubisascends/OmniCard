@@ -568,6 +568,7 @@ public sealed class CardService : ICardService
         context.SaveChanges();
 
         // Acquire movements + flag resolution records for flagged cards that were fixed
+        var tagCache = new Dictionary<string, Tag>(StringComparer.OrdinalIgnoreCase);
         foreach (var (lot, scan) in committed)
         {
             context.Movements.Add(new InventoryMovement
@@ -581,6 +582,23 @@ public sealed class CardService : ICardService
 
             if (scan.LinkedTradeId is int linkedTradeId)
                 lot.FulfilledTradeId = linkedTradeId;
+
+            foreach (var tagName in scan.Tags)
+            {
+                var trimmed = tagName.Trim();
+                if (trimmed.Length == 0) continue;
+
+                if (!tagCache.TryGetValue(trimmed, out var tag))
+                {
+                    tag = context.Tags.FirstOrDefault(t => t.Name.ToLower() == trimmed.ToLower())
+                        ?? new Tag { Name = trimmed };
+                    tagCache[trimmed] = tag;
+                }
+
+                // Set via the navigation, not TagId directly — a just-created tag isn't saved
+                // yet, so its Id is still 0; EF fixes up the FK from the tracked reference.
+                context.LotTags.Add(new LotTag { LotId = lot.Id, Tag = tag });
+            }
 
             if (scan.FlagFix is not null)
             {
@@ -1300,10 +1318,10 @@ public sealed class CardService : ICardService
             cards = cards.Where(c => c.ContainerId == containerFilter.Value);
 
         if (!string.IsNullOrWhiteSpace(query))
-            cards = ApplyScryfallFilter(cards, query);
+            cards = ApplyScryfallFilter(cards, query, context);
 
         if (filterPreset is not null && !string.IsNullOrWhiteSpace(filterPreset.Query))
-            cards = ApplyScryfallFilter(cards, filterPreset.Query);
+            cards = ApplyScryfallFilter(cards, filterPreset.Query, context);
 
         return cards;
     }
@@ -1371,14 +1389,14 @@ public sealed class CardService : ICardService
         return values.Distinct().OrderBy(v => v).ToList();
     }
 
-    private static IQueryable<CollectionCard> ApplyScryfallFilter(IQueryable<CollectionCard> cards, string query)
+    private static IQueryable<CollectionCard> ApplyScryfallFilter(IQueryable<CollectionCard> cards, string query, OmniCardDbContext context)
     {
         var filter = ScryfallQueryParser.ParseFilter(query);
         if (filter is null)
             return cards;
 
         var param = LinqExpression.Parameter(typeof(CollectionCard), "c");
-        var expr = BuildFilterExpression(param, filter);
+        var expr = BuildFilterExpression(param, filter, context);
         var lambda = LinqExpression.Lambda<Func<CollectionCard, bool>>(expr, param);
         return cards.Where(lambda);
     }
@@ -1397,23 +1415,23 @@ public sealed class CardService : ICardService
             LinqExpression.Constant(pattern));
     }
 
-    private static LinqExpression BuildFilterExpression(System.Linq.Expressions.ParameterExpression param, FilterNode node)
+    private static LinqExpression BuildFilterExpression(System.Linq.Expressions.ParameterExpression param, FilterNode node, OmniCardDbContext context)
     {
         return node switch
         {
-            FieldFilter f => BuildFieldExpression(param, f),
+            FieldFilter f => BuildFieldExpression(param, f, context),
             AndFilter and => and.Children
-                .Select(c => BuildFilterExpression(param, c))
+                .Select(c => BuildFilterExpression(param, c, context))
                 .Aggregate(LinqExpression.AndAlso),
             OrFilter or => or.Children
-                .Select(c => BuildFilterExpression(param, c))
+                .Select(c => BuildFilterExpression(param, c, context))
                 .Aggregate(LinqExpression.OrElse),
-            NotFilter not => LinqExpression.Not(BuildFilterExpression(param, not.Inner)),
+            NotFilter not => LinqExpression.Not(BuildFilterExpression(param, not.Inner, context)),
             _ => LinqExpression.Constant(true),
         };
     }
 
-    private static LinqExpression BuildFieldExpression(System.Linq.Expressions.ParameterExpression param, FieldFilter filter)
+    private static LinqExpression BuildFieldExpression(System.Linq.Expressions.ParameterExpression param, FieldFilter filter, OmniCardDbContext context)
     {
         var expr = filter.Field switch
         {
@@ -1427,10 +1445,32 @@ public sealed class CardService : ICardService
             "foil" => BuildLegacyFoilExpression(param, filter.Value),
             "condition" or "cond" => BuildStringExpression(param, nameof(CollectionCard.Condition), filter.Op, filter.Value),
             "location" or "loc" => BuildLocationExpression(param, filter.Op, filter.Value),
+            "tag" => BuildTagExpression(param, context, filter.Op, filter.Value),
             _ => BuildNameExpression(param, filter.Op, filter.Value),
         };
 
         return filter.Negated ? LinqExpression.Not(expr) : expr;
+    }
+
+    /// <summary>Unlike the other field builders, this one isn't pure — it resolves matching lot
+    /// ids eagerly via a small subquery against LotTags (there's no scalar "tags" column on
+    /// CollectionCard to filter in-place), then bakes the result into the expression tree as a
+    /// HashSet.Contains check. Mirrors the "resolve ids ahead of time" precedent already used for
+    /// SQLite's per-statement parameter cap (see ChunkedByIdLookup).</summary>
+    private static LinqExpression BuildTagExpression(System.Linq.Expressions.ParameterExpression param, OmniCardDbContext context, ComparisonOp op, string value)
+    {
+        var matchingLotIds = (op == ComparisonOp.Exact
+                ? context.LotTags.Where(lt => lt.Tag.Name.ToLower() == value.ToLower())
+                : context.LotTags.Where(lt => EF.Functions.Like(lt.Tag.Name, $"%{value}%")))
+            .Select(lt => lt.LotId)
+            .Distinct()
+            .ToHashSet();
+
+        var containsMethod = typeof(HashSet<int>).GetMethod(nameof(HashSet<int>.Contains), [typeof(int)])!;
+        return LinqExpression.Call(
+            LinqExpression.Constant(matchingLotIds),
+            containsMethod,
+            LinqExpression.Property(param, nameof(CollectionCard.Id)));
     }
 
     private static LinqExpression BuildNameExpression(System.Linq.Expressions.ParameterExpression param, ComparisonOp op, string value)

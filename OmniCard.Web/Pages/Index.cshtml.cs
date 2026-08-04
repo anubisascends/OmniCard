@@ -109,6 +109,12 @@ public class IndexModel : PageModel
         if (gameFilter.HasValue)
             query = query.Where(c => c.Game == gameFilter.Value);
 
+        var allCards = query.ToList();
+        var tagsByLot = TagLookup.GetTagsByLots(db, allCards.Select(c => c.Id));
+        foreach (var c in allCards)
+            c.Tags = tagsByLot.GetValueOrDefault(c.Id, []);
+        query = allCards;
+
         var terms = Q!.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         foreach (var term in terms)
@@ -153,6 +159,11 @@ public class IndexModel : PageModel
                 var val = term[2..];
                 query = query.Where(c => Contains(c.CardType, val));
             }
+            else if (term.StartsWith("tag:", StringComparison.OrdinalIgnoreCase))
+            {
+                var val = term[4..];
+                query = query.Where(c => c.Tags.Any(t => Contains(t, val)));
+            }
             else
             {
                 query = query.Where(c => Contains(c.Name, term));
@@ -177,6 +188,7 @@ public class IndexModel : PageModel
                     Quantity = g.Count(),
                     ImageUrl = CardImageUrl.Resolve(rep.ScanImagePath, rep.ImageUri),
                     MarketPrice = rep.MarketPrice > 0m ? rep.MarketPrice : null,
+                    Tags = rep.Tags,
                 };
             })
             .OrderBy(r => r.Name)
@@ -217,5 +229,6 @@ public class IndexModel : PageModel
         public int Quantity { get; init; }
         public string? ImageUrl { get; init; }
         public decimal? MarketPrice { get; init; }
+        public List<string> Tags { get; init; } = [];
     }
 }

@@ -33,6 +33,17 @@ public class CollectionCard : INotifyPropertyChanged
     public bool IsTraded { get; set; }
     public string? TradeNote { get; set; }
 
+    /// <summary>User-defined tags on this physical copy. Populated in a separate pass after the
+    /// base query, same as <see cref="ListingStatus"/> — there's no scalar tags column to
+    /// project directly.</summary>
+    public List<string> Tags { get; set; } = [];
+
+    [NotMapped]
+    public bool HasTags => Tags.Count > 0;
+
+    [NotMapped]
+    public string TagsDisplay => string.Join(", ", Tags);
+
     /// <summary>Cached market price for display and sorting. Not persisted.</summary>
     [NotMapped]
     public decimal MarketPrice

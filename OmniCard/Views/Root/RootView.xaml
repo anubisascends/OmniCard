@@ -176,6 +176,8 @@
                           Command="{Binding ViewModel.Collection.OpenSortFilterBuilderCommand}"/>
                 <MenuItem Header="Manage Storage _Locations..."
                           Command="{Binding ViewModel.ManageStorageLocationsCommand}"/>
+                <MenuItem Header="Manage _Tags..."
+                          Command="{Binding ViewModel.Collection.ManageTagsCommand}"/>
                 <Separator/>
                 <MenuItem Header="Refresh Card _Data..."
                           Command="{Binding ViewModel.RefreshCardDataCommand}"/>
@@ -194,6 +196,8 @@
                 <Separator/>
                 <MenuItem Header="_Move to Location..."
                           Command="{Binding ViewModel.Collection.MoveSelectedToLocationCommand}"/>
+                <MenuItem Header="Add _Tag(s)..."
+                          Command="{Binding ViewModel.Collection.AddTagsToSelectedCommand}"/>
                 <MenuItem Header="_List for Sale..."
                           Command="{Binding ViewModel.Collection.ListForSaleCommand}"/>
                 <MenuItem Header="Mark _Picked"

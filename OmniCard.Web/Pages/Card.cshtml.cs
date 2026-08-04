@@ -57,6 +57,8 @@ public class CardModel : PageModel
         if (lot.LocationId is int locationId)
             card.Container = db.StorageContainers.AsNoTracking().FirstOrDefault(c => c.Id == locationId);
 
+        card.Tags = TagLookup.GetTagsByLots(db, [card.Id]).GetValueOrDefault(card.Id, []);
+
         Card = card;
         ExtendedDataJson = LookupExtendedDataJson(card.Game, card.GameCardId);
         return Page();

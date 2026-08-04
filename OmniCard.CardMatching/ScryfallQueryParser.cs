@@ -245,6 +245,7 @@ public static class ScryfallQueryParser
         "price" => "price",
         "date" => "date",
         "loc" or "location" => "location",
+        "tag" or "tags" => "tag",
         _ => field,
     };
 
