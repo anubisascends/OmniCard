@@ -150,6 +150,18 @@ tr:active { background: var(--surface); }
 
 .card-tile .qty { color: var(--accent); font-weight: 600; font-size: 0.85rem; }
 
+.tag-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+
+.tag-chip {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+}
+
 .back-link {
     display: inline-flex;
     align-items: center;

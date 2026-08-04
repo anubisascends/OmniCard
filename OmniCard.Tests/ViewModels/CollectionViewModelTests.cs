@@ -19,6 +19,7 @@ public class CollectionViewModelTests
     private readonly Mock<IDataPathService> _dataPath = new();
     private readonly Mock<IEbayListingService> _ebayListing = new();
     private readonly Mock<IListingService> _listing = new();
+    private readonly Mock<ITagService> _tags = new();
 
     private CollectionViewModel CreateVm()
     {
@@ -34,6 +35,8 @@ public class CollectionViewModelTests
              .Returns(0);
         _listing.Setup(l => l.GetActiveListingStatusByLot(It.IsAny<IEnumerable<int>>()))
                 .Returns(new Dictionary<int, ListingStatus>());
+        _tags.Setup(t => t.GetTagsByLots(It.IsAny<IEnumerable<int>>()))
+             .Returns(new Dictionary<int, List<string>>());
 
         return new CollectionViewModel(
             _card.Object,
@@ -46,7 +49,8 @@ public class CollectionViewModelTests
             NullLogger<CollectionViewModel>.Instance,
             _ebayListing.Object,
             Options.Create(new EbaySettings()),
-            _listing.Object);
+            _listing.Object,
+            _tags.Object);
     }
 
     [Fact]

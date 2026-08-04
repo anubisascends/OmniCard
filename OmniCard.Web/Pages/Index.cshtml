@@ -21,7 +21,7 @@
     </header>
     <main>
         <form method="get" class="search-bar" id="searchForm">
-            <input type="text" name="q" id="searchInput" value="@Model.Q" placeholder="Search cards... (e.g. lightning, set:tmt, cn:002)" />
+            <input type="text" name="q" id="searchInput" value="@Model.Q" placeholder="Search cards... (e.g. lightning, set:tmt, cn:002, tag:foil)" />
             <select name="game" id="gameFilter" onchange="this.form.submit()">
                 <option value="">All Games</option>
                 <option value="mtg" selected="@(Model.Game == "mtg" ? "selected" : null)">Magic: The Gathering</option>
@@ -68,6 +68,15 @@
                             @if (r.Quantity > 1)
                             {
                                 <div class="qty">&times;@r.Quantity</div>
+                            }
+                            @if (r.Tags.Count > 0)
+                            {
+                                <div class="tag-list">
+                                    @foreach (var t in r.Tags)
+                                    {
+                                        <span class="tag-chip">@t</span>
+                                    }
+                                </div>
                             }
                         </a>
                     }

@@ -14,16 +14,21 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
     private readonly IStorageContainerService _containerService;
     private readonly IPerceptualHashService _hashService;
     private readonly IDataPathService _dataPathService;
+    private readonly ITagService _tagService;
     private CollectionCard _originalCard = null!;
     private List<int> _stackedIds = [];
 
-    public CollectionCardEditorViewModel(ICardService cardService, IStorageContainerService containerService, IPerceptualHashService hashService, IDataPathService dataPathService)
+    public CollectionCardEditorViewModel(ICardService cardService, IStorageContainerService containerService, IPerceptualHashService hashService, IDataPathService dataPathService, ITagService tagService)
     {
         _cardService = cardService;
         _containerService = containerService;
         _hashService = hashService;
         _dataPathService = dataPathService;
+        _tagService = tagService;
     }
+
+    public ObservableCollection<string> Tags { get; } = [];
+    public ObservableCollection<string> AllTagSuggestions { get; } = [];
 
     // Card identity (read-only display)
     [ObservableProperty]
@@ -327,6 +332,13 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
         Slot = card.Slot;
         Section = card.Section;
 
+        Tags.Clear();
+        foreach (var tag in _tagService.GetTagsForLot(card.Id))
+            Tags.Add(tag);
+        AllTagSuggestions.Clear();
+        foreach (var tag in _tagService.GetAllTags())
+            AllTagSuggestions.Add(tag.Name);
+
         RefreshPrintings();
 
         // eBay listing info
@@ -433,6 +445,7 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
         _originalCard.Slot = SelectedContainer?.ContainerType == ContainerType.Binder ? Slot : null;
         _originalCard.Section = SelectedContainer?.ContainerType == ContainerType.Box ? Section : null;
         _cardService.UpdateCollectionCard(_originalCard);
+        _tagService.SetTagsForLot(_originalCard.Id, Tags);
 
         // Apply to all stacked siblings when checked
         if (ApplyToAll)
@@ -462,6 +475,9 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
                     c.Slot = slot;
                     c.Section = section;
                 });
+
+                foreach (var id in siblingIds)
+                    _tagService.SetTagsForLot(id, Tags);
             }
         }
 

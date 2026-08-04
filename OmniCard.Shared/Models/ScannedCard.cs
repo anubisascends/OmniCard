@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace OmniCard.Models;
@@ -61,6 +62,9 @@ public partial class ScannedCard : ObservableObject
     /// cached at link time so the scan tile badge doesn't need a live lookup.</summary>
     [ObservableProperty]
     public partial string? LinkedTradeLabel { get; set; }
+
+    /// <summary>Tags to attach to the lot this scan becomes on commit.</summary>
+    public ObservableCollection<string> Tags { get; } = [];
 
     public bool IsFlagged => FlagReason != FlagReason.None;
 

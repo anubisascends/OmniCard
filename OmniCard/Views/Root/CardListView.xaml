@@ -4,7 +4,8 @@
              xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
              xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
              xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
-             xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel">
+             xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
 
     <ListBox x:Name="CollectionListBox"
              ItemsSource="{Binding CollectionSearchResults}"
@@ -163,6 +164,19 @@
                                     ToolTip="{Binding TradeNote}">
                                 <TextBlock Text="TRADED" FontSize="9" FontWeight="Bold" Foreground="White"/>
                             </Border>
+
+                            <!-- Tag indicator: icon + count, tooltip lists every tag on this copy -->
+                            <Border VerticalAlignment="Bottom" HorizontalAlignment="Right"
+                                    Margin="4" Padding="4,1" CornerRadius="3"
+                                    Background="#00000099"
+                                    Visibility="{Binding HasTags, Converter={conv:BoolToVisibilityConverter}}"
+                                    ToolTip="{Binding TagsDisplay}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="Tag" Width="11" Height="11" Foreground="White" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Tags.Count}" FontSize="9" FontWeight="Bold"
+                                               Foreground="White" Margin="2,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
                         </Grid>
 
                         <!-- Name: single line, ellipsis when too long (full name in the tile tooltip) -->
@@ -204,6 +218,8 @@
                 <Separator/>
                 <MenuItem Header="Move to Location..."
                           Command="{Binding MoveSelectedToLocationCommand}"/>
+                <MenuItem Header="Add Tag(s)..."
+                          Command="{Binding AddTagsToSelectedCommand}"/>
                 <Separator/>
                 <MenuItem Header="List for Sale..."
                           Command="{Binding ListForSaleCommand}"/>

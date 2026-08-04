@@ -1,0 +1,62 @@
+<UserControl x:Class="OmniCard.Controls.TagEditor"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Self">
+
+    <StackPanel>
+        <ItemsControl ItemsSource="{Binding Tags, ElementName=Self}"
+                      Margin="0,0,0,4">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Background="{DynamicResource MaterialDesign.Brush.Primary}"
+                            CornerRadius="10"
+                            Padding="8,3"
+                            Margin="0,0,4,4">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding}" Foreground="White" FontSize="11" VerticalAlignment="Center"/>
+                            <Button Content="&#10005;"
+                                    Tag="{Binding}"
+                                    Click="RemoveTag_Click"
+                                    Margin="6,0,0,0"
+                                    Padding="0"
+                                    Width="14" Height="14"
+                                    FontSize="9"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Foreground="White"
+                                    ToolTip="Remove tag"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Grid>
+            <TextBox x:Name="InputBox"
+                     TextChanged="InputBox_TextChanged"
+                     KeyDown="InputBox_KeyDown"
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                     ToolTip="Type a tag name, Enter to add"/>
+            <Popup x:Name="SuggestionsPopup"
+                   PlacementTarget="{Binding ElementName=InputBox}"
+                   Placement="Bottom"
+                   StaysOpen="False"
+                   Width="{Binding ActualWidth, ElementName=InputBox}">
+                <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                        BorderBrush="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"
+                        BorderThickness="1"
+                        MaxHeight="150">
+                    <ListBox x:Name="SuggestionsList"
+                             MouseUp="SuggestionsList_MouseUp"
+                             KeyDown="SuggestionsList_KeyDown"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                </Border>
+            </Popup>
+        </Grid>
+    </StackPanel>
+</UserControl>

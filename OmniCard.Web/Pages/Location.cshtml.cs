@@ -45,6 +45,10 @@ public class LocationModel : PageModel
 
         CardCount = rawCards.Count;
 
+        var tagsByLot = TagLookup.GetTagsByLots(db, rawCards.Select(c => c.Id));
+        foreach (var c in rawCards)
+            c.Tags = tagsByLot.GetValueOrDefault(c.Id, []);
+
         Cards = rawCards
             .GroupBy(c => new { c.Name, c.SetCode })
             .Select(g =>
@@ -61,7 +65,8 @@ public class LocationModel : PageModel
                     rep.Color,
                     g.Count(),
                     CardImageUrl.Resolve(rep.ScanImagePath, rep.ImageUri),
-                    rep.MarketPrice > 0m ? rep.MarketPrice : null);
+                    rep.MarketPrice > 0m ? rep.MarketPrice : null,
+                    rep.Tags);
             })
             .OrderBy(c => c.Name)
             .ToList();
@@ -107,5 +112,6 @@ public class LocationModel : PageModel
         string? Color,
         int Quantity,
         string? ImageUrl,
-        decimal? MarketPrice);
+        decimal? MarketPrice,
+        List<string> Tags);
 }

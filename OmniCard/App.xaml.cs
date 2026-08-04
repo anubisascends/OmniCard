@@ -141,6 +141,7 @@ public partial class App : Application
             services.AddSingleton<ISealedPriceUpdateService, SealedPriceUpdateService>();
             services.AddSingleton<ITradeImportService, TradeImportService>();
             services.AddSingleton<ITradeService, TradeService>();
+            services.AddSingleton<ITagService, TagService>();
 
             // Storage containers
             services.AddSingleton<IStorageContainerService, StorageContainerService>();
@@ -241,6 +242,10 @@ public partial class App : Application
             services.AddTransient<Views.Inventory.OpenUnitsViewModel>();
             services.AddTransient<Views.Sales.RequireReasonView>();
             services.AddTransient<Views.Sales.RequireReasonViewModel>();
+            services.AddTransient<Views.AddTags.AddTagsView>();
+            services.AddTransient<Views.AddTags.AddTagsViewModel>();
+            services.AddTransient<Views.ManageTags.ManageTagsView>();
+            services.AddTransient<Views.ManageTags.ManageTagsViewModel>();
             services.AddTransient<Views.MovementHistory.MovementHistoryView>();
             services.AddTransient<Views.MovementHistory.MovementHistoryViewModel>();
             services.AddTransient<Views.LogViewer.LogViewerView>();

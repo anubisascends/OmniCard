@@ -35,4 +35,11 @@ public interface IDialogService
     /// <summary>Required-reason modal: Confirm is disabled while the reason field is blank.
     /// Returns the trimmed reason on confirm, or null if cancelled.</summary>
     string? RequireReason(string title, string message);
+
+    /// <summary>Prompts for one or more tags (type-to-add with autocomplete) to apply to a bulk
+    /// card selection. Returns the entered tag names, or null if cancelled/empty.</summary>
+    List<string>? PickTags();
+
+    /// <summary>Opens the tag library management dialog (rename/delete/merge, usage counts).</summary>
+    void ManageTags();
 }

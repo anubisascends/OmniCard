@@ -221,6 +221,35 @@ public static class UnifiedMigrationService
         cmd.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS IX_Trades_TradeRecordId ON Trades(TradeRecordId)";
         cmd.ExecuteNonQuery();
 
+        // Tagging system: user-defined tags on individual lots (physical copies), many-to-many
+        // via LotTags. Name uniqueness is case-insensitive (COLLATE NOCASE) so "Foil" and "foil"
+        // can't both exist.
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS Tags (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL COLLATE NOCASE,
+                CreatedAt TEXT NOT NULL
+            )
+            """;
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS IX_Tags_Name ON Tags(Name COLLATE NOCASE)";
+        cmd.ExecuteNonQuery();
+
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS LotTags (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                LotId INTEGER NOT NULL,
+                TagId INTEGER NOT NULL,
+                FOREIGN KEY (LotId) REFERENCES Lots(Id) ON DELETE CASCADE,
+                FOREIGN KEY (TagId) REFERENCES Tags(Id) ON DELETE CASCADE
+            )
+            """;
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS IX_LotTags_LotId_TagId ON LotTags(LotId, TagId)";
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_LotTags_TagId ON LotTags(TagId)";
+        cmd.ExecuteNonQuery();
+
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS Customers (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,

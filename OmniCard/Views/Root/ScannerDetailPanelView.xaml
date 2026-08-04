@@ -221,6 +221,20 @@
                 </Grid>
             </Border>
 
+            <!-- Single-select: tags -->
+            <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                CornerRadius="4"
+                Padding="8"
+                Margin="0,0,0,8"
+                Visibility="{Binding ViewModel.HasSingleSelection, Converter={StaticResource BoolToVis}}">
+                <StackPanel>
+                    <TextBlock Text="Tags" FontWeight="SemiBold" Margin="0,0,0,4"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                    <helpers:TagEditor Tags="{Binding ViewModel.SelectedScannedCard.Tags}"
+                                    AllTagSuggestions="{Binding ViewModel.AllTagNames}"/>
+                </StackPanel>
+            </Border>
+
             <!-- Single-select: per-card location override -->
             <Border Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
                 CornerRadius="4"

@@ -199,6 +199,88 @@ public class CollectionCardCrudTests : IDisposable
     }
 
     [Fact]
+    public void CommitScans_WithTags_CreatesLotTagLinks()
+    {
+        var service = CreateService();
+
+        var scan = new ScannedCard
+        {
+            TempImagePath = Path.GetTempFileName(),
+            Hash = 0,
+            Game = CardGame.Mtg,
+            Match = null,
+            FlagReason = FlagReason.MissingFromDatabase,
+            Condition = "NM",
+            IsFoil = false,
+        };
+        scan.Tags.Add("Foil");
+        scan.Tags.Add(" PSA-Worthy ");
+
+        try
+        {
+            service.CommitScans([scan]);
+
+            using var ctx = new OmniCardDbContext(_omniOptions);
+            var lot = ctx.Lots.AsNoTracking().Single();
+            var tagNames = ctx.LotTags.AsNoTracking()
+                .Include(lt => lt.Tag)
+                .Where(lt => lt.LotId == lot.Id)
+                .Select(lt => lt.Tag.Name)
+                .OrderBy(n => n)
+                .ToList();
+
+            Assert.Equal(["Foil", "PSA-Worthy"], tagNames); // trimmed on write
+            Assert.Single(ctx.Tags.AsNoTracking().Where(t => t.Name == "Foil"));
+        }
+        finally
+        {
+            File.Delete(scan.TempImagePath);
+        }
+    }
+
+    [Fact]
+    public void CommitScans_SameTagOnTwoScans_ReusesOneTagRow()
+    {
+        var service = CreateService();
+
+        var scan1 = new ScannedCard
+        {
+            TempImagePath = Path.GetTempFileName(),
+            Hash = 0,
+            Game = CardGame.Mtg,
+            Match = null,
+            FlagReason = FlagReason.MissingFromDatabase,
+            Condition = "NM",
+        };
+        scan1.Tags.Add("Foil");
+
+        var scan2 = new ScannedCard
+        {
+            TempImagePath = Path.GetTempFileName(),
+            Hash = 1,
+            Game = CardGame.Mtg,
+            Match = null,
+            FlagReason = FlagReason.MissingFromDatabase,
+            Condition = "NM",
+        };
+        scan2.Tags.Add("foil"); // different casing, same tag
+
+        try
+        {
+            service.CommitScans([scan1, scan2]);
+
+            using var ctx = new OmniCardDbContext(_omniOptions);
+            var foilTag = Assert.Single(ctx.Tags.AsNoTracking().Where(t => t.Name.ToLower() == "foil"));
+            Assert.Equal(2, ctx.LotTags.AsNoTracking().Count(lt => lt.TagId == foilTag.Id));
+        }
+        finally
+        {
+            File.Delete(scan1.TempImagePath);
+            File.Delete(scan2.TempImagePath);
+        }
+    }
+
+    [Fact]
     public void CommitScans_NoMatchWithoutMissingFlag_IsSkipped()
     {
         var service = CreateService();

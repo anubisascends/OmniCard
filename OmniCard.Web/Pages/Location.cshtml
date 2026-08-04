@@ -58,6 +58,15 @@
                         {
                             <div class="qty">&times;@card.Quantity</div>
                         }
+                        @if (card.Tags.Count > 0)
+                        {
+                            <div class="tag-list">
+                                @foreach (var t in card.Tags)
+                                {
+                                    <span class="tag-chip">@t</span>
+                                }
+                            </div>
+                        }
                     </a>
                 }
             </div>
