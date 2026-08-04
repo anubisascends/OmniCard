@@ -26,9 +26,53 @@ Supports **Magic: The Gathering** (via Scryfall) and **One Piece TCG**.
 
 ## Download
 
-Grab the latest release from the [Releases](../../releases) page. Download the `OmniCard-v{VERSION}-win-x64.zip`, extract it, and run `OmniCard.exe`.
+Grab the latest release from the [Releases](../../releases) page. Each release includes two downloads:
+
+| Asset | What it is |
+|-------|------------|
+| `OmniCard-v{VERSION}-win-x64.zip` | The desktop app -- a single self-contained `OmniCard.exe` plus a handful of native scanner/OCR support files |
+| `OmniCard-Web-v{VERSION}-iis.zip` | The web companion, packaged for installation on IIS |
+
+### Installing the Desktop App
+
+Download `OmniCard-v{VERSION}-win-x64.zip`, extract it anywhere, and run `OmniCard.exe`.
 
 No installation required -- just extract and run.
+
+### Installing the Web Companion on IIS
+
+The web companion is a normal ASP.NET Core app and is meant to run alongside the desktop app on
+the same machine (or one with access to the same data directory), so people on your network can
+browse the collection and scan with their phones.
+
+**Prerequisites (on the IIS server):**
+
+- IIS with the **ASP.NET Core Module V2** -- install the
+  [.NET 10 Hosting Bundle](https://dotnet.microsoft.com/download/dotnet/10.0) (not just the SDK/runtime), then restart the server (or at least run `net stop was /y` followed by `net start w3svc`).
+- The desktop app must have run at least once on a reachable path, so `inventory.db` and the
+  per-game catalog databases exist to point at.
+
+**Steps:**
+
+1. Download `OmniCard-Web-v{VERSION}-iis.zip` and extract it to a folder, e.g. `C:\inetpub\OmniCardWeb`.
+2. In IIS Manager, create an **Application Pool** for the site with **.NET CLR version** set to
+   **No Managed Code** (the ASP.NET Core Module hosts the runtime itself, IIS doesn't need to).
+3. Create a **Site** (or **Application** under an existing site) with its physical path pointing at
+   the folder from step 1, using the app pool from step 2.
+4. Point the app at your data directory. Open the generated `web.config` in that folder and add an
+   `environmentVariables` entry inside the `<aspNetCore>` element:
+   ```xml
+   <aspNetCore processPath="dotnet" arguments=".\OmniCard.Web.dll" ...>
+     <environmentVariables>
+       <environmentVariable name="DataDirectory" value="C:\Users\<you>\AppData\Local\OmniCard" />
+     </environmentVariables>
+   </aspNetCore>
+   ```
+   Use the same data directory the desktop app uses (default `%LOCALAPPDATA%\OmniCard`).
+5. Grant the app pool identity (`IIS AppPool\<your app pool name>`) **read** access to that data
+   directory -- the web app opens the databases read-only, so no write access is needed.
+6. Browse to the site. You should see the collection browser; `/scan` works from any device on the
+   same network once you're browsing over the LAN.
 
 ## Building from Source
 

@@ -8,7 +8,13 @@ permissions:
   contents: write
 
 jobs:
+  # Re-run the full CI build+test suite before publishing anything, so a release can never ship
+  # from a broken build.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   publish:
+    needs: ci
     runs-on: windows-latest
 
     steps:
@@ -24,22 +30,61 @@ jobs:
         shell: bash
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Publish
-        run: dotnet publish OmniCard/OmniCard.csproj -c Release -r win-x64 -p:Version=${{ steps.version.outputs.VERSION }}
+      # --- Desktop app: single-file self-contained .exe (same flags as the "Publish Single File"
+      #     task in .vscode/tasks.json) ---
+      - name: Publish desktop app
+        run: >
+          dotnet publish OmniCard/OmniCard.csproj -c Release -r win-x64
+          -p:Version=${{ steps.version.outputs.VERSION }}
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          --self-contained true
 
-      - name: Package release
+      - name: Package desktop release
         shell: bash
         run: |
+          ROOT="$PWD"
           PUBLISH_DIR="OmniCard/bin/Release/net10.0-windows10.0.22621.0/win-x64/publish"
           ARTIFACT="OmniCard-v${{ steps.version.outputs.VERSION }}-win-x64.zip"
-          # Remove PDB files — not needed for end users
+          # Remove PDB/XML files — not needed for end users
           rm -f "$PUBLISH_DIR"/*.pdb
           rm -f "$PUBLISH_DIR"/*.xml
           cd "$PUBLISH_DIR"
-          7z a -tzip "../../../../../$ARTIFACT" ./*
-          cd -
+          7z a -tzip "$ROOT/$ARTIFACT" ./*
+          cd "$ROOT"
+
+      # --- Web companion: framework-dependent package for IIS. Self-contained=false keeps it
+      #     small; the target IIS server needs the matching .NET 10 ASP.NET Core Hosting Bundle
+      #     installed (see README). -r win-x64 scopes native assets (SQLite, SkiaSharp, etc.) to
+      #     one RID instead of bundling every platform's. dotnet publish auto-generates web.config
+      #     with the ASP.NET Core Module entry, so the zip is drop-in ready for an IIS site root. ---
+      - name: Publish web companion
+        run: >
+          dotnet publish OmniCard.Web/OmniCard.Web.csproj -c Release -r win-x64
+          --self-contained false
+          -p:Version=${{ steps.version.outputs.VERSION }}
+          -o publish-web
+
+      - name: Package web companion release
+        shell: bash
+        run: |
+          ROOT="$PWD"
+          ARTIFACT="OmniCard-Web-v${{ steps.version.outputs.VERSION }}-iis.zip"
+          rm -f publish-web/*.pdb
+          cd publish-web
+          7z a -tzip "$ROOT/$ARTIFACT" ./*
+          cd "$ROOT"
 
       - name: Upload to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload ${{ github.event.release.tag_name }} "OmniCard-v${{ steps.version.outputs.VERSION }}-win-x64.zip"
+          eBay_AppID: ${{ secrets.EBAY_APPID }}
+          eBay_CertId: ${{ secrets.EBAY_CERTID }}
+          eBay_AcceptUrl: ${{ secrets.EBAY_ACCEPTURL }}
+          eBay_DeclineUrl: ${{ secrets.EBAY_DECLINEURL }}
+          eBay_DevId: ${{ secrets.EBAY_DEVID }}
+          eBay_RuName: ${{ secrets.EBAY_RUNAME }}
+          eBay_Environment: ${{ secrets.EBAY_ENV }}
+        run: |
+          gh release upload ${{ github.event.release.tag_name }} "OmniCard-v${{ steps.version.outputs.VERSION }}-win-x64.zip"
+          gh release upload ${{ github.event.release.tag_name }} "OmniCard-Web-v${{ steps.version.outputs.VERSION }}-iis.zip"
