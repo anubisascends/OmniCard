@@ -76,6 +76,15 @@ public partial class RootView : IView<RootViewModel>, IHostedService
         _logger.LogInformation("Application window opening");
         Show();
 
+        // App.OnStartup shows the splash screen first, which WPF auto-assigns as
+        // Application.MainWindow. That reference is never updated when the splash
+        // closes, so it's left pointing at a closed (unloaded) window for the rest
+        // of the app's life. DialogService.SetOwner checks MainWindow.IsLoaded
+        // before assigning Owner on dialogs, so every dialog silently ended up
+        // ownerless — breaking CenterOwner positioning and letting dialogs get
+        // buried behind the main window when the app regains focus.
+        Application.Current.MainWindow = this;
+
         // Provide the window handle to the scanner service so TWAIN drivers
         // that require a valid HWND for message pumping (e.g., network scanners)
         // don't crash with STATUS_STACK_BUFFER_OVERRUN.
