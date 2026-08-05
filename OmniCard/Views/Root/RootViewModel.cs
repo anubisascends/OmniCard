@@ -767,6 +767,8 @@ public sealed partial class RootViewModel(
         RemoveScannedCardCommand.NotifyCanExecuteChanged();
         SetScannedConditionCommand.NotifyCanExecuteChanged();
         SetScannedFoilCommand.NotifyCanExecuteChanged();
+        ToggleScanTagFlyoutItemCommand.NotifyCanExecuteChanged();
+        CreateScanTagFlyoutItemCommand.NotifyCanExecuteChanged();
         CopyScannedCardNamesCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(CanLinkToTrade));
         OnPropertyChanged(nameof(CanUnlinkFromTrade));
@@ -1167,6 +1169,23 @@ public sealed partial class RootViewModel(
         AllTagNames.Clear();
         foreach (var tag in tagService.GetAllTags())
             AllTagNames.Add(tag.Name);
+    }
+
+    /// <summary>Backing list for the Scanner "Tags..." flyout — recomputed by
+    /// <see cref="LoadScanTagFlyoutItems"/> immediately before the flyout's popup opens.</summary>
+    public ObservableCollection<Controls.TagFlyoutItem> ScanTagFlyoutItems { get; } = [];
+
+    public void LoadScanTagFlyoutItems()
+    {
+        ScanTagFlyoutItems.Clear();
+        if (SelectedScannedCards.Count == 0) return;
+
+        foreach (var tagName in tagService.GetAllTags().Select(t => t.Name))
+        {
+            var countWithTag = SelectedScannedCards.Count(c => c.Tags.Contains(tagName, StringComparer.OrdinalIgnoreCase));
+            var state = Controls.TagTriState.Compute(countWithTag, SelectedScannedCards.Count);
+            ScanTagFlyoutItems.Add(new Controls.TagFlyoutItem(tagName, state));
+        }
     }
 
     [ObservableProperty]
@@ -2150,6 +2169,27 @@ public sealed partial class RootViewModel(
         foreach (var card in SelectedScannedCards)
             card.IsFoil = isFoil;
         Message = $"Set {(isFoil ? "Foil" : "Non-Foil")} on {SelectedScannedCards.Count} card(s).";
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    public void ToggleScanTagFlyoutItem((string Name, bool Apply) arg)
+    {
+        OmniCard.Collection.ScanTagToggle.Apply(SelectedScannedCards, arg.Name, arg.Apply);
+        Message = arg.Apply
+            ? $"Added tag \"{arg.Name}\" to {SelectedScannedCards.Count} card(s)."
+            : $"Removed tag \"{arg.Name}\" from {SelectedScannedCards.Count} card(s).";
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    public void CreateScanTagFlyoutItem(string name)
+    {
+        var trimmed = OmniCard.Collection.ScanTagToggle.CreateAndApply(SelectedScannedCards, name);
+        if (trimmed is null) return;
+
+        ScanTagFlyoutItems.Add(new Controls.TagFlyoutItem(trimmed, Controls.TagCheckState.Checked));
+        if (!AllTagNames.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+            AllTagNames.Add(trimmed); // keep the scan detail panel's TagEditor autocomplete in sync
+        Message = $"Added tag \"{trimmed}\" to {SelectedScannedCards.Count} card(s).";
     }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
