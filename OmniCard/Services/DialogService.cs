@@ -25,7 +25,6 @@ using OmniCard.Views.Sales;
 using OmniCard.Views.SalesListing;
 using OmniCard.Views.Settings;
 using OmniCard.Views.TcgOrderImport;
-using OmniCard.Views.AddTags;
 using OmniCard.Views.ManageTags;
 
 namespace OmniCard.Services;
@@ -287,15 +286,6 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         var wnd = Services.GetRequiredService<RequireReasonView>();
         SetOwner(wnd);
         wnd.ViewModel.Load(title, message);
-        var result = wnd.ShowDialog();
-        return result == true ? wnd.ViewModel.Result : null;
-    }
-
-    public List<string>? PickTags()
-    {
-        var wnd = Services.GetRequiredService<AddTagsView>();
-        SetOwner(wnd);
-        wnd.ViewModel.Load();
         var result = wnd.ShowDialog();
         return result == true ? wnd.ViewModel.Result : null;
     }

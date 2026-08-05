@@ -406,7 +406,6 @@ public sealed partial class CollectionViewModel : ViewModel
     partial void OnSelectedCardCountChanged(int value)
     {
         MoveSelectedToLocationCommand.NotifyCanExecuteChanged();
-        AddTagsToSelectedCommand.NotifyCanExecuteChanged();
         ListForSaleCommand.NotifyCanExecuteChanged();
         UnlistForSaleCommand.NotifyCanExecuteChanged();
         MarkPickedCommand.NotifyCanExecuteChanged();
@@ -826,20 +825,68 @@ public sealed partial class CollectionViewModel : ViewModel
         _ = SearchCollection();
     }
 
-    [RelayCommand(CanExecute = nameof(HasSelection))]
-    public void AddTagsToSelected()
+    /// <summary>Backing list for the "Tags..." flyout — recomputed by <see cref="LoadTagFlyoutItems"/>
+    /// immediately before the flyout's popup opens, so it reflects the current selection.</summary>
+    public ObservableCollection<Controls.TagFlyoutItem> TagFlyoutItems { get; } = [];
+
+    public void LoadTagFlyoutItems()
+    {
+        TagFlyoutItems.Clear();
+        var selectedIds = GetAllSelectedCardIds();
+        if (selectedIds.Count == 0) return;
+
+        var tagsByLot = _tagService.GetTagsByLots(selectedIds);
+        foreach (var tag in _tagService.GetAllTags())
+        {
+            var lotsWithTag = selectedIds.Count(id =>
+                tagsByLot.TryGetValue(id, out var lotTags) && lotTags.Contains(tag.Name, StringComparer.OrdinalIgnoreCase));
+
+            var state = Controls.TagTriState.Compute(lotsWithTag, selectedIds.Count);
+            TagFlyoutItems.Add(new Controls.TagFlyoutItem(tag.Name, state));
+        }
+    }
+
+    [RelayCommand]
+    public void ToggleTagFlyoutItem((string Name, bool Apply) arg)
     {
         var ids = GetAllSelectedCardIds();
         if (ids.Count == 0) return;
 
-        var tags = _dialogService.PickTags();
-        if (tags is null or { Count: 0 }) return;
+        if (arg.Apply)
+            _tagService.AddTagToLots(ids, arg.Name);
+        else
+            _tagService.RemoveTagFromLots(ids, arg.Name);
 
-        foreach (var tag in tags)
-            _tagService.AddTagToLots(ids, tag);
+        ApplyTagToDisplayedSelection(arg.Name, arg.Apply);
+        ReportMessage?.Invoke(arg.Apply
+            ? $"Added tag \"{arg.Name}\" to {ids.Count} card(s)."
+            : $"Removed tag \"{arg.Name}\" from {ids.Count} card(s).");
+    }
 
-        ReportMessage?.Invoke($"Added {tags.Count} tag(s) to {ids.Count} card(s).");
-        _ = SearchCollection();
+    [RelayCommand]
+    public void CreateTagFlyoutItem(string name)
+    {
+        var trimmed = name.Trim();
+        if (trimmed.Length == 0) return;
+
+        ToggleTagFlyoutItem((trimmed, true));
+        TagFlyoutItems.Add(new Controls.TagFlyoutItem(trimmed, Controls.TagCheckState.Checked));
+    }
+
+    /// <summary>Updates the already-bound <see cref="CollectionCard"/> row objects in place so
+    /// tile badges refresh without a full <see cref="SearchCollection"/> re-query (which would
+    /// disturb scroll position and could close the still-open Tags popup).</summary>
+    private void ApplyTagToDisplayedSelection(string tagName, bool applied)
+    {
+        var selectedCards = GetSelectedCards?.Invoke();
+        if (selectedCards is null) return;
+
+        foreach (var card in selectedCards)
+        {
+            card.Tags = applied
+                ? (card.Tags.Contains(tagName, StringComparer.OrdinalIgnoreCase) ? card.Tags : [.. card.Tags, tagName])
+                : card.Tags.Where(t => !string.Equals(t, tagName, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
     }
 
     [RelayCommand]

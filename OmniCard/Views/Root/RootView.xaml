@@ -8,6 +8,7 @@
         xmlns:sales="clr-namespace:OmniCard.Views.Sales"
         xmlns:lists="clr-namespace:OmniCard.Views.Lists"
         xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
+        xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance {x:Type local:RootView}}"
@@ -196,8 +197,9 @@
                 <Separator/>
                 <MenuItem Header="_Move to Location..."
                           Command="{Binding ViewModel.Collection.MoveSelectedToLocationCommand}"/>
-                <MenuItem Header="Add _Tag(s)..."
-                          Command="{Binding ViewModel.Collection.AddTagsToSelectedCommand}"/>
+                <MenuItem Header="_Tags..."
+                          IsEnabled="{Binding ViewModel.Collection.HasSelection}"
+                          Click="CollectionTagsMenuItem_Click"/>
                 <MenuItem Header="_List for Sale..."
                           Command="{Binding ViewModel.Collection.ListForSaleCommand}"/>
                 <MenuItem Header="Mark _Picked"
@@ -269,6 +271,9 @@
                 <MenuItem Header="Set Non-Foil (Queue)"
                           Command="{Binding ViewModel.SetScannedFoilCommand}"
                           CommandParameter="False"/>
+                <MenuItem Header="Tags..."
+                          IsEnabled="{Binding ViewModel.HasSelection}"
+                          Click="ScannerMenuTagsMenuItem_Click"/>
                 <MenuItem Header="_Assign Match"
                           Command="{Binding ViewModel.AssignMatchCommand}"/>
                 <MenuItem Header="_Link to Trade..."
@@ -401,5 +406,17 @@
                 </StackPanel>
             </StatusBarItem>
         </StatusBar>
+
+        <Popup x:Name="CollectionMenuTagsPopup" StaysOpen="False" Placement="MousePoint">
+            <helpers:TagFlyout Tags="{Binding ViewModel.Collection.TagFlyoutItems}"
+                                ToggleCommand="{Binding ViewModel.Collection.ToggleTagFlyoutItemCommand}"
+                                NewTagCommand="{Binding ViewModel.Collection.CreateTagFlyoutItemCommand}"/>
+        </Popup>
+
+        <Popup x:Name="ScannerMenuTagsPopup" StaysOpen="False" Placement="MousePoint">
+            <helpers:TagFlyout Tags="{Binding ViewModel.ScanTagFlyoutItems}"
+                                ToggleCommand="{Binding ViewModel.ToggleScanTagFlyoutItemCommand}"
+                                NewTagCommand="{Binding ViewModel.CreateScanTagFlyoutItemCommand}"/>
+        </Popup>
     </Grid>
 </Window>
