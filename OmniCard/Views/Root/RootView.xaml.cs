@@ -123,6 +123,15 @@ public partial class RootView : IView<RootViewModel>, IHostedService
         }
     }
 
+    private void CollectionTagsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem) return;
+
+        ViewModel.Collection.LoadTagFlyoutItems();
+        CollectionMenuTagsPopup.PlacementTarget = menuItem;
+        CollectionMenuTagsPopup.IsOpen = true;
+    }
+
     protected override void OnClosing(CancelEventArgs e)
     {
         base.OnClosing(e);
