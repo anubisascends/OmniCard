@@ -137,15 +137,17 @@ git commit -m "Add ITagService.RemoveTagFromLots"
 
 ---
 
-## Task 2: `TagCheckState` + `TagFlyoutItem` display model
+## Task 2: `TagCheckState` + `TagFlyoutItem` display model + `TagTriState` helper
 
 **Files:**
 - Create: `OmniCard.Controls/TagCheckState.cs`
 - Create: `OmniCard.Controls/TagFlyoutItem.cs`
+- Create: `OmniCard.Controls/TagTriState.cs`
 - Test: `OmniCard.Tests/Controls/TagFlyoutItemTests.cs`
+- Test: `OmniCard.Tests/Controls/TagTriStateTests.cs`
 
 **Interfaces:**
-- Produces: `enum TagCheckState { Unchecked, Checked, Indeterminate }`; `class TagFlyoutItem(string name, TagCheckState state) : INotifyPropertyChanged` with `Name` (string, get-only), `State` (get/set, raises `PropertyChanged` for `State`/`IsChecked`/`IsIndeterminate`), `IsChecked` (bool), `IsIndeterminate` (bool). Used by Task 4 (`TagFlyout` control), Task 5 (`CollectionViewModel`), Task 9 (`RootViewModel`).
+- Produces: `enum TagCheckState { Unchecked, Checked, Indeterminate }`; `class TagFlyoutItem(string name, TagCheckState state) : INotifyPropertyChanged` with `Name` (string, get-only), `State` (get/set, raises `PropertyChanged` for `State`/`IsChecked`/`IsIndeterminate`), `IsChecked` (bool), `IsIndeterminate` (bool); `static class TagTriState` with `static TagCheckState Compute(int countWithTag, int totalCount)`. Used by Task 4 (`TagFlyout` control), Task 5 (`CollectionViewModel`), Task 9 (`RootViewModel`). `TagTriState.Compute` is the single place the checked/unchecked/indeterminate rule is expressed — both `CollectionViewModel.LoadTagFlyoutItems` and `RootViewModel.LoadScanTagFlyoutItems` call it instead of inlining the same ternary chain twice, and it is independently unit tested here since neither `CollectionViewModel` (indirectly, via mocked `ITagService`) nor `RootViewModel` (no test harness exists in this repo) is a reliable place to pin down its edge cases.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -256,11 +258,68 @@ public sealed class TagFlyoutItem(string name, TagCheckState state) : INotifyPro
 Run: `dotnet test OmniCard.Tests/OmniCard.Tests.csproj --filter "FullyQualifiedName~TagFlyoutItemTests"`
 Expected: PASS (4 tests).
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Write the failing `TagTriState` test**
+
+Create `OmniCard.Tests/Controls/TagTriStateTests.cs`:
+
+```csharp
+using OmniCard.Controls;
+using Xunit;
+
+namespace OmniCard.Tests.Controls;
+
+public class TagTriStateTests
+{
+    [Fact]
+    public void Compute_ZeroOfTotal_ReturnsUnchecked()
+        => Assert.Equal(TagCheckState.Unchecked, TagTriState.Compute(countWithTag: 0, totalCount: 3));
+
+    [Fact]
+    public void Compute_AllOfTotal_ReturnsChecked()
+        => Assert.Equal(TagCheckState.Checked, TagTriState.Compute(countWithTag: 3, totalCount: 3));
+
+    [Fact]
+    public void Compute_SomeOfTotal_ReturnsIndeterminate()
+        => Assert.Equal(TagCheckState.Indeterminate, TagTriState.Compute(countWithTag: 1, totalCount: 3));
+
+    [Fact]
+    public void Compute_SingleItemWithTag_ReturnsChecked()
+        => Assert.Equal(TagCheckState.Checked, TagTriState.Compute(countWithTag: 1, totalCount: 1));
+}
+```
+
+Run: `dotnet test OmniCard.Tests/OmniCard.Tests.csproj --filter "FullyQualifiedName~TagTriStateTests"`
+Expected: build FAILS — `OmniCard.Controls.TagTriState` does not exist yet.
+
+- [ ] **Step 7: Create `TagTriState.cs`**
+
+```csharp
+namespace OmniCard.Controls;
+
+/// <summary>Single source of the checked/unchecked/indeterminate rule shared by every
+/// <see cref="TagFlyout"/> host (Collection, Locations, Scanner): checked when every item in the
+/// selection has the tag, unchecked when none do, indeterminate otherwise.</summary>
+public static class TagTriState
+{
+    public static TagCheckState Compute(int countWithTag, int totalCount) => countWithTag switch
+    {
+        0 => TagCheckState.Unchecked,
+        var n when n == totalCount => TagCheckState.Checked,
+        _ => TagCheckState.Indeterminate,
+    };
+}
+```
+
+- [ ] **Step 8: Run tests to verify they pass**
+
+Run: `dotnet test OmniCard.Tests/OmniCard.Tests.csproj --filter "FullyQualifiedName~TagFlyoutItemTests|FullyQualifiedName~TagTriStateTests"`
+Expected: PASS (4 `TagFlyoutItemTests` + 4 `TagTriStateTests`).
+
+- [ ] **Step 9: Commit**
 
 ```bash
-git add OmniCard.Controls/TagCheckState.cs OmniCard.Controls/TagFlyoutItem.cs OmniCard.Tests/Controls/TagFlyoutItemTests.cs
-git commit -m "Add TagCheckState/TagFlyoutItem display model"
+git add OmniCard.Controls/TagCheckState.cs OmniCard.Controls/TagFlyoutItem.cs OmniCard.Controls/TagTriState.cs OmniCard.Tests/Controls/TagFlyoutItemTests.cs OmniCard.Tests/Controls/TagTriStateTests.cs
+git commit -m "Add TagCheckState/TagFlyoutItem display model and TagTriState helper"
 ```
 
 ---
@@ -273,9 +332,9 @@ git commit -m "Add TagCheckState/TagFlyoutItem display model"
 
 **Interfaces:**
 - Consumes: `ScannedCard.Tags` (`ObservableCollection<string>`, `OmniCard.Shared/Models/ScannedCard.cs:67`).
-- Produces: `static void ScanTagToggle.Apply(IEnumerable<ScannedCard> cards, string tagName, bool apply)`. Used by Task 9 (`RootViewModel`).
+- Produces: `static void ScanTagToggle.Apply(IEnumerable<ScannedCard> cards, string tagName, bool apply)`; `static string? ScanTagToggle.CreateAndApply(IEnumerable<ScannedCard> cards, string name)` (trims `name`, returns `null` with no side effect if the trimmed result is empty, otherwise applies it via `Apply` and returns the trimmed name). Both used by Task 9 (`RootViewModel`).
 
-`RootViewModel` (the Scanner-tab ViewModel) has no existing unit test harness in this repo (no `RootViewModelTests.cs` — it has a very large constructor). Rather than stand one up for this feature, the in-memory tag toggle/create logic is extracted into this small static helper so it's independently testable; `RootViewModel` will just call it.
+`RootViewModel` (the Scanner-tab ViewModel) has no existing unit test harness in this repo (no `RootViewModelTests.cs` — it has a very large constructor). Rather than stand one up for this feature, the in-memory tag toggle/create logic — including the trim/blank-check orchestration for creating a brand-new tag — is extracted into this small static helper so it's independently testable; `RootViewModel` will just call it and handle the thin UI-list bookkeeping (`ScanTagFlyoutItems`, `AllTagNames`, `Message`) around it.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -338,6 +397,28 @@ public class ScanTagToggleTests
         ScanTagToggle.Apply([card], "NeverThere", apply: false); // no throw, no change
         Assert.Empty(card.Tags);
     }
+
+    [Fact]
+    public void CreateAndApply_TrimsAppliesAndReturnsTrimmedName()
+    {
+        var card = new ScannedCard();
+
+        var result = ScanTagToggle.CreateAndApply([card], "  Brand New  ");
+
+        Assert.Equal("Brand New", result);
+        Assert.Contains("Brand New", card.Tags);
+    }
+
+    [Fact]
+    public void CreateAndApply_BlankName_ReturnsNullAndDoesNotTouchCards()
+    {
+        var card = new ScannedCard();
+
+        var result = ScanTagToggle.CreateAndApply([card], "   ");
+
+        Assert.Null(result);
+        Assert.Empty(card.Tags);
+    }
 }
 ```
 
@@ -374,13 +455,25 @@ public static class ScanTagToggle
             }
         }
     }
+
+    /// <summary>Trims <paramref name="name"/>; if the result is non-empty, applies it to every
+    /// card via <see cref="Apply"/> and returns the trimmed name, otherwise returns null and
+    /// touches no cards.</summary>
+    public static string? CreateAndApply(IEnumerable<ScannedCard> cards, string name)
+    {
+        var trimmed = name.Trim();
+        if (trimmed.Length == 0) return null;
+
+        Apply(cards, trimmed, apply: true);
+        return trimmed;
+    }
 }
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test OmniCard.Tests/OmniCard.Tests.csproj --filter "FullyQualifiedName~ScanTagToggleTests"`
-Expected: PASS (4 tests).
+Expected: PASS (6 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -645,7 +738,7 @@ git commit -m "Add TagFlyout control"
 - Test: `OmniCard.Tests/ViewModels/CollectionViewModelTests.cs`
 
 **Interfaces:**
-- Consumes: `ITagService.GetAllTags()`, `GetTagsByLots(IEnumerable<int>)`, `AddTagToLots(IEnumerable<int>, string)`, `RemoveTagFromLots(IEnumerable<int>, string)` (Task 1); `TagFlyoutItem`/`TagCheckState` (Task 2).
+- Consumes: `ITagService.GetAllTags()`, `GetTagsByLots(IEnumerable<int>)`, `AddTagToLots(IEnumerable<int>, string)`, `RemoveTagFromLots(IEnumerable<int>, string)` (Task 1); `TagFlyoutItem`/`TagCheckState`/`TagTriState.Compute(int, int)` (Task 2).
 - Produces: `CollectionViewModel.TagFlyoutItems` (`ObservableCollection<TagFlyoutItem>`), `LoadTagFlyoutItems()` (void), `ToggleTagFlyoutItemCommand` (`IRelayCommand<(string Name, bool Apply)>`), `CreateTagFlyoutItemCommand` (`IRelayCommand<string>`). Consumed by Tasks 7 and 8.
 
 - [ ] **Step 1: Write the failing tests**
@@ -832,10 +925,7 @@ with:
             var lotsWithTag = selectedIds.Count(id =>
                 tagsByLot.TryGetValue(id, out var lotTags) && lotTags.Contains(tag.Name, StringComparer.OrdinalIgnoreCase));
 
-            var state = lotsWithTag == 0 ? Controls.TagCheckState.Unchecked
-                : lotsWithTag == selectedIds.Count ? Controls.TagCheckState.Checked
-                : Controls.TagCheckState.Indeterminate;
-
+            var state = Controls.TagTriState.Compute(lotsWithTag, selectedIds.Count);
             TagFlyoutItems.Add(new Controls.TagFlyoutItem(tag.Name, state));
         }
     }
@@ -1156,10 +1246,10 @@ git commit -m "Add Tags flyout to Collection Selection main menu"
 - Modify: `OmniCard/Views/Root/RootViewModel.cs`
 
 **Interfaces:**
-- Consumes: `ScanTagToggle.Apply` (Task 3); `TagFlyoutItem`/`TagCheckState` (Task 2); existing `SelectedScannedCards` (`List<ScannedCard>`, line 697), `HasSelection` (line 699), `AllTagNames` (`ObservableCollection<string>`, line 1163), `tagService` (primary-constructor parameter, line 53).
+- Consumes: `ScanTagToggle.Apply`, `ScanTagToggle.CreateAndApply` (Task 3); `TagFlyoutItem`/`TagCheckState`/`TagTriState.Compute` (Task 2); existing `SelectedScannedCards` (`List<ScannedCard>`, line 697), `HasSelection` (line 699), `AllTagNames` (`ObservableCollection<string>`, line 1163), `tagService` (primary-constructor parameter, line 53).
 - Produces: `ScanTagFlyoutItems` (`ObservableCollection<TagFlyoutItem>`), `LoadScanTagFlyoutItems()`, `ToggleScanTagFlyoutItemCommand`, `CreateScanTagFlyoutItemCommand`. Consumed by Tasks 10 and 11.
 
-`RootViewModel` has no existing unit test harness in this repo (large constructor, no `RootViewModelTests.cs`) — the pure logic this task adds is a thin wrapper around the already-tested `ScanTagToggle.Apply` (Task 3), so no new tests are added here; correctness is covered by Task 3's unit tests plus the Task 12 manual smoke pass.
+`RootViewModel` has no existing unit test harness in this repo (large constructor, no `RootViewModelTests.cs`). The logic that would otherwise need pinning down here — the tri-state rule and the create-tag trim/apply orchestration — is pushed into the already-independently-tested `TagTriState.Compute` (Task 2) and `ScanTagToggle.CreateAndApply` (Task 3), so `RootViewModel`'s own methods reduce to thin UI-list bookkeeping (`ScanTagFlyoutItems`, `AllTagNames`, `Message`) around those calls, consistent with this repo's precedent of leaving `RootViewModel` itself untested and covering it via the Task 12 manual smoke pass instead.
 
 - [ ] **Step 1: Add the flyout members**
 
@@ -1178,10 +1268,7 @@ In `OmniCard/Views/Root/RootViewModel.cs`, add near `AllTagNames`/`RefreshTagSug
         foreach (var tagName in tagService.GetAllTags().Select(t => t.Name))
         {
             var countWithTag = SelectedScannedCards.Count(c => c.Tags.Contains(tagName, StringComparer.OrdinalIgnoreCase));
-            var state = countWithTag == 0 ? Controls.TagCheckState.Unchecked
-                : countWithTag == SelectedScannedCards.Count ? Controls.TagCheckState.Checked
-                : Controls.TagCheckState.Indeterminate;
-
+            var state = Controls.TagTriState.Compute(countWithTag, SelectedScannedCards.Count);
             ScanTagFlyoutItems.Add(new Controls.TagFlyoutItem(tagName, state));
         }
     }
@@ -1204,13 +1291,13 @@ In `OmniCard/Views/Root/RootViewModel.cs`, add near the other "Scanner context m
     [RelayCommand(CanExecute = nameof(HasSelection))]
     public void CreateScanTagFlyoutItem(string name)
     {
-        var trimmed = name.Trim();
-        if (trimmed.Length == 0) return;
+        var trimmed = OmniCard.Collection.ScanTagToggle.CreateAndApply(SelectedScannedCards, name);
+        if (trimmed is null) return;
 
-        ToggleScanTagFlyoutItem((trimmed, true));
         ScanTagFlyoutItems.Add(new Controls.TagFlyoutItem(trimmed, Controls.TagCheckState.Checked));
         if (!AllTagNames.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
             AllTagNames.Add(trimmed); // keep the scan detail panel's TagEditor autocomplete in sync
+        Message = $"Added tag \"{trimmed}\" to {SelectedScannedCards.Count} card(s).";
     }
 ```
 
