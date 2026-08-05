@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -36,12 +37,19 @@ public partial class TagFlyout : UserControl
     private static void OnTagsChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         var control = (TagFlyout)d;
+        if (e.OldValue is ObservableCollection<TagFlyoutItem> old)
+            old.CollectionChanged -= control.OnTagsCollectionChanged;
+        if (e.NewValue is ObservableCollection<TagFlyoutItem> now)
+            now.CollectionChanged += control.OnTagsCollectionChanged;
+
         control.FilterBox.Text = "";
         control.NewTagBox.Text = "";
         control.NewTagBox.Visibility = Visibility.Collapsed;
         control.NewTagLabel.Visibility = Visibility.Visible;
         control.RefreshFilteredList();
     }
+
+    private void OnTagsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshFilteredList();
 
     public static readonly DependencyProperty ToggleCommandProperty =
         DependencyProperty.Register(nameof(ToggleCommand), typeof(ICommand), typeof(TagFlyout));

@@ -1,8 +1,12 @@
 using System.Collections.ObjectModel;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
+using OmniCard.Collection;
 using OmniCard.Controls;
+using OmniCard.Data;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 using OmniCard.Views.Root;
@@ -288,5 +292,64 @@ public class CollectionViewModelTests
         vm.CreateTagFlyoutItemCommand.Execute("   ");
 
         _tags.Verify(t => t.AddTagToLots(It.IsAny<IEnumerable<int>>(), It.IsAny<string>()), Times.Never);
+    }
+
+    // Integration test: exercises the toggle -> DB write -> re-query round trip through a REAL
+    // TagService (backed by SQLite), not the Mock<ITagService> used by every other test in this
+    // class. This deliberately bypasses CreateVm() (which always wires the mock) and constructs
+    // CollectionViewModel directly, following the in-memory SQLite pattern from
+    // OmniCard.Tests/Services/TagServiceTests.cs.
+    [Fact]
+    public void ToggleTagFlyoutItem_ThroughRealTagService_PersistsAndReloadReflectsWrite()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:");
+        connection.Open();
+        var options = new DbContextOptionsBuilder<OmniCardDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        using (var ctx = new OmniCardDbContext(options))
+            ctx.Database.EnsureCreated();
+
+        var realTagService = new TagService(new MockFactory(options));
+
+        _presets.Setup(p => p.GetSortPresets(It.IsAny<CardGame>())).Returns([]);
+        _presets.Setup(p => p.GetFilterPresets(It.IsAny<CardGame>())).Returns([]);
+        _containers.Setup(c => c.GetAll()).Returns([]);
+        _query.Setup(q => q.GetLocationOverviewsAsync(It.IsAny<CardGame?>())).ReturnsAsync([]);
+        _card.Setup(c => c.GetSearchCount(It.IsAny<string>(), It.IsAny<CardGame?>(), It.IsAny<int?>(),
+                                          It.IsAny<FilterPreset?>(), It.IsAny<bool>()))
+             .Returns(0);
+        _listing.Setup(l => l.GetActiveListingStatusByLot(It.IsAny<IEnumerable<int>>()))
+                .Returns(new Dictionary<int, ListingStatus>());
+
+        var vm = new CollectionViewModel(
+            _card.Object,
+            _containers.Object,
+            _presets.Object,
+            _dialog.Object,
+            _query.Object,
+            Options.Create(new DisplaySettings()),
+            _dataPath.Object,
+            NullLogger<CollectionViewModel>.Instance,
+            _ebayListing.Object,
+            Options.Create(new EbaySettings()),
+            _listing.Object,
+            realTagService);
+
+        var card = new CollectionCard { Id = 10 };
+        vm.GetSelectedCards = () => [card];
+
+        vm.ToggleTagFlyoutItemCommand.Execute(("Foil", true));
+
+        // Reload from a fresh LoadTagFlyoutItems() call, which re-queries the real TagService/DB.
+        vm.LoadTagFlyoutItems();
+
+        Assert.Equal(TagCheckState.Checked, vm.TagFlyoutItems.Single(t => t.Name == "Foil").State);
+        Assert.Contains("Foil", realTagService.GetTagsForLot(10));
+    }
+
+    private sealed class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
+    {
+        public OmniCardDbContext CreateDbContext() => new(options);
     }
 }

@@ -1180,7 +1180,17 @@ public sealed partial class RootViewModel(
         ScanTagFlyoutItems.Clear();
         if (SelectedScannedCards.Count == 0) return;
 
-        foreach (var tagName in tagService.GetAllTags().Select(t => t.Name))
+        // Union persisted tags with any tag already applied in-memory to a selected scan (a scan
+        // has no lot id pre-commit, so a tag it was just given via CreateScanTagFlyoutItem/TagEditor
+        // may not exist in tagService yet) so every tag a selected card actually has is listed.
+        var persistedNames = tagService.GetAllTags().Select(t => t.Name);
+        var inMemoryNames = SelectedScannedCards.SelectMany(c => c.Tags);
+        var allNames = persistedNames.Concat(inMemoryNames)
+            .GroupBy(n => n, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var tagName in allNames)
         {
             var countWithTag = SelectedScannedCards.Count(c => c.Tags.Contains(tagName, StringComparer.OrdinalIgnoreCase));
             var state = Controls.TagTriState.Compute(countWithTag, SelectedScannedCards.Count);
