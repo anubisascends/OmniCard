@@ -271,6 +271,9 @@
                 <MenuItem Header="Set Non-Foil (Queue)"
                           Command="{Binding ViewModel.SetScannedFoilCommand}"
                           CommandParameter="False"/>
+                <MenuItem Header="Tags..."
+                          IsEnabled="{Binding ViewModel.HasSelection}"
+                          Click="ScannerMenuTagsMenuItem_Click"/>
                 <MenuItem Header="_Assign Match"
                           Command="{Binding ViewModel.AssignMatchCommand}"/>
                 <MenuItem Header="_Link to Trade..."
@@ -408,6 +411,12 @@
             <helpers:TagFlyout Tags="{Binding ViewModel.Collection.TagFlyoutItems}"
                                 ToggleCommand="{Binding ViewModel.Collection.ToggleTagFlyoutItemCommand}"
                                 NewTagCommand="{Binding ViewModel.Collection.CreateTagFlyoutItemCommand}"/>
+        </Popup>
+
+        <Popup x:Name="ScannerMenuTagsPopup" StaysOpen="False" Placement="Right">
+            <helpers:TagFlyout Tags="{Binding ViewModel.ScanTagFlyoutItems}"
+                                ToggleCommand="{Binding ViewModel.ToggleScanTagFlyoutItemCommand}"
+                                NewTagCommand="{Binding ViewModel.CreateScanTagFlyoutItemCommand}"/>
         </Popup>
     </Grid>
 </Window>

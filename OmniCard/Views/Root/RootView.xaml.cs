@@ -132,6 +132,15 @@ public partial class RootView : IView<RootViewModel>, IHostedService
         CollectionMenuTagsPopup.IsOpen = true;
     }
 
+    private void ScannerMenuTagsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem) return;
+
+        ViewModel.LoadScanTagFlyoutItems();
+        ScannerMenuTagsPopup.PlacementTarget = menuItem;
+        ScannerMenuTagsPopup.IsOpen = true;
+    }
+
     protected override void OnClosing(CancelEventArgs e)
     {
         base.OnClosing(e);
