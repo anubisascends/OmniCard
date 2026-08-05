@@ -99,6 +99,23 @@ public sealed class TagService(IDbContextFactory<OmniCardDbContext> dbContextFac
         context.SaveChanges();
     }
 
+    public void RemoveTagFromLots(IEnumerable<int> lotIds, string tagName)
+    {
+        var name = tagName.Trim();
+        if (name.Length == 0) return;
+
+        using var context = dbContextFactory.CreateDbContext();
+        var lotIdList = lotIds.Distinct().ToList();
+
+        var links = context.LotTags
+            .Include(lt => lt.Tag)
+            .Where(lt => lotIdList.Contains(lt.LotId) && lt.Tag.Name.ToLower() == name.ToLower())
+            .ToList();
+
+        context.LotTags.RemoveRange(links);
+        context.SaveChanges();
+    }
+
     public void RenameTag(int tagId, string newName)
     {
         var name = newName.Trim();

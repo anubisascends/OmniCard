@@ -88,6 +88,56 @@ public class TagServiceTests : IDisposable
     }
 
     [Fact]
+    public void RemoveTagFromLots_RemovesJoinRowsButKeepsTagAlive()
+    {
+        var service = CreateService();
+        service.SetTagsForLot(1, ["Foil"]);
+        service.SetTagsForLot(2, ["Foil"]);
+
+        service.RemoveTagFromLots([1], "Foil");
+
+        Assert.Empty(service.GetTagsForLot(1));
+        Assert.Equal(["Foil"], service.GetTagsForLot(2));
+        var tag = Assert.Single(service.GetAllTags()); // tag row survives even mid-removal
+        Assert.Equal("Foil", tag.Name);
+    }
+
+    [Fact]
+    public void RemoveTagFromLots_SurvivesZeroRemainingUsages()
+    {
+        var service = CreateService();
+        service.SetTagsForLot(1, ["OnlyHere"]);
+
+        service.RemoveTagFromLots([1], "OnlyHere");
+
+        Assert.Empty(service.GetTagsForLot(1));
+        var tag = Assert.Single(service.GetAllTags());
+        Assert.Equal(0, tag.UsageCount); // tag itself is not deleted, unlike DeleteTag
+    }
+
+    [Fact]
+    public void RemoveTagFromLots_NoOpWhenLotDoesNotHaveTag()
+    {
+        var service = CreateService();
+        service.SetTagsForLot(1, ["Kept"]);
+
+        service.RemoveTagFromLots([2], "Kept"); // lot 2 was never tagged
+
+        Assert.Equal(["Kept"], service.GetTagsForLot(1));
+    }
+
+    [Fact]
+    public void RemoveTagFromLots_NoOpWhenTagNameUnknown()
+    {
+        var service = CreateService();
+        service.SetTagsForLot(1, ["Real"]);
+
+        service.RemoveTagFromLots([1], "DoesNotExist");
+
+        Assert.Equal(["Real"], service.GetTagsForLot(1));
+    }
+
+    [Fact]
     public void RenameTag_UpdatesNameForAllTaggedLots()
     {
         var service = CreateService();
