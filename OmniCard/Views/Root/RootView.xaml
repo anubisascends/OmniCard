@@ -407,13 +407,13 @@
             </StatusBarItem>
         </StatusBar>
 
-        <Popup x:Name="CollectionMenuTagsPopup" StaysOpen="False" Placement="Right">
+        <Popup x:Name="CollectionMenuTagsPopup" StaysOpen="False" Placement="MousePoint">
             <helpers:TagFlyout Tags="{Binding ViewModel.Collection.TagFlyoutItems}"
                                 ToggleCommand="{Binding ViewModel.Collection.ToggleTagFlyoutItemCommand}"
                                 NewTagCommand="{Binding ViewModel.Collection.CreateTagFlyoutItemCommand}"/>
         </Popup>
 
-        <Popup x:Name="ScannerMenuTagsPopup" StaysOpen="False" Placement="Right">
+        <Popup x:Name="ScannerMenuTagsPopup" StaysOpen="False" Placement="MousePoint">
             <helpers:TagFlyout Tags="{Binding ViewModel.ScanTagFlyoutItems}"
                                 ToggleCommand="{Binding ViewModel.ToggleScanTagFlyoutItemCommand}"
                                 NewTagCommand="{Binding ViewModel.CreateScanTagFlyoutItemCommand}"/>

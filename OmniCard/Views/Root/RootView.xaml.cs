@@ -125,19 +125,19 @@ public partial class RootView : IView<RootViewModel>, IHostedService
 
     private void CollectionTagsMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem menuItem) return;
-
         ViewModel.Collection.LoadTagFlyoutItems();
-        CollectionMenuTagsPopup.PlacementTarget = menuItem;
+        // A Popup auto-closes when its PlacementTarget becomes invisible. The clicked MenuItem
+        // goes invisible the instant its owning Menu dropdown closes (which happens right after
+        // this Click handler runs), so anchoring to it made the popup close itself immediately.
+        // Anchor to the always-visible Window instead, positioned at the cursor.
+        CollectionMenuTagsPopup.PlacementTarget = this;
         CollectionMenuTagsPopup.IsOpen = true;
     }
 
     private void ScannerMenuTagsMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem menuItem) return;
-
         ViewModel.LoadScanTagFlyoutItems();
-        ScannerMenuTagsPopup.PlacementTarget = menuItem;
+        ScannerMenuTagsPopup.PlacementTarget = this;
         ScannerMenuTagsPopup.IsOpen = true;
     }
 

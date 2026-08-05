@@ -197,10 +197,14 @@ public partial class ScannerTabView : UserControl
 
     private void ScanTagsMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if (ViewModel is null || sender is not MenuItem menuItem) return;
+        if (ViewModel is null) return;
 
         ViewModel.LoadScanTagFlyoutItems();
-        ScanTagsPopup.PlacementTarget = menuItem;
+        // A Popup auto-closes when its PlacementTarget becomes invisible. The clicked MenuItem
+        // goes invisible the instant its owning ContextMenu closes (which happens right after
+        // this Click handler runs), so anchoring to it made the popup close itself immediately.
+        // Anchor to the always-visible ListView instead, positioned at the cursor.
+        ScanTagsPopup.PlacementTarget = ScannedCardsListView;
         ScanTagsPopup.IsOpen = true;
     }
 

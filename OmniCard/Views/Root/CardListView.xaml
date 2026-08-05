@@ -264,7 +264,7 @@
 
     </ListBox>
 
-    <Popup x:Name="TagsPopup" StaysOpen="False" Placement="Right">
+    <Popup x:Name="TagsPopup" StaysOpen="False" Placement="MousePoint">
         <helpers:TagFlyout Tags="{Binding TagFlyoutItems}"
                             ToggleCommand="{Binding ToggleTagFlyoutItemCommand}"
                             NewTagCommand="{Binding CreateTagFlyoutItemCommand}"/>

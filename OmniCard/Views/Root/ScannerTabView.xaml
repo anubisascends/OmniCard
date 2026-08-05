@@ -798,7 +798,7 @@
             </StackPanel>
         </Border>
 
-        <Popup x:Name="ScanTagsPopup" StaysOpen="False" Placement="Right">
+        <Popup x:Name="ScanTagsPopup" StaysOpen="False" Placement="MousePoint">
             <helpers:TagFlyout Tags="{Binding ViewModel.ScanTagFlyoutItems}"
                                 ToggleCommand="{Binding ViewModel.ToggleScanTagFlyoutItemCommand}"
                                 NewTagCommand="{Binding ViewModel.CreateScanTagFlyoutItemCommand}"/>

@@ -129,10 +129,14 @@ public partial class CardListView : UserControl
 
     private void TagsMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if (ViewModel is null || sender is not MenuItem menuItem) return;
+        if (ViewModel is null) return;
 
         ViewModel.LoadTagFlyoutItems();
-        TagsPopup.PlacementTarget = menuItem;
+        // A Popup auto-closes when its PlacementTarget becomes invisible. The clicked MenuItem
+        // goes invisible the instant its owning ContextMenu closes (which happens right after
+        // this Click handler runs), so anchoring to it made the popup close itself immediately.
+        // Anchor to the always-visible ListBox instead, positioned at the cursor.
+        TagsPopup.PlacementTarget = CollectionListBox;
         TagsPopup.IsOpen = true;
     }
 }
