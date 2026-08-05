@@ -6,6 +6,9 @@ namespace OmniCard.Collection;
 /// <see cref="ScannedCard.Tags"/> — no DB access, since scans have no lot id until commit.</summary>
 public static class ScanTagToggle
 {
+    /// <summary>Applies <paramref name="tagName"/> to every card (case-insensitive; no duplicate
+    /// added if a matching tag is already present) when <paramref name="apply"/> is true, or
+    /// removes it (case-insensitive; no-op if absent) when <paramref name="apply"/> is false.</summary>
     public static void Apply(IEnumerable<ScannedCard> cards, string tagName, bool apply)
     {
         foreach (var card in cards)
