@@ -126,4 +126,13 @@ public partial class CardListView : UserControl
 
     public IList<CollectionCard> GetSelectedCards()
         => CollectionListBox.SelectedItems.Cast<CollectionCard>().ToList();
+
+    private void TagsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is null || sender is not MenuItem menuItem) return;
+
+        ViewModel.LoadTagFlyoutItems();
+        TagsPopup.PlacementTarget = menuItem;
+        TagsPopup.IsOpen = true;
+    }
 }
