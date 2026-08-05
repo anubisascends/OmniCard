@@ -35,8 +35,19 @@ public class CollectionCard : INotifyPropertyChanged
 
     /// <summary>User-defined tags on this physical copy. Populated in a separate pass after the
     /// base query, same as <see cref="ListingStatus"/> — there's no scalar tags column to
-    /// project directly.</summary>
-    public List<string> Tags { get; set; } = [];
+    /// project directly. Reassigning (not mutating in place) notifies bound tile badges.</summary>
+    public List<string> Tags
+    {
+        get => _tags;
+        set
+        {
+            _tags = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Tags)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasTags)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TagsDisplay)));
+        }
+    }
+    private List<string> _tags = [];
 
     [NotMapped]
     public bool HasTags => Tags.Count > 0;

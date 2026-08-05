@@ -21,6 +21,11 @@ public interface ITagService
     /// A lot that already has the tag is left alone.</summary>
     void AddTagToLots(IEnumerable<int> lotIds, string tagName);
 
+    /// <summary>Removes the tag from every listed lot. Unlike <see cref="DeleteTag"/>, the tag
+    /// row itself is never deleted, even if its usage count drops to zero — mirrors
+    /// <see cref="AddTagToLots"/>.</summary>
+    void RemoveTagFromLots(IEnumerable<int> lotIds, string tagName);
+
     void RenameTag(int tagId, string newName);
 
     /// <summary>Removes the tag from every lot and deletes it.</summary>

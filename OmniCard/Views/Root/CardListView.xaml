@@ -7,6 +7,7 @@
              xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
 
+    <Grid>
     <ListBox x:Name="CollectionListBox"
              ItemsSource="{Binding CollectionSearchResults}"
              SelectedItem="{Binding SelectedCollectionCard}"
@@ -218,8 +219,9 @@
                 <Separator/>
                 <MenuItem Header="Move to Location..."
                           Command="{Binding MoveSelectedToLocationCommand}"/>
-                <MenuItem Header="Add Tag(s)..."
-                          Command="{Binding AddTagsToSelectedCommand}"/>
+                <MenuItem Header="Tags..."
+                          IsEnabled="{Binding HasSelection}"
+                          Click="TagsMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="List for Sale..."
                           Command="{Binding ListForSaleCommand}"/>
@@ -261,4 +263,11 @@
         </i:Interaction.Triggers>
 
     </ListBox>
+
+    <Popup x:Name="TagsPopup" StaysOpen="False" Placement="MousePoint">
+        <helpers:TagFlyout Tags="{Binding TagFlyoutItems}"
+                            ToggleCommand="{Binding ToggleTagFlyoutItemCommand}"
+                            NewTagCommand="{Binding CreateTagFlyoutItemCommand}"/>
+    </Popup>
+    </Grid>
 </UserControl>
