@@ -503,6 +503,9 @@
                             <MenuItem Header="Set Non-Foil"
                                       Command="{Binding ViewModel.SetScannedFoilCommand}"
                                       CommandParameter="False"/>
+                            <MenuItem Header="Tags..."
+                                      IsEnabled="{Binding ViewModel.HasSelection}"
+                                      Click="ScanTagsMenuItem_Click"/>
                             <Separator/>
                             <MenuItem Header="Assign Match"
                                       Command="{Binding ViewModel.AssignMatchCommand}"/>
@@ -794,5 +797,11 @@
                            Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
             </StackPanel>
         </Border>
+
+        <Popup x:Name="ScanTagsPopup" StaysOpen="False" Placement="Right">
+            <helpers:TagFlyout Tags="{Binding ViewModel.ScanTagFlyoutItems}"
+                                ToggleCommand="{Binding ViewModel.ToggleScanTagFlyoutItemCommand}"
+                                NewTagCommand="{Binding ViewModel.CreateScanTagFlyoutItemCommand}"/>
+        </Popup>
     </Grid>
 </UserControl>

@@ -195,4 +195,13 @@ public partial class ScannerTabView : UserControl
         }
     }
 
+    private void ScanTagsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is null || sender is not MenuItem menuItem) return;
+
+        ViewModel.LoadScanTagFlyoutItems();
+        ScanTagsPopup.PlacementTarget = menuItem;
+        ScanTagsPopup.IsOpen = true;
+    }
+
 }
