@@ -75,6 +75,27 @@ public class OrderServiceTests : IDisposable
         return (c.Id, lot.Id);
     }
 
+    /// <summary>Seeds a customer plus N distinct single-copy lots of the same product/condition —
+    /// mirrors how identical singles are actually stored (one lot per physical card).</summary>
+    private (int customerId, List<int> lotIds) SeedCustomerAndLots(int count)
+    {
+        using var ctx = new OmniCardDbContext(_opts);
+        var c = new Customer { Name = "Ada" };
+        ctx.Customers.Add(c);
+        var p = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, Name = "Sol Ring", SetName = "Commander", Foil = false };
+        ctx.Products.Add(p);
+        ctx.SaveChanges();
+        var lotIds = new List<int>();
+        for (var i = 0; i < count; i++)
+        {
+            var lot = new InventoryLot { ProductId = p.Id, Quantity = 1, Condition = "NM" };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            lotIds.Add(lot.Id);
+        }
+        return (c.Id, lotIds);
+    }
+
     /// <summary>Creates an OrderLine directly (bypassing AddLine's hardcoded Quantity=1) so tests
     /// can exercise quantities &gt; 1.</summary>
     private OrderLine AddLineDirect(int orderId, int? lotId, int quantity, decimal unitPrice, string name = "Sol Ring")
@@ -135,6 +156,22 @@ public class OrderServiceTests : IDisposable
 
         svc.RemoveLine(line.Id);
         Assert.Empty(svc.GetLines(order.Id));
+    }
+
+    [Fact]
+    public void AddLines_CreatesOneOrderLinePerLot_InOneCall()
+    {
+        var (customerId, lotIds) = SeedCustomerAndLots(3);
+        var svc = OrderSvc();
+        var order = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "TCG-BULK");
+
+        var created = svc.AddLines(order.Id, lotIds, 3.50m);
+
+        Assert.Equal(3, created.Count);
+        Assert.All(created, l => Assert.Equal(1, l.Quantity));
+        Assert.All(created, l => Assert.Equal(3.50m, l.UnitSalePrice));
+        Assert.Equal(lotIds, created.Select(l => l.LotId!.Value).ToList());
+        Assert.Equal(3, svc.GetLines(order.Id).Count);
     }
 
     [Fact]

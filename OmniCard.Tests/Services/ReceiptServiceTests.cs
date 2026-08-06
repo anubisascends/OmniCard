@@ -108,6 +108,29 @@ public class ReceiptServiceTests : IDisposable
     }
 
     [Fact]
+    public void BuildReceipt_CollapsesIdenticalLines_IntoOneWithSummedQuantity()
+    {
+        var svc = BuildService(out var orderId);
+
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            ctx.Lots.Add(new InventoryLot { Id = 2, ProductId = 1, Quantity = 1, Condition = "NM" });
+            ctx.SaveChanges();
+        }
+
+        var orders = new OrderService(new Factory(_opts), new ListingService(new Factory(_opts), new SalesSettingsService(new DataPathStub(_dataDir))),
+            new FakeEbayListingService(), NullLogger<OrderService>.Instance);
+        orders.AddLine(orderId, 2, 3.50m); // same name/set/condition/foil/price as the seeded line
+
+        var doc = svc.BuildReceipt(orderId);
+
+        var line = Assert.Single(doc.Lines);
+        Assert.Equal(2, line.Quantity);
+        Assert.Equal(7.00m, line.LineTotal);
+        Assert.Equal(7.00m, doc.ItemsTotal);
+    }
+
+    [Fact]
     public void BuildReceipt_UnknownOrder_Throws()
     {
         var svc = BuildService(out _);

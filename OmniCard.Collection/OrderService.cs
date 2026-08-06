@@ -91,6 +91,40 @@ public class OrderService(
         return line;
     }
 
+    public List<OrderLine> AddLines(int orderId, IEnumerable<int> lotIds, decimal unitSalePrice)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var ids = lotIds.Distinct().ToList();
+        var lots = ctx.Lots.AsNoTracking().Where(l => ids.Contains(l.Id)).ToDictionary(l => l.Id);
+        var productIds = lots.Values.Select(l => l.ProductId).Distinct().ToList();
+        var products = ctx.Products.AsNoTracking().Where(p => productIds.Contains(p.Id)).ToDictionary(p => p.Id);
+
+        var lines = new List<OrderLine>();
+        foreach (var lotId in ids)
+        {
+            if (!lots.TryGetValue(lotId, out var lot))
+                throw new InvalidOperationException($"Lot {lotId} not found.");
+            var product = products.GetValueOrDefault(lot.ProductId);
+
+            lines.Add(new OrderLine
+            {
+                OrderId = orderId,
+                LotId = lotId,
+                ProductId = lot.ProductId,
+                NameSnapshot = product?.Name ?? "",
+                SetSnapshot = product?.SetName,
+                ConditionSnapshot = lot.Condition,
+                IsFoilSnapshot = product?.Foil ?? false,
+                Quantity = 1,
+                UnitSalePrice = unitSalePrice,
+            });
+        }
+
+        ctx.OrderLines.AddRange(lines);
+        ctx.SaveChanges();
+        return lines;
+    }
+
     public void RemoveLine(int orderLineId)
     {
         using var ctx = dbContextFactory.CreateDbContext();

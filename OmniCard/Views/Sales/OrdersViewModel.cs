@@ -57,7 +57,11 @@ public partial class OrdersViewModel(
     public ObservableCollection<Order> CancelledOrders { get; } = [];
     public ObservableCollection<Customer> Customers { get; } = [];
     public ObservableCollection<OrderLine> Lines { get; } = [];
-    public ObservableCollection<ActiveListing> AvailableCards { get; } = [];
+
+    /// <summary>Active listings grouped by (name/set/condition/foil/price) so identical items —
+    /// common for bulk sales of the same card — show as one row with a count rather than one row
+    /// per physical lot.</summary>
+    public ObservableCollection<AvailableCardStack> AvailableStacks { get; } = [];
 
     [ObservableProperty]
     public partial Order? SelectedOrder { get; set; }
@@ -66,7 +70,27 @@ public partial class OrdersViewModel(
     public partial Customer? SelectedCustomer { get; set; }
 
     [ObservableProperty]
-    public partial ActiveListing? SelectedAvailableCard { get; set; }
+    public partial AvailableCardStack? SelectedAvailableStack { get; set; }
+
+    /// <summary>How many items to add from <see cref="SelectedAvailableStack"/> on the next Add
+    /// click. Clamped to [1, stack.Count] on every change (typed value, arrow-key step, or a
+    /// stack switch that shrinks below the current quantity) — see <see cref="OnAddQuantityChanged"/>.</summary>
+    [ObservableProperty]
+    public partial int AddQuantity { get; set; } = 1;
+
+    partial void OnAddQuantityChanged(int value)
+    {
+        var clamped = ClampAddQuantity(value);
+        if (clamped != value) AddQuantity = clamped;
+    }
+
+    partial void OnSelectedAvailableStackChanged(AvailableCardStack? value)
+    {
+        var clamped = ClampAddQuantity(AddQuantity);
+        if (clamped != AddQuantity) AddQuantity = clamped;
+    }
+
+    private int ClampAddQuantity(int value) => Math.Clamp(value, 1, Math.Max(SelectedAvailableStack?.Count ?? 1, 1));
 
     [ObservableProperty]
     public partial string? StatusMessage { get; set; }
@@ -142,8 +166,24 @@ public partial class OrdersViewModel(
             }).Add(o);
         }
 
-        AvailableCards.Clear();
-        foreach (var a in listingService.GetActiveListings()) AvailableCards.Add(a);
+        AvailableStacks.Clear();
+        foreach (var stack in GroupIntoStacks(listingService.GetActiveListings())) AvailableStacks.Add(stack);
+    }
+
+    private static List<AvailableCardStack> GroupIntoStacks(IEnumerable<ActiveListing> listings)
+    {
+        var stacks = new List<AvailableCardStack>();
+        foreach (var listing in listings)
+        {
+            var stack = stacks.FirstOrDefault(s =>
+                s.Name == listing.Name && s.SetName == listing.SetName && s.Condition == listing.Condition
+                && s.IsFoil == listing.IsFoil && s.ListedPrice == listing.ListedPrice);
+            if (stack is null)
+                stacks.Add(new AvailableCardStack(listing));
+            else
+                stack.Listings.Add(listing);
+        }
+        return stacks;
     }
 
     partial void OnSelectedOrderChanged(Order? value)
@@ -242,33 +282,47 @@ public partial class OrdersViewModel(
     [RelayCommand]
     public void AddCard()
     {
-        if (SelectedOrder is null || SelectedAvailableCard is null) return;
+        if (SelectedOrder is null || SelectedAvailableStack is null) return;
         if (!IsEditable) { StatusMessage = "Only a Created order (or an order in edit mode) can be edited."; return; }
+
+        var stack = SelectedAvailableStack;
+        var quantity = Math.Clamp(AddQuantity, 1, stack.Count);
+        var toAdd = stack.Listings.Take(quantity).ToList();
 
         if (IsEditingCompletedOrder)
         {
             // Staged locally (Id = 0 marks "new" for EditCompletedOrder's diff) — no DB write
             // until SaveEditedOrder commits the whole edit session atomically.
-            Lines.Add(new OrderLine
+            foreach (var listing in toAdd)
             {
-                Id = 0,
-                OrderId = SelectedOrder.Id,
-                LotId = SelectedAvailableCard.LotId,
-                NameSnapshot = SelectedAvailableCard.Name,
-                SetSnapshot = SelectedAvailableCard.SetName,
-                ConditionSnapshot = SelectedAvailableCard.Condition,
-                IsFoilSnapshot = SelectedAvailableCard.IsFoil,
-                Quantity = 1,
-                UnitSalePrice = SelectedAvailableCard.ListedPrice,
-            });
-            AvailableCards.Remove(SelectedAvailableCard);
+                Lines.Add(new OrderLine
+                {
+                    Id = 0,
+                    OrderId = SelectedOrder.Id,
+                    LotId = listing.LotId,
+                    NameSnapshot = listing.Name,
+                    SetSnapshot = listing.SetName,
+                    ConditionSnapshot = listing.Condition,
+                    IsFoilSnapshot = listing.IsFoil,
+                    Quantity = 1,
+                    UnitSalePrice = listing.ListedPrice,
+                });
+            }
             OnPropertyChanged(nameof(OrderTotal));
-            return;
+        }
+        else
+        {
+            orderService.AddLines(SelectedOrder.Id, toAdd.Select(l => l.LotId), stack.ListedPrice);
+            RefreshLines();
         }
 
-        orderService.AddLine(SelectedOrder.Id, SelectedAvailableCard.LotId, SelectedAvailableCard.ListedPrice);
-        RefreshLines();
-        AvailableCards.Remove(SelectedAvailableCard);
+        foreach (var listing in toAdd) stack.Listings.Remove(listing);
+        if (stack.Count == 0)
+        {
+            AvailableStacks.Remove(stack);
+            SelectedAvailableStack = null;
+        }
+        AddQuantity = 1;
     }
 
     [RelayCommand]

@@ -1,3 +1,4 @@
+using System.Linq;
 using Moq;
 using OmniCard.Interfaces;
 using OmniCard.Models;
@@ -128,7 +129,7 @@ public class OrdersViewModelTests
 
         Assert.Single(vm.Orders);
         Assert.Single(vm.Customers);
-        Assert.Single(vm.AvailableCards);
+        Assert.Single(vm.AvailableStacks);
     }
 
     [Fact]
@@ -170,18 +171,19 @@ public class OrdersViewModelTests
         var order = NewOrder(1, 1, OrderStatus.Created);
         var listing = Listing(10, 5.00m);
 
-        orderService.Setup(s => s.AddLine(1, 10, 5.00m)).Returns(Line(1, 1, 5.00m));
+        orderService.Setup(s => s.AddLines(1, It.Is<IEnumerable<int>>(ids => ids.SequenceEqual(new[] { 10 })), 5.00m))
+            .Returns([Line(1, 1, 5.00m)]);
         orderService.Setup(s => s.GetLines(1)).Returns([Line(1, 1, 5.00m)]);
 
-        vm.AvailableCards.Add(listing);
+        vm.AvailableStacks.Add(new AvailableCardStack(listing));
         vm.SelectedOrder = order;
-        vm.SelectedAvailableCard = listing;
+        vm.SelectedAvailableStack = vm.AvailableStacks.Single();
 
         vm.AddCard();
 
-        orderService.Verify(s => s.AddLine(1, 10, 5.00m), Times.Once);
+        orderService.Verify(s => s.AddLines(1, It.Is<IEnumerable<int>>(ids => ids.SequenceEqual(new[] { 10 })), 5.00m), Times.Once);
         Assert.Single(vm.Lines);
-        Assert.Empty(vm.AvailableCards);
+        Assert.Empty(vm.AvailableStacks);
         Assert.Equal(5.00m, vm.OrderTotal);
     }
 
@@ -194,13 +196,79 @@ public class OrdersViewModelTests
 
         orderService.Setup(s => s.GetLines(1)).Returns([]);
 
+        vm.AvailableStacks.Add(new AvailableCardStack(listing));
         vm.SelectedOrder = order;
-        vm.SelectedAvailableCard = listing;
+        vm.SelectedAvailableStack = vm.AvailableStacks.Single();
 
         vm.AddCard();
 
-        orderService.Verify(s => s.AddLine(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<decimal>()), Times.Never);
+        orderService.Verify(s => s.AddLines(It.IsAny<int>(), It.IsAny<IEnumerable<int>>(), It.IsAny<decimal>()), Times.Never);
         Assert.Equal("Only a Created order (or an order in edit mode) can be edited.", vm.StatusMessage);
+    }
+
+    [Fact]
+    public void AddCard_WithQuantityGreaterThanOne_BatchesIntoOneAddLinesCall()
+    {
+        var vm = MakeVm(out var orderService, out _, out _);
+        var order = NewOrder(1, 1, OrderStatus.Created);
+        var stack = new AvailableCardStack(Listing(10, 5.00m));
+        stack.Listings.Add(Listing(11, 5.00m));
+        stack.Listings.Add(Listing(12, 5.00m));
+
+        orderService.Setup(s => s.AddLines(1, It.Is<IEnumerable<int>>(ids => ids.SequenceEqual(new[] { 10, 11 })), 5.00m))
+            .Returns([Line(1, 1, 5.00m), Line(2, 1, 5.00m)]);
+        orderService.Setup(s => s.GetLines(1)).Returns([Line(1, 1, 5.00m), Line(2, 1, 5.00m)]);
+
+        vm.AvailableStacks.Add(stack);
+        vm.SelectedOrder = order;
+        vm.SelectedAvailableStack = stack;
+        vm.AddQuantity = 2;
+
+        vm.AddCard();
+
+        orderService.Verify(s => s.AddLines(1, It.Is<IEnumerable<int>>(ids => ids.SequenceEqual(new[] { 10, 11 })), 5.00m), Times.Once);
+        Assert.Equal(2, vm.Lines.Count);
+        Assert.Equal(1, stack.Count); // one lot (12) left in the stack
+        Assert.Equal(1, vm.AddQuantity); // reset after add
+    }
+
+    [Fact]
+    public void AddQuantity_ClampsToOneAndToTheSelectedStackCount()
+    {
+        var vm = MakeVm(out _, out _, out _);
+        var stack = new AvailableCardStack(Listing(10, 5.00m));
+        stack.Listings.Add(Listing(11, 5.00m));
+        stack.Listings.Add(Listing(12, 5.00m));
+        stack.Listings.Add(Listing(13, 5.00m));
+        stack.Listings.Add(Listing(14, 5.00m)); // stack of 5
+
+        vm.SelectedAvailableStack = stack;
+
+        vm.AddQuantity = 100;
+        Assert.Equal(5, vm.AddQuantity); // clamped to stack count
+
+        vm.AddQuantity = 0;
+        Assert.Equal(1, vm.AddQuantity);
+
+        vm.AddQuantity = -3;
+        Assert.Equal(1, vm.AddQuantity);
+    }
+
+    [Fact]
+    public void AddQuantity_ReclampsWhenSwitchingToASmallerStack()
+    {
+        var vm = MakeVm(out _, out _, out _);
+        var bigStack = new AvailableCardStack(Listing(10, 5.00m));
+        bigStack.Listings.Add(Listing(11, 5.00m));
+        bigStack.Listings.Add(Listing(12, 5.00m));
+        var smallStack = new AvailableCardStack(Listing(20, 7.00m));
+
+        vm.SelectedAvailableStack = bigStack;
+        vm.AddQuantity = 3;
+
+        vm.SelectedAvailableStack = smallStack;
+
+        Assert.Equal(1, vm.AddQuantity); // smallStack only has 1 lot
     }
 
     [Fact]
@@ -570,17 +638,18 @@ public class OrdersViewModelTests
 
         vm.SelectedOrder = order;
         vm.BeginEditCompletedOrder();
-        vm.AvailableCards.Add(listing);
-        vm.SelectedAvailableCard = listing;
+        vm.AvailableStacks.Add(new AvailableCardStack(listing));
+        vm.SelectedAvailableStack = vm.AvailableStacks.Single();
 
         vm.AddCard();
 
         orderService.Verify(s => s.AddLine(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<decimal>()), Times.Never);
+        orderService.Verify(s => s.AddLines(It.IsAny<int>(), It.IsAny<IEnumerable<int>>(), It.IsAny<decimal>()), Times.Never);
         var staged = Assert.Single(vm.Lines);
         Assert.Equal(0, staged.Id);
         Assert.Equal(10, staged.LotId);
         Assert.Equal(5.00m, staged.UnitSalePrice);
-        Assert.Empty(vm.AvailableCards);
+        Assert.Empty(vm.AvailableStacks);
     }
 
     [Fact]

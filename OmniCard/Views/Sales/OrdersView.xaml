@@ -11,6 +11,16 @@
              Loaded="OrdersView_OnLoaded">
 
     <UserControl.Resources>
+        <!-- Groups Lines by distinct item (name/set/condition/foil/price) so a bulk sale of many
+             identical lots reads as one collapsible group instead of a wall of duplicate rows.
+             Grouping is presentation-only: Lines itself, Remove, and the Completed-edit Qty/Price
+             columns still operate on individual per-lot OrderLine rows underneath. -->
+        <CollectionViewSource x:Key="LinesViewSource" Source="{Binding Lines}">
+            <CollectionViewSource.GroupDescriptions>
+                <PropertyGroupDescription PropertyName="GroupKey"/>
+            </CollectionViewSource.GroupDescriptions>
+        </CollectionViewSource>
+
         <!-- Card container: strip the default ListBoxItem chrome so the card Border is the whole
              visual; show a primary outline when the card is selected. -->
         <Style x:Key="CardItemContainerStyle" TargetType="ListBoxItem">
@@ -356,11 +366,24 @@
                 <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             </StackPanel>
 
-            <!-- Add-card row -->
+            <!-- Add-card row. AvailableStacks groups identical listings (same name/set/condition/
+                 foil/price) into one row with a count, and Qty lets a bulk sale of N identical
+                 items be added in a single click instead of N. -->
             <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0" LastChildFill="True" IsEnabled="{Binding IsEditable}">
                 <Button DockPanel.Dock="Right" Content="Add" Command="{Binding AddCardCommand}" Padding="12,4" Margin="8,0,0,0"/>
-                <ComboBox ItemsSource="{Binding AvailableCards}"
-                          SelectedItem="{Binding SelectedAvailableCard}"
+                <!-- Up/Down step by 1, Page Up/Down jump to max/min, typed values clamp on commit
+                     (all via AddQuantity_PreviewKeyDown + the ViewModel's own clamp). -->
+                <TextBox DockPanel.Dock="Right" Text="{Binding AddQuantity, UpdateSourceTrigger=LostFocus}"
+                         Width="50" Margin="8,0,0,0" HorizontalContentAlignment="Center"
+                         ToolTip="Quantity to add" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                         PreviewKeyDown="AddQuantity_PreviewKeyDown"/>
+                <!-- TextSearch.TextPath drives what the editable text box shows once a stack is
+                     selected — without it an editable ComboBox falls back to the raw ToString of
+                     the object for the edit box (ItemTemplate only affects the dropdown/closed
+                     display), which showed the CLR type name here. -->
+                <ComboBox ItemsSource="{Binding AvailableStacks}"
+                          SelectedItem="{Binding SelectedAvailableStack}"
+                          TextSearch.TextPath="DisplayText"
                           IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
@@ -372,6 +395,8 @@
                                 <Run Text="{Binding Condition, Mode=OneWay}"/>
                                 <Run Text=") $"/>
                                 <Run Text="{Binding ListedPrice, Mode=OneWay, StringFormat=F2}"/>
+                                <Run Text=" ×"/>
+                                <Run Text="{Binding Count, Mode=OneWay}"/>
                             </TextBlock>
                         </DataTemplate>
                     </ComboBox.ItemTemplate>
@@ -381,12 +406,32 @@
             <!-- Lines. Qty/Price are editable only in Completed-edit-mode (IsReadOnly is bound so
                  a Created order's grid behaves exactly as before — IsEditingCompletedOrder is
                  always false there). -->
-            <DataGrid ItemsSource="{Binding Lines}" AutoGenerateColumns="False"
+            <DataGrid ItemsSource="{Binding Source={StaticResource LinesViewSource}}" AutoGenerateColumns="False"
                       CanUserAddRows="False" CanUserDeleteRows="False"
                       IsReadOnly="{Binding IsEditingCompletedOrder, Converter={conv:InverseBoolConverter}}"
                       IsEnabled="{Binding IsEditable}"
                       CellEditEnding="Lines_CellEditEnding"
                       Style="{StaticResource {x:Type DataGrid}}">
+                <DataGrid.GroupStyle>
+                    <GroupStyle>
+                        <GroupStyle.HeaderTemplate>
+                            <DataTemplate>
+                                <TextBlock Margin="4,6,0,2" FontWeight="Bold"
+                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
+                                    <Run Text="{Binding Items[0].NameSnapshot, Mode=OneWay}"/>
+                                    <Run Text=" ("/>
+                                    <Run Text="{Binding Items[0].SetSnapshot, Mode=OneWay}"/>
+                                    <Run Text=") "/>
+                                    <Run Text="{Binding Items[0].ConditionSnapshot, Mode=OneWay}"/>
+                                    <Run Text=" — ×"/>
+                                    <Run Text="{Binding ItemCount, Mode=OneWay}"/>
+                                    <Run Text=" @ "/>
+                                    <Run Text="{Binding Items[0].UnitSalePrice, Mode=OneWay, StringFormat=C}"/>
+                                </TextBlock>
+                            </DataTemplate>
+                        </GroupStyle.HeaderTemplate>
+                    </GroupStyle>
+                </DataGrid.GroupStyle>
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Name" Binding="{Binding NameSnapshot}" Width="*" IsReadOnly="True"/>
                     <DataGridTextColumn Header="Set" Binding="{Binding SetSnapshot}" IsReadOnly="True"/>

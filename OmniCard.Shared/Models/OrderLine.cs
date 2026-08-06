@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace OmniCard.Models;
 
 public class OrderLine
@@ -13,4 +15,9 @@ public class OrderLine
     public bool IsFoilSnapshot { get; set; }
     public int Quantity { get; set; } = 1;
     public decimal UnitSalePrice { get; set; }
+
+    /// <summary>Identifies lines that represent the same distinct item (for grouping identical
+    /// lines in the UI/receipt) — not persisted.</summary>
+    [NotMapped]
+    public string GroupKey => $"{NameSnapshot}|{SetSnapshot}|{ConditionSnapshot}|{IsFoilSnapshot}|{UnitSalePrice}";
 }
