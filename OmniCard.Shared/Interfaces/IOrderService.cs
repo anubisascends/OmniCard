@@ -14,6 +14,11 @@ public interface IOrderService
     Order CreateOrder(int customerId, SalesChannel channel, string? orderNumber);
     void UpdateOrder(Order order);
     OrderLine AddLine(int orderId, int lotId, decimal unitSalePrice);
+
+    /// <summary>Adds one <see cref="OrderLine"/> per lot in a single save — the batch form of
+    /// <see cref="AddLine"/>, used when a user bulk-adds identical items (same product/condition/
+    /// foil/price) from the grouped picker so N additions cost one DB round trip instead of N.</summary>
+    List<OrderLine> AddLines(int orderId, IEnumerable<int> lotIds, decimal unitSalePrice);
     void RemoveLine(int orderLineId);
     /// <summary>Applies a status change. On a transition into Shipped it records the sale,
     /// marks listings sold, and best-effort auto-ends any active eBay listing for the sold lots.</summary>

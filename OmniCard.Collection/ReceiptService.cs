@@ -21,16 +21,25 @@ public class ReceiptService(
         var company = salesSettings.GetCompany();
         var receipt = salesSettings.GetReceipt();
 
-        var receiptLines = lines.Select(l => new ReceiptLine
-        {
-            Name = l.NameSnapshot,
-            Set = l.SetSnapshot,
-            Condition = l.ConditionSnapshot,
-            IsFoil = l.IsFoilSnapshot,
-            Quantity = l.Quantity,
-            UnitSalePrice = l.UnitSalePrice,
-            LineTotal = l.Quantity * l.UnitSalePrice,
-        }).ToList();
+        // Identical items (same name/set/condition/foil/price) collapse into one printed line
+        // with a summed quantity — avoids one paper line per physical lot for bulk sales.
+        var receiptLines = lines
+            .GroupBy(l => l.GroupKey)
+            .Select(g =>
+            {
+                var first = g.First();
+                var quantity = g.Sum(l => l.Quantity);
+                return new ReceiptLine
+                {
+                    Name = first.NameSnapshot,
+                    Set = first.SetSnapshot,
+                    Condition = first.ConditionSnapshot,
+                    IsFoil = first.IsFoilSnapshot,
+                    Quantity = quantity,
+                    UnitSalePrice = first.UnitSalePrice,
+                    LineTotal = quantity * first.UnitSalePrice,
+                };
+            }).ToList();
 
         var itemsTotal = receiptLines.Sum(l => l.LineTotal);
 

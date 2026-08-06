@@ -102,4 +102,21 @@ public partial class OrdersView : UserControl
         if (DataContext is OrdersViewModel vm)
             Dispatcher.BeginInvoke(vm.OnLineFieldEdited); // after the binding commits
     }
+
+    /// <summary>Spinner-style stepping for the Add-quantity box: Up/Down step by 1, Page Up/Down
+    /// jump to the stack's max/1. Typed-value clamping happens in the ViewModel itself
+    /// (OnAddQuantityChanged), so it applies here too since these all set the bound property.</summary>
+    private void AddQuantity_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (DataContext is not OrdersViewModel vm) return;
+        var max = Math.Max(vm.SelectedAvailableStack?.Count ?? 1, 1);
+
+        switch (e.Key)
+        {
+            case Key.Up: vm.AddQuantity++; e.Handled = true; break;
+            case Key.Down: vm.AddQuantity--; e.Handled = true; break;
+            case Key.PageUp: vm.AddQuantity = max; e.Handled = true; break;
+            case Key.PageDown: vm.AddQuantity = 1; e.Handled = true; break;
+        }
+    }
 }
