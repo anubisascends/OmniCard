@@ -331,6 +331,8 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         TrySetColorProfile(caps);
         TryDisableDuplex(caps);
         TryResetImageProcessing(caps);
+        TrySetXferCount(caps, -1);
+        TryEnableAutoScan(caps);
 
         if (ScanQuality == ScanQuality.Fast)
         {
@@ -418,6 +420,25 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         try { if (caps.ICapICCProfile.CanSet) caps.ICapICCProfile.SetValue(IccProfile.Embed); }
         catch (Exception ex) { _logger.LogDebug(ex, "Cannot set ICC profile"); }
     }
+
+    private void TrySetXferCount(ICapabilities caps, int count)
+    {
+        // Pin the transfer count explicitly (-1 = unlimited) so a previous app's
+        // leftover value (e.g. a low count from a single-page job) doesn't cut the
+        // ADF batch short on this scanner.
+        try { if (caps.CapXferCount.CanSet) caps.CapXferCount.SetValue(count); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set XferCount to {Count}", count); }
+    }
+
+    private void TryEnableAutoScan(ICapabilities caps)
+    {
+        // The RS40 is ADF-only. AutoScan=TRUE is what makes the driver keep
+        // pulling cards from the feeder automatically instead of stopping after
+        // one; pin it on each scan so a previous app leaving it off doesn't stick.
+        try { if (caps.CapAutoScan.CanSet) caps.CapAutoScan.SetValue(BoolType.True); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cannot enable AutoScan"); }
+    }
+
 
     private void TryDisableDuplex(ICapabilities caps)
     {
