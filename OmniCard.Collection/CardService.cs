@@ -136,19 +136,10 @@ public sealed class CardService : ICardService
         }
     }
 
-    private DateTime _lastTransferTime;
-    private static readonly TimeSpan DebounceWindow = TimeSpan.FromMilliseconds(500);
+    private byte[]? _lastScanBytes;
 
     public void AddFromStream(Stream stream)
     {
-        var now = DateTime.UtcNow;
-        if (now - _lastTransferTime < DebounceWindow)
-        {
-            _logger.LogDebug("Duplicate transfer debounced ({Elapsed}ms since last)", (now - _lastTransferTime).TotalMilliseconds);
-            return;
-        }
-        _lastTransferTime = now;
-
         var game = SelectedGame;
         _logger.LogInformation("Processing scanned card image for {Game}", game);
         var sw = Stopwatch.StartNew();
@@ -156,6 +147,19 @@ public sealed class CardService : ICardService
         var buffer = new MemoryStream();
         stream.CopyTo(buffer);
         _logger.LogDebug("Buffered {Bytes} bytes from scanner stream", buffer.Length);
+
+        // Some scanner drivers (e.g. the Canon RS40) occasionally resend the
+        // previous card's image data instead of the next card's — a hardware/driver
+        // quirk, not something distinguishable by timing. Compare raw bytes against
+        // the immediately preceding transfer and drop exact duplicates.
+        var preCropBytes = buffer.ToArray();
+        if (_lastScanBytes is not null && preCropBytes.AsSpan().SequenceEqual(_lastScanBytes))
+        {
+            _logger.LogWarning("Duplicate scan transfer detected (identical image bytes to previous scan), skipping");
+            buffer.Dispose();
+            return;
+        }
+        _lastScanBytes = preCropBytes;
 
         // Auto-crop oversized scans. Foil cards confuse the RS40's internal
         // edge detection, producing images much larger than the card itself.
@@ -1193,11 +1197,19 @@ public sealed class CardService : ICardService
                 { right = x; break; }
             }
 
-            // Add margin
+            // Add margin as a buffer against overly tight detection, then shave
+            // back any rows/cols within that margin that are pure background —
+            // otherwise the margin itself reintroduces a visible white strip.
+            int detectedTop = top, detectedBottom = bottom, detectedLeft = left, detectedRight = right;
             top = Math.Max(0, top - margin);
             left = Math.Max(0, left - margin);
             bottom = Math.Min(h - 1, bottom + margin);
             right = Math.Min(w - 1, right + margin);
+
+            while (top < detectedTop && CountDarkPixelsInRow(pixels, top, w, stride, brightnessThreshold) == 0) top++;
+            while (bottom > detectedBottom && CountDarkPixelsInRow(pixels, bottom, w, stride, brightnessThreshold) == 0) bottom--;
+            while (left < detectedLeft && CountDarkPixelsInCol(pixels, left, top, bottom, stride, brightnessThreshold) == 0) left++;
+            while (right > detectedRight && CountDarkPixelsInCol(pixels, right, top, bottom, stride, brightnessThreshold) == 0) right--;
 
             int cropW = right - left + 1;
             int cropH = bottom - top + 1;
