@@ -26,6 +26,9 @@ public class SalesViewModelTests
     private static CustomersViewModel NewCustomersViewModel() =>
         new(Mock.Of<ICustomerService>());
 
+    private static ManageListingsViewModel NewManageListingsViewModel() =>
+        new(Mock.Of<IListingService>());
+
     [Fact]
     public async Task Load_PopulatesLocationsAndPickList_AndSelectsSavedForSaleLocation()
     {
@@ -38,7 +41,7 @@ public class SalesViewModelTests
         salesSettings.Setup(s => s.ForSaleLocationId).Returns(2);
         listingService.Setup(l => l.GetPickList(null)).Returns([Entry(10), Entry(11)]);
 
-        var vm = new SalesViewModel(listingService.Object, salesSettings.Object, containerService.Object, NewOrdersViewModel(), NewCustomersViewModel());
+        var vm = new SalesViewModel(listingService.Object, salesSettings.Object, containerService.Object, NewOrdersViewModel(), NewCustomersViewModel(), NewManageListingsViewModel());
 
         await vm.Load();
 
@@ -59,7 +62,7 @@ public class SalesViewModelTests
         salesSettings.Setup(s => s.ForSaleLocationId).Returns(1);
         listingService.Setup(l => l.GetPickList(null)).Throws(new InvalidOperationException("db is locked"));
 
-        var vm = new SalesViewModel(listingService.Object, salesSettings.Object, containerService.Object, NewOrdersViewModel(), NewCustomersViewModel());
+        var vm = new SalesViewModel(listingService.Object, salesSettings.Object, containerService.Object, NewOrdersViewModel(), NewCustomersViewModel(), NewManageListingsViewModel());
 
         var ex = await Record.ExceptionAsync(() => vm.Load());
 
@@ -80,7 +83,7 @@ public class SalesViewModelTests
         salesSettings.Setup(s => s.ForSaleLocationId).Returns(2);
         listingService.Setup(l => l.GetPickList(null)).Returns([]);
 
-        var vm = new SalesViewModel(listingService.Object, salesSettings.Object, containerService.Object, NewOrdersViewModel(), NewCustomersViewModel());
+        var vm = new SalesViewModel(listingService.Object, salesSettings.Object, containerService.Object, NewOrdersViewModel(), NewCustomersViewModel(), NewManageListingsViewModel());
 
         await vm.Load();
 
@@ -101,7 +104,7 @@ public class SalesViewModelTests
 
         listingService.Setup(l => l.GetPickList(null)).Returns([]);
 
-        var vm = new SalesViewModel(listingService.Object, salesSettings.Object, containerService.Object, NewOrdersViewModel(), NewCustomersViewModel());
+        var vm = new SalesViewModel(listingService.Object, salesSettings.Object, containerService.Object, NewOrdersViewModel(), NewCustomersViewModel(), NewManageListingsViewModel());
         var location = Container(5, "Bulk");
 
         vm.ForSaleLocation = location;
@@ -120,7 +123,7 @@ public class SalesViewModelTests
         salesSettings.Setup(s => s.ForSaleLocationId).Returns(1);
         listingService.Setup(l => l.GetPickList(null)).Returns([Entry(10), Entry(11)]);
 
-        var vm = new SalesViewModel(listingService.Object, salesSettings.Object, containerService.Object, NewOrdersViewModel(), NewCustomersViewModel());
+        var vm = new SalesViewModel(listingService.Object, salesSettings.Object, containerService.Object, NewOrdersViewModel(), NewCustomersViewModel(), NewManageListingsViewModel());
         await vm.Load();
 
         listingService.Setup(l => l.MarkPicked(It.IsAny<IEnumerable<int>>()))
@@ -144,7 +147,7 @@ public class SalesViewModelTests
         var salesSettings = new Mock<ISalesSettingsService>();
         var containerService = new Mock<IStorageContainerService>();
 
-        var vm = new SalesViewModel(listingService.Object, salesSettings.Object, containerService.Object, NewOrdersViewModel(), NewCustomersViewModel());
+        var vm = new SalesViewModel(listingService.Object, salesSettings.Object, containerService.Object, NewOrdersViewModel(), NewCustomersViewModel(), NewManageListingsViewModel());
         // ForSaleLocation left at its default (null) — the state before the user has picked one.
         vm.PickList.Add(Entry(10));
 

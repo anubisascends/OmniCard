@@ -512,6 +512,8 @@ public class RecordingListingService : IListingService
     public Dictionary<int, ListingStatus> GetActiveListingStatusByLot(IEnumerable<int> lotIds) => [];
     public List<ActiveListing> GetActiveListings(CardGame? game = null) => [];
     public void MarkSold(int lotId, int orderLineId) { }
+    public List<ListingDetail> GetListingDetails(CardGame? game = null) => [];
+    public void UpdateListing(int listingId, decimal price, SalesChannel channel, int quantity, string? note) { }
 }
 
 public class TestDbContextFactory : IDbContextFactory<OmniCardDbContext>

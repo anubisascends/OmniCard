@@ -1,0 +1,85 @@
+<UserControl x:Class="OmniCard.Views.Sales.ManageListingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:OmniCard.Views.Sales"
+             xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance {x:Type local:ManageListingsViewModel}}"
+             Loaded="ManageListingsView_OnLoaded">
+    <Grid Margin="8">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="280"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Listings grid -->
+        <DockPanel Grid.Column="0" Margin="0,0,8,0">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                <Button Content="Refresh" Command="{Binding RefreshCommand}" Padding="12,4"/>
+            </StackPanel>
+            <DataGrid ItemsSource="{Binding Listings}" SelectedItem="{Binding SelectedListing}"
+                      AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single"
+                      Style="{StaticResource {x:Type DataGrid}}">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                    <DataGridTextColumn Header="Set" Binding="{Binding SetName}"/>
+                    <DataGridTextColumn Header="Cond" Binding="{Binding Condition}"/>
+                    <DataGridTextColumn Header="Status" Binding="{Binding Status}"/>
+                    <DataGridTextColumn Header="Channel" Binding="{Binding Channel}"/>
+                    <DataGridTextColumn Header="Price" Binding="{Binding ListedPrice, StringFormat=C}"/>
+                    <DataGridTextColumn Header="Qty" Binding="{Binding Quantity}"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </DockPanel>
+
+        <!-- Edit form -->
+        <DockPanel Grid.Column="1"
+                    Visibility="{Binding SelectedListing, Converter={conv:NullToVisibilityConverter}}">
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
+                <Button Content="Save" Command="{Binding SaveChangesCommand}" Padding="12,4" Margin="0,0,8,0"/>
+                <Button Content="Unlist" Command="{Binding UnlistCommand}" Padding="12,4"/>
+            </StackPanel>
+            <TextBlock DockPanel.Dock="Bottom" Text="{Binding StatusMessage}" Margin="0,8,0,0"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="{Binding SelectedListing.Name}" FontWeight="Bold" TextWrapping="Wrap"
+                           Grid.ColumnSpan="2" Margin="0,0,0,8" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+
+                <TextBlock Grid.Row="1" Text="Status:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedListing.Status}" VerticalAlignment="Center" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+
+                <TextBlock Grid.Row="2" Text="Price:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                <TextBox Grid.Row="2" Grid.Column="1" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                         Text="{Binding EditPrice, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}"/>
+
+                <TextBlock Grid.Row="3" Text="Channel:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                <ComboBox Grid.Row="3" Grid.Column="1" Margin="0,4"
+                          ItemsSource="{Binding Channels}" SelectedItem="{Binding EditChannel}"/>
+
+                <TextBlock Grid.Row="4" Text="Quantity:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                <TextBox Grid.Row="4" Grid.Column="1" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                         Text="{Binding EditQuantity, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Grid.Row="5" Text="Note:" FontWeight="SemiBold" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                <TextBox Grid.Row="5" Grid.Column="1" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                         Text="{Binding EditNote, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60"/>
+            </Grid>
+        </DockPanel>
+    </Grid>
+</UserControl>

@@ -515,4 +515,80 @@ public class ListingServiceTests : IDisposable
         Assert.Equal(ListingStatus.Sold, listing.Status);
         Assert.Equal(77, listing.OrderLineId);
     }
+
+    [Fact]
+    public void UpdateListing_ChangesPriceChannelQuantityAndNote()
+    {
+        var lotId = SeedLot(_opts).lotId;
+        var svc = CreateService();
+        svc.ListForSale([lotId], SalesChannel.Manual, 1m, 1);
+        var listingId = CreateService().GetListingDetails().Single().Id;
+
+        svc.UpdateListing(listingId, 4.25m, SalesChannel.Ebay, 3, "price matched to eBay");
+
+        using var ctx = new OmniCardDbContext(_opts);
+        var listing = ctx.Listings.Single(l => l.Id == listingId);
+        Assert.Equal(4.25m, listing.ListedPrice);
+        Assert.Equal(SalesChannel.Ebay, listing.Channel);
+        Assert.Equal(3, listing.Quantity);
+        Assert.Equal("price matched to eBay", listing.Note);
+    }
+
+    [Fact]
+    public void UpdateListing_OnPickedListing_ChangesPriceWithoutTouchingStatusOrLocation()
+    {
+        var (lotId, _) = SeedLot(_opts, locationId: 7);
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            ctx.StorageContainers.Add(new StorageContainer { Id = 99, Name = "For Sale" });
+            ctx.SaveChanges();
+        }
+        var svc = CreateService();
+        svc.ListForSale([lotId], SalesChannel.Manual, 1m, 1);
+        svc.MarkPicked([lotId]);
+        var listingId = svc.GetListingDetails().Single().Id;
+
+        svc.UpdateListing(listingId, 9.99m, SalesChannel.Manual, 1, null);
+
+        using var ctx2 = new OmniCardDbContext(_opts);
+        var listing = ctx2.Listings.Single(l => l.Id == listingId);
+        Assert.Equal(9.99m, listing.ListedPrice);
+        Assert.Equal(ListingStatus.Picked, listing.Status);
+        var lot = ctx2.Lots.Single(l => l.Id == lotId);
+        Assert.Equal(99, lot.LocationId);
+    }
+
+    [Fact]
+    public void UpdateListing_UnknownListingId_Throws()
+    {
+        var svc = CreateService();
+        Assert.Throws<InvalidOperationException>(() => svc.UpdateListing(999, 1m, SalesChannel.Manual, 1, null));
+    }
+
+    [Fact]
+    public void GetListingDetails_ProjectsListingIdAndProperties()
+    {
+        var lotId = SeedLot(_opts).lotId;
+        var svc = CreateService();
+        svc.ListForSale([lotId], SalesChannel.TcgPlayer, 2.50m, 4, "test note");
+
+        var detail = Assert.Single(svc.GetListingDetails());
+        Assert.Equal(lotId, detail.LotId);
+        Assert.Equal(SalesChannel.TcgPlayer, detail.Channel);
+        Assert.Equal(ListingStatus.Listed, detail.Status);
+        Assert.Equal(2.50m, detail.ListedPrice);
+        Assert.Equal(4, detail.Quantity);
+        Assert.Equal("test note", detail.Note);
+    }
+
+    [Fact]
+    public void GetListingDetails_ExcludesCancelledAndSold()
+    {
+        var lotId = SeedLot(_opts).lotId;
+        var svc = CreateService();
+        svc.ListForSale([lotId], SalesChannel.Manual, 1m, 1);
+        svc.Unlist([lotId]);
+
+        Assert.Empty(svc.GetListingDetails());
+    }
 }
