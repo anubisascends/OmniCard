@@ -18,13 +18,15 @@ public partial class SalesViewModel(
     ISalesSettingsService salesSettings,
     IStorageContainerService storageContainers,
     OrdersViewModel orders,
-    CustomersViewModel customers) : ObservableObject
+    CustomersViewModel customers,
+    ManageListingsViewModel manageListings) : ObservableObject
 {
     public ObservableCollection<PickListEntry> PickList { get; } = [];
     public ObservableCollection<StorageContainer> Locations { get; } = [];
 
     public OrdersViewModel Orders { get; } = orders;
     public CustomersViewModel Customers { get; } = customers;
+    public ManageListingsViewModel ManageListings { get; } = manageListings;
 
     [ObservableProperty]
     public partial StorageContainer? ForSaleLocation { get; set; }

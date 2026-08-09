@@ -206,6 +206,49 @@ public class ListingService(
         return query.ToList().Where(a => !committedLotIds.Contains(a.LotId)).ToList();
     }
 
+    public List<ListingDetail> GetListingDetails(CardGame? game = null)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+
+        var query =
+            from listing in ctx.Listings.AsNoTracking()
+            where ActiveStatuses.Contains(listing.Status)
+            join lot in ctx.Lots.AsNoTracking() on listing.LotId equals lot.Id
+            join p in ctx.Products.AsNoTracking() on lot.ProductId equals p.Id
+            where game == null || p.Game == game
+            orderby p.Name
+            select new ListingDetail(
+                listing.Id,
+                lot.Id,
+                p.Name,
+                p.SetName ?? "",
+                p.SetCode ?? "",
+                lot.Condition,
+                p.Foil,
+                listing.Channel,
+                listing.Status,
+                listing.ListedPrice,
+                listing.Quantity,
+                listing.Note,
+                listing.ListedAt,
+                listing.PickedAt);
+
+        return query.ToList();
+    }
+
+    public void UpdateListing(int listingId, decimal price, SalesChannel channel, int quantity, string? note)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var listing = ctx.Listings.FirstOrDefault(l => l.Id == listingId && ActiveStatuses.Contains(l.Status))
+            ?? throw new InvalidOperationException("Listing not found or is no longer active.");
+
+        listing.ListedPrice = price;
+        listing.Channel = channel;
+        listing.Quantity = quantity;
+        listing.Note = note;
+        ctx.SaveChanges();
+    }
+
     public void MarkSold(int lotId, int orderLineId)
     {
         using var ctx = dbContextFactory.CreateDbContext();

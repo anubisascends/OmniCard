@@ -10,6 +10,9 @@
         <TabItem Header="Pick List">
             <local:PickListView/>
         </TabItem>
+        <TabItem Header="Listings">
+            <local:ManageListingsView DataContext="{Binding ManageListings}"/>
+        </TabItem>
         <TabItem Header="Orders">
             <local:OrdersView DataContext="{Binding Orders}"/>
         </TabItem>
