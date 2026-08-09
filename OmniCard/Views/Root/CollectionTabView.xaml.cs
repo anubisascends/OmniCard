@@ -31,5 +31,7 @@ public partial class CollectionTabView : UserControl
 
     public void SelectAll() => CardList.SelectAll();
 
+    public void ClearSelection() => CardList.ClearSelection();
+
     public IList<CollectionCard> GetSelectedCards() => CardList.GetSelectedCards();
 }

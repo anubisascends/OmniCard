@@ -14,6 +14,12 @@ public class DisplaySettings
     public bool ShowScannerUI { get; set; }
     public bool SidebarExpanded { get; set; } = true;
 
+    /// <summary>Width (px) of the Collection card-list's details panel.</summary>
+    public double CardDetailsSidebarWidth { get; set; } = 300;
+
+    /// <summary>Whether the Collection card-list's details panel is collapsed by the user.</summary>
+    public bool CardDetailsSidebarCollapsed { get; set; }
+
     /// <summary>Scan tiles at/above this price get the non-bulk (green by default) right-edge accent.</summary>
     public decimal NonBulkPriceThreshold { get; set; } = 1.00m;
 

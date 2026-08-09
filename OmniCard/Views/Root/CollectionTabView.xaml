@@ -5,6 +5,13 @@
              xmlns:inv="clr-namespace:OmniCard.Views.Inventory"
              xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls">
 
+    <UserControl.InputBindings>
+        <!-- Deselect all cards (and hide the details sidebar) regardless of which child has focus. -->
+        <KeyBinding Key="Escape"
+                    Command="{Binding DataContext.ViewModel.Collection.ClearSelectionActionCommand,
+                        RelativeSource={RelativeSource AncestorType=Window}}"/>
+    </UserControl.InputBindings>
+
     <UserControl.Resources>
         <!-- Visible only when viewing a single location's card list (not the overview, not "all cards") -->
         <Style x:Key="SingleLocationButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">

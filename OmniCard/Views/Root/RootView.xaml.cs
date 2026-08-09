@@ -46,6 +46,7 @@ public partial class RootView : IView<RootViewModel>, IHostedService
         };
 
         ViewModel.Collection.GetSelectedCards = () => CollectionTab.GetSelectedCards();
+        ViewModel.Collection.ClearSelection = () => CollectionTab.ClearSelection();
         ViewModel.Collection.FocusSearch = () =>
         {
             MainTabControl.SelectedIndex = MainTabControl.Items.IndexOf(tabItemCollection);
