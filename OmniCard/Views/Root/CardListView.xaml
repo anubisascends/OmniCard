@@ -8,6 +8,12 @@
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
 
     <Grid>
+    <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" MinWidth="200"/>
+        <ColumnDefinition x:Name="SidebarSplitterColumn" Width="Auto"/>
+        <!-- Width + visibility are driven from code-behind (ApplySidebarLayout). -->
+        <ColumnDefinition x:Name="SidebarColumn" Width="0" MinWidth="0"/>
+    </Grid.ColumnDefinitions>
     <ListBox x:Name="CollectionListBox"
              ItemsSource="{Binding CollectionSearchResults}"
              SelectedItem="{Binding SelectedCollectionCard}"
@@ -46,13 +52,19 @@
                                 <ContentPresenter/>
                             </Border>
                             <ControlTemplate.Triggers>
-                                <Trigger Property="IsSelected" Value="True">
-                                    <Setter TargetName="SelBorder" Property="BorderBrush"
-                                            Value="{DynamicResource MaterialDesign.Brush.Primary}"/>
-                                </Trigger>
+                                <!-- IsSelected declared after IsMouseOver so its setters win when both are
+                                     active — otherwise hovering a selected tile silently overwrote the
+                                     selection-colored border with the (weaker) hover border, making
+                                     selected tiles look unselected under the mouse. Also thickened so
+                                     selection reads clearly even against the hover background. -->
                                 <Trigger Property="IsMouseOver" Value="True">
                                     <Setter TargetName="SelBorder" Property="BorderBrush"
                                             Value="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"/>
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="SelBorder" Property="BorderBrush"
+                                            Value="{DynamicResource MaterialDesign.Brush.Primary}"/>
+                                    <Setter TargetName="SelBorder" Property="BorderThickness" Value="3"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -269,5 +281,65 @@
                             ToggleCommand="{Binding ToggleTagFlyoutItemCommand}"
                             NewTagCommand="{Binding CreateTagFlyoutItemCommand}"/>
     </Popup>
+
+    <!-- Resizable divider between the card list and the details panel (shown only when open) -->
+    <GridSplitter x:Name="SidebarSplitter" Grid.Column="1" Width="6" Visibility="Collapsed"
+                  HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                  ResizeBehavior="PreviousAndNext" ResizeDirection="Columns"
+                  Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                  DragCompleted="SidebarSplitter_DragCompleted"/>
+
+    <!-- Card details panel: always present (collapsible/resizable by the user, independent of
+         selection). Shows readonly, copyable fields common to every selected card; empty (just
+         the title) with nothing selected. QTY only shows for a single stacked tile. -->
+    <Border x:Name="SidebarPanel"
+            Grid.Column="2"
+            Padding="12"
+            Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+            BorderBrush="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"
+            BorderThickness="1,0,0,0">
+        <DockPanel>
+            <DockPanel DockPanel.Dock="Top" LastChildFill="False" Margin="0,0,0,8">
+                <TextBlock DockPanel.Dock="Left"
+                           Text="Card Details"
+                           FontWeight="Bold"
+                           FontSize="16"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                <Button DockPanel.Dock="Right" Content="›" FontSize="15" Padding="8,0" MinWidth="28"
+                        Command="{Binding CollapseSidebarCommand}" ToolTip="Collapse panel"/>
+            </DockPanel>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding SidebarFields}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,0,0,10">
+                                <TextBlock Text="{Binding Label}"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                                <!-- Readonly TextBox (not TextBlock) so mouse drag-select, Ctrl+C,
+                                     and the right-click Copy context menu all work natively. -->
+                                <TextBox Text="{Binding Value, Mode=OneWay}"
+                                         IsReadOnly="True"
+                                         IsReadOnlyCaretVisible="True"
+                                         BorderThickness="0"
+                                         Background="Transparent"
+                                         Padding="0"
+                                         TextWrapping="Wrap"
+                                         Cursor="IBeam"
+                                         Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DockPanel>
+    </Border>
+
+    <!-- Reopen handle, shown at the list's right edge only when the panel is collapsed -->
+    <Button x:Name="SidebarExpandHandle" Grid.Column="0" Visibility="Collapsed"
+            HorizontalAlignment="Right" VerticalAlignment="Center"
+            Width="16" Height="64" Content="‹" FontSize="15" Padding="0"
+            Command="{Binding ExpandSidebarCommand}" ToolTip="Show card details"/>
     </Grid>
 </UserControl>

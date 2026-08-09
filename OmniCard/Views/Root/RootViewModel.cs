@@ -414,6 +414,8 @@ public sealed partial class RootViewModel(
         writer.WriteEndObject();
 
         writer.WriteBoolean("StackDuplicates", Collection.IsStacked);
+        writer.WriteNumber("CardDetailsSidebarWidth", Collection.SidebarWidth);
+        writer.WriteBoolean("CardDetailsSidebarCollapsed", Collection.IsSidebarCollapsed);
         writer.WriteNumber("ScannerFontSize", ScannerFontSize);
         writer.WriteNumber("ScannerListWidth", ScannerListWidth);
         if (DefaultScannerName is not null)

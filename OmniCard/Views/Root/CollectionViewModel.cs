@@ -31,6 +31,9 @@ public sealed partial class CollectionViewModel : ViewModel
     /// <summary>Set by the View for DataGrid selected cards access.</summary>
     public Func<IList<CollectionCard>>? GetSelectedCards { get; set; }
 
+    /// <summary>Set by the View to clear the card list's selection (e.g. on Escape).</summary>
+    public Action? ClearSelection { get; set; }
+
     /// <summary>Set by the View for search box focus.</summary>
     public Action? FocusSearch { get; set; }
 
@@ -75,6 +78,9 @@ public sealed partial class CollectionViewModel : ViewModel
             _columnVisibility[col.Key] = saved.TryGetValue(col.Key, out var v) ? v : col.Value;
 
         IsStacked = displaySettings.Value.StackDuplicates;
+
+        SidebarWidth = displaySettings.Value.CardDetailsSidebarWidth is double w and >= MinSidebarWidth ? w : MinSidebarWidth;
+        IsSidebarCollapsed = displaySettings.Value.CardDetailsSidebarCollapsed;
     }
 
     // --- Column definitions: Key = column name, Value = default visibility ---
@@ -394,6 +400,8 @@ public sealed partial class CollectionViewModel : ViewModel
     // --- Stats ---
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelection))]
+    [NotifyPropertyChangedFor(nameof(HasExactlyOneSelected))]
     public partial int SelectedCardCount { get; set; }
 
     /// <summary>Gates the bulk selection actions (Selection menu, context menu) — true once at
@@ -416,6 +424,7 @@ public sealed partial class CollectionViewModel : ViewModel
         ListOnEbayCommand.NotifyCanExecuteChanged();
         ViewOnEbayCommand.NotifyCanExecuteChanged();
         EndEbayListingCommand.NotifyCanExecuteChanged();
+        ClearSelectionActionCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Total matching cards (including not-yet-loaded rows).</summary>

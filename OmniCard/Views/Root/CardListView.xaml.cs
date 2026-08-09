@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -44,6 +45,8 @@ public partial class CardListView : UserControl
                 _scrollViewer.ScrollChanged += ScrollViewer_ScrollChanged;
         };
         CollectionListBox.Loaded += _listBoxLoadedHandler;
+
+        ApplySidebarLayout(vm);
     }
 
     // A new result set replaces CollectionSearchResults on every search/filter/sort. WPF keeps
@@ -53,6 +56,12 @@ public partial class CardListView : UserControl
     // (no property change), so paging does not trigger this and the scroll position is preserved.
     private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(CollectionViewModel.IsSidebarCollapsed) && ViewModel is not null)
+        {
+            ApplySidebarLayout(ViewModel);
+            return;
+        }
+
         if (e.PropertyName != nameof(CollectionViewModel.CollectionSearchResults))
             return;
 
@@ -60,6 +69,27 @@ public partial class CardListView : UserControl
         Dispatcher.BeginInvoke(
             DispatcherPriority.Background,
             new Action(() => _scrollViewer?.ScrollToTop()));
+    }
+
+    /// <summary>Drives the details panel's column width + splitter/handle visibility from VM
+    /// state — open (at the persisted width) unless the user collapsed it, in which case only a
+    /// reopen handle shows. Independent of card selection; the panel body just shows/hides its
+    /// field rows based on <see cref="CollectionViewModel.SidebarFields"/>.</summary>
+    private void ApplySidebarLayout(CollectionViewModel vm)
+    {
+        var open = !vm.IsSidebarCollapsed;
+
+        SidebarColumn.MinWidth = open ? CollectionViewModel.MinSidebarWidth : 0;
+        SidebarColumn.Width = open ? new GridLength(vm.SidebarWidth) : new GridLength(0);
+        SidebarSplitter.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+        SidebarPanel.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+        SidebarExpandHandle.Visibility = open ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void SidebarSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        if (ViewModel is not null)
+            ViewModel.SidebarWidth = SidebarColumn.ActualWidth;
     }
 
     private async void ScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
@@ -86,8 +116,13 @@ public partial class CardListView : UserControl
 
     private void CollectionListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (ViewModel is not null)
-            ViewModel.SelectedCardCount = CollectionListBox.SelectedItems.Count;
+        if (ViewModel is null) return;
+
+        ViewModel.SelectedCardCount = CollectionListBox.SelectedItems.Count;
+
+        // Not driven off SelectedCardCount's change notification: swapping from one single-card
+        // selection to another leaves the count at 1, so that notification wouldn't fire here.
+        ViewModel.RebuildSidebarFields();
     }
 
     // Right-clicking a tile selects it (unless it is part of an existing multi-selection),
@@ -123,6 +158,8 @@ public partial class CardListView : UserControl
     }
 
     public void SelectAll() => CollectionListBox.SelectAll();
+
+    public void ClearSelection() => CollectionListBox.UnselectAll();
 
     public IList<CollectionCard> GetSelectedCards()
         => CollectionListBox.SelectedItems.Cast<CollectionCard>().ToList();
