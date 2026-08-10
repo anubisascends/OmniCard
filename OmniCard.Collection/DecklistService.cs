@@ -18,11 +18,12 @@ public sealed partial class DecklistService(
     [GeneratedRegex(@"^(\d+)x?\s+(.+?)(?:\s+\(([A-Za-z0-9]+)\)\s+(\S+)(?:\s+.*)?)?$")]
     private static partial Regex DecklistLineRegex();
 
-    // Known section headers to skip (Moxfield/Archidekt text export)
+    // Known section headers to skip (Moxfield/Archidekt text export, plus Riftbound's "Legend:" etc.)
     private static readonly HashSet<string> SectionHeaders = new(StringComparer.OrdinalIgnoreCase)
     {
         "Deck", "Sideboard", "Commander", "Companion", "Maybeboard", "Considering",
-        "Main", "Mainboard", "Main Deck", "Tokens", "Attractions", "Stickers", "Contraptions"
+        "Main", "Mainboard", "Main Deck", "Tokens", "Attractions", "Stickers", "Contraptions",
+        "Legend", "Champion", "MainDeck", "Battlefields", "Runes"
     };
 
     public static readonly string[] TypeCategoryOrder =
@@ -55,7 +56,7 @@ public sealed partial class DecklistService(
             var line = rawLine.Trim();
             if (string.IsNullOrEmpty(line) || line.StartsWith("//"))
                 continue;
-            if (SectionHeaders.Contains(line))
+            if (SectionHeaders.Contains(line.TrimEnd(':')))
                 continue;
 
             var match = regex.Match(line);
@@ -91,7 +92,7 @@ public sealed partial class DecklistService(
     public static bool IsIgnorableLine(string line)
     {
         var t = line.Trim();
-        return t.Length == 0 || t.StartsWith("//") || SectionHeaders.Contains(t);
+        return t.Length == 0 || t.StartsWith("//") || SectionHeaders.Contains(t.TrimEnd(':'));
     }
 
     /// <summary>True if the line looks like a decklist entry ("1 Card", "1x Card (SET) 4 ...").</summary>
@@ -279,10 +280,21 @@ public sealed partial class DecklistService(
 
         foreach (var entry in entries)
         {
-            // Find all owned copies by name (case-insensitive)
+            // Find all owned copies by name (case-insensitive); fall back to swapping ", " for " - "
+            // (e.g. Riftbound's "Vi, Piltover Enforcer" decklist name vs. "Vi - Piltover Enforcer" in the DB).
             var ownedCopies = allCards
                 .Where(c => string.Equals(c.Name, entry.CardName, StringComparison.OrdinalIgnoreCase))
                 .ToList();
+            if (ownedCopies.Count == 0)
+            {
+                var fuzzyName = entry.CardName.Replace(", ", " - ");
+                if (fuzzyName != entry.CardName)
+                {
+                    ownedCopies = allCards
+                        .Where(c => string.Equals(c.Name, fuzzyName, StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                }
+            }
 
             // Sort: exact set matches first, then others
             if (entry.SetCode is not null)
@@ -308,7 +320,7 @@ public sealed partial class DecklistService(
 
             // Look up card details from Scryfall DB for type/image/detail info
             var gameService = cardService.GetGameService(game);
-            var searchResults = gameService.GetPrintings(entry.CardName);
+            var searchResults = DecklistPrintingResolver.GetPrintingsFuzzy(gameService, entry.CardName);
             CardMatch? cardInfo = null;
             if (searchResults.Count > 0)
             {

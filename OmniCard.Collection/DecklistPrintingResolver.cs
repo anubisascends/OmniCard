@@ -24,7 +24,7 @@ public static class DecklistPrintingResolver
         }
 
         // Rungs 2-4 operate over all printings of the name.
-        var printings = gs.GetPrintings(entry.CardName);
+        var printings = GetPrintingsFuzzy(gs, entry.CardName);
         if (printings.Count == 0)
             return null;
 
@@ -39,6 +39,19 @@ public static class DecklistPrintingResolver
             return null;
 
         return Cheapest(gs, list);
+    }
+
+    /// <summary>Looks up printings by name, falling back to swapping ", " for " - " (e.g. Riftbound's
+    /// "Vi, Piltover Enforcer" decklist name vs. "Vi - Piltover Enforcer" in the card database) when the
+    /// exact name has no printings.</summary>
+    public static List<CardMatch> GetPrintingsFuzzy(ICardGameService gs, string cardName)
+    {
+        var printings = gs.GetPrintings(cardName);
+        if (printings.Count > 0)
+            return printings;
+
+        var fuzzyName = cardName.Replace(", ", " - ");
+        return fuzzyName != cardName ? gs.GetPrintings(fuzzyName) : printings;
     }
 
     private static CardMatch Cheapest(ICardGameService gs, List<CardMatch> printings)

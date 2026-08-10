@@ -242,7 +242,7 @@ public class ListService(
     private static (CardMatch Printing, decimal? Price, bool Unpriced)? ResolveCheapest(
         ICardGameService gs, string cardName)
     {
-        var printings = gs.GetPrintings(cardName);
+        var printings = DecklistPrintingResolver.GetPrintingsFuzzy(gs, cardName);
         if (printings.Count == 0) return null;
 
         var prices = gs.GetCurrentPrices(printings.Select(p => p.GameSpecificId), isFoil: false);

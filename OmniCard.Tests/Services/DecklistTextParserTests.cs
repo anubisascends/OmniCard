@@ -73,6 +73,44 @@ public class DecklistTextParserTests
         Assert.Equal(2, entries.Count);
     }
 
+    [Fact]
+    public void ParseDecklistText_RiftboundFormat_IgnoresSectionHeadersAndParsesAllCards()
+    {
+        var service = CreateService();
+        var text = """
+            Legend:
+            1 Vi, Piltover Enforcer
+
+            Champion:
+            1 Vi, Hotheaded
+
+            MainDeck:
+            3 Inferna
+            3 Sharkling
+            2 Vi, Peacekeeper
+            1 Vi, Destructive
+            1 Ashe, Focused
+
+            Battlefields:
+            1 Star Spring
+            1 Trapping Grounds
+            1 Valley of Idols
+
+            Runes:
+            6 Fury Rune
+            6 Order Rune
+            """;
+        var (_, entries) = service.ParseDecklistText(text);
+
+        Assert.Equal(12, entries.Count);
+        Assert.Contains(entries, e => e.CardName == "Vi, Piltover Enforcer" && e.Quantity == 1);
+        Assert.Contains(entries, e => e.CardName == "Vi, Hotheaded" && e.Quantity == 1);
+        Assert.Contains(entries, e => e.CardName == "Inferna" && e.Quantity == 3);
+        Assert.Contains(entries, e => e.CardName == "Star Spring" && e.Quantity == 1);
+        Assert.Contains(entries, e => e.CardName == "Fury Rune" && e.Quantity == 6);
+        Assert.Contains(entries, e => e.CardName == "Order Rune" && e.Quantity == 6);
+    }
+
     private static DecklistService CreateService()
     {
         return new DecklistService(null!, null!, null!);
