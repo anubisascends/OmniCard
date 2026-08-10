@@ -2053,17 +2053,18 @@ public sealed partial class RootViewModel(
             return;
         }
 
-        var name = dialogService.RequireReason("New List", "Name for the new list:");
-        if (string.IsNullOrWhiteSpace(name)) return;
+        var groups = scans.GroupBy(s => s.Game).Select(g => (Game: g.Key, Count: g.Count())).ToList();
+        var picks = dialogService.PickListTargetsForScans(groups, "New List");
+        if (picks is null) return;
 
-        var groups = scans.GroupBy(s => s.Game).ToList();
         var total = scans.Count;
-        foreach (var group in groups)
+        foreach (var pick in picks)
         {
-            var listName = groups.Count > 1 ? $"{name} ({group.Key})" : name;
-            var list = listService.CreateList(listName, group.Key);
-            foreach (var scan in group)
-                listService.AddPrinting(list.Id, scan.Match!, scan.IsFoil, quantity: 1, ListItemSource.Scan);
+            var listId = pick.CreateNew
+                ? listService.CreateList(pick.NewName, pick.Game).Id
+                : pick.ExistingList!.Id;
+            foreach (var scan in scans.Where(s => s.Game == pick.Game))
+                listService.AddPrinting(listId, scan.Match!, scan.IsFoil, quantity: 1, ListItemSource.Scan);
         }
 
         ResetScanFilterSort();
@@ -2073,8 +2074,8 @@ public sealed partial class RootViewModel(
         CardService.ClearTempFiles();
         CardService.ScannedCards.Clear();
         Lists.Refresh();
-        Message = $"Created list \"{name}\" with {total} cards.";
-        _logger.LogInformation("Created list(s) from {Count} scanned cards", total);
+        Message = $"Added {total} cards to {picks.Count} list(s).";
+        _logger.LogInformation("Added {Count} scanned cards to list(s)", total);
     }
 
     [RelayCommand]

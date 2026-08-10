@@ -248,7 +248,7 @@
                 <MenuItem Header="_Commit"
                           Command="{Binding ViewModel.CommitScansCommand}"
                           InputGestureText="Ctrl+S"/>
-                <MenuItem Header="Create _List from Scans..."
+                <MenuItem Header="_Add to List..."
                           Command="{Binding ViewModel.CreateListFromScansCommand}"/>
                 <MenuItem Header="_Reprocess Unmatched"
                           Command="{Binding ViewModel.ReprocessScansCommand}"

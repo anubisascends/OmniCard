@@ -18,6 +18,10 @@ public interface IDialogService
     int? PickCoverArt(int containerId, string containerName);
     MoveToLocationResult? PickMoveToLocation();
     MoveListToLocationResult? PickMoveListToLocation();
+
+    /// <summary>Prompts for a list destination (existing or new) per game group, for "Create List from Scans".
+    /// Returns null if cancelled.</summary>
+    IReadOnlyList<ScanListTargetResult>? PickListTargetsForScans(IReadOnlyList<(CardGame Game, int Count)> groups, string defaultName);
     void ShowAuditReport(AuditReport report);
     bool? OpenEbayListingDialog(CollectionCard card);
     bool? OpenManualAdd(StorageContainer? defaultContainer = null);

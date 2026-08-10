@@ -1,0 +1,72 @@
+<Window x:Class="OmniCard.Views.CreateListFromScans.CreateListFromScansView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:OmniCard.Views.CreateListFromScans"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Title="Add to List" Height="420" Width="460"
+        Background="{DynamicResource MaterialDesign.Brush.Background}"
+        TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="13"
+        FontFamily="{StaticResource AppFont}">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="1*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,8"
+                   Text="Add the scanned cards to an existing list, or create a new one."
+                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+
+        <ItemsControl Grid.Row="1" ItemsSource="{Binding ViewModel.Rows}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                            Padding="0,8">
+                        <StackPanel>
+                            <TextBlock FontWeight="SemiBold" Margin="0,0,0,4"
+                                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
+                                <Run Text="{Binding Game, Mode=OneWay}"/>
+                                <Run Text=" — "/>
+                                <Run Text="{Binding Count, Mode=OneWay}"/>
+                                <Run Text=" card(s)"/>
+                            </TextBlock>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <RadioButton Content="Existing list" IsChecked="{Binding UseExistingEditable}"
+                                             Margin="0,0,10,0"
+                                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                                <RadioButton Content="New list" IsChecked="{Binding CreateNew}"
+                                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                            </StackPanel>
+                            <ComboBox DisplayMemberPath="Name"
+                                      ItemsSource="{Binding AvailableLists}"
+                                      SelectedItem="{Binding SelectedList}"
+                                      IsEnabled="{Binding UseExisting}"
+                                      Visibility="{Binding UseExisting, Converter={StaticResource BoolToVis}}"
+                                      Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                            <TextBox Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}"
+                                     IsEnabled="{Binding CreateNew}"
+                                     Visibility="{Binding CreateNew, Converter={StaticResource BoolToVis}}"
+                                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Cancel" Command="{Binding ViewModel.CancelCommand}"
+                    IsCancel="True" Padding="16,6" Margin="0,0,8,0"/>
+            <Button Content="Create" Command="{Binding ViewModel.ConfirmCommand}"
+                    IsDefault="True" IsEnabled="{Binding ViewModel.CanConfirm}" Padding="16,6" FontWeight="SemiBold"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -279,6 +279,23 @@ public class ScryfallSetCompletionTests : IDisposable
     }
 
     [Fact]
+    public async Task GetSetCompletionAsync_SameSetCodeDifferentSetName_DoesNotThrow()
+    {
+        // Scryfall's bulk data occasionally has the same SetCode under two slightly different
+        // SetName strings (e.g. localized/promo variants) — regression test for the duplicate-key
+        // crash this used to cause.
+        using var ctx = _factory.CreateDbContext();
+        ctx.Cards.Add(MakeCard("00000000-0000-0000-0000-000000000006", "Card A4", "seta", "Set A (Alt)", "004", "common"));
+        ctx.SaveChanges();
+
+        var svc = CreateService();
+        var results = await svc.GetSetCompletionAsync([]);
+
+        var setA = Assert.Single(results, r => r.SetCode == "seta");
+        Assert.Equal(4, setA.TotalCount); // merged despite the differing SetName
+    }
+
+    [Fact]
     public void GetMissingCards_ReturnsOnlyUnownedWithFullDetails()
     {
         var svc = CreateService();
