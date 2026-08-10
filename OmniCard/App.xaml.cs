@@ -225,6 +225,8 @@ public partial class App : Application
             services.AddTransient<CoverArtPickerViewModel>();
             services.AddTransient<OmniCard.Views.MoveToLocation.MoveToLocationView>();
             services.AddTransient<OmniCard.Views.MoveToLocation.MoveToLocationViewModel>();
+            services.AddTransient<OmniCard.Views.MoveListToLocation.MoveListToLocationView>();
+            services.AddTransient<OmniCard.Views.MoveListToLocation.MoveListToLocationViewModel>();
             services.AddTransient<OmniCard.Views.PickTrade.PickTradeView>();
             services.AddTransient<OmniCard.Views.PickTrade.PickTradeViewModel>();
             services.AddTransient<AuditReportView>();

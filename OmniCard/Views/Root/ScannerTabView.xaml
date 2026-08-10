@@ -245,6 +245,9 @@
                             </Style>
                         </Button.Style>
                     </Button>
+                    <Button Command="{Binding ViewModel.CreateListFromScansCommand}"
+                            Content="Create List from Scans"
+                            Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                     <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={StaticResource BoolToVis}}"/>
                     <Button Command="{Binding ViewModel.GenerateAuditReportCommand}"
                             Content="Generate Audit Report"

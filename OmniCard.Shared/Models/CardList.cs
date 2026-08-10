@@ -1,6 +1,6 @@
 namespace OmniCard.Models;
 
-public enum ListItemSource { Manual, Url, Paste, File }
+public enum ListItemSource { Manual, Url, Paste, File, Scan }
 
 public class CardList
 {
@@ -33,3 +33,7 @@ public class CardListItem
 }
 
 public record AddCardsResult(int AddedCount, IReadOnlyList<string> UnresolvedNames);
+
+/// <summary>Result of committing a <see cref="CardList"/>'s items into real inventory at a location
+/// (see <c>IListService.CommitToLocation</c>). Items that fail to re-resolve stay in the list.</summary>
+public record CommitToLocationResult(int AddedCount, int RemainingUnresolvedCount, bool ListDeleted);

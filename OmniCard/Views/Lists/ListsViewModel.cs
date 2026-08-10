@@ -11,6 +11,8 @@ public sealed partial class ListsViewModel(
     IListService listService,
     ICardService cardService,
     IDecklistService decklistService,
+    IDialogService dialogService,
+    IStorageContainerService containerService,
     ILogger<ListsViewModel> logger) : ObservableObject
 {
     private CardGame? _game;
@@ -122,6 +124,24 @@ public sealed partial class ListsViewModel(
         if (SelectedList is null) return;
         listService.DeleteList(SelectedList.Id);
         LoadLists();
+    }
+
+    [RelayCommand]
+    private void MoveSelectedListToLocation()
+    {
+        if (SelectedList is null) return;
+        var pick = dialogService.PickMoveListToLocation();
+        if (pick is null) return;
+
+        var container = pick.CreateNew
+            ? containerService.Create(pick.NewContainerName, pick.NewContainerType)
+            : pick.ExistingContainer!;
+
+        var result = listService.CommitToLocation(SelectedList.Id, container, pick.Condition);
+        LoadLists();
+        StatusMessage = result.RemainingUnresolvedCount == 0
+            ? $"Moved {result.AddedCount} cards to {container.Name}. List removed."
+            : $"Moved {result.AddedCount} cards to {container.Name}. {result.RemainingUnresolvedCount} card(s) couldn't be resolved and remain in the list.";
     }
 
     [RelayCommand]

@@ -17,6 +17,7 @@ public interface IDialogService
     void ShowSettings();
     int? PickCoverArt(int containerId, string containerName);
     MoveToLocationResult? PickMoveToLocation();
+    MoveListToLocationResult? PickMoveListToLocation();
     void ShowAuditReport(AuditReport report);
     bool? OpenEbayListingDialog(CollectionCard card);
     bool? OpenManualAdd(StorageContainer? defaultContainer = null);

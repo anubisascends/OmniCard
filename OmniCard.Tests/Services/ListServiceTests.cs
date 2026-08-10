@@ -256,6 +256,50 @@ public class ListServiceTests : IDisposable
         Assert.Equal(1m, item.AddedMarketPrice);
     }
 
+    [Fact]
+    public void CommitToLocation_MovesResolvedItems_DeletesEmptyList()
+    {
+        var cards = new FakeCardService();
+        cards.Game.Printings.Add(Printing("Sol Ring", "x", "C21", "1"));
+        var svc = CreateService(cards);
+        var list = svc.CreateList("L", CardGame.Mtg);
+        svc.AddPrinting(list.Id, Printing("Sol Ring", "x", "C21", "1"), isFoil: true, quantity: 2, ListItemSource.Scan);
+        var container = new StorageContainer { Id = 1, Name = "Binder A", ContainerType = ContainerType.Binder };
+
+        var result = svc.CommitToLocation(list.Id, container, "NM");
+
+        Assert.Equal(2, result.AddedCount);
+        Assert.Equal(0, result.RemainingUnresolvedCount);
+        Assert.True(result.ListDeleted);
+        Assert.Empty(svc.GetLists(CardGame.Mtg));
+
+        var committed = Assert.Single(cards.Committed);
+        Assert.Equal("x", committed.Match.GameSpecificId);
+        Assert.True(committed.IsFoil);
+        Assert.Equal(2, committed.Quantity);
+        Assert.Equal("NM", committed.Condition);
+        Assert.Same(container, committed.Container);
+    }
+
+    [Fact]
+    public void CommitToLocation_UnresolvedItem_LeftInListAndListSurvives()
+    {
+        var cards = new FakeCardService(); // no printings registered -> resolution fails
+        var svc = CreateService(cards);
+        var list = svc.CreateList("L", CardGame.Mtg);
+        svc.AddPrinting(list.Id, Printing("Sol Ring", "x", "C21", "1"), isFoil: false, quantity: 1, ListItemSource.Scan);
+        var container = new StorageContainer { Id = 1, Name = "Binder A", ContainerType = ContainerType.Binder };
+
+        var result = svc.CommitToLocation(list.Id, container, "NM");
+
+        Assert.Equal(0, result.AddedCount);
+        Assert.Equal(1, result.RemainingUnresolvedCount);
+        Assert.False(result.ListDeleted);
+        Assert.Empty(cards.Committed);
+        Assert.Single(svc.GetLists(CardGame.Mtg));
+        Assert.Single(svc.GetItems(list.Id));
+    }
+
     private class FakeCardService : ICardService
     {
         public ObservableCollection<ScannedCard> ScannedCards { get; } = [];
@@ -295,7 +339,9 @@ public class ListServiceTests : IDisposable
         public void StartNewDiagnosticSession() { }
         public (int FlagResolutions, int MismatchLogs, int DiagnosticEvents) ClearDiagnosticLogs() => (0, 0, 0);
         public (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null) => (0, 0);
-        public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section) { }
+        public List<(CardMatch Match, CardGame Game, string Condition, bool IsFoil, int Quantity, StorageContainer? Container)> Committed { get; } = [];
+        public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section)
+            => Committed.Add((match, game, condition, isFoil, quantity, container));
         public bool IsFirstCopy(CardGame game, string gameCardId, bool isFoil) => throw new NotImplementedException();
         public void AnnotateScan(ScannedCard scan) => throw new NotImplementedException();
         public int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates) => 0;
@@ -316,7 +362,16 @@ public class ListServiceTests : IDisposable
         public Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
         public Task UpdatePricesAsync(IProgress<PriceUpdateProgress>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
         public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14, ulong? scanEdgeHash = null) => null;
-        public List<CardMatch> SearchCards(string query, int maxResults = 20) => [];
+        public List<CardMatch> SearchCards(string query, int maxResults = 20)
+        {
+            // Supports the "set:X cn:Y" query format DecklistPrintingResolver issues.
+            var setMatch = System.Text.RegularExpressions.Regex.Match(query, @"set:(\S+)");
+            var cnMatch = System.Text.RegularExpressions.Regex.Match(query, @"cn:(\S+)");
+            if (!setMatch.Success || !cnMatch.Success) return [];
+            return Printings.Where(p =>
+                string.Equals(p.SetCode, setMatch.Groups[1].Value, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(p.CollectorNumber, cnMatch.Groups[1].Value, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
         public List<CardMatch> GetPrintings(string cardName) => Printings.Where(p => p.Name == cardName).ToList();
         public decimal? GetCurrentPrice(string gameCardId, bool isFoil) => Prices.TryGetValue(gameCardId, out var v) ? v : null;
         public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil) =>

@@ -175,6 +175,15 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         return result == true ? wnd.ViewModel.Result : null;
     }
 
+    public MoveListToLocationResult? PickMoveListToLocation()
+    {
+        var wnd = Services.GetRequiredService<Views.MoveListToLocation.MoveListToLocationView>();
+        SetOwner(wnd);
+        wnd.ViewModel.Load();
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.Result : null;
+    }
+
     public TradeSummary? PickTrade()
     {
         var wnd = Services.GetRequiredService<PickTradeView>();

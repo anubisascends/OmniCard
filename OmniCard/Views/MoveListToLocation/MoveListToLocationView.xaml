@@ -1,0 +1,70 @@
+<Window x:Class="OmniCard.Views.MoveListToLocation.MoveListToLocationView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:OmniCard.Views.MoveListToLocation"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Title="Move List to Location" Height="320" Width="420"
+        Background="{DynamicResource MaterialDesign.Brush.Background}"
+        TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="13"
+        FontFamily="{StaticResource AppFont}">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="1*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Location:" Margin="0,0,0,4"
+                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+        <ComboBox Grid.Row="1" DisplayMemberPath="Name"
+                  ItemsSource="{Binding ViewModel.AvailableLocations}"
+                  SelectedItem="{Binding ViewModel.SelectedLocation}"
+                  IsEnabled="{Binding ViewModel.UseExistingLocation}"
+                  Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                  Margin="0,0,0,8"/>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
+            <CheckBox Content="Create new location" IsChecked="{Binding ViewModel.CreateNew}"
+                      VerticalAlignment="Center" Margin="0,0,10,0"
+                      Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            <TextBox Width="160" Margin="0,0,8,0"
+                     Text="{Binding ViewModel.NewName, UpdateSourceTrigger=PropertyChanged}"
+                     IsEnabled="{Binding ViewModel.CreateNew}"
+                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            <ComboBox Width="110" ItemsSource="{Binding ViewModel.LocationTypes}"
+                      SelectedItem="{Binding ViewModel.NewLocationType}"
+                      IsEnabled="{Binding ViewModel.CreateNew}"
+                      Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Condition:" VerticalAlignment="Center" Margin="0,0,6,0"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            <ComboBox Width="80" ItemsSource="{Binding ViewModel.ConditionOptions}"
+                      SelectedItem="{Binding ViewModel.Condition}"
+                      Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="4" TextWrapping="Wrap" VerticalAlignment="Top"
+                   Text="Every card currently in this list will be moved into the chosen location and removed from the list. Cards that can no longer be resolved to a printing will be left in the list."
+                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Cancel" Command="{Binding ViewModel.CancelCommand}"
+                    IsCancel="True" Padding="16,6" Margin="0,0,8,0"/>
+            <Button Content="Move" Command="{Binding ViewModel.ConfirmCommand}"
+                    IsDefault="True" IsEnabled="{Binding ViewModel.CanConfirm}" Padding="16,6" FontWeight="SemiBold"/>
+        </StackPanel>
+    </Grid>
+</Window>

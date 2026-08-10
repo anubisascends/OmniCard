@@ -200,6 +200,43 @@ public class ListService(
             .ToList();
     }
 
+    public CommitToLocationResult CommitToLocation(int listId, StorageContainer container, string condition)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var list = ctx.CardLists.FirstOrDefault(l => l.Id == listId)
+                   ?? throw new InvalidOperationException($"List {listId} not found.");
+        var gs = cardService.GetGameService(list.Game);
+        var items = ctx.CardListItems.Where(i => i.CardListId == listId).ToList();
+
+        var added = 0;
+        var unresolved = 0;
+        foreach (var item in items)
+        {
+            var entry = new DecklistEntry(item.Quantity, item.CardName, item.SetCode, item.CollectorNumber);
+            var match = DecklistPrintingResolver.Resolve(gs, entry);
+            if (match is null)
+            {
+                unresolved++;
+                continue;
+            }
+
+            cardService.AddCardToCollection(match, list.Game, condition, item.IsFoil,
+                purchasePrice: null, quantity: item.Quantity, container, page: null, slot: null, section: null);
+            added += item.Quantity;
+            ctx.CardListItems.Remove(item);
+        }
+
+        var deleted = false;
+        if (unresolved == 0)
+        {
+            ctx.CardLists.Remove(list);
+            deleted = true;
+        }
+
+        ctx.SaveChanges();
+        return new CommitToLocationResult(added, unresolved, deleted);
+    }
+
     /// <summary>Cheapest non-foil printing of the named card. Returns null if no printing exists;
     /// on no-price, returns the first printing flagged unpriced.</summary>
     private static (CardMatch Printing, decimal? Price, bool Unpriced)? ResolveCheapest(

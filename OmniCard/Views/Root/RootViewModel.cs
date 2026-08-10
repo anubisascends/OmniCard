@@ -30,6 +30,7 @@ public sealed partial class RootViewModel(
     ScannerService scannerService,
     IDialogService dialogService,
     ICardService cardService,
+    IListService listService,
     IOptions<DisplaySettings> displaySettings,
     IStorageContainerService containerService,
     IEbayAuthService ebayAuthService,
@@ -2032,6 +2033,48 @@ public sealed partial class RootViewModel(
         {
             IsCommitting = false;
         }
+    }
+
+    [RelayCommand]
+    public void CreateListFromScans()
+    {
+        if (IsAuditMode) return; // Cannot create a list in audit mode
+
+        var scans = CardService.ScannedCards;
+        if (scans.Count == 0) return;
+
+        if (scans.Any(s => s.Match is null))
+        {
+            MessageBox.Show(
+                "Match or remove all unmatched scans before creating a list from them.",
+                "Unmatched Scans",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        var name = dialogService.RequireReason("New List", "Name for the new list:");
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        var groups = scans.GroupBy(s => s.Game).ToList();
+        var total = scans.Count;
+        foreach (var group in groups)
+        {
+            var listName = groups.Count > 1 ? $"{name} ({group.Key})" : name;
+            var list = listService.CreateList(listName, group.Key);
+            foreach (var scan in group)
+                listService.AddPrinting(list.Id, scan.Match!, scan.IsFoil, quantity: 1, ListItemSource.Scan);
+        }
+
+        ResetScanFilterSort();
+        SelectedScannedCards = [];
+        SelectedScannedCard = null;
+        NotifySelectionChanged();
+        CardService.ClearTempFiles();
+        CardService.ScannedCards.Clear();
+        Lists.Refresh();
+        Message = $"Created list \"{name}\" with {total} cards.";
+        _logger.LogInformation("Created list(s) from {Count} scanned cards", total);
     }
 
     [RelayCommand]

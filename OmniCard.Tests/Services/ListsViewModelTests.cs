@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Interfaces;
 using OmniCard.Models;
+using OmniCard.Tests.Fakes;
 using OmniCard.Views.Lists;
 using Xunit;
 
@@ -9,12 +10,52 @@ namespace OmniCard.Tests.Services;
 public class ListsViewModelTests
 {
     [Fact]
+    public void MoveSelectedListToLocation_CommitsAndReloadsLists()
+    {
+        var svc = new FakeListService();
+        var list = new CardList { Id = 1, Name = "L", Game = CardGame.Mtg };
+        svc.Seed(list);
+        var container = new StorageContainer { Id = 5, Name = "Binder A", ContainerType = ContainerType.Binder };
+        svc.CommitResult = new CommitToLocationResult(3, 0, true);
+        var dialogService = new FakeDialogService
+        {
+            MoveListResult = new MoveListToLocationResult { ExistingContainer = container, Condition = "NM" },
+        };
+        var containerService = new RecordingContainerService();
+        var vm = new ListsViewModel(svc, null!, new FakeDecklistService(), dialogService, containerService, NullLogger<ListsViewModel>.Instance);
+        vm.SetGame(CardGame.Mtg);
+        vm.SelectedList = vm.Lists[0];
+
+        vm.MoveSelectedListToLocationCommand.Execute(null);
+
+        var call = Assert.Single(svc.CommitToLocationCalls);
+        Assert.Equal((list.Id, container, "NM"), call);
+        Assert.Contains("Moved 3 cards", vm.StatusMessage);
+        Assert.Empty(vm.Lists); // list was deleted server-side; Refresh/LoadLists reflects that
+    }
+
+    [Fact]
+    public void MoveSelectedListToLocation_DialogCancelled_DoesNothing()
+    {
+        var svc = new FakeListService();
+        svc.Seed(new CardList { Id = 1, Name = "L", Game = CardGame.Mtg });
+        var dialogService = new FakeDialogService { MoveListResult = null };
+        var vm = new ListsViewModel(svc, null!, new FakeDecklistService(), dialogService, new RecordingContainerService(), NullLogger<ListsViewModel>.Instance);
+        vm.SetGame(CardGame.Mtg);
+        vm.SelectedList = vm.Lists[0];
+
+        vm.MoveSelectedListToLocationCommand.Execute(null);
+
+        Assert.Empty(svc.CommitToLocationCalls);
+    }
+
+    [Fact]
     public void SetGame_LoadsListsForThatGame()
     {
         var svc = new FakeListService();
         svc.Seed(new CardList { Id = 1, Name = "A", Game = CardGame.Mtg });
         svc.Seed(new CardList { Id = 2, Name = "B", Game = CardGame.Pokemon });
-        var vm = new ListsViewModel(svc, null!, new FakeDecklistService(), NullLogger<ListsViewModel>.Instance);
+        var vm = new ListsViewModel(svc, null!, new FakeDecklistService(), null!, null!, NullLogger<ListsViewModel>.Instance);
 
         vm.SetGame(CardGame.Mtg);
 
@@ -26,7 +67,7 @@ public class ListsViewModelTests
     public void CreateList_AddsAndSelects()
     {
         var svc = new FakeListService();
-        var vm = new ListsViewModel(svc, null!, new FakeDecklistService(), NullLogger<ListsViewModel>.Instance);
+        var vm = new ListsViewModel(svc, null!, new FakeDecklistService(), null!, null!, NullLogger<ListsViewModel>.Instance);
         vm.SetGame(CardGame.Mtg);
         vm.NewListName = "My List";
 
@@ -42,7 +83,7 @@ public class ListsViewModelTests
     {
         var svc = new FakeListService();
         svc.Seed(new CardList { Id = 1, Name = "A", Game = CardGame.Mtg });
-        var vm = new ListsViewModel(svc, null!, new FakeDecklistService(), NullLogger<ListsViewModel>.Instance);
+        var vm = new ListsViewModel(svc, null!, new FakeDecklistService(), null!, null!, NullLogger<ListsViewModel>.Instance);
         vm.SetGame(CardGame.Mtg);
         vm.SelectedList = vm.Lists[0];
 
@@ -64,7 +105,7 @@ public class ListsViewModelTests
         {
             new() { Id = 1, CardListId = 1, Quantity = 1, CardName = "Sol Ring" },
         };
-        var vm = new ListsViewModel(svc, null!, new FakeDecklistService(), NullLogger<ListsViewModel>.Instance);
+        var vm = new ListsViewModel(svc, null!, new FakeDecklistService(), null!, null!, NullLogger<ListsViewModel>.Instance);
         vm.SetGame(CardGame.Mtg);
         vm.SelectedList = vm.Lists[0];
 
@@ -101,6 +142,51 @@ public class ListsViewModelTests
         public void RefreshPrices(int listId) { }
         public List<DecklistEntry> ToDecklistEntries(int listId)
             => GetItems(listId).Select(i => new DecklistEntry(i.Quantity, i.CardName, i.SetCode, i.CollectorNumber)).ToList();
+
+        public List<(int ListId, StorageContainer Container, string Condition)> CommitToLocationCalls { get; } = [];
+        public CommitToLocationResult CommitResult { get; set; } = new(0, 0, false);
+        public CommitToLocationResult CommitToLocation(int listId, StorageContainer container, string condition)
+        {
+            CommitToLocationCalls.Add((listId, container, condition));
+            if (CommitResult.ListDeleted) _lists.RemoveAll(l => l.Id == listId);
+            return CommitResult;
+        }
+    }
+
+    private sealed class FakeDialogService : IDialogService
+    {
+        public MoveListToLocationResult? MoveListResult { get; set; }
+        public MoveListToLocationResult? PickMoveListToLocation() => MoveListResult;
+
+        public (bool Connected, bool SetAsDefault) ConnectToScanner() => throw new NotImplementedException();
+        public bool? ConnectToEbay() => throw new NotImplementedException();
+        public void ShowCard(ScannedCard card) => throw new NotImplementedException();
+        public bool IsCardPreviewOpen => throw new NotImplementedException();
+        public void UpdateCardPreview(ScannedCard? card) => throw new NotImplementedException();
+        public bool? EditCollectionCard(CollectionCard card) => throw new NotImplementedException();
+        public void ManageStorageContainers() => throw new NotImplementedException();
+        public int? ShowImportPreview(CsvImportPreview preview) => throw new NotImplementedException();
+        public bool OpenSortFilterBuilder(CardGame game) => throw new NotImplementedException();
+        public IReadOnlyList<string>? OpenSetFilterBuilder(IReadOnlyList<SetInfo> allSets, IReadOnlySet<string>? currentFilter) => throw new NotImplementedException();
+        public void ShowSettings() => throw new NotImplementedException();
+        public int? PickCoverArt(int containerId, string containerName) => throw new NotImplementedException();
+        public MoveToLocationResult? PickMoveToLocation() => throw new NotImplementedException();
+        public void ShowAuditReport(AuditReport report) => throw new NotImplementedException();
+        public bool? OpenEbayListingDialog(CollectionCard card) => throw new NotImplementedException();
+        public bool? OpenManualAdd(StorageContainer? defaultContainer = null) => throw new NotImplementedException();
+        public void ShowDecklistCheck() => throw new NotImplementedException();
+        public Product? EditProduct(Product? existing) => throw new NotImplementedException();
+        public (int Quantity, decimal? UnitCost, int? LocationId, string? Source, DateTime AcquisitionDate)? AddLotDialog(int productId) => throw new NotImplementedException();
+        public bool OpenUnitsDialog(Product product) => throw new NotImplementedException();
+        public void OpenMovementHistory() => throw new NotImplementedException();
+        public void OpenLogViewer() => throw new NotImplementedException();
+        public ListForSaleResult? PickListForSale(decimal suggestedPrice) => throw new NotImplementedException();
+        public TradeSummary? PickTrade() => throw new NotImplementedException();
+        public int ShowTcgOrderImportPreview(TcgOrderImportPreview preview) => throw new NotImplementedException();
+        public bool Confirm(string message, string title) => throw new NotImplementedException();
+        public BatchDecklistImportSummary? ShowBatchDecklistImport() => throw new NotImplementedException();
+        public string? RequireReason(string title, string message) => throw new NotImplementedException();
+        public void ManageTags() => throw new NotImplementedException();
     }
 
     private sealed class FakeDecklistService : IDecklistService
