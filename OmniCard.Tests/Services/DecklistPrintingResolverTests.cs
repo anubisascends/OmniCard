@@ -84,4 +84,24 @@ public class DecklistPrintingResolverTests
         var result = DecklistPrintingResolver.Resolve(gs, new DecklistEntry(1, "Island", null, null));
         Assert.Equal("a", result!.GameSpecificId);
     }
+
+    [Fact]
+    public void NameOnly_ExactNameMisses_FuzzyCommaDashMatchResolves()
+    {
+        var gs = new ConfigurableGameService
+        {
+            OnGetPrintings = name => name == "Vi - Piltover Enforcer" ? [Match("a", "OGS", "1")] : [],
+            OnGetCurrentPrices = (_, _) => new() { ["a"] = 1m },
+        };
+        var result = DecklistPrintingResolver.Resolve(gs, new DecklistEntry(1, "Vi, Piltover Enforcer", null, null));
+        Assert.Equal("a", result!.GameSpecificId);
+    }
+
+    [Fact]
+    public void NameOnly_ExactAndFuzzyBothMiss_Unresolved()
+    {
+        var gs = new ConfigurableGameService { OnGetPrintings = _ => [] };
+        var result = DecklistPrintingResolver.Resolve(gs, new DecklistEntry(1, "Vi, Piltover Enforcer", null, null));
+        Assert.Null(result);
+    }
 }
