@@ -1569,20 +1569,28 @@ public sealed class CardService : ICardService
         var prop = LinqExpression.Property(param, nameof(CollectionCard.Color));
         var notNull = LinqExpression.NotEqual(prop, LinqExpression.Constant(null, typeof(string)));
 
-        // colorless: Color is null or empty
-        if (value.Equals("colorless", StringComparison.OrdinalIgnoreCase))
+        // ExtractColor stores the literal buckets "Colorless"/"Land" for cards with no
+        // WUBRG colors, rather than null/empty - see CardAttributeExtractor.ExtractMtgColor.
+        var isColorlessBucket = LinqExpression.OrElse(
+            LinqExpression.Equal(prop, LinqExpression.Constant(null, typeof(string))),
+            LinqExpression.OrElse(
+                LinqExpression.Equal(prop, LinqExpression.Constant("")),
+                LinqExpression.OrElse(
+                    CallLike(prop, "Colorless"),
+                    CallLike(prop, "Land"))));
+
+        // colorless
+        if (value.Equals("colorless", StringComparison.OrdinalIgnoreCase) || value.Equals("c", StringComparison.OrdinalIgnoreCase))
         {
-            var isColorless = LinqExpression.OrElse(
-                LinqExpression.Equal(prop, LinqExpression.Constant(null, typeof(string))),
-                LinqExpression.Equal(prop, LinqExpression.Constant("")));
-            return op == ComparisonOp.NotEqual ? LinqExpression.Not(isColorless) : isColorless;
+            return op == ComparisonOp.NotEqual ? LinqExpression.Not(isColorlessBucket) : isColorlessBucket;
         }
 
-        // multicolor: Color has 2+ characters
+        // multicolor: Color has 2+ characters and isn't a colorless/land bucket
         if (value.Equals("multicolor", StringComparison.OrdinalIgnoreCase) || value.Equals("multi", StringComparison.OrdinalIgnoreCase))
         {
             var lengthProp = LinqExpression.Property(prop, nameof(string.Length));
-            var isMulti = LinqExpression.AndAlso(notNull,
+            var isMulti = LinqExpression.AndAlso(
+                LinqExpression.AndAlso(notNull, LinqExpression.Not(isColorlessBucket)),
                 LinqExpression.GreaterThanOrEqual(lengthProp, LinqExpression.Constant(2)));
             return op == ComparisonOp.NotEqual ? LinqExpression.Not(isMulti) : isMulti;
         }
@@ -1591,27 +1599,31 @@ public sealed class CardService : ICardService
         if (normalized.Length == 0)
             return LinqExpression.Constant(true);
 
+        // Exclude the colorless/land buckets from letter-based matching so, e.g.,
+        // c:r doesn't match a "Colorless" card just because that word contains an 'r'.
+        var notColorlessBucket = LinqExpression.AndAlso(notNull, LinqExpression.Not(isColorlessBucket));
+
         return op switch
         {
             // : and >= mean "includes at least these colors"
-            ComparisonOp.Contains or ComparisonOp.GreaterOrEqual => BuildColorSuperset(prop, notNull, normalized),
+            ComparisonOp.Contains or ComparisonOp.GreaterOrEqual => BuildColorSuperset(prop, notColorlessBucket, normalized),
             // = means "exactly these colors"
-            ComparisonOp.Exact => LinqExpression.AndAlso(notNull, CallLike(prop, normalized)),
+            ComparisonOp.Exact => LinqExpression.AndAlso(notColorlessBucket, CallLike(prop, normalized)),
             // != means "not exactly these colors"
             ComparisonOp.NotEqual => LinqExpression.OrElse(
                 LinqExpression.Equal(prop, LinqExpression.Constant(null, typeof(string))),
-                LinqExpression.Not(CallLike(prop, normalized))),
+                LinqExpression.OrElse(isColorlessBucket, LinqExpression.Not(CallLike(prop, normalized)))),
             // <= means "at most these colors" (subset)
-            ComparisonOp.LessOrEqual => BuildColorSubset(prop, notNull, normalized),
+            ComparisonOp.LessOrEqual => BuildColorSubset(prop, notColorlessBucket, normalized),
             // < means "strict subset"
             ComparisonOp.LessThan => LinqExpression.AndAlso(
-                BuildColorSubset(prop, notNull, normalized),
+                BuildColorSubset(prop, notColorlessBucket, normalized),
                 LinqExpression.Not(CallLike(prop, normalized))),
             // > means "strict superset"
             ComparisonOp.GreaterThan => LinqExpression.AndAlso(
-                BuildColorSuperset(prop, notNull, normalized),
+                BuildColorSuperset(prop, notColorlessBucket, normalized),
                 LinqExpression.Not(CallLike(prop, normalized))),
-            _ => BuildColorSuperset(prop, notNull, normalized),
+            _ => BuildColorSuperset(prop, notColorlessBucket, normalized),
         };
     }
 
