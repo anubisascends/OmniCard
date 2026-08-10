@@ -117,6 +117,7 @@ public sealed class RecordingListService : IListService
     public AddCardsResult AddCardsByName(int listId, IEnumerable<DecklistEntry> entries) => throw new NotImplementedException();
     public void RefreshPrices(int listId) => throw new NotImplementedException();
     public List<DecklistEntry> ToDecklistEntries(int listId) => throw new NotImplementedException();
+    public CommitToLocationResult CommitToLocation(int listId, StorageContainer container, string condition) => throw new NotImplementedException();
 }
 
 /// <summary>IStorageContainerService that records Create and serves a seeded list.</summary>

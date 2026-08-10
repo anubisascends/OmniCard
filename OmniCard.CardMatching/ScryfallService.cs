@@ -664,11 +664,18 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
     {
         _logger.LogInformation("Calculating set completion for MTG");
 
-        // Total cards per set (distinct collector numbers)
+        // Total cards per set (distinct collector numbers). Grouped by SetCode alone — Scryfall's
+        // bulk data occasionally has the same SetCode under slightly different SetName strings
+        // (e.g. localized/promo variants), which would otherwise collide as duplicate dictionary keys.
         var setTotals = _readContext.Cards
             .AsNoTracking()
-            .GroupBy(c => new { c.SetCode, c.SetName })
-            .Select(g => new { g.Key.SetCode, g.Key.SetName, Total = g.Select(c => c.CollectorNumber).Distinct().Count() })
+            .GroupBy(c => c.SetCode)
+            .Select(g => new
+            {
+                SetCode = g.Key,
+                SetName = g.Select(c => c.SetName).First(),
+                Total = g.Select(c => c.CollectorNumber).Distinct().Count(),
+            })
             .ToDictionary(s => s.SetCode, s => (s.SetName, s.Total));
 
         // Owned cards per set: distinct collector numbers (completion) and physical copies (incl. duplicates)

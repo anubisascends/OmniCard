@@ -30,6 +30,7 @@ public sealed partial class RootViewModel(
     ScannerService scannerService,
     IDialogService dialogService,
     ICardService cardService,
+    IListService listService,
     IOptions<DisplaySettings> displaySettings,
     IStorageContainerService containerService,
     IEbayAuthService ebayAuthService,
@@ -2032,6 +2033,49 @@ public sealed partial class RootViewModel(
         {
             IsCommitting = false;
         }
+    }
+
+    [RelayCommand]
+    public void CreateListFromScans()
+    {
+        if (IsAuditMode) return; // Cannot create a list in audit mode
+
+        var scans = CardService.ScannedCards;
+        if (scans.Count == 0) return;
+
+        if (scans.Any(s => s.Match is null))
+        {
+            MessageBox.Show(
+                "Match or remove all unmatched scans before creating a list from them.",
+                "Unmatched Scans",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        var groups = scans.GroupBy(s => s.Game).Select(g => (Game: g.Key, Count: g.Count())).ToList();
+        var picks = dialogService.PickListTargetsForScans(groups, "New List");
+        if (picks is null) return;
+
+        var total = scans.Count;
+        foreach (var pick in picks)
+        {
+            var listId = pick.CreateNew
+                ? listService.CreateList(pick.NewName, pick.Game).Id
+                : pick.ExistingList!.Id;
+            foreach (var scan in scans.Where(s => s.Game == pick.Game))
+                listService.AddPrinting(listId, scan.Match!, scan.IsFoil, quantity: 1, ListItemSource.Scan);
+        }
+
+        ResetScanFilterSort();
+        SelectedScannedCards = [];
+        SelectedScannedCard = null;
+        NotifySelectionChanged();
+        CardService.ClearTempFiles();
+        CardService.ScannedCards.Clear();
+        Lists.Refresh();
+        Message = $"Added {total} cards to {picks.Count} list(s).";
+        _logger.LogInformation("Added {Count} scanned cards to list(s)", total);
     }
 
     [RelayCommand]

@@ -46,6 +46,8 @@
                 <TextBox Text="{Binding NewListName, UpdateSourceTrigger=PropertyChanged}"
                          Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             </DockPanel>
+            <Button DockPanel.Dock="Bottom" Content="Move to Location..." Margin="0,8,0,0"
+                    Command="{Binding MoveSelectedListToLocationCommand}"/>
             <Button DockPanel.Dock="Bottom" Content="Delete List" Margin="0,8,0,0"
                     Command="{Binding DeleteListCommand}"/>
             <ListBox ItemsSource="{Binding Lists}" SelectedItem="{Binding SelectedList}"
