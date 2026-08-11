@@ -1232,7 +1232,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
 
         // Phase 2: Set symbol hash computation
         progress?.Report("Computing set symbol hashes...");
-        await ComputeSymbolHashesAsync(ct);
+        await ComputeSymbolHashesAsync(forceAll, ct);
 
         sw.Stop();
         _logger.LogInformation("Hash computation complete: {Processed} illustrations, {Failed} failed in {ElapsedSec:F1}s", completed - failed, failed, sw.Elapsed.TotalSeconds);
@@ -1267,15 +1267,23 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         }
     }
 
-    private async Task ComputeSymbolHashesAsync(CancellationToken ct)
+    private async Task ComputeSymbolHashesAsync(bool forceAll, CancellationToken ct)
     {
-        var setCodes = _readContext.Cards
+        var allSetCodes = _readContext.Cards
             .AsNoTracking()
             .Select(c => c.SetCode)
             .Distinct()
             .ToList();
 
-        _logger.LogInformation("Computing symbol hashes for {Count} sets", setCodes.Count);
+        // Sets that already have a hash don't need recomputing — RasterizeSymbolAsync's own
+        // disk cache (and missing-symbol marker) already avoids network calls, but skipping
+        // known-hashed sets entirely also avoids the wasted per-set DB write every rescan.
+        var existingHashes = LoadSymbolHashCache();
+        var setCodes = forceAll
+            ? allSetCodes
+            : [.. allSetCodes.Where(c => !existingHashes.ContainsKey(c))];
+
+        _logger.LogInformation("Computing symbol hashes for {Count} sets ({SkippedCount} already cached)", setCodes.Count, allSetCodes.Count - setCodes.Count);
 
         await using var context = _dbContextFactory.CreateDbContext();
         var computed = 0;

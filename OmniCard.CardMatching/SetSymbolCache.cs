@@ -173,6 +173,11 @@ public class SetSymbolCache(IHttpClientFactory httpClientFactory, IDataPathServi
     {
         var dir = Path.Combine(_cacheDir, setCode.ToUpperInvariant());
         var filePath = Path.Combine(dir, "C.svg"); // Common rarity — shape only, color irrelevant for pHash
+        var missingMarkerPath = filePath + ".missing";
+
+        // A prior 404 was recorded — don't hit the network again for a set that doesn't exist upstream.
+        if (File.Exists(missingMarkerPath))
+            return null;
 
         // Download if not cached
         if (!File.Exists(filePath))
@@ -182,7 +187,15 @@ public class SetSymbolCache(IHttpClientFactory httpClientFactory, IDataPathServi
                 var url = $"https://raw.githubusercontent.com/Investigamer/mtg-vectors/main/svg/set/{setCode.ToUpperInvariant()}/C.svg";
                 var client = httpClientFactory.CreateClient();
                 var response = await client.GetAsync(url);
-                if (!response.IsSuccessStatusCode) return null;
+                if (!response.IsSuccessStatusCode)
+                {
+                    if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        Directory.CreateDirectory(dir);
+                        await File.WriteAllBytesAsync(missingMarkerPath, []);
+                    }
+                    return null;
+                }
 
                 var svgContent = await response.Content.ReadAsByteArrayAsync();
                 Directory.CreateDirectory(dir);

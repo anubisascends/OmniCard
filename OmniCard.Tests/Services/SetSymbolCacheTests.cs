@@ -129,4 +129,55 @@ public class SetSymbolCacheTests : IDisposable
         Assert.NotNull(result);
     }
 
+    // --- RasterizeSymbolAsync negative caching ---
+
+    private static IHttpClientFactory CreateNotFoundHttpFactory(int callLimit = int.MaxValue)
+    {
+        var callCount = 0;
+        var mockHandler = new Mock<HttpMessageHandler>();
+        mockHandler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(() =>
+            {
+                Interlocked.Increment(ref callCount);
+                if (callCount > callLimit)
+                    throw new InvalidOperationException("HTTP should not have been called again");
+                return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+            });
+
+        var client = new HttpClient(mockHandler.Object);
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(client);
+        return factory.Object;
+    }
+
+    [StaFact]
+    public async Task RasterizeSymbolAsync_404_WritesMissingMarker()
+    {
+        var cache = CreateCache(CreateNotFoundHttpFactory());
+        var result = await cache.RasterizeSymbolAsync("PMEI");
+
+        Assert.Null(result);
+        var markerPath = Path.Combine(_tempDir, "PMEI", "C.svg.missing");
+        Assert.True(File.Exists(markerPath));
+    }
+
+    [StaFact]
+    public async Task RasterizeSymbolAsync_SecondCallAfter404_SkipsHttp()
+    {
+        var httpFactory = CreateNotFoundHttpFactory(callLimit: 1);
+        var cache = CreateCache(httpFactory);
+
+        // First call 404s and writes the marker
+        await cache.RasterizeSymbolAsync("PMEI");
+        // Second call should short-circuit on the marker (no HTTP)
+        var result = await cache.RasterizeSymbolAsync("PMEI");
+
+        // If this doesn't throw, the HTTP was only called once (callLimit: 1)
+        Assert.Null(result);
+    }
+
 }
