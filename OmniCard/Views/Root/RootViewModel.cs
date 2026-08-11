@@ -876,6 +876,7 @@ public sealed partial class RootViewModel(
             ScanFilterMode.HighConfidence => card.Match?.Confidence is >= 80,
             ScanFilterMode.LowConfidence => card.Match?.Confidence is not null and < 80,
             ScanFilterMode.Flagged => card.FlagReason != FlagReason.None,
+            ScanFilterMode.New => card.IsFirstCopy,
             _ => true
         };
     }
@@ -1015,6 +1016,9 @@ public sealed partial class RootViewModel(
     [ObservableProperty]
     public partial int ScanFlaggedCount { get; set; }
 
+    [ObservableProperty]
+    public partial int ScanNewCount { get; set; }
+
     public void RefreshScanStats()
     {
         var cards = CardService.ScannedCards;
@@ -1028,6 +1032,7 @@ public sealed partial class RootViewModel(
         ScanHighConfidenceCount = cards.Count(c => c.Match?.Confidence is >= 80);
         ScanLowConfidenceCount = cards.Count(c => c.Match?.Confidence is not null and < 80);
         ScanFlaggedCount = cards.Count(c => c.FlagReason != FlagReason.None);
+        ScanNewCount = cards.Count(c => c.IsFirstCopy);
         OnPropertyChanged(nameof(HasMatchedScans));
     }
 

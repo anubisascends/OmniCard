@@ -5,5 +5,6 @@ public enum ScanFilterMode
     None,
     HighConfidence,
     LowConfidence,
-    Flagged
+    Flagged,
+    New
 }
