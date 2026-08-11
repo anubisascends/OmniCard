@@ -37,7 +37,8 @@ public class CardServiceAnnotateScanTests : IDisposable
         NullLogger<CardService>.Instance,
         new DataPathService(Path.GetTempPath()),
         new NullScanDiagnosticService(),
-        new NullAuditService());
+        new NullAuditService(),
+        new StubScannerSettingsService());
 
     private void SeedLot(string gameCardId, bool foil)
     {
@@ -193,5 +194,11 @@ public class CardServiceAnnotateScanTests : IDisposable
         public void EndAudit() { }
         public CardMatch? FindScopedMatch(ulong hash, ulong[]? artHashes) => null;
         public AuditReport GenerateReport(IEnumerable<ScannedCard> scannedCards) => throw new NotImplementedException();
+    }
+
+    private class StubScannerSettingsService : IScannerSettingsService
+    {
+        public ScanWorkflowMode WorkflowMode { get; private set; } = ScanWorkflowMode.Store;
+        public void SetWorkflowMode(ScanWorkflowMode mode) => WorkflowMode = mode;
     }
 }

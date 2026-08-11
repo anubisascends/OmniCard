@@ -39,6 +39,7 @@
             <ListBoxItem Content="Data Location" Padding="16,10" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <ListBoxItem Content="Sales &amp; Receipts" Padding="16,10" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <ListBoxItem Content="eBay Selling" Padding="16,10" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            <ListBoxItem Content="Scan Workflow" Padding="16,10" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
         </ListBox>
 
         <!-- Section content: the selected group's view is shown; the others are collapsed.
@@ -56,6 +57,9 @@
             </ContentControl>
             <ContentControl Visibility="{Binding Settings.ShowEbaySelling, Converter={StaticResource BoolToVis}}">
                 <local:EbaySellingSettingsView DataContext="{Binding Settings.EbaySelling}"/>
+            </ContentControl>
+            <ContentControl Visibility="{Binding Settings.ShowScanner, Converter={StaticResource BoolToVis}}">
+                <local:ScannerSettingsView DataContext="{Binding Settings.Scanner}"/>
             </ContentControl>
         </Grid>
     </Grid>
