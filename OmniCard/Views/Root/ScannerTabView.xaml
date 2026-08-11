@@ -451,6 +451,36 @@
                                 <Run Text="{Binding ViewModel.ScanFlaggedCount, Mode=OneWay}" FontWeight="SemiBold"/>
                             </TextBlock>
                         </Button>
+
+                        <TextBlock Text="|" VerticalAlignment="Center" Margin="2,0"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" FontSize="11"/>
+
+                        <!-- New (filter) -->
+                        <Button Command="{Binding ViewModel.SetScanFilterCommand}"
+                                Padding="6,2" Margin="0,0,2,0"
+                                Style="{StaticResource MaterialDesignFlatButton}">
+                            <Button.CommandParameter>
+                                <Models:ScanFilterMode>New</Models:ScanFilterMode>
+                            </Button.CommandParameter>
+                            <TextBlock FontSize="11">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground"
+                                                Value="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ViewModel.ScanFilterMode}"
+                                                         Value="{x:Static Models:ScanFilterMode.New}">
+                                                <Setter Property="Foreground"
+                                                        Value="{DynamicResource MaterialDesign.Brush.Primary}"/>
+                                                <Setter Property="FontWeight" Value="Bold"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                                <Run Text="New:"/>
+                                <Run Text="{Binding ViewModel.ScanNewCount, Mode=OneWay}" FontWeight="SemiBold"/>
+                            </TextBlock>
+                        </Button>
                         <!-- Flag navigation -->
                         <TextBlock Text="|" VerticalAlignment="Center" Margin="2,0"
                                    Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" FontSize="11"/>
