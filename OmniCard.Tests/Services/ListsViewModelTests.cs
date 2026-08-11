@@ -188,6 +188,7 @@ public class ListsViewModelTests
         public BatchDecklistImportSummary? ShowBatchDecklistImport() => throw new NotImplementedException();
         public string? RequireReason(string title, string message) => throw new NotImplementedException();
         public void ManageTags() => throw new NotImplementedException();
+        public (CardGame Game, int? ContainerId)? ShowTopValueCards() => throw new NotImplementedException();
     }
 
     private sealed class FakeDecklistService : IDecklistService

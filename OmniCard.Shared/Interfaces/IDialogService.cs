@@ -43,4 +43,8 @@ public interface IDialogService
 
     /// <summary>Opens the tag library management dialog (rename/delete/merge, usage counts).</summary>
     void ManageTags();
+
+    /// <summary>Opens the Top 100 Cards dialog. Returns the game/location to navigate to if the
+    /// user picked "Go to Location" on a row, or null if the dialog was simply closed.</summary>
+    (CardGame Game, int? ContainerId)? ShowTopValueCards();
 }

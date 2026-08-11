@@ -2410,6 +2410,20 @@ public sealed partial class RootViewModel(
     }
 
     [RelayCommand]
+    public void ShowTopValueCards()
+    {
+        var nav = dialogService.ShowTopValueCards();
+        if (nav is not { } result) return;
+
+        SelectedGame = result.Game;
+        if (result.ContainerId is int containerId)
+            Collection.NavigateToLocation(containerId);
+        else
+            Collection.BrowseAll();
+        SelectedTabIndex = 1; // Collection tab
+    }
+
+    [RelayCommand]
     public void ExportScansManaboxCsv()
     {
         if (IsAuditMode) return;
