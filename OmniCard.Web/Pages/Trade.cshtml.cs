@@ -18,16 +18,18 @@ public class TradeModel : PageModel
 
     private readonly IDbContextFactory<OmniCardDbContext> _dbFactory;
     private readonly IDataPathService _dataPathService;
+    private readonly CatalogImageLookup _catalogImageLookup;
 
-    public TradeModel(IDbContextFactory<OmniCardDbContext> dbFactory, IDataPathService dataPathService)
+    public TradeModel(IDbContextFactory<OmniCardDbContext> dbFactory, IDataPathService dataPathService, CatalogImageLookup catalogImageLookup)
     {
         _dbFactory = dbFactory;
         _dataPathService = dataPathService;
+        _catalogImageLookup = catalogImageLookup;
     }
 
     public CollectionCard Card { get; set; } = null!;
 
-    public string? ImageUrl => CardImageUrl.Resolve(Card.ScanImagePath, Card.ImageUri);
+    public string? ImageUrl => _catalogImageLookup.Resolve(Card.Game, Card.GameCardId, Card.ScanImagePath, Card.ImageUri);
 
     public IActionResult OnGet(int lotId)
     {

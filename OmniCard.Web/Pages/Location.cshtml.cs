@@ -10,10 +10,12 @@ namespace OmniCard.Web.Pages;
 public class LocationModel : PageModel
 {
     private readonly IDbContextFactory<OmniCardDbContext> _dbFactory;
+    private readonly CatalogImageLookup _catalogImageLookup;
 
-    public LocationModel(IDbContextFactory<OmniCardDbContext> dbFactory)
+    public LocationModel(IDbContextFactory<OmniCardDbContext> dbFactory, CatalogImageLookup catalogImageLookup)
     {
         _dbFactory = dbFactory;
+        _catalogImageLookup = catalogImageLookup;
     }
 
     public StorageContainer Container { get; set; } = null!;
@@ -64,7 +66,7 @@ public class LocationModel : PageModel
                     rep.Rarity,
                     rep.Color,
                     g.Count(),
-                    CardImageUrl.Resolve(rep.ScanImagePath, rep.ImageUri),
+                    _catalogImageLookup.Resolve(rep.Game, rep.GameCardId, rep.ScanImagePath, rep.ImageUri),
                     rep.MarketPrice > 0m ? rep.MarketPrice : null,
                     rep.Tags);
             })

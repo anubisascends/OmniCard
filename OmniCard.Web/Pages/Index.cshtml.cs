@@ -10,10 +10,12 @@ namespace OmniCard.Web.Pages;
 public class IndexModel : PageModel
 {
     private readonly IDbContextFactory<OmniCardDbContext> _dbFactory;
+    private readonly CatalogImageLookup _catalogImageLookup;
 
-    public IndexModel(IDbContextFactory<OmniCardDbContext> dbFactory)
+    public IndexModel(IDbContextFactory<OmniCardDbContext> dbFactory, CatalogImageLookup catalogImageLookup)
     {
         _dbFactory = dbFactory;
+        _catalogImageLookup = catalogImageLookup;
     }
 
     [BindProperty(SupportsGet = true)]
@@ -186,7 +188,7 @@ public class IndexModel : PageModel
                     Rarity = rep.Rarity,
                     Color = rep.Color,
                     Quantity = g.Count(),
-                    ImageUrl = CardImageUrl.Resolve(rep.ScanImagePath, rep.ImageUri),
+                    ImageUrl = _catalogImageLookup.Resolve(rep.Game, rep.GameCardId, rep.ScanImagePath, rep.ImageUri),
                     MarketPrice = rep.MarketPrice > 0m ? rep.MarketPrice : null,
                     Tags = rep.Tags,
                 };

@@ -1,3 +1,4 @@
+using System.IO;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
@@ -6,7 +7,9 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
+using OmniCard.Web;
 using OmniCard.Web.Pages;
 
 namespace OmniCard.Tests.Web;
@@ -15,6 +18,11 @@ public class WebPageTests : IDisposable
 {
     private readonly SqliteConnection _connection;
     private readonly IDbContextFactory<OmniCardDbContext> _factory;
+    private readonly string _tempDir;
+
+    // No game services registered — these tests only exercise the scan-existence/ImageUri
+    // fallback tiers; the catalog-lookup tier is covered separately in CatalogImageLookupTests.
+    private readonly CatalogImageLookup NoCatalogFallback;
 
     public WebPageTests()
     {
@@ -25,9 +33,37 @@ public class WebPageTests : IDisposable
         _factory = new TestDbContextFactory(options);
         using var ctx = _factory.CreateDbContext();
         ctx.Database.EnsureCreated();
+
+        _tempDir = Path.Combine(Path.GetTempPath(), "OmniCardTests_" + Guid.NewGuid());
+        Directory.CreateDirectory(Path.Combine(_tempDir, "scans"));
+        NoCatalogFallback = new CatalogImageLookup([], new StubDataPathService(_tempDir));
     }
 
-    public void Dispose() => _connection.Dispose();
+    public void Dispose()
+    {
+        _connection.Dispose();
+        Directory.Delete(_tempDir, recursive: true);
+    }
+
+    /// <summary>Writes an empty file at scans/{fileName} in this test's scratch data
+    /// directory, so <see cref="CatalogImageLookup"/>'s on-disk existence check finds it.</summary>
+    private void WriteFakeScanFile(string fileName)
+        => File.WriteAllBytes(Path.Combine(_tempDir, "scans", fileName), [0xFF, 0xD8, 0xFF]);
+
+    private class StubDataPathService(string dataDirectory) : IDataPathService
+    {
+        public string DataDirectory => dataDirectory;
+        public string ScansDirectory => Path.Combine(dataDirectory, "scans");
+        public string TempScansDirectory => Path.Combine(dataDirectory, "temp_scans");
+        public string SymbolsCacheDirectory => Path.Combine(dataDirectory, "symbols", "sets");
+        public string LogsDirectory => Path.Combine(dataDirectory, "logs");
+        public string TradesDirectory => Path.Combine(dataDirectory, "trades");
+        public string? PendingDataDirectory => null;
+        public bool IsMigrationPending => false;
+        public void SetPendingDataDirectory(string path) { }
+        public void CommitMigration() { }
+        public void CancelPendingMigration() { }
+    }
 
     private static PageContext CreatePageContext()
     {
@@ -77,7 +113,7 @@ public class WebPageTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var model = new IndexModel(_factory) { PageContext = CreatePageContext() };
+        var model = new IndexModel(_factory, NoCatalogFallback) { PageContext = CreatePageContext() };
         model.OnGet();
 
         Assert.Equal(3, model.Containers.Count);
@@ -109,7 +145,7 @@ public class WebPageTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var model = new IndexModel(_factory) { PageContext = CreatePageContext(), Q = "bolt" };
+        var model = new IndexModel(_factory, NoCatalogFallback) { PageContext = CreatePageContext(), Q = "bolt" };
         model.OnGet();
 
         var result = Assert.Single(model.SearchResults);
@@ -133,7 +169,7 @@ public class WebPageTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var model = new IndexModel(_factory) { PageContext = CreatePageContext(), Q = "counterspell" };
+        var model = new IndexModel(_factory, NoCatalogFallback) { PageContext = CreatePageContext(), Q = "counterspell" };
         model.OnGet();
 
         var result = Assert.Single(model.SearchResults);
@@ -166,7 +202,7 @@ public class WebPageTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var model = new LocationModel(_factory) { PageContext = CreatePageContext() };
+        var model = new LocationModel(_factory, NoCatalogFallback) { PageContext = CreatePageContext() };
         var result = model.OnGet(containerId);
 
         Assert.IsType<PageResult>(result);
@@ -201,7 +237,7 @@ public class WebPageTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var model = new LocationModel(_factory) { PageContext = CreatePageContext() };
+        var model = new LocationModel(_factory, NoCatalogFallback) { PageContext = CreatePageContext() };
         model.OnGet(containerId);
 
         var boltCard = Assert.Single(model.Cards, c => c.Name == "Lightning Bolt");
@@ -218,7 +254,7 @@ public class WebPageTests : IDisposable
     [Fact]
     public void LocationModel_OnGet_NonexistentContainer_Returns404()
     {
-        var model = new LocationModel(_factory) { PageContext = CreatePageContext() };
+        var model = new LocationModel(_factory, NoCatalogFallback) { PageContext = CreatePageContext() };
         var result = model.OnGet(99999);
         Assert.IsType<NotFoundResult>(result);
     }
@@ -246,7 +282,7 @@ public class WebPageTests : IDisposable
             lotId = lot.Id;
         }
 
-        var model = new CardModel(_factory) { PageContext = CreatePageContext() };
+        var model = new CardModel(_factory, NoCatalogFallback) { PageContext = CreatePageContext() };
         var result = model.OnGet(lotId);
 
         Assert.IsType<PageResult>(result);
@@ -258,7 +294,7 @@ public class WebPageTests : IDisposable
     [Fact]
     public void CardModel_OnGet_NonexistentCard_Returns404()
     {
-        var model = new CardModel(_factory) { PageContext = CreatePageContext() };
+        var model = new CardModel(_factory, NoCatalogFallback) { PageContext = CreatePageContext() };
         var result = model.OnGet(99999);
         Assert.IsType<NotFoundResult>(result);
     }
@@ -266,6 +302,7 @@ public class WebPageTests : IDisposable
     [Fact]
     public void CardModel_ImageUrl_ResolvesScanPathOverApiUri()
     {
+        WriteFakeScanFile("12345.jpg");
         int lotId;
         using (var ctx = _factory.CreateDbContext())
         {
@@ -280,11 +317,37 @@ public class WebPageTests : IDisposable
             lotId = lot.Id;
         }
 
-        var model = new CardModel(_factory) { PageContext = CreatePageContext() };
+        var model = new CardModel(_factory, NoCatalogFallback) { PageContext = CreatePageContext() };
         model.OnGet(lotId);
 
-        // ScanImagePath takes precedence: extracts filename → /scans/12345.jpg
+        // ScanImagePath takes precedence when the file is actually on disk: extracts filename → /scans/12345.jpg
         Assert.Equal("/scans/12345.jpg", model.ImageUrl);
+    }
+
+    [Fact]
+    public void CardModel_ImageUrl_ScanFileMissingOnDisk_FallsBackToApiUri()
+    {
+        // Regression: a lot can carry a stale ScanImagePath whose file is gone (e.g. archived
+        // and deleted after switching to the Discard workflow) — trusting the DB value blindly
+        // renders a broken image instead of falling through to ImageUri.
+        int lotId;
+        using (var ctx = _factory.CreateDbContext())
+        {
+            var product = NewSingle("stale-scan-card", "Stale Scan Card", "Set", "SET", "1", "common");
+            product.ImageUri = "https://api.example.com/card.jpg";
+            ctx.Products.Add(product);
+            ctx.SaveChanges();
+
+            var lot = new InventoryLot { ProductId = product.Id, ScanImagePath = "scans/99999.jpg" };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            lotId = lot.Id;
+        }
+
+        var model = new CardModel(_factory, NoCatalogFallback) { PageContext = CreatePageContext() };
+        model.OnGet(lotId);
+
+        Assert.Equal("https://api.example.com/card.jpg", model.ImageUrl);
     }
 
     // --- IndexModel game filter (mtg/optcg/riftbound + new pokemon/yugioh/fftcg) ---
@@ -318,7 +381,7 @@ public class WebPageTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var model = new IndexModel(_factory) { PageContext = CreatePageContext(), Game = gameCode };
+        var model = new IndexModel(_factory, NoCatalogFallback) { PageContext = CreatePageContext(), Game = gameCode };
         model.OnGet();
 
         Assert.Single(model.Containers);
@@ -365,7 +428,7 @@ public class WebPageTests : IDisposable
                 lotId = lot.Id;
             }
 
-            var model = new CardModel(_factory, pokemonFactory) { PageContext = CreatePageContext() };
+            var model = new CardModel(_factory, NoCatalogFallback, pokemonFactory) { PageContext = CreatePageContext() };
             var result = model.OnGet(lotId);
 
             Assert.IsType<PageResult>(result);
@@ -397,7 +460,7 @@ public class WebPageTests : IDisposable
             lotId = lot.Id;
         }
 
-        var model = new CardModel(_factory) { PageContext = CreatePageContext() };
+        var model = new CardModel(_factory, NoCatalogFallback) { PageContext = CreatePageContext() };
         model.OnGet(lotId);
 
         Assert.Null(model.ExtendedDataJson);
@@ -432,7 +495,7 @@ public class WebPageTests : IDisposable
             lotId = lot.Id;
         }
 
-        var model = new CardModel(_factory, pokemonFactory) { PageContext = CreatePageContext() };
+        var model = new CardModel(_factory, NoCatalogFallback, pokemonFactory) { PageContext = CreatePageContext() };
 
         var exception = Record.Exception(() => model.OnGet(lotId));
 

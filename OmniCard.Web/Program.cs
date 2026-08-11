@@ -4,6 +4,7 @@ using OmniCard.Collection;
 using OmniCard.Data;
 using OmniCard.Interfaces;
 using OmniCard.Models;
+using OmniCard.Web;
 using OmniCard.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -89,6 +90,7 @@ builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<Fina
 // Card & decklist services
 builder.Services.AddSingleton<ICardService, WebCardService>();
 builder.Services.AddSingleton<IDecklistService, DecklistService>();
+builder.Services.AddSingleton<CatalogImageLookup>();
 
 var app = builder.Build();
 

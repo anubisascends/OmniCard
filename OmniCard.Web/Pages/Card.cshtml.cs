@@ -13,14 +13,17 @@ public class CardModel : PageModel
     private readonly IDbContextFactory<PokemonDbContext>? _pokemonFactory;
     private readonly IDbContextFactory<YugiohDbContext>? _yugiohFactory;
     private readonly IDbContextFactory<FinalFantasyDbContext>? _finalFantasyFactory;
+    private readonly CatalogImageLookup _catalogImageLookup;
 
     public CardModel(
         IDbContextFactory<OmniCardDbContext> dbFactory,
+        CatalogImageLookup catalogImageLookup,
         IDbContextFactory<PokemonDbContext>? pokemonFactory = null,
         IDbContextFactory<YugiohDbContext>? yugiohFactory = null,
         IDbContextFactory<FinalFantasyDbContext>? finalFantasyFactory = null)
     {
         _dbFactory = dbFactory;
+        _catalogImageLookup = catalogImageLookup;
         _pokemonFactory = pokemonFactory;
         _yugiohFactory = yugiohFactory;
         _finalFantasyFactory = finalFantasyFactory;
@@ -97,5 +100,5 @@ public class CardModel : PageModel
         }
     }
 
-    public string? ImageUrl => CardImageUrl.Resolve(Card.ScanImagePath, Card.ImageUri);
+    public string? ImageUrl => _catalogImageLookup.Resolve(Card.Game, Card.GameCardId, Card.ScanImagePath, Card.ImageUri);
 }
