@@ -28,6 +28,7 @@ public sealed class CardService : ICardService
     private readonly IDataPathService _dataPathService;
     private readonly IScanDiagnosticService _diagnosticService;
     private readonly IAuditService _auditService;
+    private readonly IScannerSettingsService _scannerSettingsService;
     private string _currentSessionId = Guid.NewGuid().ToString();
 
     public CardService(
@@ -39,7 +40,8 @@ public sealed class CardService : ICardService
         ILogger<CardService> logger,
         IDataPathService dataPathService,
         IScanDiagnosticService diagnosticService,
-        IAuditService auditService)
+        IAuditService auditService,
+        IScannerSettingsService scannerSettingsService)
     {
         _hashService = hashService;
         _gameServices = gameServices.ToDictionary(s => s.Game);
@@ -51,6 +53,7 @@ public sealed class CardService : ICardService
         _dataPathService = dataPathService;
         _diagnosticService = diagnosticService;
         _auditService = auditService;
+        _scannerSettingsService = scannerSettingsService;
 
         // Ensure the unified store exists. Schema completeness beyond a brand-new file
         // (missing tables/columns on a pre-existing inventory.db) is handled at startup by
@@ -501,6 +504,7 @@ public sealed class CardService : ICardService
     public void CommitScans(IEnumerable<ScannedCard> scannedCards, StorageContainer? activeContainer, int? page, int? slot, string? section, IProgress<string>? progress = null)
     {
         _logger.LogInformation("Committing scanned cards to collection");
+        var workflowMode = _scannerSettingsService.WorkflowMode;
         using var context = _omniDbContextFactory.CreateDbContext();
         var productCache = new Dictionary<(CardGame Game, string GameCardId, bool Foil), Product>();
 
@@ -567,75 +571,126 @@ public sealed class CardService : ICardService
             committed.Add((lot, scan));
         }
 
-        // First save to get auto-generated IDs (and resolve any newly-created Products)
-        progress?.Report($"Saving {committed.Count} cards to database...");
-        context.SaveChanges();
-
-        // Acquire movements + flag resolution records for flagged cards that were fixed
-        var tagCache = new Dictionary<string, Tag>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (lot, scan) in committed)
+        // Both saves (and, for the Store workflow, the scan-image copy that sets
+        // ScanImagePath) are wrapped in one transaction so a failure anywhere in the commit
+        // leaves neither partial DB rows nor orphaned image copies. For the Discard workflow,
+        // temp scan files are only ever deleted after this transaction durably commits (see
+        // below) — never before, so a failed commit never loses the source image.
+        var saved = 0;
+        using (var transaction = context.Database.BeginTransaction())
         {
-            context.Movements.Add(new InventoryMovement
+            try
             {
-                ProductId = lot.ProductId,
-                LotId = lot.Id,
-                Type = MovementType.Acquire,
-                Quantity = 1,
-                UnitValue = lot.UnitCost,
-            });
+                // First save to get auto-generated IDs (and resolve any newly-created Products)
+                progress?.Report($"Saving {committed.Count} cards to database...");
+                context.SaveChanges();
 
-            if (scan.LinkedTradeId is int linkedTradeId)
-                lot.FulfilledTradeId = linkedTradeId;
-
-            foreach (var tagName in scan.Tags)
-            {
-                var trimmed = tagName.Trim();
-                if (trimmed.Length == 0) continue;
-
-                if (!tagCache.TryGetValue(trimmed, out var tag))
+                // Acquire movements + flag resolution records for flagged cards that were fixed
+                var tagCache = new Dictionary<string, Tag>(StringComparer.OrdinalIgnoreCase);
+                foreach (var (lot, scan) in committed)
                 {
-                    tag = context.Tags.FirstOrDefault(t => t.Name.ToLower() == trimmed.ToLower())
-                        ?? new Tag { Name = trimmed };
-                    tagCache[trimmed] = tag;
+                    context.Movements.Add(new InventoryMovement
+                    {
+                        ProductId = lot.ProductId,
+                        LotId = lot.Id,
+                        Type = MovementType.Acquire,
+                        Quantity = 1,
+                        UnitValue = lot.UnitCost,
+                    });
+
+                    if (scan.LinkedTradeId is int linkedTradeId)
+                        lot.FulfilledTradeId = linkedTradeId;
+
+                    foreach (var tagName in scan.Tags)
+                    {
+                        var trimmed = tagName.Trim();
+                        if (trimmed.Length == 0) continue;
+
+                        if (!tagCache.TryGetValue(trimmed, out var tag))
+                        {
+                            tag = context.Tags.FirstOrDefault(t => t.Name.ToLower() == trimmed.ToLower())
+                                ?? new Tag { Name = trimmed };
+                            tagCache[trimmed] = tag;
+                        }
+
+                        // Set via the navigation, not TagId directly — a just-created tag isn't saved
+                        // yet, so its Id is still 0; EF fixes up the FK from the tracked reference.
+                        context.LotTags.Add(new LotTag { LotId = lot.Id, Tag = tag });
+                    }
+
+                    if (scan.FlagFix is not null)
+                    {
+                        context.FlagResolutions.Add(new FlagResolution
+                        {
+                            LotId = lot.Id,
+                            FlagReason = scan.FlagFix.OriginalFlagReason.ToString(),
+                            FixType = scan.FlagFix.FixType,
+                            OriginalData = scan.FlagFix.OriginalData,
+                            ResolvedData = scan.FlagFix.ResolvedData,
+                            ScanHash = scan.Hash,
+                            Confidence = scan.Match?.Confidence,
+                            FixedAt = scan.FlagFix.FixedAt,
+                        });
+                    }
                 }
 
-                // Set via the navigation, not TagId directly — a just-created tag isn't saved
-                // yet, so its Id is still 0; EF fixes up the FK from the tracked reference.
-                context.LotTags.Add(new LotTag { LotId = lot.Id, Tag = tag });
-            }
-
-            if (scan.FlagFix is not null)
-            {
-                context.FlagResolutions.Add(new FlagResolution
+                if (workflowMode == ScanWorkflowMode.Store)
                 {
-                    LotId = lot.Id,
-                    FlagReason = scan.FlagFix.OriginalFlagReason.ToString(),
-                    FixType = scan.FlagFix.FixType,
-                    OriginalData = scan.FlagFix.OriginalData,
-                    ResolvedData = scan.FlagFix.ResolvedData,
-                    ScanHash = scan.Hash,
-                    Confidence = scan.Match?.Confidence,
-                    FixedAt = scan.FlagFix.FixedAt,
-                });
+                    // Save scan images to disk
+                    var scansDir = _dataPathService.ScansDirectory;
+                    Directory.CreateDirectory(scansDir);
+
+                    foreach (var (lot, scan) in committed)
+                    {
+                        var fileName = $"{lot.Id}.jpg";
+                        var filePath = Path.Combine(scansDir, fileName);
+
+                        try
+                        {
+                            ConvertToJpeg(scan.TempImagePath, filePath, quality: 90);
+                            lot.ScanImagePath = $"scans/{fileName}";
+
+                            // Delete temp file after successful copy
+                            try
+                            {
+                                File.Delete(scan.TempImagePath);
+                                _imageCache.Evict(scan.TempImagePath);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Failed to delete temp file after commit: {Path}", scan.TempImagePath);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to copy scan image for card {Id}", lot.Id);
+                        }
+
+                        saved++;
+                        if (saved % 5 == 0 || saved == committed.Count)
+                            progress?.Report($"Saving scan images... {saved}/{committed.Count}");
+                    }
+                }
+                // Discard workflow: ScanImagePath stays null and temp files are left untouched
+                // here — they're deleted below, only once the transaction has durably committed.
+
+                // Second save to persist movements, flag resolutions, and ScanImagePath values
+                progress?.Report("Finalizing...");
+                context.SaveChanges();
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
             }
         }
 
-        // Save scan images to disk
-        var scansDir = _dataPathService.ScansDirectory;
-        Directory.CreateDirectory(scansDir);
-
-        var saved = 0;
-        foreach (var (lot, scan) in committed)
+        if (workflowMode == ScanWorkflowMode.Discard)
         {
-            var fileName = $"{lot.Id}.jpg";
-            var filePath = Path.Combine(scansDir, fileName);
-
-            try
+            saved = 0;
+            foreach (var (lot, scan) in committed)
             {
-                ConvertToJpeg(scan.TempImagePath, filePath, quality: 90);
-                lot.ScanImagePath = $"scans/{fileName}";
-
-                // Delete temp file after successful copy
                 try
                 {
                     File.Delete(scan.TempImagePath);
@@ -643,22 +698,14 @@ public sealed class CardService : ICardService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to delete temp file after commit: {Path}", scan.TempImagePath);
+                    _logger.LogWarning(ex, "Failed to delete temp scan file after commit (Discard workflow): {Path}", scan.TempImagePath);
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to copy scan image for card {Id}", lot.Id);
-            }
 
-            saved++;
-            if (saved % 5 == 0 || saved == committed.Count)
-                progress?.Report($"Saving scan images... {saved}/{committed.Count}");
+                saved++;
+                if (saved % 5 == 0 || saved == committed.Count)
+                    progress?.Report($"Cleaning up temp scans... {saved}/{committed.Count}");
+            }
         }
-
-        // Second save to persist movements, flag resolutions, and ScanImagePath values
-        progress?.Report("Finalizing...");
-        context.SaveChanges();
 
         // Trade fulfillment: delete the traded-away lot on a trade's first fulfillment. Further
         // replacements linked to the same trade (this commit or a later one) just carry

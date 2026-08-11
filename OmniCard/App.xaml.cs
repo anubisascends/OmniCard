@@ -82,6 +82,7 @@ public partial class App : Application
             services.AddSingleton<Views.Sales.ManageListingsViewModel>();
             services.AddSingleton<Views.Settings.SalesSettingsViewModel>();
             services.AddSingleton<Views.Settings.EbaySellingSettingsViewModel>();
+            services.AddSingleton<Views.Settings.ScannerSettingsViewModel>();
             services.AddSingleton<Views.Settings.SettingsViewModel>();
             services.AddSingleton<RootViewModel>();
             services.AddSingleton<ScannerService>();
@@ -153,6 +154,8 @@ public partial class App : Application
 
             // Sales & fulfillment
             services.AddSingleton<ISalesSettingsService, SalesSettingsService>();
+            services.AddSingleton<IScannerSettingsService, ScannerSettingsService>();
+            services.AddSingleton<IScanArchiveService, ScanArchiveService>();
             services.AddSingleton<IEbaySellingSettingsService, EbaySellingSettingsService>();
             services.AddSingleton<IListingService, ListingService>();
             services.AddSingleton<ICustomerService, CustomerService>();

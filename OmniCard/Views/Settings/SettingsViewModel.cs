@@ -12,14 +12,16 @@ namespace OmniCard.Views.Settings;
 public partial class SettingsViewModel(
     SalesSettingsViewModel sales,
     DataLocationViewModel dataLocation,
-    EbaySellingSettingsViewModel ebaySelling) : ObservableObject
+    EbaySellingSettingsViewModel ebaySelling,
+    ScannerSettingsViewModel scanner) : ObservableObject
 {
     public SalesSettingsViewModel Sales { get; } = sales;
     public DataLocationViewModel DataLocation { get; } = dataLocation;
     public EbaySellingSettingsViewModel EbaySelling { get; } = ebaySelling;
+    public ScannerSettingsViewModel Scanner { get; } = scanner;
 
     /// <summary>Index of the section selected in the dialog's left-hand nav
-    /// (0 = Display, 1 = Data Location, 2 = Sales &amp; Receipts, 3 = eBay Selling).</summary>
+    /// (0 = Display, 1 = Data Location, 2 = Sales &amp; Receipts, 3 = eBay Selling, 4 = Scan Workflow).</summary>
     [ObservableProperty]
     public partial int SelectedSectionIndex { get; set; }
 
@@ -27,6 +29,7 @@ public partial class SettingsViewModel(
     public bool ShowDataLocation => SelectedSectionIndex == 1;
     public bool ShowSales => SelectedSectionIndex == 2;
     public bool ShowEbaySelling => SelectedSectionIndex == 3;
+    public bool ShowScanner => SelectedSectionIndex == 4;
 
     partial void OnSelectedSectionIndexChanged(int value)
     {
@@ -34,6 +37,7 @@ public partial class SettingsViewModel(
         OnPropertyChanged(nameof(ShowDataLocation));
         OnPropertyChanged(nameof(ShowSales));
         OnPropertyChanged(nameof(ShowEbaySelling));
+        OnPropertyChanged(nameof(ShowScanner));
     }
 
     /// <summary>Loads section data. Called when the Settings dialog opens.</summary>
@@ -42,5 +46,6 @@ public partial class SettingsViewModel(
         Sales.Load();
         await DataLocation.LoadAsync();
         EbaySelling.Load();
+        Scanner.Load();
     }
 }

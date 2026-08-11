@@ -18,14 +18,20 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
     private CollectionCard _originalCard = null!;
     private List<int> _stackedIds = [];
 
-    public CollectionCardEditorViewModel(ICardService cardService, IStorageContainerService containerService, IPerceptualHashService hashService, IDataPathService dataPathService, ITagService tagService)
+    public CollectionCardEditorViewModel(ICardService cardService, IStorageContainerService containerService, IPerceptualHashService hashService, IDataPathService dataPathService, ITagService tagService, IScannerSettingsService scannerSettingsService)
     {
         _cardService = cardService;
         _containerService = containerService;
         _hashService = hashService;
         _dataPathService = dataPathService;
         _tagService = tagService;
+        ShowScanPanel = scannerSettingsService.WorkflowMode == ScanWorkflowMode.Store;
     }
+
+    /// <summary>Whether the scan-image panel should be shown at all. False under the Discard
+    /// workflow, where cards never have a stored scan image, so the panel would only ever show
+    /// the misleading "imported from an external source" placeholder.</summary>
+    public bool ShowScanPanel { get; }
 
     public ObservableCollection<string> Tags { get; } = [];
     public ObservableCollection<string> AllTagSuggestions { get; } = [];

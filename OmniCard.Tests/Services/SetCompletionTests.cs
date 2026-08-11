@@ -59,7 +59,8 @@ public class CardServiceAllGamesSetCompletionTests : IDisposable
             NullLogger<CardService>.Instance,
             new DataPathService(Path.GetTempPath()),
             new NullScanDiagnosticService(),
-            new NullAuditService());
+            new NullAuditService(),
+            new StubScannerSettingsService());
 
         var all = await service.CalculateSetCompletionAsync((CardGame?)null);
 
@@ -82,7 +83,8 @@ public class CardServiceAllGamesSetCompletionTests : IDisposable
             NullLogger<CardService>.Instance,
             new DataPathService(Path.GetTempPath()),
             new NullScanDiagnosticService(),
-            new NullAuditService());
+            new NullAuditService(),
+            new StubScannerSettingsService());
 
         var prices = service.GetCurrentPrices(CardGame.Mtg, ["id1", "id2"], foil: true);
 
@@ -168,6 +170,12 @@ public class CardServiceAllGamesSetCompletionTests : IDisposable
         public void EndAudit() { }
         public CardMatch? FindScopedMatch(ulong hash, ulong[]? artHashes) => null;
         public AuditReport GenerateReport(IEnumerable<ScannedCard> scannedCards) => throw new NotImplementedException();
+    }
+
+    private class StubScannerSettingsService : IScannerSettingsService
+    {
+        public ScanWorkflowMode WorkflowMode { get; private set; } = ScanWorkflowMode.Store;
+        public void SetWorkflowMode(ScanWorkflowMode mode) => WorkflowMode = mode;
     }
 }
 
