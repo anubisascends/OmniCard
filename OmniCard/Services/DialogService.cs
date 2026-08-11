@@ -26,6 +26,7 @@ using OmniCard.Views.SalesListing;
 using OmniCard.Views.Settings;
 using OmniCard.Views.TcgOrderImport;
 using OmniCard.Views.ManageTags;
+using OmniCard.Views.TopValueCards;
 
 namespace OmniCard.Services;
 
@@ -274,6 +275,15 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         SetOwner(wnd);
         wnd.ViewModel.Load();
         wnd.ShowDialog();
+    }
+
+    public (CardGame Game, int? ContainerId)? ShowTopValueCards()
+    {
+        var wnd = Services.GetRequiredService<TopValueCardsView>();
+        SetOwner(wnd);
+        wnd.ViewModel.Load();
+        wnd.ShowDialog();
+        return wnd.ViewModel.NavigationResult;
     }
 
     public ListForSaleResult? PickListForSale(decimal suggestedPrice)

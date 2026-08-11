@@ -172,6 +172,8 @@
                 <MenuItem Header="Search _Collection"
                           Command="{Binding ViewModel.FocusCollectionSearchBoxCommand}"
                           InputGestureText="Ctrl+F"/>
+                <MenuItem Header="_Top 100 Cards..."
+                          Command="{Binding ViewModel.ShowTopValueCardsCommand}"/>
                 <Separator />
                 <MenuItem Header="Sort &amp; Filter Builder..."
                           Command="{Binding ViewModel.Collection.OpenSortFilterBuilderCommand}"/>

@@ -8,7 +8,8 @@ namespace OmniCard.Collection;
 public sealed class CollectionQueryService(
     IDbContextFactory<OmniCardDbContext> dbContextFactory,
     IStorageContainerService containerService,
-    ICardService cardService) : ICollectionQueryService
+    ICardService cardService,
+    IListingService listingService) : ICollectionQueryService
 {
     public async Task<List<LocationTileSummary>> GetLocationOverviewsAsync(CardGame? gameFilter = null)
     {
@@ -124,5 +125,48 @@ public sealed class CollectionQueryService(
         });
 
         return summaries;
+    }
+
+    public List<CollectionCard> GetTopValueCards(int take)
+    {
+        using var context = dbContextFactory.CreateDbContext();
+        var lots = context.Lots.AsNoTracking()
+            .Include(l => l.Product)
+            .Where(l => !l.IsTraded && l.Product.Category == ProductCategory.Single)
+            .ToList();
+
+        var listedLotIds = listingService.GetActiveListingStatusByLot(lots.Select(l => l.Id)).Keys.ToHashSet();
+        var unlisted = lots.Where(l => !listedLotIds.Contains(l.Id)).ToList();
+
+        var containers = containerService.GetAll().ToDictionary(c => c.Id);
+
+        var cards = new List<CollectionCard>(unlisted.Count);
+        foreach (var gameGroup in unlisted.GroupBy(l => l.Product.Game))
+        {
+            var gameService = cardService.GetGameService(gameGroup.Key);
+            foreach (var foilGroup in gameGroup.GroupBy(l => l.Product.Foil))
+            {
+                var gameCardIds = foilGroup
+                    .Select(l => l.Product.GameCardId)
+                    .Where(id => !string.IsNullOrEmpty(id))
+                    .Distinct()
+                    .ToList();
+                var prices = gameService.GetCurrentPrices(gameCardIds!, foilGroup.Key);
+
+                foreach (var lot in foilGroup)
+                {
+                    var price = lot.Product.GameCardId is { Length: > 0 } id
+                        ? prices.GetValueOrDefault(id)
+                        : 0m;
+                    var card = CollectionCardMapper.ToDto(lot, lot.Product, price);
+                    card.Container = card.ContainerId.HasValue
+                        ? containers.GetValueOrDefault(card.ContainerId.Value)
+                        : null;
+                    cards.Add(card);
+                }
+            }
+        }
+
+        return cards.OrderByDescending(c => c.MarketPrice).Take(take).ToList();
     }
 }

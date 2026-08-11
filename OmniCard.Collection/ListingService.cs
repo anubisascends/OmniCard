@@ -162,10 +162,16 @@ public class ListingService(
     public Dictionary<int, ListingStatus> GetActiveListingStatusByLot(IEnumerable<int> lotIds)
     {
         using var ctx = dbContextFactory.CreateDbContext();
-        var ids = lotIds.Distinct().ToList();
+        var ids = lotIds.Distinct().ToHashSet();
+
+        // Filter by lot id in memory rather than a SQL "IN" clause: callers can pass the whole
+        // collection's lot ids (e.g. a cross-game top-value scan), which would otherwise blow
+        // SQLite's per-statement bound-parameter cap. Active listings are normally a small
+        // fraction of all lots, so loading them unfiltered is cheap.
         return ctx.Listings.AsNoTracking()
-            .Where(l => ids.Contains(l.LotId) && ActiveStatuses.Contains(l.Status))
+            .Where(l => ActiveStatuses.Contains(l.Status))
             .ToList()
+            .Where(l => ids.Contains(l.LotId))
             .GroupBy(l => l.LotId)
             .ToDictionary(g => g.Key, g => g.Max(l => l.Status));
     }

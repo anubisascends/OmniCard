@@ -51,7 +51,9 @@ public class CollectionQueryServiceTests : IDisposable
             .Setup(c => c.GetGameService(It.IsAny<CardGame>()))
             .Returns(mockGameService.Object);
 
-        return new CollectionQueryService(_factory, mockContainerService.Object, mockCardService.Object);
+        var listingService = new ListingService(_factory, new Mock<ISalesSettingsService>().Object);
+
+        return new CollectionQueryService(_factory, mockContainerService.Object, mockCardService.Object, listingService);
     }
 
     private StorageContainer SeedContainer(string name, ContainerType type = ContainerType.Binder, int? coverCardId = null)
@@ -70,9 +72,9 @@ public class CollectionQueryServiceTests : IDisposable
 
     /// <summary>Seeds a Product+Lot pair (the unified-store equivalent of a single CollectionCard row).
     /// Returns the Lot, whose Id is the CollectionCard.Id replacement (used e.g. for CoverCardId).</summary>
-    private InventoryLot SeedCard(int containerId, string gameCardId, string name,
+    private InventoryLot SeedCard(int? containerId, string gameCardId, string name,
         CardGame game = CardGame.Mtg, decimal? purchasePrice = null,
-        bool isFoil = false, string? imageUri = null)
+        bool isFoil = false, string? imageUri = null, bool isTraded = false)
     {
         using var ctx = _factory.CreateDbContext();
         var product = new Product
@@ -91,10 +93,37 @@ public class CollectionQueryServiceTests : IDisposable
         ctx.Products.Add(product);
         ctx.SaveChanges();
 
-        var lot = new InventoryLot { ProductId = product.Id, LocationId = containerId, UnitCost = purchasePrice };
+        var lot = new InventoryLot { ProductId = product.Id, LocationId = containerId, UnitCost = purchasePrice, IsTraded = isTraded };
         ctx.Lots.Add(lot);
         ctx.SaveChanges();
         return lot;
+    }
+
+    /// <summary>Seeds a sealed (non-single) Product+Lot pair, to verify GetTopValueCards excludes it.</summary>
+    private InventoryLot SeedSealedProduct(int? containerId, string name, decimal? lastMarketPrice)
+    {
+        using var ctx = _factory.CreateDbContext();
+        var product = new Product
+        {
+            Game = CardGame.Mtg,
+            Category = ProductCategory.Box,
+            Name = name,
+            LastMarketPrice = lastMarketPrice,
+        };
+        ctx.Products.Add(product);
+        ctx.SaveChanges();
+
+        var lot = new InventoryLot { ProductId = product.Id, LocationId = containerId };
+        ctx.Lots.Add(lot);
+        ctx.SaveChanges();
+        return lot;
+    }
+
+    private void SeedListing(int lotId, ListingStatus status = ListingStatus.Listed)
+    {
+        using var ctx = _factory.CreateDbContext();
+        ctx.Listings.Add(new Listing { LotId = lotId, Status = status, ListedPrice = 0m });
+        ctx.SaveChanges();
     }
 
     [Fact]
@@ -231,6 +260,121 @@ public class CollectionQueryServiceTests : IDisposable
 
         var summary = Assert.Single(result);
         Assert.NotNull(summary.CoverImageUri);
+    }
+
+    [Fact]
+    public void GetTopValueCards_RanksDescendingAndCapsAtTake()
+    {
+        var container = SeedContainer("Binder");
+        SeedCard(container.Id, "c1", "Low", purchasePrice: 1m);
+        SeedCard(container.Id, "c2", "High", purchasePrice: 1m);
+        SeedCard(container.Id, "c3", "Mid", purchasePrice: 1m);
+
+        var prices = new Dictionary<string, decimal> { ["c1"] = 5m, ["c2"] = 50m, ["c3"] = 20m };
+        var svc = CreateService([container], prices);
+
+        var result = svc.GetTopValueCards(2);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal("High", result[0].Name);
+        Assert.Equal(20m, result[1].MarketPrice);
+    }
+
+    [Fact]
+    public void GetTopValueCards_ExcludesActivelyListedLots()
+    {
+        var container = SeedContainer("Binder");
+        var expensive = SeedCard(container.Id, "c1", "Expensive", purchasePrice: 1m);
+        SeedCard(container.Id, "c2", "Cheap", purchasePrice: 1m);
+        SeedListing(expensive.Id, ListingStatus.Listed);
+
+        var prices = new Dictionary<string, decimal> { ["c1"] = 100m, ["c2"] = 1m };
+        var svc = CreateService([container], prices);
+
+        var result = svc.GetTopValueCards(100);
+
+        var card = Assert.Single(result);
+        Assert.Equal("Cheap", card.Name);
+    }
+
+    [Fact]
+    public void GetTopValueCards_IncludesLotsWithNoOrInactiveListing()
+    {
+        var container = SeedContainer("Binder");
+        var picked = SeedCard(container.Id, "c1", "Was Picked, Now Sold", purchasePrice: 1m);
+        SeedListing(picked.Id, ListingStatus.Sold);
+
+        var prices = new Dictionary<string, decimal> { ["c1"] = 10m };
+        var svc = CreateService([container], prices);
+
+        var result = svc.GetTopValueCards(100);
+
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public void GetTopValueCards_ExcludesSealedProduct()
+    {
+        var container = SeedContainer("Binder");
+        SeedSealedProduct(container.Id, "Booster Box", lastMarketPrice: 500m);
+        SeedCard(container.Id, "c1", "Single", purchasePrice: 1m);
+
+        var prices = new Dictionary<string, decimal> { ["c1"] = 5m };
+        var svc = CreateService([container], prices);
+
+        var result = svc.GetTopValueCards(100);
+
+        var card = Assert.Single(result);
+        Assert.Equal("Single", card.Name);
+    }
+
+    [Fact]
+    public void GetTopValueCards_ExcludesTradedLots()
+    {
+        var container = SeedContainer("Binder");
+        SeedCard(container.Id, "c1", "Traded Away", purchasePrice: 1m, isTraded: true);
+
+        var prices = new Dictionary<string, decimal> { ["c1"] = 100m };
+        var svc = CreateService([container], prices);
+
+        var result = svc.GetTopValueCards(100);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void GetTopValueCards_PopulatesContainer_UnassignedWhenNoLocation()
+    {
+        var container = SeedContainer("Binder");
+        SeedCard(container.Id, "c1", "Located", purchasePrice: 1m);
+        SeedCard(null, "c2", "Unassigned", purchasePrice: 1m);
+
+        var prices = new Dictionary<string, decimal> { ["c1"] = 5m, ["c2"] = 5m };
+        var svc = CreateService([container], prices);
+
+        var result = svc.GetTopValueCards(100);
+
+        var located = Assert.Single(result, c => c.Name == "Located");
+        Assert.Equal("Binder", located.Container?.Name);
+        var unassigned = Assert.Single(result, c => c.Name == "Unassigned");
+        Assert.Null(unassigned.Container);
+    }
+
+    [Fact]
+    public void GetTopValueCards_SpansMultipleGames()
+    {
+        var container = SeedContainer("Binder");
+        SeedCard(container.Id, "c1", "MTG Card", game: CardGame.Mtg, purchasePrice: 1m);
+        SeedCard(container.Id, "c2", "OP Card", game: CardGame.OnePiece, purchasePrice: 1m);
+
+        var prices = new Dictionary<string, decimal> { ["c1"] = 10m, ["c2"] = 20m };
+        var svc = CreateService([container], prices);
+
+        var result = svc.GetTopValueCards(100);
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, c => c.Game == CardGame.Mtg);
+        Assert.Contains(result, c => c.Game == CardGame.OnePiece);
     }
 
     private class TestDbContextFactory(DbContextOptions<OmniCardDbContext> options)
