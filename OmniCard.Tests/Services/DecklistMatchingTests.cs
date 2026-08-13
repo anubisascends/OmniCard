@@ -181,6 +181,7 @@ public class DecklistMatchingTests : IDisposable
         public void SearchCollection(string query, CardGame? gameFilter, int? containerFilter, SortPreset? sortPreset, FilterPreset? filterPreset, bool stacked, int skip, int take, ObservableCollection<CollectionCard> results) { }
         public int GetSearchCount(string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset, bool stacked) => 0;
         public HashSet<int> GetMatchingContainerIds(string query, CardGame? gameFilter = null) => [];
+        public List<CollectionCard> GetUnplacedBinderCards(int containerId, FilterPreset? filterPreset) => [];
         public void MoveCardsToContainer(IEnumerable<int> cardIds, int containerId, string? section = null) { }
         public void BulkUpdateField(IEnumerable<int> cardIds, Action<CollectionCard> update) { }
         public List<CollectionCard> GetCollectionCards(IEnumerable<int> cardIds) => [];
@@ -197,6 +198,7 @@ public class DecklistMatchingTests : IDisposable
         public (int FlagResolutions, int MismatchLogs, int DiagnosticEvents) ClearDiagnosticLogs() => (0, 0, 0);
         public (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null) => (0, 0);
         public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section) { }
+        public void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int containerId, int page, int slot) { }
         public bool IsFirstCopy(CardGame game, string gameCardId, bool isFoil) => throw new NotImplementedException();
         public void AnnotateScan(ScannedCard scan) => throw new NotImplementedException();
         public int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates) => 0;

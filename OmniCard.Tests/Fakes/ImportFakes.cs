@@ -40,6 +40,7 @@ public sealed class RecordingCardService(ICardGameService active) : ICardService
 
     public ICardGameService ActiveGameService => active;
     public ICardGameService GetGameService(CardGame game) => active;
+    public void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int containerId, int page, int slot) { }
     public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section)
         => Added.Add(new AddCall(match, game, condition, isFoil, purchasePrice, quantity, container));
 
@@ -64,6 +65,7 @@ public sealed class RecordingCardService(ICardGameService active) : ICardService
     public void SearchCollection(string query, CardGame? gameFilter, int? containerFilter, SortPreset? sortPreset, FilterPreset? filterPreset, bool stacked, int skip, int take, ObservableCollection<CollectionCard> results) => throw new NotImplementedException();
     public int GetSearchCount(string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset, bool stacked) => throw new NotImplementedException();
     public HashSet<int> GetMatchingContainerIds(string query, CardGame? gameFilter = null) => throw new NotImplementedException();
+    public List<CollectionCard> GetUnplacedBinderCards(int containerId, FilterPreset? filterPreset) => throw new NotImplementedException();
     public void MoveCardsToContainer(IEnumerable<int> cardIds, int containerId, string? section = null) => throw new NotImplementedException();
     public void BulkUpdateField(IEnumerable<int> cardIds, Action<CollectionCard> update) => throw new NotImplementedException();
     public List<CollectionCard> GetCollectionCards(IEnumerable<int> cardIds) => throw new NotImplementedException();
@@ -130,10 +132,10 @@ public sealed class RecordingContainerService : IStorageContainerService
 
     public List<StorageContainer> GetAll() => Containers;
     public StorageContainer GetBulk() => Bulk;
-    public StorageContainer Create(string name, ContainerType type)
+    public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9)
     {
         Created.Add((name, type));
-        var c = new StorageContainer { Id = _nextId++, Name = name, ContainerType = type };
+        var c = new StorageContainer { Id = _nextId++, Name = name, ContainerType = type, SlotsPerPage = slotsPerPage };
         Containers.Add(c);
         return c;
     }
@@ -145,6 +147,13 @@ public sealed class RecordingContainerService : IStorageContainerService
     public void SetCoverCard(int containerId, int? cardId) => throw new NotImplementedException();
     public List<CollectionCard> GetCardsInContainer(int containerId) => throw new NotImplementedException();
     public void SetExcludeFromDeckCheck(int containerId, bool exclude) => throw new NotImplementedException();
+    public BinderLayout GetBinderLayout(int containerId) => throw new NotImplementedException();
+    public void AddBinderPage(int containerId) => throw new NotImplementedException();
+    public void SetSlotsPerPage(int containerId, int slotsPerPage) => throw new NotImplementedException();
+    public void SetColumns(int containerId, int columns) => throw new NotImplementedException();
+    public List<CollectionCard> GetPlacedCardsOnPage(int containerId, int page) => throw new NotImplementedException();
+    public void UnassignFromPage(int lotId) => throw new NotImplementedException();
+    public void AssignCardToSlot(int lotId, int containerId, int page, int slot) => throw new NotImplementedException();
 }
 
 /// <summary>IDecklistService that returns canned printing entries.</summary>

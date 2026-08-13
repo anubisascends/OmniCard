@@ -130,12 +130,23 @@ public static class UnifiedMigrationService
                 IsSystem INTEGER NOT NULL DEFAULT 0,
                 SortOrder INTEGER NOT NULL DEFAULT 0,
                 CoverCardId INTEGER,
-                ExcludeFromDeckCheck INTEGER NOT NULL DEFAULT 0
+                ExcludeFromDeckCheck INTEGER NOT NULL DEFAULT 0,
+                SlotsPerPage INTEGER NOT NULL DEFAULT 9,
+                TotalPages INTEGER NOT NULL DEFAULT 1,
+                Columns INTEGER NOT NULL DEFAULT 3
             )
             """;
         cmd.ExecuteNonQuery();
         cmd.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS IX_StorageContainers_Name ON StorageContainers(Name)";
         cmd.ExecuteNonQuery();
+
+        if (TableExists(cmd, "StorageContainers"))
+        {
+            // Binder page/slot layout (visual Binder management feature).
+            AddColumnIfMissing(cmd, "StorageContainers", "SlotsPerPage", "INTEGER NOT NULL DEFAULT 9");
+            AddColumnIfMissing(cmd, "StorageContainers", "TotalPages", "INTEGER NOT NULL DEFAULT 1");
+            AddColumnIfMissing(cmd, "StorageContainers", "Columns", "INTEGER NOT NULL DEFAULT 3");
+        }
 
         // If EbayListings already exists from before the Task-5 rename, get its FK column
         // renamed to LotId before (re)running the CREATE TABLE/index statements below — SQLite's

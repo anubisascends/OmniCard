@@ -78,6 +78,9 @@
                     <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
                         <MenuItem Header="Change Cover Art..."
                                   Click="ChangeCoverArt_Click"/>
+                        <MenuItem Header="Open Binder View..."
+                                  Click="OpenBinderView_Click"
+                                  Visibility="{Binding Container.ContainerType, Converter={conv:EnumEqualsToVisibilityConverter}, ConverterParameter=Binder}"/>
                         <Separator Visibility="{Binding Container.IsSystem, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                         <MenuItem Header="Delete Location..."
                                   Click="DeleteLocation_Click"

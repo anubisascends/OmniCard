@@ -984,6 +984,50 @@ public sealed class CardService : ICardService
         _logger.LogInformation("Manually added {Quantity}x {Name} ({SetCode}) to collection", quantity, match.Name, match.SetCode);
     }
 
+    public void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int containerId, int page, int slot)
+    {
+        using var context = _omniDbContextFactory.CreateDbContext();
+
+        var product = FindOrCreateProduct(context, game, match.GameSpecificId, isFoil,
+            match.Name, match.SetCode, match.SetName, match.CollectorNumber, match.Rarity, match.ImageUri,
+            CardAttributeExtractor.ExtractColor(match, game), CardAttributeExtractor.ExtractCardType(match, game));
+
+        // Swap semantics matching drag-and-drop: if the slot is already occupied, the existing
+        // card is displaced back to the Unplaced pool (page/slot cleared, still in this binder).
+        var occupant = context.Lots.FirstOrDefault(l =>
+            l.LocationId == containerId && l.Page == page && l.Slot == slot);
+        if (occupant is not null)
+        {
+            occupant.Page = null;
+            occupant.Slot = null;
+        }
+
+        var lot = new InventoryLot
+        {
+            Product = product,
+            Condition = condition,
+            UnitCost = purchasePrice,
+            LocationId = containerId,
+            Page = page,
+            Slot = slot,
+        };
+        context.Lots.Add(lot);
+        context.SaveChanges();
+
+        context.Movements.Add(new InventoryMovement
+        {
+            ProductId = lot.ProductId,
+            LotId = lot.Id,
+            Type = MovementType.Acquire,
+            Quantity = 1,
+            UnitValue = purchasePrice,
+        });
+        context.SaveChanges();
+
+        _logger.LogInformation("Added missing card {Name} ({SetCode}) to binder {Container} page {Page} slot {Slot}",
+            match.Name, match.SetCode, containerId, page, slot);
+    }
+
     public bool IsFirstCopy(CardGame game, string gameCardId, bool isFoil)
     {
         using var context = _omniDbContextFactory.CreateDbContext();
@@ -1181,6 +1225,17 @@ public sealed class CardService : ICardService
             .Select(c => c.ContainerId!.Value)
             .Distinct()
             .ToHashSet();
+    }
+
+    public List<CollectionCard> GetUnplacedBinderCards(int containerId, FilterPreset? filterPreset)
+    {
+        using var context = _omniDbContextFactory.CreateDbContext();
+        var cards = BuildFilteredQuery(context, "", null, containerId, filterPreset)
+            .Where(c => c.Page == null)
+            .OrderBy(c => c.Name);
+        var list = cards.ToList();
+        AttachEbayListings(context, list);
+        return list;
     }
 
     /// <summary>

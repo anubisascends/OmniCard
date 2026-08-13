@@ -27,6 +27,10 @@ public interface ICardService
     void SearchCollection(string query, CardGame? gameFilter, int? containerFilter, SortPreset? sortPreset, FilterPreset? filterPreset, bool stacked, int skip, int take, ObservableCollection<CollectionCard> results);
     int GetSearchCount(string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset, bool stacked);
     HashSet<int> GetMatchingContainerIds(string query, CardGame? gameFilter);
+
+    /// <summary>Cards in the given (Binder) container not yet placed on a page/slot, narrowed by
+    /// the same filter-preset query language used for the main collection search.</summary>
+    List<CollectionCard> GetUnplacedBinderCards(int containerId, FilterPreset? filterPreset);
     void MoveCardsToContainer(IEnumerable<int> cardIds, int containerId, string? section = null);
     void BulkUpdateField(IEnumerable<int> cardIds, Action<CollectionCard> update);
     List<CollectionCard> GetCollectionCards(IEnumerable<int> cardIds);
@@ -43,6 +47,10 @@ public interface ICardService
     (int FlagResolutions, int MismatchLogs, int DiagnosticEvents) ClearDiagnosticLogs();
     (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null);
     void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section);
+
+    /// <summary>Adds a single card directly into a specific binder page/slot. If that slot is already
+    /// occupied, the existing card is displaced back to the Unplaced pool (swap) — same as dragging.</summary>
+    void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int containerId, int page, int slot);
     bool IsFirstCopy(CardGame game, string gameCardId, bool isFoil);
     void AnnotateScan(ScannedCard scan);
     int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates);

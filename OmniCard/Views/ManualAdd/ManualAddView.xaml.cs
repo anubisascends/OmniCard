@@ -8,6 +8,11 @@ public partial class ManualAddView : Window, IView<ManualAddViewModel>
     {
         InitializeComponent();
         ViewModel = viewModel;
+        ViewModel.CloseDialog = result =>
+        {
+            DialogResult = result;
+            Close();
+        };
         DataContext = this;
     }
 

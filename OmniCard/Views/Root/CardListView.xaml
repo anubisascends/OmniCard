@@ -7,6 +7,14 @@
              xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
 
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="CardTileTemplate.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
     <Grid>
     <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" MinWidth="200"/>
@@ -14,9 +22,27 @@
         <!-- Width + visibility are driven from code-behind (ApplySidebarLayout). -->
         <ColumnDefinition x:Name="SidebarColumn" Width="0" MinWidth="0"/>
     </Grid.ColumnDefinitions>
+
+    <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
+    </Grid.RowDefinitions>
+
+    <!-- Quick filter: instantly hides/shows already-loaded tiles as you type (client-side,
+         no round-trip) — separate from the toolbar's full-catalog search/Go, which can live in
+         the ToolBar overflow and isn't always visible. -->
+    <TextBox x:Name="QuickFilterBox"
+             Grid.Row="0"
+             Margin="0,0,0,6"
+             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+             materialDesign:HintAssist.Hint="Quick filter (name, set, #)..."
+             TextChanged="QuickFilterBox_TextChanged"/>
+
     <ListBox x:Name="CollectionListBox"
+             Grid.Row="1"
              ItemsSource="{Binding CollectionSearchResults}"
              SelectedItem="{Binding SelectedCollectionCard}"
+             ItemTemplate="{StaticResource CardTileTemplate}"
              SelectionMode="Extended"
              HorizontalContentAlignment="Stretch"
              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -72,155 +98,6 @@
                 </Setter>
             </Style>
         </ListBox.ItemContainerStyle>
-
-        <!-- Tile: art (or placeholder) + name + set + price + qty -->
-        <ListBox.ItemTemplate>
-            <DataTemplate>
-                <Border Width="160"
-                        Margin="6"
-                        Padding="6"
-                        Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
-                        BorderBrush="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"
-                        BorderThickness="1"
-                        CornerRadius="6">
-                    <!-- Full card details on hover (the tile itself trims to fit). -->
-                    <Border.ToolTip>
-                        <!-- ToolTips render in their own popup outside the themed window, so the
-                             default (light) tooltip background blends with the theme's light
-                             foreground text. Pin a themed dark surface + border for contrast. -->
-                        <ToolTip MaxWidth="340"
-                                 Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
-                                 Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
-                                 BorderBrush="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"
-                                 BorderThickness="1">
-                            <StackPanel>
-                                <TextBlock Text="{Binding Name}"
-                                           FontWeight="Bold"
-                                           FontSize="14"
-                                           TextWrapping="Wrap"
-                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                                <TextBlock Margin="0,2,0,0"
-                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
-                                           TextWrapping="Wrap">
-                                    <Run Text="{Binding SetName, Mode=OneWay}"/><Run Text=" ("/><Run Text="{Binding SetCode, Mode=OneWay}"/><Run Text=")"/>
-                                </TextBlock>
-                                <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}">
-                                    <Run Text="#"/><Run Text="{Binding Number, Mode=OneWay}"/><Run Text="   "/><Run Text="{Binding Rarity, Mode=OneWay}"/>
-                                </TextBlock>
-                                <TextBlock Margin="0,4,0,0"
-                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
-                                    <Run Text="Condition: "/><Run Text="{Binding Condition, Mode=OneWay}"/>
-                                </TextBlock>
-                                <TextBlock Text="Foil"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource MaterialDesign.Brush.Primary}"
-                                           Visibility="{Binding IsFoil, Converter={conv:BoolToVisibilityConverter}}"/>
-                                <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
-                                    <Run Text="Market: "/><Run Text="{Binding MarketPrice, Converter={conv:MarketPriceDisplayConverter}, Mode=OneWay}"/>
-                                </TextBlock>
-                                <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
-                                    <Run Text="Quantity: "/><Run Text="{Binding Quantity, Mode=OneWay}"/>
-                                </TextBlock>
-                            </StackPanel>
-                        </ToolTip>
-                    </Border.ToolTip>
-                    <StackPanel>
-                        <!-- Art area (63:88 card ratio) -->
-                        <Grid Width="148" Height="207" Margin="0,0,0,6">
-                            <!-- Placeholder shown when the image resolves to null -->
-                            <Border CornerRadius="6"
-                                    Background="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"
-                                    Visibility="{Binding Source, ElementName=TileImage,
-                                        Converter={conv:NullToVisibleConverter}}">
-                                <TextBlock Text="No Image"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontStyle="Italic"
-                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
-                            </Border>
-                            <Image x:Name="TileImage"
-                                   Stretch="Uniform"
-                                   helpers:TileArt.Card="{Binding}"
-                                   helpers:TileArt.DataDirectory="{Binding DataContext.DataDirectory,
-                                       RelativeSource={RelativeSource AncestorType=ListBox}}"/>
-
-                            <!-- On-market badge: "eBAY" when actively listed on eBay, else "LISTED"/"PICKED";
-                                 visible only when the card is on-market. -->
-                            <Border VerticalAlignment="Top" HorizontalAlignment="Left"
-                                    Margin="4" Padding="4,1" CornerRadius="3"
-                                    Visibility="{Binding ListingStatus, Converter={conv:NullToCollapsedConverter}}">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Setter Property="Background" Value="{DynamicResource MaterialDesign.Brush.Primary}"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Text, ElementName=BadgeText}" Value="eBAY">
-                                                <Setter Property="Background" Value="#1E88E5"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Border.Style>
-                                <TextBlock x:Name="BadgeText" FontSize="9" FontWeight="Bold" Foreground="White">
-                                    <TextBlock.Text>
-                                        <MultiBinding Converter="{conv:ListingBadgeConverter}">
-                                            <Binding Path="ListingStatus"/>
-                                            <Binding Path="EbayListing.Status"/>
-                                        </MultiBinding>
-                                    </TextBlock.Text>
-                                </TextBlock>
-                            </Border>
-
-                            <!-- Traded badge: this physical copy was marked traded from the web app -->
-                            <Border VerticalAlignment="Top" HorizontalAlignment="Right"
-                                    Margin="4" Padding="4,1" CornerRadius="3"
-                                    Background="#6D4C41"
-                                    Visibility="{Binding IsTraded, Converter={conv:BoolToVisibilityConverter}}"
-                                    ToolTip="{Binding TradeNote}">
-                                <TextBlock Text="TRADED" FontSize="9" FontWeight="Bold" Foreground="White"/>
-                            </Border>
-
-                            <!-- Tag indicator: icon + count, tooltip lists every tag on this copy -->
-                            <Border VerticalAlignment="Bottom" HorizontalAlignment="Right"
-                                    Margin="4" Padding="4,1" CornerRadius="3"
-                                    Background="#00000099"
-                                    Visibility="{Binding HasTags, Converter={conv:BoolToVisibilityConverter}}"
-                                    ToolTip="{Binding TagsDisplay}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="Tag" Width="11" Height="11" Foreground="White" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Tags.Count}" FontSize="9" FontWeight="Bold"
-                                               Foreground="White" Margin="2,0,0,0" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-
-                        <!-- Name: single line, ellipsis when too long (full name in the tile tooltip) -->
-                        <TextBlock Text="{Binding Name}"
-                                   FontWeight="Bold"
-                                   TextWrapping="NoWrap"
-                                   TextTrimming="CharacterEllipsis"
-                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-
-                        <!-- Set Name (Set Code) -->
-                        <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
-                                   TextTrimming="CharacterEllipsis">
-                            <Run Text="{Binding SetName, Mode=OneWay}"/><Run Text=" ("/><Run Text="{Binding SetCode, Mode=OneWay}"/><Run Text=")"/>
-                        </TextBlock>
-
-                        <!-- Market price -->
-                        <TextBlock Text="{Binding MarketPrice, Converter={conv:MarketPriceDisplayConverter}}"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-
-                        <!-- Quantity (stacked mode only) -->
-                        <TextBlock Text="{Binding Quantity, StringFormat=×{0}}"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource MaterialDesign.Brush.Primary}"
-                                   Visibility="{Binding DataContext.IsStacked,
-                                       RelativeSource={RelativeSource AncestorType=ListBox},
-                                       Converter={conv:BoolToVisibilityConverter}}"/>
-                    </StackPanel>
-                </Border>
-            </DataTemplate>
-        </ListBox.ItemTemplate>
 
         <ListBox.ContextMenu>
             <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">

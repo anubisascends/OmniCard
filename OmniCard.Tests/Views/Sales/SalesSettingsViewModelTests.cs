@@ -14,13 +14,20 @@ public class SalesSettingsViewModelTests
             [new StorageContainer { Id = 1, Name = "Bulk" }, new StorageContainer { Id = 2, Name = "For Sale" }];
         public List<StorageContainer> GetAll() => Containers;
         public StorageContainer GetBulk() => Containers[0];
-        public StorageContainer Create(string name, ContainerType type) => throw new System.NotImplementedException();
+        public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9) => throw new System.NotImplementedException();
         public void Rename(int id, string newName) { }
         public void Delete(int id, bool moveCardsToBulk = true) { }
         public int GetCardCount(int containerId) => 0;
         public void SetCoverCard(int containerId, int? cardId) { }
         public List<CollectionCard> GetCardsInContainer(int containerId) => [];
         public void SetExcludeFromDeckCheck(int containerId, bool exclude) { }
+        public BinderLayout GetBinderLayout(int containerId) => throw new System.NotImplementedException();
+        public void AddBinderPage(int containerId) { }
+        public void SetSlotsPerPage(int containerId, int slotsPerPage) { }
+        public void SetColumns(int containerId, int columns) { }
+        public List<CollectionCard> GetPlacedCardsOnPage(int containerId, int page) => [];
+        public void UnassignFromPage(int lotId) { }
+        public void AssignCardToSlot(int lotId, int containerId, int page, int slot) { }
     }
 
     private sealed class FakeSettings : ISalesSettingsService

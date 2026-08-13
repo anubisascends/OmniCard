@@ -134,6 +134,14 @@
                               ItemsSource="{Binding Source={x:Static local:StorageManagerView.ContainerTypes}}"
                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4"
+                            Visibility="{Binding ViewModel.ShowSlotsPerPage, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="Slots per page:" VerticalAlignment="Center" Margin="0,0,8,0"
+                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                    <TextBox Text="{Binding ViewModel.NewSlotsPerPage, UpdateSourceTrigger=PropertyChanged}"
+                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                             Width="60"/>
+                </StackPanel>
                 <StackPanel Orientation="Horizontal">
                     <Button Content="Create" Command="{Binding ViewModel.ConfirmAddCommand}" Padding="8,2" Margin="0,0,4,0"/>
                     <Button Content="Cancel" Command="{Binding ViewModel.CancelAddCommand}" Padding="8,2"/>

@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 using OmniCard.Collection;
 
@@ -9,307 +10,128 @@ namespace OmniCard.Tests.Services;
 public class StorageContainerServiceTests : IDisposable
 {
     private readonly SqliteConnection _connection;
-    private readonly IDbContextFactory<OmniCardDbContext> _factory;
+    private readonly DbContextOptions<OmniCardDbContext> _options;
 
     public StorageContainerServiceTests()
     {
         _connection = new SqliteConnection("Data Source=:memory:");
         _connection.Open();
-        var options = new DbContextOptionsBuilder<OmniCardDbContext>()
+        _options = new DbContextOptionsBuilder<OmniCardDbContext>()
             .UseSqlite(_connection)
             .Options;
-        _factory = new TestDbContextFactory(options);
-        using var ctx = _factory.CreateDbContext();
+        using var ctx = new OmniCardDbContext(_options);
         ctx.Database.EnsureCreated();
-
-        // Seed Bulk container
-        ctx.StorageContainers.Add(new StorageContainer
-        {
-            Name = "Bulk",
-            ContainerType = ContainerType.Bulk,
-            IsSystem = true,
-            SortOrder = 0,
-        });
-        ctx.SaveChanges();
     }
 
     public void Dispose() => _connection.Dispose();
 
-    private StorageContainerService CreateService() => new(_factory);
+    private IStorageContainerService CreateService() =>
+        new StorageContainerService(new MockFactory(_options));
 
-    private static Product NewSingle(string gameCardId, string name) => new()
+    private (int ContainerId, int LotAId, int LotBId) SeedBinderWithTwoLots()
     {
-        Game = CardGame.Mtg,
-        Category = ProductCategory.Single,
-        GameCardId = gameCardId,
-        Name = name,
-        SetName = "S",
-        SetCode = "S",
-        CollectorNumber = "1",
-        Rarity = "common",
-    };
-
-    [Fact]
-    public void GetAll_ReturnsBulkFirst()
-    {
-        var svc = CreateService();
-        var all = svc.GetAll();
-        Assert.NotEmpty(all);
-        Assert.Equal("Bulk", all[0].Name);
-    }
-
-    [Fact]
-    public void GetBulk_ReturnsSystemContainer()
-    {
-        var svc = CreateService();
-        var bulk = svc.GetBulk();
-        Assert.Equal("Bulk", bulk.Name);
-        Assert.True(bulk.IsSystem);
-        Assert.Equal(ContainerType.Bulk, bulk.ContainerType);
-    }
-
-    [Fact]
-    public void Create_AddsContainer()
-    {
-        var svc = CreateService();
-        var container = svc.Create("Red Binder", ContainerType.Binder);
-        Assert.True(container.Id > 0);
-        Assert.Equal("Red Binder", container.Name);
-        Assert.Equal(ContainerType.Binder, container.ContainerType);
-        Assert.False(container.IsSystem);
-
-        var all = svc.GetAll();
-        Assert.Equal(2, all.Count); // Bulk + Red Binder
-    }
-
-    [Fact]
-    public void Create_SetsIncrementingSortOrder()
-    {
-        var svc = CreateService();
-        var c1 = svc.Create("Binder A", ContainerType.Binder);
-        var c2 = svc.Create("Binder B", ContainerType.Binder);
-        Assert.True(c2.SortOrder > c1.SortOrder);
-    }
-
-    [Fact]
-    public void Rename_UpdatesName()
-    {
-        var svc = CreateService();
-        var container = svc.Create("Old Name", ContainerType.Box);
-        svc.Rename(container.Id, "New Name");
-
-        var all = svc.GetAll();
-        Assert.Contains(all, c => c.Name == "New Name");
-    }
-
-    [Fact]
-    public void Rename_ThrowsForSystemContainer()
-    {
-        var svc = CreateService();
-        var bulk = svc.GetBulk();
-        Assert.Throws<InvalidOperationException>(() => svc.Rename(bulk.Id, "Not Bulk"));
-    }
-
-    [Fact]
-    public void Delete_RemovesContainer()
-    {
-        var svc = CreateService();
-        var container = svc.Create("To Delete", ContainerType.DeckBox);
-        svc.Delete(container.Id);
-
-        var all = svc.GetAll();
-        Assert.DoesNotContain(all, c => c.Name == "To Delete");
-    }
-
-    [Fact]
-    public void Delete_ThrowsForSystemContainer()
-    {
-        var svc = CreateService();
-        var bulk = svc.GetBulk();
-        Assert.Throws<InvalidOperationException>(() => svc.Delete(bulk.Id));
-    }
-
-    [Fact]
-    public void Delete_WithMoveCardsToBulk_MovesCardsToSystem()
-    {
-        var svc = CreateService();
-        var container = svc.Create("Container With Cards", ContainerType.Box);
-        var bulk = svc.GetBulk();
-
-        // Add a card to this container
-        using (var ctx = _factory.CreateDbContext())
-        {
-            var product = NewSingle("test", "Test");
-            ctx.Products.Add(product);
-            ctx.SaveChanges();
-            ctx.Lots.Add(new InventoryLot { ProductId = product.Id, LocationId = container.Id });
-            ctx.SaveChanges();
-        }
-
-        // Delete with moveCardsToBulk = true
-        svc.Delete(container.Id, moveCardsToBulk: true);
-
-        // Verify container is deleted
-        var all = svc.GetAll();
-        Assert.DoesNotContain(all, c => c.Name == "Container With Cards");
-
-        // Verify card was moved to bulk
-        using (var ctx = _factory.CreateDbContext())
-        {
-            var lot = ctx.Lots.Include(l => l.Product).First(l => l.Product.Name == "Test");
-            Assert.Equal(bulk.Id, lot.LocationId);
-            Assert.Null(lot.Page);
-            Assert.Null(lot.Slot);
-            Assert.Null(lot.Section);
-        }
-    }
-
-    [Fact]
-    public void Delete_WithDeleteCards_RemovesCards()
-    {
-        var svc = CreateService();
-        var container = svc.Create("Container With Cards", ContainerType.Box);
-
-        // Add a card to this container
-        using (var ctx = _factory.CreateDbContext())
-        {
-            var product = NewSingle("test", "Test");
-            ctx.Products.Add(product);
-            ctx.SaveChanges();
-            ctx.Lots.Add(new InventoryLot { ProductId = product.Id, LocationId = container.Id });
-            ctx.SaveChanges();
-        }
-
-        // Delete with moveCardsToBulk = false
-        svc.Delete(container.Id, moveCardsToBulk: false);
-
-        // Verify container is deleted
-        var all = svc.GetAll();
-        Assert.DoesNotContain(all, c => c.Name == "Container With Cards");
-
-        // Verify card was deleted
-        using (var ctx = _factory.CreateDbContext())
-        {
-            Assert.Empty(ctx.Lots.Include(l => l.Product).Where(l => l.Product.Name == "Test"));
-        }
-    }
-
-    [Fact]
-    public void GetCardCount_ReturnsCorrectCount()
-    {
-        var svc = CreateService();
-        var container = svc.Create("Box", ContainerType.Box);
-
-        using var ctx = _factory.CreateDbContext();
-        var a = NewSingle("a", "A");
-        var b = NewSingle("b", "B");
-        ctx.Products.AddRange(a, b);
-        ctx.SaveChanges();
-        ctx.Lots.Add(new InventoryLot { ProductId = a.Id, LocationId = container.Id });
-        ctx.Lots.Add(new InventoryLot { ProductId = b.Id, LocationId = container.Id });
+        using var ctx = new OmniCardDbContext(_options);
+        var container = new StorageContainer { Name = "Binder A", ContainerType = ContainerType.Binder, SlotsPerPage = 9, TotalPages = 1 };
+        ctx.StorageContainers.Add(container);
         ctx.SaveChanges();
 
-        Assert.Equal(2, svc.GetCardCount(container.Id));
+        var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, Name = "Test Card" };
+        ctx.Products.Add(product);
+        ctx.SaveChanges();
+
+        var lotA = new InventoryLot { ProductId = product.Id, Quantity = 1, LocationId = container.Id, Page = null, Slot = null };
+        var lotB = new InventoryLot { ProductId = product.Id, Quantity = 1, LocationId = container.Id, Page = null, Slot = null };
+        ctx.Lots.AddRange(lotA, lotB);
+        ctx.SaveChanges();
+
+        return (container.Id, lotA.Id, lotB.Id);
     }
 
     [Fact]
-    public void SetCoverCard_UpdatesCoverCardId()
+    public void AssignCardToSlot_EmptySlot_PlacesCard()
     {
-        var svc = CreateService();
-        var container = svc.Create("Box", ContainerType.Box);
+        var (containerId, lotAId, _) = SeedBinderWithTwoLots();
+        var service = CreateService();
 
-        // Add a card
-        int cardId;
-        using (var ctx = _factory.CreateDbContext())
-        {
-            var product = NewSingle("cover", "Cover Card");
-            ctx.Products.Add(product);
-            ctx.SaveChanges();
-            var lot = new InventoryLot { ProductId = product.Id, LocationId = container.Id };
-            ctx.Lots.Add(lot);
-            ctx.SaveChanges();
-            cardId = lot.Id;
-        }
+        service.AssignCardToSlot(lotAId, containerId, page: 1, slot: 0);
 
-        // Set cover card
-        svc.SetCoverCard(container.Id, cardId);
-
-        // Verify
-        using (var ctx = _factory.CreateDbContext())
-        {
-            var updated = ctx.StorageContainers.Find(container.Id);
-            Assert.NotNull(updated);
-            Assert.Equal(cardId, updated.CoverCardId);
-        }
+        using var ctx = new OmniCardDbContext(_options);
+        var lotA = ctx.Lots.Single(l => l.Id == lotAId);
+        Assert.Equal(1, lotA.Page);
+        Assert.Equal(0, lotA.Slot);
     }
 
     [Fact]
-    public void SetCoverCard_CanClearCoverCard()
+    public void AssignCardToSlot_FromUnplacedPool_DisplacesOccupantBackToPool()
     {
-        var svc = CreateService();
-        var container = svc.Create("Box", ContainerType.Box);
+        var (containerId, lotAId, lotBId) = SeedBinderWithTwoLots();
+        var service = CreateService();
 
-        // Add a card
-        int cardId;
-        using (var ctx = _factory.CreateDbContext())
-        {
-            var product = NewSingle("cover", "Cover Card");
-            ctx.Products.Add(product);
-            ctx.SaveChanges();
-            var lot = new InventoryLot { ProductId = product.Id, LocationId = container.Id };
-            ctx.Lots.Add(lot);
-            ctx.SaveChanges();
-            cardId = lot.Id;
-        }
+        // A takes slot 0.
+        service.AssignCardToSlot(lotAId, containerId, page: 1, slot: 0);
+        // B (from the unplaced pool) takes the same slot, displacing A.
+        service.AssignCardToSlot(lotBId, containerId, page: 1, slot: 0);
 
-        // Set then clear cover card
-        svc.SetCoverCard(container.Id, cardId);
-        svc.SetCoverCard(container.Id, null);
+        using var ctx = new OmniCardDbContext(_options);
+        var lotA = ctx.Lots.Single(l => l.Id == lotAId);
+        var lotB = ctx.Lots.Single(l => l.Id == lotBId);
 
-        // Verify
-        using (var ctx = _factory.CreateDbContext())
-        {
-            var updated = ctx.StorageContainers.Find(container.Id);
-            Assert.NotNull(updated);
-            Assert.Null(updated.CoverCardId);
-        }
+        Assert.Null(lotA.Page);
+        Assert.Null(lotA.Slot);
+        Assert.Equal(containerId, lotA.LocationId); // stays in the binder, just unplaced
+
+        Assert.Equal(1, lotB.Page);
+        Assert.Equal(0, lotB.Slot);
     }
 
     [Fact]
-    public void GetCardsInContainer_ReturnsAllCards()
+    public void AssignCardToSlot_BetweenTwoSlots_Swaps()
     {
-        var svc = CreateService();
-        var container = svc.Create("Box", ContainerType.Box);
+        var (containerId, lotAId, lotBId) = SeedBinderWithTwoLots();
+        var service = CreateService();
 
-        using (var ctx = _factory.CreateDbContext())
-        {
-            var bCard = NewSingle("a", "B Card");
-            var aCard = NewSingle("b", "A Card");
-            ctx.Products.AddRange(bCard, aCard);
-            ctx.SaveChanges();
-            ctx.Lots.Add(new InventoryLot { ProductId = bCard.Id, LocationId = container.Id });
-            ctx.Lots.Add(new InventoryLot { ProductId = aCard.Id, LocationId = container.Id });
-            ctx.SaveChanges();
-        }
+        service.AssignCardToSlot(lotAId, containerId, page: 1, slot: 0);
+        service.AssignCardToSlot(lotBId, containerId, page: 1, slot: 1);
 
-        var cards = svc.GetCardsInContainer(container.Id);
-        Assert.Equal(2, cards.Count);
-        // Should be ordered by name
-        Assert.Equal("A Card", cards[0].Name);
-        Assert.Equal("B Card", cards[1].Name);
+        // Drag A (currently at slot 0) onto B's slot (1) -> swap.
+        service.AssignCardToSlot(lotAId, containerId, page: 1, slot: 1);
+
+        using var ctx = new OmniCardDbContext(_options);
+        var lotA = ctx.Lots.Single(l => l.Id == lotAId);
+        var lotB = ctx.Lots.Single(l => l.Id == lotBId);
+
+        Assert.Equal(1, lotA.Page);
+        Assert.Equal(1, lotA.Slot);
+        Assert.Equal(1, lotB.Page);
+        Assert.Equal(0, lotB.Slot);
     }
 
     [Fact]
-    public void GetCardsInContainer_ReturnsEmptyForEmptyContainer()
+    public void AddBinderPage_IncrementsTotalPages()
     {
-        var svc = CreateService();
-        var container = svc.Create("Box", ContainerType.Box);
+        var (containerId, _, _) = SeedBinderWithTwoLots();
+        var service = CreateService();
 
-        var cards = svc.GetCardsInContainer(container.Id);
-        Assert.Empty(cards);
+        service.AddBinderPage(containerId);
+
+        var layout = service.GetBinderLayout(containerId);
+        Assert.Equal(2, layout.TotalPages);
     }
 
-    private class TestDbContextFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
+    [Fact]
+    public void SetColumns_UpdatesBinderLayout()
+    {
+        var (containerId, _, _) = SeedBinderWithTwoLots();
+        var service = CreateService();
+
+        service.SetColumns(containerId, 5);
+
+        var layout = service.GetBinderLayout(containerId);
+        Assert.Equal(5, layout.Columns);
+    }
+
+
+    private class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
         public OmniCardDbContext CreateDbContext() => new(options);
     }

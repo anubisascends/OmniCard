@@ -244,12 +244,19 @@ public class AuditServiceTests : IDisposable
         // AuditService reads container name from OmniCardDbContext directly — this stub is unused
         public List<StorageContainer> GetAll() => [];
         public StorageContainer GetBulk() => throw new NotImplementedException();
-        public StorageContainer Create(string name, ContainerType type) => throw new NotImplementedException();
+        public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9) => throw new NotImplementedException();
         public void Rename(int id, string newName) => throw new NotImplementedException();
         public void Delete(int id, bool moveCardsToBulk = true) => throw new NotImplementedException();
         public int GetCardCount(int containerId) => throw new NotImplementedException();
         public void SetCoverCard(int containerId, int? cardId) => throw new NotImplementedException();
         public List<CollectionCard> GetCardsInContainer(int containerId) => throw new NotImplementedException();
         public void SetExcludeFromDeckCheck(int containerId, bool exclude) => throw new NotImplementedException();
+        public BinderLayout GetBinderLayout(int containerId) => throw new NotImplementedException();
+        public void AddBinderPage(int containerId) => throw new NotImplementedException();
+        public void SetSlotsPerPage(int containerId, int slotsPerPage) => throw new NotImplementedException();
+        public void SetColumns(int containerId, int columns) => throw new NotImplementedException();
+        public List<CollectionCard> GetPlacedCardsOnPage(int containerId, int page) => throw new NotImplementedException();
+        public void UnassignFromPage(int lotId) => throw new NotImplementedException();
+        public void AssignCardToSlot(int lotId, int containerId, int page, int slot) => throw new NotImplementedException();
     }
 }

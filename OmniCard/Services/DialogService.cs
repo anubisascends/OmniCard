@@ -176,6 +176,14 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         return result == true ? wnd.ViewModel.Result : null;
     }
 
+    public void ShowBinderView(int containerId)
+    {
+        var wnd = Services.GetRequiredService<Views.Binder.BinderView>();
+        SetOwner(wnd);
+        wnd.ViewModel.Load(containerId);
+        wnd.ShowDialog();
+    }
+
     public MoveListToLocationResult? PickMoveListToLocation()
     {
         var wnd = Services.GetRequiredService<Views.MoveListToLocation.MoveListToLocationView>();
@@ -184,6 +192,7 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         var result = wnd.ShowDialog();
         return result == true ? wnd.ViewModel.Result : null;
     }
+
 
     public IReadOnlyList<ScanListTargetResult>? PickListTargetsForScans(IReadOnlyList<(CardGame Game, int Count)> groups, string defaultName)
     {
@@ -224,6 +233,14 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         var wnd = Services.GetRequiredService<ManualAddView>();
         SetOwner(wnd);
         wnd.ViewModel.Load(defaultContainer);
+        return wnd.ShowDialog();
+    }
+
+    public bool? OpenManualAddToSlot(int containerId, int page, int slot)
+    {
+        var wnd = Services.GetRequiredService<ManualAddView>();
+        SetOwner(wnd);
+        wnd.ViewModel.LoadForSlot(containerId, page, slot);
         return wnd.ShowDialog();
     }
 
