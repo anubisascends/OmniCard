@@ -9,6 +9,7 @@ using OmniCard.Controls;
 using OmniCard.Data;
 using OmniCard.Interfaces;
 using OmniCard.Models;
+using OmniCard.Views.Binder;
 using OmniCard.Views.Root;
 using Xunit;
 

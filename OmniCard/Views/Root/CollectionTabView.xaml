@@ -77,10 +77,10 @@
                                 RelativeSource={RelativeSource AncestorType=Window}}"
                             Padding="8,4"
                             Margin="0,0,8,0"
-                            Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                            Visibility="{Binding DataContext.ViewModel.Collection.IsInLocationDetail,
                                 RelativeSource={RelativeSource AncestorType=Window},
                                 Converter={conv:BoolToVisibilityConverter}}"/>
-                    <Separator Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                    <Separator Visibility="{Binding DataContext.ViewModel.Collection.IsInLocationDetail,
                         RelativeSource={RelativeSource AncestorType=Window},
                         Converter={conv:BoolToVisibilityConverter}}"/>
 
@@ -91,10 +91,10 @@
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                VerticalAlignment="Center"
                                Margin="0,0,12,0"
-                               Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                               Visibility="{Binding DataContext.ViewModel.Collection.IsInLocationDetail,
                                    RelativeSource={RelativeSource AncestorType=Window},
                                    Converter={conv:BoolToVisibilityConverter}}"/>
-                    <Separator Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                    <Separator Visibility="{Binding DataContext.ViewModel.Collection.IsInLocationDetail,
                         RelativeSource={RelativeSource AncestorType=Window},
                         Converter={conv:BoolToVisibilityConverter}}"/>
 
@@ -105,6 +105,17 @@
                                 RelativeSource={RelativeSource AncestorType=Window}}"
                             CommandParameter="{Binding DataContext.ViewModel.Collection.CurrentLocationId,
                                 RelativeSource={RelativeSource AncestorType=Window}}"/>
+
+                    <!-- Open the drag-and-drop binder placement editor (Binder locations only) -->
+                    <Button Content="Open Binder..."
+                            Padding="8,4"
+                            Margin="4,0,0,0"
+                            Command="{Binding DataContext.ViewModel.Collection.OpenBinderCommand,
+                                RelativeSource={RelativeSource AncestorType=Window}}"
+                            Visibility="{Binding DataContext.ViewModel.Collection.IsCurrentLocationBinder,
+                                RelativeSource={RelativeSource AncestorType=Window},
+                                Converter={conv:BoolToVisibilityConverter}}"
+                            ToolTip="Arrange this binder's cards into pages and slots"/>
 
                     <!-- Add card manually -->
                     <Button Content="Add Card"
@@ -196,7 +207,7 @@
                             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                             VerticalAlignment="Center"
                             Margin="4,0,4,0"
-                            Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                            Visibility="{Binding DataContext.ViewModel.Collection.IsInLocationDetail,
                                 RelativeSource={RelativeSource AncestorType=Window},
                                 Converter={conv:BoolToVisibilityConverter}}"/>
                     <ComboBox Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
@@ -207,7 +218,7 @@
                               DisplayMemberPath="Name"
                               Width="120"
                               VerticalAlignment="Center"
-                              Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                              Visibility="{Binding DataContext.ViewModel.Collection.IsInLocationDetail,
                                   RelativeSource={RelativeSource AncestorType=Window},
                                   Converter={conv:BoolToVisibilityConverter}}"/>
                     <Button Content="X"
@@ -216,7 +227,7 @@
                             Command="{Binding DataContext.ViewModel.Collection.ResetSelectedFilterPresetCommand,
                                 RelativeSource={RelativeSource AncestorType=Window}}"
                             Style="{StaticResource MaterialDesignFlatButton}"
-                            Visibility="{Binding DataContext.ViewModel.Collection.ShowCardList,
+                            Visibility="{Binding DataContext.ViewModel.Collection.IsInLocationDetail,
                                 RelativeSource={RelativeSource AncestorType=Window},
                                 Converter={conv:BoolToVisibilityConverter}}"/>
 

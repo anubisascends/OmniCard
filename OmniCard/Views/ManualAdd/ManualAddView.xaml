@@ -65,6 +65,7 @@
                     <TextBlock Text="Qty:" VerticalAlignment="Center" Margin="0,0,6,0"
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <TextBox Text="{Binding ViewModel.Quantity}" Width="40"
+                             IsEnabled="{Binding ViewModel.IsSlotEditable}"
                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                              VerticalAlignment="Center" VerticalContentAlignment="Center"/>
                 </StackPanel>
@@ -80,6 +81,7 @@
                     <ComboBox ItemsSource="{Binding ViewModel.Containers}"
                               SelectedItem="{Binding ViewModel.SelectedContainer}"
                               DisplayMemberPath="Name"
+                              IsEnabled="{Binding ViewModel.IsSlotEditable}"
                               Width="160" VerticalAlignment="Center"
                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 </StackPanel>
@@ -87,6 +89,7 @@
                     <TextBlock Text="Page:" VerticalAlignment="Center" Margin="0,0,6,0"
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <TextBox Text="{Binding ViewModel.Page, TargetNullValue=''}"
+                             IsEnabled="{Binding ViewModel.IsSlotEditable}"
                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                              Width="40" VerticalAlignment="Center" VerticalContentAlignment="Center"/>
                 </StackPanel>
@@ -94,6 +97,7 @@
                     <TextBlock Text="Slot:" VerticalAlignment="Center" Margin="0,0,6,0"
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <TextBox Text="{Binding ViewModel.Slot, TargetNullValue=''}"
+                             IsEnabled="{Binding ViewModel.IsSlotEditable}"
                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                              Width="40" VerticalAlignment="Center" VerticalContentAlignment="Center"/>
                 </StackPanel>

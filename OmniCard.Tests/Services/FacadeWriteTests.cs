@@ -210,6 +210,62 @@ public class FacadeWriteTests : IDisposable
         Assert.Equal(5, lot.Slot);
     }
 
+    [Fact]
+    public void AddMissingCardToSlot_EmptySlot_PlacesCard()
+    {
+        var service = CreateService();
+        int containerId;
+        using (var seedCtx = new OmniCardDbContext(_omniOptions))
+        {
+            var container = new StorageContainer { Name = "Binder", ContainerType = ContainerType.Binder };
+            seedCtx.StorageContainers.Add(container);
+            seedCtx.SaveChanges();
+            containerId = container.Id;
+        }
+
+        service.AddMissingCardToSlot(MakeMatch("bolt-1", "Lightning Bolt"), CardGame.Mtg, "NM", false, null,
+            containerId, page: 1, slot: 3);
+
+        using var ctx = new OmniCardDbContext(_omniOptions);
+        var lot = ctx.Lots.AsNoTracking().Single();
+        Assert.Equal(containerId, lot.LocationId);
+        Assert.Equal(1, lot.Page);
+        Assert.Equal(3, lot.Slot);
+        Assert.Equal(1, ctx.Movements.AsNoTracking().Count(m => m.Type == MovementType.Acquire));
+    }
+
+    [Fact]
+    public void AddMissingCardToSlot_OccupiedSlot_DisplacesOccupantToUnplaced()
+    {
+        var service = CreateService();
+        int containerId;
+        using (var seedCtx = new OmniCardDbContext(_omniOptions))
+        {
+            var container = new StorageContainer { Name = "Binder", ContainerType = ContainerType.Binder };
+            seedCtx.StorageContainers.Add(container);
+            seedCtx.SaveChanges();
+            containerId = container.Id;
+        }
+
+        // Existing card occupies page 1 / slot 3.
+        service.AddMissingCardToSlot(MakeMatch("bolt-1", "Lightning Bolt"), CardGame.Mtg, "NM", false, null,
+            containerId, page: 1, slot: 3);
+        // New card added to the same slot must displace the occupant back to the Unplaced pool.
+        service.AddMissingCardToSlot(MakeMatch("counter-1", "Counterspell"), CardGame.Mtg, "NM", false, null,
+            containerId, page: 1, slot: 3);
+
+        using var ctx = new OmniCardDbContext(_omniOptions);
+        var lots = ctx.Lots.AsNoTracking().Include(l => l.Product).ToList();
+        Assert.Equal(2, lots.Count);
+
+        var placed = lots.Single(l => l.Page == 1 && l.Slot == 3);
+        Assert.Equal("Counterspell", placed.Product.Name);
+
+        var displaced = lots.Single(l => l.Page == null && l.Slot == null);
+        Assert.Equal("Lightning Bolt", displaced.Product.Name);
+        Assert.Equal(containerId, displaced.LocationId); // still in the binder, just unplaced
+    }
+
     // --- UpdateCollectionCard: copy-attr update + identity-change lot move ---
 
     [Fact]

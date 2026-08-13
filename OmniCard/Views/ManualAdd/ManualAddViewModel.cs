@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -63,6 +64,17 @@ public sealed partial class ManualAddViewModel : ViewModel
     [ObservableProperty]
     public partial string? Section { get; set; }
 
+    /// <summary>True when the dialog is locked to a single binder slot (opened via "Add Missing
+    /// Card..."). Container/Page/Slot are fixed and the add goes straight into that slot with swap
+    /// semantics; the dialog closes after one card since a slot holds exactly one.</summary>
+    [ObservableProperty]
+    public partial bool IsSlotLocked { get; set; }
+
+    /// <summary>Inverse of <see cref="IsSlotLocked"/> for enabling the location/quantity fields.</summary>
+    public bool IsSlotEditable => !IsSlotLocked;
+
+    partial void OnIsSlotLockedChanged(bool value) => OnPropertyChanged(nameof(IsSlotEditable));
+
     // Status
     [ObservableProperty]
     public partial int AddedCount { get; set; }
@@ -80,6 +92,17 @@ public sealed partial class ManualAddViewModel : ViewModel
             Containers.Add(c);
 
         SelectedContainer = defaultContainer ?? (Containers.Count > 0 ? Containers[0] : null);
+    }
+
+    /// <summary>Opens the dialog locked to a specific binder page/slot — used by "Add Missing Card...".</summary>
+    public void LoadForSlot(int containerId, int page, int slot)
+    {
+        Load();
+        SelectedContainer = Containers.FirstOrDefault(c => c.Id == containerId);
+        Page = page;
+        Slot = slot;
+        Quantity = 1;
+        IsSlotLocked = true;
     }
 
     [RelayCommand]
@@ -111,6 +134,20 @@ public sealed partial class ManualAddViewModel : ViewModel
         }
 
         var game = _cardService.SelectedGame;
+
+        // Slot-locked mode: place directly into the clicked binder slot (swap-aware), one card only.
+        if (IsSlotLocked && SelectedContainer is not null && Page is int p && Slot is int s)
+        {
+            _cardService.AddMissingCardToSlot(SelectedResult, game, Condition, IsFoil, PurchasePrice,
+                SelectedContainer.Id, p, s);
+            AddedCount += 1;
+            OnPropertyChanged(nameof(HasAdded));
+            _logger.LogInformation("Added missing card {Name} to {Container} page {Page} slot {Slot}",
+                SelectedResult.Name, SelectedContainer.Id, p, s);
+            CloseDialog?.Invoke(true);
+            return;
+        }
+
         _cardService.AddCardToCollection(
             SelectedResult,
             game,

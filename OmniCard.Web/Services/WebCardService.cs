@@ -82,6 +82,7 @@ public sealed class WebCardService : ICardService
     public void SearchCollection(string query, CardGame? gameFilter, int? containerFilter, SortPreset? sortPreset, FilterPreset? filterPreset, bool stacked, int skip, int take, ObservableCollection<CollectionCard> results) => throw new NotSupportedException();
     public int GetSearchCount(string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset, bool stacked) => throw new NotSupportedException();
     public HashSet<int> GetMatchingContainerIds(string query, CardGame? gameFilter) => throw new NotSupportedException();
+    public List<CollectionCard> GetUnplacedBinderCards(int containerId, FilterPreset? filterPreset) => throw new NotSupportedException();
     public void MoveCardsToContainer(IEnumerable<int> cardIds, int containerId, string? section = null) => throw new NotSupportedException();
     public void BulkUpdateField(IEnumerable<int> cardIds, Action<CollectionCard> update) => throw new NotSupportedException();
     public List<CollectionCard> GetCollectionCards(IEnumerable<int> cardIds) => throw new NotSupportedException();
@@ -98,6 +99,7 @@ public sealed class WebCardService : ICardService
     public (int FlagResolutions, int MismatchLogs, int DiagnosticEvents) ClearDiagnosticLogs() => throw new NotSupportedException();
     public (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null) => throw new NotSupportedException();
     public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section) => throw new NotSupportedException();
+    public void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int containerId, int page, int slot) => throw new NotSupportedException();
     public bool IsFirstCopy(CardGame game, string gameCardId, bool isFoil) => throw new NotSupportedException();
     public void AnnotateScan(ScannedCard scan) => throw new NotSupportedException();
     public int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates) => throw new NotSupportedException();

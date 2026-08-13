@@ -31,6 +31,13 @@ public sealed partial class StorageManagerViewModel(
     public partial ContainerType NewContainerType { get; set; } = ContainerType.Binder;
 
     [ObservableProperty]
+    public partial int NewSlotsPerPage { get; set; } = 9;
+
+    public bool ShowSlotsPerPage => NewContainerType == ContainerType.Binder;
+
+    partial void OnNewContainerTypeChanged(ContainerType value) => OnPropertyChanged(nameof(ShowSlotsPerPage));
+
+    [ObservableProperty]
     public partial bool IsAdding { get; set; }
 
     [ObservableProperty]
@@ -96,6 +103,7 @@ public sealed partial class StorageManagerViewModel(
         IsEditing = false;
         NewContainerName = "";
         NewContainerType = ContainerType.Binder;
+        NewSlotsPerPage = 9;
     }
 
     [RelayCommand]
@@ -104,7 +112,7 @@ public sealed partial class StorageManagerViewModel(
         if (string.IsNullOrWhiteSpace(NewContainerName))
             return;
 
-        containerService.Create(NewContainerName.Trim(), NewContainerType);
+        containerService.Create(NewContainerName.Trim(), NewContainerType, NewSlotsPerPage);
         IsAdding = false;
         Load();
     }

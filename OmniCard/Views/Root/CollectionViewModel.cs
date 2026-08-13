@@ -163,6 +163,17 @@ public sealed partial class CollectionViewModel : ViewModel
     [ObservableProperty]
     public partial string CurrentLocationName { get; set; } = "";
 
+    /// <summary>True while viewing a single Binder location's flat card list — drives visibility of
+    /// the "Open Binder" button that launches the drag-and-drop placement dialog.</summary>
+    [ObservableProperty]
+    public partial bool IsCurrentLocationBinder { get; set; }
+
+    /// <summary>True while viewing a single location's card list (not the overview tile grid).
+    /// Drives toolbar elements (Back button, location name, Filter preset).</summary>
+    public bool IsInLocationDetail => ShowCardList;
+
+    partial void OnShowCardListChanged(bool value) => OnPropertyChanged(nameof(IsInLocationDetail));
+
     [RelayCommand]
     public void NavigateToLocation(int locationId)
     {
@@ -170,6 +181,10 @@ public sealed partial class CollectionViewModel : ViewModel
         CurrentLocationId = locationId;
         CurrentLocationName = container?.Name ?? "";
         ShowAllCards = false;
+
+        // Binder locations show the normal flat card list like any other location; the drag-and-drop
+        // placement editor is a separate dialog reachable via the "Open Binder" button.
+        IsCurrentLocationBinder = container?.ContainerType == ContainerType.Binder;
 
         ResetSearchState();
         ShowCardList = true;
@@ -181,9 +196,21 @@ public sealed partial class CollectionViewModel : ViewModel
         LoadCardList();
     }
 
+    /// <summary>Opens the drag-and-drop binder placement editor for the current binder location as a
+    /// modal dialog, then refreshes the card list (placements may have changed).</summary>
+    [RelayCommand]
+    public void OpenBinder()
+    {
+        if (CurrentLocationId is not int id) return;
+        _dialogService.ShowBinderView(id);
+        if (ShowCardList) _ = SearchCollection();
+        CollectionChanged?.Invoke();
+    }
+
     [RelayCommand]
     public void BrowseAll()
     {
+        IsCurrentLocationBinder = false;
         CurrentLocationId = null;
         CurrentLocationName = "Entire Collection";
         ShowAllCards = true;
@@ -201,6 +228,8 @@ public sealed partial class CollectionViewModel : ViewModel
     /// <summary>Enter card-tile mode filtered to a single set of a single game (dashboard drill-in).</summary>
     public void BrowseSet(CardGame game, string setCode)
     {
+        IsCurrentLocationBinder = false;
+
         // Filter to the tile's own game regardless of the global selector.
         _allGames = false;
         _selectedGame = game;
@@ -233,6 +262,7 @@ public sealed partial class CollectionViewModel : ViewModel
     [RelayCommand]
     public void NavigateBack()
     {
+        IsCurrentLocationBinder = false;
         ShowCardList = false;
         ShowAllCards = false;
         CurrentLocationId = null;

@@ -19,12 +19,19 @@ public interface IDialogService
     MoveToLocationResult? PickMoveToLocation();
     MoveListToLocationResult? PickMoveListToLocation();
 
+    /// <summary>Opens the drag-and-drop binder placement editor for a Binder location as a modal dialog.</summary>
+    void ShowBinderView(int containerId);
+
     /// <summary>Prompts for a list destination (existing or new) per game group, for "Create List from Scans".
     /// Returns null if cancelled.</summary>
     IReadOnlyList<ScanListTargetResult>? PickListTargetsForScans(IReadOnlyList<(CardGame Game, int Count)> groups, string defaultName);
     void ShowAuditReport(AuditReport report);
     bool? OpenEbayListingDialog(CollectionCard card);
     bool? OpenManualAdd(StorageContainer? defaultContainer = null);
+
+    /// <summary>Opens the Add-Card dialog locked to a specific binder page/slot (container/page/slot
+    /// read-only). Adding places the card into that slot, displacing any occupant to the Unplaced pool.</summary>
+    bool? OpenManualAddToSlot(int containerId, int page, int slot);
     void ShowDecklistCheck();
     Product? EditProduct(Product? existing);
     (int Quantity, decimal? UnitCost, int? LocationId, string? Source, DateTime AcquisitionDate)? AddLotDialog(int productId);

@@ -87,6 +87,42 @@ public class CardServiceCollectionTests : IDisposable
     }
 
     [Fact]
+    public void GetUnplacedBinderCards_ExcludesPlacedCards_AndAppliesFilterPreset()
+    {
+        int containerId;
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+        {
+            var container = new StorageContainer { Name = "Binder A", ContainerType = ContainerType.Binder };
+            ctx.StorageContainers.Add(container);
+            ctx.SaveChanges();
+            containerId = container.Id;
+
+            var sorcery = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, Name = "Wrath of God", CardType = "Sorcery" };
+            var instant = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, Name = "Counterspell", CardType = "Instant" };
+            var placedSorcery = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, Name = "Day of Judgment", CardType = "Sorcery" };
+            ctx.Products.AddRange(sorcery, instant, placedSorcery);
+            ctx.SaveChanges();
+
+            ctx.Lots.AddRange(
+                new InventoryLot { ProductId = sorcery.Id, LocationId = containerId, Page = null },
+                new InventoryLot { ProductId = instant.Id, LocationId = containerId, Page = null },
+                new InventoryLot { ProductId = placedSorcery.Id, LocationId = containerId, Page = 1, Slot = 0 });
+            ctx.SaveChanges();
+        }
+
+        var service = CreateService();
+
+        var all = service.GetUnplacedBinderCards(containerId, filterPreset: null);
+        Assert.Equal(2, all.Count);
+        Assert.DoesNotContain(all, c => c.Name == "Day of Judgment");
+
+        var sorceriesOnly = service.GetUnplacedBinderCards(containerId,
+            new FilterPreset { Name = "Sorceries", Game = CardGame.Mtg, Query = "type:sorcery" });
+        Assert.Single(sorceriesOnly);
+        Assert.Equal("Wrath of God", sorceriesOnly[0].Name);
+    }
+
+    [Fact]
     public void SearchCollection_AllGames_CrossesChunkBoundary_AttachesEveryListing()
     {
         // Integration guard: "All Games" (gameFilter == null) loads the whole collection unpaginated

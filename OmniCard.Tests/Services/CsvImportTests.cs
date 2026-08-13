@@ -311,9 +311,9 @@ public class CsvImportTests : IDisposable
 
         public List<StorageContainer> GetAll() => _containers;
         public StorageContainer GetBulk() => _containers.First(c => c.IsSystem);
-        public StorageContainer Create(string name, ContainerType type)
+        public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9)
         {
-            var c = new StorageContainer { Id = _nextId++, Name = name, ContainerType = type };
+            var c = new StorageContainer { Id = _nextId++, Name = name, ContainerType = type, SlotsPerPage = slotsPerPage };
             _containers.Add(c);
             return c;
         }
@@ -323,5 +323,12 @@ public class CsvImportTests : IDisposable
         public void SetCoverCard(int containerId, int? cardId) { }
         public List<CollectionCard> GetCardsInContainer(int containerId) => [];
         public void SetExcludeFromDeckCheck(int containerId, bool exclude) { }
+        public BinderLayout GetBinderLayout(int containerId) => throw new NotImplementedException();
+        public void AddBinderPage(int containerId) { }
+        public void SetSlotsPerPage(int containerId, int slotsPerPage) { }
+        public void SetColumns(int containerId, int columns) { }
+        public List<CollectionCard> GetPlacedCardsOnPage(int containerId, int page) => [];
+        public void UnassignFromPage(int lotId) { }
+        public void AssignCardToSlot(int lotId, int containerId, int page, int slot) { }
     }
 }

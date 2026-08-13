@@ -228,6 +228,8 @@ public partial class App : Application
             services.AddTransient<CoverArtPickerViewModel>();
             services.AddTransient<OmniCard.Views.MoveToLocation.MoveToLocationView>();
             services.AddTransient<OmniCard.Views.MoveToLocation.MoveToLocationViewModel>();
+            services.AddTransient<Views.Binder.BinderView>();
+            services.AddTransient<Views.Binder.BinderViewModel>();
             services.AddTransient<OmniCard.Views.MoveListToLocation.MoveListToLocationView>();
             services.AddTransient<OmniCard.Views.MoveListToLocation.MoveListToLocationViewModel>();
             services.AddTransient<OmniCard.Views.CreateListFromScans.CreateListFromScansView>();
