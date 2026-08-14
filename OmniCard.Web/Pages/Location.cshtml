@@ -18,6 +18,11 @@
         <p><span class="badge">@Model.TypeDisplay</span> &middot; @Model.CardCount card(s)</p>
     </header>
     <main>
+        @if (Model.Container.ContainerType == ContainerType.Binder)
+        {
+            <a href="/binder/@Model.Container.Id" class="binder-open">📖 Open binder view</a>
+        }
+
         @if (Model.Sets.Count > 0)
         {
             <h2>Sets</h2>
