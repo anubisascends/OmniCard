@@ -30,12 +30,33 @@ public sealed class YugiohService : TcgCsvGameService<YugiohDbContext>
         return (normal, null);
     }
 
-    // Yu-Gi-Oh! set codes look like "LOB-EN001"; printed lower-left/right.
+    // Yu-Gi-Oh! set codes (e.g. "GRCR-EN060") print in the lower-right: just below the artwork on
+    // Spell/Trap cards, lower down (above the ATK/DEF band) on Monsters. We try both bands. The text
+    // is small and low-contrast (worst on holofoil Collector's Rares), so the crop is binarized and
+    // the read is matched to the catalog fuzzily rather than exactly — see FuzzyOcrMatch.
     public static readonly OcrCollectorSpec OcrSpec = new()
     {
-        PortraitRegion = (0.55, 0.88, 0.42, 0.06),
-        LandscapeRegion = (0.55, 0.86, 0.42, 0.08),
+        PortraitRegions =
+        [
+            // The code prints just below the artwork; its exact height drifts a little card-to-card,
+            // so two thin overlapping bands cover the range without a tall crop swallowing the art
+            // frame's edge (which wrecks single-line OCR). Validated on Spell/Trap and Collector's
+            // Rare Monster scans. (A band down by the bottom edge is avoided: on Monsters it reads
+            // the ATK/DEF line, which mimics a code — "DEF/ 800" → "…DEF800".)
+            (0.70, 0.723, 0.28, 0.028),
+            (0.70, 0.751, 0.28, 0.028),
+        ],
+        LandscapeRegions =
+        [
+            (0.70, 0.723, 0.28, 0.028),
+            (0.70, 0.751, 0.28, 0.028),
+        ],
         Whitelist = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-",
-        RegexPattern = @"([A-Z0-9]+-[A-Z]{0,2}\d+)"
+        RegexPattern = @"([A-Z0-9]+-[A-Z]{0,2}\d+)",
+        Binarize = true,
+        LooseExtraction = true,
     };
+
+    // OCR of small holofoil set codes is noisy; resolve reads to the catalog fuzzily + by pHash.
+    protected override bool UseFuzzyOcrMatch => true;
 }

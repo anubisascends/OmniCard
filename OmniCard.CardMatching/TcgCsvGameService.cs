@@ -34,6 +34,12 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
     private List<(int Id, ulong EdgeHash, string SetCode)>? _edgeHashCache;
     private Dictionary<int, string>? _hashSetLookup;
     private List<(ulong ScanHash, string CorrectCardId)>? _correctionsCache;
+    private List<(int Id, ulong? Hash, string Code, string CanonCode, string SetCode)>? _fuzzyCache;
+
+    /// <summary>When true, OCR'd collector numbers are matched to the catalog fuzzily (tolerant of
+    /// holofoil OCR confusions), disambiguated by pHash — see <see cref="FuzzyOcrMatch"/>. Yu-Gi-Oh!
+    /// enables this; games with cleaner, exactly-read numbers keep the strict lookup.</summary>
+    protected virtual bool UseFuzzyOcrMatch => false;
 
     // TCGCSV returns camelCase JSON.
     protected static readonly JsonSerializerOptions TcgCsvJsonOptions = new()
@@ -123,7 +129,7 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
 
         var oldContext = _readContext;
         _readContext = _dbContextFactory.CreateDbContext();
-        _hashCache = null; _edgeHashCache = null; _hashSetLookup = null; _correctionsCache = null;
+        _hashCache = null; _edgeHashCache = null; _hashSetLookup = null; _correctionsCache = null; _fuzzyCache = null;
         oldContext.Dispose();
     }
 
@@ -233,7 +239,7 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
 
         var oldContext = _readContext;
         _readContext = _dbContextFactory.CreateDbContext();
-        _hashCache = null; _edgeHashCache = null; _hashSetLookup = null;
+        _hashCache = null; _edgeHashCache = null; _hashSetLookup = null; _fuzzyCache = null;
         oldContext.Dispose();
 
         sw.Stop();
@@ -413,7 +419,7 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
 
         var oldContext = _readContext;
         _readContext = _dbContextFactory.CreateDbContext();
-        _hashCache = null; _edgeHashCache = null; _hashSetLookup = null;
+        _hashCache = null; _edgeHashCache = null; _hashSetLookup = null; _fuzzyCache = null;
         oldContext.Dispose();
 
         sw.Stop();
@@ -448,6 +454,106 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
 
     internal static string NormalizeNumber(string s) => s.Trim().ToUpperInvariant();
 
+    private void EnsureFuzzyCache()
+    {
+        if (_fuzzyCache is not null) return;
+        _fuzzyCache = _readContext.Cards.AsNoTracking()
+            .Where(c => c.CollectorNumber != "")
+            .Select(c => new { c.ProductId, c.ImageHash, c.CollectorNumber, c.SetCode })
+            .AsEnumerable()
+            .Select(c => (c.ProductId, c.ImageHash, c.CollectorNumber,
+                CollectorNumberFuzzyMatcher.Canonicalize(c.CollectorNumber), c.SetCode))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Resolves an OCR'd collector-number token to a catalog card, tolerant of holofoil OCR
+    /// confusions. Conservative: an exact canonical match anywhere is trusted; a distance-1 match is
+    /// trusted only when it's also a pHash candidate (so a mis-read can't pick an unrelated card);
+    /// as a last resort the set prefix narrows reprints. Returns null when nothing is confident,
+    /// letting the caller fall back to pure pHash matching.
+    /// </summary>
+    private CardMatch? FuzzyOcrMatch(string ocrToken, ulong imageHash, IReadOnlySet<string>? setFilter, int maxDistance)
+    {
+        var canonOcr = CollectorNumberFuzzyMatcher.Canonicalize(ocrToken);
+        if (canonOcr.Length < 4) return null;
+
+        EnsureFuzzyCache();
+        IEnumerable<(int Id, ulong? Hash, string Code, string CanonCode, string SetCode)> pool = _fuzzyCache!;
+        if (setFilter is not null) pool = pool.Where(e => setFilter.Contains(e.SetCode));
+        var poolList = pool.ToList();
+
+        // (a) Exact canonical match anywhere in the catalog → trust; disambiguate any duplicates by pHash.
+        var exact = poolList.Where(e => e.CanonCode == canonOcr).ToList();
+        if (exact.Count > 0)
+        {
+            var pick = PickByHash(exact, imageHash);
+            var card = LookupById(pick.Id);
+            if (card is not null)
+            {
+                LastMatchDiagnostics.DecisionPhase = "OcrFuzzyExact";
+                return ToMatch(card, 100);
+            }
+        }
+
+        // pHash-narrowed candidates (the reprints of this art). Conservative gating below requires
+        // the fuzzy pick to also be a pHash match, so a mis-read can't select an unrelated card.
+        var phashCandidates = poolList
+            .Where(e => e.Hash is not null)
+            .Select(e => (e, dist: PerceptualHashService.HammingDistance(imageHash, e.Hash!.Value)))
+            .Where(t => t.dist <= maxDistance)
+            .OrderBy(t => t.dist)
+            .Take(12)
+            .ToList();
+
+        // (b) Distance-1 within the pHash candidates.
+        var d1 = phashCandidates
+            .Select(t => (t.e, t.dist, cd: CollectorNumberFuzzyMatcher.RawDistance(canonOcr, t.e.CanonCode)))
+            .Where(t => t.cd <= 1)
+            .OrderBy(t => t.cd).ThenBy(t => t.dist)
+            .ToList();
+        if (d1.Count > 0)
+        {
+            var card = LookupById(d1[0].e.Id);
+            if (card is not null)
+            {
+                LastMatchDiagnostics.DecisionPhase = "OcrFuzzyDist1";
+                return ToMatch(card, 100);
+            }
+        }
+
+        // (c) Set-prefix narrowing: the number may be unreadable but the set prefix isn't. Prefer the
+        // pHash candidate whose printed prefix matches, so reprints still resolve to the right set.
+        var ocrPrefix = CollectorNumberFuzzyMatcher.CanonPrefix(ocrToken);
+        if (ocrPrefix.Length >= 3)
+        {
+            var byPrefix = phashCandidates
+                .Where(t => CollectorNumberFuzzyMatcher.RawDistance(ocrPrefix, CollectorNumberFuzzyMatcher.CanonPrefix(t.e.Code)) <= 1)
+                .OrderBy(t => t.dist)
+                .ToList();
+            if (byPrefix.Count > 0)
+            {
+                var card = LookupById(byPrefix[0].e.Id);
+                if (card is not null)
+                {
+                    LastMatchDiagnostics.DecisionPhase = "OcrSetPrefix";
+                    return ToMatch(card, 90);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static (int Id, ulong? Hash, string Code, string CanonCode, string SetCode) PickByHash(
+        List<(int Id, ulong? Hash, string Code, string CanonCode, string SetCode)> items, ulong imageHash)
+    {
+        var hashed = items.Where(i => i.Hash is not null).ToList();
+        return hashed.Count > 0
+            ? hashed.OrderBy(i => PerceptualHashService.HammingDistance(imageHash, i.Hash!.Value)).First()
+            : items[0];
+    }
+
     public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null,
         IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14, ulong? scanEdgeHash = null)
     {
@@ -456,24 +562,33 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
         // Phase 0: OCR collector-number lookup. Number is ground truth from extendedData.
         if (ocrResult?.CollectorNumber is not null && ocrResult.CollectorNumberConfidence >= 0.5)
         {
-            var num = NormalizeNumber(ocrResult.CollectorNumber);
-            var candidates = _readContext.Cards.AsNoTracking()
-                .Where(c => c.CollectorNumber.ToUpper() == num).ToList();
-            if (setFilter is not null) candidates = candidates.Where(c => setFilter.Contains(c.SetCode)).ToList();
-
-            if (candidates.Count == 1)
+            if (UseFuzzyOcrMatch)
             {
-                LastMatchDiagnostics.DecisionPhase = "OcrCollectorNumber";
-                return ToMatch(candidates[0], 100);
+                var fuzzy = FuzzyOcrMatch(ocrResult.CollectorNumber, imageHash, setFilter, maxDistance);
+                if (fuzzy is not null) return fuzzy;
+                // No confident fuzzy resolution — fall through to hash matching below.
             }
-            if (candidates.Count > 1)
+            else
             {
-                var hashed = candidates.Where(c => c.ImageHash != null).ToList();
-                var best = hashed.Count > 0
-                    ? hashed.OrderBy(c => PerceptualHashService.HammingDistance(imageHash, c.ImageHash!.Value)).First()
-                    : candidates[0];
-                LastMatchDiagnostics.DecisionPhase = "OcrCollectorNumber";
-                return ToMatch(best, 100);
+                var num = NormalizeNumber(ocrResult.CollectorNumber);
+                var candidates = _readContext.Cards.AsNoTracking()
+                    .Where(c => c.CollectorNumber.ToUpper() == num).ToList();
+                if (setFilter is not null) candidates = candidates.Where(c => setFilter.Contains(c.SetCode)).ToList();
+
+                if (candidates.Count == 1)
+                {
+                    LastMatchDiagnostics.DecisionPhase = "OcrCollectorNumber";
+                    return ToMatch(candidates[0], 100);
+                }
+                if (candidates.Count > 1)
+                {
+                    var hashed = candidates.Where(c => c.ImageHash != null).ToList();
+                    var best = hashed.Count > 0
+                        ? hashed.OrderBy(c => PerceptualHashService.HammingDistance(imageHash, c.ImageHash!.Value)).First()
+                        : candidates[0];
+                    LastMatchDiagnostics.DecisionPhase = "OcrCollectorNumber";
+                    return ToMatch(best, 100);
+                }
             }
         }
 

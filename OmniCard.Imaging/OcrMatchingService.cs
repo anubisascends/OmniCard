@@ -222,6 +222,14 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
             g.DrawImage(cropped, 0, 0, newWidth, newHeight);
         }
 
+        try { return RunOcr(toOcr, psm, whitelist); }
+        finally { if (needsDispose) toOcr.Dispose(); }
+    }
+
+    // Runs Tesseract on an already-prepared bitmap. Extracted so the plain crop path and the
+    // binarized collector-number path share one engine-pool + whitelist discipline.
+    private (string Text, double Confidence) RunOcr(Bitmap toOcr, PageSegMode psm, string? whitelist)
+    {
         var engine = RentEngine();
         try
         {
@@ -235,18 +243,80 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
             using var page = engine.Process(pix, psm);
 
             var text = page.GetText() ?? string.Empty;
-            // Tesseract's real mean confidence (0..1) — far better than the previous
-            // text-length proxy, and it flows into the downstream match scoring.
             var confidence = string.IsNullOrWhiteSpace(text) ? 0.0 : page.GetMeanConfidence();
-
             return (text.Trim(), confidence);
         }
         finally
         {
             engine.SetVariable("tessedit_char_whitelist", string.Empty);
             ReturnEngine(engine);
-            if (needsDispose) toOcr.Dispose();
         }
+    }
+
+    // Upscale a crop to targetW and convert to high-contrast grayscale. Small holofoil set-code
+    // text (Yu-Gi-Oh!) reads far better enlarged and desaturated than at native size in colour.
+    private static Bitmap UpscaleGray(Bitmap crop, int targetW, float contrast)
+    {
+        var scale = (double)targetW / crop.Width;
+        int nw = targetW, nh = Math.Max(1, (int)(crop.Height * scale));
+        var outBmp = new Bitmap(nw, nh);
+        using var g = Graphics.FromImage(outBmp);
+        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+        float t = 0.5f - 0.5f * contrast;
+        var cm = new System.Drawing.Imaging.ColorMatrix(
+        [
+            [0.299f * contrast, 0.299f * contrast, 0.299f * contrast, 0, 0],
+            [0.587f * contrast, 0.587f * contrast, 0.587f * contrast, 0, 0],
+            [0.114f * contrast, 0.114f * contrast, 0.114f * contrast, 0, 0],
+            [0, 0, 0, 1, 0],
+            [t, t, t, 0, 1],
+        ]);
+        using var ia = new System.Drawing.Imaging.ImageAttributes();
+        ia.SetColorMatrix(cm);
+        g.DrawImage(crop, new Rectangle(0, 0, nw, nh), 0, 0, crop.Width, crop.Height, GraphicsUnit.Pixel, ia);
+        return outBmp;
+    }
+
+    // Upscale + grayscale + Otsu threshold to a clean black-on-white binary, auto-picking polarity
+    // so the code reads whether it's dark-on-light or light-on-dark against the card border.
+    private static Bitmap BinarizeOtsu(Bitmap crop, int targetW)
+    {
+        using var gray = UpscaleGray(crop, targetW, 1.0f);
+        int w = gray.Width, h = gray.Height, total = w * h;
+        var lum = new byte[total];
+        var hist = new int[256];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                var c = gray.GetPixel(x, y);
+                int l = (int)(0.299 * c.R + 0.587 * c.G + 0.114 * c.B);
+                lum[y * w + x] = (byte)l; hist[l]++;
+            }
+
+        double sum = 0; for (int i = 0; i < 256; i++) sum += i * hist[i];
+        double sumB = 0; int wB = 0; double maxVar = 0; int thr = 127;
+        for (int i = 0; i < 256; i++)
+        {
+            wB += hist[i]; if (wB == 0) continue;
+            int wF = total - wB; if (wF == 0) break;
+            sumB += i * hist[i];
+            double mB = sumB / wB, mF = (sum - sumB) / wF;
+            double between = (double)wB * wF * (mB - mF) * (mB - mF);
+            if (between > maxVar) { maxVar = between; thr = i; }
+        }
+
+        int dark = 0; for (int i = 0; i < total; i++) if (lum[i] <= thr) dark++;
+        bool textIsDark = dark <= total / 2; // ink = the minority tone
+
+        var outBmp = new Bitmap(w, h);
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                bool isDark = lum[y * w + x] <= thr;
+                bool ink = textIsDark ? isDark : !isDark;
+                outBmp.SetPixel(x, y, ink ? Color.Black : Color.White);
+            }
+        return outBmp;
     }
 
     public Task<(string? CollectorNumber, double Confidence)> DetectOptcgCollectorNumberAsync(byte[] imageData)
@@ -356,33 +426,106 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     public Task<(string? CollectorNumber, double Confidence)> DetectCollectorNumberAsync(byte[] imageData, OcrCollectorSpec spec)
         => Task.Run(() => DetectCollectorNumber(imageData, spec));
 
+    private const int CollectorBinarizeTargetWidth = 700;
+
     private (string? CollectorNumber, double Confidence) DetectCollectorNumber(byte[] imageData, OcrCollectorSpec spec)
     {
         if (!_ocrAvailable) return (null, 0);
         try
         {
             using var bitmap = new Bitmap(new MemoryStream(imageData));
-            var region = bitmap.Width > bitmap.Height ? spec.LandscapeRegion : spec.PortraitRegion;
-            var rect = ToPixelRect(region, bitmap.Width, bitmap.Height);
-            if (rect.Width < 10 || rect.Height < 5) return (null, 0);
+            var landscape = bitmap.Width > bitmap.Height;
+            var regions = spec.RegionsFor(landscape);
 
-            var (text, confidence) = OcrCroppedRegion(bitmap, rect, PageSegMode.SingleLine, spec.Whitelist);
-            if (string.IsNullOrWhiteSpace(text)) return (null, 0);
+            string? bestToken = null;
+            double bestConfidence = 0;
+            int bestDigits = -1;
+            bool bestShaped = false;
 
-            if (TryExtractCollectorNumber(text, spec.RegexPattern, out var formatted))
+            foreach (var region in regions)
             {
-                var reported = Math.Max(0.9, confidence);
-                _logger.LogInformation("Collector number detected: {Number} (raw: {Raw}, ocrConf: {Conf:F2})", formatted, text, confidence);
-                return (formatted, reported);
+                var rect = ToPixelRect(region, bitmap.Width, bitmap.Height);
+                if (rect.Width < 10 || rect.Height < 5) continue;
+
+                // Try each preprocessing variant; the same holofoil crop reads under one but not the
+                // other. Prefer a token that looks like a set code (letters then digits) over a merely
+                // digit-rich one, so a stray read of the passcode/ATK line can't outrank the real code.
+                foreach (var (text, confidence) in ReadRegion(bitmap, rect, spec))
+                {
+                    if (string.IsNullOrWhiteSpace(text)) continue;
+
+                    string? token = spec.LooseExtraction
+                        ? ExtractLooseToken(text)
+                        : (TryExtractCollectorNumber(text, spec.RegexPattern, out var f) ? f : null);
+                    if (token is null) continue;
+
+                    var shaped = LooksLikeSetCode(token);
+                    var digits = token.Count(char.IsDigit);
+                    bool better = (shaped, digits, confidence).CompareTo((bestShaped, bestDigits, bestConfidence)) > 0;
+                    if (better)
+                    {
+                        bestToken = token; bestConfidence = confidence; bestDigits = digits; bestShaped = shaped;
+                    }
+                }
             }
-            _logger.LogDebug("Collector OCR text did not match spec pattern: {Text}", text);
-            return (null, 0);
+
+            if (bestToken is null)
+            {
+                _logger.LogDebug("Collector OCR found no usable token across {Count} region(s)", regions.Count);
+                return (null, 0);
+            }
+
+            // Floor the reported confidence so it clears the caller's gate — the real gate for the
+            // fuzzy path is the catalog edit-distance + pHash agreement downstream, not Tesseract's
+            // (unreliable, often near-zero) mean confidence on small holofoil text.
+            var reported = Math.Max(0.9, bestConfidence);
+            _logger.LogInformation("Collector token detected: {Token} (ocrConf: {Conf:F2})", bestToken, bestConfidence);
+            return (bestToken, reported);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Collector number detection failed");
             return (null, 0);
         }
+    }
+
+    // Yields OCR (text, confidence) for a region: plain when Binarize is off, else both the Otsu
+    // binarization and a high-contrast grayscale pass (each wins on different card finishes).
+    private IEnumerable<(string Text, double Confidence)> ReadRegion(Bitmap bitmap, Rectangle rect, OcrCollectorSpec spec)
+    {
+        if (!spec.Binarize)
+        {
+            yield return OcrCroppedRegion(bitmap, rect, PageSegMode.SingleLine, spec.Whitelist);
+            yield break;
+        }
+
+        using var crop = bitmap.Clone(rect, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using var otsu = BinarizeOtsu(crop, CollectorBinarizeTargetWidth);
+        yield return RunOcr(otsu, PageSegMode.SingleLine, spec.Whitelist);
+        using var gray = UpscaleGray(crop, CollectorBinarizeTargetWidth, 1.7f);
+        yield return RunOcr(gray, PageSegMode.SingleLine, spec.Whitelist);
+    }
+
+    // Best code-like token from noisy OCR text: split on non-code characters, then take the run
+    // carrying both letters and digits (a set code always has both; a copyright year or a plain
+    // word does not) with the most digits.
+    // A set code reads as some letters/prefix, an optional region code, then a run of digits at the
+    // end (e.g. "GRCR-EN049", or a mis-read "3RCR-ENO49"). Passcodes and ATK/DEF are pure digits;
+    // copyright words have no trailing digit group — neither looks like this.
+    internal static bool LooksLikeSetCode(string token) =>
+        System.Text.RegularExpressions.Regex.IsMatch(token, "^[A-Z0-9]{2,6}-?[A-Z]{1,3}[A-Z0-9]{0,2}[0-9]{2,4}$");
+
+    internal static string? ExtractLooseToken(string text)
+    {
+        var spaced = System.Text.RegularExpressions.Regex.Replace(text.ToUpperInvariant(), "[^A-Z0-9-]", " ");
+        return spaced.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(v => v.Trim('-'))
+            .Where(v => v.Length >= 4 && v.Any(char.IsLetter) && v.Any(char.IsDigit))
+            // No set code contains ATK/DEF — guards against a crop that catches a Monster's stat line.
+            .Where(v => !v.Contains("ATK") && !v.Contains("DEF"))
+            .OrderByDescending(v => v.Count(char.IsDigit))
+            .ThenByDescending(v => v.Length)
+            .FirstOrDefault();
     }
 
     private (List<string> SetCodes, double Confidence) MatchSymbol(Bitmap source, Rectangle symbolRect)
