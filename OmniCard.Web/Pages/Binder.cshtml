@@ -1,0 +1,109 @@
+@page "/binder/{id:int}"
+@model OmniCard.Web.Pages.BinderModel
+@{
+    ViewData["Title"] = Model.Container.Name + " — Binder";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>@ViewData["Title"] — OmniCard</title>
+    <link rel="stylesheet" href="/css/site.css"/>
+</head>
+<body class="binder-body">
+    <a href="/location/@Model.Container.Id" class="back-link">&larr; Back to @Model.Container.Name</a>
+
+    <header>
+        <h1>@Model.Container.Name</h1>
+        <p>
+            <span class="badge">@Model.TypeDisplay</span> &middot;
+            @Model.PlacedCount placed card(s) &middot; @Model.TotalPages page(s)
+        </p>
+    </header>
+
+    <main>
+        @if (Model.PlacedCount == 0)
+        {
+            <p class="empty">No cards have been placed into pages for this binder yet. Arrange cards into
+                page slots in the desktop app's binder view, then flip through them here.</p>
+        }
+
+        <div class="binder" id="binder"
+             data-total-pages="@Model.TotalPages"
+             style="--cols:@Model.Columns;">
+            <div class="binder-book" id="binderBook">
+                @foreach (var pg in Model.Pages)
+                {
+                    <div class="binder-page@(pg.Number == 1 ? " current" : "")" data-page="@pg.Number">
+                        <div class="binder-grid">
+                            @foreach (var cell in pg.Slots)
+                            {
+                                if (cell is not null)
+                                {
+                                    <button type="button" class="binder-slot filled" data-lot="@cell.Id">
+                                        @if (cell.ImageUrl is not null)
+                                        {
+                                            <img src="@cell.ImageUrl" loading="lazy" alt="@cell.Name"/>
+                                        }
+                                        else
+                                        {
+                                            <span class="no-image">@cell.Name</span>
+                                        }
+                                        @if (cell.IsTraded)
+                                        {
+                                            <span class="slot-badge traded">TRADED</span>
+                                        }
+                                        else if (cell.Foil)
+                                        {
+                                            <span class="slot-badge foil">FOIL</span>
+                                        }
+                                    </button>
+                                }
+                                else
+                                {
+                                    <div class="binder-slot empty" aria-hidden="true"></div>
+                                }
+                            }
+                        </div>
+                        <div class="page-number">Page @pg.Number</div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="binder-nav">
+            <button type="button" id="binderFirst" class="binder-btn" aria-label="First page">&laquo;</button>
+            <button type="button" id="binderPrev" class="binder-btn" aria-label="Previous page">&lsaquo; Prev</button>
+            <span class="binder-pageinfo"><span id="binderCurrent">1</span> / @Model.TotalPages</span>
+            <button type="button" id="binderNext" class="binder-btn" aria-label="Next page">Next &rsaquo;</button>
+            <button type="button" id="binderLast" class="binder-btn" aria-label="Last page">&raquo;</button>
+        </div>
+
+        <p class="binder-hint">Swipe left/right or use &larr; &rarr; to turn pages. Tap a card to preview.</p>
+    </main>
+
+    <!-- Preview modal -->
+    <div class="binder-modal" id="binderModal" hidden>
+        <div class="binder-modal-backdrop" data-close></div>
+        <div class="binder-modal-card" role="dialog" aria-modal="true" aria-labelledby="modalName">
+            <button type="button" class="binder-modal-close" data-close aria-label="Close">&times;</button>
+            <img id="modalImage" class="card-image" alt=""/>
+            <h2 id="modalName"></h2>
+            <p id="modalSet" class="modal-sub"></p>
+            <table class="detail-table">
+                <tbody id="modalDetails"></tbody>
+            </table>
+            <div id="modalTags" class="tag-list"></div>
+            <div class="binder-modal-actions">
+                <a id="modalTrade" class="trade-button" href="#">Trade this card&hellip;</a>
+                <span id="modalTraded" class="badge trade-badge" hidden>TRADED</span>
+                <a id="modalDetailsLink" class="binder-btn" href="#">Full details</a>
+            </div>
+        </div>
+    </div>
+
+    <script id="binder-data" type="application/json">@Html.Raw(Model.DetailsJson)</script>
+    <script src="/js/binder.js"></script>
+</body>
+</html>

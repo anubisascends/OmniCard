@@ -6,8 +6,10 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 using OmniCard.Web.Pages;
+using OmniCard.Web.Services;
 
 namespace OmniCard.Tests.Web;
 
@@ -15,6 +17,12 @@ public class WebPageTests : IDisposable
 {
     private readonly SqliteConnection _connection;
     private readonly IDbContextFactory<OmniCardDbContext> _factory;
+
+    // No game catalogs are registered in these tests, so art hydration is a no-op (GetGameService
+    // throws → skipped). Cards keep whatever ImageUri the test set explicitly.
+    private static readonly ICardService NoGameServices = new WebCardService([]);
+    private readonly IDataPathService _dataPaths =
+        new WebDataPathService(Path.Combine(Path.GetTempPath(), "omnicard-web-tests"));
 
     public WebPageTests()
     {
@@ -77,7 +85,7 @@ public class WebPageTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var model = new IndexModel(_factory) { PageContext = CreatePageContext() };
+        var model = new IndexModel(_factory, NoGameServices, _dataPaths) { PageContext = CreatePageContext() };
         model.OnGet();
 
         Assert.Equal(3, model.Containers.Count);
@@ -109,7 +117,7 @@ public class WebPageTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var model = new IndexModel(_factory) { PageContext = CreatePageContext(), Q = "bolt" };
+        var model = new IndexModel(_factory, NoGameServices, _dataPaths) { PageContext = CreatePageContext(), Q = "bolt" };
         model.OnGet();
 
         var result = Assert.Single(model.SearchResults);
@@ -133,7 +141,7 @@ public class WebPageTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var model = new IndexModel(_factory) { PageContext = CreatePageContext(), Q = "counterspell" };
+        var model = new IndexModel(_factory, NoGameServices, _dataPaths) { PageContext = CreatePageContext(), Q = "counterspell" };
         model.OnGet();
 
         var result = Assert.Single(model.SearchResults);
@@ -166,7 +174,7 @@ public class WebPageTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var model = new LocationModel(_factory) { PageContext = CreatePageContext() };
+        var model = new LocationModel(_factory, NoGameServices, _dataPaths) { PageContext = CreatePageContext() };
         var result = model.OnGet(containerId);
 
         Assert.IsType<PageResult>(result);
@@ -201,7 +209,7 @@ public class WebPageTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var model = new LocationModel(_factory) { PageContext = CreatePageContext() };
+        var model = new LocationModel(_factory, NoGameServices, _dataPaths) { PageContext = CreatePageContext() };
         model.OnGet(containerId);
 
         var boltCard = Assert.Single(model.Cards, c => c.Name == "Lightning Bolt");
@@ -218,7 +226,7 @@ public class WebPageTests : IDisposable
     [Fact]
     public void LocationModel_OnGet_NonexistentContainer_Returns404()
     {
-        var model = new LocationModel(_factory) { PageContext = CreatePageContext() };
+        var model = new LocationModel(_factory, NoGameServices, _dataPaths) { PageContext = CreatePageContext() };
         var result = model.OnGet(99999);
         Assert.IsType<NotFoundResult>(result);
     }
@@ -246,7 +254,7 @@ public class WebPageTests : IDisposable
             lotId = lot.Id;
         }
 
-        var model = new CardModel(_factory) { PageContext = CreatePageContext() };
+        var model = new CardModel(_factory, NoGameServices, _dataPaths) { PageContext = CreatePageContext() };
         var result = model.OnGet(lotId);
 
         Assert.IsType<PageResult>(result);
@@ -258,13 +266,13 @@ public class WebPageTests : IDisposable
     [Fact]
     public void CardModel_OnGet_NonexistentCard_Returns404()
     {
-        var model = new CardModel(_factory) { PageContext = CreatePageContext() };
+        var model = new CardModel(_factory, NoGameServices, _dataPaths) { PageContext = CreatePageContext() };
         var result = model.OnGet(99999);
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public void CardModel_ImageUrl_ResolvesScanPathOverApiUri()
+    public void CardModel_ImageUrl_ResolvesApiUriOverScanPath()
     {
         int lotId;
         using (var ctx = _factory.CreateDbContext())
@@ -280,11 +288,12 @@ public class WebPageTests : IDisposable
             lotId = lot.Id;
         }
 
-        var model = new CardModel(_factory) { PageContext = CreatePageContext() };
+        var model = new CardModel(_factory, NoGameServices, _dataPaths) { PageContext = CreatePageContext() };
         model.OnGet(lotId);
 
-        // ScanImagePath takes precedence: extracts filename → /scans/12345.jpg
-        Assert.Equal("/scans/12345.jpg", model.ImageUrl);
+        // Catalog art takes precedence over the scan, matching the desktop (CardArtCandidateResolver).
+        // A stored scan path can be stale, so it must not shadow good catalog art.
+        Assert.Equal("https://api.example.com/card.jpg", model.ImageUrl);
     }
 
     // --- IndexModel game filter (mtg/optcg/riftbound + new pokemon/yugioh/fftcg) ---
@@ -318,7 +327,7 @@ public class WebPageTests : IDisposable
             ctx.SaveChanges();
         }
 
-        var model = new IndexModel(_factory) { PageContext = CreatePageContext(), Game = gameCode };
+        var model = new IndexModel(_factory, NoGameServices, _dataPaths) { PageContext = CreatePageContext(), Game = gameCode };
         model.OnGet();
 
         Assert.Single(model.Containers);
@@ -365,7 +374,7 @@ public class WebPageTests : IDisposable
                 lotId = lot.Id;
             }
 
-            var model = new CardModel(_factory, pokemonFactory) { PageContext = CreatePageContext() };
+            var model = new CardModel(_factory, NoGameServices, _dataPaths, pokemonFactory) { PageContext = CreatePageContext() };
             var result = model.OnGet(lotId);
 
             Assert.IsType<PageResult>(result);
@@ -397,7 +406,7 @@ public class WebPageTests : IDisposable
             lotId = lot.Id;
         }
 
-        var model = new CardModel(_factory) { PageContext = CreatePageContext() };
+        var model = new CardModel(_factory, NoGameServices, _dataPaths) { PageContext = CreatePageContext() };
         model.OnGet(lotId);
 
         Assert.Null(model.ExtendedDataJson);
@@ -432,7 +441,7 @@ public class WebPageTests : IDisposable
             lotId = lot.Id;
         }
 
-        var model = new CardModel(_factory, pokemonFactory) { PageContext = CreatePageContext() };
+        var model = new CardModel(_factory, NoGameServices, _dataPaths, pokemonFactory) { PageContext = CreatePageContext() };
 
         var exception = Record.Exception(() => model.OnGet(lotId));
 

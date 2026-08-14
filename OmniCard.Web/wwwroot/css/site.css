@@ -467,6 +467,234 @@ tr:active { background: var(--surface); }
 .trade-form button:hover { opacity: 0.9; }
 .trade-form button:active { opacity: 0.75; }
 
+/* ===== Binder view ===== */
+
+/* The modal + its inner toggles rely on [hidden] actually hiding, but some of the elements carry
+   classes that set display (.trade-button, .card-image), which beat the UA [hidden] rule. Force it. */
+[hidden] { display: none !important; }
+
+.binder-body { max-width: 1000px; }
+
+.binder {
+    touch-action: pan-y; /* let vertical scroll through; we handle horizontal swipes ourselves */
+    -webkit-user-select: none;
+    user-select: none;
+    margin-bottom: 12px;
+}
+
+/* All pages share one grid cell so they stack for the flip and the book auto-sizes to a page. */
+.binder-book {
+    display: grid;
+    perspective: 2200px;
+}
+
+.binder-page {
+    grid-area: 1 / 1;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    transform-origin: left center;
+    backface-visibility: hidden;
+    transition: transform 0.5s ease, box-shadow 0.5s ease;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.binder-page.current { display: flex; }
+
+/* Mid-turn: hinge on the spine (left edge) and swing away, with a deeper lift shadow. */
+.binder-page.flip-left {
+    transform: rotateY(-168deg);
+    box-shadow: 24px 0 40px rgba(0, 0, 0, 0.55);
+}
+
+.binder-page.no-anim { transition: none; }
+
+.binder-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--cols, 3), 1fr);
+    gap: 8px;
+}
+
+.binder-slot {
+    position: relative;
+    aspect-ratio: 63 / 88;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.binder-slot.filled {
+    padding: 0;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.15s;
+}
+
+.binder-slot.filled:hover { border-color: var(--accent); }
+.binder-slot.filled:active { transform: scale(0.97); }
+
+.binder-slot.filled img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.binder-slot.filled .no-image {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 4px;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    text-align: center;
+}
+
+.binder-slot.empty {
+    border: 1px dashed var(--border);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.slot-badge {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
+.slot-badge.foil { background: #4a148c; color: #e1bee7; }
+.slot-badge.traded { background: #6d4c41; color: #fff; }
+
+.page-number {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-top: auto;
+}
+
+.binder-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 4px 0 8px;
+}
+
+.binder-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 14px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.binder-btn:hover { border-color: var(--accent); text-decoration: none; }
+.binder-btn:active { background: var(--border); }
+.binder-btn:disabled { opacity: 0.4; cursor: default; border-color: var(--border); }
+
+.binder-pageinfo { color: var(--text-muted); font-size: 0.9rem; min-width: 60px; text-align: center; }
+
+.binder-hint { color: var(--text-muted); font-size: 0.8rem; text-align: center; }
+
+/* Entry button on the location page */
+.binder-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0 18px;
+    margin: 4px 0 16px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.binder-open:hover { opacity: 0.9; text-decoration: none; }
+.binder-open:active { opacity: 0.75; }
+
+/* Preview modal */
+body.modal-open { overflow: hidden; }
+
+.binder-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.binder-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+}
+
+.binder-modal-card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 420px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+}
+
+.binder-modal-card h2 { color: var(--accent); margin-bottom: 4px; }
+.binder-modal-card .modal-sub { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 12px; }
+.binder-modal-card .card-image { display: block; margin: 0 auto 16px; }
+
+.binder-modal-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 40px;
+    height: 40px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 1.3rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.binder-modal-close:active { background: var(--border); }
+
+.binder-modal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+}
+
 /* Narrow phones: stack the search/decklist controls instead of leaving a cramped, wrapped row. */
 @media (max-width: 480px) {
     .search-bar,
