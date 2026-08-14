@@ -18,16 +18,21 @@ public class TradeModel : PageModel
 
     private readonly IDbContextFactory<OmniCardDbContext> _dbFactory;
     private readonly IDataPathService _dataPathService;
+    private readonly ICardService _cardService;
 
-    public TradeModel(IDbContextFactory<OmniCardDbContext> dbFactory, IDataPathService dataPathService)
+    public TradeModel(
+        IDbContextFactory<OmniCardDbContext> dbFactory,
+        IDataPathService dataPathService,
+        ICardService cardService)
     {
         _dbFactory = dbFactory;
         _dataPathService = dataPathService;
+        _cardService = cardService;
     }
 
     public CollectionCard Card { get; set; } = null!;
 
-    public string? ImageUrl => CardImageUrl.Resolve(Card.ScanImagePath, Card.ImageUri);
+    public string? ImageUrl => CardImageUrl.Resolve(Card.ScanImagePath, Card.ImageUri, _dataPathService.ScansDirectory);
 
     public IActionResult OnGet(int lotId)
     {
@@ -41,6 +46,7 @@ public class TradeModel : PageModel
             return RedirectToPage("Card", new { id = lotId });
 
         Card = CollectionCardMapper.ToDto(lot, lot.Product, 0m);
+        CardArtHydrator.HydrateMissingImageUris(_cardService, [Card]);
         return Page();
     }
 

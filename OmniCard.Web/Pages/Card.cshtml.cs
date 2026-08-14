@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Collection;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Web.Pages;
@@ -10,17 +11,23 @@ namespace OmniCard.Web.Pages;
 public class CardModel : PageModel
 {
     private readonly IDbContextFactory<OmniCardDbContext> _dbFactory;
+    private readonly ICardService _cardService;
+    private readonly IDataPathService _dataPathService;
     private readonly IDbContextFactory<PokemonDbContext>? _pokemonFactory;
     private readonly IDbContextFactory<YugiohDbContext>? _yugiohFactory;
     private readonly IDbContextFactory<FinalFantasyDbContext>? _finalFantasyFactory;
 
     public CardModel(
         IDbContextFactory<OmniCardDbContext> dbFactory,
+        ICardService cardService,
+        IDataPathService dataPathService,
         IDbContextFactory<PokemonDbContext>? pokemonFactory = null,
         IDbContextFactory<YugiohDbContext>? yugiohFactory = null,
         IDbContextFactory<FinalFantasyDbContext>? finalFantasyFactory = null)
     {
         _dbFactory = dbFactory;
+        _cardService = cardService;
+        _dataPathService = dataPathService;
         _pokemonFactory = pokemonFactory;
         _yugiohFactory = yugiohFactory;
         _finalFantasyFactory = finalFantasyFactory;
@@ -58,6 +65,9 @@ public class CardModel : PageModel
             card.Container = db.StorageContainers.AsNoTracking().FirstOrDefault(c => c.Id == locationId);
 
         card.Tags = TagLookup.GetTagsByLots(db, [card.Id]).GetValueOrDefault(card.Id, []);
+
+        // Fill in catalog art when the card has no stored ImageUri, same as the desktop.
+        CardArtHydrator.HydrateMissingImageUris(_cardService, [card]);
 
         Card = card;
         ExtendedDataJson = LookupExtendedDataJson(card.Game, card.GameCardId);
@@ -97,5 +107,5 @@ public class CardModel : PageModel
         }
     }
 
-    public string? ImageUrl => CardImageUrl.Resolve(Card.ScanImagePath, Card.ImageUri);
+    public string? ImageUrl => CardImageUrl.Resolve(Card.ScanImagePath, Card.ImageUri, _dataPathService.ScansDirectory);
 }

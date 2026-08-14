@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Collection;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Web.Pages;
@@ -10,10 +11,17 @@ namespace OmniCard.Web.Pages;
 public class LocationModel : PageModel
 {
     private readonly IDbContextFactory<OmniCardDbContext> _dbFactory;
+    private readonly ICardService _cardService;
+    private readonly IDataPathService _dataPathService;
 
-    public LocationModel(IDbContextFactory<OmniCardDbContext> dbFactory)
+    public LocationModel(
+        IDbContextFactory<OmniCardDbContext> dbFactory,
+        ICardService cardService,
+        IDataPathService dataPathService)
     {
         _dbFactory = dbFactory;
+        _cardService = cardService;
+        _dataPathService = dataPathService;
     }
 
     public StorageContainer Container { get; set; } = null!;
@@ -49,6 +57,9 @@ public class LocationModel : PageModel
         foreach (var c in rawCards)
             c.Tags = tagsByLot.GetValueOrDefault(c.Id, []);
 
+        // Fill in catalog art for cards with no stored ImageUri, same as the desktop collection list.
+        CardArtHydrator.HydrateMissingImageUris(_cardService, rawCards);
+
         Cards = rawCards
             .GroupBy(c => new { c.Name, c.SetCode })
             .Select(g =>
@@ -64,7 +75,7 @@ public class LocationModel : PageModel
                     rep.Rarity,
                     rep.Color,
                     g.Count(),
-                    CardImageUrl.Resolve(rep.ScanImagePath, rep.ImageUri),
+                    CardImageUrl.Resolve(rep.ScanImagePath, rep.ImageUri, _dataPathService.ScansDirectory),
                     rep.MarketPrice > 0m ? rep.MarketPrice : null,
                     rep.Tags);
             })

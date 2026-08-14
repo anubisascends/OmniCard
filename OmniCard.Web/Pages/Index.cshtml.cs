@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Collection;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Web.Pages;
@@ -10,10 +11,17 @@ namespace OmniCard.Web.Pages;
 public class IndexModel : PageModel
 {
     private readonly IDbContextFactory<OmniCardDbContext> _dbFactory;
+    private readonly ICardService _cardService;
+    private readonly IDataPathService _dataPathService;
 
-    public IndexModel(IDbContextFactory<OmniCardDbContext> dbFactory)
+    public IndexModel(
+        IDbContextFactory<OmniCardDbContext> dbFactory,
+        ICardService cardService,
+        IDataPathService dataPathService)
     {
         _dbFactory = dbFactory;
+        _cardService = cardService;
+        _dataPathService = dataPathService;
     }
 
     [BindProperty(SupportsGet = true)]
@@ -170,26 +178,30 @@ public class IndexModel : PageModel
             }
         }
 
-        SearchResults = query
+        // One representative copy (lowest Id) per Name+SetCode supplies the tile's art and price.
+        var reps = query
             .GroupBy(c => new { c.Name, c.SetCode })
-            .Select(g =>
+            .Select(g => (Rep: g.OrderBy(c => c.Id).First(), Quantity: g.Count()))
+            .ToList();
+
+        // Fill in catalog art for reps with no stored ImageUri, same as the desktop — bounded to the
+        // displayed reps rather than every matched lot.
+        CardArtHydrator.HydrateMissingImageUris(_cardService, reps.Select(r => r.Rep).ToList());
+
+        SearchResults = reps
+            .Select(r => new CardSearchResult
             {
-                // Representative copy (lowest Id) supplies set name, art, and price.
-                var rep = g.OrderBy(c => c.Id).First();
-                return new CardSearchResult
-                {
-                    Id = rep.Id,
-                    Name = g.Key.Name,
-                    SetName = rep.SetName,
-                    SetCode = g.Key.SetCode,
-                    Number = rep.Number,
-                    Rarity = rep.Rarity,
-                    Color = rep.Color,
-                    Quantity = g.Count(),
-                    ImageUrl = CardImageUrl.Resolve(rep.ScanImagePath, rep.ImageUri),
-                    MarketPrice = rep.MarketPrice > 0m ? rep.MarketPrice : null,
-                    Tags = rep.Tags,
-                };
+                Id = r.Rep.Id,
+                Name = r.Rep.Name,
+                SetName = r.Rep.SetName,
+                SetCode = r.Rep.SetCode,
+                Number = r.Rep.Number,
+                Rarity = r.Rep.Rarity,
+                Color = r.Rep.Color,
+                Quantity = r.Quantity,
+                ImageUrl = CardImageUrl.Resolve(r.Rep.ScanImagePath, r.Rep.ImageUri, _dataPathService.ScansDirectory),
+                MarketPrice = r.Rep.MarketPrice > 0m ? r.Rep.MarketPrice : null,
+                Tags = r.Rep.Tags,
             })
             .OrderBy(r => r.Name)
             .ThenBy(r => r.SetCode)
