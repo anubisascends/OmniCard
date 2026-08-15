@@ -23,23 +23,7 @@
         <ColumnDefinition x:Name="SidebarColumn" Width="0" MinWidth="0"/>
     </Grid.ColumnDefinitions>
 
-    <Grid.RowDefinitions>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="*"/>
-    </Grid.RowDefinitions>
-
-    <!-- Quick filter: instantly hides/shows already-loaded tiles as you type (client-side,
-         no round-trip) — separate from the toolbar's full-catalog search/Go, which can live in
-         the ToolBar overflow and isn't always visible. -->
-    <TextBox x:Name="QuickFilterBox"
-             Grid.Row="0"
-             Margin="0,0,0,6"
-             Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
-             materialDesign:HintAssist.Hint="Quick filter (name, set, #)..."
-             TextChanged="QuickFilterBox_TextChanged"/>
-
     <ListBox x:Name="CollectionListBox"
-             Grid.Row="1"
              ItemsSource="{Binding CollectionSearchResults}"
              SelectedItem="{Binding SelectedCollectionCard}"
              ItemTemplate="{StaticResource CardTileTemplate}"

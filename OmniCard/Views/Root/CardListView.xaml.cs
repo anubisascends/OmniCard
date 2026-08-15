@@ -48,7 +48,6 @@ public partial class CardListView : UserControl
         CollectionListBox.Loaded += _listBoxLoadedHandler;
 
         ApplySidebarLayout(vm);
-        ApplyQuickFilter();
     }
 
     // A new result set replaces CollectionSearchResults on every search/filter/sort. WPF keeps
@@ -67,45 +66,10 @@ public partial class CardListView : UserControl
         if (e.PropertyName != nameof(CollectionViewModel.CollectionSearchResults))
             return;
 
-        // Defer so the ItemsSource binding and layout update before we scroll/refilter.
+        // Defer so the ItemsSource binding and layout update before we scroll.
         Dispatcher.BeginInvoke(
             DispatcherPriority.Background,
-            new Action(() =>
-            {
-                // Each new CollectionSearchResults instance gets its own default ICollectionView,
-                // so the quick-filter predicate (set on the previous instance's view) needs reapplying.
-                ApplyQuickFilter();
-                _scrollViewer?.ScrollToTop();
-            }));
-    }
-
-    // Instant client-side filter over whatever's already loaded — separate from the toolbar's
-    // full-catalog search/Go, which round-trips the DB and can be tucked away in the ToolBar
-    // overflow. Filtering via ICollectionView (rather than hiding tiles with Visibility) keeps
-    // the VirtualizingWrapPanel's layout/scroll-extent math correct, since it only ever sees the
-    // filtered item count.
-    private void QuickFilterBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyQuickFilter();
-
-    private void ApplyQuickFilter()
-    {
-        if (CollectionListBox.ItemsSource is not { } itemsSource) return;
-        var view = CollectionViewSource.GetDefaultView(itemsSource);
-        if (view is null) return;
-
-        if (view.Filter != QuickFilterPredicate)
-            view.Filter = QuickFilterPredicate;
-        view.Refresh();
-    }
-
-    private bool QuickFilterPredicate(object obj)
-    {
-        var text = QuickFilterBox.Text?.Trim() ?? "";
-        if (text.Length == 0) return true;
-        if (obj is not CollectionCard card) return true;
-
-        return card.Name.Contains(text, StringComparison.OrdinalIgnoreCase)
-            || card.SetName.Contains(text, StringComparison.OrdinalIgnoreCase)
-            || card.Number.Contains(text, StringComparison.OrdinalIgnoreCase);
+            new Action(() => _scrollViewer?.ScrollToTop()));
     }
 
     /// <summary>Drives the details panel's column width + splitter/handle visibility from VM
