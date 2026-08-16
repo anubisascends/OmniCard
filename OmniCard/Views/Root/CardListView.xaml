@@ -37,8 +37,11 @@
              VirtualizingPanel.ScrollUnit="Pixel"
              VirtualizingPanel.CacheLengthUnit="Item"
              VirtualizingPanel.CacheLength="30,30"
+             IsTextSearchEnabled="False"
              SelectionChanged="CollectionListBox_SelectionChanged"
-             PreviewMouseRightButtonDown="CollectionListBox_PreviewMouseRightButtonDown">
+             PreviewMouseRightButtonDown="CollectionListBox_PreviewMouseRightButtonDown"
+             PreviewTextInput="CollectionListBox_PreviewTextInput"
+             PreviewKeyDown="CollectionListBox_PreviewKeyDown">
 
         <ListBox.ItemsPanel>
             <ItemsPanelTemplate>
@@ -136,6 +139,38 @@
         </i:Interaction.Triggers>
 
     </ListBox>
+
+    <!-- Type-ahead find indicator: shown while the user is typing to jump to a card by name.
+         Anchored bottom-left over the card list; driven entirely from code-behind. -->
+    <Border x:Name="TypeAheadOverlay"
+            Grid.Column="0"
+            Visibility="Collapsed"
+            HorizontalAlignment="Left" VerticalAlignment="Bottom"
+            Margin="12"
+            Padding="12,8"
+            CornerRadius="6"
+            Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+            BorderBrush="{DynamicResource MaterialDesign.Brush.Primary}"
+            BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="8" ShadowDepth="1" Opacity="0.4"/>
+        </Border.Effect>
+        <StackPanel Orientation="Horizontal">
+            <TextBlock Text="Find: "
+                       FontWeight="SemiBold"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+            <TextBlock x:Name="TypeAheadText"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            <TextBlock x:Name="TypeAheadHint"
+                       VerticalAlignment="Center"
+                       Margin="8,0,0,0"
+                       FontSize="11"
+                       FontStyle="Italic"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+        </StackPanel>
+    </Border>
 
     <Popup x:Name="TagsPopup" StaysOpen="False" Placement="MousePoint">
         <helpers:TagFlyout Tags="{Binding TagFlyoutItems}"
