@@ -17,9 +17,18 @@ public partial class CardListView : UserControl
     private ScrollViewer? _scrollViewer;
     private RoutedEventHandler? _listBoxLoadedHandler;
 
+    // Type-ahead ("jump to card by name") state. The buffer accumulates typed characters;
+    // a short idle timeout resets it, matching Windows Explorer's behavior.
+    private string _typeAheadBuffer = "";
+    private readonly DispatcherTimer _typeAheadTimer;
+    private static readonly TimeSpan TypeAheadTimeout = TimeSpan.FromSeconds(1);
+
     public CardListView()
     {
         InitializeComponent();
+
+        _typeAheadTimer = new DispatcherTimer { Interval = TypeAheadTimeout };
+        _typeAheadTimer.Tick += (_, _) => ResetTypeAhead();
     }
 
     public void WireUp(CollectionViewModel vm)
@@ -164,6 +173,119 @@ public partial class CardListView : UserControl
 
     public IList<CollectionCard> GetSelectedCards()
         => CollectionListBox.SelectedItems.Cast<CollectionCard>().ToList();
+
+    // ── Type-ahead: jump to a card by typing its name ──────────────────────────────────────
+    // Matches against the name of currently-loaded cards (starts-with, case-insensitive) and
+    // scrolls/selects the first hit. Typing more characters refines the prefix; repeating the
+    // same single letter cycles through cards that start with it. Only loaded cards are searched
+    // (results page in at PageSize) — the overlay hints when more are unloaded.
+
+    private void CollectionListBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+    {
+        var text = e.Text;
+        // Ignore control characters (Enter, Tab, Esc arrive here as text on some layouts).
+        if (string.IsNullOrEmpty(text) || text.Length != 1 || char.IsControl(text[0]))
+            return;
+
+        // A leading space with an empty buffer is meaningless as a prefix — skip it.
+        if (_typeAheadBuffer.Length == 0 && text[0] == ' ')
+            return;
+
+        char c = text[0];
+
+        // Repeated same single letter → cycle through cards starting with that letter, rather
+        // than extending the prefix to a string that matches nothing.
+        bool cycle = _typeAheadBuffer.Length > 0
+            && _typeAheadBuffer.All(ch => char.ToLowerInvariant(ch) == char.ToLowerInvariant(_typeAheadBuffer[0]))
+            && char.ToLowerInvariant(c) == char.ToLowerInvariant(_typeAheadBuffer[0]);
+
+        string candidate = cycle ? c.ToString() : _typeAheadBuffer + c;
+
+        if (TryJump(candidate, cycle))
+            _typeAheadBuffer = candidate;
+        // On a miss the buffer is left untouched so the last good prefix is preserved.
+
+        RestartTypeAheadTimer();
+        e.Handled = true;
+    }
+
+    private void CollectionListBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (_typeAheadBuffer.Length == 0)
+            return;
+
+        if (e.Key == Key.Escape)
+        {
+            ResetTypeAhead();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Back)
+        {
+            var trimmed = _typeAheadBuffer[..^1];
+            if (trimmed.Length == 0)
+            {
+                ResetTypeAhead();
+            }
+            else
+            {
+                TryJump(trimmed, cycle: false);
+                _typeAheadBuffer = trimmed;
+                RestartTypeAheadTimer();
+            }
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>Finds the first loaded card whose name starts with <paramref name="prefix"/> and
+    /// scrolls/selects it. In cycle mode the search starts after the current selection and wraps.
+    /// Returns false (leaving selection unchanged) when nothing matches.</summary>
+    private bool TryJump(string prefix, bool cycle)
+    {
+        var results = ViewModel?.CollectionSearchResults;
+        if (results is null || results.Count == 0)
+            return false;
+
+        int start = cycle ? CollectionListBox.SelectedIndex + 1 : 0;
+        int match = -1;
+
+        for (int i = 0; i < results.Count; i++)
+        {
+            int idx = (start + i) % results.Count;
+            if (results[idx].Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                match = idx;
+                break;
+            }
+        }
+
+        if (match < 0)
+            return false;
+
+        CollectionListBox.SelectedIndex = match;
+        CollectionListBox.ScrollIntoView(results[match]);
+        UpdateTypeAheadOverlay(prefix);
+        return true;
+    }
+
+    private void UpdateTypeAheadOverlay(string prefix)
+    {
+        TypeAheadText.Text = prefix;
+        TypeAheadHint.Text = ViewModel?.HasMoreResults == true ? "(loaded cards only)" : "";
+        TypeAheadOverlay.Visibility = Visibility.Visible;
+    }
+
+    private void RestartTypeAheadTimer()
+    {
+        _typeAheadTimer.Stop();
+        _typeAheadTimer.Start();
+    }
+
+    private void ResetTypeAhead()
+    {
+        _typeAheadTimer.Stop();
+        _typeAheadBuffer = "";
+        TypeAheadOverlay.Visibility = Visibility.Collapsed;
+    }
 
     private void TagsMenuItem_Click(object sender, RoutedEventArgs e)
     {
