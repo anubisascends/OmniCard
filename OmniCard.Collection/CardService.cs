@@ -783,6 +783,17 @@ public sealed class CardService : ICardService
             };
             context.Products.Add(product);
         }
+        else
+        {
+            // Backfill denormalized fields left blank when the product was first created — e.g. by an
+            // older CSV import that didn't resolve Color/CardType. Only fill blanks; never overwrite
+            // existing values. This lets a later scan (which does carry these) self-heal old rows.
+            if (string.IsNullOrEmpty(product.Color) && !string.IsNullOrEmpty(color)) product.Color = color;
+            if (string.IsNullOrEmpty(product.CardType) && !string.IsNullOrEmpty(cardType)) product.CardType = cardType;
+            if (string.IsNullOrEmpty(product.ImageUri) && !string.IsNullOrEmpty(imageUri)) product.ImageUri = imageUri;
+            if (string.IsNullOrEmpty(product.SetName) && !string.IsNullOrEmpty(setName)) product.SetName = setName;
+            if (string.IsNullOrEmpty(product.Rarity) && !string.IsNullOrEmpty(rarity)) product.Rarity = rarity;
+        }
 
         cache[key] = product;
         return product;
@@ -1057,6 +1068,33 @@ public sealed class CardService : ICardService
     /// are expected to have already resolved <c>card.ContainerId</c> (including creating any
     /// container referenced by name in app-native imports) before calling this.
     /// </summary>
+    /// <summary>
+    /// CSV/decklist imports arrive without denormalized Color/CardType — the row parsers only carry
+    /// identity + copy fields, so imported cards used to display no color while scanned ones did.
+    /// Resolve them from the game's catalog by GameCardId so imports match scans. Best-effort: rows
+    /// with no resolvable GameCardId (e.g. TCGplayer/Moxfield exports that omit it) keep null and are
+    /// picked up later by <see cref="CollectionRepairService"/> or a re-scan.
+    /// </summary>
+    private void EnsureDenormalizedAttributes(CollectionCard card)
+    {
+        if (!string.IsNullOrEmpty(card.Color) && !string.IsNullOrEmpty(card.CardType))
+            return;
+        if (string.IsNullOrEmpty(card.GameCardId))
+            return;
+        if (!_gameServices.TryGetValue(card.Game, out var gameService))
+            return;
+
+        var source = gameService.FindCardById(card.GameCardId);
+        if (source is null)
+            return;
+
+        var match = new CardMatch { Source = source };
+        if (string.IsNullOrEmpty(card.Color))
+            card.Color = CardAttributeExtractor.ExtractColor(match, card.Game);
+        if (string.IsNullOrEmpty(card.CardType))
+            card.CardType = CardAttributeExtractor.ExtractCardType(match, card.Game);
+    }
+
     public int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates)
     {
         using var context = _omniDbContextFactory.CreateDbContext();
@@ -1076,6 +1114,8 @@ public sealed class CardService : ICardService
                 if (exists)
                     continue;
             }
+
+            EnsureDenormalizedAttributes(card);
 
             var product = FindOrCreateProduct(context, productCache, card.Game, card.GameCardId, card.IsFoil,
                 card.Name, card.SetCode, card.SetName, card.Number, card.Rarity, card.ImageUri, card.Color, card.CardType);

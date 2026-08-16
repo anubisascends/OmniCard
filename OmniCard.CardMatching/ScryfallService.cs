@@ -1018,10 +1018,11 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         if (!pricesOnly)
             RelinkOrphanedCorrections();
 
-        // Auto-hash new records (incremental only)
-        if (inserted > 0)
+        // Auto-hash records needing it (incremental: new cards, plus existing cards whose
+        // IllustrationId changed in this refresh). The query is a no-op when nothing needs hashing.
+        if (!pricesOnly)
         {
-            _logger.LogInformation("Auto-computing hashes for {Count} newly added cards", inserted);
+            _logger.LogInformation("Auto-computing hashes for new/changed cards ({Count} inserted this run)", inserted);
             await ComputeImageHashesAsync(forceAll: false, progress, ct);
         }
     }
@@ -1059,7 +1060,11 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
                 newCards.Add(card);
         }
 
-        // Update prices for existing cards
+        // Update existing cards.
+        // - Prices-only refresh: touch only the Prices column (cheap daily update).
+        // - Full download: refresh every Scryfall-owned field so upstream data changes
+        //   (name/text/image URIs/set metadata/legalities/illustration, etc.) actually land,
+        //   while preserving the locally-computed columns that never come from Scryfall.
         if (existingCardIds.Count > 0)
         {
             var tracked = await context.Cards
@@ -1068,8 +1073,37 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
 
             foreach (var card in batch)
             {
-                if (tracked.TryGetValue(card.Id, out var existing))
+                if (!tracked.TryGetValue(card.Id, out var existing))
+                    continue;
+
+                if (pricesOnly)
+                {
                     existing.Prices = card.Prices;
+                    continue;
+                }
+
+                // Preserve locally-computed columns (absent from Scryfall's JSON).
+                var imageHash = existing.ImageHash;
+                var artHash = existing.ArtHash;
+                var hashedIllustrationId = existing.HashedIllustrationId;
+                var localImagePath = existing.LocalImagePath;
+
+                // Copy all mapped scalar + JSON-converted properties in one shot,
+                // so newly added Card fields refresh automatically without touching this code.
+                context.Entry(existing).CurrentValues.SetValues(card);
+
+                // Owned JSON navigations aren't covered by SetValues — assign explicitly.
+                existing.ImageUris = card.ImageUris;
+                existing.Prices = card.Prices;
+                existing.Preview = card.Preview;
+
+                // Restore the preserved local columns (SetValues nulled them from the incoming card).
+                // Keeping HashedIllustrationId while IllustrationId may have changed lets the
+                // incremental hash pass below detect art changes and recompute.
+                existing.ImageHash = imageHash;
+                existing.ArtHash = artHash;
+                existing.HashedIllustrationId = hashedIllustrationId;
+                existing.LocalImagePath = localImagePath;
             }
 
             await context.SaveChangesAsync(ct);
