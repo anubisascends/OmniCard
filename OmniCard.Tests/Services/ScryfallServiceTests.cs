@@ -249,6 +249,107 @@ public class ScryfallServiceTests : IDisposable
         Assert.Equal("tsp", cards[0].SetCode);
     }
 
+    [Fact]
+    public async Task DownloadBulkDataAsync_UpdatesExistingCardFields_AndPreservesLocalHash()
+    {
+        var cardId = Guid.Parse("0000579f-7b35-4ed3-b44c-db2a538066fe");
+        var oldIllustrationId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var newIllustrationId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+
+        // Seed an existing card with stale Scryfall data and locally-computed columns.
+        using (var seed = new ScryfallDbContext(_dbOptions))
+        {
+            seed.Cards.Add(new Card
+            {
+                Id = cardId,
+                Name = "Old Name",
+                Lang = "en",
+                SetCode = "tsp",
+                CollectorNumber = "157",
+                OracleText = "Old text",
+                Rarity = "common",
+                IllustrationId = oldIllustrationId,
+                Prices = new Prices { Usd = "0.10" },
+                ImageUris = new ImageUris { Normal = "https://old.example/normal.jpg" },
+                // Locally-computed columns that must survive a refresh.
+                ImageHash = 123456789UL,
+                ArtHash = 987654321UL,
+                HashedIllustrationId = oldIllustrationId,
+                LocalImagePath = "art/tsp/157.jpg"
+            });
+            seed.SaveChanges();
+        }
+
+        // Same Id, but upstream data has changed (name/text/rarity/prices/image/illustration).
+        var updatedCardLine = $$"""
+            {
+                "id": "{{cardId}}",
+                "oracle_id": "44623693-51d6-49ad-8cd7-140505caf02f",
+                "name": "New Name",
+                "lang": "en",
+                "type_line": "Creature",
+                "color_identity": [],
+                "keywords": [],
+                "legalities": {"modern": "legal"},
+                "games": ["paper"],
+                "finishes": ["nonfoil"],
+                "nonfoil": true,
+                "set": "tsp",
+                "set_name": "Time Spiral",
+                "collector_number": "157",
+                "rarity": "uncommon",
+                "oracle_text": "New text",
+                "illustration_id": "{{newIllustrationId}}",
+                "image_uris": {"normal": "https://new.example/normal.jpg"},
+                "prices": {"usd": "9.99", "usd_foil": null, "usd_etched": null, "eur": null, "eur_foil": null, "tix": null},
+                "related_uris": {},
+                "purchase_uris": {}
+            }
+            """;
+        var cardsJsonl = JsonSerializer.Serialize(JsonDocument.Parse(updatedCardLine).RootElement);
+
+        var bulkDataJson = JsonSerializer.Serialize(new
+        {
+            jsonl_download_uri = "https://data.scryfall.io/default-cards/test.jsonl.gz"
+        });
+        var handler = new MockHttpMessageHandler(new Dictionary<string, string>
+        {
+            ["https://api.scryfall.com/bulk-data/default_cards"] = bulkDataJson,
+            ["https://data.scryfall.io/default-cards/test.jsonl.gz"] = cardsJsonl
+        });
+        var httpClientFactory = new MockHttpClientFactory(handler);
+
+        var service = new ScryfallService(
+            httpClientFactory,
+            new MockDbContextFactory(_dbOptions),
+            new PerceptualHashService(NullLogger<PerceptualHashService>.Instance),
+            new SetSymbolCache(httpClientFactory, new DataPathService(Path.GetTempPath()), NullLogger<SetSymbolCache>.Instance),
+            Options.Create(new ScryfallSettings()),
+            NullLogger<ScryfallService>.Instance,
+            new DataPathService(Path.GetTempPath()));
+
+        // Act
+        await service.DownloadBulkDataAsync();
+
+        // Assert
+        using var verify = new ScryfallDbContext(_dbOptions);
+        var card = Assert.Single(verify.Cards.ToList());
+
+        // Scryfall-owned fields refreshed
+        Assert.Equal("New Name", card.Name);
+        Assert.Equal("New text", card.OracleText);
+        Assert.Equal("uncommon", card.Rarity);
+        Assert.Equal("9.99", card.Prices!.Usd);
+        Assert.Equal("https://new.example/normal.jpg", card.ImageUris!.Normal);
+        Assert.Equal(newIllustrationId, card.IllustrationId);
+
+        // Locally-computed columns preserved (HashedIllustrationId kept stale so the
+        // incremental hash pass can detect the art change and recompute later).
+        Assert.Equal(987654321UL, card.ArtHash);
+        Assert.Equal(oldIllustrationId, card.HashedIllustrationId);
+        Assert.Equal("art/tsp/157.jpg", card.LocalImagePath);
+    }
+
     private ScryfallService CreateServiceWithLanguages(params string[] languages)
     {
         var settings = Options.Create(new ScryfallSettings { Languages = languages.ToList() });

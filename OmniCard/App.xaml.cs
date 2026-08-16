@@ -91,6 +91,7 @@ public partial class App : Application
             services.AddSingleton<IPerceptualHashService, PerceptualHashService>();
             services.AddSingleton<IOcrMatchingService, OcrMatchingService>();
             services.AddSingleton<ICardService, CardService>();
+            services.AddSingleton<CollectionRepairService>();
             services.AddSingleton<ICollectionQueryService, CollectionQueryService>();
             services.AddSingleton<IMismatchLogService, MismatchLogService>();
             services.AddSingleton<ScanImageCache>();
@@ -347,6 +348,23 @@ public partial class App : Application
             catch (Exception ex)
             {
                 migrationLogger.LogError(ex, "Unified data migration failed; continuing startup without it (will retry on next launch)");
+            }
+
+            // One-time repair of MTG single products built before imports resolved colour/type:
+            // backfills null Color/CardType from Scryfall and normalises SetCode casing (and merges
+            // any genuine duplicate printings). Guarded by its own MigrationState marker and by an
+            // empty-catalog check, and wrapped like the migration above so a failure just retries.
+            splash.SetStatus("Repairing card attributes...");
+            try
+            {
+                var repairService = Host.Services.GetRequiredService<CollectionRepairService>();
+                var repaired = repairService.RepairIfNeeded();
+                if (repaired > 0)
+                    migrationLogger.LogInformation("Repaired {Count} product(s) (colour/set-code backfill)", repaired);
+            }
+            catch (Exception ex)
+            {
+                migrationLogger.LogError(ex, "Product attribute repair failed; continuing startup without it (will retry on next launch)");
             }
 
             splash.SetStatus("Importing trades...");

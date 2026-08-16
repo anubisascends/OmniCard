@@ -12,6 +12,7 @@ public sealed class ConfigurableGameService : ICardGameService
     public Func<string, int, List<CardMatch>> OnSearchCards = (_, _) => [];
     public Func<string, List<CardMatch>> OnGetPrintings = _ => [];
     public Func<IEnumerable<string>, bool, Dictionary<string, decimal>> OnGetCurrentPrices = (_, _) => new();
+    public Func<string, object?> OnFindCardById = _ => null;
 
     public CardGame Game => CardGame.Mtg;
     public List<CardMatch> SearchCards(string query, int maxResults = 20) => OnSearchCards(query, maxResults);
@@ -29,7 +30,7 @@ public sealed class ConfigurableGameService : ICardGameService
     public IReadOnlyList<SetInfo> GetAvailableSets() => [];
     public Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null) => Task.FromResult(new List<SetCompletionSummary>());
     public List<MissingCard> GetMissingCards(string setCode, IEnumerable<string> ownedCollectorNumbers) => [];
-    public object? FindCardById(string gameCardId) => null;
+    public object? FindCardById(string gameCardId) => OnFindCardById(gameCardId);
 }
 
 /// <summary>ICardService that exposes a single active game service and records AddCardToCollection calls.</summary>

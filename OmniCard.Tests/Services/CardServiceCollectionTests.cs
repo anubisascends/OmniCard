@@ -8,6 +8,7 @@ using OmniCard.Imaging;
 using OmniCard.Models;
 using OmniCard.Interfaces;
 using OmniCard.Collection;
+using OmniCard.Tests.Fakes;
 
 namespace OmniCard.Tests.Services;
 
@@ -66,6 +67,69 @@ public class CardServiceCollectionTests : IDisposable
         new NullScanDiagnosticService(),
         new NullAuditService(),
         new StubScannerSettingsService());
+
+    private CardService CreateServiceWithGame(ICardGameService game) => new(
+        new StubHashService(),
+        [game],
+        CreateOmniFactory(),
+        new StubOcrService(),
+        new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
+        NullLogger<CardService>.Instance,
+        new DataPathService(Path.GetTempPath()),
+        new NullScanDiagnosticService(),
+        new NullAuditService(),
+        new StubScannerSettingsService());
+
+    [Fact]
+    public void ImportCollectionCards_ResolvesColorAndType_FromCatalog_WhenMissing()
+    {
+        var cardId = Guid.NewGuid();
+        var game = new ConfigurableGameService
+        {
+            OnFindCardById = id => id == cardId.ToString()
+                ? new Card { Id = cardId, Colors = ["R"], TypeLine = "Creature — Goblin" }
+                : null,
+        };
+        var svc = CreateServiceWithGame(game);
+
+        svc.ImportCollectionCards(
+            [new CollectionCard { Game = CardGame.Mtg, GameCardId = cardId.ToString(), Name = "Goblin", Condition = "NM" }],
+            skipDuplicates: false);
+
+        using var ctx = new OmniCardDbContext(_omniOptions);
+        var product = ctx.Products.Single();
+        Assert.Equal("R", product.Color);
+        Assert.Equal("Creature", product.CardType);
+    }
+
+    [Fact]
+    public void ImportCollectionCards_BackfillsColor_OnExistingColorlessProduct()
+    {
+        var cardId = Guid.NewGuid().ToString();
+
+        // First import with no catalog resolver → product created with null colour (the legacy bug).
+        CreateServiceWithGame(new ConfigurableGameService()).ImportCollectionCards(
+            [new CollectionCard { Game = CardGame.Mtg, GameCardId = cardId, Name = "X", Condition = "NM" }],
+            skipDuplicates: false);
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+            Assert.True(string.IsNullOrEmpty(ctx.Products.Single().Color));
+
+        // Re-import the same printing once the catalog resolves it → existing product is backfilled.
+        var resolver = new ConfigurableGameService
+        {
+            OnFindCardById = _ => new Card { Colors = ["G"], TypeLine = "Creature" },
+        };
+        CreateServiceWithGame(resolver).ImportCollectionCards(
+            [new CollectionCard { Game = CardGame.Mtg, GameCardId = cardId, Name = "X", Condition = "NM" }],
+            skipDuplicates: false);
+
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+        {
+            var product = ctx.Products.Single(); // same identity, not duplicated
+            Assert.Equal("G", product.Color);
+            Assert.Equal(2, ctx.Lots.Count());   // both imports recorded a lot
+        }
+    }
 
     [Fact]
     public void ChunkedByIdLookup_ReturnsAllRows_AcrossChunkBoundaries()
