@@ -129,6 +129,7 @@
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                 <TextBlock Text="Price: $" VerticalAlignment="Center" Margin="0,0,4,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                                 <TextBox Width="100" Text="{Binding ViewModel.Price, UpdateSourceTrigger=LostFocus, StringFormat=F2}"
+                                         helpers:CurrencyBox.IsCurrency="True"
                                          Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                             </StackPanel>
 

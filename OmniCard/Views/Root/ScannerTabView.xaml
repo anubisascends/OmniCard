@@ -157,6 +157,7 @@
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                     <TextBox Text="{Binding ViewModel.DefaultPurchasePrice, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
+                             helpers:CurrencyBox.IsCurrency="True" helpers:CurrencyBox.AllowEmpty="True"
                              Width="60"
                              VerticalAlignment="Center"
                              Margin="0,0,8,0"
