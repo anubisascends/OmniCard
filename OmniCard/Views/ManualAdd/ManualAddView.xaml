@@ -59,6 +59,7 @@
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <TextBox Text="{Binding ViewModel.PurchasePrice, StringFormat={}{0:F2}, TargetNullValue=''}"
                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                             helpers:CurrencyBox.IsCurrency="True" helpers:CurrencyBox.AllowEmpty="True"
                              Width="70" VerticalAlignment="Center" VerticalContentAlignment="Center"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">

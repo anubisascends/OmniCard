@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
+             xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
              mc:Ignorable="d">
     <!-- DataContext is the RootViewModel (set by SettingsView host). -->
     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -43,7 +44,7 @@
             <TextBlock Text="Non-bulk price threshold" Margin="0,0,0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                 <TextBlock Text="$" VerticalAlignment="Center" Margin="0,0,4,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox Width="80" Text="{Binding NonBulkPriceThreshold, StringFormat=F2, UpdateSourceTrigger=PropertyChanged}"
+                <TextBox Width="80" helpers:CurrencyBox.IsCurrency="True" Text="{Binding NonBulkPriceThreshold, StringFormat=F2, UpdateSourceTrigger=PropertyChanged}"
                          Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <Rectangle Width="16" Height="16" Margin="12,0,4,0" RadiusX="2" RadiusY="2"
                            Fill="{Binding NonBulkIndicatorColor, Converter={conv:HexColorToBrushConverter}}"/>
@@ -54,7 +55,7 @@
             <TextBlock Text="High-value price threshold" Margin="0,0,0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                 <TextBlock Text="$" VerticalAlignment="Center" Margin="0,0,4,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                <TextBox Width="80" Text="{Binding HighValuePriceThreshold, StringFormat=F2, UpdateSourceTrigger=PropertyChanged}"
+                <TextBox Width="80" helpers:CurrencyBox.IsCurrency="True" Text="{Binding HighValuePriceThreshold, StringFormat=F2, UpdateSourceTrigger=PropertyChanged}"
                          Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <Rectangle Width="16" Height="16" Margin="12,0,4,0" RadiusX="2" RadiusY="2"
                            Fill="{Binding HighValueIndicatorColor, Converter={conv:HexColorToBrushConverter}}"/>

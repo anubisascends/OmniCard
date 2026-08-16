@@ -140,6 +140,7 @@
                                VerticalAlignment="Center" Margin="0,0,6,0"
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                         <TextBox Grid.Column="4" Width="80"
+                             helpers:CurrencyBox.IsCurrency="True" helpers:CurrencyBox.AllowEmpty="True"
                              Text="{Binding ViewModel.BulkPurchasePrice, TargetNullValue='', UpdateSourceTrigger=LostFocus}"
                              VerticalAlignment="Center"
                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
@@ -215,6 +216,7 @@
                            Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <TextBox Grid.Column="4"
                          Width="80"
+                         helpers:CurrencyBox.IsCurrency="True" helpers:CurrencyBox.AllowEmpty="True"
                          Text="{Binding ViewModel.SelectedScannedCard.PurchasePrice,
                                 TargetNullValue='', UpdateSourceTrigger=LostFocus}"
                          VerticalAlignment="Center"/>

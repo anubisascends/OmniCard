@@ -228,6 +228,7 @@
                                VerticalAlignment="Center" Margin="0,0,4,0"/>
                     <TextBox Width="65" VerticalAlignment="Center"
                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                             helpers:CurrencyBox.IsCurrency="True" helpers:CurrencyBox.AllowEmpty="True"
                              Text="{Binding ViewModel.PurchasePrice, TargetNullValue='', UpdateSourceTrigger=LostFocus}"/>
                 </StackPanel>
 

@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:OmniCard.Views.Sales"
              xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
+             xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -65,6 +66,7 @@
 
                 <TextBlock Grid.Row="2" Text="Price:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox Grid.Row="2" Grid.Column="1" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                         helpers:CurrencyBox.IsCurrency="True"
                          Text="{Binding EditPrice, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}"/>
 
                 <TextBlock Grid.Row="3" Text="Channel:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>

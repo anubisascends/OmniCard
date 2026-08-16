@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:OmniCard.Views.Inventory"
         xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
+        xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         Title="{Binding ViewModel.Title}" Height="440" Width="450"
@@ -68,6 +69,7 @@
             <TextBlock Grid.Row="5" Text="Market Price $:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Grid.Row="5" Grid.Column="1" Margin="0,4"
                      Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                     helpers:CurrencyBox.IsCurrency="True" helpers:CurrencyBox.AllowEmpty="True"
                      Text="{Binding ViewModel.MarketPrice, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}"/>
 
             <TextBlock Grid.Row="6" Text="Image URI:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>

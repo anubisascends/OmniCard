@@ -4,6 +4,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:OmniCard.Views.Sales"
              xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
+             xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -333,14 +334,17 @@
 
                 <TextBlock Grid.Row="1" Grid.Column="2" Text="Marketplace fees:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox Grid.Row="1" Grid.Column="3" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                         helpers:CurrencyBox.IsCurrency="True"
                          Text="{Binding SelectedOrder.MarketplaceFees, UpdateSourceTrigger=PropertyChanged, StringFormat=F2}"/>
 
                 <TextBlock Grid.Row="2" Grid.Column="0" Text="Shipping cost:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox Grid.Row="2" Grid.Column="1" Margin="0,4,16,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                         helpers:CurrencyBox.IsCurrency="True"
                          Text="{Binding SelectedOrder.ShippingCost, UpdateSourceTrigger=PropertyChanged, StringFormat=F2}"/>
 
                 <TextBlock Grid.Row="2" Grid.Column="2" Text="Shipping charged to buyer:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBox Grid.Row="2" Grid.Column="3" Margin="0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                         helpers:CurrencyBox.IsCurrency="True"
                          Text="{Binding SelectedOrder.ShippingChargedToBuyer, UpdateSourceTrigger=PropertyChanged, StringFormat=F2}"/>
             </Grid>
 
