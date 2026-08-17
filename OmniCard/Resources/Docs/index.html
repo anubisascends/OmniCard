@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OmniCard Help</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="logo.png" alt="OmniCard" class="brand-logo" onerror="this.style.display='none'">
+      <div>
+        <div class="brand-name">OmniCard</div>
+        <div class="brand-sub">Help &amp; Documentation</div>
+      </div>
+    </div>
+    <div class="search-wrap">
+      <input id="search" type="search" placeholder="Search the docs…" autocomplete="off" spellcheck="false">
+      <div id="search-meta" class="search-meta"></div>
+    </div>
+    <nav id="toc" class="toc"><!-- built by docs.js --></nav>
+  </aside>
+
+  <!-- Content -->
+  <main id="content" class="content">
+
+    <p id="no-results" class="no-results" hidden>No sections match your search.</p>
+
+    <!-- ===================== GETTING STARTED ===================== -->
+    <section id="overview" data-group="Getting Started">
+      <h2>Welcome to OmniCard</h2>
+      <p>OmniCard is a Windows desktop app for scanning and managing trading card collections. It identifies
+      physical cards — scanned with a TWAIN scanner or your phone's camera — using perceptual image hashing
+      and OCR, then tracks them across storage locations, sealed-product inventory, and sales &amp; fulfillment
+      (including listing on eBay).</p>
+      <p>Supported games: <strong>Magic: The Gathering</strong>, <strong>Pokémon</strong>,
+      <strong>One Piece TCG</strong>, <strong>Yu-Gi-Oh!</strong>, <strong>Final Fantasy TCG</strong>, and
+      <strong>Riftbound</strong>.</p>
+      <div class="callout tip">
+        <strong>New here?</strong> Read <em>The Main Window</em> and <em>The Game Selector</em> below, then jump to
+        <em>Scanning Cards</em> to add your first cards, or <em>Import &amp; Export</em> if you already have a CSV.
+      </div>
+      <figure class="shot" data-img="overview.png"><span>Screenshot placeholder — <code>images/overview.png</code> (the main window on first launch)</span></figure>
+    </section>
+
+    <section id="main-window" data-group="Getting Started">
+      <h2>The Main Window</h2>
+      <p>Everything lives in one window with three regions:</p>
+      <ul>
+        <li><strong>Menu bar</strong> (top) — File, Edit, View, Collection, Selection, Scanner, Tools, and Help.
+        Every command is reachable here.</li>
+        <li><strong>Toolbar</strong> — the <em>Game</em> selector and quick actions.</li>
+        <li><strong>Sidebar navigation</strong> (left, collapsible) — switches between the five main tabs:
+        Dashboard, Collection, Scanner, Sales, and Lists.</li>
+        <li><strong>Status bar</strong> (bottom) — app version, current status message, price-update progress,
+        a diagnostics count, and eBay connection state.</li>
+      </ul>
+      <figure class="shot" data-img="main-window-regions.png"><span>Screenshot placeholder — <code>images/main-window-regions.png</code> (regions labelled)</span></figure>
+    </section>
+
+    <section id="game-selector" data-group="Getting Started">
+      <h2>The Game Selector</h2>
+      <p>The <strong>Game</strong> dropdown in the toolbar scopes the <em>entire</em> app to one game at a time —
+      the Collection grid, Dashboard stats, scanning, and set lists all follow it. Switching games swaps the
+      underlying database (each game has its own), so changing it is instant and non-destructive.</p>
+      <div class="callout note">Sealed-product inventory, orders, customers, and sales are game-agnostic and shared
+      across all games — only card browsing and scanning are game-scoped.</div>
+    </section>
+
+    <section id="status-bar" data-group="Getting Started">
+      <h2>The Status Bar</h2>
+      <p>Along the bottom edge:</p>
+      <table class="ref">
+        <tr><th>Element</th><th>Meaning</th></tr>
+        <tr><td>Version</td><td>The running app version.</td></tr>
+        <tr><td>Status message</td><td>What the app is currently doing (e.g. "Refreshing prices…").</td></tr>
+        <tr><td>Price-update progress</td><td>A progress indicator while catalog/price data downloads.</td></tr>
+        <tr><td>Diagnostics count</td><td>Number of diagnostic events logged this session — click to open the Log Viewer.</td></tr>
+        <tr><td>eBay status</td><td>Whether an eBay account is connected.</td></tr>
+      </table>
+    </section>
+
+    <!-- ===================== VIEWS ===================== -->
+    <section id="dashboard" data-group="Views">
+      <h2>Dashboard</h2>
+      <p>The Dashboard is your portfolio and collection-stats landing page. A single <strong>Refresh</strong>
+      button recomputes everything. It has two halves: financial/valuation on top, collection statistics below.</p>
+
+      <figure class="shot" data-img="dashboard.png"><span>Screenshot placeholder — <code>images/dashboard.png</code></span></figure>
+
+      <h3>Financial summary tiles</h3>
+      <table class="ref">
+        <tr><th>Tile</th><th>What the number means</th></tr>
+        <tr><td>Cost Basis</td><td>Total amount you paid for everything you currently hold (sum of lot costs).</td></tr>
+        <tr><td>Market Value</td><td>Current market value of everything you hold, using the latest downloaded prices.</td></tr>
+        <tr><td>Unrealized Gain</td><td>Market Value minus Cost Basis — paper profit/loss on what you still own. Green = gain, red = loss.</td></tr>
+        <tr><td>Realized Profit</td><td>Profit from cards you have <em>sold</em>. The All Time / This Year / This Month toggle changes the period.</td></tr>
+        <tr><td>Realized (net)</td><td>Realized Profit after fees and associated costs are deducted.</td></tr>
+      </table>
+
+      <h3>Charts</h3>
+      <ul>
+        <li><strong>Market Value by Game</strong> — how your current market value splits across games.</li>
+        <li><strong>Market Value by Category</strong> — split by category (singles, sealed, etc.).</li>
+        <li><strong>Realized Profit by Game</strong> — sales profit per game; losses show a signed label.</li>
+      </ul>
+
+      <h3>Holdings tables</h3>
+      <p>Four breakdown tables — <strong>by Game</strong>, <strong>by Category</strong>, and <strong>by Location</strong>
+      (each showing Units, Cost, Market, Unrealized, and a share bar), plus <strong>Realized P&amp;L by Game</strong>
+      (Sold count, Proceeds, Cost, Profit).</p>
+
+      <h3>Collection stats</h3>
+      <ul>
+        <li><strong>Total Cards / Sets / Foils / Total Value</strong> — headline counts for the selected game.</li>
+        <li><strong>Rarity breakdown</strong> — Common, Uncommon, Rare, Mythic, Other.</li>
+        <li><strong>Sets in Collection</strong> — a tile per set showing the set symbol, owned / total (percent complete),
+        and total physical copies. Click a set to expand it.</li>
+      </ul>
+      <div class="callout note">"No holdings yet…" appears until you own something. Prices come from the latest catalog
+      download — run a price refresh if values look stale.</div>
+    </section>
+
+    <section id="collection" data-group="Views">
+      <h2>Collection</h2>
+      <p>Browse and manage what you own. A <strong>Cards / Inventory</strong> toggle switches between two modes:</p>
+      <h3>Cards mode</h3>
+      <ul>
+        <li>A grid or list of owned cards for the selected game, with search, sort, and filter.</li>
+        <li><strong>Type-ahead jump</strong> — start typing a card's name to scroll straight to it (Explorer-style);
+        repeat the same letters to cycle through matches.</li>
+        <li><strong>Locations</strong> — drill into a storage location to see just the cards stored there.</li>
+        <li>Double-click a card to open its detail/editor. Right-click for per-card actions (move, tag, list for sale, trade…).</li>
+      </ul>
+      <h3>Inventory mode</h3>
+      <p>Swaps the grid for sealed-product inventory — see <a href="#inventory">Sealed Inventory</a>.</p>
+      <figure class="shot" data-img="collection.png"><span>Screenshot placeholder — <code>images/collection.png</code></span></figure>
+      <div class="callout tip">Use <em>Collection ▸ Sort &amp; Filter Builder</em> to build reusable sort/filter rules, and the
+      <em>Set Filter</em> to narrow to specific sets.</div>
+    </section>
+
+    <section id="scanner-view" data-group="Views">
+      <h2>Scanner</h2>
+      <p>The live scanning workflow. Enabled once a scanner (TWAIN) or phone camera source is connected.</p>
+      <ol>
+        <li>Scan a card — it appears in the <strong>scan queue</strong> with the best match(es).</li>
+        <li>Review the match; adjust <strong>condition</strong>, <strong>foil</strong>, quantity, and <strong>tags</strong> as needed.</li>
+        <li>Correct the match if it's wrong (this trains future matches — see <a href="#corrections">Corrections</a>).</li>
+        <li><strong>Commit</strong> the queue to add the cards to your collection.</li>
+      </ol>
+      <figure class="shot" data-img="scanner.png"><span>Screenshot placeholder — <code>images/scanner.png</code></span></figure>
+      <p>See <a href="#scanning-workflow">Scanning Cards</a> for the full workflow and <a href="#how-matching-works">How Matching Works</a>.</p>
+    </section>
+
+    <section id="sales-view" data-group="Views">
+      <h2>Sales</h2>
+      <p>The selling hub, organised into sub-tabs:</p>
+      <ul>
+        <li><strong>Pick List</strong> — cards you need to pull for open orders.</li>
+        <li><strong>Listings</strong> — everything currently listed for sale (locally and on eBay).</li>
+        <li><strong>Orders</strong> — the order pipeline as a drag-and-drop kanban board.</li>
+        <li><strong>Customers</strong> — your customer records.</li>
+      </ul>
+      <p>Details in the <a href="#listings">Sales &amp; Fulfillment</a> chapter.</p>
+    </section>
+
+    <section id="lists-view" data-group="Views">
+      <h2>Lists</h2>
+      <p>Custom card lists and decklists. The master list is on the left, its contents on the right. Lists feed the
+      <a href="#decklist-check">Decklist Check</a> tool and can be turned into a storage location via
+      <em>Move List to Location</em>. Create lists manually, from an import, or from scanned cards
+      (<em>Scanner ▸ Create List from Scans</em>).</p>
+    </section>
+
+    <!-- ===================== SCANNING & MATCHING ===================== -->
+    <section id="scanning-workflow" data-group="Scanning &amp; Matching">
+      <h2>Scanning Cards</h2>
+      <ol>
+        <li><strong>Connect a source.</strong> <em>Scanner ▸ Connect to Scanner…</em> for a TWAIN scanner, or use the
+        phone-camera flow via the web companion.</li>
+        <li><strong>Pick the game</strong> in the toolbar so matches are looked up in the right catalog.</li>
+        <li><strong>Scan.</strong> Each card is hashed and matched; results land in the scan queue with a confidence indicator.</li>
+        <li><strong>Review &amp; edit</strong> condition, foil, quantity, tags. First copies you own can show a star badge, and a
+        price-tier accent (configurable in Settings ▸ Display).</li>
+        <li><strong>Commit</strong> to write the cards into your collection (optionally keeping the scan images — Settings ▸ Scan Workflow).</li>
+      </ol>
+      <div class="callout tip">You can turn a batch of scans into a List (<em>Scanner ▸ Create List from Scans</em>) or link a scan
+      to a trade (<em>right-click ▸ Link to Trade</em>) before committing.</div>
+    </section>
+
+    <section id="how-matching-works" data-group="Scanning &amp; Matching">
+      <h2>How Matching Works</h2>
+      <p>OmniCard combines several signals into one confidence score:</p>
+      <ul>
+        <li><strong>Perceptual hash (pHash)</strong> — a fingerprint of the card art that survives resizing and minor blur.</li>
+        <li><strong>Foil edge hash</strong> — a color-robust hash used for foils, whose color shift otherwise breaks plain pHash.</li>
+        <li><strong>OCR</strong> — reads text such as collector numbers / set codes to disambiguate look-alikes and reprints.</li>
+      </ul>
+      <p>The higher the combined score, the more confident the match. Low-confidence scans are flagged so you can correct them.</p>
+    </section>
+
+    <section id="corrections" data-group="Scanning &amp; Matching">
+      <h2>Corrections &amp; Training</h2>
+      <p>When you fix a wrong match, OmniCard records the correction <em>per game</em> against that card's image hash. The next
+      time a card with the same fingerprint is scanned, the correction boosts the right match — so accuracy improves as you use it.</p>
+    </section>
+
+    <!-- ===================== STORAGE & LOCATIONS ===================== -->
+    <section id="locations" data-group="Storage &amp; Locations">
+      <h2>Storage Locations</h2>
+      <p>Locations (a.k.a. storage containers) are where your cards physically live — boxes, binders, deck boxes, shelves.
+      Manage them via <em>Manage Storage Locations</em>. Each card can be assigned to a location, and the Dashboard's
+      <em>Holdings by Location</em> reflects value per location.</p>
+      <p>Move cards with <em>Move to Location</em> (single/selection) or <em>Move List to Location</em> (a whole list).</p>
+    </section>
+
+    <section id="binders" data-group="Storage &amp; Locations">
+      <h2>Binders</h2>
+      <p>Binder locations get a visual page-slot editor: drag and drop cards into pages and slots, view facing-page spreads, and
+      page through with the bottom pagination strip (First / Prev / spread list / Next / Last). Open it from a binder location, or
+      add a card straight into a specific page/slot.</p>
+      <figure class="shot" data-img="binder.png"><span>Screenshot placeholder — <code>images/binder.png</code></span></figure>
+    </section>
+
+    <section id="move-cards" data-group="Storage &amp; Locations">
+      <h2>Moving Cards</h2>
+      <p><strong>Move to Location</strong> relocates the selected card(s). <strong>Move List to Location</strong> relocates every card
+      in a list at once — handy for filing a freshly-built deck or a purchase into a box. Every move is recorded in
+      <a href="#movement-history">Movement History</a>.</p>
+    </section>
+
+    <section id="price-sheets" data-group="Storage &amp; Locations">
+      <h2>Price Sheets</h2>
+      <p><em>Create Price Sheet…</em> on a location exports a printable PDF of the cards in that location with prices — useful for
+      shows, trade nights, or a physical binder insert.</p>
+    </section>
+
+    <section id="audit" data-group="Storage &amp; Locations">
+      <h2>Location Audit</h2>
+      <p>The Audit Report verifies a location's expected contents against what's physically there and exports a PDF. Use it to reconcile
+      a box after a busy day of scanning and selling.</p>
+    </section>
+
+    <!-- ===================== INVENTORY ===================== -->
+    <section id="inventory" data-group="Sealed Inventory">
+      <h2>Sealed Product Inventory</h2>
+      <p>Beyond singles, OmniCard tracks sealed product (booster boxes, packs, bundles) with proper cost-basis accounting.
+      Open it via the <strong>Inventory</strong> toggle inside the Collection tab.</p>
+      <ul>
+        <li><strong>Products</strong> — the sealed items you stock. Add/edit via the product editor.</li>
+        <li><strong>Lots</strong> — each purchase is a lot with a quantity, unit cost, source, and date, so cost basis stays accurate as prices change.</li>
+        <li><strong>Open Units</strong> — record opening/consuming sealed units (e.g. cracking a box for singles).</li>
+      </ul>
+      <figure class="shot" data-img="inventory.png"><span>Screenshot placeholder — <code>images/inventory.png</code></span></figure>
+    </section>
+
+    <!-- ===================== SALES & FULFILLMENT ===================== -->
+    <section id="listings" data-group="Sales &amp; Fulfillment">
+      <h2>Listing Cards for Sale</h2>
+      <p>Right-click a card (or use <em>Selection ▸ List for Sale</em>) to create a listing at a suggested price. Listings appear on the
+      <strong>Sales ▸ Listings</strong> tab. To list on eBay specifically, use the eBay Listing editor (requires a connected eBay
+      account — see <a href="#ebay-connect">Connecting eBay</a>).</p>
+    </section>
+
+    <section id="orders" data-group="Sales &amp; Fulfillment">
+      <h2>Orders (Kanban)</h2>
+      <p>The <strong>Sales ▸ Orders</strong> tab is a drag-and-drop kanban board. Cards move through columns as you fulfill them
+      (Created → picking → shipped → Completed). Drag an order card between columns to change its state; open a card for full details.</p>
+      <ul>
+        <li><strong>Pick List</strong> tells you which cards to pull for open orders and where they're stored.</li>
+        <li>Completed orders can be edited with a required reason and a full field-diff audit trail; the ledger and inventory auto-correct.</li>
+      </ul>
+      <figure class="shot" data-img="orders-kanban.png"><span>Screenshot placeholder — <code>images/orders-kanban.png</code></span></figure>
+    </section>
+
+    <section id="receipts" data-group="Sales &amp; Fulfillment">
+      <h2>Receipts</h2>
+      <p>Receipts print for fulfilled orders. Configure width, margins, font size, whether prices show, footer text, and default printer
+      in <a href="#settings-sales">Settings ▸ Sales &amp; Receipts</a>. Identical line items are condensed automatically.</p>
+    </section>
+
+    <section id="customers" data-group="Sales &amp; Fulfillment">
+      <h2>Customers</h2>
+      <p>The <strong>Sales ▸ Customers</strong> tab holds customer records that orders link to. eBay orders import their buyer details automatically.</p>
+    </section>
+
+    <section id="trades" data-group="Sales &amp; Fulfillment">
+      <h2>Trades</h2>
+      <p>Trade a card away and OmniCard records a note and photo, removes it from valuation, and logs the movement. You can start a trade
+      from the web companion's <em>Trade</em> button or link a scan to a trade in the desktop app; committing the trade deletes the
+      traded-away card and records it in the permanent trades log.</p>
+    </section>
+
+    <!-- ===================== EBAY ===================== -->
+    <section id="ebay-connect" data-group="eBay Integration">
+      <h2>Connecting an eBay Account</h2>
+      <p>Do this once to sell on eBay from OmniCard.</p>
+      <ol>
+        <li>Open <em>Tools ▸ Connect to eBay…</em>.</li>
+        <li>An eBay sign-in window opens (an embedded browser). Sign in to your eBay account and grant OmniCard permission.</li>
+        <li>On success the window closes and the status bar shows <strong>eBay: Connected</strong>. Your tokens are stored securely and refreshed automatically.</li>
+      </ol>
+      <div class="callout note">To disconnect later, use <em>Tools ▸ Disconnect from eBay</em>.</div>
+      <figure class="shot" data-img="ebay-connect.png"><span>Screenshot placeholder — <code>images/ebay-connect.png</code></span></figure>
+    </section>
+
+    <section id="ebay-selling-settings" data-group="eBay Integration">
+      <h2>eBay Selling Details</h2>
+      <p>Before your first listing, fill in <em>Settings ▸ eBay Selling</em>:</p>
+      <ul>
+        <li><strong>Ship-from address</strong> — location name, address, city, state, postal code, ISO-2 country, phone.</li>
+        <li><strong>Shipping</strong> — free-shipping toggle, shipping cost, handling-time (days), shipping-service code.</li>
+        <li><strong>Returns</strong> — whether you accept returns, the return window (days), and who pays return shipping.</li>
+      </ul>
+    </section>
+
+    <section id="ebay-setup" data-group="eBay Integration">
+      <h2>Running eBay Setup</h2>
+      <p>Click <strong>Run eBay Setup</strong> in <em>Settings ▸ eBay Selling</em>. This one-time step provisions your eBay seller
+      account so listings can be created:</p>
+      <ol>
+        <li>Opts your account into eBay <strong>Business Policies</strong>.</li>
+        <li>Ensures an <strong>inventory location</strong> exists.</li>
+        <li>Creates (or reuses) your <strong>fulfillment (shipping)</strong>, <strong>payment</strong>, and <strong>return</strong> policies.</li>
+      </ol>
+      <p>A live status log shows each step. Once it completes, you can list cards on eBay.</p>
+    </section>
+
+    <section id="ebay-listing" data-group="eBay Integration">
+      <h2>Listing &amp; Syncing on eBay</h2>
+      <p>Use <em>Selection ▸ List on eBay</em> or the eBay Listing editor to publish a card. Card condition (NM / LP / MP / HP) maps to
+      eBay's condition and a "Card Condition" grade. OmniCard syncs listing and order state from eBay so sold items flow into your Orders
+      pipeline and buyer details create/attach a Customer.</p>
+    </section>
+
+    <!-- ===================== SETTINGS ===================== -->
+    <section id="settings-display" data-group="Settings">
+      <h2>Settings — Display</h2>
+      <p>Open Settings from <em>Edit ▸ Settings</em>. The <strong>Display</strong> section controls:</p>
+      <ul>
+        <li>Card-detail font size, card-preview size, scanner font size.</li>
+        <li>Scan-tile price indicators — the <em>non-bulk</em> price threshold (green accent) and the <em>high-value</em> price threshold (blue accent).</li>
+      </ul>
+    </section>
+
+    <section id="settings-data" data-group="Settings">
+      <h2>Settings — Data Location</h2>
+      <p>Shows the current data folder and lets you <strong>Browse</strong> to a new one and <strong>Migrate</strong> your data store there
+      (with a cancel option). All game databases, scans, and logs live under this folder.</p>
+      <div class="callout note">Default location: <code>%LOCALAPPDATA%\OmniCard</code>.</div>
+    </section>
+
+    <section id="settings-sales" data-group="Settings">
+      <h2>Settings — Sales &amp; Receipts</h2>
+      <ul>
+        <li><strong>For-Sale location</strong> — where picked cards are moved during fulfillment.</li>
+        <li><strong>Company Profile</strong> — name, address, city/state/postal/country, email, phone, and a logo for receipts.</li>
+        <li><strong>Receipt setup</strong> — width (mm), margin (mm), font (pt), show prices, footer text, and default printer.</li>
+      </ul>
+    </section>
+
+    <section id="settings-ebay" data-group="Settings">
+      <h2>Settings — eBay Selling</h2>
+      <p>The ship-from address, shipping, and returns configuration plus the <strong>Run eBay Setup</strong> button. Covered under
+      <a href="#ebay-selling-settings">eBay Selling Details</a> and <a href="#ebay-setup">Running eBay Setup</a>.</p>
+    </section>
+
+    <section id="settings-scan" data-group="Settings">
+      <h2>Settings — Scan Workflow</h2>
+      <ul>
+        <li><strong>Store vs discard scan images</strong> after committing a scan.</li>
+        <li><strong>Scan Archives</strong> — import a previously archived scans <code>.zip</code> and relink it to inventory.</li>
+      </ul>
+    </section>
+
+    <!-- ===================== IMPORT / EXPORT ===================== -->
+    <section id="import" data-group="Import &amp; Export">
+      <h2>Importing</h2>
+      <p><em>File ▸ Import…</em> (Ctrl+I) is a hub that auto-detects what you give it:</p>
+      <ul>
+        <li><strong>CSV</strong> collection exports — mapped and previewed before import.</li>
+        <li><strong>Decklists</strong> — plain-text lists, batch-imported with a master/detail preview.</li>
+        <li><strong>Add files…</strong> or <strong>Add URL(s)…</strong> — import from Moxfield / Archidekt links.</li>
+      </ul>
+      <p>After import the collection refreshes automatically.</p>
+    </section>
+
+    <section id="export" data-group="Import &amp; Export">
+      <h2>Exporting</h2>
+      <p>The <em>File ▸ Export</em> submenu exports your collection (e.g. to CSV) for backup or use in other tools.</p>
+    </section>
+
+    <section id="tcg-import" data-group="Import &amp; Export">
+      <h2>TCGplayer Order Import</h2>
+      <p>Import TCGplayer orders (Shipping Export) to create orders in the pipeline. This brings in orders only — not card line items —
+      so you fulfill against your own inventory.</p>
+    </section>
+
+    <!-- ===================== TOOLS ===================== -->
+    <section id="decklist-check" data-group="Tools">
+      <h2>Check Decklist</h2>
+      <p><em>Tools ▸ Check Decklist…</em> compares a decklist against what you own so you can see what you're missing. A batch variant
+      checks several lists at once.</p>
+    </section>
+
+    <section id="movement-history" data-group="Tools">
+      <h2>Movement History</h2>
+      <p><em>Tools ▸ Movement History…</em> is the audit log of every card move — location changes, sales, trades — with timestamps.</p>
+    </section>
+
+    <section id="log-viewer" data-group="Tools">
+      <h2>Log Viewer</h2>
+      <p><em>Tools ▸ View Logs…</em> parses the app's logs with level/time/text filters and a "copy for AI" action, so you can hand
+      diagnostics to support (or an assistant) when troubleshooting.</p>
+    </section>
+
+    <section id="top100" data-group="Tools">
+      <h2>Top 100 Cards</h2>
+      <p><em>Collection ▸ Top 100 Cards</em> lists your highest-value unlisted singles across all games, with a "go to location" jump
+      so you can pull them quickly.</p>
+    </section>
+
+    <section id="tags" data-group="Tools">
+      <h2>Tags</h2>
+      <p>Tag individual card lots and search them with <code>tag:</code> queries. Add tags while scanning or in the card editor, bulk-add
+      to a selection, and manage the tag library (rename / delete / merge, with usage counts) via <em>Manage Tags</em>. Tags also display
+      in the web companion.</p>
+    </section>
+
+    <!-- ===================== WEB COMPANION ===================== -->
+    <section id="web" data-group="Web Companion">
+      <h2>Web Companion</h2>
+      <p>OmniCard ships a read-only web app that browses the same collection and lets you scan with a phone from any device on the network.
+      It opens the desktop app's databases read-only. Features include browsing the collection, a flip-through <strong>binder view</strong>
+      (swipe + page-turn + tap-to-preview), and a <strong>Trade</strong> workflow that hands trades back to the desktop app.</p>
+      <div class="callout note">The web companion is launched separately, pointed at the desktop app's data folder. It never writes to your
+      databases directly — trades and scans are handed back to the desktop app to apply.</div>
+    </section>
+
+    <!-- ===================== REFERENCE ===================== -->
+    <section id="shortcuts" data-group="Reference">
+      <h2>Keyboard Shortcuts</h2>
+      <table class="ref">
+        <tr><th>Shortcut</th><th>Action</th></tr>
+        <tr><td>Ctrl + I</td><td>Import…</td></tr>
+        <tr><td>F1</td><td>Open this documentation</td></tr>
+        <tr><td>Type a name (Collection grid)</td><td>Jump to the first matching card; repeat to cycle.</td></tr>
+      </table>
+      <div class="callout note">Menus show their own shortcuts inline (the grey text on the right of a menu item).</div>
+    </section>
+
+    <section id="faq" data-group="Reference">
+      <h2>FAQ &amp; Troubleshooting</h2>
+      <h3>My prices look out of date.</h3>
+      <p>Prices come from the latest catalog download. Let a price refresh finish (watch the status bar), then Refresh the Dashboard.</p>
+      <h3>A scan matched the wrong card.</h3>
+      <p>Correct it in the scan queue before committing — OmniCard learns the correction for next time. See <a href="#corrections">Corrections</a>.</p>
+      <h3>The Scanner tab is greyed out.</h3>
+      <p>Connect a source first via <em>Scanner ▸ Connect to Scanner…</em>, or scan from your phone through the web companion.</p>
+      <h3>eBay listing fails.</h3>
+      <p>Make sure you've connected eBay (<a href="#ebay-connect">Connecting eBay</a>), filled in <a href="#ebay-selling-settings">Selling Details</a>,
+      and run <a href="#ebay-setup">eBay Setup</a> successfully.</p>
+      <h3>Where is my data stored?</h3>
+      <p><code>%LOCALAPPDATA%\OmniCard</code> by default; change it under <a href="#settings-data">Settings ▸ Data Location</a>.</p>
+    </section>
+
+  </main>
+</div>
+<script src="docs.js"></script>
+</body>
+</html>

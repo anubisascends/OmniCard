@@ -1,0 +1,15 @@
+<Project>
+
+  <!-- Solution-wide assembly/product metadata. Consumed at runtime by the About dialog
+       (reads AssemblyInformationalVersion / product / company) and stamped into every
+       assembly in the solution. Bump <Version> on each release. -->
+  <PropertyGroup>
+    <Version>1.0.0</Version>
+    <InformationalVersion>1.0.0</InformationalVersion>
+    <Product>OmniCard</Product>
+    <Company>Andrew Riebe</Company>
+    <Authors>Andrew Riebe</Authors>
+    <Copyright>Copyright © 2026 Andrew Riebe</Copyright>
+  </PropertyGroup>
+
+</Project>

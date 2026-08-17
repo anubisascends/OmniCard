@@ -2101,6 +2101,12 @@ public sealed partial class RootViewModel(
     [RelayCommand]
     public void OpenLogViewer() => DialogService.OpenLogViewer();
 
+    [RelayCommand]
+    public void ShowDocumentation() => DialogService.ShowDocumentation();
+
+    [RelayCommand]
+    public void ShowAbout() => DialogService.ShowAbout();
+
     [RelayCommand(CanExecute = nameof(HasSingleSelection))]
     public void CardDoubleClick()
     {

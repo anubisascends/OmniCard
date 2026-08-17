@@ -27,6 +27,8 @@ using OmniCard.Views.Settings;
 using OmniCard.Views.TcgOrderImport;
 using OmniCard.Views.ManageTags;
 using OmniCard.Views.TopValueCards;
+using OmniCard.Views.About;
+using OmniCard.Views.Documentation;
 
 namespace OmniCard.Services;
 
@@ -154,6 +156,20 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
     public void ShowSettings()
     {
         var wnd = Services.GetRequiredService<SettingsView>();
+        SetOwner(wnd);
+        wnd.ShowDialog();
+    }
+
+    public void ShowAbout()
+    {
+        var wnd = Services.GetRequiredService<AboutView>();
+        SetOwner(wnd);
+        wnd.ShowDialog();
+    }
+
+    public void ShowDocumentation()
+    {
+        var wnd = Services.GetRequiredService<DocumentationView>();
         SetOwner(wnd);
         wnd.ShowDialog();
     }

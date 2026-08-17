@@ -112,6 +112,7 @@
         <KeyBinding Gesture="Ctrl+E" Command="{Binding ViewModel.ExportAllAppNativeCommand}"/>
         <KeyBinding Key="F5" Command="{Binding ViewModel.ReprocessScansCommand}"/>
         <KeyBinding Gesture="Ctrl+A" Command="{Binding ViewModel.SelectAllCommand}"/>
+        <KeyBinding Key="F1" Command="{Binding ViewModel.ShowDocumentationCommand}"/>
     </Window.InputBindings>
 
     <Grid>
@@ -304,6 +305,14 @@
                 <Separator/>
                 <MenuItem Header="View _Logs..."
                           Command="{Binding ViewModel.OpenLogViewerCommand}"/>
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="_Documentation..."
+                          Command="{Binding ViewModel.ShowDocumentationCommand}"
+                          InputGestureText="F1"/>
+                <Separator/>
+                <MenuItem Header="_About OmniCard..."
+                          Command="{Binding ViewModel.ShowAboutCommand}"/>
             </MenuItem>
         </Menu>
 

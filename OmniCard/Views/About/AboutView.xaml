@@ -1,0 +1,133 @@
+<Window x:Class="OmniCard.Views.About.AboutView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Title="About OmniCard" Height="620" Width="560"
+        MinHeight="480" MinWidth="480"
+        Background="{DynamicResource MaterialDesign.Brush.Background}"
+        TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="13"
+        FontFamily="{StaticResource AppFont}">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header: logo + identity -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal">
+            <Image Source="/Resources/Images/OmniCard_Logo.png"
+                   Width="64" Height="64"
+                   VerticalAlignment="Top"
+                   RenderOptions.BitmapScalingMode="HighQuality"/>
+            <StackPanel Margin="16,0,0,0" VerticalAlignment="Center">
+                <TextBlock Text="{Binding ProductName}"
+                           FontSize="26" FontWeight="Bold"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground}" Opacity="0.75">
+                    <Run Text="Version"/>
+                    <Run Text="{Binding Version, Mode=OneWay}"/>
+                </TextBlock>
+                <TextBlock Text="{Binding Framework}"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                           Opacity="0.55" FontSize="11"/>
+            </StackPanel>
+        </StackPanel>
+
+        <TextBlock Grid.Row="1"
+                   Text="{Binding Description}"
+                   TextWrapping="Wrap"
+                   Margin="0,18,0,0"
+                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                   Opacity="0.85"/>
+
+        <TextBlock Grid.Row="2"
+                   Text="{Binding Copyright}"
+                   Margin="0,14,0,0"
+                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                   Opacity="0.7"/>
+
+        <TextBlock Grid.Row="3"
+                   Text="Third-party libraries"
+                   FontSize="15" FontWeight="SemiBold"
+                   Margin="0,18,0,6"
+                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+
+        <!-- Attributions list -->
+        <Border Grid.Row="4"
+                Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                CornerRadius="4"
+                Padding="4">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Attributions}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Padding="10,8"
+                                    BorderThickness="0,0,0,1"
+                                    BorderBrush="{DynamicResource MaterialDesign.Brush.Chip.Background}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
+                                            <Run Text="{Binding Name, Mode=OneWay}"/>
+                                            <Run Text="{Binding Version, Mode=OneWay}"
+                                                 Foreground="{DynamicResource MaterialDesign.Brush.Primary}"/>
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding License}"
+                                                   TextWrapping="Wrap"
+                                                   FontSize="11"
+                                                   Opacity="0.7"
+                                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1"
+                                            Style="{StaticResource MaterialDesignFlatButton}"
+                                            Padding="8,0"
+                                            VerticalAlignment="Center"
+                                            ToolTip="{Binding Url}"
+                                            Command="{Binding DataContext.OpenLinkCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding Url}">
+                                        <materialDesign:PackIcon Kind="OpenInNew"/>
+                                    </Button>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Footer -->
+        <Grid Grid.Row="5" Margin="0,14,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0"
+                       VerticalAlignment="Center"
+                       TextWrapping="Wrap"
+                       FontSize="11" Opacity="0.6"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                       Text="Card data &amp; images © their respective rights holders (Scryfall, TCGCSV, and the games' publishers). OmniCard is not affiliated with or endorsed by any game publisher."/>
+            <Button Grid.Column="1"
+                    Content="Close"
+                    Margin="12,0,0,0"
+                    MinWidth="88"
+                    IsCancel="True" IsDefault="True"
+                    Style="{StaticResource MaterialDesignRaisedButton}"
+                    Click="CloseButton_Click"/>
+        </Grid>
+    </Grid>
+</Window>
