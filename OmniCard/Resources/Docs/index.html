@@ -200,6 +200,17 @@
         <li><strong>OCR</strong> — reads text such as collector numbers / set codes to disambiguate look-alikes and reprints.</li>
       </ul>
       <p>The higher the combined score, the more confident the match. Low-confidence scans are flagged so you can correct them.</p>
+
+      <h3>Set-code reading (One Piece, Riftbound, Pokémon, Yu-Gi-Oh!, Final Fantasy)</h3>
+      <p>For these games OmniCard reads the printed collector / set code first and uses it as the primary matcher, falling
+      back to perceptual hashing only when the code can't be read. <strong>Final Fantasy TCG</strong> cards print their code
+      centered along the bottom credit line as <code>opus-number-rarity</code> (for example <code>29-048C</code> = set 29,
+      card 48, Common; rarities are C, R, H, L, and P for premium/foil). Reprints that share art across sets still resolve to
+      the correct printing this way.</p>
+      <p><strong>Newly released sets:</strong> a scan can only match a card the local catalog knows about. When a brand-new set
+      appears, refresh that game's card data so its singles are downloaded; until then, cards from that set fall back to hash
+      matching and may be flagged for correction. (A set the vendor hasn't published as individual cards yet — only sealed
+      product — can't be matched until it's listed and you refresh.)</p>
     </section>
 
     <section id="corrections" data-group="Scanning &amp; Matching">

@@ -41,6 +41,12 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
     /// enables this; games with cleaner, exactly-read numbers keep the strict lookup.</summary>
     protected virtual bool UseFuzzyOcrMatch => false;
 
+    /// <summary>When true, a catalog collector number that joins several printings with '/'
+    /// (FFTCG reprints, e.g. "Re-103C/11-072R") matches an OCR token equal to any one part. Off by
+    /// default — other games' numbers aren't slash-joined (and Pokémon's "123/198" is a single value,
+    /// so it must stay off there to avoid matching the count as a number).</summary>
+    protected virtual bool SplitReprintNumbers => false;
+
     // TCGCSV returns camelCase JSON.
     protected static readonly JsonSerializerOptions TcgCsvJsonOptions = new()
     {
@@ -571,8 +577,24 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
             else
             {
                 var num = NormalizeNumber(ocrResult.CollectorNumber);
-                var candidates = _readContext.Cards.AsNoTracking()
-                    .Where(c => c.CollectorNumber.ToUpper() == num).ToList();
+                IQueryable<TcgCsvCard> query = _readContext.Cards.AsNoTracking();
+                if (SplitReprintNumbers)
+                {
+                    // Some catalog Numbers join several printings of a card with '/' (FFTCG reprints,
+                    // e.g. "Re-103C/11-072R"). A scan prints just one of them, so match the token
+                    // against any '/'-delimited part. The boundary LIKEs (start/end/middle) avoid the
+                    // substring false-match a bare Contains would cause (e.g. "11-072R" in "111-072R").
+                    // SQLite LIKE is case-insensitive for ASCII, so no upper() needed on the column.
+                    query = query.Where(c => c.CollectorNumber.ToUpper() == num
+                        || EF.Functions.Like(c.CollectorNumber, num + "/%")
+                        || EF.Functions.Like(c.CollectorNumber, "%/" + num)
+                        || EF.Functions.Like(c.CollectorNumber, "%/" + num + "/%"));
+                }
+                else
+                {
+                    query = query.Where(c => c.CollectorNumber.ToUpper() == num);
+                }
+                var candidates = query.ToList();
                 if (setFilter is not null) candidates = candidates.Where(c => setFilter.Contains(c.SetCode)).ToList();
 
                 if (candidates.Count == 1)

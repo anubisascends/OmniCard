@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Drawing.Imaging;
 using Microsoft.Extensions.Logging.Abstractions;
+using OmniCard.CardMatching;
 using OmniCard.Imaging;
 
 namespace OmniCard.Tests.Services;
@@ -46,6 +47,22 @@ public class OcrMatchingServiceEngineTests
         var (collectorNumber, confidence) = await service.DetectOptcgCollectorNumberAsync(image);
 
         Assert.Equal("OP15-043", collectorNumber);
+        Assert.True(confidence >= 0.5, $"confidence {confidence} should clear the downstream lookup gate");
+    }
+
+    [Fact]
+    public async Task DetectCollectorNumberAsync_ReadsFftcgSetCode()
+    {
+        // Spec-driven collector-number OCR (the newer path used by FFTCG/Pokémon/Yu-Gi-Oh!), which
+        // no other engine test exercised. Render the code into FFTCG's real crop region and confirm
+        // the multi-line block + tightened regex reads it.
+        var region = FinalFantasyService.OcrSpec.PortraitRegion;
+        var image = RenderCard(600, 840, region, "29-048C", fontSize: 26);
+
+        using var service = CreateService();
+        var (collectorNumber, confidence) = await service.DetectCollectorNumberAsync(image, FinalFantasyService.OcrSpec);
+
+        Assert.Equal("29-048C", collectorNumber);
         Assert.True(confidence >= 0.5, $"confidence {confidence} should clear the downstream lookup gate");
     }
 
