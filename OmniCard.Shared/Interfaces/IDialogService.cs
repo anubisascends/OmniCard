@@ -54,4 +54,10 @@ public interface IDialogService
     /// <summary>Opens the Top 100 Cards dialog. Returns the game/location to navigate to if the
     /// user picked "Go to Location" on a row, or null if the dialog was simply closed.</summary>
     (CardGame Game, int? ContainerId)? ShowTopValueCards();
+
+    /// <summary>Opens the About dialog (app version, description, third-party attributions).</summary>
+    void ShowAbout();
+
+    /// <summary>Opens the browsable/searchable Help &amp; Documentation dialog.</summary>
+    void ShowDocumentation();
 }

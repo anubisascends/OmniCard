@@ -261,6 +261,10 @@ public partial class App : Application
             services.AddTransient<Views.LogViewer.LogViewerViewModel>();
             services.AddTransient<Views.TopValueCards.TopValueCardsView>();
             services.AddTransient<Views.TopValueCards.TopValueCardsViewModel>();
+            services.AddTransient<Views.About.AboutView>();
+            services.AddTransient<Views.About.AboutViewModel>();
+            services.AddTransient<Views.Documentation.DocumentationView>();
+            services.AddTransient<Views.Documentation.DocumentationViewModel>();
             services.AddSingleton<OmniCard.Data.LogFileParser>();
         })
         .Build();

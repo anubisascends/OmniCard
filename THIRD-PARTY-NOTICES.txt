@@ -34,6 +34,127 @@ License:     Apache License, Version 2.0
              https://www.apache.org/licenses/LICENSE-2.0
 
 --------------------------------------------------------------------------------
+MaterialDesignThemes 5.3.2 — MIT License
+--------------------------------------------------------------------------------
+Homepage:    https://github.com/MaterialDesignInXAML/MaterialDesignInXamlToolkit
+Copyright (c) James Willock, Mulholland Software and Contributors.
+
+--------------------------------------------------------------------------------
+CommunityToolkit.Mvvm 8.4.2 — MIT License
+--------------------------------------------------------------------------------
+Homepage:    https://github.com/CommunityToolkit/dotnet
+Copyright (c) .NET Foundation and Contributors.
+
+--------------------------------------------------------------------------------
+Microsoft .NET libraries — MIT License
+--------------------------------------------------------------------------------
+Components:  Entity Framework Core + Microsoft.EntityFrameworkCore.Sqlite (10.0.9),
+             Microsoft.Data.Sqlite (10.0.9),
+             Microsoft.Extensions.* — Hosting, Http, Logging.Abstractions,
+               Options (10.0.9),
+             Microsoft.AspNetCore.SignalR.Client (10.0.9),
+             Microsoft.Xaml.Behaviors.Wpf (1.1.142)
+Homepage:    https://github.com/dotnet
+License:     MIT License
+Copyright (c) .NET Foundation and Contributors / Microsoft Corporation.
+
+--------------------------------------------------------------------------------
+Microsoft Edge WebView2 SDK 1.0.4022.49 — Microsoft Software License Terms
+--------------------------------------------------------------------------------
+Component:   Microsoft.Web.WebView2
+Homepage:    https://developer.microsoft.com/microsoft-edge/webview2/
+License:     Proprietary — Microsoft Software License Terms for the WebView2 SDK
+             (NOT an open-source license). Redistribution of the "Distributable
+             Code" is permitted under those terms. See the SDK EULA:
+             https://aka.ms/webview2/eula
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+--------------------------------------------------------------------------------
+Serilog 4.3.0 and sinks/extensions — Apache License 2.0
+--------------------------------------------------------------------------------
+Components:  Serilog, Serilog.Extensions.Hosting, Serilog.Settings.Configuration,
+             Serilog.Sinks.Console, Serilog.Sinks.File
+Homepage:    https://serilog.net
+Copyright (c) Serilog Contributors.
+
+--------------------------------------------------------------------------------
+SkiaSharp 4.150.1 — MIT License
+--------------------------------------------------------------------------------
+Homepage:    https://github.com/mono/SkiaSharp
+Copyright (c) Microsoft Corporation. (Wraps Google's Skia graphics library,
+BSD-3-Clause, Copyright (c) Google Inc.)
+
+--------------------------------------------------------------------------------
+QuestPDF 2026.7.0 — QuestPDF Community MIT License (dual-licensed)
+--------------------------------------------------------------------------------
+Homepage:    https://www.questpdf.com
+License:     https://www.questpdf.com/license/
+QuestPDF is dual-licensed. It is free under MIT-equivalent "Community" terms for
+individuals, non-profits, and organizations under the vendor's stated annual
+gross-revenue threshold; organizations above that threshold require a paid
+Professional or Enterprise license. Verify OmniCard's eligibility before
+distribution.
+Copyright (c) Marcin Ziąbek and QuestPDF contributors.
+
+--------------------------------------------------------------------------------
+NTwain 3.7.6 — MIT License
+--------------------------------------------------------------------------------
+Homepage:    https://github.com/soukoku/ntwain
+Copyright (c) Yin-Chun Wang.
+
+--------------------------------------------------------------------------------
+CsvHelper 33.1.0 — Microsoft Public License (MS-PL) OR Apache License 2.0
+--------------------------------------------------------------------------------
+Homepage:    https://github.com/JoshClose/CsvHelper
+License:     Dual-licensed; the user may choose MS-PL or Apache-2.0.
+Copyright (c) Josh Close and contributors.
+
+--------------------------------------------------------------------------------
+QRCoder 1.6.0 — MIT License
+--------------------------------------------------------------------------------
+Homepage:    https://github.com/codebude/QRCoder
+Copyright (c) Raffael Herrmann.
+
+--------------------------------------------------------------------------------
+SharpVectors.Wpf 1.8.5 — BSD 3-Clause License
+--------------------------------------------------------------------------------
+Homepage:    https://github.com/ElinamLLC/SharpVectors
+Copyright (c) 2010-2024, Elinam LLC and SharpVectors contributors.
+
+--------------------------------------------------------------------------------
+VirtualizingWrapPanel 2.5.3 — MIT License
+--------------------------------------------------------------------------------
+Homepage:    https://github.com/sbaeumlisberger/VirtualizingWrapPanel
+Copyright (c) Sebastian Bäumlisberger.
+
+--------------------------------------------------------------------------------
+AdysTech.CredentialManager 3.1.0 — Apache License 2.0
+--------------------------------------------------------------------------------
+Homepage:    https://github.com/mnottale/AdysTech.CredentialManager
+Copyright (c) AdysTech and contributors.
+
+--------------------------------------------------------------------------------
+Card data & imagery
+--------------------------------------------------------------------------------
+Card data, prices, and images are provided by third parties including Scryfall
+(https://scryfall.com) and TCGCSV (https://tcgcsv.com), and remain the property
+of their respective rights holders and the games' publishers. OmniCard is an
+independent tool and is not affiliated with, endorsed, or sponsored by any card
+game publisher.
+
+--------------------------------------------------------------------------------
+MIT License — standard text
+--------------------------------------------------------------------------------
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the inclusion of the above copyright notice and this permission
+notice in all copies or substantial portions of the Software. THE SOFTWARE IS
+PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
+
+--------------------------------------------------------------------------------
 Apache License 2.0 — summary of obligations
 --------------------------------------------------------------------------------
 The Apache License 2.0 is a permissive license. It permits commercial and

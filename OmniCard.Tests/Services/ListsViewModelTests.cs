@@ -191,6 +191,8 @@ public class ListsViewModelTests
         public string? RequireReason(string title, string message) => throw new NotImplementedException();
         public void ManageTags() => throw new NotImplementedException();
         public (CardGame Game, int? ContainerId)? ShowTopValueCards() => throw new NotImplementedException();
+        public void ShowAbout() => throw new NotImplementedException();
+        public void ShowDocumentation() => throw new NotImplementedException();
     }
 
     private sealed class FakeDecklistService : IDecklistService

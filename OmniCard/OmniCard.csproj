@@ -42,6 +42,15 @@
     </Content>
   </ItemGroup>
 
+  <!-- Bundled HTML help. Copied next to the exe under Docs\ (preserving the images\ subfolder)
+       and served to the Documentation dialog's WebView2 via a virtual host mapping. -->
+  <ItemGroup>
+    <Content Include="Resources\Docs\**\*.*">
+      <Link>Docs\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.9" />
