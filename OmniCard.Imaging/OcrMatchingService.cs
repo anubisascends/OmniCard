@@ -493,17 +493,24 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     // binarization and a high-contrast grayscale pass (each wins on different card finishes).
     private IEnumerable<(string Text, double Confidence)> ReadRegion(Bitmap bitmap, Rectangle rect, OcrCollectorSpec spec)
     {
+        var psm = spec.MultiLine ? PageSegMode.SingleBlock : PageSegMode.SingleLine;
         if (!spec.Binarize)
         {
-            yield return OcrCroppedRegion(bitmap, rect, PageSegMode.SingleLine, spec.Whitelist);
+            yield return OcrCroppedRegion(bitmap, rect, psm, spec.Whitelist);
             yield break;
         }
 
         using var crop = bitmap.Clone(rect, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        // For block/multi-line crops (FFTCG), add a plain upscaled pass: on codes printed over
+        // artwork (no light footer, e.g. FFTCG full-art) the raw crop often reads cleaner than a
+        // binarization the busy background corrupts. Scoring keeps whichever pass is best-shaped.
+        // Skipped for single-line specs (Yu-Gi-Oh!) to preserve their tuned two-pass behaviour.
+        if (spec.MultiLine)
+            yield return OcrCroppedRegion(bitmap, rect, psm, spec.Whitelist);
         using var otsu = BinarizeOtsu(crop, CollectorBinarizeTargetWidth);
-        yield return RunOcr(otsu, PageSegMode.SingleLine, spec.Whitelist);
+        yield return RunOcr(otsu, psm, spec.Whitelist);
         using var gray = UpscaleGray(crop, CollectorBinarizeTargetWidth, 1.7f);
-        yield return RunOcr(gray, PageSegMode.SingleLine, spec.Whitelist);
+        yield return RunOcr(gray, psm, spec.Whitelist);
     }
 
     // Best code-like token from noisy OCR text: split on non-code characters, then take the run

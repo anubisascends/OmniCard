@@ -1131,6 +1131,20 @@ public sealed partial class RootViewModel(
                 if (cn is not null && conf >= 0.5)
                     ocrResult = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
             }
+            else if (scan.Game is CardGame.Pokemon or CardGame.YuGiOh or CardGame.FinalFantasy)
+            {
+                // Spec-driven collector-number OCR (mirrors the auto-scan/rotate routing in CardService),
+                // so manual rotate of these games re-matches by set code first, not pHash only.
+                var spec = scan.Game switch
+                {
+                    CardGame.Pokemon => PokemonService.OcrSpec,
+                    CardGame.YuGiOh => YugiohService.OcrSpec,
+                    _ => FinalFantasyService.OcrSpec,
+                };
+                var (cn, conf) = await CardService.OcrService.DetectCollectorNumberAsync(rotatedBytes, spec);
+                if (cn is not null && conf >= 0.5)
+                    ocrResult = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
+            }
 
             // Structure rotates too — recompute the edge hash on the rotated bytes for foil One Piece/Riftbound scans
             ulong? rotatedEdgeHash = null;

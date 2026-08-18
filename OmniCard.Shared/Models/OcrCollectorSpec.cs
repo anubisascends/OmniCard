@@ -24,6 +24,13 @@ public sealed class OcrCollectorSpec
     /// against the catalog, which tolerates OCR character confusions.</summary>
     public bool LooseExtraction { get; init; }
 
+    /// <summary>OCR the crop as a multi-line text block rather than a single line. Use when the code
+    /// shares a tall crop with neighbouring text (FFTCG prints the set code on the bottom credit line,
+    /// directly below the illustrator/copyright lines); a taller block crop is robust to the code's
+    /// exact vertical position drifting card-to-card, and <see cref="RegexPattern"/> isolates the code
+    /// from the surrounding credit text.</summary>
+    public bool MultiLine { get; init; }
+
     /// <summary>The crop regions to try for the given orientation, honoring the multi-region lists
     /// when present and otherwise falling back to the single region.</summary>
     public IReadOnlyList<(double X, double Y, double W, double H)> RegionsFor(bool landscape) =>
