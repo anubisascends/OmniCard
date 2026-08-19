@@ -200,6 +200,26 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         wnd.ShowDialog();
     }
 
+    public (int InsertIndex, bool DoubleSided)? InsertBinderPage(int containerId, int? nearPage)
+    {
+        var sheets = Services.GetRequiredService<IStorageContainerService>().GetSheets(containerId);
+        var vm = new Views.Binder.InsertBinderPageViewModel(sheets, nearPage);
+        var wnd = new Views.Binder.InsertBinderPageDialog(vm);
+        SetOwner(wnd);
+        var result = wnd.ShowDialog();
+        return result == true ? vm.ToResult() : null;
+    }
+
+    public int? MoveBinderPage(int containerId, int movingSheetIndex)
+    {
+        var sheets = Services.GetRequiredService<IStorageContainerService>().GetSheets(containerId);
+        var vm = new Views.Binder.MoveBinderPageViewModel(sheets, movingSheetIndex);
+        var wnd = new Views.Binder.MoveBinderPageDialog(vm);
+        SetOwner(wnd);
+        var result = wnd.ShowDialog();
+        return result == true ? vm.ToResult() : null;
+    }
+
     public MoveListToLocationResult? PickMoveListToLocation()
     {
         var wnd = Services.GetRequiredService<Views.MoveListToLocation.MoveListToLocationView>();

@@ -329,12 +329,112 @@ public sealed partial class BinderViewModel(
         SpreadIndex = index;
     }
 
+    /// <summary>Adds a physical sheet to the end of the binder. <paramref name="mode"/> is
+    /// <c>"single"</c> for a single-sided sheet (one page — a single-pocket page, or when the back
+    /// isn't wanted); anything else adds the default double-sided sheet (front + back = two
+    /// pages). Jumps to the spread containing the new last page.</summary>
     [RelayCommand]
-    public void AddPage()
+    public void AddPage(string? mode)
     {
-        containerService.AddBinderPage(_containerId);
-        TotalPages++;
+        var doubleSided = !string.Equals(mode, "single", StringComparison.OrdinalIgnoreCase);
+        containerService.AddBinderSheet(_containerId, doubleSided);
+        TotalPages = containerService.GetBinderLayout(_containerId).TotalPages;
         SpreadIndex = TotalPages / 2; // spread containing the new last page
+        Refresh();
+    }
+
+    /// <summary>Opens the insert-position picker and inserts a new empty sheet where the user chose,
+    /// shifting every later page (and its cards) up. Defaults the picker to the spread currently in
+    /// view, and jumps to the inserted sheet afterward.</summary>
+    [RelayCommand]
+    public void InsertPage()
+    {
+        var nearPage = RightPageNumber ?? LeftPageNumber;
+        if (dialogService.InsertBinderPage(_containerId, nearPage) is not { } result) return;
+
+        containerService.InsertBinderSheet(_containerId, result.InsertIndex, result.DoubleSided);
+        TotalPages = containerService.GetBinderLayout(_containerId).TotalPages;
+
+        // Navigate to the spread that now shows the inserted sheet's first page.
+        var sheets = containerService.GetSheets(_containerId);
+        var insertedFirstPage = result.InsertIndex < sheets.Count ? sheets[result.InsertIndex].FirstPage : TotalPages;
+        SpreadIndex = insertedFirstPage <= 1 ? 0 : insertedFirstPage / 2;
+        Refresh();
+    }
+
+    /// <summary>Removes the physical sheet that owns <paramref name="pageNumber"/> — both sides of
+    /// a double-sided sheet, so this removes two pages. Any cards on it return to the Unplaced pool
+    /// and every later page shifts down. Confirms first (there's no undo) and refuses to remove the
+    /// binder's only sheet.</summary>
+    [RelayCommand]
+    public void RemovePage(int? pageNumber)
+    {
+        if (pageNumber is not int page) return;
+
+        BinderSheetInfo info;
+        try { info = containerService.GetSheetForPage(_containerId, page); }
+        catch (InvalidOperationException) { return; }
+
+        if (info.TotalSheets <= 1)
+        {
+            System.Windows.MessageBox.Show(
+                "A binder must keep at least one page. Delete the binder location itself if you want to remove it entirely.",
+                "Remove Page",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Information);
+            return;
+        }
+
+        var pagesClause = info.Sides == 2
+            ? $"pages {info.FirstPage} and {info.FirstPage + 1} (front and back)"
+            : $"page {info.FirstPage}";
+        var cardsClause = info.CardCount == 0
+            ? "It holds no cards."
+            : $"Its {info.CardCount} card{(info.CardCount == 1 ? "" : "s")} will be returned to the Unplaced pool.";
+
+        var confirm = System.Windows.MessageBox.Show(
+            $"Remove this sheet — {pagesClause}? {cardsClause} Later pages shift down to close the gap. This can't be undone.",
+            "Remove Page",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning);
+        if (confirm != System.Windows.MessageBoxResult.Yes) return;
+
+        containerService.RemoveBinderSheet(_containerId, page);
+        TotalPages = containerService.GetBinderLayout(_containerId).TotalPages;
+        if (SpreadIndex >= TotalSpreads) SpreadIndex = Math.Max(0, TotalSpreads - 1);
+        Refresh();
+    }
+
+    /// <summary>Opens the move-destination picker for the sheet that owns <paramref name="pageNumber"/>
+    /// and moves it there — like pulling a page out of the binder and slotting it in elsewhere. Every
+    /// card on a shifted page moves with it (slots preserved). Jumps to the sheet's new location.</summary>
+    [RelayCommand]
+    public void MovePage(int? pageNumber)
+    {
+        if (pageNumber is not int page) return;
+
+        BinderSheetInfo info;
+        try { info = containerService.GetSheetForPage(_containerId, page); }
+        catch (InvalidOperationException) { return; }
+
+        if (info.TotalSheets <= 1)
+        {
+            System.Windows.MessageBox.Show(
+                "There's only one page, so there's nowhere to move it.",
+                "Move Page",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Information);
+            return;
+        }
+
+        if (dialogService.MoveBinderPage(_containerId, info.SheetIndex) is not int toIndex) return;
+
+        containerService.MoveBinderSheet(_containerId, page, toIndex);
+
+        // The moved sheet now sits at index `toIndex` in the reading order; jump to its spread.
+        var sheets = containerService.GetSheets(_containerId);
+        var landedFirstPage = toIndex < sheets.Count ? sheets[toIndex].FirstPage : sheets[^1].FirstPage;
+        SpreadIndex = landedFirstPage <= 1 ? 0 : landedFirstPage / 2;
         Refresh();
     }
 

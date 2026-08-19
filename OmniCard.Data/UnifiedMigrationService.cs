@@ -176,6 +176,9 @@ public static class UnifiedMigrationService
             AddColumnIfMissing(cmd, "StorageContainers", "SlotsPerPage", "INTEGER NOT NULL DEFAULT 9");
             AddColumnIfMissing(cmd, "StorageContainers", "TotalPages", "INTEGER NOT NULL DEFAULT 1");
             AddColumnIfMissing(cmd, "StorageContainers", "Columns", "INTEGER NOT NULL DEFAULT 3");
+            // Per-sheet side list (binder page front/back model). Null on existing binders;
+            // BinderSheetLayout.Parse backfills those from TotalPages on first read.
+            AddColumnIfMissing(cmd, "StorageContainers", "SheetSides", "TEXT");
         }
 
         // If EbayListings already exists from before the Task-5 rename, get its FK column
