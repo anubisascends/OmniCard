@@ -150,6 +150,16 @@
                               VerticalAlignment="Center"
                               Margin="0,0,8,0"
                               Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
+                    <ComboBox IsEditable="True"
+                              Text="{Binding ViewModel.DefaultFoilType}"
+                              ItemsSource="{Binding ViewModel.AvailableFoilTypes}"
+                              IsEnabled="{Binding ViewModel.DefaultIsFoil}"
+                              ToolTip="Default foil finish for scanned cards"
+                              Width="120"
+                              VerticalAlignment="Center"
+                              Margin="0,0,8,0"
+                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                              Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                     <Separator Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                     <TextBlock Text="Purchase Price $:"
                                VerticalAlignment="Center"

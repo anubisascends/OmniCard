@@ -183,12 +183,34 @@
         phone-camera flow via the web companion.</li>
         <li><strong>Pick the game</strong> in the toolbar so matches are looked up in the right catalog.</li>
         <li><strong>Scan.</strong> Each card is hashed and matched; results land in the scan queue with a confidence indicator.</li>
-        <li><strong>Review &amp; edit</strong> condition, foil, quantity, tags. First copies you own can show a star badge, and a
+        <li><strong>Review &amp; edit</strong> condition, foil, <strong>foil finish</strong>, quantity, tags. First copies you own can show a star badge, and a
         price-tier accent (configurable in Settings ▸ Display).</li>
         <li><strong>Commit</strong> to write the cards into your collection (optionally keeping the scan images — Settings ▸ Scan Workflow).</li>
       </ol>
+      <p>The scanner toolbar has an <strong>Is Foil</strong> toggle and, next to it, a <strong>default foil finish</strong> dropdown. When
+      <em>Is Foil</em> is on, every new scan is tagged foil with that finish; you can still change either per card in the queue before committing.</p>
       <div class="callout tip">You can turn a batch of scans into a List (<em>Scanner ▸ Create List from Scans</em>) or link a scan
       to a trade (<em>right-click ▸ Link to Trade</em>) before committing.</div>
+    </section>
+
+    <section id="foil-finishes" data-group="Scanning &amp; Matching">
+      <h2>Foil Finishes</h2>
+      <p>Beyond a simple foil / non-foil flag, OmniCard records <strong>which foil finish</strong> a card is — because a Rainbow Foil, a
+      Cold Foil, an Etched foil, and a Reverse Holofoil of the same card are genuinely different printings with different values.
+      Each game has its own finishes (a curated starter list is offered in every finish dropdown, and you can type your own):</p>
+      <ul>
+        <li><strong>Magic</strong> — Foil, Etched, Rainbow, Textured, Galaxy, Surge, Halo, and more.</li>
+        <li><strong>Pokémon</strong> — Holofoil, Reverse Holofoil, Cosmos Holo, Poké Ball / Master Ball Holo, and more.</li>
+        <li><strong>Yu-Gi-Oh!</strong> — Ultra / Secret / Ultimate / Ghost / Starlight Rare, and more.</li>
+        <li><strong>Final Fantasy TCG</strong> — Premium.</li>
+        <li><strong>Riftbound / One Piece</strong> — Foil (One Piece also Alternate Art, Manga, Parallel).</li>
+      </ul>
+      <p>A finish is part of a card's identity in your collection: two copies of the same card with different finishes are tracked and
+      valued separately. You can set or change a card's finish any time in the <a href="#collection">card editor</a> (the finish
+      dropdown next to the Foil checkbox); changing it moves that copy to the matching finish without disturbing your other copies.</p>
+      <div class="callout note">Existing foil cards (and any older data) are set to the game's basic finish — Magic "Foil", Pokémon
+      "Holofoil", Final Fantasy "Premium", etc. — so you can review and correct them at your own pace. Foil pricing still uses the
+      foil / non-foil market price for now; the finish is recorded for your own tracking.</div>
     </section>
 
     <section id="how-matching-works" data-group="Scanning &amp; Matching">
@@ -396,12 +418,15 @@
         <li><strong>Decklists</strong> — plain-text lists, batch-imported with a master/detail preview.</li>
         <li><strong>Add files…</strong> or <strong>Add URL(s)…</strong> — import from Moxfield / Archidekt links.</li>
       </ul>
-      <p>After import the collection refreshes automatically.</p>
+      <p>Each import dialog offers a <strong>default foil treatment</strong> — a Foil toggle and a finish dropdown. Any foil card that
+      doesn't already carry a finish (decklists never do; a CSV may) is saved with your chosen finish, or the game's basic finish if you
+      leave it blank. See <a href="#foil-finishes">Foil Finishes</a>. After import the collection refreshes automatically.</p>
     </section>
 
     <section id="export" data-group="Import &amp; Export">
       <h2>Exporting</h2>
-      <p>The <em>File ▸ Export</em> submenu exports your collection (e.g. to CSV) for backup or use in other tools.</p>
+      <p>The <em>File ▸ Export</em> submenu exports your collection (e.g. to CSV) for backup or use in other tools. The app-native CSV
+      includes a <strong>FoilType</strong> column so foil finishes round-trip on re-import.</p>
     </section>
 
     <section id="tcg-import" data-group="Import &amp; Export">

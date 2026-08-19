@@ -88,6 +88,36 @@ public static class UnifiedMigrationService
             // Task 1 (Phase 3): persisted eBay-derived sealed pricing.
             AddColumnIfMissing(cmd, "Products", "LastMarketPrice", "TEXT");
             AddColumnIfMissing(cmd, "Products", "PriceUpdatedAt", "TEXT");
+
+            // Foil-finish sub-type. Joins the (Game, GameCardId, Foil) catalog identity, so a
+            // different finish of the same print is a distinct product. Newly added here; existing
+            // foil products have no finish yet, so backfill each to its game's basic finish (users
+            // correct them later). Idempotent: only rows still lacking a finish are touched, and
+            // non-foil rows are left null.
+            var newlyAdded = !ColumnExists(cmd, "Products", "FoilType");
+            AddColumnIfMissing(cmd, "Products", "FoilType", "TEXT");
+            foreach (CardGame game in Enum.GetValues<CardGame>())
+            {
+                var basic = FoilTypes.BasicFoilType(game).Replace("'", "''");
+                cmd.CommandText =
+                    $"UPDATE Products SET FoilType = '{basic}' " +
+                    $"WHERE Foil = 1 AND (FoilType IS NULL OR FoilType = '') AND Game = '{game}'";
+                cmd.ExecuteNonQuery();
+            }
+
+            // Refresh the identity index so it covers FoilType on pre-existing databases (a fresh
+            // DB already gets the four-column index from OmniCardDbContext). EnsureCreated does not
+            // add indexes to an already-existing table, so create it explicitly here and drop the
+            // old three-column one it supersedes.
+            if (newlyAdded)
+            {
+                cmd.CommandText = "DROP INDEX IF EXISTS IX_Products_Game_GameCardId_Foil";
+                cmd.ExecuteNonQuery();
+                cmd.CommandText =
+                    "CREATE INDEX IF NOT EXISTS IX_Products_Game_GameCardId_Foil_FoilType " +
+                    "ON Products(Game, GameCardId, Foil, FoilType)";
+                cmd.ExecuteNonQuery();
+            }
         }
 
         if (TableExists(cmd, "Lots"))
@@ -351,6 +381,7 @@ public static class UnifiedMigrationService
                 SetCode TEXT,
                 CollectorNumber TEXT,
                 IsFoil INTEGER NOT NULL DEFAULT 0,
+                FoilType TEXT,
                 AddedMarketPrice TEXT,
                 IsUnpriced INTEGER NOT NULL DEFAULT 0,
                 Source TEXT NOT NULL DEFAULT 'Manual'
@@ -359,6 +390,8 @@ public static class UnifiedMigrationService
         cmd.ExecuteNonQuery();
         cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_CardListItems_CardListId ON CardListItems(CardListId)";
         cmd.ExecuteNonQuery();
+        if (TableExists(cmd, "CardListItems"))
+            AddColumnIfMissing(cmd, "CardListItems", "FoilType", "TEXT");
 
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS MismatchLogs (

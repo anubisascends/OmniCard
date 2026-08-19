@@ -63,6 +63,7 @@ public class CsvExportTests : IDisposable
                 Rarity = "rare",
                 Condition = "LP",
                 IsFoil = true,
+                FoilType = "Etched",
                 PurchasePrice = null,
                 DateAdded = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
             },
@@ -87,6 +88,18 @@ public class CsvExportTests : IDisposable
         Assert.Contains("Lightning Bolt", lines[1]);
         Assert.Contains("Red Binder", lines[1]);
         Assert.Contains("Binder", lines[1]);
+    }
+
+    [Fact]
+    public void ExportAppNative_WritesFoilTypeColumn()
+    {
+        var path = Path.Combine(_tempDir, "finish.csv");
+        _service.ExportAppNative(path, CreateTestCards());
+
+        var lines = File.ReadAllLines(path);
+        Assert.Contains("FoilType", lines[0]);
+        // The foil card carries its finish; the non-foil card's finish cell is empty.
+        Assert.Contains("Etched", lines[2]);
     }
 
     [Fact]

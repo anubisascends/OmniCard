@@ -79,6 +79,9 @@ public sealed class CardService : ICardService
     public CardGame SelectedGame { get; set; }
     public HashSet<string>? SelectedSetFilter { get; set; }
     public bool DefaultIsFoil { get; set; }
+    /// <summary>Default foil finish applied to scans when <see cref="DefaultIsFoil"/> is on. Null
+    /// falls back to the game's basic finish (see <see cref="FoilTypes.BasicFoilType"/>).</summary>
+    public string? DefaultFoilType { get; set; }
     public decimal? DefaultPurchasePrice { get; set; }
     public IReadOnlyList<CardGame> AvailableGames { get; }
     public ICardGameService ActiveGameService => _gameServices[SelectedGame];
@@ -266,6 +269,7 @@ public sealed class CardService : ICardService
             Game = game,
             Match = match,
             IsFoil = DefaultIsFoil,
+            FoilType = DefaultIsFoil ? (DefaultFoilType ?? FoilTypes.BasicFoilType(game)) : null,
             PurchasePrice = DefaultPurchasePrice,
             FlagReason = flagReason,
         };
@@ -506,7 +510,7 @@ public sealed class CardService : ICardService
         _logger.LogInformation("Committing scanned cards to collection");
         var workflowMode = _scannerSettingsService.WorkflowMode;
         using var context = _omniDbContextFactory.CreateDbContext();
-        var productCache = new Dictionary<(CardGame Game, string GameCardId, bool Foil), Product>();
+        var productCache = new Dictionary<(CardGame Game, string GameCardId, bool Foil, string? FoilType), Product>();
 
         var committed = new List<(InventoryLot Lot, ScannedCard Scan)>();
         var skipped = 0;
@@ -515,6 +519,11 @@ public sealed class CardService : ICardService
         {
             // Use per-card override if set, otherwise use toolbar defaults
             var container = scan.OverrideContainer ?? activeContainer;
+
+            // A foil scan always resolves to a concrete finish (falling back to the game's basic
+            // finish) so a foil product never lands with a null finish — matching the backfill
+            // invariant, and covering per-card/bulk foil toggles made after the scan defaults ran.
+            var scanFoilType = scan.IsFoil ? (scan.FoilType ?? FoilTypes.BasicFoilType(scan.Game)) : null;
 
             InventoryLot lot;
             if (scan.Match is null)
@@ -526,7 +535,7 @@ public sealed class CardService : ICardService
                     continue;
                 }
 
-                var product = FindOrCreateProduct(context, productCache, scan.Game, "", scan.IsFoil,
+                var product = FindOrCreateProduct(context, productCache, scan.Game, "", scan.IsFoil, scanFoilType,
                     "Unknown Card", "", "", "", "", null, null, null);
 
                 lot = new InventoryLot
@@ -541,7 +550,7 @@ public sealed class CardService : ICardService
             }
             else
             {
-                var product = FindOrCreateProduct(context, productCache, scan.Game, scan.Match.GameSpecificId, scan.IsFoil,
+                var product = FindOrCreateProduct(context, productCache, scan.Game, scan.Match.GameSpecificId, scan.IsFoil, scanFoilType,
                     scan.Match.Name, scan.Match.SetCode, scan.Match.SetName, scan.Match.CollectorNumber, scan.Match.Rarity,
                     scan.Match.ImageUri,
                     CardAttributeExtractor.ExtractColor(scan.Match, scan.Game),
@@ -750,19 +759,22 @@ public sealed class CardService : ICardService
     /// </summary>
     private static Product FindOrCreateProduct(
         OmniCardDbContext context,
-        Dictionary<(CardGame Game, string GameCardId, bool Foil), Product> cache,
-        CardGame game, string gameCardId, bool foil,
+        Dictionary<(CardGame Game, string GameCardId, bool Foil, string? FoilType), Product> cache,
+        CardGame game, string gameCardId, bool foil, string? foilType,
         string name, string? setCode, string? setName, string? number, string? rarity,
         string? imageUri, string? color, string? cardType)
     {
-        var key = (game, gameCardId, foil);
+        // Non-foil cards never carry a finish; normalise so identity/dedup is stable.
+        if (!foil) foilType = null;
+
+        var key = (game, gameCardId, foil, foilType);
         if (cache.TryGetValue(key, out var cached))
             return cached;
 
         var product = context.Products.Local.FirstOrDefault(p =>
-                p.Category == ProductCategory.Single && p.Game == game && p.GameCardId == gameCardId && p.Foil == foil)
+                p.Category == ProductCategory.Single && p.Game == game && p.GameCardId == gameCardId && p.Foil == foil && p.FoilType == foilType)
             ?? context.Products.FirstOrDefault(p =>
-                p.Category == ProductCategory.Single && p.Game == game && p.GameCardId == gameCardId && p.Foil == foil);
+                p.Category == ProductCategory.Single && p.Game == game && p.GameCardId == gameCardId && p.Foil == foil && p.FoilType == foilType);
 
         if (product is null)
         {
@@ -772,6 +784,7 @@ public sealed class CardService : ICardService
                 Category = ProductCategory.Single,
                 GameCardId = gameCardId,
                 Foil = foil,
+                FoilType = foilType,
                 Name = name,
                 SetCode = setCode,
                 SetName = setName,
@@ -801,10 +814,10 @@ public sealed class CardService : ICardService
 
     private static Product FindOrCreateProduct(
         OmniCardDbContext context,
-        CardGame game, string gameCardId, bool foil,
+        CardGame game, string gameCardId, bool foil, string? foilType,
         string name, string? setCode, string? setName, string? number, string? rarity,
         string? imageUri, string? color, string? cardType)
-        => FindOrCreateProduct(context, [], game, gameCardId, foil, name, setCode, setName, number, rarity, imageUri, color, cardType);
+        => FindOrCreateProduct(context, [], game, gameCardId, foil, foilType, name, setCode, setName, number, rarity, imageUri, color, cardType);
 
     /// <summary>
     /// Applies a <see cref="CollectionCard"/> DTO's edits back onto its backing <see cref="InventoryLot"/>.
@@ -814,13 +827,16 @@ public sealed class CardService : ICardService
     /// attributes (condition, location, scan image, etc.) always apply directly to the Lot.
     /// </summary>
     private static void ApplyIdentityAndCopyAttrs(OmniCardDbContext context, InventoryLot lot, CollectionCard card,
-        Dictionary<(CardGame Game, string GameCardId, bool Foil), Product>? productCache = null)
+        Dictionary<(CardGame Game, string GameCardId, bool Foil, string? FoilType), Product>? productCache = null)
     {
         var product = lot.Product;
+        // A non-foil card carries no finish, matching FindOrCreateProduct's normalisation.
+        var cardFoilType = card.IsFoil ? card.FoilType : null;
         var identityChanged =
             product.Game != card.Game ||
             (product.GameCardId ?? "") != card.GameCardId ||
             product.Foil != card.IsFoil ||
+            product.FoilType != cardFoilType ||
             product.Name != card.Name ||
             (product.SetCode ?? "") != card.SetCode ||
             (product.SetName ?? "") != card.SetName ||
@@ -829,7 +845,7 @@ public sealed class CardService : ICardService
 
         if (identityChanged)
         {
-            var target = FindOrCreateProduct(context, productCache ?? [], card.Game, card.GameCardId, card.IsFoil,
+            var target = FindOrCreateProduct(context, productCache ?? [], card.Game, card.GameCardId, card.IsFoil, cardFoilType,
                 card.Name, card.SetCode, card.SetName, card.Number, card.Rarity, card.ImageUri, card.Color, card.CardType);
             lot.Product = target;
         }
@@ -944,11 +960,11 @@ public sealed class CardService : ICardService
         return (deleted, errors);
     }
 
-    public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section)
+    public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, string? foilType, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section)
     {
         using var context = _omniDbContextFactory.CreateDbContext();
 
-        var product = FindOrCreateProduct(context, game, match.GameSpecificId, isFoil,
+        var product = FindOrCreateProduct(context, game, match.GameSpecificId, isFoil, foilType,
             match.Name, match.SetCode, match.SetName, match.CollectorNumber, match.Rarity, match.ImageUri,
             CardAttributeExtractor.ExtractColor(match, game), CardAttributeExtractor.ExtractCardType(match, game));
 
@@ -995,11 +1011,11 @@ public sealed class CardService : ICardService
         _logger.LogInformation("Manually added {Quantity}x {Name} ({SetCode}) to collection", quantity, match.Name, match.SetCode);
     }
 
-    public void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int containerId, int page, int slot)
+    public void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, string? foilType, decimal? purchasePrice, int containerId, int page, int slot)
     {
         using var context = _omniDbContextFactory.CreateDbContext();
 
-        var product = FindOrCreateProduct(context, game, match.GameSpecificId, isFoil,
+        var product = FindOrCreateProduct(context, game, match.GameSpecificId, isFoil, foilType,
             match.Name, match.SetCode, match.SetName, match.CollectorNumber, match.Rarity, match.ImageUri,
             CardAttributeExtractor.ExtractColor(match, game), CardAttributeExtractor.ExtractCardType(match, game));
 
@@ -1098,18 +1114,20 @@ public sealed class CardService : ICardService
     public int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates)
     {
         using var context = _omniDbContextFactory.CreateDbContext();
-        var productCache = new Dictionary<(CardGame Game, string GameCardId, bool Foil), Product>();
+        var productCache = new Dictionary<(CardGame Game, string GameCardId, bool Foil, string? FoilType), Product>();
         var imported = 0;
         var committed = new List<InventoryLot>();
 
         foreach (var card in cards)
         {
+            var cardFoilType = card.IsFoil ? card.FoilType : null;
             if (skipDuplicates)
             {
                 var exists = context.Lots
                     .Any(l => l.Product.Game == card.Game
                         && l.Product.GameCardId == card.GameCardId
                         && l.Product.Foil == card.IsFoil
+                        && l.Product.FoilType == cardFoilType
                         && l.Condition == card.Condition);
                 if (exists)
                     continue;
@@ -1117,7 +1135,7 @@ public sealed class CardService : ICardService
 
             EnsureDenormalizedAttributes(card);
 
-            var product = FindOrCreateProduct(context, productCache, card.Game, card.GameCardId, card.IsFoil,
+            var product = FindOrCreateProduct(context, productCache, card.Game, card.GameCardId, card.IsFoil, cardFoilType,
                 card.Name, card.SetCode, card.SetName, card.Number, card.Rarity, card.ImageUri, card.Color, card.CardType);
 
             var lot = new InventoryLot
@@ -1987,7 +2005,7 @@ public sealed class CardService : ICardService
         var lots = context.Lots.Include(l => l.Product)
             .Where(l => ids.Contains(l.Id) && l.Product.Category == ProductCategory.Single)
             .ToList();
-        var productCache = new Dictionary<(CardGame Game, string GameCardId, bool Foil), Product>();
+        var productCache = new Dictionary<(CardGame Game, string GameCardId, bool Foil, string? FoilType), Product>();
 
         foreach (var lot in lots)
         {

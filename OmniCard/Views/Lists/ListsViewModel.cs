@@ -157,7 +157,7 @@ public sealed partial class ListsViewModel(
     private void AddSelectedPrinting()
     {
         if (SelectedList is null || SelectedSearchResult is null) return;
-        listService.AddPrinting(SelectedList.Id, SelectedSearchResult, isFoil: false, quantity: 1, ListItemSource.Manual);
+        listService.AddPrinting(SelectedList.Id, SelectedSearchResult, isFoil: false, foilType: null, quantity: 1, ListItemSource.Manual);
         LoadItems();
     }
 

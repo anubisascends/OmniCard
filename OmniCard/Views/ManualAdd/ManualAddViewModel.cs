@@ -43,6 +43,17 @@ public sealed partial class ManualAddViewModel : ViewModel
     [ObservableProperty]
     public partial bool IsFoil { get; set; }
 
+    /// <summary>Finish presets for the active game, offered when <see cref="IsFoil"/> is on.</summary>
+    public ObservableCollection<string> AvailableFoilTypes { get; } = [];
+
+    /// <summary>Selected foil finish; only meaningful when <see cref="IsFoil"/> is on.</summary>
+    [ObservableProperty]
+    public partial string? FoilType { get; set; }
+
+    // Seed a sensible finish when foil is first checked; clear it when unchecked.
+    partial void OnIsFoilChanged(bool value)
+        => FoilType = value ? (FoilType ?? AvailableFoilTypes.FirstOrDefault()) : null;
+
     [ObservableProperty]
     public partial decimal? PurchasePrice { get; set; }
 
@@ -91,6 +102,10 @@ public sealed partial class ManualAddViewModel : ViewModel
         foreach (var c in containers)
             Containers.Add(c);
 
+        AvailableFoilTypes.Clear();
+        foreach (var t in FoilTypes.ForGame(_cardService.SelectedGame))
+            AvailableFoilTypes.Add(t);
+
         SelectedContainer = defaultContainer ?? (Containers.Count > 0 ? Containers[0] : null);
     }
 
@@ -134,11 +149,12 @@ public sealed partial class ManualAddViewModel : ViewModel
         }
 
         var game = _cardService.SelectedGame;
+        var foilType = IsFoil ? (FoilType ?? FoilTypes.BasicFoilType(game)) : null;
 
         // Slot-locked mode: place directly into the clicked binder slot (swap-aware), one card only.
         if (IsSlotLocked && SelectedContainer is not null && Page is int p && Slot is int s)
         {
-            _cardService.AddMissingCardToSlot(SelectedResult, game, Condition, IsFoil, PurchasePrice,
+            _cardService.AddMissingCardToSlot(SelectedResult, game, Condition, IsFoil, foilType, PurchasePrice,
                 SelectedContainer.Id, p, s);
             AddedCount += 1;
             OnPropertyChanged(nameof(HasAdded));
@@ -153,6 +169,7 @@ public sealed partial class ManualAddViewModel : ViewModel
             game,
             Condition,
             IsFoil,
+            foilType,
             PurchasePrice,
             Quantity,
             SelectedContainer,

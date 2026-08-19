@@ -54,6 +54,7 @@ public class CsvExportImportService(
         csv.WriteField("Rarity");
         csv.WriteField("Condition");
         csv.WriteField("IsFoil");
+        csv.WriteField("FoilType");
         csv.WriteField("PurchasePrice");
         csv.WriteField("DateAdded");
         csv.WriteField("ContainerName");
@@ -74,6 +75,7 @@ public class CsvExportImportService(
             csv.WriteField(card.Rarity);
             csv.WriteField(card.Condition);
             csv.WriteField(card.IsFoil);
+            csv.WriteField(card.FoilType ?? "");
             csv.WriteField(card.PurchasePrice?.ToString(CultureInfo.InvariantCulture) ?? "");
             csv.WriteField(card.DateAdded.ToString("o"));
             csv.WriteField(card.Container?.Name ?? "");
@@ -386,13 +388,20 @@ public class CsvExportImportService(
         };
     }
 
-    public int ImportCards(CsvImportPreview preview, bool skipDuplicates, int? targetContainerId = null)
+    public int ImportCards(CsvImportPreview preview, bool skipDuplicates, int? targetContainerId = null, string? defaultFoilType = null)
     {
-        logger.LogInformation("Importing {Count} cards (skipDuplicates={Skip}, container={Container})",
-            preview.Cards.Count, skipDuplicates, targetContainerId);
+        logger.LogInformation("Importing {Count} cards (skipDuplicates={Skip}, container={Container}, defaultFoilType={FoilType})",
+            preview.Cards.Count, skipDuplicates, targetContainerId, defaultFoilType);
 
         foreach (var card in preview.Cards)
         {
+            // Foil finish: a value parsed from the file wins; otherwise a foil card without a finish
+            // gets the dialog's default treatment (or the game's basic finish). Non-foil stays null.
+            if (!card.IsFoil)
+                card.FoilType = null;
+            else if (string.IsNullOrEmpty(card.FoilType))
+                card.FoilType = defaultFoilType ?? FoilTypes.BasicFoilType(card.Game);
+
             // Resolve container: use target if specified, otherwise resolve from app-native data
             if (targetContainerId is not null && card.ContainerId is null)
             {
@@ -446,6 +455,7 @@ public class CsvExportImportService(
             Rarity = csv.GetField("Rarity") ?? "",
             Condition = csv.GetField("Condition") ?? "NM",
             IsFoil = bool.TryParse(csv.GetField("IsFoil"), out var foil) && foil,
+            FoilType = csv.GetField("FoilType") is { Length: > 0 } ft ? ft : null,
             PurchasePrice = decimal.TryParse(csv.GetField("PurchasePrice"), CultureInfo.InvariantCulture, out var price) ? price : null,
             DateAdded = DateTime.TryParse(csv.GetField("DateAdded"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var date) ? date : DateTime.UtcNow,
             Page = int.TryParse(csv.GetField("Page"), out var page) ? page : null,

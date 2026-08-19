@@ -119,6 +119,17 @@
         </Grid>
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <CheckBox Content="Foil" IsChecked="{Binding ViewModel.DefaultIsFoil}"
+                      VerticalAlignment="Center" Margin="0,0,6,0"
+                      ToolTip="Treat every imported card as foil (decklists carry no foil marker)"
+                      Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            <ComboBox IsEditable="True"
+                      Text="{Binding ViewModel.DefaultFoilType}"
+                      ItemsSource="{Binding ViewModel.AvailableFoilTypes}"
+                      IsEnabled="{Binding ViewModel.DefaultIsFoil}"
+                      ToolTip="Default foil finish for imported cards"
+                      Width="130" VerticalAlignment="Center" Margin="0,0,16,0"
+                      Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <Button Content="Import" Command="{Binding ViewModel.ImportCommand}"
                     IsEnabled="{Binding ViewModel.CanImportNow}" Padding="16,4" Margin="0,0,8,0"/>
             <Button Content="Cancel" Command="{Binding ViewModel.CancelCommand}" Padding="16,4" IsCancel="True"

@@ -92,7 +92,7 @@ public class ListServiceTests : IDisposable
         var svc = CreateService();
         var list = svc.CreateList("L", CardGame.Mtg);
         svc.AddPrinting(list.Id, new CardMatch { Name = "Sol Ring", GameSpecificId = "x" },
-            isFoil: false, quantity: 1, ListItemSource.Manual);
+            isFoil: false, foilType: null, quantity: 1, ListItemSource.Manual);
 
         svc.DeleteList(list.Id);
 
@@ -110,8 +110,8 @@ public class ListServiceTests : IDisposable
         var list = svc.CreateList("L", CardGame.Mtg);
         var match = new CardMatch { Name = "Sol Ring", GameSpecificId = "x", SetCode = "C21", CollectorNumber = "1" };
 
-        svc.AddPrinting(list.Id, match, isFoil: false, quantity: 1, ListItemSource.Manual);
-        svc.AddPrinting(list.Id, match, isFoil: false, quantity: 2, ListItemSource.Manual);
+        svc.AddPrinting(list.Id, match, isFoil: false, foilType: null, quantity: 1, ListItemSource.Manual);
+        svc.AddPrinting(list.Id, match, isFoil: false, foilType: null, quantity: 2, ListItemSource.Manual);
 
         var item = Assert.Single(svc.GetItems(list.Id));
         Assert.Equal(3, item.Quantity);          // merged
@@ -125,7 +125,7 @@ public class ListServiceTests : IDisposable
         var svc = CreateService();
         var list = svc.CreateList("L", CardGame.Mtg);
         var item = svc.AddPrinting(list.Id, new CardMatch { Name = "A", GameSpecificId = "x" },
-            false, 1, ListItemSource.Manual);
+            false, null, 1, ListItemSource.Manual);
         svc.SetQuantity(item.Id, 0);
         Assert.Empty(svc.GetItems(list.Id));
     }
@@ -210,7 +210,7 @@ public class ListServiceTests : IDisposable
         cards.Game.Prices["x"] = 1m;
         var svc = CreateService(cards);
         var list = svc.CreateList("L", CardGame.Mtg);
-        svc.AddPrinting(list.Id, Printing("Sol Ring", "x", "C21", "1"), false, 2, ListItemSource.Manual);
+        svc.AddPrinting(list.Id, Printing("Sol Ring", "x", "C21", "1"), false, null, 2, ListItemSource.Manual);
 
         var entries = svc.ToDecklistEntries(list.Id);
 
@@ -227,7 +227,7 @@ public class ListServiceTests : IDisposable
         cards.Game.Prices["x"] = 1.00m;
         var svc = CreateService(cards);
         var list = svc.CreateList("L", CardGame.Mtg);
-        svc.AddPrinting(list.Id, Printing("Sol Ring", "x", "C21"), false, 1, ListItemSource.Manual);
+        svc.AddPrinting(list.Id, Printing("Sol Ring", "x", "C21"), false, null, 1, ListItemSource.Manual);
 
         cards.Game.Prices["x"] = 3.00m;
         svc.RefreshPrices(list.Id);
@@ -263,7 +263,7 @@ public class ListServiceTests : IDisposable
         cards.Game.Printings.Add(Printing("Sol Ring", "x", "C21", "1"));
         var svc = CreateService(cards);
         var list = svc.CreateList("L", CardGame.Mtg);
-        svc.AddPrinting(list.Id, Printing("Sol Ring", "x", "C21", "1"), isFoil: true, quantity: 2, ListItemSource.Scan);
+        svc.AddPrinting(list.Id, Printing("Sol Ring", "x", "C21", "1"), isFoil: true, foilType: "Etched", quantity: 2, ListItemSource.Scan);
         var container = new StorageContainer { Id = 1, Name = "Binder A", ContainerType = ContainerType.Binder };
 
         var result = svc.CommitToLocation(list.Id, container, "NM");
@@ -276,6 +276,7 @@ public class ListServiceTests : IDisposable
         var committed = Assert.Single(cards.Committed);
         Assert.Equal("x", committed.Match.GameSpecificId);
         Assert.True(committed.IsFoil);
+        Assert.Equal("Etched", committed.FoilType);   // finish carried from list item into the collection
         Assert.Equal(2, committed.Quantity);
         Assert.Equal("NM", committed.Condition);
         Assert.Same(container, committed.Container);
@@ -287,7 +288,7 @@ public class ListServiceTests : IDisposable
         var cards = new FakeCardService(); // no printings registered -> resolution fails
         var svc = CreateService(cards);
         var list = svc.CreateList("L", CardGame.Mtg);
-        svc.AddPrinting(list.Id, Printing("Sol Ring", "x", "C21", "1"), isFoil: false, quantity: 1, ListItemSource.Scan);
+        svc.AddPrinting(list.Id, Printing("Sol Ring", "x", "C21", "1"), isFoil: false, foilType: null, quantity: 1, ListItemSource.Scan);
         var container = new StorageContainer { Id = 1, Name = "Binder A", ContainerType = ContainerType.Binder };
 
         var result = svc.CommitToLocation(list.Id, container, "NM");
@@ -306,6 +307,7 @@ public class ListServiceTests : IDisposable
         public CardGame SelectedGame { get; set; }
         public HashSet<string>? SelectedSetFilter { get; set; }
         public bool DefaultIsFoil { get; set; }
+        public string? DefaultFoilType { get; set; }
         public decimal? DefaultPurchasePrice { get; set; }
         public IReadOnlyList<CardGame> AvailableGames => [];
         public ICardGameService ActiveGameService => null!;
@@ -340,10 +342,10 @@ public class ListServiceTests : IDisposable
         public void StartNewDiagnosticSession() { }
         public (int FlagResolutions, int MismatchLogs, int DiagnosticEvents) ClearDiagnosticLogs() => (0, 0, 0);
         public (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null) => (0, 0);
-        public List<(CardMatch Match, CardGame Game, string Condition, bool IsFoil, int Quantity, StorageContainer? Container)> Committed { get; } = [];
-        public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section)
-            => Committed.Add((match, game, condition, isFoil, quantity, container));
-        public void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int containerId, int page, int slot) { }
+        public List<(CardMatch Match, CardGame Game, string Condition, bool IsFoil, string? FoilType, int Quantity, StorageContainer? Container)> Committed { get; } = [];
+        public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, string? foilType, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section)
+            => Committed.Add((match, game, condition, isFoil, foilType, quantity, container));
+        public void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, string? foilType, decimal? purchasePrice, int containerId, int page, int slot) { }
         public bool IsFirstCopy(CardGame game, string gameCardId, bool isFoil) => throw new NotImplementedException();
         public void AnnotateScan(ScannedCard scan) => throw new NotImplementedException();
         public int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates) => 0;

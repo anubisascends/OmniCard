@@ -56,14 +56,15 @@ public class ListService(
             .ToList();
     }
 
-    public CardListItem AddPrinting(int listId, CardMatch printing, bool isFoil, int quantity, ListItemSource source)
+    public CardListItem AddPrinting(int listId, CardMatch printing, bool isFoil, string? foilType, int quantity, ListItemSource source)
     {
         using var ctx = dbContextFactory.CreateDbContext();
         var list = ctx.CardLists.AsNoTracking().FirstOrDefault(l => l.Id == listId)
                    ?? throw new InvalidOperationException($"List {listId} not found.");
 
+        if (!isFoil) foilType = null;
         var existing = ctx.CardListItems.FirstOrDefault(i =>
-            i.CardListId == listId && i.GameCardId == printing.GameSpecificId && i.IsFoil == isFoil);
+            i.CardListId == listId && i.GameCardId == printing.GameSpecificId && i.IsFoil == isFoil && i.FoilType == foilType);
         if (existing is not null)
         {
             existing.Quantity += quantity;
@@ -81,6 +82,7 @@ public class ListService(
             SetCode = string.IsNullOrEmpty(printing.SetCode) ? null : printing.SetCode,
             CollectorNumber = string.IsNullOrEmpty(printing.CollectorNumber) ? null : printing.CollectorNumber,
             IsFoil = isFoil,
+            FoilType = foilType,
             AddedMarketPrice = price,
             IsUnpriced = price is null,
             Source = source,
@@ -220,7 +222,7 @@ public class ListService(
                 continue;
             }
 
-            cardService.AddCardToCollection(match, list.Game, condition, item.IsFoil,
+            cardService.AddCardToCollection(match, list.Game, condition, item.IsFoil, item.FoilType,
                 purchasePrice: null, quantity: item.Quantity, container, page: null, slot: null, section: null);
             added += item.Quantity;
             ctx.CardListItems.Remove(item);

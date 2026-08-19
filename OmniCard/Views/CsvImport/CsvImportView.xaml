@@ -59,6 +59,15 @@
                           DisplayMemberPath="Name"
                           Width="250"
                           VerticalAlignment="Center"/>
+                <TextBlock Text="Default foil finish:" VerticalAlignment="Center" Margin="16,0,8,0"
+                           ToolTip="Applied to foil rows that don't specify a finish. Blank = each game's basic finish."
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                <ComboBox IsEditable="True"
+                          Text="{Binding ViewModel.DefaultFoilType}"
+                          ItemsSource="{Binding ViewModel.AvailableFoilTypes}"
+                          Width="150"
+                          VerticalAlignment="Center"
+                          Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             </StackPanel>
         </GroupBox>
 

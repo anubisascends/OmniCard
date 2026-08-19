@@ -17,6 +17,9 @@ public class CollectionCard : INotifyPropertyChanged
     public string? ScanImagePath { get; set; }
     public string Condition { get; set; } = "NM";
     public bool IsFoil { get; set; }
+    /// <summary>Foil finish sub-type (e.g. "Etched", "Reverse Holofoil"). Null for non-foil.
+    /// Mirrors <see cref="Product.FoilType"/>. See <see cref="FoilTypes"/>.</summary>
+    public string? FoilType { get; set; }
     public decimal? PurchasePrice { get; set; }
     public DateTime DateAdded { get; set; } = DateTime.UtcNow;
 

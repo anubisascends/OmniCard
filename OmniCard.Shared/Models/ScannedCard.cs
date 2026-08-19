@@ -24,6 +24,11 @@ public partial class ScannedCard : ObservableObject
     [ObservableProperty]
     public partial bool IsFoil { get; set; }
 
+    /// <summary>Foil finish sub-type applied to the lot this scan becomes on commit (e.g.
+    /// "Etched", "Reverse Holofoil"). Null for non-foil. See <see cref="FoilTypes"/>.</summary>
+    [ObservableProperty]
+    public partial string? FoilType { get; set; }
+
     [ObservableProperty]
     public partial decimal? PurchasePrice { get; set; }
 

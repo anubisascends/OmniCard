@@ -62,6 +62,18 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
     [ObservableProperty]
     public partial bool IsFoil { get; set; }
 
+    /// <summary>Finish presets for this card's game, offered when <see cref="IsFoil"/> is on.</summary>
+    public ObservableCollection<string> AvailableFoilTypes { get; } = [];
+
+    /// <summary>Selected foil finish; changing it re-homes the lot to the matching-finish product
+    /// on save (via <c>ApplyIdentityAndCopyAttrs</c>). Only meaningful when <see cref="IsFoil"/> is on.</summary>
+    [ObservableProperty]
+    public partial string? FoilType { get; set; }
+
+    // Seed a finish when foil is first checked; clear it when unchecked.
+    partial void OnIsFoilChanged(bool value)
+        => FoilType = value ? (FoilType ?? AvailableFoilTypes.FirstOrDefault()) : null;
+
     [ObservableProperty]
     public partial decimal? PurchasePrice { get; set; }
 
@@ -295,7 +307,11 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
         Rarity = card.Rarity;
         GameName = card.Game.ToString();
         Condition = card.Condition;
+        AvailableFoilTypes.Clear();
+        foreach (var t in FoilTypes.ForGame(card.Game))
+            AvailableFoilTypes.Add(t);
         IsFoil = card.IsFoil;
+        FoilType = card.FoilType;
         PurchasePrice = card.PurchasePrice;
 
         // Load scan images for stack flipper
@@ -445,6 +461,8 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
         // Update the representative card
         _originalCard.Condition = Condition;
         _originalCard.IsFoil = IsFoil;
+        // A foil card always resolves to a concrete finish (falling back to the game's basic finish).
+        _originalCard.FoilType = IsFoil ? (FoilType ?? FoilTypes.BasicFoilType(_originalCard.Game)) : null;
         _originalCard.PurchasePrice = PurchasePrice;
         _originalCard.ContainerId = SelectedContainer?.Id;
         _originalCard.Page = SelectedContainer?.ContainerType == ContainerType.Binder ? Page : null;
@@ -475,6 +493,7 @@ public sealed partial class CollectionCardEditorViewModel : ViewModel
                     c.ImageUri = _originalCard.ImageUri;
                     c.Condition = Condition;
                     c.IsFoil = IsFoil;
+                    c.FoilType = _originalCard.FoilType;
                     c.PurchasePrice = PurchasePrice;
                     c.ContainerId = containerId;
                     c.Page = page;

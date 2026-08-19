@@ -133,8 +133,8 @@ public class ListsViewModelTests
         public void RenameList(int listId, string name) { }
         public void DeleteList(int listId) => _lists.RemoveAll(l => l.Id == listId);
         public IReadOnlyList<CardListItem> GetItems(int listId) => Items.TryGetValue(listId, out var v) ? v : [];
-        public CardListItem AddPrinting(int listId, CardMatch p, bool foil, int qty, ListItemSource s)
-            => new() { CardListId = listId, CardName = p.Name, Quantity = qty };
+        public CardListItem AddPrinting(int listId, CardMatch p, bool foil, string? foilType, int qty, ListItemSource s)
+            => new() { CardListId = listId, CardName = p.Name, Quantity = qty, IsFoil = foil, FoilType = foilType };
         public void RemoveItem(int itemId) { }
         public void SetQuantity(int itemId, int quantity) { }
         public AddCardsResult AddCardsByName(int listId, IEnumerable<DecklistEntry> entries)

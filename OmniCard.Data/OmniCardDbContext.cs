@@ -42,7 +42,7 @@ public class OmniCardDbContext : DbContext
             e.Property(p => p.PriceUpdatedAt);
             e.HasIndex(p => new { p.Game, p.Category });
             e.HasIndex(p => p.Upc);
-            e.HasIndex(p => new { p.Game, p.GameCardId, p.Foil });
+            e.HasIndex(p => new { p.Game, p.GameCardId, p.Foil, p.FoilType });
         });
 
         modelBuilder.Entity<InventoryLot>(e =>

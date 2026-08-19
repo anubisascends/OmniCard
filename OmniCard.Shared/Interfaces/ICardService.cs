@@ -10,6 +10,7 @@ public interface ICardService
     CardGame SelectedGame { get; set; }
     HashSet<string>? SelectedSetFilter { get; set; }
     bool DefaultIsFoil { get; set; }
+    string? DefaultFoilType { get; set; }
     decimal? DefaultPurchasePrice { get; set; }
     IReadOnlyList<CardGame> AvailableGames { get; }
     ICardGameService ActiveGameService { get; }
@@ -46,11 +47,11 @@ public interface ICardService
     void StartNewDiagnosticSession();
     (int FlagResolutions, int MismatchLogs, int DiagnosticEvents) ClearDiagnosticLogs();
     (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null);
-    void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section);
+    void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, string? foilType, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section);
 
     /// <summary>Adds a single card directly into a specific binder page/slot. If that slot is already
     /// occupied, the existing card is displaced back to the Unplaced pool (swap) — same as dragging.</summary>
-    void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int containerId, int page, int slot);
+    void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, string? foilType, decimal? purchasePrice, int containerId, int page, int slot);
     bool IsFirstCopy(CardGame game, string gameCardId, bool isFoil);
     void AnnotateScan(ScannedCard scan);
     int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates);

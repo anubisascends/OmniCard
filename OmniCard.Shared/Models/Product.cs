@@ -15,6 +15,10 @@ public class Product
     public string? CollectorNumber { get; set; }
     public string? Rarity { get; set; }
     public bool Foil { get; set; }
+    /// <summary>Foil finish sub-type (e.g. "Etched", "Reverse Holofoil", "Premium"). Null for
+    /// non-foil cards. Part of the product's catalog identity alongside <see cref="Foil"/>, so a
+    /// different finish of the same print is a distinct product. See <see cref="FoilTypes"/>.</summary>
+    public string? FoilType { get; set; }
     public string? ImageUri { get; set; }
     // Added in the Phase 2a unified-store migration (Task 2) to carry the remaining
     // CollectionCard fields faithfully — the Phase-1 model omitted these.
