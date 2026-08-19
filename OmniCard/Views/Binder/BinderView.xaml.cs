@@ -164,6 +164,18 @@ public partial class BinderView : Window
         return null;
     }
 
+    // The Add-page caret is an ordinary button; open its attached ContextMenu on left-click so it
+    // reads as a dropdown of page-type options.
+    private void AddPageOptionsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { ContextMenu: { } menu } button)
+        {
+            menu.PlacementTarget = button;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.IsOpen = true;
+        }
+    }
+
     private void TagsMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (_viewModel is null) return;

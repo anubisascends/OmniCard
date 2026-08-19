@@ -22,6 +22,16 @@ public interface IDialogService
     /// <summary>Opens the drag-and-drop binder placement editor for a Binder location as a modal dialog.</summary>
     void ShowBinderView(int containerId);
 
+    /// <summary>Prompts for where to insert a new binder sheet and whether it's double- or
+    /// single-sided. <paramref name="nearPage"/> pre-selects the sheet the user is currently viewing.
+    /// Returns the target sheet index and side choice, or null if cancelled.</summary>
+    (int InsertIndex, bool DoubleSided)? InsertBinderPage(int containerId, int? nearPage);
+
+    /// <summary>Prompts for where to move the sheet identified by <paramref name="movingSheetIndex"/>.
+    /// Returns the destination as an insertion index into the list of the other sheets, or null if
+    /// cancelled.</summary>
+    int? MoveBinderPage(int containerId, int movingSheetIndex);
+
     /// <summary>Prompts for a list destination (existing or new) per game group, for "Create List from Scans".
     /// Returns null if cancelled.</summary>
     IReadOnlyList<ScanListTargetResult>? PickListTargetsForScans(IReadOnlyList<(CardGame Game, int Count)> groups, string defaultName);

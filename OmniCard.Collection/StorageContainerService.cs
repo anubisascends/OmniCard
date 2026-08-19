@@ -40,6 +40,15 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
             SlotsPerPage = slotsPerPage > 0 ? slotsPerPage : 9
         };
 
+        // New binders start with one double-sided sheet (front + back), the default the user asked
+        // for; non-binder containers ignore this and keep the single-page default.
+        if (type == ContainerType.Binder)
+        {
+            var layout = BinderSheetLayout.NewDefault();
+            container.SheetSides = layout.Serialize();
+            container.TotalPages = layout.TotalPages;
+        }
+
         context.StorageContainers.Add(container);
         context.SaveChanges();
         return container;
@@ -133,15 +142,168 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
         using var context = dbContextFactory.CreateDbContext();
         var container = context.StorageContainers.AsNoTracking().FirstOrDefault(c => c.Id == containerId)
             ?? throw new InvalidOperationException($"Container {containerId} not found");
-        return new BinderLayout { SlotsPerPage = container.SlotsPerPage, TotalPages = container.TotalPages, Columns = container.Columns };
+        var sheets = BinderSheetLayout.Parse(container.SheetSides, container.TotalPages);
+        return new BinderLayout
+        {
+            SlotsPerPage = container.SlotsPerPage,
+            TotalPages = sheets.TotalPages,
+            Columns = container.Columns,
+            SheetSides = sheets.Sides,
+        };
     }
 
-    public void AddBinderPage(int containerId)
+    public void AddBinderSheet(int containerId, bool doubleSided)
     {
         using var context = dbContextFactory.CreateDbContext();
         var container = context.StorageContainers.Find(containerId)
             ?? throw new InvalidOperationException($"Container {containerId} not found");
-        container.AddPage();
+
+        // Appending a sheet never moves an existing page, so no lot remapping is needed.
+        var layout = BinderSheetLayout.Parse(container.SheetSides, container.TotalPages).Append(doubleSided);
+        container.SheetSides = layout.Serialize();
+        container.TotalPages = layout.TotalPages;
+        context.SaveChanges();
+    }
+
+    public BinderSheetInfo GetSheetForPage(int containerId, int page)
+    {
+        using var context = dbContextFactory.CreateDbContext();
+        var container = context.StorageContainers.AsNoTracking().FirstOrDefault(c => c.Id == containerId)
+            ?? throw new InvalidOperationException($"Container {containerId} not found");
+
+        var layout = BinderSheetLayout.Parse(container.SheetSides, container.TotalPages);
+        var sheetIndex = layout.SheetIndexOfPage(page);
+        if (sheetIndex < 0)
+            throw new InvalidOperationException($"Page {page} is not in binder {containerId}.");
+
+        var firstPage = layout.FirstPageOfSheet(sheetIndex);
+        var sides = layout.SidesOfSheet(sheetIndex);
+        var lastPageExclusive = firstPage + sides;
+        var cardCount = context.Lots.Count(l => l.LocationId == containerId
+            && l.Page >= firstPage && l.Page < lastPageExclusive
+            && l.Product.Category == ProductCategory.Single);
+
+        return new BinderSheetInfo
+        {
+            SheetIndex = sheetIndex,
+            FirstPage = firstPage,
+            Sides = sides,
+            TotalSheets = layout.SheetCount,
+            CardCount = cardCount,
+            Pages = Enumerable.Range(firstPage, sides).ToList(),
+        };
+    }
+
+    public List<BinderSheetInfo> GetSheets(int containerId)
+    {
+        using var context = dbContextFactory.CreateDbContext();
+        var container = context.StorageContainers.AsNoTracking().FirstOrDefault(c => c.Id == containerId)
+            ?? throw new InvalidOperationException($"Container {containerId} not found");
+
+        var layout = BinderSheetLayout.Parse(container.SheetSides, container.TotalPages);
+
+        var placedPages = context.Lots.AsNoTracking()
+            .Where(l => l.LocationId == containerId && l.Page != null && l.Product.Category == ProductCategory.Single)
+            .Select(l => l.Page)
+            .ToList();
+        var counts = placedPages.Where(p => p.HasValue)
+            .GroupBy(p => p!.Value)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var sheets = new List<BinderSheetInfo>();
+        for (var i = 0; i < layout.SheetCount; i++)
+        {
+            var first = layout.FirstPageOfSheet(i);
+            var sides = layout.SidesOfSheet(i);
+            var pages = Enumerable.Range(first, sides).ToList();
+            sheets.Add(new BinderSheetInfo
+            {
+                SheetIndex = i,
+                FirstPage = first,
+                Sides = sides,
+                TotalSheets = layout.SheetCount,
+                CardCount = pages.Sum(p => counts.GetValueOrDefault(p)),
+                Pages = pages,
+            });
+        }
+
+        return sheets;
+    }
+
+    public void InsertBinderSheet(int containerId, int insertIndex, bool doubleSided)
+    {
+        using var context = dbContextFactory.CreateDbContext();
+        var container = context.StorageContainers.Find(containerId)
+            ?? throw new InvalidOperationException($"Container {containerId} not found");
+
+        var layout = BinderSheetLayout.Parse(container.SheetSides, container.TotalPages);
+        if (insertIndex < 0 || insertIndex > layout.SheetCount)
+            throw new ArgumentOutOfRangeException(nameof(insertIndex));
+
+        var (newLayout, remap) = layout.InsertSheet(insertIndex, doubleSided);
+        ApplyPageRemap(context, containerId, newLayout, remap);
+    }
+
+    public void MoveBinderSheet(int containerId, int fromPage, int toIndex)
+    {
+        using var context = dbContextFactory.CreateDbContext();
+        var container = context.StorageContainers.Find(containerId)
+            ?? throw new InvalidOperationException($"Container {containerId} not found");
+
+        var layout = BinderSheetLayout.Parse(container.SheetSides, container.TotalPages);
+        var fromIndex = layout.SheetIndexOfPage(fromPage);
+        if (fromIndex < 0)
+            throw new InvalidOperationException($"Page {fromPage} is not in binder {containerId}.");
+        if (toIndex < 0 || toIndex >= layout.SheetCount)
+            throw new ArgumentOutOfRangeException(nameof(toIndex));
+
+        var (newLayout, remap) = layout.MoveSheet(fromIndex, toIndex);
+        ApplyPageRemap(context, containerId, newLayout, remap);
+    }
+
+    public void RemoveBinderSheet(int containerId, int page)
+    {
+        using var context = dbContextFactory.CreateDbContext();
+        var container = context.StorageContainers.Find(containerId)
+            ?? throw new InvalidOperationException($"Container {containerId} not found");
+
+        var layout = BinderSheetLayout.Parse(container.SheetSides, container.TotalPages);
+        var sheetIndex = layout.SheetIndexOfPage(page);
+        if (sheetIndex < 0)
+            throw new InvalidOperationException($"Page {page} is not in binder {containerId}.");
+        if (layout.SheetCount <= 1)
+            throw new InvalidOperationException("A binder must keep at least one page.");
+
+        var (newLayout, remap) = layout.RemoveSheet(sheetIndex);
+        ApplyPageRemap(context, containerId, newLayout, remap);
+    }
+
+    /// <summary>Applies a page-number remap (from a <see cref="BinderSheetLayout"/> transform) to
+    /// every placed lot in the binder in one pass, then persists the new sheet layout. A null
+    /// target unplaces the lot (Page/Slot cleared, staying in the binder); any other target renames
+    /// the page, keeping the slot. Shared by remove/insert/move.</summary>
+    private static void ApplyPageRemap(
+        OmniCardDbContext context, int containerId, BinderSheetLayout newLayout,
+        IReadOnlyDictionary<int, int?> pageRemap)
+    {
+        var container = context.StorageContainers.Find(containerId)
+            ?? throw new InvalidOperationException($"Container {containerId} not found");
+
+        if (pageRemap.Count > 0)
+        {
+            var placed = context.Lots.Where(l => l.LocationId == containerId && l.Page != null).ToList();
+            foreach (var lot in placed)
+            {
+                if (lot.Page is int p && pageRemap.TryGetValue(p, out var newPage))
+                {
+                    if (newPage is null) { lot.Page = null; lot.Slot = null; }
+                    else lot.Page = newPage.Value;
+                }
+            }
+        }
+
+        container.SheetSides = newLayout.Serialize();
+        container.TotalPages = newLayout.TotalPages;
         context.SaveChanges();
     }
 
