@@ -222,7 +222,14 @@
                     </ComboBox>
                     <CheckBox Content="Foil" IsChecked="{Binding ViewModel.IsFoil}"
                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
-                              VerticalAlignment="Center" Margin="0,0,12,0"/>
+                              VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox IsEditable="True"
+                              Text="{Binding ViewModel.FoilType}"
+                              ItemsSource="{Binding ViewModel.AvailableFoilTypes}"
+                              IsEnabled="{Binding ViewModel.IsFoil}"
+                              ToolTip="Foil finish"
+                              Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                              VerticalAlignment="Center" Width="120" Margin="0,0,12,0"/>
                     <TextBlock Text="$" FontSize="11"
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
                                VerticalAlignment="Center" Margin="0,0,4,0"/>

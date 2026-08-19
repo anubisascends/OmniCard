@@ -23,6 +23,8 @@ public class CardListItem
     public string? SetCode { get; set; }
     public string? CollectorNumber { get; set; }
     public bool IsFoil { get; set; }
+    /// <summary>Foil finish sub-type carried to the created lot on commit; null for non-foil. See <see cref="FoilTypes"/>.</summary>
+    public string? FoilType { get; set; }
 
     /// <summary>Market price captured when the printing was resolved; null if unpriced.</summary>
     public decimal? AddedMarketPrice { get; set; }

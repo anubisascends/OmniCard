@@ -14,6 +14,14 @@ public sealed partial class CsvImportViewModel(
 
     public ObservableCollection<CollectionCard> PreviewCards { get; } = [];
     public ObservableCollection<StorageContainer> AvailableContainers { get; } = [];
+    /// <summary>Finish presets across the games present in the file. The blank first entry means
+    /// "use each card's basic finish" — see <see cref="DefaultFoilType"/>.</summary>
+    public ObservableCollection<string> AvailableFoilTypes { get; } = [];
+
+    /// <summary>Finish applied to foil rows that don't carry one from the file. Null (blank) falls
+    /// back to each card's game basic finish. A finish parsed from the file always wins.</summary>
+    [ObservableProperty]
+    public partial string? DefaultFoilType { get; set; }
 
     [ObservableProperty]
     public partial string FormatLabel { get; set; } = "";
@@ -66,6 +74,15 @@ public sealed partial class CsvImportViewModel(
         foreach (var c in containerService.GetAll())
             AvailableContainers.Add(c);
 
+        // Finish presets: blank ("use each card's basic finish") plus the union of finishes for
+        // every game present in the file.
+        AvailableFoilTypes.Clear();
+        AvailableFoilTypes.Add("");
+        foreach (var t in preview.Cards.Select(c => c.Game).Distinct()
+                     .SelectMany(FoilTypes.ForGame).Distinct())
+            AvailableFoilTypes.Add(t);
+        DefaultFoilType = null;
+
         // Default to Bulk
         SelectedContainer = AvailableContainers.FirstOrDefault(c => c.IsSystem);
     }
@@ -73,7 +90,8 @@ public sealed partial class CsvImportViewModel(
     [RelayCommand]
     public void Import()
     {
-        ImportedCount = csvService.ImportCards(_preview, SkipDuplicates, SelectedContainer?.Id);
+        ImportedCount = csvService.ImportCards(_preview, SkipDuplicates, SelectedContainer?.Id,
+            string.IsNullOrEmpty(DefaultFoilType) ? null : DefaultFoilType);
         CloseDialog?.Invoke(true);
     }
 

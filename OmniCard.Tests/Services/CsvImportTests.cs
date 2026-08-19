@@ -203,6 +203,58 @@ public class CsvImportTests : IDisposable
         Assert.Equal(2, ctx2.Lots.Count());
     }
 
+    [Fact]
+    public void ImportCards_NativeFoilTypeColumn_IsPreserved()
+    {
+        var path = WriteCsv("finish.csv",
+            "Game,GameCardId,Name,SetName,SetCode,Number,Rarity,Condition,IsFoil,FoilType,PurchasePrice,DateAdded,ContainerName,ContainerType,Page,Slot,Section\n" +
+            "Mtg,abc-123,Lightning Bolt,Alpha,LEA,161,common,NM,True,Etched,,,,,,,\n");
+
+        var svc = CreateService();
+        var preview = svc.PreviewImport(path);
+        svc.ImportCards(preview, skipDuplicates: false);
+
+        using var ctx = _dbFactory.CreateDbContext();
+        var product = ctx.Products.AsNoTracking().Single(p => p.GameCardId == "abc-123");
+        Assert.True(product.Foil);
+        Assert.Equal("Etched", product.FoilType);
+    }
+
+    [Fact]
+    public void ImportCards_DefaultFoilTreatment_AppliesToFoilRowsWithoutFinish()
+    {
+        // No FoilType column at all; the foil row must pick up the dialog's default treatment,
+        // while the non-foil row stays null.
+        var path = WriteCsv("default-finish.csv",
+            "Game,GameCardId,Name,SetName,SetCode,Number,Rarity,Condition,IsFoil,PurchasePrice,DateAdded,ContainerName,ContainerType,Page,Slot,Section\n" +
+            "Mtg,foil-1,Lightning Bolt,Alpha,LEA,161,common,NM,True,,,,,,,\n" +
+            "Mtg,plain-1,Counterspell,Alpha,LEA,55,common,NM,False,,,,,,,\n");
+
+        var svc = CreateService();
+        var preview = svc.PreviewImport(path);
+        svc.ImportCards(preview, skipDuplicates: false, targetContainerId: null, defaultFoilType: "Rainbow");
+
+        using var ctx = _dbFactory.CreateDbContext();
+        Assert.Equal("Rainbow", ctx.Products.AsNoTracking().Single(p => p.GameCardId == "foil-1").FoilType);
+        Assert.Null(ctx.Products.AsNoTracking().Single(p => p.GameCardId == "plain-1").FoilType);
+    }
+
+    [Fact]
+    public void ImportCards_FoilRowNoDefault_FallsBackToBasicFinish()
+    {
+        var path = WriteCsv("basic-finish.csv",
+            "Game,GameCardId,Name,SetName,SetCode,Number,Rarity,Condition,IsFoil,PurchasePrice,DateAdded,ContainerName,ContainerType,Page,Slot,Section\n" +
+            "Mtg,foil-2,Lightning Bolt,Alpha,LEA,161,common,NM,True,,,,,,,\n");
+
+        var svc = CreateService();
+        var preview = svc.PreviewImport(path);
+        svc.ImportCards(preview, skipDuplicates: false);
+
+        using var ctx = _dbFactory.CreateDbContext();
+        Assert.Equal(FoilTypes.BasicFoilType(CardGame.Mtg),
+            ctx.Products.AsNoTracking().Single(p => p.GameCardId == "foil-2").FoilType);
+    }
+
     private static void SeedExisting(OmniCardDbContext ctx)
     {
         var product = new Product

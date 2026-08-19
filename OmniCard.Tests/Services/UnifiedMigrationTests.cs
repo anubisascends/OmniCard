@@ -895,6 +895,70 @@ public class UnifiedMigrationTests : IDisposable
         SqliteConnection.ClearAllPools();
     }
 
+    [Fact]
+    public void EnsureUnifiedSchema_BackfillsFoilTypeForExistingFoilProducts()
+    {
+        var dir = Path.Combine(_tempDir, "foiltype");
+        Directory.CreateDirectory(dir);
+        var dbPath = Path.Combine(dir, "inventory.db");
+
+        // A pre-existing inventory.db whose Products table has no FoilType column yet.
+        using (var conn = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE Products (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Game TEXT NOT NULL,
+                    Category TEXT NOT NULL DEFAULT 'Single',
+                    GameCardId TEXT,
+                    Name TEXT NOT NULL DEFAULT '',
+                    Foil INTEGER NOT NULL DEFAULT 0
+                );
+                INSERT INTO Products (Game, GameCardId, Name, Foil) VALUES ('Mtg', 'bolt-1', 'Lightning Bolt', 1);
+                INSERT INTO Products (Game, GameCardId, Name, Foil) VALUES ('Pokemon', 'pika-1', 'Pikachu', 1);
+                INSERT INTO Products (Game, GameCardId, Name, Foil) VALUES ('Mtg', 'bolt-2', 'Counterspell', 0);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        UnifiedMigrationService.EnsureUnifiedSchema(dir, NullLogger.Instance);
+        SqliteConnection.ClearAllPools();
+
+        static string? FoilTypeOf(string dbPath, string gameCardId)
+        {
+            using var conn = new SqliteConnection($"Data Source={dbPath}");
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"SELECT FoilType FROM Products WHERE GameCardId = '{gameCardId}'";
+            var v = cmd.ExecuteScalar();
+            return v is DBNull or null ? null : (string)v;
+        }
+
+        Assert.Equal("Foil", FoilTypeOf(dbPath, "bolt-1"));       // MTG basic finish
+        Assert.Equal("Holofoil", FoilTypeOf(dbPath, "pika-1"));   // Pokémon basic finish
+        Assert.Null(FoilTypeOf(dbPath, "bolt-2"));                // non-foil stays null
+        SqliteConnection.ClearAllPools();
+
+        // Idempotent: manually correct one finish, then re-run — the backfill must not overwrite it.
+        using (var conn = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "UPDATE Products SET FoilType = 'Etched' WHERE GameCardId = 'bolt-1'";
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        UnifiedMigrationService.EnsureUnifiedSchema(dir, NullLogger.Instance);
+        SqliteConnection.ClearAllPools();
+
+        Assert.Equal("Etched", FoilTypeOf(dbPath, "bolt-1"));     // user correction preserved
+        SqliteConnection.ClearAllPools();
+    }
+
     private class UnifiedDbContextFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
         public OmniCardDbContext CreateDbContext() => new(options);

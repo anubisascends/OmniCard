@@ -164,6 +164,7 @@ public class DecklistMatchingTests : IDisposable
         public CardGame SelectedGame { get; set; }
         public HashSet<string>? SelectedSetFilter { get; set; }
         public bool DefaultIsFoil { get; set; }
+        public string? DefaultFoilType { get; set; }
         public decimal? DefaultPurchasePrice { get; set; }
         public IReadOnlyList<CardGame> AvailableGames => [];
         public ICardGameService ActiveGameService => null!;
@@ -197,8 +198,8 @@ public class DecklistMatchingTests : IDisposable
         public void StartNewDiagnosticSession() { }
         public (int FlagResolutions, int MismatchLogs, int DiagnosticEvents) ClearDiagnosticLogs() => (0, 0, 0);
         public (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null) => (0, 0);
-        public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section) { }
-        public void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int containerId, int page, int slot) { }
+        public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, string? foilType, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section) { }
+        public void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, string? foilType, decimal? purchasePrice, int containerId, int page, int slot) { }
         public bool IsFirstCopy(CardGame game, string gameCardId, bool isFoil) => throw new NotImplementedException();
         public void AnnotateScan(ScannedCard scan) => throw new NotImplementedException();
         public int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates) => 0;

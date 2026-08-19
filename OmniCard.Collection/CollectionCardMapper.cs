@@ -26,6 +26,7 @@ public static class CollectionCardMapper
             Rarity = product.Rarity ?? "",
             ImageUri = product.ImageUri,
             IsFoil = product.Foil,
+            FoilType = product.FoilType,
             Color = product.Color,
             CardType = product.CardType,
 

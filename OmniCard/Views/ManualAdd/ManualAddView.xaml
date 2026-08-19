@@ -53,7 +53,14 @@
                 <CheckBox Content="Foil"
                           IsChecked="{Binding ViewModel.IsFoil}"
                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
-                          VerticalAlignment="Center" Margin="0,0,16,4"/>
+                          VerticalAlignment="Center" Margin="0,0,8,4"/>
+                <ComboBox IsEditable="True"
+                          Text="{Binding ViewModel.FoilType}"
+                          ItemsSource="{Binding ViewModel.AvailableFoilTypes}"
+                          IsEnabled="{Binding ViewModel.IsFoil}"
+                          ToolTip="Foil finish"
+                          Width="130" VerticalAlignment="Center" Margin="0,0,16,4"
+                          Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <StackPanel Orientation="Horizontal" Margin="0,0,16,4">
                     <TextBlock Text="Price:" VerticalAlignment="Center" Margin="0,0,6,0"
                                Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>

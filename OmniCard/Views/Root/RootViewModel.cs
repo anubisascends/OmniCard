@@ -197,6 +197,24 @@ public sealed partial class RootViewModel(
     public partial bool DefaultIsFoil { get; set; }
     partial void OnDefaultIsFoilChanged(bool value) => CardService.DefaultIsFoil = value;
 
+    /// <summary>Finish presets for the active game, offered when <see cref="DefaultIsFoil"/> is on.</summary>
+    public ObservableCollection<string> AvailableFoilTypes { get; } = [];
+
+    [ObservableProperty]
+    public partial string? DefaultFoilType { get; set; }
+    partial void OnDefaultFoilTypeChanged(string? value) => CardService.DefaultFoilType = value;
+
+    /// <summary>Refresh the finish presets for the given game and reset the selected default.
+    /// Called when the active scanner game changes.</summary>
+    private void UpdateAvailableFoilTypes(CardGame? game)
+    {
+        AvailableFoilTypes.Clear();
+        if (game.HasValue)
+            foreach (var t in FoilTypes.ForGame(game.Value))
+                AvailableFoilTypes.Add(t);
+        DefaultFoilType = AvailableFoilTypes.FirstOrDefault();
+    }
+
     [ObservableProperty]
     public partial decimal? DefaultPurchasePrice { get; set; }
     partial void OnDefaultPurchasePriceChanged(decimal? value) => CardService.DefaultPurchasePrice = value;
@@ -598,6 +616,7 @@ public sealed partial class RootViewModel(
             CardService.SelectedGame = value.Value;   // scanner routing stays concrete
             SetFilterText = "";
             LoadAvailableSets();
+            UpdateAvailableFoilTypes(value);
         }
         else
         {
@@ -2083,7 +2102,7 @@ public sealed partial class RootViewModel(
                 ? listService.CreateList(pick.NewName, pick.Game).Id
                 : pick.ExistingList!.Id;
             foreach (var scan in scans.Where(s => s.Game == pick.Game))
-                listService.AddPrinting(listId, scan.Match!, scan.IsFoil, quantity: 1, ListItemSource.Scan);
+                listService.AddPrinting(listId, scan.Match!, scan.IsFoil, scan.FoilType, quantity: 1, ListItemSource.Scan);
         }
 
         ResetScanFilterSort();

@@ -10,7 +10,7 @@ public interface IListService
     void DeleteList(int listId);
 
     IReadOnlyList<CardListItem> GetItems(int listId);
-    CardListItem AddPrinting(int listId, CardMatch printing, bool isFoil, int quantity, ListItemSource source);
+    CardListItem AddPrinting(int listId, CardMatch printing, bool isFoil, string? foilType, int quantity, ListItemSource source);
     void RemoveItem(int itemId);
     void SetQuantity(int itemId, int quantity);
 

@@ -43,24 +43,27 @@ public sealed class DecklistImportService(
         return rows;
     }
 
-    public int CommitToList(int listId, IEnumerable<DecklistImportRow> resolvedRows)
+    public int CommitToList(int listId, IEnumerable<DecklistImportRow> resolvedRows, bool defaultFoil = false, string? defaultFoilType = null)
     {
         var added = 0;
+        var game = cardService.ActiveGameService.Game;
+        var foilType = defaultFoil ? (defaultFoilType ?? FoilTypes.BasicFoilType(game)) : null;
         foreach (var row in resolvedRows)
         {
-            listService.AddPrinting(listId, row.Match!, isFoil: false, row.Quantity, ListItemSource.File);
+            listService.AddPrinting(listId, row.Match!, defaultFoil, foilType, row.Quantity, ListItemSource.File);
             added += row.Quantity;
         }
         return added;
     }
 
-    public int CommitToLocation(StorageContainer container, IEnumerable<DecklistImportRow> resolvedRows)
+    public int CommitToLocation(StorageContainer container, IEnumerable<DecklistImportRow> resolvedRows, bool defaultFoil = false, string? defaultFoilType = null)
     {
         var added = 0;
         var game = cardService.ActiveGameService.Game;
+        var foilType = defaultFoil ? (defaultFoilType ?? FoilTypes.BasicFoilType(game)) : null;
         foreach (var row in resolvedRows)
         {
-            cardService.AddCardToCollection(row.Match!, game, condition: "Near Mint", isFoil: false,
+            cardService.AddCardToCollection(row.Match!, game, condition: "Near Mint", isFoil: defaultFoil, foilType,
                 purchasePrice: null, quantity: row.Quantity, container, page: null, slot: null, section: null);
             added += row.Quantity;
         }

@@ -36,20 +36,21 @@ public sealed class ConfigurableGameService : ICardGameService
 /// <summary>ICardService that exposes a single active game service and records AddCardToCollection calls.</summary>
 public sealed class RecordingCardService(ICardGameService active) : ICardService
 {
-    public sealed record AddCall(CardMatch Match, CardGame Game, string Condition, bool IsFoil, decimal? PurchasePrice, int Quantity, StorageContainer? Container);
+    public sealed record AddCall(CardMatch Match, CardGame Game, string Condition, bool IsFoil, string? FoilType, decimal? PurchasePrice, int Quantity, StorageContainer? Container);
     public List<AddCall> Added { get; } = [];
 
     public ICardGameService ActiveGameService => active;
     public ICardGameService GetGameService(CardGame game) => active;
-    public void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int containerId, int page, int slot) { }
-    public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section)
-        => Added.Add(new AddCall(match, game, condition, isFoil, purchasePrice, quantity, container));
+    public void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, string? foilType, decimal? purchasePrice, int containerId, int page, int slot) { }
+    public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, string? foilType, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section)
+        => Added.Add(new AddCall(match, game, condition, isFoil, foilType, purchasePrice, quantity, container));
 
     // Unused members
     public ObservableCollection<ScannedCard> ScannedCards { get; } = [];
     public CardGame SelectedGame { get; set; }
     public HashSet<string>? SelectedSetFilter { get; set; }
     public bool DefaultIsFoil { get; set; }
+    public string? DefaultFoilType { get; set; }
     public decimal? DefaultPurchasePrice { get; set; }
     public IReadOnlyList<CardGame> AvailableGames => [];
     public Action<HashStageResult>? OnHashStage { get; set; }
@@ -93,7 +94,7 @@ public sealed class RecordingCardService(ICardGameService active) : ICardService
 /// <summary>IListService that records AddPrinting/CreateList calls.</summary>
 public sealed class RecordingListService : IListService
 {
-    public sealed record AddPrintingCall(int ListId, CardMatch Printing, bool IsFoil, int Quantity, ListItemSource Source);
+    public sealed record AddPrintingCall(int ListId, CardMatch Printing, bool IsFoil, string? FoilType, int Quantity, ListItemSource Source);
     public List<AddPrintingCall> Printings { get; } = [];
     public List<CardList> Lists { get; } = [];
     private int _nextId = 500;
@@ -105,10 +106,10 @@ public sealed class RecordingListService : IListService
         Lists.Add(l);
         return l;
     }
-    public CardListItem AddPrinting(int listId, CardMatch printing, bool isFoil, int quantity, ListItemSource source)
+    public CardListItem AddPrinting(int listId, CardMatch printing, bool isFoil, string? foilType, int quantity, ListItemSource source)
     {
-        Printings.Add(new AddPrintingCall(listId, printing, isFoil, quantity, source));
-        return new CardListItem { CardListId = listId, GameCardId = printing.GameSpecificId, Quantity = quantity, Source = source };
+        Printings.Add(new AddPrintingCall(listId, printing, isFoil, foilType, quantity, source));
+        return new CardListItem { CardListId = listId, GameCardId = printing.GameSpecificId, Quantity = quantity, Source = source, IsFoil = isFoil, FoilType = foilType };
     }
 
     // Unused members
@@ -181,14 +182,14 @@ public sealed class FakeDecklistImportService : IDecklistImportService
     public IReadOnlyList<DecklistImportRow> ResolveFile(string fileText) => OnResolve(fileText);
     public IReadOnlyList<DecklistImportRow> ResolveEntries(IEnumerable<DecklistEntry> entries) => OnResolveEntries(entries);
 
-    public int CommitToList(int listId, IEnumerable<DecklistImportRow> resolvedRows)
+    public int CommitToList(int listId, IEnumerable<DecklistImportRow> resolvedRows, bool defaultFoil = false, string? defaultFoilType = null)
     {
         var rows = resolvedRows.ToList();
         ListCommits.Add((listId, rows.Count));
         return rows.Sum(r => r.Quantity);
     }
 
-    public int CommitToLocation(StorageContainer container, IEnumerable<DecklistImportRow> resolvedRows)
+    public int CommitToLocation(StorageContainer container, IEnumerable<DecklistImportRow> resolvedRows, bool defaultFoil = false, string? defaultFoilType = null)
     {
         var rows = resolvedRows.ToList();
         LocationCommits.Add((container, rows.Count));

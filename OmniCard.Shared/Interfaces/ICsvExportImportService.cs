@@ -12,5 +12,5 @@ public interface ICsvExportImportService
     void ExportManaboxScansCollection(string filePath, IEnumerable<ScannedCard> scans);
     void ExportManaboxScansText(string filePath, IEnumerable<ScannedCard> scans);
     CsvImportPreview PreviewImport(string filePath);
-    int ImportCards(CsvImportPreview preview, bool skipDuplicates, int? targetContainerId = null);
+    int ImportCards(CsvImportPreview preview, bool skipDuplicates, int? targetContainerId = null, string? defaultFoilType = null);
 }

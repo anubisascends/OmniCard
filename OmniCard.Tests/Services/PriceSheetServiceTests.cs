@@ -224,6 +224,7 @@ public class PriceSheetServiceTests : IDisposable
         public CardGame SelectedGame { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
         public HashSet<string>? SelectedSetFilter { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
         public bool DefaultIsFoil { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        public string? DefaultFoilType { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
         public decimal? DefaultPurchasePrice { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
         public IReadOnlyList<CardGame> AvailableGames => throw new NotImplementedException();
         public ICardGameService ActiveGameService => throw new NotImplementedException();
@@ -257,8 +258,8 @@ public class PriceSheetServiceTests : IDisposable
         public void StartNewDiagnosticSession() => throw new NotImplementedException();
         public (int FlagResolutions, int MismatchLogs, int DiagnosticEvents) ClearDiagnosticLogs() => throw new NotImplementedException();
         public (int Deleted, int Errors) DeleteOrphanedScans(IProgress<string>? progress = null) => throw new NotImplementedException();
-        public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section) => throw new NotImplementedException();
-        public void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, decimal? purchasePrice, int containerId, int page, int slot) => throw new NotImplementedException();
+        public void AddCardToCollection(CardMatch match, CardGame game, string condition, bool isFoil, string? foilType, decimal? purchasePrice, int quantity, StorageContainer? container, int? page, int? slot, string? section) => throw new NotImplementedException();
+        public void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, string? foilType, decimal? purchasePrice, int containerId, int page, int slot) => throw new NotImplementedException();
         public int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates) => throw new NotImplementedException();
         public ulong ComputeHashFromStream(Stream stream) => throw new NotImplementedException();
         public ulong ComputeEdgeHashFromStream(Stream stream) => throw new NotImplementedException();

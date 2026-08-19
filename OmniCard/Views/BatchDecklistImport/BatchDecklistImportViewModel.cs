@@ -23,6 +23,13 @@ public sealed partial class BatchDecklistImportViewModel(
     public ObservableCollection<DecklistFileImport> Files { get; } = [];
     public ObservableCollection<CardList> AvailableLists { get; } = [];
     public ObservableCollection<StorageContainer> AvailableLocations { get; } = [];
+    /// <summary>Finish presets for the active game, shown when <see cref="DefaultIsFoil"/> is on.</summary>
+    public ObservableCollection<string> AvailableFoilTypes { get; } = [];
+
+    /// <summary>When on, every imported card is treated as foil (decklists carry no foil marker).</summary>
+    [ObservableProperty] public partial bool DefaultIsFoil { get; set; }
+    /// <summary>Finish applied to imported foil cards; null falls back to the game's basic finish.</summary>
+    [ObservableProperty] public partial string? DefaultFoilType { get; set; }
 
     [ObservableProperty] public partial DecklistFileImport? SelectedFile { get; set; }
     [ObservableProperty] public partial string HeaderLabel { get; set; } = "";
@@ -56,6 +63,9 @@ public sealed partial class BatchDecklistImportViewModel(
         foreach (var l in listService.GetLists(game)) AvailableLists.Add(l);
         AvailableLocations.Clear();
         foreach (var c in containerService.GetAll()) AvailableLocations.Add(c);
+        AvailableFoilTypes.Clear();
+        foreach (var t in FoilTypes.ForGame(game)) AvailableFoilTypes.Add(t);
+        DefaultFoilType = AvailableFoilTypes.FirstOrDefault();
         Files.Clear();
         UpdateHeader();
     }
@@ -182,14 +192,14 @@ public sealed partial class BatchDecklistImportViewModel(
                 anyList = true;
                 var listId = f.CreateNew ? listService.CreateList(f.NewName.Trim(), game).Id : f.SelectedList!.Id;
                 targetName = f.CreateNew ? f.NewName.Trim() : f.SelectedList!.Name;
-                added = importService.CommitToList(listId, resolved);
+                added = importService.CommitToList(listId, resolved, DefaultIsFoil, DefaultFoilType);
             }
             else
             {
                 anyLocation = true;
                 var container = f.CreateNew ? containerService.Create(f.NewName.Trim(), f.NewLocationType) : f.SelectedLocation!;
                 targetName = container.Name;
-                added = importService.CommitToLocation(container, resolved);
+                added = importService.CommitToLocation(container, resolved, DefaultIsFoil, DefaultFoilType);
             }
 
             totalAdded += added;

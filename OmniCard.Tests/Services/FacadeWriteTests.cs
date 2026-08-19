@@ -153,6 +153,81 @@ public class FacadeWriteTests : IDisposable
         }
     }
 
+    [Fact]
+    public void CommitScans_SamePrintingDifferentFoilType_CreatesSeparateProducts()
+    {
+        var service = CreateService();
+        var etched = MakeScan(MakeMatch("bolt-1", "Lightning Bolt"), isFoil: true);
+        etched.FoilType = "Etched";
+        var rainbow = MakeScan(MakeMatch("bolt-1", "Lightning Bolt"), isFoil: true);
+        rainbow.FoilType = "Rainbow";
+
+        try
+        {
+            service.CommitScans([etched, rainbow]);
+
+            using var ctx = new OmniCardDbContext(_omniOptions);
+            var products = ctx.Products.AsNoTracking().ToList();
+            Assert.Equal(2, products.Count);
+            Assert.Contains(products, p => p.FoilType == "Etched");
+            Assert.Contains(products, p => p.FoilType == "Rainbow");
+            Assert.All(products, p => Assert.True(p.Foil));
+        }
+        finally
+        {
+            File.Delete(etched.TempImagePath);
+            File.Delete(rainbow.TempImagePath);
+        }
+    }
+
+    [Fact]
+    public void CommitScans_FoilWithoutFinish_FallsBackToBasicFinish()
+    {
+        var service = CreateService();
+        var scan = MakeScan(MakeMatch("bolt-1", "Lightning Bolt"), isFoil: true);
+        scan.FoilType = null; // e.g. a per-card foil toggle made after scanning
+
+        try
+        {
+            service.CommitScans([scan]);
+
+            using var ctx = new OmniCardDbContext(_omniOptions);
+            var product = ctx.Products.AsNoTracking().Single();
+            Assert.True(product.Foil);
+            Assert.Equal(FoilTypes.BasicFoilType(CardGame.Mtg), product.FoilType);
+        }
+        finally
+        {
+            File.Delete(scan.TempImagePath);
+        }
+    }
+
+    [Fact]
+    public void UpdateCollectionCard_ChangingFoilType_RehomesLotToNewProduct()
+    {
+        var service = CreateService();
+        service.AddCardToCollection(MakeMatch("bolt-1", "Lightning Bolt"), CardGame.Mtg, "NM",
+            isFoil: true, foilType: "Etched", purchasePrice: null, quantity: 1,
+            container: null, page: null, slot: null, section: null);
+
+        int lotId;
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+            lotId = ctx.Lots.AsNoTracking().Single().Id;
+
+        var dto = service.GetCollectionCards([lotId]).Single();
+        Assert.Equal("Etched", dto.FoilType);
+        dto.FoilType = "Rainbow";
+        service.UpdateCollectionCard(dto);
+
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+        {
+            // The lot moved to a new-finish product; both product rows persist in the catalog.
+            var lot = ctx.Lots.AsNoTracking().Include(l => l.Product).Single();
+            Assert.Equal("Rainbow", lot.Product.FoilType);
+            Assert.Equal(2, ctx.Products.AsNoTracking().Count());
+        }
+    }
+
     // --- AddCardToCollection: Product dedup + qty Lots + Acquire movements ---
 
     [Fact]
@@ -161,7 +236,7 @@ public class FacadeWriteTests : IDisposable
         var service = CreateService();
         var match = MakeMatch("bolt-1", "Lightning Bolt");
 
-        service.AddCardToCollection(match, CardGame.Mtg, "NM", false, 1.50m, 3, null, null, null, null);
+        service.AddCardToCollection(match, CardGame.Mtg, "NM", false, null, 1.50m, 3, null, null, null, null);
 
         using var ctx = new OmniCardDbContext(_omniOptions);
         Assert.Single(ctx.Products.AsNoTracking().ToList());
@@ -178,8 +253,8 @@ public class FacadeWriteTests : IDisposable
         var service = CreateService();
         var match = MakeMatch("bolt-1", "Lightning Bolt");
 
-        service.AddCardToCollection(match, CardGame.Mtg, "NM", false, null, 1, null, null, null, null);
-        service.AddCardToCollection(match, CardGame.Mtg, "LP", false, null, 1, null, null, null, null);
+        service.AddCardToCollection(match, CardGame.Mtg, "NM", false, null, null, 1, null, null, null, null);
+        service.AddCardToCollection(match, CardGame.Mtg, "LP", false, null, null, 1, null, null, null, null);
 
         using var ctx = new OmniCardDbContext(_omniOptions);
         Assert.Single(ctx.Products.AsNoTracking().ToList());
@@ -200,7 +275,7 @@ public class FacadeWriteTests : IDisposable
         }
 
         var match = MakeMatch("bolt-1", "Lightning Bolt");
-        service.AddCardToCollection(match, CardGame.Mtg, "NM", false, null, 1,
+        service.AddCardToCollection(match, CardGame.Mtg, "NM", false, null, null, 1,
             new StorageContainer { Id = containerId, ContainerType = ContainerType.Binder }, page: 2, slot: 5, section: null);
 
         using var ctx = new OmniCardDbContext(_omniOptions);
@@ -223,7 +298,7 @@ public class FacadeWriteTests : IDisposable
             containerId = container.Id;
         }
 
-        service.AddMissingCardToSlot(MakeMatch("bolt-1", "Lightning Bolt"), CardGame.Mtg, "NM", false, null,
+        service.AddMissingCardToSlot(MakeMatch("bolt-1", "Lightning Bolt"), CardGame.Mtg, "NM", false, null, null,
             containerId, page: 1, slot: 3);
 
         using var ctx = new OmniCardDbContext(_omniOptions);
@@ -248,10 +323,10 @@ public class FacadeWriteTests : IDisposable
         }
 
         // Existing card occupies page 1 / slot 3.
-        service.AddMissingCardToSlot(MakeMatch("bolt-1", "Lightning Bolt"), CardGame.Mtg, "NM", false, null,
+        service.AddMissingCardToSlot(MakeMatch("bolt-1", "Lightning Bolt"), CardGame.Mtg, "NM", false, null, null,
             containerId, page: 1, slot: 3);
         // New card added to the same slot must displace the occupant back to the Unplaced pool.
-        service.AddMissingCardToSlot(MakeMatch("counter-1", "Counterspell"), CardGame.Mtg, "NM", false, null,
+        service.AddMissingCardToSlot(MakeMatch("counter-1", "Counterspell"), CardGame.Mtg, "NM", false, null, null,
             containerId, page: 1, slot: 3);
 
         using var ctx = new OmniCardDbContext(_omniOptions);
