@@ -100,6 +100,33 @@
             }
             else
             {
+                @if (Model.AlwaysAvailableContainers.Any())
+                {
+                    var aaTotal = Model.AlwaysAvailableContainers.Sum(c => c.CardCount);
+                    var aaCount = Model.AlwaysAvailableContainers.Count();
+                    <details class="location-section" data-section="AlwaysAvailable">
+                        <summary>
+                            Always Available <span class="count">&times;@aaCount (@aaTotal cards)</span>
+                        </summary>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="sortable">Name</th>
+                                    <th class="sortable" data-sort-numeric>Cards</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var c in Model.AlwaysAvailableContainers)
+                                {
+                                    <tr>
+                                        <td><a href="/location/@c.Id">@c.Name</a></td>
+                                        <td>@c.CardCount</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </details>
+                }
                 @foreach (var group in Model.ContainersByType)
                 {
                     var sectionKey = group.Key.ToString();

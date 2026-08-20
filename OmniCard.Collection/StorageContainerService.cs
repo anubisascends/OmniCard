@@ -137,6 +137,18 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
         context.SaveChanges();
     }
 
+    public void SetAlwaysAvailable(int containerId, bool alwaysAvailable)
+    {
+        using var context = dbContextFactory.CreateDbContext();
+        var container = context.StorageContainers.Find(containerId)
+            ?? throw new InvalidOperationException($"Container {containerId} not found");
+        // The system Bulk location is always available intrinsically; leave its stored flag alone.
+        if (container.IsSystem)
+            return;
+        container.AlwaysAvailable = alwaysAvailable;
+        context.SaveChanges();
+    }
+
     public BinderLayout GetBinderLayout(int containerId)
     {
         using var context = dbContextFactory.CreateDbContext();

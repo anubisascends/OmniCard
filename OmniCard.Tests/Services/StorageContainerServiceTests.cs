@@ -333,6 +333,51 @@ public class StorageContainerServiceTests : IDisposable
         Assert.Equal(new[] { 3, 4 }, info.Pages);
     }
 
+    [Fact]
+    public void SetAlwaysAvailable_TogglesFlag_AndIsAlwaysAvailableReflectsIt()
+    {
+        using (var ctx = new OmniCardDbContext(_options))
+        {
+            ctx.StorageContainers.Add(new StorageContainer { Name = "Trade Box", ContainerType = ContainerType.Box });
+            ctx.SaveChanges();
+        }
+        var id = new OmniCardDbContext(_options).StorageContainers.Single(c => c.Name == "Trade Box").Id;
+        var service = CreateService();
+
+        service.SetAlwaysAvailable(id, true);
+
+        var updated = new OmniCardDbContext(_options).StorageContainers.Single(c => c.Id == id);
+        Assert.True(updated.AlwaysAvailable);
+        Assert.True(updated.IsAlwaysAvailable);
+
+        service.SetAlwaysAvailable(id, false);
+        var reverted = new OmniCardDbContext(_options).StorageContainers.Single(c => c.Id == id);
+        Assert.False(reverted.AlwaysAvailable);
+        Assert.False(reverted.IsAlwaysAvailable);
+    }
+
+    [Fact]
+    public void SetAlwaysAvailable_SystemBulk_IsNoOp_ButStillAlwaysAvailable()
+    {
+        using (var ctx = new OmniCardDbContext(_options))
+        {
+            ctx.StorageContainers.Add(new StorageContainer
+            {
+                Name = "Bulk", ContainerType = ContainerType.Bulk, IsSystem = true, SortOrder = 0,
+            });
+            ctx.SaveChanges();
+        }
+        var bulkId = new OmniCardDbContext(_options).StorageContainers.Single(c => c.IsSystem).Id;
+        var service = CreateService();
+
+        // Attempting to turn always-available off on the system location does nothing.
+        service.SetAlwaysAvailable(bulkId, false);
+
+        var bulk = new OmniCardDbContext(_options).StorageContainers.Single(c => c.Id == bulkId);
+        Assert.False(bulk.AlwaysAvailable);   // stored flag untouched
+        Assert.True(bulk.IsAlwaysAvailable);  // but always available intrinsically
+    }
+
     private class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
         public OmniCardDbContext CreateDbContext() => new(options);

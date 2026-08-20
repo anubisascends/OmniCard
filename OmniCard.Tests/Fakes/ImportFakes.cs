@@ -149,6 +149,7 @@ public sealed class RecordingContainerService : IStorageContainerService
     public void SetCoverCard(int containerId, int? cardId) => throw new NotImplementedException();
     public List<CollectionCard> GetCardsInContainer(int containerId) => throw new NotImplementedException();
     public void SetExcludeFromDeckCheck(int containerId, bool exclude) => throw new NotImplementedException();
+    public void SetAlwaysAvailable(int containerId, bool alwaysAvailable) => throw new NotImplementedException();
     public BinderLayout GetBinderLayout(int containerId) => throw new NotImplementedException();
     public void AddBinderSheet(int containerId, bool doubleSided) => throw new NotImplementedException();
     public BinderSheetInfo GetSheetForPage(int containerId, int page) => throw new NotImplementedException();

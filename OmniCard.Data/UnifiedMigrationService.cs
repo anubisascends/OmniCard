@@ -161,6 +161,7 @@ public static class UnifiedMigrationService
                 SortOrder INTEGER NOT NULL DEFAULT 0,
                 CoverCardId INTEGER,
                 ExcludeFromDeckCheck INTEGER NOT NULL DEFAULT 0,
+                AlwaysAvailable INTEGER NOT NULL DEFAULT 0,
                 SlotsPerPage INTEGER NOT NULL DEFAULT 9,
                 TotalPages INTEGER NOT NULL DEFAULT 1,
                 Columns INTEGER NOT NULL DEFAULT 3
@@ -179,6 +180,8 @@ public static class UnifiedMigrationService
             // Per-sheet side list (binder page front/back model). Null on existing binders;
             // BinderSheetLayout.Parse backfills those from TotalPages on first read.
             AddColumnIfMissing(cmd, "StorageContainers", "SheetSides", "TEXT");
+            // "Always Available" locations: always grouped with Bulk and never hidden by game filter.
+            AddColumnIfMissing(cmd, "StorageContainers", "AlwaysAvailable", "INTEGER NOT NULL DEFAULT 0");
         }
 
         // If EbayListings already exists from before the Task-5 rename, get its FK column

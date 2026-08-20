@@ -74,6 +74,15 @@ public partial class LocationOverviewView : UserControl
         rootView.ViewModel.Collection.ToggleDeckCheckExclusion(summary.Container.Id);
     }
 
+    private void ToggleAlwaysAvailable_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem) return;
+        if (menuItem.DataContext is not LocationTileSummary summary) return;
+
+        var rootView = (RootView)Window.GetWindow(this)!;
+        rootView.ViewModel.Collection.ToggleAlwaysAvailable(summary.Container.Id);
+    }
+
     private void DeleteLocation_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem menuItem) return;
