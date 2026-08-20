@@ -164,7 +164,7 @@
                             <ItemsControl Grid.Row="1" ItemsSource="{Binding Lots}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Grid Margin="0,2">
+                                        <Grid Margin="0,2" Background="Transparent">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="70"/>
                                                 <ColumnDefinition Width="90"/>
@@ -175,14 +175,58 @@
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
 
+                                            <!-- Right-click a lot to list it for sale, matching the collection view. -->
+                                            <Grid.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Edit..."
+                                                              Command="{Binding PlacementTarget.DataContext.EditLotCommand, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"
+                                                              CommandParameter="{Binding}"/>
+                                                    <MenuItem Header="Move..."
+                                                              Command="{Binding PlacementTarget.DataContext.MoveLotCommand, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"
+                                                              CommandParameter="{Binding}"/>
+                                                    <MenuItem Header="Open Units..."
+                                                              Command="{Binding PlacementTarget.DataContext.OpenUnitsForLotCommand, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"
+                                                              CommandParameter="{Binding}"/>
+                                                    <Separator/>
+                                                    <MenuItem Header="List for Sale..."
+                                                              Command="{Binding PlacementTarget.DataContext.ListLotForSaleCommand, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"
+                                                              CommandParameter="{Binding}"/>
+                                                    <MenuItem Header="List on eBay"
+                                                              Command="{Binding PlacementTarget.DataContext.ListLotOnEbayCommand, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"
+                                                              CommandParameter="{Binding}"/>
+                                                    <Separator/>
+                                                    <MenuItem Header="Delete"
+                                                              Command="{Binding PlacementTarget.DataContext.DeleteLotCommand, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"
+                                                              CommandParameter="{Binding}"/>
+                                                </ContextMenu>
+                                            </Grid.ContextMenu>
+
                                             <TextBlock Text="{Binding Quantity}" VerticalAlignment="Center"
                                                        Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                                             <TextBlock Grid.Column="1" Text="{Binding UnitCost, StringFormat='${0:F2}', TargetNullValue='—'}" VerticalAlignment="Center"
                                                        Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                                             <TextBlock Grid.Column="2" Text="{Binding TotalCost, StringFormat='${0:F2}'}" VerticalAlignment="Center"
                                                        Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                                            <TextBlock Grid.Column="3" Text="{Binding LocationDisplay}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                                                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                                            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <!-- On-market state pill, mirroring the card tile badge: "LISTED"/"PICKED",
+                                                     or a distinct blue "eBAY" for eBay listings. Hidden when not for sale. -->
+                                                <Border CornerRadius="3" Padding="5,1" Margin="0,0,6,0" VerticalAlignment="Center"
+                                                        Visibility="{Binding ListingStatus, Converter={conv:NullToCollapsedConverter}}">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="{DynamicResource MaterialDesign.Brush.Primary}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding ListingBadge}" Value="eBAY">
+                                                                    <Setter Property="Background" Value="#1E88E5"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock Text="{Binding ListingBadge}" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                </Border>
+                                                <TextBlock Text="{Binding LocationDisplay}" TextTrimming="CharacterEllipsis"
+                                                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                                            </StackPanel>
                                             <TextBlock Grid.Column="4" Text="{Binding Source}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                        Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                                             <TextBlock Grid.Column="5" Text="{Binding AcquisitionDate, StringFormat='{}{0:yyyy-MM-dd}'}" VerticalAlignment="Center"
@@ -201,6 +245,16 @@
                                                 <Button Content="Open Units" Padding="8,2" Margin="0,0,4,0"
                                                         Style="{StaticResource MaterialDesignFlatButton}"
                                                         Command="{Binding DataContext.OpenUnitsForLotCommand, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                                        CommandParameter="{Binding}"/>
+                                                <Button Content="List..." Padding="8,2" Margin="0,0,4,0"
+                                                        Style="{StaticResource MaterialDesignFlatButton}"
+                                                        ToolTip="List this lot for sale (Manual / TCGPlayer)"
+                                                        Command="{Binding DataContext.ListLotForSaleCommand, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                                        CommandParameter="{Binding}"/>
+                                                <Button Content="eBay" Padding="8,2" Margin="0,0,4,0"
+                                                        Style="{StaticResource MaterialDesignFlatButton}"
+                                                        ToolTip="List this lot on eBay"
+                                                        Command="{Binding DataContext.ListLotOnEbayCommand, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
                                                         CommandParameter="{Binding}"/>
                                                 <Button Content="Delete" Padding="8,2"
                                                         Style="{StaticResource MaterialDesignFlatButton}"

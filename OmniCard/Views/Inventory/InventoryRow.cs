@@ -53,4 +53,23 @@ public sealed record LotRow(InventoryLot Lot, string? LocationName)
     public DateTime AcquisitionDate => Lot.AcquisitionDate;
     public string? Condition => Lot.Condition;
     public string LocationDisplay => LocationName ?? "—";
+
+    /// <summary>Active on-market status of this lot (Listed/Picked), or null when not for sale.
+    /// Populated in <see cref="InventoryViewModel.LoadInventory"/> from <see cref="IListingService"/>.
+    /// Drives the lot's state pill, mirroring the card tile's LISTED/PICKED/eBAY badge.</summary>
+    public ListingStatus? ListingStatus { get; init; }
+
+    /// <summary>The channel the active listing is on (null when not listed). Used to show the
+    /// distinct "eBAY" pill for eBay listings.</summary>
+    public SalesChannel? ListingChannel { get; init; }
+
+    /// <summary>Pill text: "eBAY" for an eBay listing, else "PICKED"/"LISTED"; "" when not listed.</summary>
+    public string ListingBadge => ListingChannel == SalesChannel.Ebay
+        ? "eBAY"
+        : ListingStatus switch
+        {
+            Models.ListingStatus.Picked => "PICKED",
+            Models.ListingStatus.Listed => "LISTED",
+            _ => "",
+        };
 }

@@ -8,6 +8,7 @@ namespace OmniCard.Tests.Services;
 public class FakeEbayListingService : IEbayListingService
 {
     public Task<bool> CreateListingAsync(CollectionCard card, EbayListingOptions options) => Task.FromResult(true);
+    public Task<bool> CreateSealedListingAsync(Product product, int lotId, EbayListingOptions options) => Task.FromResult(true);
     public Task<bool> ReviseListingAsync(EbayListing listing, EbayListingOptions options) => Task.FromResult(true);
     public virtual Task<bool> EndListingAsync(EbayListing listing) => Task.FromResult(true);
     public Task<List<EbaySellerPolicy>> GetSellerPoliciesAsync(string policyType) => Task.FromResult(new List<EbaySellerPolicy>());
