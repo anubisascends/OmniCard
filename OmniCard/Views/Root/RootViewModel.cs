@@ -632,6 +632,7 @@ public sealed partial class RootViewModel(
         OnPropertyChanged(nameof(IsScannerEnabled));
         Collection.SetGame(value);
         Lists.SetGame(value);
+        Inventory.SetGame(value);
         InvalidateHomeTab();
 
         // Keep the ComboBox selection in sync when SelectedGame changes programmatically
@@ -1406,7 +1407,8 @@ public sealed partial class RootViewModel(
 
         // Wire Inventory delegates
         Inventory.ReportMessage = msg => Message = msg;
-        Inventory.LoadInventory();
+        // Mirror the active game selector into the Inventory list (also performs the initial load).
+        Inventory.SetGame(SelectedGame);
 
         // Keep HasMatchedScans in sync with the ScannedCards collection
         if (_scannedCardsHandler is not null)

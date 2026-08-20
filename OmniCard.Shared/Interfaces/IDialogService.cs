@@ -45,7 +45,16 @@ public interface IDialogService
     void ShowDecklistCheck();
     Product? EditProduct(Product? existing);
     (int Quantity, decimal? UnitCost, int? LocationId, string? Source, DateTime AcquisitionDate)? AddLotDialog(int productId);
+
+    /// <summary>Opens the lot editor prefilled from <paramref name="lot"/>. Returns the edited
+    /// quantity/cost/location/source/date, or null if cancelled. The caller applies these to the
+    /// existing lot, preserving every other field.</summary>
+    (int Quantity, decimal? UnitCost, int? LocationId, string? Source, DateTime AcquisitionDate)? EditLotDialog(InventoryLot lot);
+
     bool OpenUnitsDialog(Product product);
+
+    /// <summary>Opens the Open-Units dialog with <paramref name="preselectLotId"/> preselected.</summary>
+    bool OpenUnitsDialog(Product product, int? preselectLotId);
     void OpenMovementHistory();
     void OpenLogViewer();
     ListForSaleResult? PickListForSale(decimal suggestedPrice);

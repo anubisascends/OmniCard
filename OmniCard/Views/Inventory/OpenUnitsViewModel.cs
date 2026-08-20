@@ -34,13 +34,18 @@ public sealed partial class OpenUnitsViewModel(IInventoryService inventoryServic
 
     public bool WasOpened { get; private set; }
 
-    public void Load(Product product)
+    public void Load(Product product) => Load(product, null);
+
+    /// <summary>Loads the product's lots and, when <paramref name="preselectLotId"/> is given,
+    /// preselects that lot (used when the user chose "Open Units" on a specific lot row).</summary>
+    public void Load(Product product, int? preselectLotId)
     {
         ProductName = product.Name;
         Lots.Clear();
         foreach (var lot in inventoryService.GetLots(product.Id))
             Lots.Add(lot);
-        SelectedLot = Lots.FirstOrDefault();
+        SelectedLot = (preselectLotId is int id ? Lots.FirstOrDefault(l => l.Id == id) : null)
+            ?? Lots.FirstOrDefault();
         Quantity = 1;
         Note = null;
         ValidationMessage = null;

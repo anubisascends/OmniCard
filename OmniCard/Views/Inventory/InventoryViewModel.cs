@@ -13,17 +13,20 @@ public sealed partial class InventoryViewModel : ViewModel
     private readonly IDialogService _dialogService;
     private readonly ISealedPriceUpdateService _sealedPriceUpdateService;
     private readonly IUpcLookupService _upcLookupService;
+    private readonly IStorageContainerService _containerService;
 
     public InventoryViewModel(
         IInventoryService inventoryService,
         IDialogService dialogService,
         ISealedPriceUpdateService sealedPriceUpdateService,
-        IUpcLookupService upcLookupService)
+        IUpcLookupService upcLookupService,
+        IStorageContainerService containerService)
     {
         _inventoryService = inventoryService;
         _dialogService = dialogService;
         _sealedPriceUpdateService = sealedPriceUpdateService;
         _upcLookupService = upcLookupService;
+        _containerService = containerService;
     }
 
     [ObservableProperty]
@@ -35,6 +38,12 @@ public sealed partial class InventoryViewModel : ViewModel
     public partial InventoryRow? SelectedRow { get; set; }
 
     public bool HasSelection => SelectedRow is not null;
+
+    /// <summary>Mirrors the global game selector so the Inventory list shows only the active game's
+    /// products (null = All Games). Set via <see cref="SetGame"/> from the root view model, and also
+    /// used to seed the game of newly added/scanned products.</summary>
+    [ObservableProperty]
+    public partial CardGame? GameFilter { get; set; }
 
     partial void OnSelectedRowChanged(InventoryRow? value)
     {
@@ -78,17 +87,30 @@ public sealed partial class InventoryViewModel : ViewModel
             LoadInventory();
     }
 
+    /// <summary>Applies the active game filter and reloads. Called by RootViewModel when the global
+    /// game selector changes.</summary>
+    public void SetGame(CardGame? game)
+    {
+        GameFilter = game;
+        LoadInventory();
+    }
+
     public void LoadInventory()
     {
+        var previousProductId = SelectedRow?.Product.Id;
         Rows.Clear();
 
         var totalUnits = 0;
         var totalCost = 0m;
         var totalMarket = 0m;
 
+        // Resolve storage-location names once for the lot sub-rows.
+        var locationNames = _containerService.GetAll().ToDictionary(c => c.Id, c => c.Name);
+
         // The Inventory tab is scoped to sealed product (singles live in the Collection tab,
         // which prices them via the live per-card game service rather than Product.MarketPrice).
-        foreach (var product in _inventoryService.GetProducts().Where(p => p.Category != ProductCategory.Single))
+        // GameFilter (mirroring the global game selector) narrows the list to one game; null = all.
+        foreach (var product in _inventoryService.GetProducts(GameFilter).Where(p => p.Category != ProductCategory.Single))
         {
             var lots = _inventoryService.GetLots(product.Id);
             var qty = lots.Sum(l => l.Quantity);
@@ -96,7 +118,12 @@ public sealed partial class InventoryViewModel : ViewModel
             // Sealed products (Task 1, Phase 3) are priced via the persisted eBay-derived
             // LastMarketPrice.
             var market = qty * (product.LastMarketPrice ?? 0m);
-            Rows.Add(new InventoryRow(product, qty, cost, market));
+
+            var lotRows = lots.Select(l => new LotRow(
+                l,
+                l.LocationId is int locId && locationNames.TryGetValue(locId, out var name) ? name : null));
+
+            Rows.Add(new InventoryRow(product, qty, cost, market, lotRows));
 
             totalUnits += qty;
             totalCost += cost;
@@ -108,8 +135,8 @@ public sealed partial class InventoryViewModel : ViewModel
         TotalMarket = totalMarket;
 
         // Keep the selected row's identity across a reload, if it still exists.
-        if (SelectedRow is not null)
-            SelectedRow = Rows.FirstOrDefault(r => r.Product.Id == SelectedRow.Product.Id);
+        if (previousProductId is int id)
+            SelectedRow = Rows.FirstOrDefault(r => r.Product.Id == id);
     }
 
     [RelayCommand]
@@ -146,7 +173,8 @@ public sealed partial class InventoryViewModel : ViewModel
     ///  - Known UPC → jump straight to the "what did you pay?" add-lot dialog for that product.
     ///  - Unknown UPC → silently look the barcode up online, prefill a new sealed product from
     ///    whatever was found, let the user confirm/complete it, then add its first lot.
-    /// The game filter is irrelevant here — lookup is purely by UPC across all games.
+    /// The game filter is irrelevant to the lookup (that's purely by UPC across all games), but a
+    /// non-"All Games" filter seeds the new product's game so it lands in the right game.
     /// </summary>
     [RelayCommand]
     public async Task ScanUpcAsync()
@@ -188,6 +216,7 @@ public sealed partial class InventoryViewModel : ViewModel
 
         var prefilled = new Product
         {
+            Game = GameFilter ?? CardGame.Mtg,
             Category = ProductCategory.Box,
             Name = info?.Title ?? "",
             Upc = upc,
@@ -224,7 +253,11 @@ public sealed partial class InventoryViewModel : ViewModel
     [RelayCommand]
     public void AddProduct()
     {
-        var product = _dialogService.EditProduct(null);
+        // Seed the new product's game from the active filter (still editable in the dialog); when
+        // "All Games" is selected there's nothing to seed, so the editor uses its own default.
+        var seed = GameFilter is CardGame g ? new Product { Game = g, Category = ProductCategory.Box } : null;
+
+        var product = _dialogService.EditProduct(seed);
         if (product is null) return;
 
         _inventoryService.CreateProduct(product);
@@ -282,4 +315,83 @@ public sealed partial class InventoryViewModel : ViewModel
         ReportMessage?.Invoke($"Deleted '{product.Name}'.");
         LoadInventory();
     }
+
+    // ----- Per-lot actions (invoked from the expandable lot rows) -----
+
+    /// <summary>Edit a single lot's quantity/cost/location/source/date. Every other field on the
+    /// lot is preserved.</summary>
+    [RelayCommand]
+    public void EditLot(LotRow? row)
+    {
+        if (row is null) return;
+
+        var input = _dialogService.EditLotDialog(row.Lot);
+        if (input is null) return;
+
+        var (quantity, unitCost, locationId, source, date) = input.Value;
+        var lot = row.Lot;
+        lot.Quantity = quantity;
+        lot.UnitCost = unitCost;
+        lot.LocationId = locationId;
+        lot.Source = source;
+        lot.AcquisitionDate = date;
+
+        _inventoryService.UpdateLot(lot);
+        ReportMessage?.Invoke($"Updated lot for '{lot.Product?.Name ?? ProductNameFor(lot.ProductId)}'.");
+        LoadInventory();
+    }
+
+    [RelayCommand]
+    public void DeleteLot(LotRow? row)
+    {
+        if (row is null) return;
+
+        var confirm = MessageBox.Show(
+            $"Delete this lot ({row.Quantity} unit(s))? This cannot be undone.",
+            "Confirm Delete",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (confirm != MessageBoxResult.Yes) return;
+
+        _inventoryService.DeleteLot(row.LotId);
+        ReportMessage?.Invoke("Deleted lot.");
+        LoadInventory();
+    }
+
+    /// <summary>Quick "change storage location" for a single lot, reusing the shared location picker.</summary>
+    [RelayCommand]
+    public void MoveLot(LotRow? row)
+    {
+        if (row is null) return;
+
+        var result = _dialogService.PickMoveToLocation();
+        if (result is null) return;
+
+        var lot = row.Lot;
+        lot.LocationId = result.Container.Id;
+        _inventoryService.UpdateLot(lot);
+        ReportMessage?.Invoke($"Moved lot to '{result.Container.Name}'.");
+        LoadInventory();
+    }
+
+    /// <summary>Open sealed units from a specific lot (vs. the product-level Open Units command,
+    /// which lets the user pick the lot).</summary>
+    [RelayCommand]
+    public void OpenUnitsForLot(LotRow? row)
+    {
+        if (row is null) return;
+
+        var product = _inventoryService.GetProducts().FirstOrDefault(p => p.Id == row.Lot.ProductId);
+        if (product is null) return;
+
+        if (_dialogService.OpenUnitsDialog(product, row.LotId))
+        {
+            ReportMessage?.Invoke($"Opened units of '{product.Name}'.");
+            LoadInventory();
+        }
+    }
+
+    private string ProductNameFor(int productId) =>
+        _inventoryService.GetProducts().FirstOrDefault(p => p.Id == productId)?.Name ?? "product";
 }

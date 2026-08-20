@@ -1,6 +1,8 @@
 <UserControl x:Class="OmniCard.Views.Inventory.InventoryListView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:local="clr-namespace:OmniCard.Views.Inventory">
 
     <Grid>
@@ -65,7 +67,8 @@
             </StackPanel>
         </Border>
 
-        <!-- Product / lot summary grid -->
+        <!-- Product / lot summary grid. Each product row expands (chevron) to reveal its lots
+             underneath as a tree-like sub-list with per-lot Edit / Move / Open / Delete actions. -->
         <DataGrid Grid.Row="2"
                   x:Name="InventoryGrid"
                   ItemsSource="{Binding Rows}"
@@ -75,9 +78,47 @@
                   SelectionMode="Single"
                   EnableRowVirtualization="True"
                   VirtualizingPanel.IsVirtualizing="True"
-                  VirtualizingPanel.VirtualizationMode="Recycling">
+                  VirtualizingPanel.VirtualizationMode="Recycling"
+                  RowDetailsVisibilityMode="Collapsed"
+                  LoadingRow="InventoryGrid_LoadingRow">
 
             <DataGrid.Columns>
+                <!-- Expander chevron. A plain Button + code-behind toggle is used (not a bound
+                     ToggleButton) because a DataGrid cell swallows the first click for row
+                     selection, which makes ToggleButton two-way binding unreliable. -->
+                <DataGridTemplateColumn Width="48" CanUserResize="False" CanUserReorder="False" CanUserSort="False">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Click="ToggleLotDetails_Click"
+                                    Background="Transparent" BorderThickness="0"
+                                    Cursor="Hand" Padding="0"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    ToolTip="Show/hide lots">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="Transparent">
+                                            <materialDesign:PackIcon Width="18" Height="18"
+                                                                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                                                                     HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <materialDesign:PackIcon.Style>
+                                                    <Style TargetType="materialDesign:PackIcon">
+                                                        <Setter Property="Kind" Value="ChevronRight"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsExpanded}" Value="True">
+                                                                <Setter Property="Kind" Value="ChevronDown"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </materialDesign:PackIcon.Style>
+                                            </materialDesign:PackIcon>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
                 <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
                 <DataGridTextColumn Header="Game" Binding="{Binding Game}" Width="90"/>
                 <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="90"/>
@@ -87,6 +128,93 @@
                 <DataGridTextColumn Header="Total Cost" Binding="{Binding TotalCost, StringFormat={}{0:F2}}" Width="90"/>
                 <DataGridTextColumn Header="Market Value" Binding="{Binding TotalMarket, StringFormat={}{0:F2}}" Width="100"/>
             </DataGrid.Columns>
+
+            <!-- Lot sub-list ("tree" children). Always-present host (RowDetailsVisibilityMode=Visible)
+                 whose content is collapsed unless the row is expanded, so it adds no height when closed. -->
+            <DataGrid.RowDetailsTemplate>
+                <DataTemplate>
+                    <Border Margin="48,2,8,8" Padding="8,6"
+                            Background="{DynamicResource MaterialDesign.Brush.Card.Background}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Lot column headers -->
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="70"/>
+                                    <ColumnDefinition Width="90"/>
+                                    <ColumnDefinition Width="90"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Qty" FontWeight="SemiBold" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                                <TextBlock Grid.Column="1" Text="Unit Cost" FontWeight="SemiBold" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                                <TextBlock Grid.Column="2" Text="Total" FontWeight="SemiBold" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                                <TextBlock Grid.Column="3" Text="Location" FontWeight="SemiBold" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                                <TextBlock Grid.Column="4" Text="Source" FontWeight="SemiBold" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                                <TextBlock Grid.Column="5" Text="Acquired" FontWeight="SemiBold" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                                <TextBlock Grid.Column="6" Text="Actions" FontWeight="SemiBold" Margin="8,0,0,0" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                            </Grid>
+
+                            <ItemsControl Grid.Row="1" ItemsSource="{Binding Lots}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="70"/>
+                                                <ColumnDefinition Width="90"/>
+                                                <ColumnDefinition Width="90"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="120"/>
+                                                <ColumnDefinition Width="100"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock Text="{Binding Quantity}" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding UnitCost, StringFormat='${0:F2}', TargetNullValue='—'}" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding TotalCost, StringFormat='${0:F2}'}" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                                            <TextBlock Grid.Column="3" Text="{Binding LocationDisplay}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                                            <TextBlock Grid.Column="4" Text="{Binding Source}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                                            <TextBlock Grid.Column="5" Text="{Binding AcquisitionDate, StringFormat='{}{0:yyyy-MM-dd}'}" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+
+                                            <StackPanel Grid.Column="6" Orientation="Horizontal" Margin="8,0,0,0">
+                                                <Button Content="Edit" Padding="8,2" Margin="0,0,4,0"
+                                                        Style="{StaticResource MaterialDesignFlatButton}"
+                                                        Command="{Binding DataContext.EditLotCommand, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                                        CommandParameter="{Binding}"/>
+                                                <Button Content="Move" Padding="8,2" Margin="0,0,4,0"
+                                                        Style="{StaticResource MaterialDesignFlatButton}"
+                                                        ToolTip="Change this lot's storage location"
+                                                        Command="{Binding DataContext.MoveLotCommand, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                                        CommandParameter="{Binding}"/>
+                                                <Button Content="Open Units" Padding="8,2" Margin="0,0,4,0"
+                                                        Style="{StaticResource MaterialDesignFlatButton}"
+                                                        Command="{Binding DataContext.OpenUnitsForLotCommand, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                                        CommandParameter="{Binding}"/>
+                                                <Button Content="Delete" Padding="8,2"
+                                                        Style="{StaticResource MaterialDesignFlatButton}"
+                                                        Command="{Binding DataContext.DeleteLotCommand, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                                        CommandParameter="{Binding}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </DataGrid.RowDetailsTemplate>
 
             <DataGrid.ContextMenu>
                 <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">

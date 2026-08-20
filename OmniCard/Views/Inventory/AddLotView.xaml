@@ -6,7 +6,7 @@
         xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
-        Title="Add Lot" Height="380" Width="420"
+        Title="{Binding ViewModel.Title}" Height="380" Width="420"
         Background="{DynamicResource MaterialDesign.Brush.Background}"
         TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
         TextElement.FontWeight="Regular"
@@ -72,7 +72,7 @@
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button Content="Cancel" Command="{Binding ViewModel.CancelCommand}"
                     IsCancel="True" Padding="16,6" Margin="0,0,8,0"/>
-            <Button Content="Add" Command="{Binding ViewModel.ConfirmCommand}"
+            <Button Content="{Binding ViewModel.ConfirmButtonText}" Command="{Binding ViewModel.ConfirmCommand}"
                     IsDefault="True" Padding="16,6" FontWeight="SemiBold"/>
         </StackPanel>
     </Grid>
