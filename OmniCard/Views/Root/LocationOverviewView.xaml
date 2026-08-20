@@ -102,6 +102,12 @@
                                   IsCheckable="True"
                                   IsChecked="{Binding Container.ExcludeFromDeckCheck, Mode=OneWay}"
                                   Click="ToggleDeckCheckExclusion_Click"/>
+                        <Separator Visibility="{Binding Container.IsSystem, Converter={conv:InverseBoolToVisibilityConverter}}"/>
+                        <MenuItem Header="Always Available"
+                                  IsCheckable="True"
+                                  IsChecked="{Binding Container.AlwaysAvailable, Mode=OneWay}"
+                                  Click="ToggleAlwaysAvailable_Click"
+                                  Visibility="{Binding Container.IsSystem, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                     </ContextMenu>
                 </Button.ContextMenu>
             </Button>
@@ -120,15 +126,27 @@
                         RelativeSource={RelativeSource AncestorType=Window}}"
                     Style="{StaticResource MaterialDesignFlatButton}"/>
 
-            <!-- Bulk container (same tile style as others) -->
-            <WrapPanel Margin="0,0,0,12"
-                       Visibility="{Binding DataContext.ViewModel.Collection.IsBulkVisible,
-                           RelativeSource={RelativeSource AncestorType=Window},
-                           Converter={conv:BoolToVisibilityConverter}}">
-                <ContentControl Content="{Binding DataContext.ViewModel.Collection.BulkSummary,
-                                    RelativeSource={RelativeSource AncestorType=Window}}"
-                                ContentTemplate="{StaticResource LocationTileTemplate}"/>
-            </WrapPanel>
+            <!-- Always Available group: system Bulk plus any user-marked always-available locations.
+                 Never hidden by the game filter (same tile style as the grouped containers). -->
+            <Expander Header="Always Available"
+                      IsExpanded="True"
+                      Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                      Margin="0,0,0,8"
+                      Visibility="{Binding DataContext.ViewModel.Collection.HasAlwaysAvailable,
+                          RelativeSource={RelativeSource AncestorType=Window},
+                          Converter={conv:BoolToVisibilityConverter}}">
+                <ItemsControl ItemsSource="{Binding DataContext.ViewModel.Collection.VisibleAlwaysAvailable,
+                                    RelativeSource={RelativeSource AncestorType=Window}}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <StaticResource ResourceKey="LocationTileTemplate"/>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Expander>
 
             <!-- Grouped containers by type -->
             <ItemsControl ItemsSource="{Binding DataContext.ViewModel.Collection.GroupedLocations,

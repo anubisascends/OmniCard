@@ -9,6 +9,18 @@ public class StorageContainer
     public int SortOrder { get; set; }
     public int? CoverCardId { get; set; }
     public bool ExcludeFromDeckCheck { get; set; }
+
+    /// <summary>When true, this location is grouped under "Always Available" in the collection
+    /// overview (alongside the system Bulk location) and is never hidden by the active game filter.
+    /// The system Bulk location behaves this way regardless of the stored flag — see
+    /// <see cref="IsAlwaysAvailable"/>.</summary>
+    public bool AlwaysAvailable { get; set; }
+
+    /// <summary>True if this location should always be shown regardless of game filter: either the
+    /// system Bulk location or one the user has explicitly marked <see cref="AlwaysAvailable"/>.
+    /// Not persisted (derived) — ignored by EF in <c>OmniCardDbContext.OnModelCreating</c>.</summary>
+    public bool IsAlwaysAvailable => IsSystem || AlwaysAvailable;
+
     public int SlotsPerPage { get; set; } = 9;
 
     /// <summary>Total logical pages in the binder. A persisted, derived value kept equal to the

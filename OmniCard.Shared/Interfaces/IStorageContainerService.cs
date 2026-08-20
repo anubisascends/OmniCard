@@ -14,6 +14,11 @@ public interface IStorageContainerService
     List<CollectionCard> GetCardsInContainer(int containerId);
     void SetExcludeFromDeckCheck(int containerId, bool exclude);
 
+    /// <summary>Marks a location as "always available": grouped with the system Bulk location in the
+    /// collection overview and never hidden by the active game filter. No-op semantics for the
+    /// system Bulk location, which is always available regardless.</summary>
+    void SetAlwaysAvailable(int containerId, bool alwaysAvailable);
+
     BinderLayout GetBinderLayout(int containerId);
 
     /// <summary>Appends a new physical sheet (leaf) to the end of the binder.

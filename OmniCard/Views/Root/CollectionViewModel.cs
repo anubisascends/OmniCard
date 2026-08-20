@@ -275,7 +275,8 @@ public sealed partial class CollectionViewModel : ViewModel
         TotalCardCount = 0;
         LoadOverview();
         OnPropertyChanged(nameof(GroupedLocations));
-        OnPropertyChanged(nameof(IsBulkVisible));
+        OnPropertyChanged(nameof(VisibleAlwaysAvailable));
+        OnPropertyChanged(nameof(HasAlwaysAvailable));
         OnPropertyChanged(nameof(IsOverviewSearchActive));
         OnPropertyChanged(nameof(HasVisibleLocations));
     }
@@ -294,19 +295,26 @@ public sealed partial class CollectionViewModel : ViewModel
 
     public ObservableCollection<LocationTileSummary> LocationSummaries { get; } = [];
 
-    [ObservableProperty]
-    public partial LocationTileSummary? BulkSummary { get; set; }
+    /// <summary>Locations shown in the "Always Available" group: the system Bulk location plus any
+    /// the user has marked always-available. These are never removed by the game filter — see
+    /// requirement in <see cref="StorageContainer.IsAlwaysAvailable"/>.</summary>
+    public ObservableCollection<LocationTileSummary> AlwaysAvailableSummaries { get; } = [];
 
     private HashSet<int>? _matchingContainerIds;
 
     public bool IsOverviewSearchActive => _matchingContainerIds is not null;
 
-    public bool IsBulkVisible =>
-        BulkSummary is not null &&
-        (_matchingContainerIds is null || _matchingContainerIds.Contains(BulkSummary.Container.Id));
+    /// <summary>The always-available tiles that survive the current overview search (all of them when
+    /// no search is active). The game filter never removes them.</summary>
+    public IEnumerable<LocationTileSummary> VisibleAlwaysAvailable =>
+        _matchingContainerIds is null
+            ? AlwaysAvailableSummaries
+            : AlwaysAvailableSummaries.Where(s => _matchingContainerIds.Contains(s.Container.Id));
+
+    public bool HasAlwaysAvailable => VisibleAlwaysAvailable.Any();
 
     public bool HasVisibleLocations =>
-        IsBulkVisible || GroupedLocations.Any();
+        HasAlwaysAvailable || GroupedLocations.Any();
 
     public IEnumerable<IGrouping<ContainerType, LocationTileSummary>> GroupedLocations
     {
@@ -343,18 +351,22 @@ public sealed partial class CollectionViewModel : ViewModel
             return;
 
         LocationSummaries.Clear();
-        BulkSummary = null;
+        AlwaysAvailableSummaries.Clear();
 
-        foreach (var summary in overviews)
-        {
-            if (summary.Container.IsSystem)
-                BulkSummary = summary;
-            else
-                LocationSummaries.Add(summary);
-        }
+        // Always-available locations first (system Bulk ahead of user-marked ones, then by name),
+        // so the "Always Available" group reads consistently.
+        foreach (var summary in overviews
+                     .Where(s => s.Container.IsAlwaysAvailable)
+                     .OrderByDescending(s => s.Container.IsSystem)
+                     .ThenBy(s => s.Container.Name, StringComparer.OrdinalIgnoreCase))
+            AlwaysAvailableSummaries.Add(summary);
+
+        foreach (var summary in overviews.Where(s => !s.Container.IsAlwaysAvailable))
+            LocationSummaries.Add(summary);
 
         OnPropertyChanged(nameof(GroupedLocations));
-        OnPropertyChanged(nameof(IsBulkVisible));
+        OnPropertyChanged(nameof(VisibleAlwaysAvailable));
+        OnPropertyChanged(nameof(HasAlwaysAvailable));
         OnPropertyChanged(nameof(HasVisibleLocations));
     }
 
@@ -377,6 +389,14 @@ public sealed partial class CollectionViewModel : ViewModel
         var container = _containerService.GetAll().FirstOrDefault(c => c.Id == containerId);
         if (container is null) return;
         _containerService.SetExcludeFromDeckCheck(containerId, !container.ExcludeFromDeckCheck);
+        LoadOverview();
+    }
+
+    public void ToggleAlwaysAvailable(int containerId)
+    {
+        var container = _containerService.GetAll().FirstOrDefault(c => c.Id == containerId);
+        if (container is null || container.IsSystem) return;
+        _containerService.SetAlwaysAvailable(containerId, !container.AlwaysAvailable);
         LoadOverview();
     }
 
@@ -534,7 +554,8 @@ public sealed partial class CollectionViewModel : ViewModel
                     _cardService.GetMatchingContainerIds(overviewQuery, GameFilter));
             }
             OnPropertyChanged(nameof(GroupedLocations));
-            OnPropertyChanged(nameof(IsBulkVisible));
+            OnPropertyChanged(nameof(VisibleAlwaysAvailable));
+            OnPropertyChanged(nameof(HasAlwaysAvailable));
             OnPropertyChanged(nameof(IsOverviewSearchActive));
             OnPropertyChanged(nameof(HasVisibleLocations));
             return;
