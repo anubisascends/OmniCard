@@ -21,6 +21,7 @@ public class SalesSettingsViewModelTests
         public void SetCoverCard(int containerId, int? cardId) { }
         public List<CollectionCard> GetCardsInContainer(int containerId) => [];
         public void SetExcludeFromDeckCheck(int containerId, bool exclude) { }
+        public void SetAlwaysAvailable(int containerId, bool alwaysAvailable) { }
         public BinderLayout GetBinderLayout(int containerId) => throw new System.NotImplementedException();
         public void AddBinderSheet(int containerId, bool doubleSided) { }
         public BinderSheetInfo GetSheetForPage(int containerId, int page) => throw new System.NotImplementedException();

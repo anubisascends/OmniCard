@@ -4,12 +4,13 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:OmniCard.Views.StorageManager"
+        xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
         xmlns:models="clr-namespace:OmniCard.Models;assembly=OmniCard.Shared"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance {x:Type local:StorageManagerView}}"
-        Title="Manage Storage Locations" Height="600" Width="500"
-        MinHeight="400" MinWidth="400"
+        Title="Manage Storage Locations" Height="600" Width="640"
+        MinHeight="400" MinWidth="560"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner" ResizeMode="CanResizeWithGrip"
         Background="{DynamicResource MaterialDesign.Brush.Background}"
@@ -66,9 +67,10 @@
                 <DataTemplate>
                     <Grid Margin="4,2">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="180"/>
-                            <ColumnDefinition Width="100"/>
-                            <ColumnDefinition Width="60"/>
+                            <ColumnDefinition Width="160"/>
+                            <ColumnDefinition Width="90"/>
+                            <ColumnDefinition Width="50"/>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
@@ -89,6 +91,15 @@
                                   Margin="8,0,0,0" VerticalAlignment="Center"
                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                   Content="Exclude"/>
+                        <CheckBox Grid.Column="5"
+                                  ToolTip="Always show this location (grouped with Bulk) and never hide it with the game filter"
+                                  IsChecked="{Binding IsAlwaysAvailable, Mode=OneWay}"
+                                  IsEnabled="{Binding IsSystem, Converter={conv:InverseBoolConverter}}"
+                                  Command="{Binding DataContext.ViewModel.ToggleAlwaysAvailableCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                  CommandParameter="{Binding}"
+                                  Margin="8,0,0,0" VerticalAlignment="Center"
+                                  Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                                  Content="Always Available"/>
                     </Grid>
                 </DataTemplate>
             </ListBox.ItemTemplate>

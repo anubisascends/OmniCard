@@ -34,8 +34,16 @@ public class IndexModel : PageModel
     public List<CardSearchResult> SearchResults { get; set; } = [];
     public bool IsSearchActive => !string.IsNullOrWhiteSpace(Q);
 
+    /// <summary>The system Bulk location plus any user-marked always-available locations, shown in a
+    /// single "Always Available" section ahead of the type groups. Never hidden by the game filter.</summary>
+    public IEnumerable<ContainerSummary> AlwaysAvailableContainers =>
+        Containers.Where(c => c.IsAlwaysAvailable)
+            .OrderByDescending(c => c.IsSystem)
+            .ThenBy(c => c.Name, StringComparer.OrdinalIgnoreCase);
+
     public IEnumerable<IGrouping<ContainerType, ContainerSummary>> ContainersByType =>
-        Containers.GroupBy(c => c.ContainerType)
+        Containers.Where(c => !c.IsAlwaysAvailable)
+            .GroupBy(c => c.ContainerType)
             .OrderBy(g => g.Key);
 
     public void OnGet()
@@ -92,11 +100,15 @@ public class IndexModel : PageModel
                 Name = c.Name,
                 ContainerType = c.ContainerType,
                 CardCount = countsByContainer.GetValueOrDefault(c.Id),
+                IsSystem = c.IsSystem,
+                AlwaysAvailable = c.AlwaysAvailable,
             })
             .ToList();
 
+        // The game filter drops locations with no cards of that game — but always-available
+        // locations (Bulk + user-marked) are kept regardless.
         Containers = gameFilter.HasValue
-            ? containers.Where(c => c.CardCount > 0).ToList()
+            ? containers.Where(c => c.CardCount > 0 || c.IsAlwaysAvailable).ToList()
             : containers;
     }
 
@@ -222,6 +234,10 @@ public class IndexModel : PageModel
         public string Name { get; init; } = "";
         public ContainerType ContainerType { get; init; }
         public int CardCount { get; init; }
+        public bool IsSystem { get; init; }
+        public bool AlwaysAvailable { get; init; }
+
+        public bool IsAlwaysAvailable => IsSystem || AlwaysAvailable;
 
         public string TypeDisplay => ContainerType switch
         {

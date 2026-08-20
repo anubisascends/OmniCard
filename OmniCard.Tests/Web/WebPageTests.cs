@@ -342,6 +342,63 @@ public class WebPageTests : IDisposable
         Assert.Equal("Matching", model.Containers[0].Name);
     }
 
+    [Fact]
+    public void IndexModel_OnGet_GameFilter_KeepsAlwaysAvailableLocations_EvenWithNoMatchingCards()
+    {
+        using (var ctx = _factory.CreateDbContext())
+        {
+            // System Bulk and a user-marked always-available box, both holding only MTG cards.
+            var bulk = new StorageContainer { Name = "Bulk", ContainerType = ContainerType.Bulk, IsSystem = true, SortOrder = 0 };
+            var trade = new StorageContainer { Name = "Trade Box", ContainerType = ContainerType.Box, AlwaysAvailable = true, SortOrder = 1 };
+            var plain = new StorageContainer { Name = "Plain Box", ContainerType = ContainerType.Box, SortOrder = 2 };
+            ctx.StorageContainers.AddRange(bulk, trade, plain);
+            ctx.SaveChanges();
+
+            var mtg = NewSingle("m1", "Bolt", "Set", "SET", "1", "common");
+            ctx.Products.Add(mtg);
+            ctx.SaveChanges();
+            ctx.Lots.AddRange(
+                new InventoryLot { ProductId = mtg.Id, LocationId = bulk.Id },
+                new InventoryLot { ProductId = mtg.Id, LocationId = trade.Id },
+                new InventoryLot { ProductId = mtg.Id, LocationId = plain.Id });
+            ctx.SaveChanges();
+        }
+
+        // Filter to a game none of the cards belong to.
+        var model = new IndexModel(_factory, NoGameServices, _dataPaths) { PageContext = CreatePageContext(), Game = "pokemon" };
+        model.OnGet();
+
+        // Plain box is dropped (no Pokémon cards); the two always-available ones survive.
+        var names = model.Containers.Select(c => c.Name).OrderBy(n => n).ToList();
+        Assert.Equal(new[] { "Bulk", "Trade Box" }, names);
+
+        // Both land in the "Always Available" group, none in the type groups.
+        Assert.Equal(new[] { "Bulk", "Trade Box" },
+            model.AlwaysAvailableContainers.Select(c => c.Name).ToList());
+        Assert.Empty(model.ContainersByType);
+    }
+
+    [Fact]
+    public void IndexModel_OnGet_NoFilter_AlwaysAvailableSplitFromTypeGroups()
+    {
+        using (var ctx = _factory.CreateDbContext())
+        {
+            ctx.StorageContainers.AddRange(
+                new StorageContainer { Name = "Bulk", ContainerType = ContainerType.Bulk, IsSystem = true, SortOrder = 0 },
+                new StorageContainer { Name = "Trade Box", ContainerType = ContainerType.Box, AlwaysAvailable = true, SortOrder = 1 },
+                new StorageContainer { Name = "Plain Box", ContainerType = ContainerType.Box, SortOrder = 2 });
+            ctx.SaveChanges();
+        }
+
+        var model = new IndexModel(_factory, NoGameServices, _dataPaths) { PageContext = CreatePageContext() };
+        model.OnGet();
+
+        Assert.Equal(new[] { "Bulk", "Trade Box" },
+            model.AlwaysAvailableContainers.Select(c => c.Name).ToList());
+        var grouped = model.ContainersByType.SelectMany(g => g).Select(c => c.Name).ToList();
+        Assert.Equal(new[] { "Plain Box" }, grouped);
+    }
+
     // --- CardModel ExtendedData rendering ---
 
     [Fact]

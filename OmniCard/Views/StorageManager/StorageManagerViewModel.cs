@@ -75,6 +75,7 @@ public sealed partial class StorageManagerViewModel(
                 IsSystem = c.IsSystem,
                 CardCount = containerService.GetCardCount(c.Id),
                 ExcludeFromDeckCheck = c.ExcludeFromDeckCheck,
+                AlwaysAvailable = c.AlwaysAvailable,
             });
         }
 
@@ -209,6 +210,15 @@ public sealed partial class StorageManagerViewModel(
     }
 
     [RelayCommand]
+    public void ToggleAlwaysAvailable(ContainerDisplayItem? item)
+    {
+        // The system Bulk location is always available and can't be toggled off.
+        if (item is null || item.IsSystem) return;
+        containerService.SetAlwaysAvailable(item.Id, !item.AlwaysAvailable);
+        Load();
+    }
+
+    [RelayCommand]
     public void UseMyIp()
     {
         try
@@ -254,6 +264,11 @@ public class ContainerDisplayItem
     public bool IsSystem { get; init; }
     public int CardCount { get; init; }
     public bool ExcludeFromDeckCheck { get; init; }
+    public bool AlwaysAvailable { get; init; }
+
+    /// <summary>The system Bulk location is always available intrinsically; its checkbox reflects
+    /// that (checked) but is disabled so it can't be turned off.</summary>
+    public bool IsAlwaysAvailable => IsSystem || AlwaysAvailable;
 
     public string TypeDisplay => ContainerType switch
     {

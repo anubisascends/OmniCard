@@ -94,6 +94,9 @@ public class OmniCardDbContext : DbContext
             // Phase-1 CollectionDbContext shim); ignore the nav so EF doesn't try to
             // pull that unmapped type into this model.
             e.Ignore(s => s.Cards);
+
+            // Derived from IsSystem/AlwaysAvailable — not a stored column.
+            e.Ignore(s => s.IsAlwaysAvailable);
         });
 
         modelBuilder.Entity<MismatchLog>(e =>

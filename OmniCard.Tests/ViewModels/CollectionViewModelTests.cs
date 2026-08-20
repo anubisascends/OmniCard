@@ -72,6 +72,39 @@ public class CollectionViewModelTests
     }
 
     [Fact]
+    public async Task LoadOverview_PartitionsAlwaysAvailableFromTypeGroups()
+    {
+        var bulk = new StorageContainer { Id = 1, Name = "Bulk", ContainerType = ContainerType.Bulk, IsSystem = true };
+        var trade = new StorageContainer { Id = 2, Name = "Trade Box", ContainerType = ContainerType.Box, AlwaysAvailable = true };
+        var plain = new StorageContainer { Id = 3, Name = "Plain Box", ContainerType = ContainerType.Box };
+
+        var summaries = new List<LocationTileSummary>
+        {
+            new() { Container = bulk, CardCount = 5 },
+            new() { Container = trade, CardCount = 0 }, // always-available even with 0 cards
+            new() { Container = plain, CardCount = 4 },
+        };
+
+        var vm = CreateVm();
+        // Override the empty default from CreateVm with our partition fixture.
+        _query.Setup(q => q.GetLocationOverviewsAsync(It.IsAny<CardGame?>()))
+              .ReturnsAsync(summaries);
+        vm.LoadOverview();
+
+        // LoadOverview is fire-and-forget; poll until the awaited continuation has partitioned.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (vm.AlwaysAvailableSummaries.Count == 0 && DateTime.UtcNow < deadline)
+            await Task.Delay(10);
+
+        Assert.Equal(new[] { "Bulk", "Trade Box" },
+            vm.AlwaysAvailableSummaries.Select(s => s.Container.Name).ToList());
+        Assert.True(vm.HasAlwaysAvailable);
+
+        var grouped = vm.GroupedLocations.SelectMany(g => g).Select(s => s.Container.Name).ToList();
+        Assert.Equal(new[] { "Plain Box" }, grouped);
+    }
+
+    [Fact]
     public async Task SetGame_InCardListMode_ReSearchesForNewGame()
     {
         var vm = CreateVm();
