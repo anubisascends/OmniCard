@@ -140,6 +140,7 @@ public partial class App : Application
             services.AddDbContextFactory<OmniCardDbContext>(options =>
                 options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "inventory.db")}"));
             services.AddSingleton<IInventoryService, InventoryService>();
+            services.AddSingleton<IUpcLookupService, UpcLookupService>();
             services.AddSingleton<IAnalyticsService, AnalyticsService>();
             services.AddSingleton<ISealedPriceUpdateService, SealedPriceUpdateService>();
             services.AddSingleton<ITradeImportService, TradeImportService>();

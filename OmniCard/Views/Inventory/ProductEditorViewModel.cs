@@ -1,11 +1,19 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Views.Inventory;
 
 public sealed partial class ProductEditorViewModel : ViewModel
 {
+    private readonly IUpcLookupService _upcLookupService;
+
+    public ProductEditorViewModel(IUpcLookupService upcLookupService)
+    {
+        _upcLookupService = upcLookupService;
+    }
+
     private int _productId;
 
     public IReadOnlyList<CardGame> AllGames { get; } = Enum.GetValues<CardGame>();
@@ -89,6 +97,46 @@ public sealed partial class ProductEditorViewModel : ViewModel
             ImageUri = string.IsNullOrWhiteSpace(ImageUri) ? null : ImageUri.Trim(),
         };
         CloseDialog?.Invoke(true);
+    }
+
+    [ObservableProperty]
+    public partial bool IsLookingUp { get; set; }
+
+    public bool CanLookup => !IsLookingUp;
+
+    partial void OnIsLookingUpChanged(bool value) => LookupUpcCommand.NotifyCanExecuteChanged();
+
+    /// <summary>Look the current UPC up online and fill in whatever details come back
+    /// (name/image), leaving anything already entered by the user untouched if the lookup
+    /// returns nothing.</summary>
+    [RelayCommand(CanExecute = nameof(CanLookup))]
+    public async Task LookupUpc()
+    {
+        var upc = (Upc ?? "").Trim();
+        if (upc.Length == 0)
+        {
+            ValidationMessage = "Enter a UPC to look up.";
+            return;
+        }
+
+        IsLookingUp = true;
+        ValidationMessage = null;
+        try
+        {
+            var info = await _upcLookupService.LookupAsync(upc);
+            if (info is null || (info.Title is null && info.ImageUrl is null))
+            {
+                ValidationMessage = "No online product info found for that UPC.";
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(info.Title)) Name = info.Title;
+            if (!string.IsNullOrWhiteSpace(info.ImageUrl)) ImageUri = info.ImageUrl;
+        }
+        finally
+        {
+            IsLookingUp = false;
+        }
     }
 
     [RelayCommand]

@@ -62,9 +62,13 @@
                      Text="{Binding ViewModel.SetCode, UpdateSourceTrigger=PropertyChanged}"/>
 
             <TextBlock Grid.Row="4" Text="UPC:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-            <TextBox Grid.Row="4" Grid.Column="1" Margin="0,4"
-                     Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
-                     Text="{Binding ViewModel.Upc, UpdateSourceTrigger=PropertyChanged}"/>
+            <DockPanel Grid.Row="4" Grid.Column="1" Margin="0,4">
+                <Button DockPanel.Dock="Right" Content="Look up" Margin="8,0,0,0" Padding="8,2"
+                        Command="{Binding ViewModel.LookupUpcCommand}"
+                        ToolTip="Fetch the product name and image online from this UPC"/>
+                <TextBox Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                         Text="{Binding ViewModel.Upc, UpdateSourceTrigger=PropertyChanged}"/>
+            </DockPanel>
 
             <TextBlock Grid.Row="5" Text="Market Price $:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <TextBox Grid.Row="5" Grid.Column="1" Margin="0,4"
