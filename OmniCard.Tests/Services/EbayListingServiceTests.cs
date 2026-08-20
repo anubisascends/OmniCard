@@ -300,6 +300,65 @@ public class EbayListingServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateSealedListingAsync_InventoryItem_UsesNewConditionWithoutGradeDescriptor()
+    {
+        // Sealed product (booster box) is brand-new factory-sealed goods, not a graded single:
+        // condition NEW, no "Card Condition" grade descriptor (name 40001 / USED_VERY_GOOD).
+        var dbFactory = CreateDbFactory();
+        int lotId;
+        using (var ctx = dbFactory.CreateDbContext()) lotId = SeedLot(ctx, "Bloomburrow Booster Box");
+
+        var handler = new RecordingHttpHandler(HttpStatusCode.OK, JsonSerializer.Serialize(new { listingId = "L1" }));
+        var svc = new EbayListingService(
+            Options.Create(_settings), new FakeHttpClientFactory(handler),
+            new FakeEbayAuthService("t"), dbFactory, CompleteSellingSettings(),
+            new RecordingListingService(),
+            NullLogger<EbayListingService>.Instance);
+
+        var product = new Product
+        {
+            Game = CardGame.Mtg, Category = ProductCategory.Box, Name = "Bloomburrow Booster Box",
+            SetName = "Bloomburrow", SetCode = "BLB", ImageUri = "https://boxes.example/blb.jpg",
+        };
+        var ok = await svc.CreateSealedListingAsync(product, lotId,
+            new EbayListingOptions { Title = "t", Description = "d", Price = 120m, IncludeStockImage = true, ListingType = EbayListingType.FixedPrice });
+
+        Assert.True(ok);
+        var inv = handler.Requests.First(r => r.Method == HttpMethod.Put && r.Uri!.ToString().Contains("/inventory_item/"));
+        Assert.Contains("NEW", inv.Body);
+        Assert.DoesNotContain("USED_VERY_GOOD", inv.Body);
+        Assert.DoesNotContain("40001", inv.Body); // no card-grade descriptor
+        Assert.Contains("Game", inv.Body);
+        Assert.Contains("Magic: The Gathering", inv.Body);
+        Assert.Contains("https://boxes.example/blb.jpg", inv.Body); // stock image included
+    }
+
+    [Fact]
+    public async Task CreateSealedListingAsync_MarksLotListed_OnEbayChannel()
+    {
+        var dbFactory = CreateDbFactory();
+        int lotId;
+        using (var ctx = dbFactory.CreateDbContext()) lotId = SeedLot(ctx, "Sealed Box");
+
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, JsonSerializer.Serialize(new { listingId = "L1" }));
+        var listingSvc = new RecordingListingService();
+        var svc = new EbayListingService(
+            Options.Create(_settings), new FakeHttpClientFactory(handler),
+            new FakeEbayAuthService("t"), dbFactory, CompleteSellingSettings(),
+            listingSvc, NullLogger<EbayListingService>.Instance);
+
+        var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Box, Name = "Sealed Box" };
+        var ok = await svc.CreateSealedListingAsync(product, lotId,
+            new EbayListingOptions { Title = "t", Description = "d", Price = 99m, ListingType = EbayListingType.FixedPrice });
+
+        Assert.True(ok);
+        var call = Assert.Single(listingSvc.ListForSaleCalls);
+        Assert.Contains(lotId, call.LotIds);
+        Assert.Equal(SalesChannel.Ebay, call.Channel);
+        Assert.Equal(99m, call.Price);
+    }
+
+    [Fact]
     public async Task CreateListingAsync_MarksLotListed_ForBadgeAndPickList()
     {
         // Regression: a published eBay listing must also create a Listing row (SalesChannel.Ebay)

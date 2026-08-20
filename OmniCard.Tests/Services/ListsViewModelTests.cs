@@ -177,6 +177,7 @@ public class ListsViewModelTests
         public IReadOnlyList<ScanListTargetResult>? PickListTargetsForScans(IReadOnlyList<(CardGame Game, int Count)> groups, string defaultName) => throw new NotImplementedException();
         public void ShowAuditReport(AuditReport report) => throw new NotImplementedException();
         public bool? OpenEbayListingDialog(CollectionCard card) => throw new NotImplementedException();
+        public bool? OpenEbayListingDialog(Product product, int lotId, decimal? suggestedPrice) => throw new NotImplementedException();
         public bool? OpenManualAdd(StorageContainer? defaultContainer = null) => throw new NotImplementedException();
         public bool? OpenManualAddToSlot(int containerId, int page, int slot) => throw new NotImplementedException();
         public void ShowDecklistCheck() => throw new NotImplementedException();

@@ -13,9 +13,22 @@ public sealed partial class EbayListingViewModel(
     IEbaySellingSettingsService sellingSettings,
     ILogger<EbayListingViewModel> logger) : ViewModel
 {
-    private CollectionCard _card = null!;
+    // Card-single mode state (set by LoadCard).
+    private CollectionCard? _card;
+    // Sealed-product mode state (set by LoadSealedProduct). In sealed mode the SKU/listing is
+    // keyed by the lot id rather than a CollectionCard.
+    private Product? _sealedProduct;
+    private int _sealedLotId;
 
     public Action<bool?>? CloseDialog { get; set; }
+
+    /// <summary>True when listing a sealed product rather than a card single. Drives the sealed
+    /// branch in <see cref="CreateListing"/> and hides card-only fields in the view.</summary>
+    [ObservableProperty] public partial bool IsSealed { get; set; }
+
+    /// <summary>Inverse of <see cref="IsSealed"/>, for binding card-only UI visibility.</summary>
+    public bool IsCardSingle => !IsSealed;
+    partial void OnIsSealedChanged(bool value) => OnPropertyChanged(nameof(IsCardSingle));
 
     // --- Card info (read-only) ---
     [ObservableProperty] public partial string CardName { get; set; } = "";
@@ -85,6 +98,37 @@ public sealed partial class EbayListingViewModel(
                       $"Condition: {card.Condition}. {(card.IsFoil ? "Foil finish." : "")}";
 
         // Kick off catalog search and policy fetch
+        _ = SearchCatalogCommand.ExecuteAsync(null);
+        _ = LoadPoliciesAsync();
+    }
+
+    /// <summary>Loads a sealed inventory product (booster box/pack/case/etc.) for listing. Mirrors
+    /// <see cref="LoadCard"/> but keys the listing by the owning lot id and marks the dialog sealed
+    /// so the service builds a NEW-condition item and the view hides card-only fields.</summary>
+    public void LoadSealedProduct(Product product, int lotId, decimal? suggestedPrice)
+    {
+        _sealedProduct = product;
+        _sealedLotId = lotId;
+        IsSealed = true;
+
+        CardName = product.Name;
+        SetInfo = product.SetName ?? "";
+        SetCode = product.SetCode ?? "";
+        CardNumber = "";
+        Rarity = "";
+        Condition = "New";
+        IsFoil = false;
+        ApiImageUri = product.ImageUri;
+        Price = suggestedPrice ?? product.MarketPrice;
+
+        var setStr = string.IsNullOrWhiteSpace(product.SetCode) ? "" : $" [{product.SetCode}]";
+        var prefix = GameTitlePrefix(product.Game);
+        Title = $"{prefix} {product.Name}{setStr} {product.Category} Sealed".Trim();
+        Description = $"Factory-sealed {product.Name}" +
+                      (string.IsNullOrWhiteSpace(product.SetName) ? "" : $" from {product.SetName}") +
+                      $" ({product.Category}). Brand new, never opened.";
+
+        // Kick off catalog search (by product name → market price + a real leaf category) and policies.
         _ = SearchCatalogCommand.ExecuteAsync(null);
         _ = LoadPoliciesAsync();
     }
@@ -182,7 +226,9 @@ public sealed partial class EbayListingViewModel(
         try
         {
             var options = BuildOptions();
-            var success = await listingService.CreateListingAsync(_card, options);
+            var success = IsSealed
+                ? await listingService.CreateSealedListingAsync(_sealedProduct!, _sealedLotId, options)
+                : await listingService.CreateListingAsync(_card!, options);
 
             if (success)
             {

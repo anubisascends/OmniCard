@@ -14,6 +14,7 @@ public class InventoryViewModelTests : IDisposable
     private readonly SqliteConnection _connection;
     private readonly DbContextOptions<OmniCardDbContext> _options;
     private readonly IInventoryService _inventory;
+    private readonly IListingService _listing;
     private readonly Mock<IDialogService> _dialog = new();
     private readonly Mock<ISealedPriceUpdateService> _sealedPrices = new();
     private readonly Mock<IUpcLookupService> _upc = new();
@@ -27,14 +28,16 @@ public class InventoryViewModelTests : IDisposable
         using (var ctx = new OmniCardDbContext(_options))
             ctx.Database.EnsureCreated();
 
-        _inventory = new InventoryService(new MockFactory(_options));
+        var factory = new MockFactory(_options);
+        _inventory = new InventoryService(factory);
+        _listing = new ListingService(factory, new Mock<ISalesSettingsService>().Object);
         _containers.Setup(c => c.GetAll()).Returns(new List<StorageContainer>());
     }
 
     public void Dispose() => _connection.Dispose();
 
     private InventoryViewModel CreateVm() =>
-        new(_inventory, _dialog.Object, _sealedPrices.Object, _upc.Object, _containers.Object);
+        new(_inventory, _dialog.Object, _sealedPrices.Object, _upc.Object, _containers.Object, _listing);
 
     private Product SeedProduct(CardGame game, string name, ProductCategory category = ProductCategory.Box) =>
         _inventory.CreateProduct(new Product { Game = game, Category = category, Name = name });
@@ -205,6 +208,115 @@ public class InventoryViewModelTests : IDisposable
         vm.MoveLotCommand.Execute(row);
 
         Assert.Equal(container.Id, _inventory.GetLots(product.Id).Single().LocationId);
+    }
+
+    [Fact]
+    public void ListLotForSale_CreatesListing_WithChosenChannelAndPrice()
+    {
+        var product = SeedProduct(CardGame.Mtg, "Box");
+        _inventory.AddLot(product.Id, 1, 40m, null, null, DateTime.Today);
+
+        var vm = CreateVm();
+        vm.LoadInventory();
+        var row = vm.Rows.Single().Lots.Single();
+
+        _dialog.Setup(d => d.PickListForSale(It.IsAny<decimal>()))
+            .Returns(new ListForSaleResult(SalesChannel.TcgPlayer, 55m, 1));
+
+        vm.ListLotForSaleCommand.Execute(row);
+
+        var details = _listing.GetListingDetails().Single();
+        Assert.Equal(row.LotId, details.LotId);
+        Assert.Equal(SalesChannel.TcgPlayer, details.Channel);
+        Assert.Equal(55m, details.ListedPrice);
+    }
+
+    [Fact]
+    public void ListLotForSale_Cancelled_CreatesNoListing()
+    {
+        var product = SeedProduct(CardGame.Mtg, "Box");
+        _inventory.AddLot(product.Id, 1, 40m, null, null, DateTime.Today);
+
+        var vm = CreateVm();
+        vm.LoadInventory();
+        var row = vm.Rows.Single().Lots.Single();
+
+        _dialog.Setup(d => d.PickListForSale(It.IsAny<decimal>())).Returns((ListForSaleResult?)null);
+
+        vm.ListLotForSaleCommand.Execute(row);
+
+        Assert.Empty(_listing.GetListingDetails());
+    }
+
+    [Fact]
+    public void ListLotForSale_RejectsNonPositiveQuantity()
+    {
+        var product = SeedProduct(CardGame.Mtg, "Box");
+        _inventory.AddLot(product.Id, 1, 40m, null, null, DateTime.Today);
+
+        var vm = CreateVm();
+        vm.LoadInventory();
+        var row = vm.Rows.Single().Lots.Single();
+
+        _dialog.Setup(d => d.PickListForSale(It.IsAny<decimal>()))
+            .Returns(new ListForSaleResult(SalesChannel.Manual, 10m, 0));
+
+        vm.ListLotForSaleCommand.Execute(row);
+
+        Assert.Empty(_listing.GetListingDetails());
+    }
+
+    [Fact]
+    public void LoadInventory_PopulatesLotListingState_ForBadgePill()
+    {
+        var product = SeedProduct(CardGame.Mtg, "Box");
+        var lot = _inventory.AddLot(product.Id, 1, 40m, null, null, DateTime.Today);
+        _listing.ListForSale([lot.Id], SalesChannel.Ebay, 99m, 1);
+
+        var vm = CreateVm();
+        vm.LoadInventory();
+
+        var row = vm.Rows.Single().Lots.Single();
+        Assert.Equal(ListingStatus.Listed, row.ListingStatus);
+        Assert.Equal(SalesChannel.Ebay, row.ListingChannel);
+        Assert.Equal("eBAY", row.ListingBadge);
+    }
+
+    [Fact]
+    public void LoadInventory_UnlistedLot_HasNoListingState()
+    {
+        var product = SeedProduct(CardGame.Mtg, "Box");
+        _inventory.AddLot(product.Id, 1, 40m, null, null, DateTime.Today);
+
+        var vm = CreateVm();
+        vm.LoadInventory();
+
+        var row = vm.Rows.Single().Lots.Single();
+        Assert.Null(row.ListingStatus);
+        Assert.Equal("", row.ListingBadge);
+    }
+
+    [Fact]
+    public void ListLotOnEbay_OpensDialog_ForResolvedProductAndLot()
+    {
+        var product = SeedProduct(CardGame.Mtg, "Box");
+        _inventory.AddLot(product.Id, 1, 40m, null, null, DateTime.Today);
+
+        var vm = CreateVm();
+        vm.LoadInventory();
+        var row = vm.Rows.Single().Lots.Single();
+
+        Product? seenProduct = null;
+        int seenLotId = -1;
+        _dialog.Setup(d => d.OpenEbayListingDialog(It.IsAny<Product>(), It.IsAny<int>(), It.IsAny<decimal?>()))
+            .Callback<Product, int, decimal?>((p, lotId, _) => { seenProduct = p; seenLotId = lotId; })
+            .Returns(false);
+
+        vm.ListLotOnEbayCommand.Execute(row);
+
+        Assert.NotNull(seenProduct);
+        Assert.Equal(product.Id, seenProduct!.Id);
+        Assert.Equal(row.LotId, seenLotId);
     }
 
     private class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>

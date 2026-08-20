@@ -14,19 +14,22 @@ public sealed partial class InventoryViewModel : ViewModel
     private readonly ISealedPriceUpdateService _sealedPriceUpdateService;
     private readonly IUpcLookupService _upcLookupService;
     private readonly IStorageContainerService _containerService;
+    private readonly IListingService _listingService;
 
     public InventoryViewModel(
         IInventoryService inventoryService,
         IDialogService dialogService,
         ISealedPriceUpdateService sealedPriceUpdateService,
         IUpcLookupService upcLookupService,
-        IStorageContainerService containerService)
+        IStorageContainerService containerService,
+        IListingService listingService)
     {
         _inventoryService = inventoryService;
         _dialogService = dialogService;
         _sealedPriceUpdateService = sealedPriceUpdateService;
         _upcLookupService = upcLookupService;
         _containerService = containerService;
+        _listingService = listingService;
     }
 
     [ObservableProperty]
@@ -107,6 +110,13 @@ public sealed partial class InventoryViewModel : ViewModel
         // Resolve storage-location names once for the lot sub-rows.
         var locationNames = _containerService.GetAll().ToDictionary(c => c.Id, c => c.Name);
 
+        // Active on-market status per lot (Listed/Picked), so each lot can show a state pill like
+        // the card tiles do. A lot has at most one active listing; if more, prefer the more
+        // advanced status (Picked > Listed).
+        var listingByLot = _listingService.GetListingDetails()
+            .GroupBy(d => d.LotId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(d => d.Status).First());
+
         // The Inventory tab is scoped to sealed product (singles live in the Collection tab,
         // which prices them via the live per-card game service rather than Product.MarketPrice).
         // GameFilter (mirroring the global game selector) narrows the list to one game; null = all.
@@ -121,7 +131,11 @@ public sealed partial class InventoryViewModel : ViewModel
 
             var lotRows = lots.Select(l => new LotRow(
                 l,
-                l.LocationId is int locId && locationNames.TryGetValue(locId, out var name) ? name : null));
+                l.LocationId is int locId && locationNames.TryGetValue(locId, out var name) ? name : null)
+            {
+                ListingStatus = listingByLot.TryGetValue(l.Id, out var d) ? d.Status : null,
+                ListingChannel = listingByLot.TryGetValue(l.Id, out var d2) ? d2.Channel : null,
+            });
 
             Rows.Add(new InventoryRow(product, qty, cost, market, lotRows));
 
@@ -388,6 +402,45 @@ public sealed partial class InventoryViewModel : ViewModel
         if (_dialogService.OpenUnitsDialog(product, row.LotId))
         {
             ReportMessage?.Invoke($"Opened units of '{product.Name}'.");
+            LoadInventory();
+        }
+    }
+
+    /// <summary>List a single lot for sale on a generic channel (Manual / TCGPlayer), mirroring the
+    /// collection view's List-for-Sale flow. eBay has its own richer flow — see <see cref="ListLotOnEbay"/>.</summary>
+    [RelayCommand]
+    public void ListLotForSale(LotRow? row)
+    {
+        if (row is null) return;
+
+        var suggested = Rows.FirstOrDefault(r => r.Lots.Contains(row))?.Product.MarketPrice
+                        ?? row.Lot.UnitCost ?? 0m;
+        var result = _dialogService.PickListForSale(suggested);
+        if (result is null) return;
+
+        if (result.Quantity <= 0 || result.Price < 0)
+        {
+            ReportMessage?.Invoke("Enter a positive quantity and non-negative price.");
+            return;
+        }
+
+        var count = _listingService.ListForSale([row.LotId], result.Channel, result.Price, result.Quantity);
+        ReportMessage?.Invoke(count > 0 ? "Listed lot for sale." : "This lot is already listed.");
+        LoadInventory();
+    }
+
+    /// <summary>List a single sealed lot on eBay via the (sealed-aware) eBay listing dialog.</summary>
+    [RelayCommand]
+    public void ListLotOnEbay(LotRow? row)
+    {
+        if (row is null) return;
+
+        var product = _inventoryService.GetProducts().FirstOrDefault(p => p.Id == row.Lot.ProductId);
+        if (product is null) return;
+
+        if (_dialogService.OpenEbayListingDialog(product, row.LotId, product.MarketPrice) == true)
+        {
+            ReportMessage?.Invoke($"Listed \"{product.Name}\" on eBay.");
             LoadInventory();
         }
     }

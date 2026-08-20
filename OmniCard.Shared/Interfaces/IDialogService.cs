@@ -37,6 +37,11 @@ public interface IDialogService
     IReadOnlyList<ScanListTargetResult>? PickListTargetsForScans(IReadOnlyList<(CardGame Game, int Count)> groups, string defaultName);
     void ShowAuditReport(AuditReport report);
     bool? OpenEbayListingDialog(CollectionCard card);
+
+    /// <summary>Opens the eBay listing dialog for a sealed inventory product, keyed by the owning
+    /// lot id. <paramref name="suggestedPrice"/> pre-fills the price field.</summary>
+    bool? OpenEbayListingDialog(Product product, int lotId, decimal? suggestedPrice);
+
     bool? OpenManualAdd(StorageContainer? defaultContainer = null);
 
     /// <summary>Opens the Add-Card dialog locked to a specific binder page/slot (container/page/slot

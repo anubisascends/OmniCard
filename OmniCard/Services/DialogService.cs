@@ -264,6 +264,14 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         return wnd.ShowDialog();
     }
 
+    public bool? OpenEbayListingDialog(Product product, int lotId, decimal? suggestedPrice)
+    {
+        var wnd = Services.GetRequiredService<EbayListingView>();
+        SetOwner(wnd);
+        wnd.ViewModel.LoadSealedProduct(product, lotId, suggestedPrice);
+        return wnd.ShowDialog();
+    }
+
     public bool? OpenManualAdd(StorageContainer? defaultContainer = null)
     {
         var wnd = Services.GetRequiredService<ManualAddView>();

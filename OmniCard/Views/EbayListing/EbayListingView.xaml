@@ -47,12 +47,14 @@
                     <TextBlock Text="{Binding ViewModel.CardName}" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,4" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                         <Border Width="14" Height="14" Margin="0,0,4,0"
+                                Visibility="{Binding ViewModel.IsCardSingle, Converter={StaticResource BoolToVis}}"
                                 helpers:SetSymbol.SetCode="{Binding ViewModel.SetCode}"
                                 helpers:SetSymbol.Rarity="{Binding ViewModel.Rarity}"/>
                         <TextBlock Text="{Binding ViewModel.SetInfo}"
                                    Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
                     </StackPanel>
-                    <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" Margin="0,0,0,2">
+                    <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}" Margin="0,0,0,2"
+                               Visibility="{Binding ViewModel.IsCardSingle, Converter={StaticResource BoolToVis}}">
                         <Run Text="#"/><Run Text="{Binding ViewModel.CardNumber, Mode=OneWay}"/>
                         <Run Text=" · "/><Run Text="{Binding ViewModel.Rarity, Mode=OneWay}"/>
                     </TextBlock>

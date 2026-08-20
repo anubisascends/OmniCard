@@ -52,7 +52,18 @@ public class EbayListingService : IEbayListingService
         _logger = logger;
     }
 
-    public async Task<bool> CreateListingAsync(CollectionCard card, EbayListingOptions options)
+    public Task<bool> CreateListingAsync(CollectionCard card, EbayListingOptions options)
+        => CreateListingCoreAsync(card.Id, card.Name, BuildInventoryItem(card, options), options);
+
+    public Task<bool> CreateSealedListingAsync(Product product, int lotId, EbayListingOptions options)
+        => CreateListingCoreAsync(lotId, product.Name, BuildSealedInventoryItem(product, options), options);
+
+    // Shared listing pipeline for both singles (CreateListingAsync) and sealed products
+    // (CreateSealedListingAsync). The only thing that differs between them is how the eBay
+    // inventory item is shaped (condition / aspects / descriptors), which the caller builds and
+    // passes in as <paramref name="inventoryItem"/>. Everything after that — SKU, offer
+    // create/update, publish, and bridging into the generic listing system — is identical.
+    private async Task<bool> CreateListingCoreAsync(int lotId, string displayName, object inventoryItem, EbayListingOptions options)
     {
         var token = await _ebayAuthService.GetAccessTokenAsync();
         if (token is null)
@@ -61,8 +72,8 @@ public class EbayListingService : IEbayListingService
         var selling = _sellingSettings.Get();
         if (!_sellingSettings.IsSetupComplete())
         {
-            _logger.LogWarning("eBay listing blocked — seller setup incomplete for card {CardId}", card.Id);
-            await SaveListingError(card.Id, options, "eBay setup incomplete — run Settings ▸ eBay Selling ▸ Run eBay Setup.");
+            _logger.LogWarning("eBay listing blocked — seller setup incomplete for lot {LotId}", lotId);
+            await SaveListingError(lotId, options, "eBay setup incomplete — run Settings ▸ eBay Selling ▸ Run eBay Setup.");
             return false;
         }
 
@@ -72,8 +83,7 @@ public class EbayListingService : IEbayListingService
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             // Step 1: Create inventory item
-            var sku = $"omnicard-{card.Id}";
-            var inventoryItem = BuildInventoryItem(card, options);
+            var sku = $"omnicard-{lotId}";
             var inventoryJson = JsonSerializer.Serialize(inventoryItem);
 
             var inventoryResponse = await client.PutAsync(
@@ -84,7 +94,7 @@ public class EbayListingService : IEbayListingService
             {
                 var error = await inventoryResponse.Content.ReadAsStringAsync();
                 _logger.LogWarning("Failed to create inventory item: {Status} — {Error}", inventoryResponse.StatusCode, error);
-                await SaveListingError(card.Id, options, $"Inventory creation failed: {inventoryResponse.StatusCode}");
+                await SaveListingError(lotId, options, $"Inventory creation failed: {inventoryResponse.StatusCode}");
                 return false;
             }
 
@@ -106,7 +116,7 @@ public class EbayListingService : IEbayListingService
                 {
                     var error = await offerResponse.Content.ReadAsStringAsync();
                     _logger.LogWarning("Failed to create offer: {Status} — {Error}", offerResponse.StatusCode, error);
-                    await SaveListingError(card.Id, options, $"Offer creation failed: {offerResponse.StatusCode}");
+                    await SaveListingError(lotId, options, $"Offer creation failed: {offerResponse.StatusCode}");
                     return false;
                 }
 
@@ -117,9 +127,9 @@ public class EbayListingService : IEbayListingService
                 if (offerDoc.RootElement.TryGetProperty("listingId", out var directListingId))
                 {
                     var ebayItemIdDirect = directListingId.GetString() ?? "";
-                    await SaveActiveListing(card.Id, options, ebayItemIdDirect);
-                    _logger.LogInformation("Created eBay listing {ItemId} for card {CardId} ({CardName})",
-                        ebayItemIdDirect, card.Id, card.Name);
+                    await SaveActiveListing(lotId, options, ebayItemIdDirect);
+                    _logger.LogInformation("Created eBay listing {ItemId} for lot {LotId} ({Name})",
+                        ebayItemIdDirect, lotId, displayName);
                     return true;
                 }
 
@@ -141,7 +151,7 @@ public class EbayListingService : IEbayListingService
                 {
                     var error = await updateResponse.Content.ReadAsStringAsync();
                     _logger.LogWarning("Failed to update existing offer {OfferId}: {Status} — {Error}", offerId, updateResponse.StatusCode, error);
-                    await SaveListingError(card.Id, options, $"Offer update failed: {updateResponse.StatusCode}");
+                    await SaveListingError(lotId, options, $"Offer update failed: {updateResponse.StatusCode}");
                     return false;
                 }
             }
@@ -164,18 +174,18 @@ public class EbayListingService : IEbayListingService
             {
                 var error = await publishResponse.Content.ReadAsStringAsync();
                 _logger.LogWarning("Failed to publish offer: {Status} — {Error}", publishResponse.StatusCode, error);
-                await SaveListingError(card.Id, options, $"Publish failed: {publishResponse.StatusCode}");
+                await SaveListingError(lotId, options, $"Publish failed: {publishResponse.StatusCode}");
                 return false;
             }
 
-            await SaveActiveListing(card.Id, options, ebayItemId);
-            _logger.LogInformation("Created eBay listing {ItemId} for card {CardId} ({CardName})",
-                ebayItemId, card.Id, card.Name);
+            await SaveActiveListing(lotId, options, ebayItemId);
+            _logger.LogInformation("Created eBay listing {ItemId} for lot {LotId} ({Name})",
+                ebayItemId, lotId, displayName);
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create eBay listing for card {CardId}", card.Id);
+            _logger.LogError(ex, "Failed to create eBay listing for lot {LotId}", lotId);
             return false;
         }
     }
@@ -377,6 +387,43 @@ public class EbayListingService : IEbayListingService
             {
                 new { name = "40001", values = new[] { descriptorValue } }
             },
+            product = new
+            {
+                title = options.Title,
+                description = options.Description,
+                aspects,
+                imageUrls,
+            },
+        };
+    }
+
+    // Sealed products (booster boxes/packs/cases/decks/bundles) are brand-new factory-sealed
+    // goods, NOT graded trading-card singles — so they carry condition NEW with no "Card Condition"
+    // grade descriptor (which is specific to the CCG-singles category 183454). The eBay leaf
+    // category and any category-specific required aspects come from the catalog match the dialog
+    // picks (EbayCategoryId), the same way singles get theirs.
+    private static object BuildSealedInventoryItem(Product product, EbayListingOptions options)
+    {
+        var aspects = new Dictionary<string, string[]>
+        {
+            ["Game"] = [EbayGameAspect(product.Game)],
+            ["Type"] = [product.Category.ToString()],
+        };
+
+        string[]? imageUrls =
+            options.IncludeStockImage
+            && product.ImageUri is { Length: > 0 } stockUrl
+            && stockUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                ? [stockUrl]
+                : null;
+
+        return new
+        {
+            availability = new
+            {
+                shipToLocationAvailability = new { quantity = 1 }
+            },
+            condition = "NEW",
             product = new
             {
                 title = options.Title,
