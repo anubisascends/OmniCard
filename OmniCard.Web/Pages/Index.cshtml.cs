@@ -186,7 +186,10 @@ public class IndexModel : PageModel
 
         // Fill in catalog art for reps with no stored ImageUri, same as the desktop — bounded to the
         // displayed reps rather than every matched lot.
-        CardArtHydrator.HydrateMissingImageUris(_cardService, reps.Select(r => r.Rep).ToList());
+        var repCards = reps.Select(r => r.Rep).ToList();
+        CardArtHydrator.HydrateMissingImageUris(_cardService, repCards);
+        // Singles don't persist a price on the row — look up the live catalog price for each tile.
+        MarketPriceHydrator.Populate(_cardService, repCards);
 
         SearchResults = reps
             .Select(r => new CardSearchResult
@@ -201,6 +204,8 @@ public class IndexModel : PageModel
                 Quantity = r.Quantity,
                 ImageUrl = CardImageUrl.Resolve(r.Rep.ScanImagePath, r.Rep.ImageUri, _dataPathService.ScansDirectory),
                 MarketPrice = r.Rep.MarketPrice > 0m ? r.Rep.MarketPrice : null,
+                Condition = r.Rep.Condition,
+                IsFoil = r.Rep.IsFoil,
                 Tags = r.Rep.Tags,
             })
             .OrderBy(r => r.Name)
@@ -241,6 +246,8 @@ public class IndexModel : PageModel
         public int Quantity { get; init; }
         public string? ImageUrl { get; init; }
         public decimal? MarketPrice { get; init; }
+        public string Condition { get; init; } = "";
+        public bool IsFoil { get; init; }
         public List<string> Tags { get; init; } = [];
     }
 }

@@ -96,7 +96,10 @@ public sealed class WebCardService : ICardService
     public void DeleteCollectionCard(int id) => throw new NotSupportedException();
     public Task<List<SetCompletionSummary>> CalculateSetCompletionAsync(CardGame game, IProgress<string>? progress = null) => throw new NotSupportedException();
     public Task<List<SetCompletionSummary>> CalculateSetCompletionAsync(CardGame? game, IProgress<string>? progress = null) => throw new NotSupportedException();
-    public IReadOnlyDictionary<string, decimal> GetCurrentPrices(CardGame game, IEnumerable<string> gameCardIds, bool foil) => throw new NotSupportedException();
+    // Live single prices come straight from the game's read-only catalog DB (no network), so this
+    // is safe in the web app — used by MarketPriceHydrator to fill CollectionCard.MarketPrice.
+    public IReadOnlyDictionary<string, decimal> GetCurrentPrices(CardGame game, IEnumerable<string> gameCardIds, bool foil)
+        => GetGameService(game).GetCurrentPrices(gameCardIds, foil);
     public List<string> GetDistinctFieldValues(string field, CardGame game) => throw new NotSupportedException();
     public List<MissingCard> GetMissingCardsForSet(CardGame game, string setCode) => throw new NotSupportedException();
     public void RemoveTempFile(ScannedCard card) => throw new NotSupportedException();

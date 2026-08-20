@@ -16,6 +16,7 @@ public class CardModel : PageModel
     private readonly IDbContextFactory<PokemonDbContext>? _pokemonFactory;
     private readonly IDbContextFactory<YugiohDbContext>? _yugiohFactory;
     private readonly IDbContextFactory<FinalFantasyDbContext>? _finalFantasyFactory;
+    private readonly IDbContextFactory<ScryfallDbContext>? _scryfallFactory;
 
     public CardModel(
         IDbContextFactory<OmniCardDbContext> dbFactory,
@@ -23,7 +24,8 @@ public class CardModel : PageModel
         IDataPathService dataPathService,
         IDbContextFactory<PokemonDbContext>? pokemonFactory = null,
         IDbContextFactory<YugiohDbContext>? yugiohFactory = null,
-        IDbContextFactory<FinalFantasyDbContext>? finalFantasyFactory = null)
+        IDbContextFactory<FinalFantasyDbContext>? finalFantasyFactory = null,
+        IDbContextFactory<ScryfallDbContext>? scryfallFactory = null)
     {
         _dbFactory = dbFactory;
         _cardService = cardService;
@@ -31,6 +33,7 @@ public class CardModel : PageModel
         _pokemonFactory = pokemonFactory;
         _yugiohFactory = yugiohFactory;
         _finalFantasyFactory = finalFantasyFactory;
+        _scryfallFactory = scryfallFactory;
     }
 
     public CollectionCard Card { get; set; } = null!;
@@ -43,6 +46,10 @@ public class CardModel : PageModel
     /// when no matching catalog row is found.
     /// </summary>
     public string? ExtendedDataJson { get; set; }
+
+    /// <summary>Link to this card on TCGPlayer — the exact product when its TCGplayer id is known,
+    /// otherwise a scoped name search. See <see cref="TcgPlayerLink"/>.</summary>
+    public string TcgPlayerUrl { get; set; } = "";
 
     [TempData]
     public string? TradeMessage { get; set; }
@@ -59,7 +66,7 @@ public class CardModel : PageModel
         if (lot is null)
             return NotFound();
 
-        var card = CollectionCardMapper.ToDto(lot, lot.Product, 0m);
+        var card = CollectionCardMapper.ToDto(lot, lot.Product, lot.Product.LastMarketPrice ?? 0m);
 
         if (lot.LocationId is int locationId)
             card.Container = db.StorageContainers.AsNoTracking().FirstOrDefault(c => c.Id == locationId);
@@ -68,10 +75,28 @@ public class CardModel : PageModel
 
         // Fill in catalog art when the card has no stored ImageUri, same as the desktop.
         CardArtHydrator.HydrateMissingImageUris(_cardService, [card]);
+        // Singles don't persist a price on the row — look up the live catalog price.
+        MarketPriceHydrator.Populate(_cardService, [card]);
 
         Card = card;
         ExtendedDataJson = LookupExtendedDataJson(card.Game, card.GameCardId);
+        TcgPlayerUrl = BuildTcgPlayerUrl(card);
         return Page();
+    }
+
+    private string BuildTcgPlayerUrl(CollectionCard card)
+    {
+        // MTG stores a Scryfall id, not a TCGplayer id — resolve the real product id from scryfall.db.
+        int? resolved = null;
+        if (card.Game == CardGame.Mtg)
+        {
+            var etched = card.IsFoil && (card.FoilType?.Contains("Etched", StringComparison.OrdinalIgnoreCase) ?? false);
+            resolved = ScryfallTcgIdResolver.Resolve(_scryfallFactory, [card.GameCardId])
+                .GetValueOrDefault(card.GameCardId)
+                .Pick(etched);
+        }
+
+        return TcgPlayerLink.Build(card.Game, card.GameCardId, card.Name, card.SetName, resolved);
     }
 
     private string? LookupExtendedDataJson(CardGame game, string gameCardId)

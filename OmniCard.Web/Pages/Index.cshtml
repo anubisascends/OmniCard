@@ -47,10 +47,18 @@
             }
             else
             {
+                <partial name="_CollectionToolbar" />
                 <div class="card-tiles">
                     @foreach (var r in Model.SearchResults)
                     {
-                        <a href="/card/@r.Id" class="card-tile">
+                        <a href="/card/@r.Id" class="card-tile"
+                           data-name="@r.Name"
+                           data-set="@r.SetCode"
+                           data-setname="@r.SetName"
+                           data-cn="@r.Number"
+                           data-price="@(r.MarketPrice.HasValue ? r.MarketPrice.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "")"
+                           data-cond="@r.Condition"
+                           data-foil="@(r.IsFoil ? "1" : "0")">
                             @if (r.ImageUrl is not null)
                             {
                                 <img src="@r.ImageUrl" loading="lazy" alt="@r.Name"/>
@@ -59,12 +67,12 @@
                             {
                                 <div class="no-image">No Image</div>
                             }
-                            <div class="name" title="@r.Name">@r.Name</div>
-                            <div class="set">@r.SetName (@r.SetCode)</div>
                             @if (r.MarketPrice is not null)
                             {
-                                <div class="price">@r.MarketPrice.Value.ToString("C")</div>
+                                <span class="price-badge">@r.MarketPrice.Value.ToString("C")</span>
                             }
+                            <div class="name" title="@r.Name">@r.Name</div>
+                            <div class="set">@r.SetName (@r.SetCode)</div>
                             @if (r.Quantity > 1)
                             {
                                 <div class="qty">&times;@r.Quantity</div>
@@ -124,6 +132,7 @@
     </main>
 
     <script src="/js/table-sort.js"></script>
+    <script src="/js/collection-view.js"></script>
     <script>
         (function() {
             var STORE_KEY = 'omnicard_prefs';

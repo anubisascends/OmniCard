@@ -58,6 +58,10 @@
                                         {
                                             <span class="slot-badge foil">FOIL</span>
                                         }
+                                        @if (cell.Price is not null)
+                                        {
+                                            <span class="price-badge">@cell.Price</span>
+                                        }
                                     </button>
                                 }
                                 else
@@ -98,6 +102,7 @@
             <div class="binder-modal-actions">
                 <a id="modalTrade" class="trade-button" href="#">Trade this card&hellip;</a>
                 <span id="modalTraded" class="badge trade-badge" hidden>TRADED</span>
+                <a id="modalTcg" class="tcg-link" href="#" target="_blank" rel="noopener">View on TCGPlayer &rarr;</a>
                 <a id="modalDetailsLink" class="binder-btn" href="#">Full details</a>
             </div>
         </div>
