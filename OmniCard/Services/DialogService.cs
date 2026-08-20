@@ -305,11 +305,22 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         return result == true ? wnd.ViewModel.Result : null;
     }
 
-    public bool OpenUnitsDialog(Product product)
+    public (int Quantity, decimal? UnitCost, int? LocationId, string? Source, DateTime AcquisitionDate)? EditLotDialog(InventoryLot lot)
+    {
+        var wnd = Services.GetRequiredService<AddLotView>();
+        SetOwner(wnd);
+        wnd.ViewModel.LoadForEdit(lot);
+        var result = wnd.ShowDialog();
+        return result == true ? wnd.ViewModel.Result : null;
+    }
+
+    public bool OpenUnitsDialog(Product product) => OpenUnitsDialog(product, null);
+
+    public bool OpenUnitsDialog(Product product, int? preselectLotId)
     {
         var wnd = Services.GetRequiredService<OpenUnitsView>();
         SetOwner(wnd);
-        wnd.ViewModel.Load(product);
+        wnd.ViewModel.Load(product, preselectLotId);
         var result = wnd.ShowDialog();
         return result == true && wnd.ViewModel.WasOpened;
     }

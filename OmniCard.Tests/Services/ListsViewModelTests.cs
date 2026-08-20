@@ -182,7 +182,9 @@ public class ListsViewModelTests
         public void ShowDecklistCheck() => throw new NotImplementedException();
         public Product? EditProduct(Product? existing) => throw new NotImplementedException();
         public (int Quantity, decimal? UnitCost, int? LocationId, string? Source, DateTime AcquisitionDate)? AddLotDialog(int productId) => throw new NotImplementedException();
+        public (int Quantity, decimal? UnitCost, int? LocationId, string? Source, DateTime AcquisitionDate)? EditLotDialog(InventoryLot lot) => throw new NotImplementedException();
         public bool OpenUnitsDialog(Product product) => throw new NotImplementedException();
+        public bool OpenUnitsDialog(Product product, int? preselectLotId) => throw new NotImplementedException();
         public void OpenMovementHistory() => throw new NotImplementedException();
         public void OpenLogViewer() => throw new NotImplementedException();
         public ListForSaleResult? PickListForSale(decimal suggestedPrice) => throw new NotImplementedException();
