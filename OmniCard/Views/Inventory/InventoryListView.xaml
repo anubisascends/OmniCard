@@ -13,8 +13,21 @@
         <!-- Toolbar -->
         <Border Padding="8" Background="{DynamicResource MaterialDesign.Brush.Card.Background}">
             <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Scan UPC:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                <TextBox x:Name="ScanBox" Width="180" VerticalAlignment="Center" Margin="0,0,4,0"
+                         Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                         ToolTip="Focus here and scan a barcode. Known UPC → add a lot; new UPC → create the product."
+                         Text="{Binding ScanUpc, UpdateSourceTrigger=PropertyChanged}">
+                    <TextBox.InputBindings>
+                        <KeyBinding Key="Enter" Command="{Binding ScanUpcCommand}"/>
+                    </TextBox.InputBindings>
+                </TextBox>
+                <Button Content="Scan" Command="{Binding ScanUpcCommand}"
+                        Padding="8,4" Margin="0,0,8,0"/>
+                <Separator/>
                 <Button Content="Add Product..." Command="{Binding AddProductCommand}"
-                        Padding="12,4" FontWeight="SemiBold" Margin="0,0,8,0"/>
+                        Padding="12,4" FontWeight="SemiBold" Margin="8,0,8,0"/>
                 <Button Content="Edit..." Command="{Binding EditProductCommand}"
                         Padding="8,4" Margin="0,0,8,0"/>
                 <Button Content="Add Lot..." Command="{Binding AddLotCommand}"

@@ -299,6 +299,25 @@
         <li><strong>Lots</strong> — each purchase is a lot with a quantity, unit cost, source, and date, so cost basis stays accurate as prices change.</li>
         <li><strong>Open Units</strong> — record opening/consuming sealed units (e.g. cracking a box for singles).</li>
       </ul>
+
+      <h3>Scanning barcodes (UPC)</h3>
+      <p>The fastest way to stock sealed product is a barcode scanner. The Inventory toolbar starts with a
+      <strong>Scan UPC</strong> box that is focused automatically whenever you open the Inventory view — just point your
+      scanner at the barcode and scan (the scanner types the UPC and presses Enter for you). What happens next depends on
+      whether OmniCard already knows the UPC:</p>
+      <ul>
+        <li><strong>Known UPC</strong> — OmniCard jumps straight to the <em>Add Lot</em> dialog for that product, so you
+        only enter what you paid (plus quantity and location). This is how you restock an item you already carry.</li>
+        <li><strong>New UPC</strong> — OmniCard does a quick online lookup of the barcode and opens the product editor
+        <em>prefilled</em> with whatever it found (name and box image), so you fill in as little as possible. Confirm the
+        game and category, save, and it immediately prompts for the first lot's cost.</li>
+      </ul>
+      <p>The online lookup is best-effort: if the barcode isn't found (or you're offline) the editor simply opens blank
+      with the UPC filled in, ready for manual entry. The lookup works regardless of which game is selected — matching is
+      purely by UPC. You can also trigger it manually with the <strong>Look up</strong> button next to the UPC field in the
+      product editor.</p>
+      <div class="callout note">The barcode service uses a free, rate-limited public catalog (about 100 lookups per day).
+      For high-volume intake, expect some lookups to come back empty — the workflow still works, you just type a bit more.</div>
       <figure class="shot" data-img="inventory.png"><span>Screenshot placeholder — <code>images/inventory.png</code></span></figure>
     </section>
 

@@ -12,15 +12,18 @@ public sealed partial class InventoryViewModel : ViewModel
     private readonly IInventoryService _inventoryService;
     private readonly IDialogService _dialogService;
     private readonly ISealedPriceUpdateService _sealedPriceUpdateService;
+    private readonly IUpcLookupService _upcLookupService;
 
     public InventoryViewModel(
         IInventoryService inventoryService,
         IDialogService dialogService,
-        ISealedPriceUpdateService sealedPriceUpdateService)
+        ISealedPriceUpdateService sealedPriceUpdateService,
+        IUpcLookupService upcLookupService)
     {
         _inventoryService = inventoryService;
         _dialogService = dialogService;
         _sealedPriceUpdateService = sealedPriceUpdateService;
+        _upcLookupService = upcLookupService;
     }
 
     [ObservableProperty]
@@ -54,6 +57,17 @@ public sealed partial class InventoryViewModel : ViewModel
 
     /// <summary>Set by RootViewModel to report status messages.</summary>
     public Action<string>? ReportMessage { get; set; }
+
+    /// <summary>Set by the view to return keyboard focus to the barcode-scan box after each scan.</summary>
+    public Action? FocusScanBox { get; set; }
+
+    /// <summary>Bound to the barcode-scan TextBox in the toolbar. A hardware scanner types the
+    /// UPC here and sends Enter, which fires <see cref="ScanUpcCommand"/>.</summary>
+    [ObservableProperty]
+    public partial string ScanUpc { get; set; } = "";
+
+    [ObservableProperty]
+    public partial bool IsScanning { get; set; }
 
     [ObservableProperty]
     public partial bool IsRefreshingSealedPrices { get; set; }
@@ -127,6 +141,86 @@ public sealed partial class InventoryViewModel : ViewModel
         }
     }
 
+    /// <summary>
+    /// Barcode-scan entry point. Reads the UPC that a hardware scanner typed into the scan box:
+    ///  - Known UPC → jump straight to the "what did you pay?" add-lot dialog for that product.
+    ///  - Unknown UPC → silently look the barcode up online, prefill a new sealed product from
+    ///    whatever was found, let the user confirm/complete it, then add its first lot.
+    /// The game filter is irrelevant here — lookup is purely by UPC across all games.
+    /// </summary>
+    [RelayCommand]
+    public async Task ScanUpcAsync()
+    {
+        var upc = (ScanUpc ?? "").Trim();
+        ScanUpc = "";
+
+        if (upc.Length == 0)
+        {
+            FocusScanBox?.Invoke();
+            return;
+        }
+
+        var existing = _inventoryService.FindProductByUpc(upc);
+        if (existing is not null)
+        {
+            ReportMessage?.Invoke($"Found '{existing.Name}' — add what you paid.");
+            AddLotFor(existing);
+            FocusScanBox?.Invoke();
+            return;
+        }
+
+        // Unknown UPC: attempt a silent online lookup so the editor opens as prefilled as possible.
+        UpcLookupResult? info = null;
+        IsScanning = true;
+        ReportMessage?.Invoke($"Looking up UPC {upc}…");
+        try
+        {
+            info = await _upcLookupService.LookupAsync(upc);
+        }
+        finally
+        {
+            IsScanning = false;
+        }
+
+        ReportMessage?.Invoke(info?.Title is { Length: > 0 } title
+            ? $"Found \"{title}\" — confirm the details."
+            : $"No online match for UPC {upc} — enter the details manually.");
+
+        var prefilled = new Product
+        {
+            Category = ProductCategory.Box,
+            Name = info?.Title ?? "",
+            Upc = upc,
+            ImageUri = info?.ImageUrl,
+        };
+
+        var created = _dialogService.EditProduct(prefilled);
+        if (created is null)
+        {
+            FocusScanBox?.Invoke();
+            return;
+        }
+
+        var saved = _inventoryService.CreateProduct(created);
+        ReportMessage?.Invoke($"Added product '{saved.Name}'.");
+        AddLotFor(saved);
+        LoadInventory();
+        FocusScanBox?.Invoke();
+    }
+
+    /// <summary>Prompt for cost/quantity/location and record a lot for <paramref name="product"/>.</summary>
+    private void AddLotFor(Product product)
+    {
+        var input = _dialogService.AddLotDialog(product.Id);
+        if (input is null) return;
+
+        var (quantity, unitCost, locationId, source, date) = input.Value;
+        _inventoryService.AddLot(product.Id, quantity, unitCost, locationId, source, date);
+
+        ReportMessage?.Invoke($"Added {quantity} unit(s) of '{product.Name}'.");
+        LoadInventory();
+    }
+
     [RelayCommand]
     public void AddProduct()
     {
@@ -155,15 +249,7 @@ public sealed partial class InventoryViewModel : ViewModel
     public void AddLot()
     {
         if (SelectedRow is null) return;
-
-        var input = _dialogService.AddLotDialog(SelectedRow.Product.Id);
-        if (input is null) return;
-
-        var (quantity, unitCost, locationId, source, date) = input.Value;
-        _inventoryService.AddLot(SelectedRow.Product.Id, quantity, unitCost, locationId, source, date);
-
-        ReportMessage?.Invoke($"Added {quantity} unit(s) of '{SelectedRow.Product.Name}'.");
-        LoadInventory();
+        AddLotFor(SelectedRow.Product);
     }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
