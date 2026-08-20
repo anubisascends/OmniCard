@@ -95,6 +95,7 @@ tr:active { background: var(--surface); }
 }
 
 .card-tile {
+    position: relative;
     display: block;
     background: var(--surface);
     border: 1px solid var(--border);
@@ -146,9 +147,27 @@ tr:active { background: var(--surface); }
     text-overflow: ellipsis;
 }
 
-.card-tile .price { font-weight: 600; font-size: 0.85rem; margin-top: 2px; }
-
 .card-tile .qty { color: var(--accent); font-weight: 600; font-size: 0.85rem; }
+
+/* Market-price pill overlaid on the top-right corner of a card's art. Shared by the search/
+   location tiles, the binder slots, and the card-detail image. */
+.price-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 2;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    pointer-events: none;
+}
+
+/* Binder slots have zero padding and clip their content, so tuck the pill tight to the corner. */
+.binder-slot.filled .price-badge { top: 4px; right: 4px; font-size: 0.7rem; padding: 1px 5px; }
 
 .tag-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 
@@ -176,12 +195,43 @@ tr:active { background: var(--surface); }
 .back-link:hover { text-decoration: none; background: var(--surface); }
 .back-link:active { background: var(--border); }
 
+.card-image-wrap {
+    position: relative;
+    display: inline-block;
+    max-width: 300px;
+    width: 100%;
+    margin-bottom: 16px;
+}
+
+.card-image-wrap .card-image { margin-bottom: 0; }
+
 .card-image {
     max-width: 300px;
     width: 100%;
     border-radius: 8px;
     margin-bottom: 16px;
 }
+
+/* Card-detail action row: Trade + TCGPlayer links side by side. */
+.card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+
+/* Secondary (outlined) action button, distinct from the filled .trade-button. */
+.tcg-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 18px;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    color: var(--accent);
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.tcg-link:hover { background: var(--surface); text-decoration: none; }
+.tcg-link:active { opacity: 0.75; }
 
 .detail-table { margin-bottom: 16px; }
 .detail-table th { width: 140px; font-size: 0.8rem; }
@@ -276,6 +326,64 @@ tr:active { background: var(--surface); }
 }
 
 .clear-link:active { opacity: 0.7; }
+
+/* Quick-search + sort toolbar above the card-tile grid (collection-view.js). */
+.collection-toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.collection-toolbar .cv-filter {
+    flex: 1;
+    min-width: 200px;
+    min-height: 44px;
+    padding: 8px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 1rem;
+}
+
+.collection-toolbar .cv-sort-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.collection-toolbar .cv-sort {
+    min-height: 44px;
+    padding: 8px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.95rem;
+}
+
+.collection-toolbar .cv-dir {
+    min-height: 44px;
+    padding: 8px 14px;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.collection-toolbar .cv-dir:hover { background: var(--border); }
+.collection-toolbar .cv-dir:active { opacity: 0.75; }
+
+.collection-toolbar .cv-count { color: var(--text-muted); font-size: 0.8rem; }
 
 .decklist-form {
     display: flex;
@@ -714,4 +822,11 @@ body.modal-open { overflow: hidden; }
     .clear-link {
         align-self: flex-start;
     }
+
+    .collection-toolbar { flex-direction: column; align-items: stretch; }
+    .collection-toolbar .cv-filter,
+    .collection-toolbar .cv-sort-label,
+    .collection-toolbar .cv-sort,
+    .collection-toolbar .cv-dir { width: 100%; }
+    .collection-toolbar .cv-sort { flex: 1; }
 }

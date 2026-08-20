@@ -35,15 +35,24 @@
             <p class="badge trade-badge">@Model.TradeMessage</p>
         }
 
-        @if (Model.ImageUrl is not null)
-        {
-            <img src="@Model.ImageUrl" alt="@Model.Card.Name" class="card-image"/>
-        }
+        <div class="card-image-wrap">
+            @if (Model.ImageUrl is not null)
+            {
+                <img src="@Model.ImageUrl" alt="@Model.Card.Name" class="card-image"/>
+            }
+            @if (Model.Card.MarketPrice > 0m)
+            {
+                <span class="price-badge">@Model.Card.MarketPrice.ToString("C")</span>
+            }
+        </div>
 
-        @if (!Model.Card.IsTraded)
-        {
-            <p><a href="/Trade?lotId=@Model.Card.Id" class="trade-button">Trade this card&hellip;</a></p>
-        }
+        <p class="card-actions">
+            @if (!Model.Card.IsTraded)
+            {
+                <a href="/Trade?lotId=@Model.Card.Id" class="trade-button">Trade this card&hellip;</a>
+            }
+            <a href="@Model.TcgPlayerUrl" class="tcg-link" target="_blank" rel="noopener">View on TCGPlayer &rarr;</a>
+        </p>
 
         <table class="detail-table">
             <tr><th>Set</th><td>@Model.Card.SetName (@Model.Card.SetCode)</td></tr>
@@ -54,6 +63,7 @@
             <tr><th>Foil</th><td>@(Model.Card.IsFoil ? (string.IsNullOrEmpty(Model.Card.FoilType) ? "Yes" : $"Yes — {Model.Card.FoilType}") : "No")</td></tr>
             <tr><th>Condition</th><td>@Model.Card.Condition</td></tr>
             <tr><th>Purchase Price</th><td>@(Model.Card.PurchasePrice.HasValue ? Model.Card.PurchasePrice.Value.ToString("C") : "—")</td></tr>
+            <tr><th>Market Price</th><td>@(Model.Card.MarketPrice > 0m ? Model.Card.MarketPrice.ToString("C") : "—")</td></tr>
             <tr><th>Date Added</th><td>@Model.Card.DateAdded.ToString("yyyy-MM-dd")</td></tr>
             @if (Model.Card.Container is not null)
             {

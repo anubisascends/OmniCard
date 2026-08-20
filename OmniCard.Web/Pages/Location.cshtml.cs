@@ -59,6 +59,8 @@ public class LocationModel : PageModel
 
         // Fill in catalog art for cards with no stored ImageUri, same as the desktop collection list.
         CardArtHydrator.HydrateMissingImageUris(_cardService, rawCards);
+        // Singles don't persist a price on the row — look up the live catalog price for each card.
+        MarketPriceHydrator.Populate(_cardService, rawCards);
 
         Cards = rawCards
             .GroupBy(c => new { c.Name, c.SetCode })
@@ -77,6 +79,8 @@ public class LocationModel : PageModel
                     g.Count(),
                     CardImageUrl.Resolve(rep.ScanImagePath, rep.ImageUri, _dataPathService.ScansDirectory),
                     rep.MarketPrice > 0m ? rep.MarketPrice : null,
+                    rep.Condition,
+                    rep.IsFoil,
                     rep.Tags);
             })
             .OrderBy(c => c.Name)
@@ -124,5 +128,7 @@ public class LocationModel : PageModel
         int Quantity,
         string? ImageUrl,
         decimal? MarketPrice,
+        string Condition,
+        bool IsFoil,
         List<string> Tags);
 }

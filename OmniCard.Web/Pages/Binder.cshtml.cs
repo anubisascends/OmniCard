@@ -22,15 +22,22 @@ public class BinderModel : PageModel
     private readonly IDbContextFactory<OmniCardDbContext> _dbFactory;
     private readonly ICardService _cardService;
     private readonly IDataPathService _dataPathService;
+    private readonly IDbContextFactory<ScryfallDbContext>? _scryfallFactory;
+
+    /// <summary>MTG Scryfall-id → real TCGplayer ids, resolved once per page load. See
+    /// <see cref="ScryfallTcgIdResolver"/>.</summary>
+    private Dictionary<string, ScryfallTcgIdResolver.Ids> _mtgTcgIds = new();
 
     public BinderModel(
         IDbContextFactory<OmniCardDbContext> dbFactory,
         ICardService cardService,
-        IDataPathService dataPathService)
+        IDataPathService dataPathService,
+        IDbContextFactory<ScryfallDbContext>? scryfallFactory = null)
     {
         _dbFactory = dbFactory;
         _cardService = cardService;
         _dataPathService = dataPathService;
+        _scryfallFactory = scryfallFactory;
     }
 
     public StorageContainer Container { get; set; } = null!;
@@ -73,6 +80,13 @@ public class BinderModel : PageModel
             c.Tags = tagsByLot.GetValueOrDefault(c.Id, []);
 
         CardArtHydrator.HydrateMissingImageUris(_cardService, placed);
+        // Singles don't persist a price on the row — look up the live catalog price for each slot.
+        MarketPriceHydrator.Populate(_cardService, placed);
+
+        // Resolve MTG cards' real TCGplayer ids once (single scryfall.db query for the whole page).
+        _mtgTcgIds = ScryfallTcgIdResolver.Resolve(
+            _scryfallFactory,
+            placed.Where(c => c.Game == CardGame.Mtg).Select(c => c.GameCardId));
 
         var maxUsedPage = placed.Count > 0 ? placed.Max(c => c.Page!.Value) : 0;
         TotalPages = Math.Max(1, Math.Max(container.TotalPages, maxUsedPage));
@@ -123,7 +137,20 @@ public class BinderModel : PageModel
         c.MarketPrice > 0m ? c.MarketPrice.ToString("C") : null,
         CardImageUrl.Resolve(c.ScanImagePath, c.ImageUri, _dataPathService.ScansDirectory),
         c.IsTraded,
-        c.Tags);
+        c.Tags,
+        BuildTcgPlayerUrl(c));
+
+    private string BuildTcgPlayerUrl(CollectionCard c)
+    {
+        int? resolved = null;
+        if (c.Game == CardGame.Mtg && _mtgTcgIds.TryGetValue(c.GameCardId, out var ids))
+        {
+            var etched = c.IsFoil && (c.FoilType?.Contains("Etched", StringComparison.OrdinalIgnoreCase) ?? false);
+            resolved = ids.Pick(etched);
+        }
+
+        return TcgPlayerLink.Build(c.Game, c.GameCardId, c.Name, c.SetName, resolved);
+    }
 
     public string TypeDisplay => Container.ContainerType switch
     {
@@ -151,5 +178,6 @@ public class BinderModel : PageModel
         string? Price,
         string? ImageUrl,
         bool IsTraded,
-        List<string> Tags);
+        List<string> Tags,
+        string TcgPlayerUrl);
 }

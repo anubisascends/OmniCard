@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
 using OmniCard.Interfaces;
 using OmniCard.Models;
+using OmniCard.Web;
 using OmniCard.Web.Pages;
 using OmniCard.Web.Services;
 
@@ -105,6 +106,7 @@ public class WebPageTests : IDisposable
             var rep = NewSingle("rep", "Lightning Bolt", "Alpha", "LEA", "161", "common");
             rep.ImageUri = "https://img/bolt-rep.jpg";
             rep.LastMarketPrice = 12.50m;
+            rep.Foil = true;
             var other = NewSingle("other", "Lightning Bolt", "Alpha", "LEA", "161", "common");
             other.ImageUri = "https://img/bolt-other.jpg";
             other.LastMarketPrice = 99.00m;
@@ -112,7 +114,7 @@ public class WebPageTests : IDisposable
             ctx.SaveChanges();
 
             ctx.Lots.AddRange(
-                new InventoryLot { ProductId = rep.Id },
+                new InventoryLot { ProductId = rep.Id, Condition = "LP" },
                 new InventoryLot { ProductId = other.Id });
             ctx.SaveChanges();
         }
@@ -127,6 +129,9 @@ public class WebPageTests : IDisposable
         Assert.Equal(2, result.Quantity);
         Assert.Equal("https://img/bolt-rep.jpg", result.ImageUrl);
         Assert.Equal(12.50m, result.MarketPrice);
+        // Sort/filter fields projected from the representative copy.
+        Assert.Equal("LP", result.Condition);
+        Assert.True(result.IsFoil);
     }
 
     [Fact]
@@ -198,6 +203,7 @@ public class WebPageTests : IDisposable
             var bolt = NewSingle("b1", "Lightning Bolt", "Alpha", "LEA", "161", "common");
             bolt.ImageUri = "https://img/bolt.jpg";
             bolt.LastMarketPrice = 12.50m;
+            bolt.Foil = true;
             var counter = NewSingle("c1", "Counterspell", "Alpha", "LEA", "54", "common");
             ctx.Products.AddRange(bolt, counter);
             ctx.SaveChanges();
@@ -217,6 +223,8 @@ public class WebPageTests : IDisposable
         Assert.Equal(2, boltCard.Quantity);
         Assert.Equal("https://img/bolt.jpg", boltCard.ImageUrl);
         Assert.Equal(12.50m, boltCard.MarketPrice);
+        Assert.True(boltCard.IsFoil);
+        Assert.Equal("NM", boltCard.Condition);
 
         var counterCard = Assert.Single(model.Cards, c => c.Name == "Counterspell");
         Assert.Null(counterCard.ImageUrl);
@@ -447,6 +455,74 @@ public class WebPageTests : IDisposable
 
         Assert.Null(exception);
         Assert.Null(model.ExtendedDataJson);
+    }
+
+    // --- TcgPlayerLink ---
+
+    [Fact]
+    public void TcgPlayerLink_NumericGameCardId_DeepLinksToProduct()
+    {
+        // TCGCSV games (Pokémon/Yu-Gi-Oh!/FFTCG/Riftbound) store the real TCGplayer product id.
+        var url = TcgPlayerLink.Build(CardGame.Pokemon, "12345", "Pikachu", "Base Set");
+        Assert.Equal("https://www.tcgplayer.com/product/12345", url);
+    }
+
+    [Fact]
+    public void TcgPlayerLink_ResolvedProductId_DeepLinksToProduct()
+    {
+        // MTG stores a Scryfall GUID; the real product id is resolved and passed in explicitly.
+        var url = TcgPlayerLink.Build(
+            CardGame.Mtg, "9e1a...-guid", "Lightning Bolt", "Alpha", resolvedProductId: 987);
+        Assert.Equal("https://www.tcgplayer.com/product/987", url);
+    }
+
+    [Fact]
+    public void TcgPlayerLink_NonNumericId_NoResolution_FallsBackToScopedSearch()
+    {
+        // One Piece stores a set code (e.g. OP01-001) and has no TCGplayer id → search.
+        var url = TcgPlayerLink.Build(CardGame.OnePiece, "OP01-001", "Monkey D. Luffy", "Romance Dawn");
+
+        Assert.StartsWith("https://www.tcgplayer.com/search/one-piece-card-game/product?q=", url);
+        Assert.Contains(Uri.EscapeDataString("Monkey D. Luffy Romance Dawn"), url);
+    }
+
+    [Fact]
+    public void TcgPlayerLink_SearchWithoutSet_UsesNameOnly()
+    {
+        var url = TcgPlayerLink.Build(CardGame.OnePiece, "OP01-001", "Nami", setName: null);
+        Assert.EndsWith("product?q=" + Uri.EscapeDataString("Nami"), url);
+    }
+
+    // --- MarketPriceHydrator ---
+
+    [Fact]
+    public void MarketPriceHydrator_Populate_SetsLivePricePerFoilGroup()
+    {
+        // MTG catalog returns different prices for foil vs non-foil printings of the same id.
+        var game = new OmniCard.Tests.Fakes.ConfigurableGameService
+        {
+            OnGetCurrentPrices = (ids, foil) => ids.ToDictionary(id => id, _ => foil ? 20m : 5m),
+        };
+        var cardService = new WebCardService([game]);
+
+        var plain = new CollectionCard { Game = CardGame.Mtg, GameCardId = "bolt", IsFoil = false };
+        var foilCard = new CollectionCard { Game = CardGame.Mtg, GameCardId = "bolt", IsFoil = true };
+        var traded = new CollectionCard { Game = CardGame.Mtg, GameCardId = "bolt", IsFoil = false, IsTraded = true };
+
+        MarketPriceHydrator.Populate(cardService, [plain, foilCard, traded]);
+
+        Assert.Equal(5m, plain.MarketPrice);
+        Assert.Equal(20m, foilCard.MarketPrice);
+        Assert.Equal(0m, traded.MarketPrice); // traded cards are excluded from live pricing
+    }
+
+    [Fact]
+    public void MarketPriceHydrator_Populate_UnregisteredGame_LeavesPriceZero()
+    {
+        // No game services registered → GetGameService throws → cards keep 0 rather than blowing up.
+        var card = new CollectionCard { Game = CardGame.Mtg, GameCardId = "x", MarketPrice = 0m };
+        MarketPriceHydrator.Populate(NoGameServices, [card]);
+        Assert.Equal(0m, card.MarketPrice);
     }
 
     private class TestDbContextFactory(DbContextOptions<OmniCardDbContext> options)

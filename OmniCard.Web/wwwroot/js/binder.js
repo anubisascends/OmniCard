@@ -134,6 +134,7 @@
     var mTags = document.getElementById('modalTags');
     var mTrade = document.getElementById('modalTrade');
     var mTraded = document.getElementById('modalTraded');
+    var mTcg = document.getElementById('modalTcg');
     var mDetailsLink = document.getElementById('modalDetailsLink');
 
     function row(label, value) {
@@ -182,6 +183,15 @@
             span.textContent = t;
             mTags.appendChild(span);
         });
+
+        if (mTcg) {
+            if (c.tcgPlayerUrl) {
+                mTcg.href = c.tcgPlayerUrl;
+                mTcg.hidden = false;
+            } else {
+                mTcg.hidden = true;
+            }
+        }
 
         mDetailsLink.href = '/card/' + id;
         if (c.isTraded) {

@@ -41,10 +41,18 @@
         }
         else
         {
+            <partial name="_CollectionToolbar" />
             <div class="card-tiles">
                 @foreach (var card in Model.Cards)
                 {
-                    <a href="/card/@card.Id" class="card-tile">
+                    <a href="/card/@card.Id" class="card-tile"
+                       data-name="@card.Name"
+                       data-set="@card.SetCode"
+                       data-setname="@card.SetName"
+                       data-cn="@card.Number"
+                       data-price="@(card.MarketPrice.HasValue ? card.MarketPrice.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "")"
+                       data-cond="@card.Condition"
+                       data-foil="@(card.IsFoil ? "1" : "0")">
                         @if (card.ImageUrl is not null)
                         {
                             <img src="@card.ImageUrl" loading="lazy" alt="@card.Name"/>
@@ -53,12 +61,12 @@
                         {
                             <div class="no-image">No Image</div>
                         }
-                        <div class="name" title="@card.Name">@card.Name</div>
-                        <div class="set">@card.SetName (@card.SetCode)</div>
                         @if (card.MarketPrice is not null)
                         {
-                            <div class="price">@card.MarketPrice.Value.ToString("C")</div>
+                            <span class="price-badge">@card.MarketPrice.Value.ToString("C")</span>
                         }
+                        <div class="name" title="@card.Name">@card.Name</div>
+                        <div class="set">@card.SetName (@card.SetCode)</div>
                         @if (card.Quantity > 1)
                         {
                             <div class="qty">&times;@card.Quantity</div>
@@ -77,5 +85,6 @@
             </div>
         }
     </main>
+    <script src="/js/collection-view.js"></script>
 </body>
 </html>
