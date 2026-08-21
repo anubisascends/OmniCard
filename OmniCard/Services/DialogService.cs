@@ -248,6 +248,14 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         return result == true ? wnd.ViewModel.Result : null;
     }
 
+    public void OpenTrades()
+    {
+        var wnd = Services.GetRequiredService<Views.Trades.TradesView>();
+        SetOwner(wnd);
+        wnd.ViewModel.Load();
+        wnd.ShowDialog();
+    }
+
     public void ShowAuditReport(AuditReport report)
     {
         var wnd = Services.GetRequiredService<AuditReportView>();

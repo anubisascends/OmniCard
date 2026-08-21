@@ -58,10 +58,11 @@ public partial class ScannedCard : ObservableObject
     [ObservableProperty]
     public partial decimal? CurrentPrice { get; set; }
 
-    /// <summary>Set when the user links this scan to an existing trade via "Link to Trade…" — on
-    /// commit, this scan's new lot fulfills that trade (see CardService.CommitScans).</summary>
+    /// <summary>Set when the user links this scan to an existing trade session via "Link to
+    /// Trade…" — on commit, this scan's new lot fulfills that session (see
+    /// CardService.CommitScans).</summary>
     [ObservableProperty]
-    public partial int? LinkedTradeId { get; set; }
+    public partial int? LinkedTradeSessionId { get; set; }
 
     /// <summary>Short display text for the linked trade (e.g. the traded-away card's name),
     /// cached at link time so the scan tile badge doesn't need a live lookup.</summary>

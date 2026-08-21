@@ -54,8 +54,14 @@ public class CardModel : PageModel
     [TempData]
     public string? TradeMessage { get; set; }
 
+    /// <summary>The current in-progress trade session, if any — drives whether the card's button
+    /// reads "Trade this card…" (start + add) or "Add to trade session…" (add to the open one).</summary>
+    public Guid? ActiveTradeSessionId { get; private set; }
+
     public IActionResult OnGet(int id)
     {
+        ActiveTradeSessionId = Services.TradeSessionCookie.GetActive(HttpContext, _dataPathService);
+
         using var db = _dbFactory.CreateDbContext();
 
         var lot = db.Lots

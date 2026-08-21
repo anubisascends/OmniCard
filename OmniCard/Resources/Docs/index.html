@@ -394,9 +394,27 @@
 
     <section id="trades" data-group="Sales &amp; Fulfillment">
       <h2>Trades</h2>
-      <p>Trade a card away and OmniCard records a note and photo, removes it from valuation, and logs the movement. You can start a trade
-      from the web companion's <em>Trade</em> button or link a scan to a trade in the desktop app; committing the trade deletes the
-      traded-away card and records it in the permanent trades log.</p>
+      <p>A trade is a <strong>session</strong> — one action that can send many cards out at once and records a single received haul.
+      You build a trade from the web companion (ideal at a card show on your phone); the desktop app applies it on next launch.</p>
+      <ol>
+        <li><strong>Start it.</strong> Tap <em>Start a Trade</em> (top nav) to open a new session, or open any card and tap
+        <em>Trade this card…</em> to start one already seeded with that card. Once a session is open, those buttons change to
+        <em>Open Current Trade Session…</em> and <em>Add to trade session…</em> — the session stays "current" as you browse.</li>
+        <li><strong>Add the cards you're giving.</strong> Browse to any card in any location and tap <em>Add to trade session…</em>,
+        or search your collection right inside the trade view. You can also add an <em>off-database</em> card — one that isn't in
+        your collection yet (a card-show pickup) — by photographing it and optionally entering a name and value. A running
+        <em>total given</em> updates as you go.</li>
+        <li><strong>Finalize.</strong> Open the current trade session, add a note, photograph the cards you received, and optionally
+        enter their estimated value so the trade shows a given-vs-received delta.</li>
+      </ol>
+      <p>Each owned card in the <em>Cards you're giving</em> list links to its TCGPlayer page (the exact product where known, otherwise
+      a name search). Changed your mind? <strong>Cancel trade</strong> discards the whole session and everything added to it — nothing
+      reaches the desktop, since a trade isn't applied until it's finalized and the desktop next launches.</p>
+      <p>On next launch the desktop app marks each owned card <em>Traded</em> (removed from valuation, logged as a movement) and records
+      the session in the permanent trades log. Review every trade under <em>Collection ▸ Trades…</em> — outgoing cards, the received
+      photo/note, the value delta, and how many replacements you've received so far.</p>
+      <p><strong>Reconciling what you received:</strong> when you scan the cards you got, right-click a scan ▸ <em>Link to Trade</em> and
+      pick the session. Committing deletes the traded-away cards from that session and marks it fulfilled.</p>
     </section>
 
     <!-- ===================== EBAY ===================== -->

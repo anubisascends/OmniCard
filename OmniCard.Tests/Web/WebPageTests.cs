@@ -582,6 +582,186 @@ public class WebPageTests : IDisposable
         Assert.Equal(0m, card.MarketPrice);
     }
 
+    // --- TradeSessionModel (multi-card trade builder) ---
+
+    private (TradeSessionModel Model, string TradesDir) CreateTradeModel()
+    {
+        var dataDir = Path.Combine(Path.GetTempPath(), "omnicard-trade-tests-" + Guid.NewGuid());
+        var paths = new WebDataPathService(dataDir);
+        var model = new TradeSessionModel(_factory, paths, NoGameServices) { PageContext = CreatePageContext() };
+        return (model, paths.TradesDirectory);
+    }
+
+    private static OmniCard.Models.TradeSessionRecord ReadDraft(string tradesDir)
+    {
+        var folder = Directory.GetDirectories(tradesDir).Single();
+        var json = File.ReadAllText(Path.Combine(folder, "trade.json"));
+        return System.Text.Json.JsonSerializer.Deserialize<OmniCard.Models.TradeSessionRecord>(json)!;
+    }
+
+    private static Guid SessionIdFrom(IActionResult result) =>
+        (Guid)((RedirectToPageResult)result).RouteValues!["id"]!;
+
+    private static IFormFile FakePhoto(string name = "p.jpg")
+    {
+        var bytes = System.Text.Encoding.UTF8.GetBytes("fake-image");
+        return new FormFile(new MemoryStream(bytes), 0, bytes.Length, "photo", name)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "image/jpeg",
+        };
+    }
+
+    [Fact]
+    public void TradeSession_OnPostStart_CreatesDraftFolder()
+    {
+        var (model, tradesDir) = CreateTradeModel();
+        try
+        {
+            var result = model.OnPostStart();
+
+            Assert.IsType<RedirectToPageResult>(result);
+            var record = ReadDraft(tradesDir);
+            Assert.Equal(2, record.SchemaVersion);
+            Assert.Equal("draft", record.Status);
+            Assert.Empty(record.OutgoingItems);
+        }
+        finally { Directory.Delete(Path.GetDirectoryName(tradesDir)!, recursive: true); }
+    }
+
+    [Fact]
+    public void TradeSession_OnPostAddOwned_AppendsOwnedItem()
+    {
+        var (model, tradesDir) = CreateTradeModel();
+        try
+        {
+            int lotId;
+            using (var ctx = _factory.CreateDbContext())
+            {
+                var p = NewSingle("bolt", "Lightning Bolt", "Alpha", "LEA", "161", "common");
+                ctx.Products.Add(p);
+                ctx.SaveChanges();
+                var lot = new InventoryLot { ProductId = p.Id };
+                ctx.Lots.Add(lot);
+                ctx.SaveChanges();
+                lotId = lot.Id;
+            }
+
+            var id = SessionIdFrom(model.OnPostStart());
+            model.OnPostAddOwned(id, lotId);
+
+            var item = Assert.Single(ReadDraft(tradesDir).OutgoingItems);
+            Assert.Equal(lotId, item.LotId);
+            Assert.False(item.IsOffDatabase);
+            Assert.Equal("Lightning Bolt", item.CardName);
+        }
+        finally { Directory.Delete(Path.GetDirectoryName(tradesDir)!, recursive: true); }
+    }
+
+    [Fact]
+    public void TradeSession_OnPostAddCard_StartsSessionAndAddsCard()
+    {
+        var (model, tradesDir) = CreateTradeModel();
+        try
+        {
+            int lotId;
+            using (var ctx = _factory.CreateDbContext())
+            {
+                var p = NewSingle("bolt", "Lightning Bolt", "Alpha", "LEA", "161", "common");
+                ctx.Products.Add(p);
+                ctx.SaveChanges();
+                var lot = new InventoryLot { ProductId = p.Id };
+                ctx.Lots.Add(lot);
+                ctx.SaveChanges();
+                lotId = lot.Id;
+            }
+
+            // No active session yet — AddCard should create one and add the card, returning to the card.
+            var result = model.OnPostAddCard(lotId);
+
+            var redirect = Assert.IsType<RedirectToPageResult>(result);
+            Assert.Equal("Card", redirect.PageName);
+            var item = Assert.Single(ReadDraft(tradesDir).OutgoingItems);
+            Assert.Equal(lotId, item.LotId);
+            Assert.Equal("Lightning Bolt", item.CardName);
+        }
+        finally { Directory.Delete(Path.GetDirectoryName(tradesDir)!, recursive: true); }
+    }
+
+    [Fact]
+    public async Task TradeSession_OnPostAddOffDb_AppendsOffDbItemWithPhoto()
+    {
+        var (model, tradesDir) = CreateTradeModel();
+        try
+        {
+            var id = SessionIdFrom(model.OnPostStart());
+            await model.OnPostAddOffDbAsync(id, "Rare Alt Art", 25m, FakePhoto());
+
+            var record = ReadDraft(tradesDir);
+            var item = Assert.Single(record.OutgoingItems);
+            Assert.True(item.IsOffDatabase);
+            Assert.Null(item.LotId);
+            Assert.Equal("Rare Alt Art", item.CardName);
+            Assert.Equal(25m, item.EstimatedValue);
+            Assert.NotNull(item.PhotoFileName);
+            var folder = Directory.GetDirectories(tradesDir).Single();
+            Assert.True(File.Exists(Path.Combine(folder, item.PhotoFileName!)));
+        }
+        finally { Directory.Delete(Path.GetDirectoryName(tradesDir)!, recursive: true); }
+    }
+
+    [Fact]
+    public async Task TradeSession_OnPostFinalize_WritesReceivedPhotoAndFlipsStatus()
+    {
+        var (model, tradesDir) = CreateTradeModel();
+        try
+        {
+            var id = SessionIdFrom(model.OnPostStart());
+            await model.OnPostAddOffDbAsync(id, "Card", 5m, FakePhoto());
+
+            var result = await model.OnPostFinalizeAsync(id, "traded with Dave", 7m, FakePhoto("received.jpg"));
+
+            Assert.IsType<RedirectToPageResult>(result); // redirects to Index on success
+            var record = ReadDraft(tradesDir);
+            Assert.Equal("final", record.Status);
+            Assert.Equal("traded with Dave", record.Note);
+            Assert.Equal(7m, record.ReceivedValue);
+            Assert.NotNull(record.ReceivedPhotoFileName);
+        }
+        finally { Directory.Delete(Path.GetDirectoryName(tradesDir)!, recursive: true); }
+    }
+
+    [Fact]
+    public void TradeSession_OnPostCancel_DeletesDraftFolder()
+    {
+        var (model, tradesDir) = CreateTradeModel();
+        try
+        {
+            var id = SessionIdFrom(model.OnPostStart());
+            Assert.NotEmpty(Directory.GetDirectories(tradesDir)); // draft exists
+
+            var result = model.OnPostCancel(id);
+
+            Assert.IsType<RedirectToPageResult>(result);
+            Assert.Empty(Directory.GetDirectories(tradesDir)); // folder + contents gone
+        }
+        finally { if (Directory.Exists(Path.GetDirectoryName(tradesDir)!)) Directory.Delete(Path.GetDirectoryName(tradesDir)!, recursive: true); }
+    }
+
+    [Fact]
+    public async Task TradeSession_OnPostFinalize_EmptyTrade_StaysDraft()
+    {
+        var (model, tradesDir) = CreateTradeModel();
+        try
+        {
+            var id = SessionIdFrom(model.OnPostStart());
+            await model.OnPostFinalizeAsync(id, "note", null, null);
+
+            Assert.Equal("draft", ReadDraft(tradesDir).Status); // nothing to trade → not finalized
+        }
+        finally { Directory.Delete(Path.GetDirectoryName(tradesDir)!, recursive: true); }
+    }
+
     private class TestDbContextFactory(DbContextOptions<OmniCardDbContext> options)
         : IDbContextFactory<OmniCardDbContext>
     {

@@ -42,100 +42,115 @@ public class CardServiceTradeFulfillmentTests : IDisposable
         new NullAuditService(),
         new StubScannerSettingsService());
 
-    /// <summary>Seeds a traded-away lot + its Trade row, as TradeImportService would leave them.</summary>
-    private (int TradeId, int OriginalLotId) SeedOpenTrade(string cardName = "Traded Card")
+    /// <summary>Seeds a trade session with one or more traded-away lots + their Trade rows, as
+    /// TradeImportService would leave them. Returns the session id and the outgoing lot ids.</summary>
+    private (int SessionId, int[] OriginalLotIds) SeedOpenTrade(int outgoingCards = 1)
     {
         using var ctx = new OmniCardDbContext(_omniOptions);
-        var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, GameCardId = "old", Name = cardName };
-        ctx.Products.Add(product);
-        ctx.SaveChanges();
-        var lot = new InventoryLot { ProductId = product.Id };
-        ctx.Lots.Add(lot);
-        ctx.SaveChanges();
-
-        var trade = new Trade
+        var session = new TradeSession
         {
-            TradeRecordId = Guid.NewGuid(),
-            Game = CardGame.Mtg,
-            CardName = cardName,
+            SessionRecordId = Guid.NewGuid(),
             Note = "traded",
-            OriginalLotId = lot.Id,
             CreatedAt = DateTime.UtcNow,
             ImportedAt = DateTime.UtcNow,
         };
-        ctx.Trades.Add(trade);
+        ctx.TradeSessions.Add(session);
         ctx.SaveChanges();
-        return (trade.Id, lot.Id);
+
+        var lotIds = new List<int>();
+        for (var i = 0; i < outgoingCards; i++)
+        {
+            var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, GameCardId = "old" + i, Name = "Traded Card " + i };
+            ctx.Products.Add(product);
+            ctx.SaveChanges();
+            var lot = new InventoryLot { ProductId = product.Id };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            lotIds.Add(lot.Id);
+
+            ctx.Trades.Add(new Trade
+            {
+                TradeSessionId = session.Id,
+                TradeRecordId = session.SessionRecordId,
+                Game = CardGame.Mtg,
+                CardName = product.Name,
+                OriginalLotId = lot.Id,
+                CreatedAt = DateTime.UtcNow,
+                ImportedAt = DateTime.UtcNow,
+            });
+        }
+        ctx.SaveChanges();
+        return (session.Id, lotIds.ToArray());
     }
 
-    private static ScannedCard NewScan(CardGame game, string gameCardId, int? linkedTradeId) => new()
+    private static ScannedCard NewScan(CardGame game, string gameCardId, int? linkedSessionId) => new()
     {
         Hash = 1,
         Game = game,
         TempImagePath = Path.Combine(Path.GetTempPath(), "nonexistent-" + Guid.NewGuid() + ".jpg"),
         Match = new CardMatch { Name = "Replacement", SetCode = "TST", GameSpecificId = gameCardId },
-        LinkedTradeId = linkedTradeId,
+        LinkedTradeSessionId = linkedSessionId,
     };
 
     [Fact]
-    public void CommitScans_LinkedScan_SetsFulfilledTradeIdOnNewLot()
+    public void CommitScans_LinkedScan_SetsFulfilledTradeSessionIdOnNewLot()
     {
-        var (tradeId, _) = SeedOpenTrade();
+        var (sessionId, _) = SeedOpenTrade();
         var svc = CreateService();
 
-        svc.CommitScans([NewScan(CardGame.Mtg, "new", tradeId)]);
+        svc.CommitScans([NewScan(CardGame.Mtg, "new", sessionId)]);
 
         using var ctx = new OmniCardDbContext(_omniOptions);
         var newLot = ctx.Lots.Single(l => l.Product.GameCardId == "new");
-        Assert.Equal(tradeId, newLot.FulfilledTradeId);
+        Assert.Equal(sessionId, newLot.FulfilledTradeSessionId);
     }
 
     [Fact]
-    public void CommitScans_LinkedScan_DeletesOriginalLotOnFirstFulfillment()
+    public void CommitScans_LinkedScan_DeletesAllOutgoingLotsOnFirstFulfillment()
     {
-        var (tradeId, originalLotId) = SeedOpenTrade();
+        var (sessionId, originalLotIds) = SeedOpenTrade(outgoingCards: 3);
         var svc = CreateService();
 
-        svc.CommitScans([NewScan(CardGame.Mtg, "new", tradeId)]);
+        svc.CommitScans([NewScan(CardGame.Mtg, "new", sessionId)]);
 
         using var ctx = new OmniCardDbContext(_omniOptions);
-        Assert.False(ctx.Lots.Any(l => l.Id == originalLotId));
+        Assert.False(ctx.Lots.Any(l => originalLotIds.Contains(l.Id)));
     }
 
     [Fact]
-    public void CommitScans_LinkedScan_SetsTradeFirstFulfilledAtAndClearsOriginalLotId()
+    public void CommitScans_LinkedScan_SetsSessionFirstFulfilledAtAndClearsOriginalLotIds()
     {
-        var (tradeId, _) = SeedOpenTrade();
+        var (sessionId, _) = SeedOpenTrade(outgoingCards: 2);
         var svc = CreateService();
 
-        svc.CommitScans([NewScan(CardGame.Mtg, "new", tradeId)]);
+        svc.CommitScans([NewScan(CardGame.Mtg, "new", sessionId)]);
 
         using var ctx = new OmniCardDbContext(_omniOptions);
-        var trade = ctx.Trades.Single(t => t.Id == tradeId);
-        Assert.NotNull(trade.FirstFulfilledAt);
-        Assert.Null(trade.OriginalLotId);
+        var session = ctx.TradeSessions.Single(s => s.Id == sessionId);
+        Assert.NotNull(session.FirstFulfilledAt);
+        Assert.All(ctx.Trades.Where(t => t.TradeSessionId == sessionId), t => Assert.Null(t.OriginalLotId));
     }
 
     [Fact]
-    public void CommitScans_SecondReplacementForSameTrade_DoesNotErrorOrRedelete()
+    public void CommitScans_SecondReplacementForSameSession_DoesNotErrorOrRedelete()
     {
-        var (tradeId, _) = SeedOpenTrade();
+        var (sessionId, _) = SeedOpenTrade();
         var svc = CreateService();
 
-        svc.CommitScans([NewScan(CardGame.Mtg, "first-replacement", tradeId)]);
-        var firstFulfilledAt = new OmniCardDbContext(_omniOptions).Trades.Single(t => t.Id == tradeId).FirstFulfilledAt;
+        svc.CommitScans([NewScan(CardGame.Mtg, "first-replacement", sessionId)]);
+        var firstFulfilledAt = new OmniCardDbContext(_omniOptions).TradeSessions.Single(s => s.Id == sessionId).FirstFulfilledAt;
 
-        // Second commit, same trade — the original lot is already gone; should just link, not throw.
-        var exception = Record.Exception(() => svc.CommitScans([NewScan(CardGame.Mtg, "second-replacement", tradeId)]));
+        // Second commit, same session — the original lots are already gone; should just link, not throw.
+        var exception = Record.Exception(() => svc.CommitScans([NewScan(CardGame.Mtg, "second-replacement", sessionId)]));
 
         Assert.Null(exception);
         using var ctx = new OmniCardDbContext(_omniOptions);
-        Assert.Equal(2, ctx.Lots.Count(l => l.FulfilledTradeId == tradeId));
-        Assert.Equal(firstFulfilledAt, ctx.Trades.Single(t => t.Id == tradeId).FirstFulfilledAt);
+        Assert.Equal(2, ctx.Lots.Count(l => l.FulfilledTradeSessionId == sessionId));
+        Assert.Equal(firstFulfilledAt, ctx.TradeSessions.Single(s => s.Id == sessionId).FirstFulfilledAt);
     }
 
     [Fact]
-    public void CommitScans_UnlinkedScan_DoesNotSetFulfilledTradeId()
+    public void CommitScans_UnlinkedScan_DoesNotSetFulfilledTradeSessionId()
     {
         var svc = CreateService();
 
@@ -143,7 +158,7 @@ public class CardServiceTradeFulfillmentTests : IDisposable
 
         using var ctx = new OmniCardDbContext(_omniOptions);
         var lot = ctx.Lots.Single(l => l.Product.GameCardId == "plain");
-        Assert.Null(lot.FulfilledTradeId);
+        Assert.Null(lot.FulfilledTradeSessionId);
     }
 
     // --- Helpers (mirrors CardServiceCollectionTests) ---

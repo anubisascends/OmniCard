@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Collection;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Tests.Services;
@@ -25,53 +26,78 @@ public class TradeServiceTests : IDisposable
 
     public void Dispose() => _connection.Dispose();
 
-    private TradeService CreateService() => new(_factory);
+    private TradeService CreateService() => new(_factory, new StubDataPathService());
 
-    private int SeedTrade(string cardName, DateTime createdAt, int? originalLotId = 1)
+    private int SeedSession(DateTime createdAt, decimal outgoingValue = 0m, decimal? receivedValue = null, params string[] cardNames)
     {
         using var ctx = _factory.CreateDbContext();
-        var trade = new Trade
+        var session = new TradeSession
         {
-            TradeRecordId = Guid.NewGuid(),
-            Game = CardGame.Mtg,
-            CardName = cardName,
+            SessionRecordId = Guid.NewGuid(),
             Note = "traded",
-            OriginalLotId = originalLotId,
+            OutgoingValue = outgoingValue,
+            ReceivedValue = receivedValue,
             CreatedAt = createdAt,
             ImportedAt = createdAt,
         };
-        ctx.Trades.Add(trade);
+        ctx.TradeSessions.Add(session);
         ctx.SaveChanges();
-        return trade.Id;
+
+        foreach (var name in cardNames.DefaultIfEmpty("Card"))
+        {
+            ctx.Trades.Add(new Trade
+            {
+                TradeSessionId = session.Id,
+                TradeRecordId = session.SessionRecordId,
+                Game = CardGame.Mtg,
+                CardName = name,
+                OriginalLotId = 1,
+                CreatedAt = createdAt,
+                ImportedAt = createdAt,
+            });
+        }
+        ctx.SaveChanges();
+        return session.Id;
     }
 
-    private void SeedReplacementLot(int tradeId)
+    private void SeedReplacementLot(int sessionId)
     {
         using var ctx = _factory.CreateDbContext();
-        var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, GameCardId = "r", Name = "Replacement" };
+        var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, GameCardId = Guid.NewGuid().ToString(), Name = "Replacement" };
         ctx.Products.Add(product);
         ctx.SaveChanges();
-        ctx.Lots.Add(new InventoryLot { ProductId = product.Id, FulfilledTradeId = tradeId });
+        ctx.Lots.Add(new InventoryLot { ProductId = product.Id, FulfilledTradeSessionId = sessionId });
         ctx.SaveChanges();
     }
 
     [Fact]
     public void GetTrades_ReturnsNewestFirst()
     {
-        SeedTrade("Older", DateTime.UtcNow.AddDays(-1));
-        SeedTrade("Newer", DateTime.UtcNow);
+        SeedSession(DateTime.UtcNow.AddDays(-1), cardNames: "Older");
+        SeedSession(DateTime.UtcNow, cardNames: "Newer");
 
         var trades = CreateService().GetTrades();
 
-        Assert.Equal(["Newer", "Older"], trades.Select(t => t.CardName));
+        Assert.Equal(["Newer", "Older"], trades.Select(t => t.OutgoingCards[0].CardName));
     }
 
     [Fact]
-    public void GetTrades_ComputesReplacementCount()
+    public void GetTrades_IncludesAllOutgoingCards()
     {
-        var tradeId = SeedTrade("Traded Card", DateTime.UtcNow);
-        SeedReplacementLot(tradeId);
-        SeedReplacementLot(tradeId);
+        SeedSession(DateTime.UtcNow, cardNames: ["Sol Ring", "Mana Crypt", "Mox Opal"]);
+
+        var trade = Assert.Single(CreateService().GetTrades());
+
+        Assert.Equal(3, trade.OutgoingCards.Count);
+        Assert.Equal("Sol Ring (+2 more)", trade.Label);
+    }
+
+    [Fact]
+    public void GetTrades_ComputesReplacementCount_FromSessionLink()
+    {
+        var sessionId = SeedSession(DateTime.UtcNow, cardNames: "Traded Card");
+        SeedReplacementLot(sessionId);
+        SeedReplacementLot(sessionId);
 
         var trade = Assert.Single(CreateService().GetTrades());
 
@@ -79,24 +105,36 @@ public class TradeServiceTests : IDisposable
     }
 
     [Fact]
-    public void GetTrades_ZeroReplacements_WhenNoneLinked()
+    public void GetTrades_ComputesValueDelta()
     {
-        SeedTrade("Traded Card", DateTime.UtcNow);
+        SeedSession(DateTime.UtcNow, outgoingValue: 10m, receivedValue: 14m, cardNames: "Traded Card");
 
         var trade = Assert.Single(CreateService().GetTrades());
 
-        Assert.Equal(0, trade.ReplacementCount);
+        Assert.Equal(10m, trade.OutgoingValue);
+        Assert.Equal(14m, trade.ReceivedValue);
+        Assert.Equal(4m, trade.ValueDelta);
+    }
+
+    [Fact]
+    public void GetTrades_ValueDeltaNull_WhenReceivedValueUnknown()
+    {
+        SeedSession(DateTime.UtcNow, outgoingValue: 10m, cardNames: "Traded Card");
+
+        var trade = Assert.Single(CreateService().GetTrades());
+
+        Assert.Null(trade.ValueDelta);
     }
 
     [Fact]
     public void GetTrade_ReturnsMatchingSummary()
     {
-        var tradeId = SeedTrade("Traded Card", DateTime.UtcNow);
+        var sessionId = SeedSession(DateTime.UtcNow, cardNames: "Traded Card");
 
-        var summary = CreateService().GetTrade(tradeId);
+        var summary = CreateService().GetTrade(sessionId);
 
         Assert.NotNull(summary);
-        Assert.Equal("Traded Card", summary.CardName);
+        Assert.Equal("Traded Card", summary.OutgoingCards[0].CardName);
     }
 
     [Fact]
@@ -108,5 +146,20 @@ public class TradeServiceTests : IDisposable
     private class TestDbContextFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
         public OmniCardDbContext CreateDbContext() => new(options);
+    }
+
+    private class StubDataPathService : IDataPathService
+    {
+        public string DataDirectory => "";
+        public string ScansDirectory => "";
+        public string TempScansDirectory => "";
+        public string SymbolsCacheDirectory => "";
+        public string LogsDirectory => "";
+        public string TradesDirectory => "";
+        public string? PendingDataDirectory => null;
+        public bool IsMigrationPending => false;
+        public void SetPendingDataDirectory(string path) => throw new NotSupportedException();
+        public void CommitMigration() => throw new NotSupportedException();
+        public void CancelPendingMigration() => throw new NotSupportedException();
     }
 }

@@ -34,6 +34,10 @@ public class IndexModel : PageModel
     public List<CardSearchResult> SearchResults { get; set; } = [];
     public bool IsSearchActive => !string.IsNullOrWhiteSpace(Q);
 
+    /// <summary>The current in-progress trade session, if any — drives the nav "Start a Trade" vs
+    /// "Open Current Trade Session…" link.</summary>
+    public Guid? ActiveTradeSessionId { get; private set; }
+
     /// <summary>The system Bulk location plus any user-marked always-available locations, shown in a
     /// single "Always Available" section ahead of the type groups. Never hidden by the game filter.</summary>
     public IEnumerable<ContainerSummary> AlwaysAvailableContainers =>
@@ -48,6 +52,8 @@ public class IndexModel : PageModel
 
     public void OnGet()
     {
+        ActiveTradeSessionId = OmniCard.Web.Services.TradeSessionCookie.GetActive(HttpContext, _dataPathService);
+
         if (IsSearchActive)
             ExecuteSearch();
         else
