@@ -36,6 +36,18 @@ public sealed partial class ManualAddViewModel : ViewModel
     [ObservableProperty]
     public partial CardMatch? SelectedResult { get; set; }
 
+    /// <summary>Sets available for the active game, with an "All Sets" sentinel (empty
+    /// <see cref="SetInfo.SetCode"/>) first so the user can opt out of set filtering.</summary>
+    public ObservableCollection<SetInfo> AvailableSets { get; } = [];
+
+    /// <summary>Set to restrict the search to; the "All Sets" sentinel means no restriction.</summary>
+    [ObservableProperty]
+    public partial SetInfo? SelectedSet { get; set; }
+
+    /// <summary>Optional exact collector number to search for.</summary>
+    [ObservableProperty]
+    public partial string CollectorNumber { get; set; } = "";
+
     // Card properties
     [ObservableProperty]
     public partial string Condition { get; set; } = "NM";
@@ -102,9 +114,18 @@ public sealed partial class ManualAddViewModel : ViewModel
         foreach (var c in containers)
             Containers.Add(c);
 
+        var game = _cardService.SelectedGame;
+
         AvailableFoilTypes.Clear();
-        foreach (var t in FoilTypes.ForGame(_cardService.SelectedGame))
+        foreach (var t in FoilTypes.ForGame(game))
             AvailableFoilTypes.Add(t);
+
+        AvailableSets.Clear();
+        AvailableSets.Add(new SetInfo("", "All Sets"));
+        foreach (var s in _cardService.GetGameService(game).GetAvailableSets())
+            AvailableSets.Add(s);
+        SelectedSet = AvailableSets[0];
+        CollectorNumber = "";
 
         SelectedContainer = defaultContainer ?? (Containers.Count > 0 ? Containers[0] : null);
     }
@@ -123,11 +144,26 @@ public sealed partial class ManualAddViewModel : ViewModel
     [RelayCommand]
     public void Search()
     {
-        if (string.IsNullOrWhiteSpace(SearchQuery)) return;
+        // Compose the free-text query with the Set and Collector # filters using the
+        // set:/cn: token syntax every ICardGameService.SearchCards already understands.
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(SearchQuery))
+            parts.Add(SearchQuery.Trim());
+        if (SelectedSet is { SetCode.Length: > 0 } set)
+            parts.Add($"set:{set.SetCode}");
+        if (!string.IsNullOrWhiteSpace(CollectorNumber))
+            parts.Add($"cn:{CollectorNumber.Trim()}");
+
+        var query = string.Join(' ', parts);
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            StatusMessage = "Enter a name, set, or collector number to search.";
+            return;
+        }
 
         var game = _cardService.SelectedGame;
         var gameService = _cardService.GetGameService(game);
-        var results = gameService.SearchCards(SearchQuery, 20);
+        var results = gameService.SearchCards(query, 20);
 
         SearchResults.Clear();
         foreach (var r in results)
@@ -182,8 +218,10 @@ public sealed partial class ManualAddViewModel : ViewModel
         StatusMessage = $"{AddedCount} card{(AddedCount == 1 ? "" : "s")} added";
         _logger.LogInformation("Manually added {Qty}x {Name} to collection", Quantity, SelectedResult.Name);
 
-        // Reset for next card
+        // Reset for next card. Keep the Set filter — users often add several from one set —
+        // but clear the collector number since it identifies a single card.
         SearchQuery = "";
+        CollectorNumber = "";
         SearchResults.Clear();
         SelectedResult = null;
         Quantity = 1;
