@@ -21,6 +21,7 @@
         @if (Model.Container.ContainerType == ContainerType.Binder)
         {
             <a href="/binder/@Model.Container.Id" class="binder-open">📖 Open binder view</a>
+            <a href="/binder/@Model.Container.Id/edit" class="binder-open">✏️ Edit binder</a>
         }
 
         @if (Model.Sets.Count > 0)

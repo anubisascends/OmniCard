@@ -62,7 +62,7 @@ public partial class BinderView : Window
         if (Math.Abs(pos.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
             Math.Abs(pos.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance) return;
 
-        DragDrop.DoDragDrop((DependencyObject)sender, _dragPayload, DragDropEffects.Move);
+        BeginDrag((DependencyObject)sender);
     }
 
     private void SlotCard_MouseDown(object sender, MouseButtonEventArgs e)
@@ -90,7 +90,29 @@ public partial class BinderView : Window
         if (Math.Abs(pos.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
             Math.Abs(pos.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance) return;
 
-        DragDrop.DoDragDrop((DependencyObject)sender, _dragPayload, DragDropEffects.Move);
+        BeginDrag((DependencyObject)sender);
+    }
+
+    /// <summary>Runs a modal drag from <paramref name="source"/> using the pending payload, then
+    /// clears the drag state. Clearing afterwards is essential: <see cref="DragDrop.DoDragDrop"/> is
+    /// a blocking call that frequently swallows the terminating LeftButtonUp, leaving WPF believing
+    /// the button is still pressed. Without this reset, the stale <see cref="_dragPayload"/> would be
+    /// re-consumed by the next PreviewMouseMove — even one fired while opening a right-click context
+    /// menu — launching a phantom drag that drops the last-dragged card onto whatever slot the
+    /// pointer is over. (Root cause of "Add Missing Card places the last card I dragged.")</summary>
+    private void BeginDrag(DependencyObject source)
+    {
+        var payload = _dragPayload;
+        if (payload is null) return;
+
+        try
+        {
+            DragDrop.DoDragDrop(source, payload, DragDropEffects.Move);
+        }
+        finally
+        {
+            _dragPayload = null;
+        }
     }
 
     private void Slot_DragOver(object sender, DragEventArgs e)
