@@ -26,7 +26,12 @@ public class InventoryLot
     public string? TradeNote { get; set; }
     public string? TradePhotoPath { get; set; }
 
-    /// <summary>Set when this lot was added as the replacement for a linked scan at commit time
-    /// (see CardService.CommitScans) — the <see cref="Trade"/> this card came in for.</summary>
+    /// <summary>Legacy: set when this lot was added as the replacement for a linked scan under the
+    /// old single-card model. Superseded by <see cref="FulfilledTradeSessionId"/>; retained for
+    /// reading data written before multi-card trade sessions.</summary>
     public int? FulfilledTradeId { get; set; }
+
+    /// <summary>Set when this lot was added as the replacement for a linked scan at commit time
+    /// (see CardService.CommitScans) — the <see cref="TradeSession"/> this card came in for.</summary>
+    public int? FulfilledTradeSessionId { get; set; }
 }

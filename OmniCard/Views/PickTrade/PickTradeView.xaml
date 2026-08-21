@@ -37,21 +37,24 @@
                         <Border Width="56" Height="78" CornerRadius="4"
                                 Background="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"
                                 Margin="0,0,10,0">
-                            <Image Source="{Binding PhotoPath, Converter={conv:LocalFilePathToImageConverter}}"
+                            <Image Source="{Binding ThumbnailPath, Converter={conv:LocalFilePathToImageConverter}}"
                                    Stretch="Uniform"/>
                         </Border>
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock FontWeight="Bold"
-                                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
-                                <Run Text="{Binding CardName, Mode=OneWay}"/>
-                                <Run Text="{Binding Foil, Converter={conv:FoilSuffixConverter}, Mode=OneWay}"
-                                     Foreground="{DynamicResource MaterialDesign.Brush.Primary}"/>
-                            </TextBlock>
-                            <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
-                                       FontSize="11">
-                                <Run Text="{Binding SetName, Mode=OneWay}"/><Run Text=" ("/><Run Text="{Binding SetCode, Mode=OneWay}"/><Run Text=") #"/><Run Text="{Binding CollectorNumber, Mode=OneWay}"/>
-                            </TextBlock>
+                                       Text="{Binding Label, Mode=OneWay}"
+                                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                            <ItemsControl ItemsSource="{Binding OutgoingCards}" Margin="0,2,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                                   FontSize="11">
+                                            <Run Text="&#8226; "/><Run Text="{Binding CardName, Mode=OneWay}"/><Run Text="{Binding Foil, Converter={conv:FoilSuffixConverter}, Mode=OneWay}"/><Run Text="{Binding SetCode, Mode=OneWay, StringFormat=' ({0})'}"/>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                             <TextBlock Text="{Binding Note}" TextWrapping="Wrap" Margin="0,4,0,0"
                                        Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                             <TextBlock Margin="0,4,0,0" FontSize="11"

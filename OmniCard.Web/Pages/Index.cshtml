@@ -17,6 +17,14 @@
         <div class="nav-links">
             <a href="/">Home</a>
             <a href="/decklist">Decklist Check</a>
+            @if (Model.ActiveTradeSessionId is { } sessionId)
+            {
+                <a href="/trade/session/@sessionId">Open Current Trade Session&hellip;</a>
+            }
+            else
+            {
+                <a href="/trade/session">Start a Trade</a>
+            }
         </div>
     </header>
     <main>

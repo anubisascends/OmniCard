@@ -9,6 +9,7 @@ public class OmniCardDbContext : DbContext
     public DbSet<InventoryLot> Lots => Set<InventoryLot>();
     public DbSet<InventoryMovement> Movements => Set<InventoryMovement>();
     public DbSet<Trade> Trades => Set<Trade>();
+    public DbSet<TradeSession> TradeSessions => Set<TradeSession>();
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<LotTag> LotTags => Set<LotTag>();
     public DbSet<StorageContainer> StorageContainers => Set<StorageContainer>();

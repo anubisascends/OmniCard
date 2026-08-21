@@ -133,6 +133,8 @@ public static class UnifiedMigrationService
             AddColumnIfMissing(cmd, "Lots", "TradeNote", "TEXT");
             AddColumnIfMissing(cmd, "Lots", "TradePhotoPath", "TEXT");
             AddColumnIfMissing(cmd, "Lots", "FulfilledTradeId", "INTEGER");
+            // Multi-card trade sessions: replacement scans now link to a TradeSession.
+            AddColumnIfMissing(cmd, "Lots", "FulfilledTradeSessionId", "INTEGER");
         }
 
         if (TableExists(cmd, "Orders"))
@@ -266,6 +268,36 @@ public static class UnifiedMigrationService
             """;
         cmd.ExecuteNonQuery();
         cmd.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS IX_Trades_TradeRecordId ON Trades(TradeRecordId)";
+        cmd.ExecuteNonQuery();
+
+        // Multi-card trade sessions: each trade is a session with many outgoing cards (owned or
+        // off-database) plus a single received note/photo. New Trades columns group each outgoing
+        // card under a session and carry off-database card info + per-card value.
+        if (TableExists(cmd, "Trades"))
+        {
+            AddColumnIfMissing(cmd, "Trades", "TradeSessionId", "INTEGER");
+            AddColumnIfMissing(cmd, "Trades", "IsOffDatabase", "INTEGER NOT NULL DEFAULT 0");
+            AddColumnIfMissing(cmd, "Trades", "OffDbPhotoPath", "TEXT");
+            AddColumnIfMissing(cmd, "Trades", "EstimatedValue", "TEXT");
+            cmd.CommandText = "CREATE INDEX IF NOT EXISTS IX_Trades_TradeSessionId ON Trades(TradeSessionId)";
+            cmd.ExecuteNonQuery();
+        }
+
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS TradeSessions (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SessionRecordId TEXT NOT NULL,
+                Note TEXT NOT NULL DEFAULT '',
+                ReceivedPhotoPath TEXT,
+                OutgoingValue TEXT NOT NULL DEFAULT '0',
+                ReceivedValue TEXT,
+                CreatedAt TEXT NOT NULL,
+                ImportedAt TEXT NOT NULL,
+                FirstFulfilledAt TEXT
+            )
+            """;
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS IX_TradeSessions_SessionRecordId ON TradeSessions(SessionRecordId)";
         cmd.ExecuteNonQuery();
 
         // Tagging system: user-defined tags on individual lots (physical copies), many-to-many
