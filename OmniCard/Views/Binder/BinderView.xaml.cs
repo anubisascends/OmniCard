@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using OmniCard.Models;
 
 namespace OmniCard.Views.Binder;
@@ -17,6 +18,12 @@ public partial class BinderView : Window
     private BinderDragPayload? _dragPayload;
     private readonly BinderViewModel _viewModel;
 
+    // Type-ahead ("jump to card by name") state for the Unplaced pool. The buffer accumulates
+    // typed characters; a short idle timeout resets it, matching Windows Explorer's behavior.
+    private string _typeAheadBuffer = "";
+    private readonly DispatcherTimer _typeAheadTimer;
+    private static readonly TimeSpan TypeAheadTimeout = TimeSpan.FromSeconds(1);
+
     public BinderViewModel ViewModel => _viewModel;
 
     public BinderView(BinderViewModel viewModel)
@@ -24,6 +31,9 @@ public partial class BinderView : Window
         InitializeComponent();
         _viewModel = viewModel;
         DataContext = viewModel;
+
+        _typeAheadTimer = new DispatcherTimer { Interval = TypeAheadTimeout };
+        _typeAheadTimer.Tick += (_, _) => ResetTypeAhead();
     }
 
     // The Unplaced pool's filter is now server-side (Scryfall syntax) — the box binds to
@@ -52,7 +62,7 @@ public partial class BinderView : Window
         if (Math.Abs(pos.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
             Math.Abs(pos.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance) return;
 
-        DragDrop.DoDragDrop((DependencyObject)sender, _dragPayload, DragDropEffects.Move);
+        BeginDrag((DependencyObject)sender);
     }
 
     private void SlotCard_MouseDown(object sender, MouseButtonEventArgs e)
@@ -80,7 +90,29 @@ public partial class BinderView : Window
         if (Math.Abs(pos.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
             Math.Abs(pos.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance) return;
 
-        DragDrop.DoDragDrop((DependencyObject)sender, _dragPayload, DragDropEffects.Move);
+        BeginDrag((DependencyObject)sender);
+    }
+
+    /// <summary>Runs a modal drag from <paramref name="source"/> using the pending payload, then
+    /// clears the drag state. Clearing afterwards is essential: <see cref="DragDrop.DoDragDrop"/> is
+    /// a blocking call that frequently swallows the terminating LeftButtonUp, leaving WPF believing
+    /// the button is still pressed. Without this reset, the stale <see cref="_dragPayload"/> would be
+    /// re-consumed by the next PreviewMouseMove — even one fired while opening a right-click context
+    /// menu — launching a phantom drag that drops the last-dragged card onto whatever slot the
+    /// pointer is over. (Root cause of "Add Missing Card places the last card I dragged.")</summary>
+    private void BeginDrag(DependencyObject source)
+    {
+        var payload = _dragPayload;
+        if (payload is null) return;
+
+        try
+        {
+            DragDrop.DoDragDrop(source, payload, DragDropEffects.Move);
+        }
+        finally
+        {
+            _dragPayload = null;
+        }
     }
 
     private void Slot_DragOver(object sender, DragEventArgs e)
@@ -194,5 +226,112 @@ public partial class BinderView : Window
         while (parent is not null && parent is not T)
             parent = VisualTreeHelper.GetParent(parent);
         return parent as T;
+    }
+
+    // ── Type-ahead: jump to a card by typing its name (Unplaced pool) ───────────────────────────
+    // Matches against the name of the unplaced cards (starts-with, case-insensitive) and
+    // scrolls/selects the first hit. Typing more characters refines the prefix; repeating the same
+    // single letter cycles through cards that start with it. Mirrors the main Collection list
+    // (CardListView) — the Unplaced pool is fully loaded, so there's no "loaded cards only" caveat.
+
+    private void UnplacedListBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+    {
+        var text = e.Text;
+        // Ignore control characters (Enter, Tab, Esc arrive here as text on some layouts).
+        if (string.IsNullOrEmpty(text) || text.Length != 1 || char.IsControl(text[0]))
+            return;
+
+        // A leading space with an empty buffer is meaningless as a prefix — skip it.
+        if (_typeAheadBuffer.Length == 0 && text[0] == ' ')
+            return;
+
+        char c = text[0];
+
+        // Repeated same single letter → cycle through cards starting with that letter, rather than
+        // extending the prefix to a string that matches nothing.
+        bool cycle = _typeAheadBuffer.Length > 0
+            && _typeAheadBuffer.All(ch => char.ToLowerInvariant(ch) == char.ToLowerInvariant(_typeAheadBuffer[0]))
+            && char.ToLowerInvariant(c) == char.ToLowerInvariant(_typeAheadBuffer[0]);
+
+        string candidate = cycle ? c.ToString() : _typeAheadBuffer + c;
+
+        if (TryJump(candidate, cycle))
+            _typeAheadBuffer = candidate;
+        // On a miss the buffer is left untouched so the last good prefix is preserved.
+
+        RestartTypeAheadTimer();
+        e.Handled = true;
+    }
+
+    private void UnplacedListBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (_typeAheadBuffer.Length == 0)
+            return;
+
+        if (e.Key == Key.Escape)
+        {
+            ResetTypeAhead();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Back)
+        {
+            var trimmed = _typeAheadBuffer[..^1];
+            if (trimmed.Length == 0)
+            {
+                ResetTypeAhead();
+            }
+            else
+            {
+                TryJump(trimmed, cycle: false);
+                _typeAheadBuffer = trimmed;
+                RestartTypeAheadTimer();
+            }
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>Finds the first unplaced card whose name starts with <paramref name="prefix"/> and
+    /// scrolls/selects it. In cycle mode the search starts after the current selection and wraps.
+    /// Returns false (leaving selection unchanged) when nothing matches.</summary>
+    private bool TryJump(string prefix, bool cycle)
+    {
+        var results = _viewModel.UnplacedCards;
+        if (results.Count == 0)
+            return false;
+
+        int start = cycle ? UnplacedListBox.SelectedIndex + 1 : 0;
+        int match = -1;
+
+        for (int i = 0; i < results.Count; i++)
+        {
+            int idx = (start + i) % results.Count;
+            if (results[idx].Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                match = idx;
+                break;
+            }
+        }
+
+        if (match < 0)
+            return false;
+
+        UnplacedListBox.SelectedIndex = match;
+        UnplacedListBox.ScrollIntoView(results[match]);
+        TypeAheadText.Text = prefix;
+        TypeAheadOverlay.Visibility = Visibility.Visible;
+        return true;
+    }
+
+    private void RestartTypeAheadTimer()
+    {
+        _typeAheadTimer.Stop();
+        _typeAheadTimer.Start();
+    }
+
+    private void ResetTypeAhead()
+    {
+        _typeAheadTimer.Stop();
+        _typeAheadBuffer = "";
+        TypeAheadOverlay.Visibility = Visibility.Collapsed;
     }
 }

@@ -284,6 +284,10 @@
       <p><strong>Moving pages.</strong> Each page in the spread also has a move (<span aria-hidden="true">✥</span>) button in its
       header — like pulling a sheet out of a binder and slotting it in somewhere else. Pick the destination and the whole sheet
       (front and back) moves there; every card on a page that shifts is renumbered automatically, keeping its slot.</p>
+      <p><strong>Find in the Unplaced pool.</strong> Click a card in the <em>Unplaced Cards</em> pool and just start typing a
+      name — like Windows Explorer, the pool scrolls to and selects the first card whose name starts with what you've typed.
+      Keep typing to refine, press the same letter again to cycle through matches, and <kbd>Backspace</kbd>/<kbd>Esc</kbd> to
+      edit or clear. This is separate from the <em>Filter</em> box above (which narrows the pool by Scryfall query).</p>
       <figure class="shot" data-img="binder.png"><span>Screenshot placeholder — <code>images/binder.png</code></span></figure>
     </section>
 
@@ -570,8 +574,31 @@
       Quick search filters the shown cards as you type, matching name, set, or collector number. Sort by Name, Market Price, Condition, Foil, Set,
       or Collector&nbsp;# using the dropdown, and use the direction button (↑ Asc / ↓ Desc) beside it to flip ascending/descending. Both act instantly
       on the cards already on screen and your choices are remembered per page.</p>
-      <div class="callout note">The web companion is launched separately, pointed at the desktop app's data folder. It never writes to your
-      databases directly — trades and scans are handed back to the desktop app to apply.</div>
+      <div class="callout note">The web companion is launched separately, pointed at the desktop app's data folder. With one exception (the
+      binder editor, below) it never writes to your databases directly — trades and scans are handed back to the desktop app to apply.</div>
+    </section>
+
+    <section id="web-binder-edit" data-group="Web Companion">
+      <h2>Editing a binder from the web</h2>
+      <p>Beyond the read-only flip-through view, the web companion has a full <strong>binder editor</strong> that recreates the desktop
+      binder view in the browser — the one place the web app writes to your collection directly (to <code>inventory.db</code>). Open it from a
+      binder's location page (<em>✏️ Edit binder</em>) or the read-only binder view (<em>✏️ Edit this binder</em>), or browse to
+      <code>/binder/&lt;id&gt;/edit</code>.</p>
+      <p>It mirrors the desktop layout: an <strong>Unplaced Cards</strong> pool on the left (with the same Scryfall-syntax filter — e.g.
+      <code>c:u</code>, <code>r&gt;=rare</code>, <code>tag:trade</code> — and type-to-jump search) and the current two-page <strong>spread</strong>
+      on the right. You can:</p>
+      <ul>
+        <li><strong>Drag</strong> a card from the pool into a slot, or between slots (dropping onto an occupied slot swaps/displaces it).</li>
+        <li>Change the <strong>layout</strong> (slots per page, columns).</li>
+        <li><strong>Add</strong> a page (front+back or single-sided), <strong>Insert</strong>, <strong>Move</strong>, or <strong>Remove</strong> pages,
+        and navigate spreads with the pagination strip.</li>
+        <li><strong>Right-click</strong> a card (or an empty slot) for the same actions as the desktop: open the card editor, copy name(s),
+        move to another location, remove from the page, tags, list/unlist for sale, mark picked, set condition/foil, add a missing card into the
+        slot, and delete.</li>
+      </ul>
+      <div class="callout note">Web binder editing is <strong>off until you set a passphrase</strong>: add <code>Binder:EditPassphrase</code> to the
+      shared <code>appsettings.json</code> and restart the web companion. Anyone on the network who knows the passphrase can then edit; without it,
+      the edit page shows a locked prompt. Live eBay listing actions are intentionally left out of the web editor — use the desktop app for those.</div>
     </section>
 
     <!-- ===================== REFERENCE ===================== -->

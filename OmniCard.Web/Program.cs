@@ -90,9 +90,33 @@ builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<Fina
 builder.Services.AddSingleton<ICardService, WebCardService>();
 builder.Services.AddSingleton<IDecklistService, DecklistService>();
 
+// --- Binder editor: the one deliberate WRITE surface in the otherwise read-only web app ---
+// A single writable factory against inventory.db, injected only into the binder-edit services so the
+// read-only invariant holds everywhere else. Editing is gated by a passphrase (Binder:EditPassphrase)
+// held in the session.
+var writableFactory = new WritableOmniCardDbContextFactory(dbPath);
+builder.Services.AddSingleton(writableFactory);
+builder.Services.AddSingleton<IStorageContainerService>(_ => new StorageContainerService(writableFactory));
+builder.Services.AddSingleton<ITagService>(_ => new TagService(writableFactory));
+builder.Services.AddSingleton<ISalesSettingsService, SalesSettingsService>();
+builder.Services.AddSingleton<IListingService>(sp =>
+    new ListingService(writableFactory, sp.GetRequiredService<ISalesSettingsService>()));
+builder.Services.AddSingleton(sp =>
+    new WebBinderCardService(writableFactory, sp.GetRequiredService<IDataPathService>()));
+builder.Services.AddScoped<BinderStateBuilder>();
+
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.IdleTimeout = TimeSpan.FromHours(8);
+});
+
 var app = builder.Build();
 
 app.UseStaticFiles();
+app.UseSession();
 
 // Serve scan images from the data directory
 if (Directory.Exists(scansDir))
