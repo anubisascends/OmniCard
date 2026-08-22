@@ -840,7 +840,7 @@ public sealed partial class RootViewModel(
     private void OnScannedCardPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(ScannedCard.OverrideContainer) or nameof(ScannedCard.Match)
-            or nameof(ScannedCard.Condition) or nameof(ScannedCard.IsFoil) or nameof(ScannedCard.LinkedTradeId))
+            or nameof(ScannedCard.Condition) or nameof(ScannedCard.IsFoil) or nameof(ScannedCard.LinkedTradeSessionId))
         {
             NotifySelectionChanged();
         }
@@ -2137,6 +2137,9 @@ public sealed partial class RootViewModel(
     public void OpenLogViewer() => DialogService.OpenLogViewer();
 
     [RelayCommand]
+    public void OpenTrades() => DialogService.OpenTrades();
+
+    [RelayCommand]
     public void ShowDocumentation() => DialogService.ShowDocumentation();
 
     [RelayCommand]
@@ -2302,12 +2305,12 @@ public sealed partial class RootViewModel(
             System.Windows.Clipboard.SetText(names);
     }
 
-    public bool CanLinkToTrade => HasSingleSelection && SelectedScannedCard?.LinkedTradeId is null;
-    public bool CanUnlinkFromTrade => HasSingleSelection && SelectedScannedCard?.LinkedTradeId is not null;
+    public bool CanLinkToTrade => HasSingleSelection && SelectedScannedCard?.LinkedTradeSessionId is null;
+    public bool CanUnlinkFromTrade => HasSingleSelection && SelectedScannedCard?.LinkedTradeSessionId is not null;
 
-    /// <summary>Marks this scan as the replacement for a picked trade — on commit, its new lot
-    /// fulfills that trade (see CardService.CommitScans), deleting the traded-away card on the
-    /// first fulfillment.</summary>
+    /// <summary>Marks this scan as a replacement received for a picked trade session — on commit,
+    /// its new lot fulfills that session (see CardService.CommitScans), deleting the traded-away
+    /// cards on the first fulfillment.</summary>
     [RelayCommand(CanExecute = nameof(CanLinkToTrade))]
     public void LinkToTrade()
     {
@@ -2315,16 +2318,16 @@ public sealed partial class RootViewModel(
         var trade = DialogService.PickTrade();
         if (trade is null) return;
 
-        SelectedScannedCard.LinkedTradeId = trade.Id;
-        SelectedScannedCard.LinkedTradeLabel = trade.CardName;
-        Message = $"Linked to trade for \"{trade.CardName}\".";
+        SelectedScannedCard.LinkedTradeSessionId = trade.Id;
+        SelectedScannedCard.LinkedTradeLabel = trade.Label;
+        Message = $"Linked to trade for \"{trade.Label}\".";
     }
 
     [RelayCommand(CanExecute = nameof(CanUnlinkFromTrade))]
     public void UnlinkFromTrade()
     {
         if (SelectedScannedCard is null) return;
-        SelectedScannedCard.LinkedTradeId = null;
+        SelectedScannedCard.LinkedTradeSessionId = null;
         SelectedScannedCard.LinkedTradeLabel = null;
     }
 

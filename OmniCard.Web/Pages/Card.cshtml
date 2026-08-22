@@ -49,10 +49,23 @@
         <p class="card-actions">
             @if (!Model.Card.IsTraded)
             {
-                <a href="/Trade?lotId=@Model.Card.Id" class="trade-button">Trade this card&hellip;</a>
+                <form method="post" asp-page="/TradeSession" asp-page-handler="AddCard" style="display:inline">
+                    <input type="hidden" name="lotId" value="@Model.Card.Id"/>
+                    <button type="submit" class="trade-button">
+                        @(Model.ActiveTradeSessionId is null ? "Trade this card…" : "Add to trade session…")
+                    </button>
+                </form>
+                @if (Model.ActiveTradeSessionId is { } sessionId)
+                {
+                    <a href="/trade/session/@sessionId" class="tcg-link">Open trade session &rarr;</a>
+                }
             }
             <a href="@Model.TcgPlayerUrl" class="tcg-link" target="_blank" rel="noopener">View on TCGPlayer &rarr;</a>
         </p>
+        @if (Model.TradeMessage is not null)
+        {
+            <p class="trade-confirm">@Model.TradeMessage</p>
+        }
 
         <table class="detail-table">
             <tr><th>Set</th><td>@Model.Card.SetName (@Model.Card.SetCode)</td></tr>

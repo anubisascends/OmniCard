@@ -606,8 +606,8 @@ public sealed class CardService : ICardService
                         UnitValue = lot.UnitCost,
                     });
 
-                    if (scan.LinkedTradeId is int linkedTradeId)
-                        lot.FulfilledTradeId = linkedTradeId;
+                    if (scan.LinkedTradeSessionId is int linkedSessionId)
+                        lot.FulfilledTradeSessionId = linkedSessionId;
 
                     foreach (var tagName in scan.Tags)
                     {
@@ -715,30 +715,38 @@ public sealed class CardService : ICardService
             }
         }
 
-        // Trade fulfillment: delete the traded-away lot on a trade's first fulfillment. Further
-        // replacements linked to the same trade (this commit or a later one) just carry
-        // FulfilledTradeId (set above) — there's nothing left to delete a second time.
-        var linkedTradeIds = committed
-            .Select(c => c.Scan.LinkedTradeId)
+        // Trade fulfillment: delete all traded-away lots in a session on its first fulfillment.
+        // Further replacements linked to the same session (this commit or a later one) just carry
+        // FulfilledTradeSessionId (set above) — outgoing lots are only deleted once, and
+        // off-database outgoing cards have no lot to delete.
+        var linkedSessionIds = committed
+            .Select(c => c.Scan.LinkedTradeSessionId)
             .Where(id => id.HasValue)
             .Select(id => id!.Value)
             .Distinct()
             .ToList();
 
-        if (linkedTradeIds.Count > 0)
+        if (linkedSessionIds.Count > 0)
         {
             var lotsToDelete = new List<int>();
             using (var tradeContext = _omniDbContextFactory.CreateDbContext())
             {
-                foreach (var trade in tradeContext.Trades.Where(t => linkedTradeIds.Contains(t.Id)))
+                var outstanding = tradeContext.Trades
+                    .Where(t => t.TradeSessionId != null
+                                && linkedSessionIds.Contains(t.TradeSessionId!.Value)
+                                && t.OriginalLotId != null)
+                    .ToList();
+                foreach (var trade in outstanding)
                 {
-                    if (trade.OriginalLotId is int originalLotId)
-                    {
-                        lotsToDelete.Add(originalLotId);
-                        trade.OriginalLotId = null;
-                    }
+                    lotsToDelete.Add(trade.OriginalLotId!.Value);
+                    trade.OriginalLotId = null;
                     trade.FirstFulfilledAt ??= DateTime.UtcNow;
                 }
+
+                foreach (var session in tradeContext.TradeSessions
+                             .Where(s => linkedSessionIds.Contains(s.Id)))
+                    session.FirstFulfilledAt ??= DateTime.UtcNow;
+
                 tradeContext.SaveChanges();
             }
 

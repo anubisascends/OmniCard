@@ -190,6 +190,7 @@ public class ListsViewModelTests
         public void OpenLogViewer() => throw new NotImplementedException();
         public ListForSaleResult? PickListForSale(decimal suggestedPrice) => throw new NotImplementedException();
         public TradeSummary? PickTrade() => throw new NotImplementedException();
+        public void OpenTrades() => throw new NotImplementedException();
         public int ShowTcgOrderImportPreview(TcgOrderImportPreview preview) => throw new NotImplementedException();
         public bool Confirm(string message, string title) => throw new NotImplementedException();
         public BatchDecklistImportSummary? ShowBatchDecklistImport() => throw new NotImplementedException();

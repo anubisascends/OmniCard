@@ -238,6 +238,8 @@ public partial class App : Application
             services.AddTransient<OmniCard.Views.CreateListFromScans.CreateListFromScansViewModel>();
             services.AddTransient<OmniCard.Views.PickTrade.PickTradeView>();
             services.AddTransient<OmniCard.Views.PickTrade.PickTradeViewModel>();
+            services.AddTransient<OmniCard.Views.Trades.TradesView>();
+            services.AddTransient<OmniCard.Views.Trades.TradesViewModel>();
             services.AddTransient<AuditReportView>();
             services.AddTransient<AuditReportViewModel>();
             services.AddTransient<EbayListingViewModel>();

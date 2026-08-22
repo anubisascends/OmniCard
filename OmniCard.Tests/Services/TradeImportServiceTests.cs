@@ -227,6 +227,119 @@ public class TradeImportServiceTests : IDisposable
         Assert.Equal(0, count);
     }
 
+    // ---- Schema v2: multi-card trade sessions ---------------------------------------------------
+
+    private string WriteSessionRecord(TradeSessionRecord record, Dictionary<string, string>? files = null)
+    {
+        var folder = Path.Combine(_tradesDir, record.SessionId.ToString());
+        Directory.CreateDirectory(folder);
+        foreach (var (name, contents) in files ?? [])
+            File.WriteAllText(Path.Combine(folder, name), contents);
+        var jsonPath = Path.Combine(folder, "trade.json");
+        File.WriteAllText(jsonPath, JsonSerializer.Serialize(record, new JsonSerializerOptions { WriteIndented = true }));
+        return jsonPath;
+    }
+
+    [Fact]
+    public void ImportPendingTrades_Session_AppliesMultipleOwnedCards()
+    {
+        var lot1 = SeedLot();
+        var lot2 = SeedLot();
+        WriteSessionRecord(new TradeSessionRecord
+        {
+            Status = "final",
+            Note = "big trade",
+            ReceivedPhotoFileName = "received.jpg",
+            ReceivedValue = 30m,
+            OutgoingItems =
+            [
+                new TradeOutgoingItem { LotId = lot1, Game = CardGame.Mtg, CardName = "Sol Ring", EstimatedValue = 12m },
+                new TradeOutgoingItem { LotId = lot2, Game = CardGame.Mtg, CardName = "Mana Crypt", EstimatedValue = 8m },
+            ],
+        }, new() { ["received.jpg"] = "photo" });
+
+        Assert.Equal(1, CreateService().ImportPendingTrades());
+
+        using var ctx = _factory.CreateDbContext();
+        Assert.True(ctx.Lots.Single(l => l.Id == lot1).IsTraded);
+        Assert.True(ctx.Lots.Single(l => l.Id == lot2).IsTraded);
+        Assert.Equal(2, ctx.Movements.Count(m => m.Type == MovementType.Trade));
+
+        var session = Assert.Single(ctx.TradeSessions);
+        Assert.Equal(20m, session.OutgoingValue);
+        Assert.Equal(30m, session.ReceivedValue);
+        Assert.EndsWith("received.jpg", session.ReceivedPhotoPath);
+
+        var trades = ctx.Trades.Where(t => t.TradeSessionId == session.Id).ToList();
+        Assert.Equal(2, trades.Count);
+        Assert.All(trades, t => Assert.Equal(session.Id, t.TradeSessionId));
+        Assert.Contains(trades, t => t.OriginalLotId == lot1);
+        Assert.Contains(trades, t => t.OriginalLotId == lot2);
+    }
+
+    [Fact]
+    public void ImportPendingTrades_Session_OffDatabaseCard_CreatesRowWithPhotoAndNoLot()
+    {
+        WriteSessionRecord(new TradeSessionRecord
+        {
+            Status = "final",
+            Note = "card-show pickup",
+            OutgoingItems =
+            [
+                new TradeOutgoingItem { IsOffDatabase = true, CardName = "Some Alt Art", EstimatedValue = 40m, PhotoFileName = "outgoing-1.jpg" },
+            ],
+        }, new() { ["outgoing-1.jpg"] = "photo" });
+
+        Assert.Equal(1, CreateService().ImportPendingTrades());
+
+        using var ctx = _factory.CreateDbContext();
+        var trade = Assert.Single(ctx.Trades);
+        Assert.True(trade.IsOffDatabase);
+        Assert.Null(trade.OriginalLotId);
+        Assert.EndsWith("outgoing-1.jpg", trade.OffDbPhotoPath);
+        Assert.Equal(40m, trade.EstimatedValue);
+        Assert.Empty(ctx.Movements); // no lot → no movement
+        Assert.Equal(40m, ctx.TradeSessions.Single().OutgoingValue);
+    }
+
+    [Fact]
+    public void ImportPendingTrades_Session_DraftIsSkippedAndNotStamped()
+    {
+        var lot = SeedLot();
+        var jsonPath = WriteSessionRecord(new TradeSessionRecord
+        {
+            Status = "draft",
+            OutgoingItems = [new TradeOutgoingItem { LotId = lot, CardName = "Sol Ring" }],
+        });
+
+        Assert.Equal(0, CreateService().ImportPendingTrades());
+
+        using var ctx = _factory.CreateDbContext();
+        Assert.False(ctx.Lots.Single(l => l.Id == lot).IsTraded);
+        Assert.Empty(ctx.TradeSessions);
+        var record = JsonSerializer.Deserialize<TradeSessionRecord>(File.ReadAllText(jsonPath));
+        Assert.Null(record!.ProcessedAt); // never stamped — still a live draft
+    }
+
+    [Fact]
+    public void ImportPendingTrades_Session_SecondRunIsNoOp()
+    {
+        var lot = SeedLot();
+        WriteSessionRecord(new TradeSessionRecord
+        {
+            Status = "final",
+            OutgoingItems = [new TradeOutgoingItem { LotId = lot, CardName = "Sol Ring", EstimatedValue = 5m }],
+        });
+
+        var svc = CreateService();
+        Assert.Equal(1, svc.ImportPendingTrades());
+        Assert.Equal(0, svc.ImportPendingTrades());
+
+        using var ctx = _factory.CreateDbContext();
+        Assert.Single(ctx.TradeSessions);
+        Assert.Single(ctx.Trades);
+    }
+
     private class TestDbContextFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
         public OmniCardDbContext CreateDbContext() => new(options);

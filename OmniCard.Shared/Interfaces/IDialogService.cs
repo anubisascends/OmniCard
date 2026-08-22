@@ -64,6 +64,9 @@ public interface IDialogService
     void OpenLogViewer();
     ListForSaleResult? PickListForSale(decimal suggestedPrice);
     TradeSummary? PickTrade();
+
+    /// <summary>Opens the read-only Trades history window (all trade sessions).</summary>
+    void OpenTrades();
     int ShowTcgOrderImportPreview(TcgOrderImportPreview preview);
     bool Confirm(string message, string title);
     BatchDecklistImportSummary? ShowBatchDecklistImport();

@@ -575,6 +575,138 @@ tr:active { background: var(--surface); }
 .trade-form button:hover { opacity: 0.9; }
 .trade-form button:active { opacity: 0.75; }
 
+/* ===== Trade session builder ===== */
+
+.trade-session { max-width: 560px; }
+.trade-session h2 { font-size: 1.05rem; margin: 0 0 8px; }
+.trade-session .muted { color: var(--text-muted); font-size: 0.85rem; }
+
+.trade-section {
+    margin: 24px 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.trade-session label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 0 0 4px;
+}
+
+.trade-session input[type="text"],
+.trade-session input[type="search"],
+.trade-session input[type="number"],
+.trade-session textarea,
+.trade-session input[type="file"] {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 1rem;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.trade-session textarea { resize: vertical; min-height: 80px; }
+
+.trade-session input:focus,
+.trade-session textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.trade-session button {
+    min-height: 44px;
+    padding: 8px 18px;
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.trade-session button:hover { opacity: 0.9; }
+.trade-session button:active { opacity: 0.75; }
+
+.trade-session button.btn-small {
+    min-height: 36px;
+    padding: 4px 14px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+}
+
+.trade-session button.btn-small:hover { background: var(--border); opacity: 1; }
+
+.trade-search { display: flex; gap: 8px; align-items: start; }
+.trade-search input { flex: 1; }
+.trade-search button { flex: 0 0 auto; margin-bottom: 12px; }
+
+.trade-items { list-style: none; padding: 0; margin: 0 0 12px; }
+.trade-items li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+}
+.trade-items .grow,
+.owned-result .grow { flex: 1; min-width: 0; }
+
+.trade-thumb {
+    width: 40px;
+    height: 56px;
+    object-fit: contain;
+    border-radius: 4px;
+    background: var(--bg);
+    flex: 0 0 auto;
+}
+
+.trade-total { font-size: 1.15rem; font-weight: 700; margin: 8px 0 4px; color: var(--text); }
+
+.owned-result {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.trade-field-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.trade-field-row > div { flex: 1; min-width: 130px; }
+
+/* Inline TCGPlayer link next to a giving-list card. */
+.tcg-inline { margin-left: 6px; color: var(--link); }
+.tcg-inline:hover { text-decoration: underline; }
+
+/* Destructive cancel action — outlined red, distinct from the accent Finalize button. */
+.trade-session button.btn-cancel {
+    background: transparent;
+    border: 1px solid #c0392b;
+    color: #e57373;
+}
+.trade-session button.btn-cancel:hover { background: rgba(192, 57, 43, 0.15); opacity: 1; }
+
+/* Confirmation banner shown on the card page after adding to a trade. */
+.trade-confirm {
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin: 12px 0;
+    color: var(--text);
+    max-width: 400px;
+}
+
 /* ===== Binder view ===== */
 
 /* The modal + its inner toggles rely on [hidden] actually hiding, but some of the elements carry

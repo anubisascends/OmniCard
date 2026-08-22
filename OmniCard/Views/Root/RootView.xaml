@@ -175,6 +175,8 @@
                           InputGestureText="Ctrl+F"/>
                 <MenuItem Header="_Top 100 Cards..."
                           Command="{Binding ViewModel.ShowTopValueCardsCommand}"/>
+                <MenuItem Header="T_rades..."
+                          Command="{Binding ViewModel.OpenTradesCommand}"/>
                 <Separator />
                 <MenuItem Header="Sort &amp; Filter Builder..."
                           Command="{Binding ViewModel.Collection.OpenSortFilterBuilderCommand}"/>
@@ -283,10 +285,10 @@
                           Command="{Binding ViewModel.AssignMatchCommand}"/>
                 <MenuItem Header="_Link to Trade..."
                           Command="{Binding ViewModel.LinkToTradeCommand}"
-                          Visibility="{Binding ViewModel.SelectedScannedCard.LinkedTradeId, Converter={conv:NullToVisibleConverter}}"/>
+                          Visibility="{Binding ViewModel.SelectedScannedCard.LinkedTradeSessionId, Converter={conv:NullToVisibleConverter}}"/>
                 <MenuItem Header="Unlin_k from Trade"
                           Command="{Binding ViewModel.UnlinkFromTradeCommand}"
-                          Visibility="{Binding ViewModel.SelectedScannedCard.LinkedTradeId, Converter={conv:NullToCollapsedConverter}}"/>
+                          Visibility="{Binding ViewModel.SelectedScannedCard.LinkedTradeSessionId, Converter={conv:NullToCollapsedConverter}}"/>
                 <MenuItem Header="Remove from _Queue"
                           Command="{Binding ViewModel.RemoveScannedCardCommand}"/>
             </MenuItem>
