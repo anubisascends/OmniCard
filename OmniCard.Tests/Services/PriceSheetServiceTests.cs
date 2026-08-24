@@ -88,9 +88,8 @@ public class PriceSheetServiceTests : IDisposable
         var svc = CreateService();
         var report = svc.BuildReport(containerId, "Box");
 
-        var section = Assert.Single(report.Sections);
-        Assert.Equal(3, section.Lines.Count);
-        Assert.All(section.Lines, l => Assert.Equal(2.50m, l.Price));
+        Assert.Equal(3, report.Lines.Count);
+        Assert.All(report.Lines, l => Assert.Equal(2.50m, l.Price));
     }
 
     [Fact]
@@ -104,7 +103,7 @@ public class PriceSheetServiceTests : IDisposable
         var svc = CreateService();
         var report = svc.BuildReport(containerId, "Box");
 
-        var line = Assert.Single(report.Sections.Single().Lines);
+        var line = Assert.Single(report.Lines);
         Assert.Equal("Lightning Bolt (Foil)", line.Name);
         Assert.Equal(40m, line.Price);
     }
@@ -118,10 +117,11 @@ public class PriceSheetServiceTests : IDisposable
         var svc = CreateService();
         var report = svc.BuildReport(containerId, "Box");
 
-        var line = Assert.Single(report.Sections.Single().Lines);
+        var line = Assert.Single(report.Lines);
         Assert.Equal(199.99m, line.Price);
         Assert.Null(line.CollectorNumber);
         Assert.Equal("LEA", line.SetCode);
+        Assert.Equal("LEA", line.CardCode); // sealed: set code only, no collector number
     }
 
     [Fact]
@@ -135,11 +135,11 @@ public class PriceSheetServiceTests : IDisposable
         var svc = CreateService();
         var report = svc.BuildReport(containerId, "Box");
 
-        Assert.All(report.Sections.Single().Lines, l => Assert.Equal(0m, l.Price));
+        Assert.All(report.Lines, l => Assert.Equal(0m, l.Price));
     }
 
     [Fact]
-    public void BuildReport_SortsByGameThenSetThenNameDescending()
+    public void BuildReport_SortsByCardNameAscendingAcrossAllGames()
     {
         var containerId = CreateContainer();
         AddSingleLot(containerId, "yugioh-a", "Alpha", CardGame.YuGiOh, "SDK", "1");
@@ -150,12 +150,22 @@ public class PriceSheetServiceTests : IDisposable
         var svc = CreateService();
         var report = svc.BuildReport(containerId, "Box");
 
-        // Games alphabetically by display name: "Magic: The Gathering" before "Yu-Gi-Oh!"
-        Assert.Equal(["Magic: The Gathering", "Yu-Gi-Oh!"], report.Sections.Select(s => s.GameDisplayName));
+        // Flat list, sorted by card name ascending regardless of game or set.
+        Assert.Equal(["Alpha", "Ambush", "Bolt", "Counterspell"], report.Lines.Select(l => l.Name));
+    }
 
-        var mtgSection = report.Sections.First(s => s.GameDisplayName == "Magic: The Gathering");
-        // Set ASC (AAA before ZZZ), then within AAA, Name DESC (Counterspell before Ambush)
-        Assert.Equal(["Ambush", "Counterspell", "Bolt"], mtgSection.Lines.Select(l => l.Name));
+    [Fact]
+    public void BuildReport_SingleCardCode_CombinesSetCodeAndCollectorNumber()
+    {
+        var containerId = CreateContainer();
+        AddSingleLot(containerId, "a", "Lightning Bolt", CardGame.Mtg, "lea", "42");
+
+        var svc = CreateService();
+        var report = svc.BuildReport(containerId, "Box");
+
+        var line = Assert.Single(report.Lines);
+        Assert.Equal("LEA-42", line.CardCode);
+        Assert.Equal("Magic: The Gathering", line.GameDisplayName);
     }
 
     [Fact]
