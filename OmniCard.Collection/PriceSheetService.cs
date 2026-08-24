@@ -40,7 +40,7 @@ public sealed class PriceSheetService(
             .Where(l => l.LocationId == containerId)
             .ToList();
 
-        var lines = new List<(CardGame Game, PriceSheetLine Line)>();
+        var lines = new List<PriceSheetLine>();
 
         foreach (var lot in lots)
         {
@@ -67,6 +67,7 @@ public sealed class PriceSheetService(
             var line = new PriceSheetLine
             {
                 Name = name,
+                GameDisplayName = GameDisplayName(product.Game),
                 SetCode = product.SetCode ?? product.SetName,
                 CollectorNumber = isSingle ? product.CollectorNumber : null,
                 Price = price,
@@ -74,26 +75,17 @@ public sealed class PriceSheetService(
 
             var quantity = Math.Max(1, lot.Quantity);
             for (var i = 0; i < quantity; i++)
-                lines.Add((product.Game, line));
+                lines.Add(line);
         }
 
-        var sections = lines
-            .GroupBy(x => x.Game)
-            .Select(g => new PriceSheetSection
-            {
-                GameDisplayName = GameDisplayName(g.Key),
-                Lines = g.Select(x => x.Line)
-                    .OrderBy(l => l.SetCode ?? "", StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(l => l.Name, StringComparer.OrdinalIgnoreCase)
-                    .ToList(),
-            })
-            .OrderBy(s => s.GameDisplayName, StringComparer.Ordinal)
+        var sorted = lines
+            .OrderBy(l => l.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         return new PriceSheetReport
         {
             LocationName = containerName,
-            Sections = sections,
+            Lines = sorted,
         };
     }
 

@@ -2443,7 +2443,7 @@ public sealed partial class RootViewModel(
         }
 
         var report = priceSheetService.BuildReport(containerId, containerName);
-        var lineCount = report.Sections.Sum(s => s.Lines.Count);
+        var lineCount = report.Lines.Count;
 
         var safeName = string.Join("_", containerName.Split(System.IO.Path.GetInvalidFileNameChars()));
         if (ExportToFile($"{safeName}-price-sheet.pdf", "PDF files|*.pdf", out var path))
