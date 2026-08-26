@@ -220,6 +220,15 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         return result == true ? vm.ToResult() : null;
     }
 
+    public (int DeltaPages, Models.BinderShiftScope Scope)? ShiftBinderPage(int page)
+    {
+        var vm = new Views.Binder.ShiftBinderPageViewModel(page);
+        var wnd = new Views.Binder.ShiftBinderPageDialog(vm);
+        SetOwner(wnd);
+        var result = wnd.ShowDialog();
+        return result == true ? vm.ToResult() : null;
+    }
+
     public MoveListToLocationResult? PickMoveListToLocation()
     {
         var wnd = Services.GetRequiredService<Views.MoveListToLocation.MoveListToLocationView>();

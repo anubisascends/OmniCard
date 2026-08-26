@@ -319,6 +319,67 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
         context.SaveChanges();
     }
 
+    public void ShiftPage(int containerId, int page, int deltaPages, BinderShiftScope scope)
+    {
+        if (deltaPages == 0) return;
+
+        using var context = dbContextFactory.CreateDbContext();
+        var container = context.StorageContainers.Find(containerId)
+            ?? throw new InvalidOperationException($"Container {containerId} not found");
+
+        var totalPages = BinderSheetLayout.Parse(container.SheetSides, container.TotalPages).TotalPages;
+
+        var placed = context.Lots
+            .Where(l => l.LocationId == containerId && l.Page != null
+                && l.Product.Category == ProductCategory.Single)
+            .ToList();
+        if (placed.Count == 0) return;
+
+        // The affected pages form a contiguous block: just this page, this page and everything before
+        // it, or this page and everything after it. Moving cards keep their slot and shift by the same
+        // delta, so they can only ever collide with cards that stay put — never with each other.
+        bool IsMoving(int p) => scope switch
+        {
+            BinderShiftScope.OnlyThisPage => p == page,
+            BinderShiftScope.ThisAndBefore => p <= page,
+            BinderShiftScope.ThisAndAfter => p >= page,
+            _ => false,
+        };
+
+        var moving = placed.Where(l => IsMoving(l.Page!.Value)).ToList();
+        if (moving.Count == 0) return;
+
+        // Slots occupied by cards that are NOT moving — a moving card landing on one of these is a
+        // collision.
+        var stayingOccupied = placed
+            .Where(l => !IsMoving(l.Page!.Value))
+            .Select(l => (l.Page!.Value, l.Slot))
+            .ToHashSet();
+
+        var amount = Math.Abs(deltaPages);
+        var pagesWord = amount == 1 ? "page" : "pages";
+
+        foreach (var lot in moving)
+        {
+            var newPage = lot.Page!.Value + deltaPages;
+            if (newPage < 1 || newPage > totalPages)
+                throw new InvalidOperationException(
+                    $"Shifting by {amount} {pagesWord} would move a card off the binder " +
+                    $"(it has {totalPages} page{(totalPages == 1 ? "" : "s")}). " +
+                    "Add more pages first, choose a different direction or scope, or shift fewer pages.");
+
+            if (stayingOccupied.Contains((newPage, lot.Slot)))
+                throw new InvalidOperationException(
+                    $"Shifting would move a card onto page {newPage}, which already has a card in that " +
+                    "slot. Clear the destination first, or widen the scope so those pages move too.");
+        }
+
+        foreach (var lot in moving)
+            lot.Page = lot.Page!.Value + deltaPages;
+
+        context.SaveChanges();
+    }
+
     public void SetSlotsPerPage(int containerId, int slotsPerPage)
     {
         if (slotsPerPage <= 0)

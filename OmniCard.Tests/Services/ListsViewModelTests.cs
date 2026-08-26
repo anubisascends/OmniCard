@@ -174,6 +174,7 @@ public class ListsViewModelTests
         public void ShowBinderView(int containerId) => throw new NotImplementedException();
         public (int InsertIndex, bool DoubleSided)? InsertBinderPage(int containerId, int? nearPage) => throw new NotImplementedException();
         public int? MoveBinderPage(int containerId, int movingSheetIndex) => throw new NotImplementedException();
+        public (int DeltaPages, BinderShiftScope Scope)? ShiftBinderPage(int page) => throw new NotImplementedException();
         public IReadOnlyList<ScanListTargetResult>? PickListTargetsForScans(IReadOnlyList<(CardGame Game, int Count)> groups, string defaultName) => throw new NotImplementedException();
         public void ShowAuditReport(AuditReport report) => throw new NotImplementedException();
         public bool? OpenEbayListingDialog(CollectionCard card) => throw new NotImplementedException();

@@ -140,6 +140,24 @@ public sealed class BinderEditController : ControllerBase
         return Ok(new { status = "ok" });
     }
 
+    public sealed record ShiftPageRequest(int ContainerId, int Page, int DeltaPages, string Scope);
+
+    [HttpPost("page/shift")]
+    public IActionResult ShiftPage([FromBody] ShiftPageRequest r)
+    {
+        if (!Enum.TryParse<BinderShiftScope>(r.Scope, ignoreCase: true, out var scope))
+            return BadRequest(new { error = $"Unknown shift scope '{r.Scope}'." });
+        try
+        {
+            _containers.ShiftPage(r.ContainerId, r.Page, r.DeltaPages, scope);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        return Ok(new { status = "ok" });
+    }
+
     // ---------------------------------------------------------------- Card actions
 
     public sealed record IdsRequest(List<int> Ids);

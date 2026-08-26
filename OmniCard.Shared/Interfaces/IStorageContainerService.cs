@@ -53,6 +53,18 @@ public interface IStorageContainerService
     /// it's the binder's only sheet.</summary>
     void RemoveBinderSheet(int containerId, int page);
 
+    /// <summary>Shifts the placed cards on <paramref name="page"/> — and, per <paramref name="scope"/>,
+    /// the pages before or after it — by <paramref name="deltaPages"/> logical pages: negative toward
+    /// the front (left / lower page numbers), positive toward the back (right / higher page numbers).
+    /// Each moved card keeps its slot; the affected pages move as a rigid block, so they never collide
+    /// with each other. Used to fix an off-by-a-page data-entry mistake from a chosen page onward (or
+    /// up to it). Throws <see cref="InvalidOperationException"/> if any moved card would fall off the
+    /// binder (before page 1 or past the last page), or would land on a page/slot already holding a
+    /// card that is <em>not</em> being moved (a collision); in either case nothing is changed and the
+    /// caller must add pages, choose a different scope/direction, or clear the target first. No-op when
+    /// <paramref name="deltaPages"/> is 0.</summary>
+    void ShiftPage(int containerId, int page, int deltaPages, BinderShiftScope scope);
+
     void SetSlotsPerPage(int containerId, int slotsPerPage);
     void SetColumns(int containerId, int columns);
     List<CollectionCard> GetPlacedCardsOnPage(int containerId, int page);

@@ -296,6 +296,114 @@ public class StorageContainerServiceTests : IDisposable
     }
 
     [Fact]
+    public void ShiftPage_ThisAndAfter_TowardBack_MovesThisPageAndTrailingPages_SlotsPreserved()
+    {
+        var (containerId, productId) = SeedBinderWithSheets("Shift A", "2,2,2"); // pages 1-6
+        var before = PlaceLot(containerId, productId, page: 1, slot: 0); // stays
+        var here = PlaceLot(containerId, productId, page: 3, slot: 2);
+        var after = PlaceLot(containerId, productId, page: 5, slot: 4);
+        var service = CreateService();
+
+        // From page 3, push this page and everything after one page toward the back.
+        service.ShiftPage(containerId, page: 3, deltaPages: 1, scope: BinderShiftScope.ThisAndAfter);
+
+        using var ctx = new OmniCardDbContext(_options);
+        Assert.Equal(1, ctx.Lots.Single(l => l.Id == before).Page); // untouched (before the block)
+        Assert.Equal(4, ctx.Lots.Single(l => l.Id == here).Page);   // 3 -> 4
+        Assert.Equal(2, ctx.Lots.Single(l => l.Id == here).Slot);   // slot preserved
+        Assert.Equal(6, ctx.Lots.Single(l => l.Id == after).Page);  // 5 -> 6
+    }
+
+    [Fact]
+    public void ShiftPage_OnlyThisPage_MovesJustThatPage()
+    {
+        var (containerId, productId) = SeedBinderWithSheets("Shift B", "2,2"); // pages 1-4
+        var here = PlaceLot(containerId, productId, page: 2, slot: 1);
+        var neighbor = PlaceLot(containerId, productId, page: 4, slot: 0); // empty slot 1 on page 3 target? no, target is page 3
+        var service = CreateService();
+
+        // Shift only page 2's cards to page 3 (page 3 is empty -> no collision).
+        service.ShiftPage(containerId, page: 2, deltaPages: 1, scope: BinderShiftScope.OnlyThisPage);
+
+        using var ctx = new OmniCardDbContext(_options);
+        Assert.Equal(3, ctx.Lots.Single(l => l.Id == here).Page);     // 2 -> 3
+        Assert.Equal(1, ctx.Lots.Single(l => l.Id == here).Slot);
+        Assert.Equal(4, ctx.Lots.Single(l => l.Id == neighbor).Page); // unrelated page, untouched
+    }
+
+    [Fact]
+    public void ShiftPage_ThisAndBefore_TowardFront_MovesHeadBlock()
+    {
+        var (containerId, productId) = SeedBinderWithSheets("Shift C", "2,2"); // pages 1-4
+        // Pages 2-3 are one too far back; page 1 is empty. Pull the head block (pages <=3) forward.
+        var p2 = PlaceLot(containerId, productId, page: 2, slot: 0);
+        var p3 = PlaceLot(containerId, productId, page: 3, slot: 1);
+        var tail = PlaceLot(containerId, productId, page: 4, slot: 2); // stays
+        var service = CreateService();
+
+        service.ShiftPage(containerId, page: 3, deltaPages: -1, scope: BinderShiftScope.ThisAndBefore);
+
+        using var ctx = new OmniCardDbContext(_options);
+        Assert.Equal(1, ctx.Lots.Single(l => l.Id == p2).Page); // 2 -> 1
+        Assert.Equal(2, ctx.Lots.Single(l => l.Id == p3).Page); // 3 -> 2
+        Assert.Equal(4, ctx.Lots.Single(l => l.Id == tail).Page); // after the block, untouched
+    }
+
+    [Fact]
+    public void ShiftPage_WouldFallOffEnd_Throws_AndLeavesEverythingUnchanged()
+    {
+        var (containerId, productId) = SeedBinderWithSheets("Shift D", "2,2"); // pages 1-4
+        var onLast = PlaceLot(containerId, productId, page: 4, slot: 0);
+        var here = PlaceLot(containerId, productId, page: 3, slot: 1);
+        var service = CreateService();
+
+        // Page 4 (part of the "this and after" block from page 3) + 1 = 5 runs off the binder.
+        Assert.Throws<InvalidOperationException>(() =>
+            service.ShiftPage(containerId, page: 3, deltaPages: 1, scope: BinderShiftScope.ThisAndAfter));
+
+        using var ctx = new OmniCardDbContext(_options);
+        Assert.Equal(4, ctx.Lots.Single(l => l.Id == onLast).Page); // unchanged
+        Assert.Equal(3, ctx.Lots.Single(l => l.Id == here).Page);   // unchanged
+    }
+
+    [Fact]
+    public void ShiftPage_OnlyThisPage_OntoOccupiedNeighbor_Throws_Collision()
+    {
+        var (containerId, productId) = SeedBinderWithSheets("Shift E", "2,2"); // pages 1-4
+        var here = PlaceLot(containerId, productId, page: 2, slot: 0);
+        var blocker = PlaceLot(containerId, productId, page: 3, slot: 0); // occupies the target slot, not moving
+        var service = CreateService();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            service.ShiftPage(containerId, page: 2, deltaPages: 1, scope: BinderShiftScope.OnlyThisPage));
+
+        using var ctx = new OmniCardDbContext(_options);
+        Assert.Equal(2, ctx.Lots.Single(l => l.Id == here).Page);    // unchanged
+        Assert.Equal(3, ctx.Lots.Single(l => l.Id == blocker).Page); // unchanged
+    }
+
+    [Fact]
+    public void ShiftPage_LeavesUnplacedCardsUntouched()
+    {
+        var (containerId, productId) = SeedBinderWithSheets("Shift F", "2,2"); // pages 1-4
+        var placed = PlaceLot(containerId, productId, page: 1, slot: 0);
+        var unplaced = PlaceLot(containerId, productId, page: 1, slot: 1);
+        using (var seed = new OmniCardDbContext(_options))
+        {
+            var u = seed.Lots.Single(l => l.Id == unplaced);
+            u.Page = null; u.Slot = null;
+            seed.SaveChanges();
+        }
+        var service = CreateService();
+
+        service.ShiftPage(containerId, page: 1, deltaPages: 1, scope: BinderShiftScope.ThisAndAfter);
+
+        using var ctx = new OmniCardDbContext(_options);
+        Assert.Equal(2, ctx.Lots.Single(l => l.Id == placed).Page); // shifted
+        Assert.Null(ctx.Lots.Single(l => l.Id == unplaced).Page);   // still unplaced
+    }
+
+    [Fact]
     public void GetSheets_ReturnsAllSheetsWithCounts()
     {
         var (containerId, productId) = SeedBinderWithSheets("Sheets", "2,1,2"); // pages [1,2][3][4,5]
