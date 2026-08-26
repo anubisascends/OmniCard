@@ -382,6 +382,7 @@ public class CsvImportTests : IDisposable
         public List<BinderSheetInfo> GetSheets(int containerId) => [];
         public void InsertBinderSheet(int containerId, int insertIndex, bool doubleSided) { }
         public void MoveBinderSheet(int containerId, int fromPage, int toIndex) { }
+        public void ShiftPage(int containerId, int page, int deltaPages, BinderShiftScope scope) { }
         public void RemoveBinderSheet(int containerId, int page) { }
         public void SetSlotsPerPage(int containerId, int slotsPerPage) { }
         public void SetColumns(int containerId, int columns) { }

@@ -438,6 +438,34 @@ public sealed partial class BinderViewModel(
         Refresh();
     }
 
+    /// <summary>Shifts the cards on <paramref name="pageNumber"/> — and, per the scope the user picks,
+    /// the pages before or after it — toward the front or back by a chosen number of pages (slots
+    /// preserved). For fixing an off-by-a-page data-entry mistake from a chosen page. Blocks (with a
+    /// warning) if a card would fall off the binder's edge or collide with a card that isn't moving,
+    /// rather than losing data.</summary>
+    [RelayCommand]
+    public void ShiftPage(int? pageNumber)
+    {
+        if (pageNumber is not int page) return;
+        if (dialogService.ShiftBinderPage(page) is not { } choice || choice.DeltaPages == 0) return;
+
+        try
+        {
+            containerService.ShiftPage(_containerId, page, choice.DeltaPages, choice.Scope);
+        }
+        catch (InvalidOperationException ex)
+        {
+            System.Windows.MessageBox.Show(
+                ex.Message,
+                "Shift Cards",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Warning);
+            return;
+        }
+
+        Refresh();
+    }
+
     public void DropOnSlot(int lotId, int page, int slot)
     {
         containerService.AssignCardToSlot(lotId, _containerId, page, slot);

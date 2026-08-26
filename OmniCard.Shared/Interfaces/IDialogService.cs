@@ -32,6 +32,12 @@ public interface IDialogService
     /// cancelled.</summary>
     int? MoveBinderPage(int containerId, int movingSheetIndex);
 
+    /// <summary>Prompts for how to shift the cards on <paramref name="page"/> — a direction
+    /// (front/back), a number of pages, and a scope (only this page, this page and all before, or all
+    /// after). Returns the signed page delta (negative = toward the front, positive = toward the back)
+    /// and the chosen scope, or null if cancelled or no shift was chosen.</summary>
+    (int DeltaPages, BinderShiftScope Scope)? ShiftBinderPage(int page);
+
     /// <summary>Prompts for a list destination (existing or new) per game group, for "Create List from Scans".
     /// Returns null if cancelled.</summary>
     IReadOnlyList<ScanListTargetResult>? PickListTargetsForScans(IReadOnlyList<(CardGame Game, int Count)> groups, string defaultName);

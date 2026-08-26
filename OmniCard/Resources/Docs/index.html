@@ -284,6 +284,18 @@
       <p><strong>Moving pages.</strong> Each page in the spread also has a move (<span aria-hidden="true">✥</span>) button in its
       header — like pulling a sheet out of a binder and slotting it in somewhere else. Pick the destination and the whole sheet
       (front and back) moves there; every card on a page that shifts is renumbered automatically, keeping its slot.</p>
+      <p><strong>Shifting cards to fix data entry.</strong> Each page's header has a shift (<span aria-hidden="true">⇄</span>) button,
+      next to Move and Remove. It's the quickest way to fix an off-by-a-page data-entry mistake — for example, you realized everything
+      from page 5 onward was entered one page too early. Click it and pick:</p>
+      <ul>
+        <li><strong>Direction</strong> — toward the front (left / lower page numbers) or toward the back (right / higher page numbers).</li>
+        <li><strong>Which pages</strong> — only this page, this page and all pages before it, or this page and all pages after it.</li>
+        <li><strong>Pages to shift</strong> — how far to move (usually 1).</li>
+      </ul>
+      <p>Every card in the affected pages keeps its slot within the page, and cards left in the Unplaced pool aren't touched. The shift
+      is <strong>blocked with a warning</strong> (nothing is changed) if it would push a card off the front or back of the binder, or move
+      a card onto a page/slot that already holds a card that isn't moving — so you never silently overwrite or lose a card. Add pages,
+      widen the scope, or clear the destination first if that happens.</p>
       <p><strong>Find in the Unplaced pool.</strong> Click a card in the <em>Unplaced Cards</em> pool and just start typing a
       name — like Windows Explorer, the pool scrolls to and selects the first card whose name starts with what you've typed.
       Keep typing to refine, press the same letter again to cycle through matches, and <kbd>Backspace</kbd>/<kbd>Esc</kbd> to
@@ -596,7 +608,9 @@
         <li><strong>Drag</strong> a card from the pool into a slot, or between slots (dropping onto an occupied slot swaps/displaces it).</li>
         <li>Change the <strong>layout</strong> (slots per page, columns).</li>
         <li><strong>Add</strong> a page (front+back or single-sided), <strong>Insert</strong>, <strong>Move</strong>, or <strong>Remove</strong> pages,
-        and navigate spreads with the pagination strip.</li>
+        <strong>Shift</strong> (<span aria-hidden="true">⇄</span> on each page header — move that page's cards, and optionally the pages before or
+        after it, toward the front or back to fix an off-by-a-page entry mistake; blocked if it would run off the binder's edge or overwrite a
+        card that isn't moving), and navigate spreads with the pagination strip.</li>
         <li><strong>Right-click</strong> a card (or an empty slot) for the same actions as the desktop: open the card editor, copy name(s),
         move to another location, remove from the page, tags, list/unlist for sale, mark picked, set condition/foil, add a missing card into the
         slot, and delete.</li>

@@ -378,6 +378,11 @@
                                     <materialDesign:PackIcon Kind="CursorMove" Width="18" Height="18"/>
                                 </Button>
                                 <Button Style="{StaticResource MaterialDesignIconButton}" Width="30" Height="30" Padding="0"
+                                        Command="{Binding ShiftPageCommand}" CommandParameter="{Binding LeftPageNumber}"
+                                        ToolTip="Shift the cards on this page (and, optionally, the pages before or after it) toward the front or back — to fix an off-by-a-page data-entry mistake">
+                                    <materialDesign:PackIcon Kind="SwapHorizontal" Width="18" Height="18"/>
+                                </Button>
+                                <Button Style="{StaticResource MaterialDesignIconButton}" Width="30" Height="30" Padding="0"
                                         Command="{Binding RemovePageCommand}" CommandParameter="{Binding LeftPageNumber}"
                                         ToolTip="Remove this page and its other side; cards return to Unplaced">
                                     <materialDesign:PackIcon Kind="TrashCanOutline" Width="18" Height="18"/>
@@ -411,6 +416,11 @@
                                         Command="{Binding MovePageCommand}" CommandParameter="{Binding RightPageNumber}"
                                         ToolTip="Move this page (and its other side) to another spot in the binder">
                                     <materialDesign:PackIcon Kind="CursorMove" Width="18" Height="18"/>
+                                </Button>
+                                <Button Style="{StaticResource MaterialDesignIconButton}" Width="30" Height="30" Padding="0"
+                                        Command="{Binding ShiftPageCommand}" CommandParameter="{Binding RightPageNumber}"
+                                        ToolTip="Shift the cards on this page (and, optionally, the pages before or after it) toward the front or back — to fix an off-by-a-page data-entry mistake">
+                                    <materialDesign:PackIcon Kind="SwapHorizontal" Width="18" Height="18"/>
                                 </Button>
                                 <Button Style="{StaticResource MaterialDesignIconButton}" Width="30" Height="30" Padding="0"
                                         Command="{Binding RemovePageCommand}" CommandParameter="{Binding RightPageNumber}"

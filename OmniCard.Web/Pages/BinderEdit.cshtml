@@ -226,6 +226,27 @@
             </div>
         </div>
 
+        <div id="modalShiftPage" class="edit-modal" hidden>
+            <h3 id="shiftPageTitle">Shift Cards</h3>
+            <p class="binder-hint">Move cards to fix an off-by-a-page data-entry mistake. Each card keeps its slot within the page; cards in the Unplaced pool aren't touched.</p>
+            <label>Direction
+                <select id="shiftDirection" class="edit-select">
+                    <option value="left">Toward the front (left / lower page numbers)</option>
+                    <option value="right">Toward the back (right / higher page numbers)</option>
+                </select>
+            </label>
+            <fieldset class="radio-row">
+                <label><input type="radio" name="shiftScope" value="OnlyThisPage"/> Only this page</label>
+                <label><input type="radio" name="shiftScope" value="ThisAndBefore"/> This page and all pages before it</label>
+                <label><input type="radio" name="shiftScope" value="ThisAndAfter" checked/> This page and all pages after it</label>
+            </fieldset>
+            <label>Pages to shift <input type="number" id="shiftCount" class="edit-input" min="1" value="1"/></label>
+            <div class="edit-modal-actions">
+                <button type="button" class="binder-btn" data-close>Cancel</button>
+                <button type="button" class="binder-btn primary" id="shiftConfirm">Shift</button>
+            </div>
+        </div>
+
         <div id="toast" class="edit-toast" hidden></div>
 
         <script id="binder-state" type="application/json">@Html.Raw(Model.StateJson)</script>

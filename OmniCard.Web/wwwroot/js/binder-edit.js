@@ -115,10 +115,13 @@
             const move = document.createElement("button");
             move.className = "icon-btn"; move.title = "Move this page"; move.textContent = "⤳";
             move.addEventListener("click", () => openMovePage(pageNumber));
+            const shift = document.createElement("button");
+            shift.className = "icon-btn"; shift.title = "Shift cards from this page to fix an off-by-a-page data-entry mistake"; shift.textContent = "⇄";
+            shift.addEventListener("click", () => openShiftPage(pageNumber));
             const del = document.createElement("button");
             del.className = "icon-btn"; del.title = "Remove this page"; del.textContent = "🗑";
             del.addEventListener("click", () => removePage(pageNumber));
-            btns.appendChild(move); btns.appendChild(del);
+            btns.appendChild(move); btns.appendChild(shift); btns.appendChild(del);
             header.appendChild(btns);
         }
         wrap.appendChild(header);
@@ -280,6 +283,30 @@
         const r = await apiPost("/api/binder/page/move", { containerId, fromPage: movePageFrom, toIndex });
         closeModals();
         spreadIndex = r.spreadIndex;
+        await refreshAll();
+    }
+
+    // --- Shift cards from a page -------------------------------------------------------------
+    let shiftFromPage = null;
+    function openShiftPage(pageNumber) {
+        shiftFromPage = pageNumber;
+        document.getElementById("shiftPageTitle").textContent = `Shift cards from page ${pageNumber}`;
+        document.getElementById("shiftDirection").value = "right";
+        document.getElementById("shiftCount").value = "1";
+        const after = document.querySelector('input[name="shiftScope"][value="ThisAndAfter"]');
+        if (after) after.checked = true;
+        showModal("modalShiftPage");
+    }
+    async function confirmShiftPage() {
+        const dir = document.getElementById("shiftDirection").value;
+        const count = parseInt(document.getElementById("shiftCount").value, 10);
+        if (!count || count <= 0) { toast("Enter a number of pages to shift."); return; }
+        const scope = document.querySelector('input[name="shiftScope"]:checked').value;
+        const deltaPages = dir === "left" ? -count : count;
+        try {
+            await apiPost("/api/binder/page/shift", { containerId, page: shiftFromPage, deltaPages, scope });
+        } catch { return; /* toast already shown (off the edge or a collision) */ }
+        closeModals();
         await refreshAll();
     }
 
@@ -565,6 +592,7 @@
     document.getElementById("insertPageBtn").addEventListener("click", openInsertPage);
     document.getElementById("insertConfirm").addEventListener("click", confirmInsertPage);
     document.getElementById("movePageConfirm").addEventListener("click", confirmMovePage);
+    document.getElementById("shiftConfirm").addEventListener("click", confirmShiftPage);
 
     const addMenuBtn = document.getElementById("addPageMenuBtn");
     const addMenu = document.getElementById("addPageMenu");

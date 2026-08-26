@@ -157,6 +157,7 @@ public sealed class RecordingContainerService : IStorageContainerService
     public List<BinderSheetInfo> GetSheets(int containerId) => throw new NotImplementedException();
     public void InsertBinderSheet(int containerId, int insertIndex, bool doubleSided) => throw new NotImplementedException();
     public void MoveBinderSheet(int containerId, int fromPage, int toIndex) => throw new NotImplementedException();
+    public void ShiftPage(int containerId, int page, int deltaPages, BinderShiftScope scope) => throw new NotImplementedException();
     public void RemoveBinderSheet(int containerId, int page) => throw new NotImplementedException();
     public void SetSlotsPerPage(int containerId, int slotsPerPage) => throw new NotImplementedException();
     public void SetColumns(int containerId, int columns) => throw new NotImplementedException();
