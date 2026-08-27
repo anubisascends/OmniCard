@@ -181,6 +181,87 @@ tr:active { background: var(--surface); }
     color: var(--text-muted);
 }
 
+/* Deck-box grouping (mirrors the desktop deck view): a Group-by bar plus columns of
+   overlapping "stacks" that fan open on hover, à la Archidekt. */
+.deck-group-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.deck-group-bar a {
+    padding: 4px 12px;
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.deck-group-bar a:hover { text-decoration: none; border-color: var(--accent); }
+.deck-group-bar a.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* Card width drives the whole deck view; Ctrl+wheel adjusts --deck-card-w (see collection-view.js). */
+.deck-groups {
+    --deck-card-w: 150px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px 22px;
+    align-items: flex-start;
+}
+
+.deck-column { width: var(--deck-card-w); }
+
+.deck-col-header {
+    font-weight: 600;
+    margin-bottom: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.deck-col-header .count { color: var(--text-muted); font-weight: 500; }
+
+/* Each card is a thin title strip (clips to the card's name band). Hovering ONE card grows it to
+   full height; because the strips are normal block flow, the cards below it slide down to make
+   room — only the hovered card enlarges (matches the desktop deck view / Archidekt). */
+.stack-card {
+    display: block;
+    width: var(--deck-card-w);
+    height: 34px;
+    overflow: hidden;
+    border-radius: 6px;
+    margin-bottom: 2px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    transition: height 0.15s ease;
+}
+
+.stack-card:hover { height: calc(var(--deck-card-w) * 88 / 63); }
+
+.stack-card img,
+.stack-card .no-image {
+    width: 100%;
+    display: block;
+    background: var(--bg);
+}
+.stack-card img { /* natural height = width·88/63; top (name band) shows in the 34px window */ }
+.stack-card:hover img { outline: 2px solid var(--accent); outline-offset: -2px; }
+.stack-card .no-image {
+    aspect-ratio: 63 / 88;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    text-align: center;
+    padding: 8px 6px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
 .back-link {
     display: inline-flex;
     align-items: center;

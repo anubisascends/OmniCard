@@ -40,8 +40,49 @@
         {
             <p class="empty">No cards in this location.</p>
         }
+        else if (Model.IsDeckBox && Model.Groups.Count > 0)
+        {
+            <div class="deck-group-bar">
+                <span>Group by:</span>
+                <a class="@(Model.GroupMode == "none" ? "active" : "")" href="/location/@Model.Container.Id">None</a>
+                <a class="@(Model.GroupMode == "type" ? "active" : "")" href="/location/@Model.Container.Id?group=type">Type</a>
+                <a class="@(Model.GroupMode == "mv" ? "active" : "")" href="/location/@Model.Container.Id?group=mv">Mana Value</a>
+            </div>
+            <div class="deck-groups">
+                @foreach (var col in Model.Groups)
+                {
+                    <div class="deck-column">
+                        <div class="deck-col-header">@col.Header <span class="count">&times;@col.Count</span></div>
+                        <div class="deck-stack">
+                            @foreach (var card in col.Cards)
+                            {
+                                <a href="/card/@card.Id" class="stack-card" title="@card.Name (@card.SetCode) — @card.Condition@(card.IsFoil ? " · Foil" : "")">
+                                    @if (card.ImageUrl is not null)
+                                    {
+                                        <img src="@card.ImageUrl" loading="lazy" alt="@card.Name"/>
+                                    }
+                                    else
+                                    {
+                                        <div class="no-image">@card.Name</div>
+                                    }
+                                </a>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
         else
         {
+            @if (Model.IsDeckBox)
+            {
+                <div class="deck-group-bar">
+                    <span>Group by:</span>
+                    <a class="@(Model.GroupMode == "none" ? "active" : "")" href="/location/@Model.Container.Id">None</a>
+                    <a class="@(Model.GroupMode == "type" ? "active" : "")" href="/location/@Model.Container.Id?group=type">Type</a>
+                    <a class="@(Model.GroupMode == "mv" ? "active" : "")" href="/location/@Model.Container.Id?group=mv">Mana Value</a>
+                </div>
+            }
             <partial name="_CollectionToolbar" />
             <div class="card-tiles">
                 @foreach (var card in Model.Cards)

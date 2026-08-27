@@ -108,3 +108,29 @@
     applyFilter();
     applySort();
 })();
+
+// Deck-box grouped view: Ctrl + mouse wheel zooms the card size (--deck-card-w), persisted.
+(function () {
+    'use strict';
+
+    var deck = document.querySelector('.deck-groups');
+    if (!deck) return;
+
+    var MIN = 96, MAX = 340, KEY = 'omnicard.deckCardW';
+
+    function apply(w) {
+        w = Math.min(MAX, Math.max(MIN, w));
+        deck.style.setProperty('--deck-card-w', w + 'px');
+        try { localStorage.setItem(KEY, String(w)); } catch (e) { /* ignore */ }
+        return w;
+    }
+
+    var saved = parseFloat((function () { try { return localStorage.getItem(KEY); } catch (e) { return null; } })());
+    var current = apply(isNaN(saved) ? 150 : saved);
+
+    deck.addEventListener('wheel', function (e) {
+        if (!e.ctrlKey) return;      // plain wheel scrolls the page as usual
+        e.preventDefault();
+        current = apply(current + (e.deltaY < 0 ? 16 : -16));
+    }, { passive: false });
+})();

@@ -29,7 +29,15 @@ public class LocationModel : PageModel
     public List<SetSummary> Sets { get; set; } = [];
     public List<StackedCard> Cards { get; set; } = [];
 
-    public IActionResult OnGet(int id)
+    /// <summary>Deck-box grouping axis from the <c>?group=</c> query param: "none", "type", or "mv".</summary>
+    public string GroupMode { get; set; } = "none";
+
+    /// <summary>Grouped stacks, populated only for a deck box with an active <see cref="GroupMode"/>.</summary>
+    public List<DeckColumn> Groups { get; set; } = [];
+
+    public bool IsDeckBox => Container.ContainerType == ContainerType.DeckBox;
+
+    public IActionResult OnGet(int id, string? group = null)
     {
         using var db = _dbFactory.CreateDbContext();
 
@@ -62,6 +70,11 @@ public class LocationModel : PageModel
         // Singles don't persist a price on the row — look up the live catalog price for each card.
         MarketPriceHydrator.Populate(_cardService, rawCards);
 
+        // For a grouped deck-box view, pull each card's type line / mana value from the catalog so
+        // the shared classifier can bucket them (cheap: a deck box holds ~100 cards).
+        var wantGroups = container.ContainerType == ContainerType.DeckBox && group is "type" or "mv";
+        if (wantGroups) HydrateGroupingFields(rawCards);
+
         Cards = rawCards
             .GroupBy(c => new { c.Name, c.SetCode })
             .Select(g =>
@@ -81,7 +94,9 @@ public class LocationModel : PageModel
                     rep.MarketPrice > 0m ? rep.MarketPrice : null,
                     rep.Condition,
                     rep.IsFoil,
-                    rep.Tags);
+                    rep.Tags,
+                    rep.TypeLine,
+                    rep.ManaValue);
             })
             .OrderBy(c => c.Name)
             .ToList();
@@ -97,7 +112,68 @@ public class LocationModel : PageModel
             .OrderBy(s => s.SetName)
             .ToList();
 
+        BuildGroups(group);
+
         return Page();
+    }
+
+    /// <summary>Maps the query param to a grouping axis and, for a deck box, hydrates each stack's
+    /// catalog type line / mana value and classifies it into ordered columns — mirroring the desktop
+    /// deck view via the shared <see cref="DeckCardClassifier"/>.</summary>
+    private void BuildGroups(string? group)
+    {
+        var axis = group?.ToLowerInvariant() switch
+        {
+            "type" => DeckGroupAxis.Type,
+            "mv" => DeckGroupAxis.ManaValue,
+            _ => DeckGroupAxis.None,
+        };
+
+        GroupMode = axis switch
+        {
+            DeckGroupAxis.Type => "type",
+            DeckGroupAxis.ManaValue => "mv",
+            _ => "none",
+        };
+
+        if (!IsDeckBox || axis == DeckGroupAxis.None || Cards.Count == 0) return;
+
+        Groups = Cards
+            .Select(c => (Card: c, Group: DeckCardClassifier.Classify(axis, c.TypeLine, c.ManaValue, c.Tags)))
+            .GroupBy(x => x.Group.Key)
+            .Select(g => (
+                Header: g.Key,
+                Order: g.Min(x => x.Group.SortOrder),
+                Cards: g.Select(x => x.Card).OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ToList()))
+            .OrderBy(g => g.Order)
+            .ThenBy(g => g.Header, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new DeckColumn(g.Header, g.Cards.Sum(c => c.Quantity), g.Cards))
+            .ToList();
+    }
+
+    /// <summary>Looks up each card's catalog type line and converted mana value (MTG only) so the
+    /// grouped deck view can classify them. Non-MTG cards fall back to no type line / mana value.</summary>
+    private void HydrateGroupingFields(IEnumerable<CollectionCard> cards)
+    {
+        foreach (var c in cards)
+        {
+            try
+            {
+                if (_cardService.GetGameService(c.Game).FindCardById(c.GameCardId) is Card mtg)
+                {
+                    c.TypeLine = mtg.TypeLine;
+                    c.ManaValue = mtg.Cmc;
+                }
+                else
+                {
+                    c.TypeLine = c.CardType;
+                }
+            }
+            catch
+            {
+                c.TypeLine = c.CardType;
+            }
+        }
     }
 
     public string TypeDisplay => Container.ContainerType switch
@@ -130,5 +206,9 @@ public class LocationModel : PageModel
         decimal? MarketPrice,
         string Condition,
         bool IsFoil,
-        List<string> Tags);
+        List<string> Tags,
+        string? TypeLine,
+        double? ManaValue);
+
+    public record DeckColumn(string Header, int Count, List<StackedCard> Cards);
 }

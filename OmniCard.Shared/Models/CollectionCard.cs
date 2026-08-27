@@ -30,6 +30,18 @@ public class CollectionCard : INotifyPropertyChanged
     public string? Section { get; set; }
     public string? Color { get; set; }
     public string? CardType { get; set; }
+
+    /// <summary>Full catalog type line (e.g. "Legendary Creature — Human Wizard"), hydrated on
+    /// demand for deck-box grouping. Not persisted on the lot/product — looked up from the game
+    /// catalog. Null until hydrated (or for games without a type line).</summary>
+    [NotMapped]
+    public string? TypeLine { get; set; }
+
+    /// <summary>Converted mana value / total mana cost, hydrated on demand for deck-box grouping.
+    /// Not persisted — looked up from the game catalog. Null until hydrated (or non-MTG cards).</summary>
+    [NotMapped]
+    public double? ManaValue { get; set; }
+
     public bool IsMissing { get; set; }
     public FlagReason? FlagReason { get; set; }
     public EbayListing? EbayListing { get; set; }
@@ -83,6 +95,21 @@ public class CollectionCard : INotifyPropertyChanged
     /// <summary>All card IDs in this stack (including this card). Only populated when stacked.</summary>
     [NotMapped]
     public List<int>? StackedIds { get; set; }
+
+    /// <summary>Transient UI selection state for the deck-box stacks view (the flat ListBox uses its
+    /// own ListBoxItem.IsSelected instead). Not persisted. Reactive so the tile border updates.</summary>
+    [NotMapped]
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected == value) return;
+            _isSelected = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+        }
+    }
+    private bool _isSelected;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 }
