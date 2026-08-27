@@ -33,6 +33,12 @@ public interface ICardService
     /// the same filter-preset query language used for the main collection search.</summary>
     List<CollectionCard> GetUnplacedBinderCards(int containerId, FilterPreset? filterPreset);
     void MoveCardsToContainer(IEnumerable<int> cardIds, int containerId, string? section = null);
+
+    /// <summary>Moves exactly <paramref name="quantity"/> copies of a single-card lot into a container.
+    /// If the lot holds more than <paramref name="quantity"/>, it is split — the source lot's quantity is
+    /// decremented and a new lot (same product/condition/foil/cost) is created in the destination.
+    /// Returns the destination lot id.</summary>
+    int MoveQuantityToContainer(int lotId, int quantity, int containerId, string? section = null);
     void BulkUpdateField(IEnumerable<int> cardIds, Action<CollectionCard> update);
     List<CollectionCard> GetCollectionCards(IEnumerable<int> cardIds);
     void UpdateCollectionCard(CollectionCard card);

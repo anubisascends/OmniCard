@@ -17,6 +17,7 @@ Expected filenames (each maps to a placeholder in index.html):
   inventory.png            The sealed-product Inventory view
   orders-kanban.png        The Sales > Orders kanban board
   ebay-connect.png         The eBay sign-in / connect window
+  upgrade-deck.png         The Upgrade Deck dialog (cut list + add list, deck source at top)
 
 To add a NEW placeholder elsewhere in the docs, add this to index.html where you want it:
 

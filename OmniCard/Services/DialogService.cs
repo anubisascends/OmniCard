@@ -312,6 +312,15 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         wnd.ShowDialog();
     }
 
+    public bool ShowDeckBoxSync(StorageContainer deckBox)
+    {
+        var wnd = Services.GetRequiredService<Views.DeckBoxSync.DeckBoxSyncView>();
+        SetOwner(wnd);
+        wnd.ViewModel.Load(deckBox);
+        wnd.ShowDialog();
+        return wnd.ViewModel.DidCommit;
+    }
+
     public Product? EditProduct(Product? existing)
     {
         var wnd = Services.GetRequiredService<ProductEditorView>();

@@ -181,6 +181,7 @@ public partial class App : Application
 
             // Decklist check
             services.AddSingleton<IDecklistService, DecklistService>();
+            services.AddSingleton<IDeckBoxSyncService, DeckBoxSyncService>();
             services.AddSingleton<IDecklistPdfExporter, DecklistPdfExporter>();
 
             // Lists
@@ -248,6 +249,8 @@ public partial class App : Application
             services.AddTransient<ManualAddViewModel>();
             services.AddTransient<DecklistCheckView>();
             services.AddTransient<DecklistCheckViewModel>();
+            services.AddTransient<Views.DeckBoxSync.DeckBoxSyncView>();
+            services.AddTransient<Views.DeckBoxSync.DeckBoxSyncViewModel>();
             services.AddTransient<Views.Inventory.ProductEditorView>();
             services.AddTransient<Views.Inventory.ProductEditorViewModel>();
             services.AddTransient<Views.Inventory.AddLotView>();

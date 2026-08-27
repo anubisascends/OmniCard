@@ -392,6 +392,18 @@ public sealed partial class CollectionViewModel : ViewModel
         LoadOverview();
     }
 
+    /// <summary>Opens the "Upgrade Deck" dialog for a Deck Box location; on commit, refreshes the
+    /// overview tiles and the card list (cards may have moved in or out).</summary>
+    public void UpgradeDeck(int containerId)
+    {
+        var container = _containerService.GetAll().FirstOrDefault(c => c.Id == containerId);
+        if (container is null) return;
+        if (!_dialogService.ShowDeckBoxSync(container)) return;
+        LoadOverview();
+        if (ShowCardList && CurrentLocationId == containerId) _ = SearchCollection();
+        CollectionChanged?.Invoke();
+    }
+
     public void ToggleAlwaysAvailable(int containerId)
     {
         var container = _containerService.GetAll().FirstOrDefault(c => c.Id == containerId);

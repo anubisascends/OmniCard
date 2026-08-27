@@ -254,6 +254,7 @@ public class PriceSheetServiceTests : IDisposable
         public HashSet<int> GetMatchingContainerIds(string query, CardGame? gameFilter) => throw new NotImplementedException();
         public List<CollectionCard> GetUnplacedBinderCards(int containerId, FilterPreset? filterPreset) => throw new NotImplementedException();
         public void MoveCardsToContainer(IEnumerable<int> cardIds, int containerId, string? section = null) => throw new NotImplementedException();
+        public int MoveQuantityToContainer(int lotId, int quantity, int containerId, string? section = null) => throw new NotImplementedException();
         public void BulkUpdateField(IEnumerable<int> cardIds, Action<CollectionCard> update) => throw new NotImplementedException();
         public List<CollectionCard> GetCollectionCards(IEnumerable<int> cardIds) => throw new NotImplementedException();
         public void UpdateCollectionCard(CollectionCard card) => throw new NotImplementedException();

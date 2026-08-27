@@ -1668,6 +1668,61 @@ public sealed class CardService : ICardService
         context.SaveChanges();
     }
 
+    public int MoveQuantityToContainer(int lotId, int quantity, int containerId, string? section = null)
+    {
+        if (quantity < 1) throw new ArgumentOutOfRangeException(nameof(quantity));
+        using var context = _omniDbContextFactory.CreateDbContext();
+        // Category=Single guard mirrors MoveCardsToContainer — the singles write path never mutates a sealed lot.
+        var lot = context.Lots.FirstOrDefault(l => l.Id == lotId && l.Product.Category == ProductCategory.Single);
+        if (lot is null) return 0;
+
+        // Whole-lot move: no split needed.
+        if (quantity >= lot.Quantity)
+        {
+            lot.LocationId = containerId;
+            lot.Page = null;
+            lot.Slot = null;
+            lot.Section = section;
+            context.Movements.Add(new InventoryMovement
+            {
+                ProductId = lot.ProductId,
+                LotId = lot.Id,
+                Type = MovementType.Move,
+                Quantity = lot.Quantity,
+                Note = section,
+            });
+            context.SaveChanges();
+            return lot.Id;
+        }
+
+        // Partial move: split off `quantity` copies into a new destination lot, leaving the remainder in place.
+        lot.Quantity -= quantity;
+        var moved = new InventoryLot
+        {
+            ProductId = lot.ProductId,
+            Quantity = quantity,
+            UnitCost = lot.UnitCost,
+            AcquisitionDate = lot.AcquisitionDate,
+            Source = lot.Source,
+            LocationId = containerId,
+            Condition = lot.Condition,
+            Section = section,
+        };
+        context.Lots.Add(moved);
+        context.SaveChanges();
+
+        context.Movements.Add(new InventoryMovement
+        {
+            ProductId = moved.ProductId,
+            LotId = moved.Id,
+            Type = MovementType.Move,
+            Quantity = quantity,
+            Note = section,
+        });
+        context.SaveChanges();
+        return moved.Id;
+    }
+
     public void BulkUpdateField(IEnumerable<int> cardIds, Action<CollectionCard> update)
     {
         using var context = _omniDbContextFactory.CreateDbContext();
