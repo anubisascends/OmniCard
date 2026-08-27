@@ -33,6 +33,29 @@ public class InverseBoolToVisibilityConverter : MarkupExtension, IValueConverter
     public override object ProvideValue(IServiceProvider serviceProvider) => this;
 }
 
+/// <summary>Deck-stack slot height: the LAST card in the pile shows full height (values: card height)
+/// so it reads as the bottom of a stack; every other card collapses to a thin title strip
+/// (ConverterParameter, default 34). Values = [this item, ItemsSource, cardHeight]. Reactive so the
+/// bottom card re-sizes as the deck view zooms.</summary>
+public class LastCardHeightConverter : MarkupExtension, IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var collapsed = parameter is string s && double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var c) ? c : 34.0;
+        if (values.Length < 3 || values[0] is null || values[1] is not IEnumerable items || values[2] is not double cardHeight)
+            return collapsed;
+
+        object? last = null;
+        foreach (var item in items) last = item;
+        return ReferenceEquals(values[0], last) ? cardHeight : collapsed;
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
+
 /// <summary>Visible when the bound enum value's string representation matches ConverterParameter.</summary>
 public class EnumEqualsToVisibilityConverter : MarkupExtension, IValueConverter
 {

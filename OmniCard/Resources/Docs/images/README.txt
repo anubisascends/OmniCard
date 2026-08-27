@@ -18,6 +18,7 @@ Expected filenames (each maps to a placeholder in index.html):
   orders-kanban.png        The Sales > Orders kanban board
   ebay-connect.png         The eBay sign-in / connect window
   upgrade-deck.png         The Upgrade Deck dialog (cut list + add list, deck source at top)
+  deck-grouping.png        A deck box grouped into stacks (Group=Type or Mana Value), one pile fanned open
 
 To add a NEW placeholder elsewhere in the docs, add this to index.html where you want it:
 

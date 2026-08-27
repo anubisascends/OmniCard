@@ -72,6 +72,13 @@ public partial class CardListView : UserControl
             return;
         }
 
+        // The deck stacks are rebuilt (new card instances) on every reload and when grouping
+        // toggles — drop selection refs that point at the old set.
+        if (e.PropertyName is nameof(CollectionViewModel.CollectionSearchResults)
+            or nameof(CollectionViewModel.IsCurrentLocationDeckBox)
+            or nameof(CollectionViewModel.IsDeckGroupingActive))
+            ClearDeckSelection();
+
         if (e.PropertyName != nameof(CollectionViewModel.CollectionSearchResults))
             return;
 
@@ -169,10 +176,78 @@ public partial class CardListView : UserControl
 
     public void SelectAll() => CollectionListBox.SelectAll();
 
-    public void ClearSelection() => CollectionListBox.UnselectAll();
+    public void ClearSelection()
+    {
+        CollectionListBox.UnselectAll();
+        ClearDeckSelection();
+    }
 
     public IList<CollectionCard> GetSelectedCards()
-        => CollectionListBox.SelectedItems.Cast<CollectionCard>().ToList();
+        => ViewModel?.IsDeckGroupingActive == true
+            ? _deckSelection.ToList()
+            : CollectionListBox.SelectedItems.Cast<CollectionCard>().ToList();
+
+    // ── Deck-box stacks: selection + activation ─────────────────────────────────────────────
+    // The grouped deck view isn't a ListBox, so selection is tracked here and mirrored onto each
+    // card's transient IsSelected (drives the tile highlight). GetSelectedCards returns this set
+    // while grouping is active, so the shared context menu and sidebar operate on it unchanged.
+    private readonly List<CollectionCard> _deckSelection = [];
+
+    private void ClearDeckSelection()
+    {
+        foreach (var c in _deckSelection) c.IsSelected = false;
+        _deckSelection.Clear();
+    }
+
+    private void SetDeckSelection(CollectionCard card)
+    {
+        ClearDeckSelection();
+        card.IsSelected = true;
+        _deckSelection.Add(card);
+    }
+
+    private void DeckStackCard_Pressed(object? sender, OmniCard.Controls.CardStackPressEventArgs e)
+    {
+        if (ViewModel is null) return;
+        var card = e.Card;
+
+        if (e.Button == System.Windows.Input.MouseButton.Right)
+        {
+            // Match the flat list: right-clicking outside the current selection reselects just that
+            // card; right-clicking within it keeps the multi-selection. Don't handle the event, so
+            // the ItemsControl's context menu still opens.
+            if (!_deckSelection.Contains(card))
+                SetDeckSelection(card);
+        }
+        else // left button
+        {
+            if (e.Ctrl)
+            {
+                if (_deckSelection.Remove(card)) card.IsSelected = false;
+                else { card.IsSelected = true; _deckSelection.Add(card); }
+            }
+            else
+            {
+                SetDeckSelection(card);
+            }
+        }
+
+        // Set before any double-click activation — CollectionCardDoubleClick reads SelectedCollectionCard.
+        ViewModel.SelectedCollectionCard = _deckSelection.Count > 0 ? _deckSelection[^1] : null;
+        ViewModel.SelectedCardCount = _deckSelection.Count;
+        ViewModel.RebuildSidebarFields();
+
+        if (e.Button == System.Windows.Input.MouseButton.Left && e.ClickCount == 2
+            && ViewModel.CollectionCardDoubleClickCommand.CanExecute(null))
+            ViewModel.CollectionCardDoubleClickCommand.Execute(null);
+    }
+
+    private void DeckGroupsScroll_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (ViewModel is null || (Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
+        ViewModel.AdjustDeckZoom(e.Delta > 0 ? 16 : -16);
+        e.Handled = true; // consume so Ctrl+wheel zooms instead of scrolling
+    }
 
     // ── Type-ahead: jump to a card by typing its name ──────────────────────────────────────
     // Matches against the name of currently-loaded cards (starts-with, case-insensitive) and
@@ -296,7 +371,8 @@ public partial class CardListView : UserControl
         // goes invisible the instant its owning ContextMenu closes (which happens right after
         // this Click handler runs), so anchoring to it made the popup close itself immediately.
         // Anchor to the always-visible ListBox instead, positioned at the cursor.
-        TagsPopup.PlacementTarget = CollectionListBox;
+        // Anchor to whichever surface is actually visible (the ListBox is collapsed in deck mode).
+        TagsPopup.PlacementTarget = ViewModel.IsDeckGroupingActive ? DeckGroupsScroll : CollectionListBox;
         TagsPopup.IsOpen = true;
     }
 }

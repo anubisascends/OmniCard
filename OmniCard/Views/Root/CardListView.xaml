@@ -12,6 +12,61 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="CardTileTemplate.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+
+            <!-- Card actions menu, shared by the flat ListBox and the deck-box stacks. x:Shared=False
+                 so each host gets its own instance (a ContextMenu can't have two logical parents).
+                 Both hosts' DataContext is the ViewModel, so PlacementTarget.DataContext resolves the
+                 same commands, and the commands act on the current selection (GetSelectedCards). -->
+            <ContextMenu x:Key="CardContextMenu" x:Shared="False"
+                         DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                <MenuItem Header="Open Card Editor"
+                          Command="{Binding CollectionCardDoubleClickCommand}"/>
+                <MenuItem Header="Copy Card Name(s)"
+                          Command="{Binding CopyCollectionCardNamesCommand}"/>
+                <Separator/>
+                <MenuItem Header="Move to Location..."
+                          Command="{Binding MoveSelectedToLocationCommand}"/>
+                <MenuItem Header="Tags..."
+                          IsEnabled="{Binding HasSelection}"
+                          Click="TagsMenuItem_Click"/>
+                <MenuItem Header="Set as Commander"
+                          Command="{Binding SetAsCommanderCommand}"
+                          Visibility="{Binding IsCurrentLocationDeckBox, Converter={conv:BoolToVisibilityConverter}}"/>
+                <MenuItem Header="Remove Commander"
+                          Command="{Binding RemoveCommanderCommand}"
+                          Visibility="{Binding IsCurrentLocationDeckBox, Converter={conv:BoolToVisibilityConverter}}"/>
+                <Separator/>
+                <MenuItem Header="List for Sale..."
+                          Command="{Binding ListForSaleCommand}"/>
+                <MenuItem Header="Mark Picked"
+                          Command="{Binding MarkPickedCommand}"/>
+                <MenuItem Header="Unlist"
+                          Command="{Binding UnlistForSaleCommand}"/>
+                <Separator/>
+                <MenuItem Header="Set Condition">
+                    <MenuItem Header="NM" Command="{Binding BulkSetCollectionConditionCommand}" CommandParameter="NM"/>
+                    <MenuItem Header="LP" Command="{Binding BulkSetCollectionConditionCommand}" CommandParameter="LP"/>
+                    <MenuItem Header="MP" Command="{Binding BulkSetCollectionConditionCommand}" CommandParameter="MP"/>
+                    <MenuItem Header="HP" Command="{Binding BulkSetCollectionConditionCommand}" CommandParameter="HP"/>
+                    <MenuItem Header="D"  Command="{Binding BulkSetCollectionConditionCommand}" CommandParameter="D"/>
+                </MenuItem>
+                <MenuItem Header="Set Foil"
+                          Command="{Binding BulkSetCollectionFoilCommand}"
+                          CommandParameter="True"/>
+                <MenuItem Header="Set Non-Foil"
+                          Command="{Binding BulkSetCollectionFoilCommand}"
+                          CommandParameter="False"/>
+                <Separator/>
+                <MenuItem Header="List on eBay"
+                          Command="{Binding ListOnEbayCommand}"/>
+                <MenuItem Header="View on eBay"
+                          Command="{Binding ViewOnEbayCommand}"/>
+                <MenuItem Header="End eBay Listing"
+                          Command="{Binding EndEbayListingCommand}"/>
+                <Separator/>
+                <MenuItem Header="Delete Selected"
+                          Command="{Binding BulkDeleteCollectionCommand}"/>
+            </ContextMenu>
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -27,6 +82,7 @@
              ItemsSource="{Binding CollectionSearchResults}"
              SelectedItem="{Binding SelectedCollectionCard}"
              ItemTemplate="{StaticResource CardTileTemplate}"
+             Visibility="{Binding IsDeckGroupingActive, Converter={conv:InverseBoolToVisibilityConverter}}"
              SelectionMode="Extended"
              HorizontalContentAlignment="Stretch"
              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -87,49 +143,7 @@
         </ListBox.ItemContainerStyle>
 
         <ListBox.ContextMenu>
-            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                <MenuItem Header="Open Card Editor"
-                          Command="{Binding CollectionCardDoubleClickCommand}"/>
-                <MenuItem Header="Copy Card Name(s)"
-                          Command="{Binding CopyCollectionCardNamesCommand}"/>
-                <Separator/>
-                <MenuItem Header="Move to Location..."
-                          Command="{Binding MoveSelectedToLocationCommand}"/>
-                <MenuItem Header="Tags..."
-                          IsEnabled="{Binding HasSelection}"
-                          Click="TagsMenuItem_Click"/>
-                <Separator/>
-                <MenuItem Header="List for Sale..."
-                          Command="{Binding ListForSaleCommand}"/>
-                <MenuItem Header="Mark Picked"
-                          Command="{Binding MarkPickedCommand}"/>
-                <MenuItem Header="Unlist"
-                          Command="{Binding UnlistForSaleCommand}"/>
-                <Separator/>
-                <MenuItem Header="Set Condition">
-                    <MenuItem Header="NM" Command="{Binding BulkSetCollectionConditionCommand}" CommandParameter="NM"/>
-                    <MenuItem Header="LP" Command="{Binding BulkSetCollectionConditionCommand}" CommandParameter="LP"/>
-                    <MenuItem Header="MP" Command="{Binding BulkSetCollectionConditionCommand}" CommandParameter="MP"/>
-                    <MenuItem Header="HP" Command="{Binding BulkSetCollectionConditionCommand}" CommandParameter="HP"/>
-                    <MenuItem Header="D"  Command="{Binding BulkSetCollectionConditionCommand}" CommandParameter="D"/>
-                </MenuItem>
-                <MenuItem Header="Set Foil"
-                          Command="{Binding BulkSetCollectionFoilCommand}"
-                          CommandParameter="True"/>
-                <MenuItem Header="Set Non-Foil"
-                          Command="{Binding BulkSetCollectionFoilCommand}"
-                          CommandParameter="False"/>
-                <Separator/>
-                <MenuItem Header="List on eBay"
-                          Command="{Binding ListOnEbayCommand}"/>
-                <MenuItem Header="View on eBay"
-                          Command="{Binding ViewOnEbayCommand}"/>
-                <MenuItem Header="End eBay Listing"
-                          Command="{Binding EndEbayListingCommand}"/>
-                <Separator/>
-                <MenuItem Header="Delete Selected"
-                          Command="{Binding BulkDeleteCollectionCommand}"/>
-            </ContextMenu>
+            <StaticResource ResourceKey="CardContextMenu"/>
         </ListBox.ContextMenu>
 
         <i:Interaction.Triggers>
@@ -139,6 +153,42 @@
         </i:Interaction.Triggers>
 
     </ListBox>
+
+    <!-- Deck-box grouped "stacks" view: shown for a deck box when a Group-by axis is chosen.
+         Each group is a fanned pile of overlapping cards (CardStack) that expands on hover. -->
+    <ScrollViewer x:Name="DeckGroupsScroll"
+                  Grid.Column="0"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Padding="8"
+                  PreviewMouseWheel="DeckGroupsScroll_PreviewMouseWheel"
+                  Visibility="{Binding IsDeckGroupingActive, Converter={conv:BoolToVisibilityConverter}}">
+        <ItemsControl ItemsSource="{Binding DeckGroups}"
+                      ContextMenu="{StaticResource CardContextMenu}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Margin="6,0,6,10" VerticalAlignment="Top">
+                        <TextBlock Text="{Binding Header}"
+                                   FontWeight="Bold"
+                                   Margin="2,0,0,6"
+                                   MaxWidth="{Binding DataContext.DeckCardWidth, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                        <helpers:CardStack ItemsSource="{Binding Cards}"
+                                           HorizontalAlignment="Left"
+                                           CardPressed="DeckStackCard_Pressed"
+                                           CardWidth="{Binding DataContext.DeckCardWidth, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                           DataDirectory="{Binding DataContext.DataDirectory, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </ScrollViewer>
 
     <!-- Type-ahead find indicator: shown while the user is typing to jump to a card by name.
          Anchored bottom-left over the card list; driven entirely from code-behind. -->

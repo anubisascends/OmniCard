@@ -185,6 +185,8 @@ public sealed partial class CollectionViewModel : ViewModel
         // Binder locations show the normal flat card list like any other location; the drag-and-drop
         // placement editor is a separate dialog reachable via the "Open Binder" button.
         IsCurrentLocationBinder = container?.ContainerType == ContainerType.Binder;
+        IsCurrentLocationDeckBox = container?.ContainerType == ContainerType.DeckBox;
+        ResetDeckGrouping();
 
         ResetSearchState();
         ShowCardList = true;
@@ -211,6 +213,8 @@ public sealed partial class CollectionViewModel : ViewModel
     public void BrowseAll()
     {
         IsCurrentLocationBinder = false;
+        IsCurrentLocationDeckBox = false;
+        ResetDeckGrouping();
         CurrentLocationId = null;
         CurrentLocationName = "Entire Collection";
         ShowAllCards = true;
@@ -229,6 +233,8 @@ public sealed partial class CollectionViewModel : ViewModel
     public void BrowseSet(CardGame game, string setCode)
     {
         IsCurrentLocationBinder = false;
+        IsCurrentLocationDeckBox = false;
+        ResetDeckGrouping();
 
         // Filter to the tile's own game regardless of the global selector.
         _allGames = false;
@@ -263,6 +269,8 @@ public sealed partial class CollectionViewModel : ViewModel
     public void NavigateBack()
     {
         IsCurrentLocationBinder = false;
+        IsCurrentLocationDeckBox = false;
+        ResetDeckGrouping();
         ShowCardList = false;
         ShowAllCards = false;
         CurrentLocationId = null;
@@ -487,6 +495,8 @@ public sealed partial class CollectionViewModel : ViewModel
         ViewOnEbayCommand.NotifyCanExecuteChanged();
         EndEbayListingCommand.NotifyCanExecuteChanged();
         ClearSelectionActionCommand.NotifyCanExecuteChanged();
+        SetAsCommanderCommand.NotifyCanExecuteChanged();
+        RemoveCommanderCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Total matching cards (including not-yet-loaded rows).</summary>
@@ -660,6 +670,7 @@ public sealed partial class CollectionViewModel : ViewModel
             OnPropertyChanged(nameof(FilteredCardCount));
             OnPropertyChanged(nameof(FilteredMarketValue));
             OnPropertyChanged(nameof(HasMoreResults));
+            RefreshDeckGroupsIfActive();
         }
         catch
         {

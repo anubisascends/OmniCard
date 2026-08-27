@@ -10,7 +10,7 @@ public sealed class DeckBoxSyncService(
     ICardService cardService,
     ITagService tagService) : IDeckBoxSyncService
 {
-    public const string SideboardTag = "sideboard";
+    public const string SideboardTag = DeckCardClassifier.SideboardTag;
 
     private static string NormalizeName(string name) => name.Trim().ToLowerInvariant();
 

@@ -235,6 +235,30 @@
                         RelativeSource={RelativeSource AncestorType=Window},
                         Converter={conv:BoolToVisibilityConverter}}"/>
 
+                    <!-- Deck-box grouping selector (deck boxes only): flat list vs. grouped stacks -->
+                    <TextBlock Text="Group:"
+                            Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                            VerticalAlignment="Center"
+                            Margin="4,0,4,0"
+                            Visibility="{Binding DataContext.ViewModel.Collection.IsCurrentLocationDeckBox,
+                                RelativeSource={RelativeSource AncestorType=Window},
+                                Converter={conv:BoolToVisibilityConverter}}"/>
+                    <ComboBox Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                              ItemsSource="{Binding DataContext.ViewModel.Collection.DeckGroupingOptions,
+                                  RelativeSource={RelativeSource AncestorType=Window}}"
+                              SelectedItem="{Binding DataContext.ViewModel.Collection.SelectedDeckGrouping,
+                                  RelativeSource={RelativeSource AncestorType=Window}}"
+                              DisplayMemberPath="Label"
+                              Width="110"
+                              VerticalAlignment="Center"
+                              ToolTip="Group this deck's cards into hover-expanding stacks"
+                              Visibility="{Binding DataContext.ViewModel.Collection.IsCurrentLocationDeckBox,
+                                  RelativeSource={RelativeSource AncestorType=Window},
+                                  Converter={conv:BoolToVisibilityConverter}}"/>
+                    <Separator Visibility="{Binding DataContext.ViewModel.Collection.IsCurrentLocationDeckBox,
+                        RelativeSource={RelativeSource AncestorType=Window},
+                        Converter={conv:BoolToVisibilityConverter}}"/>
+
                     <!-- Stack duplicates toggle -->
                     <CheckBox Content="Stack Duplicates"
                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
