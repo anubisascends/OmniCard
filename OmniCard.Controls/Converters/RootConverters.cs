@@ -33,10 +33,11 @@ public class InverseBoolToVisibilityConverter : MarkupExtension, IValueConverter
     public override object ProvideValue(IServiceProvider serviceProvider) => this;
 }
 
-/// <summary>Deck-stack slot height: the LAST card in the pile shows full height (values: card height)
-/// so it reads as the bottom of a stack; every other card collapses to a thin title strip
-/// (ConverterParameter, default 34). Values = [this item, ItemsSource, cardHeight]. Reactive so the
-/// bottom card re-sizes as the deck view zooms.</summary>
+/// <summary>Deck-stack slot base height: a card shows full height (values: card height) when it's the
+/// LAST card in the pile (so the stack has a visible bottom card) OR when it's selected (so a selected
+/// card stays open after the mouse leaves); every other card collapses to a thin title strip
+/// (ConverterParameter, default 34). Values = [this item, ItemsSource, cardHeight, isSelected].
+/// Reactive so cards re-size as the deck zooms or the selection changes.</summary>
 public class LastCardHeightConverter : MarkupExtension, IMultiValueConverter
 {
     public object Convert(object[] values, Type targetType, object? parameter, CultureInfo culture)
@@ -45,9 +46,11 @@ public class LastCardHeightConverter : MarkupExtension, IMultiValueConverter
         if (values.Length < 3 || values[0] is null || values[1] is not IEnumerable items || values[2] is not double cardHeight)
             return collapsed;
 
+        var isSelected = values.Length > 3 && values[3] is true;
+
         object? last = null;
         foreach (var item in items) last = item;
-        return ReferenceEquals(values[0], last) ? cardHeight : collapsed;
+        return ReferenceEquals(values[0], last) || isSelected ? cardHeight : collapsed;
     }
 
     public object[] ConvertBack(object value, Type[] targetTypes, object? parameter, CultureInfo culture)

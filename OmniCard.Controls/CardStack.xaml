@@ -36,6 +36,7 @@
                             <Binding/>
                             <Binding Path="ItemsSource" RelativeSource="{RelativeSource AncestorType={x:Type local:CardStack}}"/>
                             <Binding Path="CardHeight" RelativeSource="{RelativeSource AncestorType={x:Type local:CardStack}}"/>
+                            <Binding Path="IsSelected"/>
                         </MultiBinding>
                     </Border.Height>
                     <Border.ToolTip>

@@ -90,10 +90,12 @@ public partial class CardStack : UserControl
     private void Slot_MouseLeave(object sender, MouseEventArgs e)
     {
         if (sender is not Border slot) return;
-        // The last card sits at full height (its base state); everyone else collapses to a strip.
-        // Hand the height binding back afterward so zoom keeps re-sizing the bottom card.
-        var toHeight = IsLastCard(slot.DataContext as CollectionCard) ? CardHeight : CollapsedHeight;
-        Animate(slot, toHeight, handBack: true);
+        // A selected card — and the last card in the pile — stay at full height as their base state;
+        // everyone else collapses to a strip. Hand the height binding back afterward so it keeps
+        // driving the value (zoom re-sizes, selection re-expands/collapses).
+        var card = slot.DataContext as CollectionCard;
+        var expanded = card?.IsSelected == true || IsLastCard(card);
+        Animate(slot, expanded ? CardHeight : CollapsedHeight, handBack: true);
     }
 
     private static void Animate(Border slot, double toHeight, bool handBack)
