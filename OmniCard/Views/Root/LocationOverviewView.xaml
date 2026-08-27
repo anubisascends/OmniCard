@@ -81,6 +81,9 @@
                         <MenuItem Header="Open Binder View..."
                                   Click="OpenBinderView_Click"
                                   Visibility="{Binding Container.ContainerType, Converter={conv:EnumEqualsToVisibilityConverter}, ConverterParameter=Binder}"/>
+                        <MenuItem Header="Upgrade Deck..."
+                                  Click="UpgradeDeck_Click"
+                                  Visibility="{Binding Container.ContainerType, Converter={conv:EnumEqualsToVisibilityConverter}, ConverterParameter=DeckBox}"/>
                         <Separator Visibility="{Binding Container.IsSystem, Converter={conv:InverseBoolToVisibilityConverter}}"/>
                         <MenuItem Header="Delete Location..."
                                   Click="DeleteLocation_Click"

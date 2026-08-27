@@ -38,6 +38,15 @@ public partial class LocationOverviewView : UserControl
         rootView.ViewModel.Collection.NavigateToLocation(summary.Container.Id);
     }
 
+    private void UpgradeDeck_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem) return;
+        if (menuItem.DataContext is not LocationTileSummary summary) return;
+
+        var rootView = (RootView)Window.GetWindow(this)!;
+        rootView.ViewModel.Collection.UpgradeDeck(summary.Container.Id);
+    }
+
     private void AddCard_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem menuItem) return;

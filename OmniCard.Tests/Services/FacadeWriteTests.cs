@@ -564,6 +564,73 @@ public class FacadeWriteTests : IDisposable
         Assert.Equal(2, moves.Count);
     }
 
+    // --- MoveQuantityToContainer: whole-lot move vs. split ---
+
+    [Fact]
+    public void MoveQuantityToContainer_WholeLot_MovesLotNoSplit()
+    {
+        var service = CreateService();
+        int lotId, containerId;
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+        {
+            var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, GameCardId = "sol-1", Name = "Sol Ring" };
+            ctx.Products.Add(product);
+            var container = new StorageContainer { Name = "Deck A", ContainerType = ContainerType.DeckBox };
+            ctx.StorageContainers.Add(container);
+            ctx.SaveChanges();
+            var lot = new InventoryLot { ProductId = product.Id, Quantity = 2, Condition = "NM" };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            lotId = lot.Id;
+            containerId = container.Id;
+        }
+
+        var destLotId = service.MoveQuantityToContainer(lotId, 2, containerId);
+
+        Assert.Equal(lotId, destLotId); // same lot, just relocated
+        using var check = new OmniCardDbContext(_omniOptions);
+        Assert.Single(check.Lots.AsNoTracking());
+        var moved = check.Lots.AsNoTracking().Single();
+        Assert.Equal(containerId, moved.LocationId);
+        Assert.Equal(2, moved.Quantity);
+    }
+
+    [Fact]
+    public void MoveQuantityToContainer_Partial_SplitsLot()
+    {
+        var service = CreateService();
+        int lotId, sourceContainerId, deckBoxId;
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+        {
+            var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, GameCardId = "sol-1", Name = "Sol Ring" };
+            ctx.Products.Add(product);
+            var source = new StorageContainer { Name = "Bulk", ContainerType = ContainerType.Bulk };
+            var deck = new StorageContainer { Name = "Deck A", ContainerType = ContainerType.DeckBox };
+            ctx.StorageContainers.AddRange(source, deck);
+            ctx.SaveChanges();
+            var lot = new InventoryLot { ProductId = product.Id, Quantity = 4, LocationId = source.Id, UnitCost = 1.5m, Condition = "NM" };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            lotId = lot.Id;
+            sourceContainerId = source.Id;
+            deckBoxId = deck.Id;
+        }
+
+        var destLotId = service.MoveQuantityToContainer(lotId, 1, deckBoxId);
+
+        Assert.NotEqual(lotId, destLotId); // a new lot was created for the moved copy
+        using var check = new OmniCardDbContext(_omniOptions);
+        var src = check.Lots.AsNoTracking().Single(l => l.Id == lotId);
+        var dest = check.Lots.AsNoTracking().Single(l => l.Id == destLotId);
+        Assert.Equal(3, src.Quantity);
+        Assert.Equal(sourceContainerId, src.LocationId);
+        Assert.Equal(1, dest.Quantity);
+        Assert.Equal(deckBoxId, dest.LocationId);
+        Assert.Equal(src.ProductId, dest.ProductId);
+        Assert.Equal(1.5m, dest.UnitCost);
+        Assert.Single(check.Movements.AsNoTracking().Where(m => m.Type == MovementType.Move));
+    }
+
     // --- Category=Single guard: write-by-id methods must never touch a sealed-lot id ---
     //
     // GetCollectionCards already scopes to Product.Category == Single; these tests confirm the

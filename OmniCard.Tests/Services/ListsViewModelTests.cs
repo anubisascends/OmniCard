@@ -182,6 +182,7 @@ public class ListsViewModelTests
         public bool? OpenManualAdd(StorageContainer? defaultContainer = null) => throw new NotImplementedException();
         public bool? OpenManualAddToSlot(int containerId, int page, int slot) => throw new NotImplementedException();
         public void ShowDecklistCheck() => throw new NotImplementedException();
+        public bool ShowDeckBoxSync(StorageContainer deckBox) => throw new NotImplementedException();
         public Product? EditProduct(Product? existing) => throw new NotImplementedException();
         public (int Quantity, decimal? UnitCost, int? LocationId, string? Source, DateTime AcquisitionDate)? AddLotDialog(int productId) => throw new NotImplementedException();
         public (int Quantity, decimal? UnitCost, int? LocationId, string? Source, DateTime AcquisitionDate)? EditLotDialog(InventoryLot lot) => throw new NotImplementedException();

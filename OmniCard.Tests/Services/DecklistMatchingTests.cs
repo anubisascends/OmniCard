@@ -184,6 +184,7 @@ public class DecklistMatchingTests : IDisposable
         public HashSet<int> GetMatchingContainerIds(string query, CardGame? gameFilter = null) => [];
         public List<CollectionCard> GetUnplacedBinderCards(int containerId, FilterPreset? filterPreset) => [];
         public void MoveCardsToContainer(IEnumerable<int> cardIds, int containerId, string? section = null) { }
+        public int MoveQuantityToContainer(int lotId, int quantity, int containerId, string? section = null) => 0;
         public void BulkUpdateField(IEnumerable<int> cardIds, Action<CollectionCard> update) { }
         public List<CollectionCard> GetCollectionCards(IEnumerable<int> cardIds) => [];
         public void UpdateCollectionCard(CollectionCard card) { }

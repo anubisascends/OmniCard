@@ -40,6 +40,10 @@ public sealed class RecordingCardService(ICardGameService active) : ICardService
     public sealed record AddCall(CardMatch Match, CardGame Game, string Condition, bool IsFoil, string? FoilType, decimal? PurchasePrice, int Quantity, StorageContainer? Container);
     public List<AddCall> Added { get; } = [];
 
+    public sealed record MoveQtyCall(int LotId, int Quantity, int ContainerId, string? Section);
+    public List<MoveQtyCall> MovedQuantities { get; } = [];
+    private int _nextMovedLotId = 10_000;
+
     public ICardGameService ActiveGameService => active;
     public ICardGameService GetGameService(CardGame game) => active;
     public void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, string? foilType, decimal? purchasePrice, int containerId, int page, int slot) { }
@@ -70,6 +74,11 @@ public sealed class RecordingCardService(ICardGameService active) : ICardService
     public HashSet<int> GetMatchingContainerIds(string query, CardGame? gameFilter = null) => throw new NotImplementedException();
     public List<CollectionCard> GetUnplacedBinderCards(int containerId, FilterPreset? filterPreset) => throw new NotImplementedException();
     public void MoveCardsToContainer(IEnumerable<int> cardIds, int containerId, string? section = null) => throw new NotImplementedException();
+    public int MoveQuantityToContainer(int lotId, int quantity, int containerId, string? section = null)
+    {
+        MovedQuantities.Add(new MoveQtyCall(lotId, quantity, containerId, section));
+        return _nextMovedLotId++;
+    }
     public void BulkUpdateField(IEnumerable<int> cardIds, Action<CollectionCard> update) => throw new NotImplementedException();
     public List<CollectionCard> GetCollectionCards(IEnumerable<int> cardIds) => throw new NotImplementedException();
     public void UpdateCollectionCard(CollectionCard card) => throw new NotImplementedException();
@@ -90,6 +99,28 @@ public sealed class RecordingCardService(ICardGameService active) : ICardService
     public (CardMatch? Match, CardGame Game) FindBestMatch(ulong hash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, ulong? scanEdgeHash = null) => throw new NotImplementedException();
     public bool IsFirstCopy(CardGame game, string gameCardId, bool isFoil) => throw new NotImplementedException();
     public void AnnotateScan(ScannedCard scan) => throw new NotImplementedException();
+}
+
+/// <summary>ITagService that records AddTagToLots calls (one entry per lot).</summary>
+public sealed class RecordingTagService : ITagService
+{
+    public sealed record TagCall(int LotId, string TagName);
+    public List<TagCall> Added { get; } = [];
+
+    public void AddTagToLots(IEnumerable<int> lotIds, string tagName)
+    {
+        foreach (var id in lotIds) Added.Add(new TagCall(id, tagName));
+    }
+
+    // Unused members
+    public List<TagSummary> GetAllTags() => [];
+    public List<string> GetTagsForLot(int lotId) => [];
+    public Dictionary<int, List<string>> GetTagsByLots(IEnumerable<int> lotIds) => [];
+    public void SetTagsForLot(int lotId, IEnumerable<string> tagNames) => throw new NotImplementedException();
+    public void RemoveTagFromLots(IEnumerable<int> lotIds, string tagName) => throw new NotImplementedException();
+    public void RenameTag(int tagId, string newName) => throw new NotImplementedException();
+    public void DeleteTag(int tagId) => throw new NotImplementedException();
+    public void MergeTags(int sourceTagId, int targetTagId) => throw new NotImplementedException();
 }
 
 /// <summary>IListService that records AddPrinting/CreateList calls.</summary>

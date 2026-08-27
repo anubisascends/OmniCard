@@ -90,6 +90,7 @@ public sealed class WebCardService : ICardService
     public HashSet<int> GetMatchingContainerIds(string query, CardGame? gameFilter) => throw new NotSupportedException();
     public List<CollectionCard> GetUnplacedBinderCards(int containerId, FilterPreset? filterPreset) => throw new NotSupportedException();
     public void MoveCardsToContainer(IEnumerable<int> cardIds, int containerId, string? section = null) => throw new NotSupportedException();
+    public int MoveQuantityToContainer(int lotId, int quantity, int containerId, string? section = null) => throw new NotSupportedException();
     public void BulkUpdateField(IEnumerable<int> cardIds, Action<CollectionCard> update) => throw new NotSupportedException();
     public List<CollectionCard> GetCollectionCards(IEnumerable<int> cardIds) => throw new NotSupportedException();
     public void UpdateCollectionCard(CollectionCard card) => throw new NotSupportedException();
