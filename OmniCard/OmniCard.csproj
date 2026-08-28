@@ -86,6 +86,7 @@
     <None Remove="Resources\Images\OmniCard_Logo.png" />
     <Resource Include="Resources\Images\OmniCard_Logo.png" />
     <Resource Include="Resources\Symbols\Mana\*.svg" />
+    <Resource Include="Resources\CardBacks\*.png" />
     <Resource Include="Resources\Fonts\*.ttf" />
   </ItemGroup>
 

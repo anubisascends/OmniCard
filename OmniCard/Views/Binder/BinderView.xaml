@@ -107,11 +107,38 @@
                         DragOver="Slot_DragOver"
                         Drop="Slot_Drop">
                     <Grid>
-                        <!-- Empty-slot placeholder -->
+                        <!-- Empty-slot placeholder. When the mirrored pocket on the reverse side of
+                             this physical sheet holds a card, we instead show that game's card back
+                             (flipped horizontally, as if seeing the back of the card behind it) over
+                             a generic vector back that shows through if no PNG is bundled. -->
                         <Border CornerRadius="6" BorderThickness="0"
                                 Visibility="{Binding Card, Converter={conv:NullToVisibleConverter}}">
-                            <TextBlock Text="Empty" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                       FontStyle="Italic" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                            <Grid>
+                                <!-- Truly-empty pocket: the plain "Empty" hint. -->
+                                <TextBlock Text="Empty" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           FontStyle="Italic" Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                           Visibility="{Binding HasCardOnReverse, Converter={conv:InverseBoolToVisibilityConverter}}"/>
+
+                                <!-- Reverse-occupied pocket: card-back hint. -->
+                                <Border CornerRadius="6" Margin="10"
+                                        ToolTip="{Binding ReverseCardName}"
+                                        Visibility="{Binding HasCardOnReverse, Converter={conv:BoolToVisibilityConverter}}">
+                                    <!-- Generic vector back (shows through when no PNG is bundled). -->
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#2A3B55" Offset="0"/>
+                                            <GradientStop Color="#16233A" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                    <Grid>
+                                        <Border CornerRadius="4" Margin="8" BorderThickness="1" BorderBrush="#3E5680"/>
+                                        <!-- Per-game back PNG, shown normally (a card back reads the
+                                             same way up whichever side of the sheet you're on). -->
+                                        <Image Stretch="UniformToFill"
+                                               Source="{Binding ReverseGame, Converter={conv:CardBackImageConverter}}"/>
+                                    </Grid>
+                                </Border>
+                            </Grid>
                         </Border>
 
                         <!-- Occupied slot: draggable card tile. Tag also carries the BinderSlotItem

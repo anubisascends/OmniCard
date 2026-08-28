@@ -40,30 +40,41 @@
                         <div class="binder-grid">
                             @foreach (var cell in pg.Slots)
                             {
-                                if (cell is not null)
+                                var card = cell.Card;
+                                if (card is not null)
                                 {
-                                    <button type="button" class="binder-slot filled" data-lot="@cell.Id">
-                                        @if (cell.ImageUrl is not null)
+                                    <button type="button" class="binder-slot filled" data-lot="@card.Id">
+                                        @if (card.ImageUrl is not null)
                                         {
-                                            <img src="@cell.ImageUrl" loading="lazy" alt="@cell.Name"/>
+                                            <img src="@card.ImageUrl" loading="lazy" alt="@card.Name"/>
                                         }
                                         else
                                         {
-                                            <span class="no-image">@cell.Name</span>
+                                            <span class="no-image">@card.Name</span>
                                         }
-                                        @if (cell.IsTraded)
+                                        @if (card.IsTraded)
                                         {
                                             <span class="slot-badge traded">TRADED</span>
                                         }
-                                        else if (cell.Foil)
+                                        else if (card.Foil)
                                         {
                                             <span class="slot-badge foil">FOIL</span>
                                         }
-                                        @if (cell.Price is not null)
+                                        @if (card.Price is not null)
                                         {
-                                            <span class="price-badge">@cell.Price</span>
+                                            <span class="price-badge">@card.Price</span>
                                         }
                                     </button>
+                                }
+                                else if (cell.ReverseBackSlug is not null)
+                                {
+                                    // Empty pocket backed by a card on the reverse side of the sheet:
+                                    // show that game's card back (mirrored), over a generic CSS back
+                                    // that shows through when no PNG is bundled.
+                                    <div class="binder-slot empty has-reverse" aria-hidden="true">
+                                        <img class="card-back" src="/img/card-back-@(cell.ReverseBackSlug).png"
+                                             alt="" loading="lazy" onerror="this.remove()"/>
+                                    </div>
                                 }
                                 else
                                 {

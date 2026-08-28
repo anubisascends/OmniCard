@@ -54,6 +54,23 @@ public class BinderSheetLayoutTests
         Assert.Equal(expectedSheet, layout.SheetIndexOfPage(page));
     }
 
+    [Theory]
+    // "2,1,2" → pages [1,2][3][4,5]. Double-sided sheets pair front/back; the single-sided sheet
+    // (page 3) has no reverse; out-of-range pages have none either.
+    [InlineData(1, 2)]     // front → back
+    [InlineData(2, 1)]     // back → front
+    [InlineData(3, null)]  // single-sided sheet: nothing behind it
+    [InlineData(4, 5)]
+    [InlineData(5, 4)]
+    [InlineData(6, null)]  // past the end
+    [InlineData(0, null)]  // before the first page
+    public void ReversePageOf_ReturnsOtherSideOfSameSheet(int page, int? expected)
+    {
+        var layout = BinderSheetLayout.Parse("2,1,2", totalPages: 0);
+
+        Assert.Equal(expected, layout.ReversePageOf(page));
+    }
+
     [Fact]
     public void Append_AddsSheet_WithoutTouchingExisting()
     {

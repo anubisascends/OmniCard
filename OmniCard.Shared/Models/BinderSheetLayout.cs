@@ -84,6 +84,20 @@ public sealed class BinderSheetLayout
         return -1;
     }
 
+    /// <summary>The logical page on the <em>other side</em> of the same physical sheet as
+    /// <paramref name="page"/>, or <c>null</c> when there is none — the page is out of range, or its
+    /// sheet is single-sided (only a front, so nothing sits behind it). For a double-sided sheet the
+    /// front and back are the pair (first, first+1), so the reverse of one is simply the other. Used
+    /// by the binder views to show a card-back hint in an empty pocket whose reverse pocket is
+    /// filled.</summary>
+    public int? ReversePageOf(int page)
+    {
+        var sheetIndex = SheetIndexOfPage(page);
+        if (sheetIndex < 0 || SidesOfSheet(sheetIndex) == 1) return null;
+        var first = FirstPageOfSheet(sheetIndex);
+        return page == first ? first + 1 : first;
+    }
+
     /// <summary>Appends a new sheet to the end of the binder. No existing page moves, so the remap
     /// is empty.</summary>
     public BinderSheetLayout Append(bool doubleSided)
