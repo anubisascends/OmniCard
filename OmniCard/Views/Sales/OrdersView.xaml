@@ -92,9 +92,9 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Status accent stripe -->
+                    <!-- Lane accent stripe (colour of the lane the card sits in) -->
                     <Border Grid.Column="0" CornerRadius="6,0,0,6"
-                            Background="{Binding Status, Converter={conv:OrderStatusToAccentBrushConverter}}"/>
+                            Background="{Binding StageColorDisplay, Converter={conv:HexColorToBrushConverter}}"/>
 
                     <StackPanel Grid.Column="1" Margin="10,8,10,8">
                         <!-- Order # (key) + channel badge -->
@@ -186,108 +186,47 @@
                 </ItemsControl>
             </Expander>
 
-            <!-- 4 columns -->
-            <UniformGrid Rows="1">
-                <!-- Created -->
-                <DockPanel Margin="3,0">
-                    <Border DockPanel.Dock="Top" BorderThickness="0,0,0,2" BorderBrush="#2196F3"
-                            Padding="4,2,4,6" Margin="0,0,0,6">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Created" FontWeight="Bold" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                            <Border Grid.Column="1" Background="#2196F3" CornerRadius="9" MinWidth="20" Padding="6,1">
-                                <TextBlock Text="{Binding CreatedOrders.Count}" FontSize="11" Foreground="White"
-                                           HorizontalAlignment="Center"/>
+            <!-- Board columns are data-driven from the customizable Sales Workflow lanes
+                 (OrdersViewModel.Lanes). Adding/removing/reordering lanes in Settings reshapes the
+                 board with no XAML change. Cancel-behavior lanes are excluded here — they feed the
+                 Cancelled strip above. -->
+            <ItemsControl ItemsSource="{Binding Lanes}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Rows="1"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <DockPanel Margin="3,0">
+                            <Border DockPanel.Dock="Top" BorderThickness="0,0,0,2"
+                                    BorderBrush="{Binding Color, Converter={conv:HexColorToBrushConverter}}"
+                                    Padding="4,2,4,6" Margin="0,0,0,6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Name}" FontWeight="Bold" TextTrimming="CharacterEllipsis"
+                                               Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+                                    <Border Grid.Column="1" CornerRadius="9" MinWidth="20" Padding="6,1"
+                                            Background="{Binding Color, Converter={conv:HexColorToBrushConverter}}">
+                                        <TextBlock Text="{Binding Orders.Count}" FontSize="11" Foreground="White"
+                                                   HorizontalAlignment="Center"/>
+                                    </Border>
+                                </Grid>
                             </Border>
-                        </Grid>
-                    </Border>
-                    <ListBox ItemsSource="{Binding CreatedOrders}" AllowDrop="True" Tag="Created"
-                             Drop="Column_Drop" DragOver="Column_DragOver"
-                             Background="Transparent" BorderThickness="0"
-                             ItemTemplate="{StaticResource OrderCardTemplate}"
-                             ItemContainerStyle="{StaticResource CardItemContainerStyle}"
-                             ScrollViewer.VerticalScrollBarVisibility="Auto"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
-                </DockPanel>
-
-                <!-- Packed -->
-                <DockPanel Margin="3,0">
-                    <Border DockPanel.Dock="Top" BorderThickness="0,0,0,2" BorderBrush="#FF9800"
-                            Padding="4,2,4,6" Margin="0,0,0,6">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Packed" FontWeight="Bold" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                            <Border Grid.Column="1" Background="#FF9800" CornerRadius="9" MinWidth="20" Padding="6,1">
-                                <TextBlock Text="{Binding PackedOrders.Count}" FontSize="11" Foreground="White"
-                                           HorizontalAlignment="Center"/>
-                            </Border>
-                        </Grid>
-                    </Border>
-                    <ListBox ItemsSource="{Binding PackedOrders}" AllowDrop="True" Tag="Packed"
-                             Drop="Column_Drop" DragOver="Column_DragOver"
-                             Background="Transparent" BorderThickness="0"
-                             ItemTemplate="{StaticResource OrderCardTemplate}"
-                             ItemContainerStyle="{StaticResource CardItemContainerStyle}"
-                             ScrollViewer.VerticalScrollBarVisibility="Auto"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
-                </DockPanel>
-
-                <!-- Shipped -->
-                <DockPanel Margin="3,0">
-                    <Border DockPanel.Dock="Top" BorderThickness="0,0,0,2" BorderBrush="#009688"
-                            Padding="4,2,4,6" Margin="0,0,0,6">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Shipped" FontWeight="Bold" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                            <Border Grid.Column="1" Background="#009688" CornerRadius="9" MinWidth="20" Padding="6,1">
-                                <TextBlock Text="{Binding ShippedOrders.Count}" FontSize="11" Foreground="White"
-                                           HorizontalAlignment="Center"/>
-                            </Border>
-                        </Grid>
-                    </Border>
-                    <ListBox ItemsSource="{Binding ShippedOrders}" AllowDrop="True" Tag="Shipped"
-                             Drop="Column_Drop" DragOver="Column_DragOver"
-                             Background="Transparent" BorderThickness="0"
-                             ItemTemplate="{StaticResource OrderCardTemplate}"
-                             ItemContainerStyle="{StaticResource CardItemContainerStyle}"
-                             ScrollViewer.VerticalScrollBarVisibility="Auto"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
-                </DockPanel>
-
-                <!-- Completed -->
-                <DockPanel Margin="3,0">
-                    <Border DockPanel.Dock="Top" BorderThickness="0,0,0,2" BorderBrush="#4CAF50"
-                            Padding="4,2,4,6" Margin="0,0,0,6">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Completed" FontWeight="Bold" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
-                            <Border Grid.Column="1" Background="#4CAF50" CornerRadius="9" MinWidth="20" Padding="6,1">
-                                <TextBlock Text="{Binding CompletedOrders.Count}" FontSize="11" Foreground="White"
-                                           HorizontalAlignment="Center"/>
-                            </Border>
-                        </Grid>
-                    </Border>
-                    <ListBox ItemsSource="{Binding CompletedOrders}" AllowDrop="True" Tag="Completed"
-                             Drop="Column_Drop" DragOver="Column_DragOver"
-                             Background="Transparent" BorderThickness="0"
-                             ItemTemplate="{StaticResource OrderCardTemplate}"
-                             ItemContainerStyle="{StaticResource CardItemContainerStyle}"
-                             ScrollViewer.VerticalScrollBarVisibility="Auto"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
-                </DockPanel>
-            </UniformGrid>
+                            <ListBox ItemsSource="{Binding Orders}" AllowDrop="True" Tag="{Binding Key}"
+                                     Drop="Column_Drop" DragOver="Column_DragOver"
+                                     Background="Transparent" BorderThickness="0"
+                                     ItemTemplate="{StaticResource OrderCardTemplate}"
+                                     ItemContainerStyle="{StaticResource CardItemContainerStyle}"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+                        </DockPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
         </DockPanel>
 
         <!-- Resizable divider between board and editor (shown only when the panel is open) -->

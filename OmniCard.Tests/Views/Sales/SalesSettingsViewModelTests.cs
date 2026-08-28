@@ -55,6 +55,8 @@ public class SalesSettingsViewModelTests
         public void SetOrdersEditorWidth(double width) { }
         public bool OrdersEditorCollapsed => false;
         public void SetOrdersEditorCollapsed(bool collapsed) { }
+        public IReadOnlyList<OmniCard.Models.WorkflowLane> GetWorkflowLanes() => OmniCard.Models.WorkflowLane.Defaults();
+        public void SaveWorkflowLanes(IEnumerable<OmniCard.Models.WorkflowLane> lanes) { }
     }
 
     [Fact]

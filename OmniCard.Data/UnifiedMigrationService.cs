@@ -144,6 +144,19 @@ public static class UnifiedMigrationService
 
             cmd.CommandText = "UPDATE Orders SET Status = 'Created' WHERE Status = 'Open'";
             cmd.ExecuteNonQuery();
+
+            // Customizable kanban lanes: StageKey remembers the exact lane an order sits in. On a
+            // pre-existing DB, backfill it from Status so legacy orders land in the built-in default
+            // lane whose key is the lowercased behavior name (see WorkflowLane.Defaults). New/blank
+            // rows also get seeded from Status; this is idempotent (only NULL/empty rows are touched).
+            var stageKeyNew = !ColumnExists(cmd, "Orders", "StageKey");
+            AddColumnIfMissing(cmd, "Orders", "StageKey", "TEXT");
+            if (stageKeyNew)
+            {
+                cmd.CommandText =
+                    "UPDATE Orders SET StageKey = lower(Status) WHERE StageKey IS NULL OR StageKey = ''";
+                cmd.ExecuteNonQuery();
+            }
         }
 
         if (TableExists(cmd, "Movements"))

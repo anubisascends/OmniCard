@@ -53,6 +53,7 @@ public class OrderService(
             Channel = channel,
             OrderNumber = orderNumber,
             Status = OrderStatus.Created,
+            StageKey = OrderStatus.Created.ToString().ToLowerInvariant(),
             OrderDate = DateTime.UtcNow,
         };
         ctx.Orders.Add(order);
@@ -134,7 +135,7 @@ public class OrderService(
         ctx.SaveChanges();
     }
 
-    public async Task SetStatusAsync(int orderId, OrderStatus status)
+    public async Task SetStatusAsync(int orderId, OrderStatus status, string? stageKey = null)
     {
         using var ctx = dbContextFactory.CreateDbContext();
         var order = ctx.Orders.FirstOrDefault(o => o.Id == orderId);
@@ -144,6 +145,7 @@ public class OrderService(
                        && order.Status != OrderStatus.Completed && order.Status != OrderStatus.Cancelled;
 
         order.Status = status;
+        order.StageKey = stageKey ?? status.ToString().ToLowerInvariant();
 
         if (!shipping)
         {

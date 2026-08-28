@@ -90,11 +90,10 @@ public partial class OrdersView : UserControl
     private async void Column_Drop(object sender, DragEventArgs e)
     {
         if (e.Data.GetData(typeof(Order)) is not Order order) return;
-        if ((sender as FrameworkElement)?.Tag is not string statusText) return;
-        if (!Enum.TryParse<OrderStatus>(statusText, out var target)) return;
+        if ((sender as FrameworkElement)?.Tag is not string stageKey) return;
         e.Handled = true;
         if (DataContext is OrdersViewModel vm)
-            await vm.MoveOrder(order, target);
+            await vm.MoveOrderToStage(order, stageKey);
     }
 
     private void Card_Select(object sender, MouseButtonEventArgs e)

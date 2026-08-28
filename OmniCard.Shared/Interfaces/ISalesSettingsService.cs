@@ -24,4 +24,12 @@ public interface ISalesSettingsService
     /// <summary>Whether the Orders view editor panel is collapsed.</summary>
     bool OrdersEditorCollapsed { get; }
     void SetOrdersEditorCollapsed(bool collapsed);
+
+    /// <summary>The customizable Sales/Orders kanban lanes, in board order. Returns the built-in
+    /// defaults (<see cref="Models.WorkflowLane.Defaults"/>) when nothing has been saved yet — never
+    /// empty.</summary>
+    IReadOnlyList<Models.WorkflowLane> GetWorkflowLanes();
+
+    /// <summary>Persists the kanban lane configuration (board order preserved).</summary>
+    void SaveWorkflowLanes(IEnumerable<Models.WorkflowLane> lanes);
 }

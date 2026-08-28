@@ -10,6 +10,14 @@ public class Order
     public string? OrderNumber { get; set; }
     public DateTime OrderDate { get; set; } = DateTime.UtcNow;
     public OrderStatus Status { get; set; }
+
+    /// <summary>Key of the customizable <see cref="WorkflowLane"/> this order currently occupies on
+    /// the kanban board. <see cref="Status"/> holds the lane's behavior (which drives accounting);
+    /// this remembers the exact lane so two lanes sharing a behavior stay distinct. Null on legacy
+    /// orders created before customizable lanes — those fall back to the default lane whose
+    /// behavior matches <see cref="Status"/>.</summary>
+    public string? StageKey { get; set; }
+
     public string? TrackingNumber { get; set; }
     public string? Carrier { get; set; }
     public decimal ShippingChargedToBuyer { get; set; }
@@ -33,4 +41,6 @@ public class Order
     [NotMapped] public int LineItemCount { get; set; }
     /// <summary>Sum of line (qty × unit price) on this order (card display).</summary>
     [NotMapped] public decimal LineTotal { get; set; }
+    /// <summary>Accent colour (hex) of the lane this order sits in, resolved for the card stripe.</summary>
+    [NotMapped] public string? StageColorDisplay { get; set; }
 }

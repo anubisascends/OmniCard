@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using OmniCard.Collection;
 using Xunit;
 
@@ -130,6 +131,46 @@ public class SalesSettingsServiceTests
             Assert.Equal(new byte[] { 1, 2, 3, 4 }, File.ReadAllBytes(Path.Combine(dir, rel)));
         }
         finally { Directory.Delete(dir, recursive: true); Directory.Delete(srcDir, recursive: true); }
+    }
+
+    [Fact]
+    public void GetWorkflowLanes_ReturnsDefaults_WhenNoneSaved()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "omnicard-sales-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var svc = new SalesSettingsService(new DataPathServiceStub(dir));
+            var lanes = svc.GetWorkflowLanes();
+            Assert.Equal(OmniCard.Models.WorkflowLane.Defaults().Count, lanes.Count);
+            Assert.Equal("created", lanes[0].Key);
+            Assert.Contains(lanes, l => l.Behavior == OmniCard.Models.OrderStatus.Shipped);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
+    public void WorkflowLanes_Persist_AcrossInstances_PreservingOrder()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "omnicard-sales-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var dps = new DataPathServiceStub(dir);
+            new SalesSettingsService(dps).SaveWorkflowLanes(
+            [
+                new() { Key = "new", Name = "New", Color = "#111111", Behavior = OmniCard.Models.OrderStatus.Created },
+                new() { Key = "await", Name = "Awaiting Payment", Color = "#222222", Behavior = OmniCard.Models.OrderStatus.Created },
+                new() { Key = "ship", Name = "Out the Door", Color = "#333333", Behavior = OmniCard.Models.OrderStatus.Shipped },
+            ]);
+
+            var reloaded = new SalesSettingsService(dps).GetWorkflowLanes();
+            Assert.Equal(3, reloaded.Count);
+            Assert.Equal(["new", "await", "ship"], reloaded.Select(l => l.Key));
+            Assert.Equal("Awaiting Payment", reloaded[1].Name);
+            Assert.Equal(OmniCard.Models.OrderStatus.Shipped, reloaded[2].Behavior);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
     }
 
     private sealed class DataPathServiceStub(string dir) : OmniCard.Interfaces.IDataPathService

@@ -71,6 +71,19 @@ public class SalesSettingsService : ISalesSettingsService
         Save(settings);
     }
 
+    public IReadOnlyList<WorkflowLane> GetWorkflowLanes()
+    {
+        var lanes = Load().WorkflowLanes;
+        return lanes is { Count: > 0 } ? lanes : WorkflowLane.Defaults();
+    }
+
+    public void SaveWorkflowLanes(IEnumerable<WorkflowLane> lanes)
+    {
+        var settings = Load();
+        settings.WorkflowLanes = [.. lanes];
+        Save(settings);
+    }
+
     private SalesSettings Load()
     {
         SalesSettings settings;

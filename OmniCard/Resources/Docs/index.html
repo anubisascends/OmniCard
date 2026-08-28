@@ -447,6 +447,8 @@
       <ul>
         <li><strong>Pick List</strong> tells you which cards to pull for open orders and where they're stored.</li>
         <li>Completed orders can be edited with a required reason and a full field-diff audit trail; the ledger and inventory auto-correct.</li>
+        <li>The board's columns are fully customizable — add, remove, rename, recolor and reorder lanes in
+        <a href="#settings-workflow">Settings ▸ Sales Workflow</a>.</li>
       </ul>
       <figure class="shot" data-img="orders-kanban.png"><span>Screenshot placeholder — <code>images/orders-kanban.png</code></span></figure>
     </section>
@@ -553,6 +555,31 @@
         <li><strong>Company Profile</strong> — name, address, city/state/postal/country, email, phone, and a logo for receipts.</li>
         <li><strong>Receipt setup</strong> — width (mm), margin (mm), font (pt), show prices, footer text, and default printer.</li>
       </ul>
+    </section>
+
+    <section id="settings-workflow" data-group="Settings">
+      <h2>Settings — Sales Workflow</h2>
+      <p>Customize the columns (lanes) on the <a href="#orders">Orders</a> kanban board. You start with the built-in
+      lanes (Created, Packed, Shipped, Completed, Cancelled) and can add, remove, rename, and recolor lanes,
+      and drag the <strong>≡</strong> handle (or use the ↑/↓ buttons) to reorder them.</p>
+      <ul>
+        <li><strong>Name &amp; colour</strong> — the column header label and its accent colour (used on the header underline,
+        count badge, and each card's stripe).</li>
+        <li><strong>Behavior</strong> — the accounting/lifecycle rule a lane follows. Multiple lanes can share a behavior
+        (e.g. two pre-ship lanes "New" and "Awaiting Payment"):
+          <ul>
+            <li><strong>Created / Packed</strong> — ordinary pre-ship stages; orders here can be freely moved among each other.</li>
+            <li><strong>Shipped</strong> — moving a card into a Shipped-behavior lane records the sale, removes the inventory,
+            and best-effort ends any active eBay listing. This can't be undone from the board.</li>
+            <li><strong>Completed</strong> — terminal; the order locks and can only be changed via the audited Edit flow.</li>
+            <li><strong>Cancelled</strong> — terminal; cancel-behavior lanes appear in the collapsible <em>Cancelled</em> strip
+            rather than as a board column.</li>
+          </ul>
+        </li>
+      </ul>
+      <p><strong>Restore defaults</strong> puts the built-in lanes back. Changes apply the next time the Orders tab loads.
+      Orders already on the board keep their place; if you delete a lane, its orders fall back to the first lane sharing
+      their behavior.</p>
     </section>
 
     <section id="settings-ebay" data-group="Settings">
