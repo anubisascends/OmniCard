@@ -3,6 +3,7 @@ using Moq;
 using Moq.Protected;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Imaging;
+using OmniCard.Interfaces;
 
 namespace OmniCard.Tests.Services;
 
@@ -54,6 +55,43 @@ public class CardArtCacheTests : IDisposable
         return factory.Object;
     }
 
+    /// <summary>HTTP factory that serves the given bytes but throws once more than <paramref name="callLimit"/>
+    /// requests are made — used to prove a later load did not hit the network.</summary>
+    private static IHttpClientFactory CreateCountingHttpFactory(byte[] responseBytes, int callLimit)
+    {
+        var callCount = 0;
+        var mockHandler = new Mock<HttpMessageHandler>();
+        mockHandler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(() =>
+            {
+                if (Interlocked.Increment(ref callCount) > callLimit)
+                    throw new InvalidOperationException("HTTP should not have been called again");
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent(responseBytes),
+                };
+            });
+
+        var client = new HttpClient(mockHandler.Object);
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(client);
+        return factory.Object;
+    }
+
+    private static byte[] CreatePngBytes()
+    {
+        using var ms = new MemoryStream();
+        var bmp = new RenderTargetBitmap(50, 50, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bmp));
+        encoder.Save(ms);
+        return ms.ToArray();
+    }
+
     private CardArtCache CreateCache(IHttpClientFactory? httpFactory = null, int capacity = 20)
     {
         httpFactory ??= new Mock<IHttpClientFactory>().Object;
@@ -61,6 +99,19 @@ public class CardArtCacheTests : IDisposable
             NullLogger<CardArtCache>.Instance,
             httpFactory,
             capacity);
+    }
+
+    /// <summary>Cache wired to an on-disk art cache directory (the <paramref name="diskDir"/>), so
+    /// downloaded art persists across instances the way it does across app launches.</summary>
+    private CardArtCache CreateDiskCache(IHttpClientFactory httpFactory, string diskDir, int capacity = 20)
+    {
+        var pathService = new Mock<IDataPathService>();
+        pathService.Setup(p => p.ArtCacheDirectory).Returns(diskDir);
+        return new CardArtCache(
+            NullLogger<CardArtCache>.Instance,
+            httpFactory,
+            capacity,
+            pathService.Object);
     }
 
     // --- Null / empty path handling ---
@@ -234,6 +285,54 @@ public class CardArtCacheTests : IDisposable
 
         Assert.Same(first, second);
         Assert.Equal(1, cache.Count);
+    }
+
+    // --- Disk cache (persistence across instances / launches) ---
+
+    [StaFact]
+    public void GetImage_RemoteUri_PersistsToDisk()
+    {
+        var diskDir = Path.Combine(_tempDir, "art_cache");
+        var cache = CreateDiskCache(CreateCountingHttpFactory(CreatePngBytes(), callLimit: 1), diskDir);
+
+        var result = cache.GetImage(null, "https://example.com/card.png");
+
+        Assert.NotNull(result);
+        Assert.True(Directory.Exists(diskDir) && Directory.GetFiles(diskDir, "*.img").Length == 1,
+            "downloaded art should be written to the disk cache");
+    }
+
+    [StaFact]
+    public void GetImage_RemoteUri_SecondInstance_ServedFromDisk_NoHttp()
+    {
+        var diskDir = Path.Combine(_tempDir, "art_cache");
+        var png = CreatePngBytes();
+
+        // First instance downloads and persists to disk.
+        var first = CreateDiskCache(CreateCountingHttpFactory(png, callLimit: 1), diskDir);
+        Assert.NotNull(first.GetImage(null, "https://example.com/card.png"));
+
+        // A fresh instance (new launch: empty in-memory cache) must serve from disk with zero HTTP.
+        // callLimit: 0 → any network call throws.
+        var second = CreateDiskCache(CreateCountingHttpFactory(png, callLimit: 0), diskDir);
+        var result = second.GetImage(null, "https://example.com/card.png");
+
+        Assert.NotNull(result);
+    }
+
+    [StaFact]
+    public async Task GetImageAsync_RemoteUri_SecondInstance_ServedFromDisk_NoHttp()
+    {
+        var diskDir = Path.Combine(_tempDir, "art_cache");
+        var png = CreatePngBytes();
+
+        var first = CreateDiskCache(CreateCountingHttpFactory(png, callLimit: 1), diskDir);
+        Assert.NotNull(await first.GetImageAsync(null, "https://example.com/card.png"));
+
+        var second = CreateDiskCache(CreateCountingHttpFactory(png, callLimit: 0), diskDir);
+        var result = await second.GetImageAsync(null, "https://example.com/card.png");
+
+        Assert.NotNull(result);
     }
 
     // --- Default capacity ---
