@@ -231,7 +231,7 @@ public sealed partial class RootViewModel(
 
     /// <summary>Opens the Settings dialog (Edit ▸ Settings…), owned by and centered on the app.</summary>
     [RelayCommand]
-    public void ShowSettings() => dialogService.ShowSettings();
+    public void ShowSettings() => DialogService.ShowSettings();
 
     [RelayCommand]
     public void ApplyBulkEdit()
@@ -415,7 +415,7 @@ public sealed partial class RootViewModel(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to persist display settings");
+            _logger.LogWarning(ex, "Failed to persist display settings");
         }
     }
 
@@ -472,7 +472,7 @@ public sealed partial class RootViewModel(
             return;
         }
 
-        var result = dialogService.ConnectToEbay();
+        var result = DialogService.ConnectToEbay();
         if (result == true)
         {
             IsEbayConnected = ebayAuthService.IsConnected;
@@ -2010,7 +2010,7 @@ public sealed partial class RootViewModel(
         if (!IsAuditMode) return;
 
         var report = auditService.GenerateReport(CardService.ScannedCards);
-        dialogService.ShowAuditReport(report);
+        DialogService.ShowAuditReport(report);
     }
 
     [RelayCommand]
@@ -2094,7 +2094,7 @@ public sealed partial class RootViewModel(
         }
 
         var groups = scans.GroupBy(s => s.Game).Select(g => (Game: g.Key, Count: g.Count())).ToList();
-        var picks = dialogService.PickListTargetsForScans(groups, "New List");
+        var picks = DialogService.PickListTargetsForScans(groups, "New List");
         if (picks is null) return;
 
         var total = scans.Count;
@@ -2121,7 +2121,7 @@ public sealed partial class RootViewModel(
     [RelayCommand]
     public void ManageStorageLocations()
     {
-        dialogService.ManageStorageContainers();
+        DialogService.ManageStorageContainers();
         LoadContainers(); // Refresh after potential adds/renames/deletes
         if (!Collection.ShowCardList)
             Collection.LoadOverview();
@@ -2456,7 +2456,7 @@ public sealed partial class RootViewModel(
     [RelayCommand]
     public void ShowTopValueCards()
     {
-        var nav = dialogService.ShowTopValueCards();
+        var nav = DialogService.ShowTopValueCards();
         if (nav is not { } result) return;
 
         SelectedGame = result.Game;
@@ -2547,7 +2547,7 @@ public sealed partial class RootViewModel(
     {
         try
         {
-            var summary = dialogService.ShowBatchDecklistImport();
+            var summary = DialogService.ShowBatchDecklistImport();
             if (summary is null)
                 return;
 
@@ -2572,7 +2572,7 @@ public sealed partial class RootViewModel(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to import");
+            _logger.LogWarning(ex, "Failed to import");
             System.Windows.MessageBox.Show($"Failed to import: {ex.Message}", "Import Error",
                 System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
         }

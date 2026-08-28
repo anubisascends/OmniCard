@@ -17,8 +17,7 @@ public class CsvExportTests : IDisposable
         _tempDir = Path.Combine(Path.GetTempPath(), "OmniCardTest_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_tempDir);
         _service = new CsvExportImportService(
-            null!, // IDbContextFactory — not needed for export
-            null!, // IScryfallService — not needed for export
+            null!, // ICardService — not needed for export
             null!, // IStorageContainerService — not needed for export
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CsvExportImportService>.Instance);
     }

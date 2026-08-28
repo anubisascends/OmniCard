@@ -71,6 +71,7 @@ public sealed partial class AboutViewModel : ViewModel
         new("CommunityToolkit.Mvvm", "8.4.2", "MIT (.NET Foundation)", "https://github.com/CommunityToolkit/dotnet"),
         new("Entity Framework Core (+ Sqlite provider)", "10.0.9", "MIT (.NET Foundation)", "https://github.com/dotnet/efcore"),
         new("Microsoft.Data.Sqlite", "10.0.9", "MIT (.NET Foundation)", "https://github.com/dotnet/efcore"),
+        new("SQLitePCLRaw (bundle_e_sqlite3, native SQLite)", "2.1.13", "Apache-2.0", "https://github.com/ericsink/SQLitePCL.raw"),
         new("Microsoft.Extensions.* (Hosting, Http, Logging, Options)", "10.0.9", "MIT (Microsoft)", "https://github.com/dotnet/runtime"),
         new("Microsoft.AspNetCore.SignalR.Client", "10.0.9", "MIT (Microsoft)", "https://github.com/dotnet/aspnetcore"),
         new("Microsoft.Xaml.Behaviors.Wpf", "1.1.142", "MIT (Microsoft)", "https://github.com/microsoft/XamlBehaviorsWpf"),
