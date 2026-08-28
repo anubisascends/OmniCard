@@ -129,6 +129,47 @@ public class SetSymbolCacheTests : IDisposable
         Assert.NotNull(result);
     }
 
+    [StaFact]
+    public async Task GetSetSymbolAsync_404_WritesMissingMarker()
+    {
+        var cache = CreateCache(CreateNotFoundHttpFactory());
+        var result = await cache.GetSetSymbolAsync("PWAR", "common");
+
+        Assert.Null(result);
+        var markerPath = Path.Combine(_tempDir, "PWAR", "C.svg.missing");
+        Assert.True(File.Exists(markerPath));
+    }
+
+    [StaFact]
+    public async Task GetSetSymbolAsync_ExistingMissingMarker_SkipsHttp()
+    {
+        // Pre-seed a .missing marker (e.g. written by a prior launch or by RasterizeSymbolAsync).
+        // The lazy load must honour it and never touch the network — this is the regression that
+        // caused dozens of promo sets to be re-fetched (and 404'd) on every startup.
+        Directory.CreateDirectory(Path.Combine(_tempDir, "TSB"));
+        await File.WriteAllBytesAsync(Path.Combine(_tempDir, "TSB", "C.svg.missing"), []);
+
+        // callLimit: 0 → any HTTP call throws.
+        var cache = CreateCache(CreateNotFoundHttpFactory(callLimit: 0));
+        var result = await cache.GetSetSymbolAsync("TSB", "common");
+
+        Assert.Null(result);
+    }
+
+    [StaFact]
+    public async Task GetSetSymbolAsync_ConcurrentCalls_SingleHttp()
+    {
+        // Many callers requesting the same symbol at once must coalesce into one network request.
+        var httpFactory = CreateMockHttpFactory(callLimit: 1);
+        var cache = CreateCache(httpFactory);
+
+        var tasks = Enumerable.Range(0, 16).Select(_ => cache.GetSetSymbolAsync("M10", "common"));
+        var results = await Task.WhenAll(tasks);
+
+        // If more than one request had fired, the mock (callLimit: 1) would have thrown.
+        Assert.All(results, Assert.NotNull);
+    }
+
     // --- RasterizeSymbolAsync negative caching ---
 
     private static IHttpClientFactory CreateNotFoundHttpFactory(int callLimit = int.MaxValue)

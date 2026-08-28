@@ -12,6 +12,7 @@ public sealed class WebDataPathService(string dataDirectory) : IDataPathService
     public string ScansDirectory => Path.Combine(dataDirectory, "scans");
     public string TempScansDirectory => Path.Combine(dataDirectory, "temp_scans");
     public string SymbolsCacheDirectory => Path.Combine(dataDirectory, "symbols", "sets");
+    public string ArtCacheDirectory => Path.Combine(dataDirectory, "art_cache");
     public string LogsDirectory => Path.Combine(dataDirectory, "logs");
     public string TradesDirectory => Path.Combine(dataDirectory, "trades");
 

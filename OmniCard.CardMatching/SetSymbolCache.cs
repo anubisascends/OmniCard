@@ -27,7 +27,11 @@ public class SetSymbolCache(IHttpClientFactory httpClientFactory, IDataPathServi
         ["mythic"] = "M",
     };
 
-    private readonly ConcurrentDictionary<string, DrawingImage?> _cache = [];
+    // Caches the in-flight (and completed) load task per symbol, not just the resolved value, so
+    // the many card rows/tiles that render at once and request the same symbol simultaneously all
+    // await one shared task instead of each firing its own network request (a cache stampede that
+    // previously fetched each set symbol ~8× on startup). Lazy guarantees the factory runs once.
+    private readonly ConcurrentDictionary<string, Lazy<Task<DrawingImage?>>> _cache = [];
     private readonly ConcurrentDictionary<string, string> _setNames = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Register a set code → set name mapping for tooltip display.</summary>
@@ -47,29 +51,37 @@ public class SetSymbolCache(IHttpClientFactory httpClientFactory, IDataPathServi
         _ => rarity ?? ""
     };
 
-    public async Task<DrawingImage?> GetSetSymbolAsync(string setCode, string rarity)
+    public Task<DrawingImage?> GetSetSymbolAsync(string setCode, string rarity)
     {
         if (!RarityToFile.TryGetValue(rarity, out var rarityFile))
-            return null;
+            return Task.FromResult<DrawingImage?>(null);
 
-        var cacheKey = $"{setCode.ToUpperInvariant()}_{rarityFile}";
+        var code = setCode.ToUpperInvariant();
+        var cacheKey = $"{code}_{rarityFile}";
 
-        if (_cache.TryGetValue(cacheKey, out var cached))
-            return cached;
-
-        var image = await LoadOrDownloadAsync(setCode.ToUpperInvariant(), rarityFile);
-        _cache.TryAdd(cacheKey, image);
-        return image;
+        // GetOrAdd + Lazy: concurrent callers for the same symbol share one load task, so a screen
+        // full of cards requesting the same set symbol triggers a single network request, not one
+        // per card.
+        return _cache.GetOrAdd(cacheKey,
+            _ => new Lazy<Task<DrawingImage?>>(() => LoadOrDownloadAsync(code, rarityFile))).Value;
     }
 
     private async Task<DrawingImage?> LoadOrDownloadAsync(string setCode, string rarityFile)
     {
         var dir = Path.Combine(_cacheDir, setCode);
         var filePath = Path.Combine(dir, $"{rarityFile}.svg");
+        var missingMarkerPath = filePath + ".missing";
 
         // Try loading from disk cache first
         if (File.Exists(filePath))
             return LoadSvgFromFile(filePath);
+
+        // A prior 404 was recorded — this set/rarity has no symbol upstream. Don't hit the network
+        // again. Many promo/special sets (TSB, SLD, PWAR, …) have no vector at all, so without this
+        // every one of them was re-requested (and 404'd) on every single launch — the bulk of the
+        // startup HTTP burst that froze the UI.
+        if (File.Exists(missingMarkerPath))
+            return null;
 
         // Download from mtg-vectors
         try
@@ -81,6 +93,12 @@ public class SetSymbolCache(IHttpClientFactory httpClientFactory, IDataPathServi
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning("Failed to download set symbol {SetCode}/{Rarity}: {Status}", setCode, rarityFile, response.StatusCode);
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    // Persist the miss so future launches skip the network for this set/rarity.
+                    Directory.CreateDirectory(dir);
+                    await File.WriteAllBytesAsync(missingMarkerPath, []);
+                }
                 return null;
             }
 
@@ -116,8 +134,10 @@ public class SetSymbolCache(IHttpClientFactory httpClientFactory, IDataPathServi
                 var code = setCode.ToUpperInvariant();
                 var dir = Path.Combine(_cacheDir, code);
                 var filePath = Path.Combine(dir, $"{rarityFile}.svg");
+                var missingMarkerPath = filePath + ".missing";
 
-                if (File.Exists(filePath))
+                // Already have the symbol, or already know it doesn't exist upstream — skip the network.
+                if (File.Exists(filePath) || File.Exists(missingMarkerPath))
                 {
                     skipped++;
                     continue;
@@ -133,6 +153,12 @@ public class SetSymbolCache(IHttpClientFactory httpClientFactory, IDataPathServi
                         var content = await response.Content.ReadAsByteArrayAsync();
                         await File.WriteAllBytesAsync(filePath, content);
                         downloaded++;
+                    }
+                    else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        // Persist the miss so it's skipped on future preloads and lazy loads.
+                        Directory.CreateDirectory(dir);
+                        await File.WriteAllBytesAsync(missingMarkerPath, []);
                     }
                 }
                 catch (Exception ex)
