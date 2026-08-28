@@ -52,7 +52,7 @@ public class FftcgOcrMatchTests : IDisposable
         var match = svc.FindClosestMatch(0x1UL, ocrResult: Ocr("9-085C"));
         Assert.NotNull(match);
         Assert.Equal("9-085C", match!.CollectorNumber);
-        Assert.Equal("OcrCollectorNumber", svc.LastMatchDiagnostics.DecisionPhase);
+        Assert.Equal("OcrCollectorNumber", svc.LastMatchDiagnostics!.DecisionPhase);
     }
 
     [Theory]
@@ -64,7 +64,7 @@ public class FftcgOcrMatchTests : IDisposable
         var match = svc.FindClosestMatch(0x2UL, ocrResult: Ocr(token));
         Assert.NotNull(match);
         Assert.Equal("Re-103C/11-072R", match!.CollectorNumber);
-        Assert.Equal("OcrCollectorNumber", svc.LastMatchDiagnostics.DecisionPhase);
+        Assert.Equal("OcrCollectorNumber", svc.LastMatchDiagnostics!.DecisionPhase);
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public class FftcgOcrMatchTests : IDisposable
         // falls through to pHash (here there's no confident hash match, so no OCR resolution).
         var svc = new NonSplitService(_factory);
         var match = svc.FindClosestMatch(0x2UL, ocrResult: Ocr("11-072R"));
-        Assert.NotEqual("OcrCollectorNumber", svc.LastMatchDiagnostics.DecisionPhase);
+        Assert.NotEqual("OcrCollectorNumber", svc.LastMatchDiagnostics!.DecisionPhase);
     }
 
     private sealed class Factory(DbContextOptions<FinalFantasyDbContext> options) : IDbContextFactory<FinalFantasyDbContext>

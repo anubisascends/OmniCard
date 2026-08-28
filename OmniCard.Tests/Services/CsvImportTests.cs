@@ -51,7 +51,6 @@ public class CsvImportTests : IDisposable
     {
         return new CsvExportImportService(
             CreateCardService(),
-            null!, // IScryfallService — not needed for app-native import tests
             containerService ?? new StubContainerService(),
             NullLogger<CsvExportImportService>.Instance);
     }

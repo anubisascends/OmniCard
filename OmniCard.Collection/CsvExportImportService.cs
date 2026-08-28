@@ -10,7 +10,6 @@ namespace OmniCard.Collection;
 
 public class CsvExportImportService(
     ICardService? cardService,
-    IScryfallService? scryfallService,
     IStorageContainerService? containerService,
     ILogger<CsvExportImportService> logger) : ICsvExportImportService
 {

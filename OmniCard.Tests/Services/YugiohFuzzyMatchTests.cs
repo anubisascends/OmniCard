@@ -58,7 +58,7 @@ public class YugiohFuzzyMatchTests : IDisposable
         var match = svc.FindClosestMatch(Hash1, ocrResult: Ocr("GRCR-ENO60"));
         Assert.NotNull(match);
         Assert.Equal("GRCR-EN060", match!.CollectorNumber);
-        Assert.Equal("OcrFuzzyExact", svc.LastMatchDiagnostics.DecisionPhase);
+        Assert.Equal("OcrFuzzyExact", svc.LastMatchDiagnostics!.DecisionPhase);
     }
 
     [Fact]
@@ -69,7 +69,7 @@ public class YugiohFuzzyMatchTests : IDisposable
         var match = svc.FindClosestMatch(Hash2, ocrResult: Ocr("GRCR-EN032"));
         Assert.NotNull(match);
         Assert.Equal("GRCR-EN033", match!.CollectorNumber);
-        Assert.Equal("OcrFuzzyDist1", svc.LastMatchDiagnostics.DecisionPhase);
+        Assert.Equal("OcrFuzzyDist1", svc.LastMatchDiagnostics!.DecisionPhase);
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class YugiohFuzzyMatchTests : IDisposable
         var match = svc.FindClosestMatch(Hash1, ocrResult: Ocr("PHHY-EN061"));
         Assert.NotNull(match);
         Assert.NotEqual("PHHY-EN060", match!.CollectorNumber);      // did not jump to the unrelated card
-        Assert.NotEqual("OcrFuzzyDist1", svc.LastMatchDiagnostics.DecisionPhase);
+        Assert.NotEqual("OcrFuzzyDist1", svc.LastMatchDiagnostics!.DecisionPhase);
     }
 
     [Fact]
@@ -93,7 +93,7 @@ public class YugiohFuzzyMatchTests : IDisposable
         var match = svc.FindClosestMatch(Hash1, ocrResult: Ocr("GRCR-EN"));
         Assert.NotNull(match);
         Assert.Equal("GRCR-EN060", match!.CollectorNumber);
-        Assert.Equal("OcrSetPrefix", svc.LastMatchDiagnostics.DecisionPhase);
+        Assert.Equal("OcrSetPrefix", svc.LastMatchDiagnostics!.DecisionPhase);
     }
 
     private sealed class Factory(DbContextOptions<PokemonDbContext> options) : IDbContextFactory<PokemonDbContext>

@@ -117,7 +117,9 @@ public class FakeEbayAuthService : IEbayAuthService
     public void Disconnect() { }
     public string GetAuthorizationUrl() => "";
     public IReadOnlyList<string> GetMissingConfiguration() => [];
+#pragma warning disable CS0067 // Required by INotifyPropertyChanged; this fake never raises it.
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+#pragma warning restore CS0067
 }
 
 public class FakeHttpHandler : HttpMessageHandler

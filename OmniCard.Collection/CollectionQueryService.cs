@@ -35,6 +35,10 @@ public sealed class CollectionQueryService(
             if (gameFilter.HasValue)
                 cardsQuery = cardsQuery.Where(c => c.Game == gameFilter.Value);
 
+            // Only lots that actually sit in a container contribute to a container summary; dropping
+            // the null-location lots up front also lets the per-container groupings key on a non-null id.
+            cardsQuery = cardsQuery.Where(c => c.ContainerId != null);
+
             // SQL aggregate: count + distinct printings + purchase total per container
             var aggregates = cardsQuery
                 .GroupBy(c => c.ContainerId)
@@ -45,7 +49,7 @@ public sealed class CollectionQueryService(
                     UniquePrints = g.Select(c => c.GameCardId).Distinct().Count(),
                     PurchaseTotal = g.Sum(c => c.PurchasePrice ?? 0m)
                 })
-                .ToDictionary(a => a.ContainerId);
+                .ToDictionary(a => a.ContainerId!.Value);
 
             // Lightweight projection for price data (no full card materialization)
             var priceData = cardsQuery
@@ -70,7 +74,7 @@ public sealed class CollectionQueryService(
             var marketTotals = priceData
                 .GroupBy(c => c.ContainerId)
                 .ToDictionary(
-                    g => g.Key,
+                    g => g.Key!.Value,
                     g => g.Sum(c => allPrices.GetValueOrDefault((c.GameCardId, c.IsFoil))));
 
             // Cover images: only fetch the specific cards needed
@@ -83,12 +87,12 @@ public sealed class CollectionQueryService(
                     .Where(c => coverCardIds.Contains(c.Id))
                     .Select(c => new { c.Id, c.ImageUri })
                     .ToDictionary(c => c.Id, c => c.ImageUri)
-                : new Dictionary<int, string>();
+                : new Dictionary<int, string?>();
             // Fallback cover images: first card per container
             var fallbackCovers = cardsQuery
                 .GroupBy(c => c.ContainerId)
                 .Select(g => new { ContainerId = g.Key, ImageUri = g.Select(c => c.ImageUri).FirstOrDefault() })
-                .ToDictionary(c => c.ContainerId, c => c.ImageUri);
+                .ToDictionary(c => c.ContainerId!.Value, c => c.ImageUri);
 
             var summaries = new List<LocationTileSummary>();
             foreach (var container in containers)

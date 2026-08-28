@@ -1206,7 +1206,7 @@ public sealed class CardService : ICardService
             results.Clear();
 
         using var context = _omniDbContextFactory.CreateDbContext();
-        var cards = BuildFilteredQuery(context, query, gameFilter, containerFilter, filterPreset);
+        var cards = BuildFilteredQuery(context, query ?? string.Empty, gameFilter, containerFilter, filterPreset);
 
         if (stacked)
         {

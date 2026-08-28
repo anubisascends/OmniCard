@@ -59,6 +59,19 @@ License:     MIT License
 Copyright (c) .NET Foundation and Contributors / Microsoft Corporation.
 
 --------------------------------------------------------------------------------
+SQLitePCLRaw 2.1.13 — Apache License 2.0
+--------------------------------------------------------------------------------
+Components:  SQLitePCLRaw.bundle_e_sqlite3, SQLitePCLRaw.core,
+             SQLitePCLRaw.lib.e_sqlite3, SQLitePCLRaw.provider.e_sqlite3
+             (referenced directly to pin a patched native SQLite above the 2.1.11
+             that EF Core / Microsoft.Data.Sqlite 10.0.9 pull in transitively —
+             CVE-2025-6965 / GHSA-2m69-gcr7-jv3q).
+Homepage:    https://github.com/ericsink/SQLitePCL.raw
+License:     Apache License 2.0
+Copyright (c) Eric Sink and Contributors. (Bundles the public-domain SQLite
+amalgamation, https://www.sqlite.org.)
+
+--------------------------------------------------------------------------------
 Microsoft Edge WebView2 SDK 1.0.4022.49 — Microsoft Software License Terms
 --------------------------------------------------------------------------------
 Component:   Microsoft.Web.WebView2

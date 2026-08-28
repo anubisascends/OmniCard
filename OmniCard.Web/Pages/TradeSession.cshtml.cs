@@ -308,7 +308,7 @@ public class TradeSessionModel : PageModel
             .ToList();
 
         // Resolve MTG Scryfall ids → TCGplayer product ids in one batch.
-        var mtgIds = products.Where(p => p.Game == CardGame.Mtg).Select(p => p.GameCardId);
+        var mtgIds = products.Where(p => p.Game == CardGame.Mtg).Select(p => p.GameCardId ?? "");
         var resolved = ScryfallTcgIdResolver.Resolve(_scryfallFactory, mtgIds);
 
         foreach (var p in products)
@@ -317,7 +317,7 @@ public class TradeSessionModel : PageModel
             if (p.Game == CardGame.Mtg)
             {
                 var etched = p.Foil && (p.FoilType?.Contains("Etched", StringComparison.OrdinalIgnoreCase) ?? false);
-                productId = resolved.GetValueOrDefault(p.GameCardId).Pick(etched);
+                productId = resolved.GetValueOrDefault(p.GameCardId ?? "").Pick(etched);
             }
             TcgPlayerUrlByLotId[p.LotId] = TcgPlayerLink.Build(p.Game, p.GameCardId, p.Name, p.SetName, productId);
         }

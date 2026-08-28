@@ -497,7 +497,7 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
             var card = LookupById(pick.Id);
             if (card is not null)
             {
-                LastMatchDiagnostics.DecisionPhase = "OcrFuzzyExact";
+                LastMatchDiagnostics!.DecisionPhase = "OcrFuzzyExact";
                 return ToMatch(card, 100);
             }
         }
@@ -523,7 +523,7 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
             var card = LookupById(d1[0].e.Id);
             if (card is not null)
             {
-                LastMatchDiagnostics.DecisionPhase = "OcrFuzzyDist1";
+                LastMatchDiagnostics!.DecisionPhase = "OcrFuzzyDist1";
                 return ToMatch(card, 100);
             }
         }
@@ -542,7 +542,7 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
                 var card = LookupById(byPrefix[0].e.Id);
                 if (card is not null)
                 {
-                    LastMatchDiagnostics.DecisionPhase = "OcrSetPrefix";
+                    LastMatchDiagnostics!.DecisionPhase = "OcrSetPrefix";
                     return ToMatch(card, 90);
                 }
             }

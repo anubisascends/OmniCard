@@ -7,7 +7,6 @@ namespace OmniCard.ScannerHost;
 static class Program
 {
     private static string? _outputPath;
-    private static bool _imageReceived;
     private static int _exitCode = 3; // default: no image
     private static Form? _hiddenForm;
 
@@ -122,7 +121,6 @@ static class Program
 
             using var file = File.Create(_outputPath!);
             stream.CopyTo(file);
-            _imageReceived = true;
             _exitCode = 0;
             Console.Out.WriteLine($"Image written to {_outputPath}");
         }
