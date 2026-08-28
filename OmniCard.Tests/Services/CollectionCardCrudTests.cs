@@ -166,6 +166,44 @@ public class CollectionCardCrudTests : IDisposable
     }
 
     [Fact]
+    public void SetCardMissing_FlagsLotWithoutRemovingItOrItsSlot()
+    {
+        int lotId;
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+        {
+            var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, GameCardId = "id1", Name = "Test Card" };
+            ctx.Products.Add(product);
+            ctx.SaveChanges();
+
+            var lot = new InventoryLot { ProductId = product.Id, Page = 2, Slot = 4 };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            lotId = lot.Id;
+        }
+
+        var service = CreateService();
+        service.SetCardMissing(lotId);
+
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+        {
+            var lot = ctx.Lots.AsNoTracking().Single(l => l.Id == lotId);
+            Assert.True(lot.IsMissing);
+            Assert.Equal(FlagReason.Manual, lot.FlagReason);
+            // Record and its binder placement are kept.
+            Assert.Equal(2, lot.Page);
+            Assert.Equal(4, lot.Slot);
+        }
+    }
+
+    [Fact]
+    public void SetCardMissing_NonExistentId_DoesNotThrow()
+    {
+        var service = CreateService();
+        service.SetCardMissing(99999);
+        // Should not throw
+    }
+
+    [Fact]
     public void CommitScans_MissingFromDatabase_CommitsAsUnknownCard()
     {
         var service = CreateService();

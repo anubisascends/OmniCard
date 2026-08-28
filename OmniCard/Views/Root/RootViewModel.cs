@@ -1992,6 +1992,22 @@ public sealed partial class RootViewModel(
         _logger.LogInformation("Audit mode started for location {Id}", containerId);
     }
 
+    /// <summary>Opens the read-only visual audit for a Binder location (no scanning). On close,
+    /// refreshes the collection/tiles so any applied corrections show immediately.</summary>
+    [RelayCommand]
+    public void StartBinderAudit(int containerId)
+    {
+        DialogService.ShowBinderAudit(containerId);
+
+        Collection.LoadContainers();
+        if (Collection.ShowCardList)
+            _ = Collection.SearchCollection();
+        else
+            Collection.LoadOverview();
+
+        _logger.LogInformation("Binder audit closed for location {Id}", containerId);
+    }
+
     [RelayCommand]
     public void EndAudit()
     {

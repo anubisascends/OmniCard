@@ -22,6 +22,10 @@ public interface IDialogService
     /// <summary>Opens the drag-and-drop binder placement editor for a Binder location as a modal dialog.</summary>
     void ShowBinderView(int containerId);
 
+    /// <summary>Opens the read-only visual binder audit for a Binder location as a modal dialog:
+    /// mark each pocket (correct/missing/wrong/extra) then review and apply the corrections.</summary>
+    void ShowBinderAudit(int containerId);
+
     /// <summary>Prompts for where to insert a new binder sheet and whether it's double- or
     /// single-sided. <paramref name="nearPage"/> pre-selects the sheet the user is currently viewing.
     /// Returns the target sheet index and side choice, or null if cancelled.</summary>

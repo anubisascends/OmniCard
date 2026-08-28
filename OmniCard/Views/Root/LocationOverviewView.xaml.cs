@@ -17,7 +17,13 @@ public partial class LocationOverviewView : UserControl
         if (menuItem.DataContext is not LocationTileSummary summary) return;
 
         var rootView = (RootView)Window.GetWindow(this)!;
-        rootView.ViewModel.StartAudit(summary.Container.Id);
+
+        // Binders get the read-only visual audit (mark each pocket, then apply corrections) instead
+        // of the scan-based flow — you can't easily re-scan every card without emptying the binder.
+        if (summary.Container.ContainerType == ContainerType.Binder)
+            rootView.ViewModel.StartBinderAudit(summary.Container.Id);
+        else
+            rootView.ViewModel.StartAudit(summary.Container.Id);
     }
 
     private void ChangeCoverArt_Click(object sender, RoutedEventArgs e)

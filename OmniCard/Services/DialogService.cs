@@ -200,6 +200,14 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         wnd.ShowDialog();
     }
 
+    public void ShowBinderAudit(int containerId)
+    {
+        var wnd = Services.GetRequiredService<Views.BinderAudit.BinderAuditView>();
+        SetOwner(wnd);
+        wnd.ViewModel.Load(containerId);
+        wnd.ShowDialog();
+    }
+
     public (int InsertIndex, bool DoubleSided)? InsertBinderPage(int containerId, int? nearPage)
     {
         var sheets = Services.GetRequiredService<IStorageContainerService>().GetSheets(containerId);

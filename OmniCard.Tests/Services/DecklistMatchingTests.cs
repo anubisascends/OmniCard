@@ -189,6 +189,7 @@ public class DecklistMatchingTests : IDisposable
         public List<CollectionCard> GetCollectionCards(IEnumerable<int> cardIds) => [];
         public void UpdateCollectionCard(CollectionCard card) { }
         public void DeleteCollectionCard(int id) { }
+        public void SetCardMissing(int lotId) { }
         public Task<List<SetCompletionSummary>> CalculateSetCompletionAsync(CardGame game, IProgress<string>? progress = null) => Task.FromResult(new List<SetCompletionSummary>());
         public Task<List<SetCompletionSummary>> CalculateSetCompletionAsync(CardGame? game, IProgress<string>? progress = null) => Task.FromResult(new List<SetCompletionSummary>());
         public IReadOnlyDictionary<string, decimal> GetCurrentPrices(CardGame game, IEnumerable<string> gameCardIds, bool foil) => new Dictionary<string, decimal>();

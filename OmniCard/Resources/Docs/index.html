@@ -380,7 +380,26 @@
     <section id="audit" data-group="Storage &amp; Locations">
       <h2>Location Audit</h2>
       <p>The Audit Report verifies a location's expected contents against what's physically there and exports a PDF. Use it to reconcile
-      a box after a busy day of scanning and selling.</p>
+      a box after a busy day of scanning and selling. Right-click a location tile and choose <strong>Audit Location…</strong> to re-scan
+      its cards and compare them against the record.</p>
+    </section>
+
+    <section id="binder-audit" data-group="Storage &amp; Locations">
+      <h2>Binder Audit</h2>
+      <p>Binders are laid out pocket by pocket, so they get a <strong>visual audit</strong> instead of the scan-based one — no need to pull
+      every card out to scan it. Right-click a <em>binder</em> location and choose <strong>Audit Location…</strong> to open a read-only view
+      of the binder. Flip through it and tag each pocket against what you physically see:</p>
+      <ul>
+        <li><strong>✓ Correct</strong> — the card is present and right. No change.</li>
+        <li><strong>− Missing</strong> — the card the app expects here isn't physically in the pocket.</li>
+        <li><strong>? Wrong</strong> — the pocket holds the wrong card or the wrong printing.</li>
+        <li><strong>+ Extra</strong> — an <em>empty</em> pocket that actually holds a card the app doesn't know about.</li>
+      </ul>
+      <p>Tap a button again to clear it. When you're done, click <strong>Review &amp; Apply</strong> to resolve everything in one pass:
+      Missing cards are flagged as missing (kept in your collection), Wrong pockets let you search the catalog and reassign the correct
+      printing, and Extra pockets let you search for and add the card that's really there. Nothing is written until you click
+      <strong>Apply Corrections</strong>.</p>
+      <figure class="shot" data-img="binder-audit.png"><span>Screenshot placeholder — images/binder-audit.png</span></figure>
     </section>
 
     <!-- ===================== INVENTORY ===================== -->
