@@ -59,6 +59,21 @@ public class LastCardHeightConverter : MarkupExtension, IMultiValueConverter
     public override object ProvideValue(IServiceProvider serviceProvider) => this;
 }
 
+/// <summary>True when the two bound values are the same object reference. Used to drive a
+/// selection highlight from a single shared VM property when several sibling lists each render
+/// items but only one item (the VM's selected one) should show as selected — binding every list's
+/// SelectedItem to that one property does NOT clear the others' stale visual selection.</summary>
+public class ReferenceEqualsConverter : MarkupExtension, IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object? parameter, CultureInfo culture)
+        => values.Length >= 2 && values[0] is not null && ReferenceEquals(values[0], values[1]);
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    public override object ProvideValue(IServiceProvider serviceProvider) => this;
+}
+
 /// <summary>Visible when the bound enum value's string representation matches ConverterParameter.</summary>
 public class EnumEqualsToVisibilityConverter : MarkupExtension, IValueConverter
 {

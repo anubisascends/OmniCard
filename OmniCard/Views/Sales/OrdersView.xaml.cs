@@ -63,6 +63,12 @@ public partial class OrdersView : UserControl
     {
         _dragStart = e.GetPosition(null);
         _dragOrder = (sender as FrameworkElement)?.Tag as Order;
+
+        // Selection is VM-driven (the lanes no longer bind ListBox.SelectedItem — see
+        // CardItemContainerStyle), so select the clicked card here. This also selects when a
+        // drag begins, which matches the previous behaviour.
+        if (DataContext is OrdersViewModel vm && _dragOrder is not null)
+            vm.SelectedOrder = _dragOrder;
     }
 
     private void Card_MouseMove(object sender, MouseEventArgs e)
