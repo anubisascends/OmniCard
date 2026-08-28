@@ -9,8 +9,17 @@ using OmniCard.Models;
 namespace OmniCard.Views.Binder;
 
 /// <summary>One rendered slot in a binder page grid: its page/slot coordinates (for drag-and-drop
-/// targeting) plus whatever card currently occupies it (null = empty slot).</summary>
-public sealed record BinderSlotItem(int Page, int SlotIndex, CollectionCard? Card);
+/// targeting) plus whatever card currently occupies it (null = empty slot). When the slot is empty
+/// but the mirrored pocket on the reverse side of the physical sheet holds a card,
+/// <see cref="HasCardOnReverse"/> is set so the view can show that game's card back (see
+/// <see cref="ReverseGame"/>), with the reverse card's name as a tooltip.</summary>
+public sealed record BinderSlotItem(
+    int Page,
+    int SlotIndex,
+    CollectionCard? Card,
+    bool HasCardOnReverse = false,
+    CardGame? ReverseGame = null,
+    string? ReverseCardName = null);
 
 /// <summary>One clickable entry in the pagination strip beneath the binder — a single spread
 /// (page 1 alone, or a left/right page pair). <see cref="IsCurrent"/> is toggled as the user
@@ -147,6 +156,12 @@ public sealed partial class BinderViewModel(
     partial void OnSlotsPerPageChanged(int value) => OnPropertyChanged(nameof(PageHeight));
 
     private int _containerId;
+
+    /// <summary>The physical-sheet layout of the loaded binder — the source of truth for which
+    /// logical page sits on the reverse of which, used to light up the card-back hint in empty
+    /// pockets whose reverse pocket is filled. Refreshed with every <see cref="Load"/>.</summary>
+    private BinderSheetLayout? _sheetLayout;
+
     /// <summary>Loads a binder into the dialog. Always starts on the first spread.</summary>
     public void Load(int containerId)
     {
@@ -158,6 +173,7 @@ public sealed partial class BinderViewModel(
         SlotsPerPage = layout.SlotsPerPage;
         TotalPages = layout.TotalPages;
         Columns = layout.Columns;
+        _sheetLayout = BinderSheetLayout.Parse(string.Join(",", layout.SheetSides), layout.TotalPages);
         PendingSlotsPerPage = layout.SlotsPerPage;
         PendingColumns = layout.Columns;
         SpreadIndex = 0;
@@ -266,9 +282,30 @@ public sealed partial class BinderViewModel(
     {
         var placed = containerService.GetPlacedCardsOnPage(_containerId, page);
         HydrateMissingImageUris(placed);
+
+        // Cards sitting in the pockets on the reverse side of this physical sheet, so an empty pocket
+        // can show the back of the card behind it. No image hydration needed — we only draw a back.
+        var reversePage = _sheetLayout?.ReversePageOf(page);
+        var reverse = reversePage is int rp
+            ? containerService.GetPlacedCardsOnPage(_containerId, rp)
+            : [];
+
         slots.Clear();
         for (var slot = 0; slot < SlotsPerPage; slot++)
-            slots.Add(new BinderSlotItem(page, slot, placed.FirstOrDefault(c => c.Slot == slot)));
+        {
+            var card = placed.FirstOrDefault(c => c.Slot == slot);
+            if (card is not null)
+            {
+                slots.Add(new BinderSlotItem(page, slot, card));
+                continue;
+            }
+
+            // Empty pocket — light up a card-back hint if the mirrored reverse pocket is filled.
+            var behind = CardBackAssets.ReverseCardFor(slot, Columns, SlotsPerPage, reverse);
+            slots.Add(behind is null
+                ? new BinderSlotItem(page, slot, null)
+                : new BinderSlotItem(page, slot, null, HasCardOnReverse: true, behind.Game, behind.Name));
+        }
     }
 
     /// <summary>Fills in <see cref="CollectionCard.ImageUri"/> for cards that have none stored

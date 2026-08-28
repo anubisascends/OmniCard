@@ -72,6 +72,11 @@
         document.getElementById("columns").value = state.columns;
     }
 
+    // Mirrors OmniCard.Shared/Models/CardBackAssets.Slug — maps a CardGame int to its card-back
+    // asset stem (/img/card-back-{slug}.png). Keep in sync with the enum order there.
+    const CARD_BACK_SLUGS = ["mtg", "optcg", "riftbound", "pokemon", "yugioh", "fftcg"];
+    function cardBackSlug(game) { return CARD_BACK_SLUGS[game] || "mtg"; }
+
     function cardTile(card, opts) {
         const el = document.createElement("div");
         el.className = "edit-tile";
@@ -147,7 +152,14 @@
             cell.appendChild(cardTile(slot.card, { page: pageNumber, slot: slot.slotIndex }));
         } else {
             cell.classList.add("empty");
-            cell.innerHTML = `<span class="slot-empty-label">Empty</span>`;
+            if (slot.reverseGame != null) {
+                // Empty pocket backed by a card on the reverse side of the sheet: show that game's
+                // card back, over the generic CSS back that shows through if no PNG exists.
+                cell.classList.add("has-reverse");
+                cell.innerHTML = `<img class="card-back" src="/img/card-back-${cardBackSlug(slot.reverseGame)}.png" alt="" loading="lazy" onerror="this.remove()"/>`;
+            } else {
+                cell.innerHTML = `<span class="slot-empty-label">Empty</span>`;
+            }
             cell.addEventListener("contextmenu", (e) => {
                 e.preventDefault();
                 openContextMenu(e, { ids: [], card: null, isPlaced: false, hasSlot: true, page: pageNumber, slot: slot.slotIndex });

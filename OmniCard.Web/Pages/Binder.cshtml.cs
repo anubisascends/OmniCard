@@ -91,11 +91,16 @@ public class BinderModel : PageModel
         var maxUsedPage = placed.Count > 0 ? placed.Max(c => c.Page!.Value) : 0;
         TotalPages = Math.Max(1, Math.Max(container.TotalPages, maxUsedPage));
 
+        // Which physical sheet each logical page sits on — so an empty pocket can show the back of a
+        // card sitting in the mirrored pocket on the reverse side of the same sheet.
+        var sheetLayout = BinderSheetLayout.Parse(container.SheetSides, TotalPages);
+        var placedByPage = placed.Where(c => c.Page is not null).ToLookup(c => c.Page!.Value);
+
         var details = new Dictionary<int, BinderCard>();
         Pages = new List<BinderPage>(TotalPages);
         for (var page = 1; page <= TotalPages; page++)
         {
-            var slots = new BinderCard?[SlotsPerPage];
+            var cards = new BinderCard?[SlotsPerPage];
             foreach (var card in placed.Where(c => c.Page == page).OrderBy(c => c.Slot ?? int.MaxValue))
             {
                 var vm = ToBinderCard(card);
@@ -104,16 +109,29 @@ public class BinderModel : PageModel
                 // Prefer the card's real slot; if it's missing or already taken, drop it into the
                 // first free slot so a mis-placed card is still visible rather than silently lost.
                 var slot = card.Slot;
-                if (slot is >= 0 && slot < SlotsPerPage && slots[slot.Value] is null)
+                if (slot is >= 0 && slot < SlotsPerPage && cards[slot.Value] is null)
                 {
-                    slots[slot.Value] = vm;
+                    cards[slot.Value] = vm;
                 }
                 else
                 {
-                    var free = Array.IndexOf(slots, null);
+                    var free = Array.IndexOf(cards, null);
                     if (free >= 0)
-                        slots[free] = vm;
+                        cards[free] = vm;
                 }
+            }
+
+            var reverseCards = sheetLayout.ReversePageOf(page) is int rev ? placedByPage[rev].ToList() : [];
+            var slots = new BinderSlot[SlotsPerPage];
+            for (var i = 0; i < SlotsPerPage; i++)
+            {
+                string? reverseSlug = null;
+                if (cards[i] is null &&
+                    CardBackAssets.ReverseCardFor(i, Columns, SlotsPerPage, reverseCards) is { } behind)
+                {
+                    reverseSlug = CardBackAssets.Slug(behind.Game);
+                }
+                slots[i] = new BinderSlot(cards[i], reverseSlug);
             }
 
             Pages.Add(new BinderPage(page, slots));
@@ -162,7 +180,12 @@ public class BinderModel : PageModel
         _ => Container.ContainerType.ToString(),
     };
 
-    public record BinderPage(int Number, BinderCard?[] Slots);
+    public record BinderPage(int Number, BinderSlot[] Slots);
+
+    /// <summary>One pocket in a rendered page: the card in it (null = empty), and — for an empty
+    /// pocket whose mirrored pocket on the reverse side of the sheet is filled — the slug of that
+    /// game's card back to show behind it (<c>/img/card-back-{slug}.png</c>).</summary>
+    public record BinderSlot(BinderCard? Card, string? ReverseBackSlug);
 
     public record BinderCard(
         int Id,

@@ -68,8 +68,15 @@ public sealed class BinderStateBuilder
         Hydrate(all);
         var tcg = ResolveTcgIds(all);
 
-        var leftSlots = BuildSlots(leftCards, slotsPerPage, tcg);
-        var rightSlots = BuildSlots(rightCards, slotsPerPage, tcg);
+        // Cards on the reverse side of each visible page's physical sheet, so an empty pocket can
+        // show the back of the card behind it. These pages live on adjacent spreads, so they aren't
+        // already loaded — fetch them (no hydration needed; we only need the game + occupied slot).
+        var sheetLayout = BinderSheetLayout.Parse(string.Join(",", layout.SheetSides), totalPages);
+        var leftReverse = ReverseCards(containerId, sheetLayout, leftPage);
+        var rightReverse = ReverseCards(containerId, sheetLayout, rightPage);
+
+        var leftSlots = BuildSlots(leftCards, leftReverse, slotsPerPage, columns, tcg);
+        var rightSlots = BuildSlots(rightCards, rightReverse, slotsPerPage, columns, tcg);
 
         return new BinderStateDto(
             name, slotsPerPage, columns, totalPages,
@@ -96,13 +103,29 @@ public sealed class BinderStateBuilder
         return cards.Select(c => Map(c, tcg)).ToList();
     }
 
-    private List<BinderSlotDto> BuildSlots(List<CollectionCard> pageCards, int slotsPerPage, IReadOnlyDictionary<string, ScryfallTcgIdResolver.Ids> tcg)
+    private List<CollectionCard> ReverseCards(int containerId, BinderSheetLayout sheetLayout, int? page)
+        => page is int p && sheetLayout.ReversePageOf(p) is int rev
+            ? _containers.GetPlacedCardsOnPage(containerId, rev)
+            : [];
+
+    private List<BinderSlotDto> BuildSlots(
+        List<CollectionCard> pageCards, List<CollectionCard> reverseCards,
+        int slotsPerPage, int columns, IReadOnlyDictionary<string, ScryfallTcgIdResolver.Ids> tcg)
     {
         var slots = new List<BinderSlotDto>(slotsPerPage);
         for (var i = 0; i < slotsPerPage; i++)
         {
             var card = pageCards.FirstOrDefault(c => c.Slot == i);
-            slots.Add(new BinderSlotDto(i, card is null ? null : Map(card, tcg)));
+
+            // Empty pocket: light up the reverse card's back (mirrored pocket on the sheet's back).
+            int? reverseGame = null;
+            if (card is null &&
+                CardBackAssets.ReverseCardFor(i, columns, slotsPerPage, reverseCards) is { } behind)
+            {
+                reverseGame = (int)behind.Game;
+            }
+
+            slots.Add(new BinderSlotDto(i, card is null ? null : Map(card, tcg), reverseGame));
         }
         return slots;
     }
@@ -171,7 +194,10 @@ public sealed record BinderCardDto(
     decimal? PurchasePrice, string? Price, decimal MarketPriceRaw, string? ImageUrl,
     bool IsTraded, List<string> Tags, int? Page, int? Slot, int? ContainerId, string TcgPlayerUrl);
 
-public sealed record BinderSlotDto(int SlotIndex, BinderCardDto? Card);
+/// <summary>One pocket in the editor spread. <see cref="ReverseGame"/> is set only for an empty
+/// pocket whose mirrored pocket on the reverse side of the sheet is filled — the client shows that
+/// game's card back (as an integer <see cref="CardGame"/>).</summary>
+public sealed record BinderSlotDto(int SlotIndex, BinderCardDto? Card, int? ReverseGame = null);
 
 public sealed record SpreadTabDto(int Index, string Label, bool IsCurrent);
 
