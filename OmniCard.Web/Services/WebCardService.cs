@@ -95,6 +95,7 @@ public sealed class WebCardService : ICardService
     public List<CollectionCard> GetCollectionCards(IEnumerable<int> cardIds) => throw new NotSupportedException();
     public void UpdateCollectionCard(CollectionCard card) => throw new NotSupportedException();
     public void DeleteCollectionCard(int id) => throw new NotSupportedException();
+    public void SetCardMissing(int lotId) => throw new NotSupportedException();
     public Task<List<SetCompletionSummary>> CalculateSetCompletionAsync(CardGame game, IProgress<string>? progress = null) => throw new NotSupportedException();
     public Task<List<SetCompletionSummary>> CalculateSetCompletionAsync(CardGame? game, IProgress<string>? progress = null) => throw new NotSupportedException();
     // Live single prices come straight from the game's read-only catalog DB (no network), so this

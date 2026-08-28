@@ -14,6 +14,7 @@ Expected filenames (each maps to a placeholder in index.html):
   collection.png           The Collection tab in Cards mode
   scanner.png              The Scanner tab mid-scan (queue + match)
   binder.png               The binder page-slot editor
+  binder-audit.png         The read-only Binder Audit view with per-pocket ✓ / − / ? / + buttons
   inventory.png            The sealed-product Inventory view
   orders-kanban.png        The Sales > Orders kanban board
   ebay-connect.png         The eBay sign-in / connect window

@@ -259,6 +259,7 @@ public class PriceSheetServiceTests : IDisposable
         public List<CollectionCard> GetCollectionCards(IEnumerable<int> cardIds) => throw new NotImplementedException();
         public void UpdateCollectionCard(CollectionCard card) => throw new NotImplementedException();
         public void DeleteCollectionCard(int id) => throw new NotImplementedException();
+        public void SetCardMissing(int lotId) => throw new NotImplementedException();
         public Task<List<SetCompletionSummary>> CalculateSetCompletionAsync(CardGame game, IProgress<string>? progress = null) => throw new NotImplementedException();
         public Task<List<SetCompletionSummary>> CalculateSetCompletionAsync(CardGame? game, IProgress<string>? progress = null) => throw new NotImplementedException();
         public IReadOnlyDictionary<string, decimal> GetCurrentPrices(CardGame game, IEnumerable<string> gameCardIds, bool foil) => throw new NotImplementedException();

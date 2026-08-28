@@ -172,6 +172,7 @@ public class ListsViewModelTests
         public int? PickCoverArt(int containerId, string containerName) => throw new NotImplementedException();
         public MoveToLocationResult? PickMoveToLocation() => throw new NotImplementedException();
         public void ShowBinderView(int containerId) => throw new NotImplementedException();
+        public void ShowBinderAudit(int containerId) => throw new NotImplementedException();
         public (int InsertIndex, bool DoubleSided)? InsertBinderPage(int containerId, int? nearPage) => throw new NotImplementedException();
         public int? MoveBinderPage(int containerId, int movingSheetIndex) => throw new NotImplementedException();
         public (int DeltaPages, BinderShiftScope Scope)? ShiftBinderPage(int page) => throw new NotImplementedException();

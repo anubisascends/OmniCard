@@ -43,6 +43,11 @@ public interface ICardService
     List<CollectionCard> GetCollectionCards(IEnumerable<int> cardIds);
     void UpdateCollectionCard(CollectionCard card);
     void DeleteCollectionCard(int id);
+
+    /// <summary>Flags a single-card lot as physically missing (<see cref="InventoryLot.IsMissing"/>)
+    /// without removing the record or its binder slot — used by the binder audit when a pocket the app
+    /// expects to be filled is empty. Sets <see cref="FlagReason.Manual"/>.</summary>
+    void SetCardMissing(int lotId);
     Task<List<SetCompletionSummary>> CalculateSetCompletionAsync(CardGame game, IProgress<string>? progress = null);
     Task<List<SetCompletionSummary>> CalculateSetCompletionAsync(CardGame? game, IProgress<string>? progress = null);
     IReadOnlyDictionary<string, decimal> GetCurrentPrices(CardGame game, IEnumerable<string> gameCardIds, bool foil);

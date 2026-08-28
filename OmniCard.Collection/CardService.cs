@@ -1773,6 +1773,20 @@ public sealed class CardService : ICardService
         context.SaveChanges();
     }
 
+    public void SetCardMissing(int lotId)
+    {
+        _logger.LogInformation("Flagging collection card {Id} as missing", lotId);
+        using var context = _omniDbContextFactory.CreateDbContext();
+        // Category=Single guard, defense-in-depth: matches the other singles write paths.
+        var lot = context.Lots.FirstOrDefault(l => l.Id == lotId && l.Product.Category == ProductCategory.Single);
+        if (lot is null)
+            return;
+
+        lot.IsMissing = true;
+        lot.FlagReason = FlagReason.Manual;
+        context.SaveChanges();
+    }
+
     public void DeleteCollectionCard(int id)
     {
         _logger.LogInformation("Deleting collection card {Id}", id);
