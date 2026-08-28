@@ -59,6 +59,8 @@ public class OrderServiceTests : IDisposable
         public void SetOrdersEditorWidth(double width) { }
         public bool OrdersEditorCollapsed => false;
         public void SetOrdersEditorCollapsed(bool collapsed) { }
+        public System.Collections.Generic.IReadOnlyList<OmniCard.Models.WorkflowLane> GetWorkflowLanes() => OmniCard.Models.WorkflowLane.Defaults();
+        public void SaveWorkflowLanes(System.Collections.Generic.IEnumerable<OmniCard.Models.WorkflowLane> lanes) { }
     }
 
     private (int customerId, int lotId) SeedCustomerAndLot(int quantity = 1, decimal? unitCost = 1.00m)
@@ -620,5 +622,34 @@ public class OrderServiceTests : IDisposable
         Assert.Empty(svc.GetOrderEdits(order.Id));
         using var verify = new OmniCardDbContext(_opts);
         Assert.Equal(3, verify.Lots.Single(l => l.Id == lotId).Quantity); // unchanged
+    }
+
+    [Fact]
+    public void CreateOrder_SeedsStageKey_ToCreatedLane()
+    {
+        var (customerId, _) = SeedCustomerAndLot();
+        var svc = OrderSvc();
+
+        var order = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "ORD-1");
+
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.Equal("created", ctx.Orders.Single(o => o.Id == order.Id).StageKey);
+    }
+
+    [Fact]
+    public async Task SetStatusAsync_PersistsCustomStageKey_AlongsideBehavior()
+    {
+        var (customerId, lotId) = SeedCustomerAndLot(quantity: 3);
+        var svc = OrderSvc();
+        var order = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "ORD-2");
+        AddLineDirect(order.Id, lotId, quantity: 1, unitPrice: 5m);
+
+        await svc.SetStatusAsync(order.Id, OrderStatus.Shipped, "out-the-door");
+
+        using var ctx = new OmniCardDbContext(_opts);
+        var reloaded = ctx.Orders.Single(o => o.Id == order.Id);
+        Assert.Equal(OrderStatus.Shipped, reloaded.Status); // behavior drives accounting as before
+        Assert.Equal("out-the-door", reloaded.StageKey);    // exact custom lane remembered
+        Assert.Equal(2, ctx.Lots.Single(l => l.Id == lotId).Quantity); // ship accounting still ran (3 → 2)
     }
 }

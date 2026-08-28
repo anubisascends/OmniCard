@@ -11,31 +11,36 @@ namespace OmniCard.Views.Settings;
 /// </summary>
 public partial class SettingsViewModel(
     SalesSettingsViewModel sales,
+    SalesWorkflowSettingsViewModel salesWorkflow,
     DataLocationViewModel dataLocation,
     EbaySellingSettingsViewModel ebaySelling,
     ScannerSettingsViewModel scanner) : ObservableObject
 {
     public SalesSettingsViewModel Sales { get; } = sales;
+    public SalesWorkflowSettingsViewModel SalesWorkflow { get; } = salesWorkflow;
     public DataLocationViewModel DataLocation { get; } = dataLocation;
     public EbaySellingSettingsViewModel EbaySelling { get; } = ebaySelling;
     public ScannerSettingsViewModel Scanner { get; } = scanner;
 
     /// <summary>Index of the section selected in the dialog's left-hand nav
-    /// (0 = Display, 1 = Data Location, 2 = Sales &amp; Receipts, 3 = eBay Selling, 4 = Scan Workflow).</summary>
+    /// (0 = Display, 1 = Data Location, 2 = Sales &amp; Receipts, 3 = Sales Workflow,
+    /// 4 = eBay Selling, 5 = Scan Workflow).</summary>
     [ObservableProperty]
     public partial int SelectedSectionIndex { get; set; }
 
     public bool ShowDisplay => SelectedSectionIndex == 0;
     public bool ShowDataLocation => SelectedSectionIndex == 1;
     public bool ShowSales => SelectedSectionIndex == 2;
-    public bool ShowEbaySelling => SelectedSectionIndex == 3;
-    public bool ShowScanner => SelectedSectionIndex == 4;
+    public bool ShowSalesWorkflow => SelectedSectionIndex == 3;
+    public bool ShowEbaySelling => SelectedSectionIndex == 4;
+    public bool ShowScanner => SelectedSectionIndex == 5;
 
     partial void OnSelectedSectionIndexChanged(int value)
     {
         OnPropertyChanged(nameof(ShowDisplay));
         OnPropertyChanged(nameof(ShowDataLocation));
         OnPropertyChanged(nameof(ShowSales));
+        OnPropertyChanged(nameof(ShowSalesWorkflow));
         OnPropertyChanged(nameof(ShowEbaySelling));
         OnPropertyChanged(nameof(ShowScanner));
     }
@@ -44,6 +49,7 @@ public partial class SettingsViewModel(
     public async Task Load()
     {
         Sales.Load();
+        SalesWorkflow.Load();
         await DataLocation.LoadAsync();
         EbaySelling.Load();
         Scanner.Load();

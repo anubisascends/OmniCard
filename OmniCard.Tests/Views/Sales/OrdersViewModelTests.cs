@@ -319,12 +319,12 @@ public class OrdersViewModelTests
         listingService.Setup(s => s.GetActiveListings(null)).Returns([]);
         orderService.Setup(s => s.GetOrders()).Returns([NewOrder(1, 1, OrderStatus.Shipped)]);
         orderService.Setup(s => s.GetLines(1)).Returns([]);
-        orderService.Setup(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>())).Returns(Task.CompletedTask);
+        orderService.Setup(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
 
         vm.SelectedOrder = order;
         await vm.MoveOrder(order, OrderStatus.Shipped);
 
-        orderService.Verify(s => s.SetStatusAsync(1, OrderStatus.Shipped), Times.Once);
+        orderService.Verify(s => s.SetStatusAsync(1, OrderStatus.Shipped, "shipped"), Times.Once);
         Assert.NotNull(vm.SelectedOrder);
         Assert.Equal(1, vm.SelectedOrder!.Id);
         Assert.Equal(OrderStatus.Shipped, vm.SelectedOrder.Status);
@@ -343,7 +343,7 @@ public class OrdersViewModelTests
         vm.SelectedOrder = order;
         await vm.MoveOrder(order, OrderStatus.Completed);
 
-        orderService.Verify(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>()), Times.Never);
+        orderService.Verify(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>(), It.IsAny<string?>()), Times.Never);
         Assert.Equal("Can't move Created → Completed.", vm.StatusMessage);
     }
 
@@ -360,7 +360,7 @@ public class OrdersViewModelTests
         vm.SelectedOrder = order;
         await vm.MoveOrder(order, OrderStatus.Shipped);
 
-        orderService.Verify(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>()), Times.Never);
+        orderService.Verify(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>(), It.IsAny<string?>()), Times.Never);
         Assert.Equal("Can't move Created → Shipped.", vm.StatusMessage);
     }
 
@@ -428,12 +428,12 @@ public class OrdersViewModelTests
         listingService.Setup(s => s.GetActiveListings(null)).Returns([]);
         orderService.Setup(s => s.GetOrders()).Returns([NewOrder(1, 1, OrderStatus.Cancelled)]);
         orderService.Setup(s => s.GetLines(1)).Returns([]);
-        orderService.Setup(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>())).Returns(Task.CompletedTask);
+        orderService.Setup(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
 
         vm.SelectedOrder = order;
         await vm.CancelOrder(order);
 
-        orderService.Verify(s => s.SetStatusAsync(1, OrderStatus.Cancelled), Times.Once);
+        orderService.Verify(s => s.SetStatusAsync(1, OrderStatus.Cancelled, "cancelled"), Times.Once);
         Assert.Equal("Order moved to Cancelled.", vm.StatusMessage);
     }
 
@@ -447,7 +447,7 @@ public class OrdersViewModelTests
         vm.SelectedOrder = order;
         await vm.CancelOrder(order);
 
-        orderService.Verify(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>()), Times.Never);
+        orderService.Verify(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>(), It.IsAny<string?>()), Times.Never);
         Assert.Equal("Can't cancel a Shipped order.", vm.StatusMessage);
     }
 
@@ -736,5 +736,138 @@ public class OrdersViewModelTests
 
         Assert.Equal("no linked sale record", vm.StatusMessage);
         Assert.True(vm.IsEditingCompletedOrder); // stays in edit mode so the user can fix it
+    }
+
+    // ── Customizable kanban lanes ──────────────────────────────────────────────
+
+    private static OrdersViewModel MakeVmWithLanes(
+        List<WorkflowLane> lanes,
+        List<Order> orders,
+        out Mock<IOrderService> orderService)
+    {
+        orderService = new Mock<IOrderService>();
+        orderService.Setup(s => s.GetOrderLineSummaries()).Returns(new List<OrderLineSummary>());
+        orderService.Setup(s => s.GetOrders()).Returns(orders);
+        orderService.Setup(s => s.GetLines(It.IsAny<int>())).Returns(new List<OrderLine>());
+        var customerService = new Mock<ICustomerService>();
+        customerService.Setup(s => s.GetAll()).Returns([]);
+        var listingService = new Mock<IListingService>();
+        listingService.Setup(s => s.GetActiveListings(null)).Returns([]);
+        var settings = new Mock<ISalesSettingsService>();
+        settings.Setup(s => s.GetWorkflowLanes()).Returns(lanes);
+        return new OrdersViewModel(
+            orderService.Object, customerService.Object, listingService.Object,
+            new FakeReceiptService(), new FakeReceiptPdfExporter(),
+            Mock.Of<ITcgPlayerOrderImportService>(), Mock.Of<IDialogService>(), settings.Object);
+    }
+
+    [Fact]
+    public void Load_BuildsColumnsFromCustomLanes_ExcludingCancelLanes()
+    {
+        var lanes = new List<WorkflowLane>
+        {
+            new() { Key = "new", Name = "New", Color = "#111", Behavior = OrderStatus.Created },
+            new() { Key = "await", Name = "Awaiting Payment", Color = "#222", Behavior = OrderStatus.Created },
+            new() { Key = "shipped", Name = "Shipped", Color = "#333", Behavior = OrderStatus.Shipped },
+            new() { Key = "cancelled", Name = "Cancelled", Color = "#999", Behavior = OrderStatus.Cancelled },
+        };
+        var vm = MakeVmWithLanes(lanes, [], out _);
+
+        vm.Load();
+
+        Assert.Equal(["New", "Awaiting Payment", "Shipped"], vm.Lanes.Select(l => l.Name));
+        Assert.DoesNotContain(vm.Lanes, l => l.Behavior == OrderStatus.Cancelled);
+    }
+
+    [Fact]
+    public void Load_BucketsOrderIntoExactLane_ByStageKey()
+    {
+        var lanes = new List<WorkflowLane>
+        {
+            new() { Key = "new", Name = "New", Color = "#111", Behavior = OrderStatus.Created },
+            new() { Key = "await", Name = "Awaiting Payment", Color = "#abc", Behavior = OrderStatus.Created },
+        };
+        var order = NewOrder(1, 1, OrderStatus.Created);
+        order.StageKey = "await";
+        var vm = MakeVmWithLanes(lanes, [order], out _);
+
+        vm.Load();
+
+        var awaitLane = vm.Lanes.Single(l => l.Key == "await");
+        Assert.Contains(order, awaitLane.Orders);
+        Assert.DoesNotContain(order, vm.Lanes.Single(l => l.Key == "new").Orders);
+        Assert.Equal("#abc", order.StageColorDisplay); // stripe colour follows the lane
+    }
+
+    [Fact]
+    public void Load_LegacyOrderWithNoStageKey_FallsBackToFirstLaneOfItsBehavior()
+    {
+        var lanes = new List<WorkflowLane>
+        {
+            new() { Key = "new", Name = "New", Color = "#111", Behavior = OrderStatus.Created },
+            new() { Key = "await", Name = "Awaiting Payment", Color = "#222", Behavior = OrderStatus.Created },
+        };
+        var order = NewOrder(1, 1, OrderStatus.Created); // StageKey null
+        var vm = MakeVmWithLanes(lanes, [order], out _);
+
+        vm.Load();
+
+        Assert.Contains(order, vm.Lanes.Single(l => l.Key == "new").Orders);
+    }
+
+    [Fact]
+    public async Task MoveOrderToStage_BetweenTwoPreShipLanes_ReTagsWithoutInvalidMessage()
+    {
+        var lanes = new List<WorkflowLane>
+        {
+            new() { Key = "new", Name = "New", Color = "#111", Behavior = OrderStatus.Created },
+            new() { Key = "await", Name = "Awaiting Payment", Color = "#222", Behavior = OrderStatus.Created },
+        };
+        var order = NewOrder(1, 1, OrderStatus.Created);
+        order.StageKey = "new";
+        var moved = NewOrder(1, 1, OrderStatus.Created);
+        moved.StageKey = "await";
+        var vm = MakeVmWithLanes(lanes, [moved], out var orderService);
+        orderService.Setup(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>(), It.IsAny<string?>()))
+            .Returns(Task.CompletedTask);
+
+        await vm.MoveOrderToStage(order, "await");
+
+        orderService.Verify(s => s.SetStatusAsync(1, OrderStatus.Created, "await"), Times.Once);
+        Assert.Equal("Order moved to Awaiting Payment.", vm.StatusMessage);
+    }
+
+    [Fact]
+    public async Task MoveOrderToStage_IntoCustomShippedLane_RunsShipAccounting()
+    {
+        var lanes = new List<WorkflowLane>
+        {
+            new() { Key = "packed", Name = "Packed", Color = "#111", Behavior = OrderStatus.Packed },
+            new() { Key = "out-the-door", Name = "Out the Door", Color = "#222", Behavior = OrderStatus.Shipped },
+        };
+        var order = NewOrder(1, 1, OrderStatus.Packed);
+        order.StageKey = "packed";
+        var vm = MakeVmWithLanes(lanes, [NewOrder(1, 1, OrderStatus.Shipped)], out var orderService);
+        orderService.Setup(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>(), It.IsAny<string?>()))
+            .Returns(Task.CompletedTask);
+
+        await vm.MoveOrderToStage(order, "out-the-door");
+
+        // The Shipped behavior on the custom lane drives the accounting call (service handles the
+        // inventory/movement side); the exact lane key is persisted alongside it.
+        orderService.Verify(s => s.SetStatusAsync(1, OrderStatus.Shipped, "out-the-door"), Times.Once);
+    }
+
+    [Fact]
+    public async Task MoveOrderToStage_IntoSameLane_IsNoOp()
+    {
+        var lanes = WorkflowLane.Defaults();
+        var order = NewOrder(1, 1, OrderStatus.Created);
+        order.StageKey = "created";
+        var vm = MakeVmWithLanes(lanes, [], out var orderService);
+
+        await vm.MoveOrderToStage(order, "created");
+
+        orderService.Verify(s => s.SetStatusAsync(It.IsAny<int>(), It.IsAny<OrderStatus>(), It.IsAny<string?>()), Times.Never);
     }
 }

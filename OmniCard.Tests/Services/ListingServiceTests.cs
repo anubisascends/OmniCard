@@ -125,6 +125,8 @@ public class ListingServiceTests : IDisposable
         public void SetOrdersEditorWidth(double width) { }
         public bool OrdersEditorCollapsed => false;
         public void SetOrdersEditorCollapsed(bool collapsed) { }
+        public System.Collections.Generic.IReadOnlyList<OmniCard.Models.WorkflowLane> GetWorkflowLanes() => OmniCard.Models.WorkflowLane.Defaults();
+        public void SaveWorkflowLanes(System.Collections.Generic.IEnumerable<OmniCard.Models.WorkflowLane> lanes) { }
     }
 
     [Fact]

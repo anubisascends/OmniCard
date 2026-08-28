@@ -38,6 +38,7 @@
             <ListBoxItem Content="Display" Padding="16,10" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <ListBoxItem Content="Data Location" Padding="16,10" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <ListBoxItem Content="Sales &amp; Receipts" Padding="16,10" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            <ListBoxItem Content="Sales Workflow" Padding="16,10" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <ListBoxItem Content="eBay Selling" Padding="16,10" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <ListBoxItem Content="Scan Workflow" Padding="16,10" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
         </ListBox>
@@ -54,6 +55,9 @@
             </ContentControl>
             <ContentControl Visibility="{Binding Settings.ShowSales, Converter={StaticResource BoolToVis}}">
                 <local:SalesSettingsView DataContext="{Binding Settings.Sales}"/>
+            </ContentControl>
+            <ContentControl Visibility="{Binding Settings.ShowSalesWorkflow, Converter={StaticResource BoolToVis}}">
+                <local:SalesWorkflowSettingsView DataContext="{Binding Settings.SalesWorkflow}"/>
             </ContentControl>
             <ContentControl Visibility="{Binding Settings.ShowEbaySelling, Converter={StaticResource BoolToVis}}">
                 <local:EbaySellingSettingsView DataContext="{Binding Settings.EbaySelling}"/>

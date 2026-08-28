@@ -595,6 +595,8 @@ public class AnalyticsServiceTests : IDisposable
         public void SetOrdersEditorWidth(double width) { }
         public bool OrdersEditorCollapsed => false;
         public void SetOrdersEditorCollapsed(bool collapsed) { }
+        public IReadOnlyList<OmniCard.Models.WorkflowLane> GetWorkflowLanes() => OmniCard.Models.WorkflowLane.Defaults();
+        public void SaveWorkflowLanes(IEnumerable<OmniCard.Models.WorkflowLane> lanes) { }
     }
 
     private class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>

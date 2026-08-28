@@ -81,6 +81,7 @@ public partial class App : Application
             services.AddSingleton<Views.Sales.OrdersViewModel>();
             services.AddSingleton<Views.Sales.ManageListingsViewModel>();
             services.AddSingleton<Views.Settings.SalesSettingsViewModel>();
+            services.AddSingleton<Views.Settings.SalesWorkflowSettingsViewModel>();
             services.AddSingleton<Views.Settings.EbaySellingSettingsViewModel>();
             services.AddSingleton<Views.Settings.ScannerSettingsViewModel>();
             services.AddSingleton<Views.Settings.SettingsViewModel>();

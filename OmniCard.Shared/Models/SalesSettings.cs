@@ -10,4 +10,8 @@ public class SalesSettings
     public double? OrdersEditorWidth { get; set; }
     /// <summary>Whether the Orders view's editor panel is collapsed.</summary>
     public bool OrdersEditorCollapsed { get; set; }
+
+    /// <summary>User-customized kanban lanes for the Sales/Orders board. Null or empty means the
+    /// built-in defaults are used (see <see cref="WorkflowLane.Defaults"/>).</summary>
+    public List<WorkflowLane>? WorkflowLanes { get; set; }
 }

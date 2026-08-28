@@ -50,11 +50,33 @@ public partial class OrdersViewModel(
     public void ExpandEditor() => IsEditorCollapsed = false;
 
     public ObservableCollection<Order> Orders { get; } = [];
-    public ObservableCollection<Order> CreatedOrders { get; } = [];
-    public ObservableCollection<Order> PackedOrders { get; } = [];
-    public ObservableCollection<Order> ShippedOrders { get; } = [];
-    public ObservableCollection<Order> CompletedOrders { get; } = [];
+
+    /// <summary>The board's columns, built from the customizable <see cref="WorkflowLane"/>
+    /// configuration (cancel-behavior lanes excluded — those feed <see cref="CancelledOrders"/>).</summary>
+    public ObservableCollection<KanbanLane> Lanes { get; } = [];
+
+    /// <summary>Orders in any cancel-behavior lane, shown in the collapsible bottom strip.</summary>
     public ObservableCollection<Order> CancelledOrders { get; } = [];
+
+    // Back-compat convenience views over the dynamic lanes, grouped by the built-in behaviors.
+    // The board binds to Lanes/CancelledOrders directly; these exist for callers/tests that reason
+    // in terms of the classic five buckets.
+    public IEnumerable<Order> CreatedOrders => OrdersWithBehavior(OrderStatus.Created);
+    public IEnumerable<Order> PackedOrders => OrdersWithBehavior(OrderStatus.Packed);
+    public IEnumerable<Order> ShippedOrders => OrdersWithBehavior(OrderStatus.Shipped);
+    public IEnumerable<Order> CompletedOrders => OrdersWithBehavior(OrderStatus.Completed);
+
+    private IEnumerable<Order> OrdersWithBehavior(OrderStatus behavior) =>
+        Lanes.Where(l => l.Behavior == behavior).SelectMany(l => l.Orders);
+
+    /// <summary>Current lane configuration, falling back to the built-in defaults if none is
+    /// persisted (a bare mock returns null here too).</summary>
+    private IReadOnlyList<WorkflowLane> LaneDefs()
+    {
+        var lanes = salesSettings.GetWorkflowLanes();
+        return lanes is { Count: > 0 } ? lanes : WorkflowLane.Defaults();
+    }
+
     public ObservableCollection<Customer> Customers { get; } = [];
     public ObservableCollection<OrderLine> Lines { get; } = [];
 
@@ -135,8 +157,23 @@ public partial class OrdersViewModel(
     public void Load()
     {
         Orders.Clear();
-        CreatedOrders.Clear(); PackedOrders.Clear(); ShippedOrders.Clear();
-        CompletedOrders.Clear(); CancelledOrders.Clear();
+        CancelledOrders.Clear();
+
+        // (Re)build the board columns from the current lane configuration so edits made in the
+        // Sales Workflow settings take effect the next time the Orders tab loads.
+        var laneDefs = LaneDefs();
+        Lanes.Clear();
+        var columnByKey = new Dictionary<string, KanbanLane>();
+        foreach (var def in laneDefs.Where(d => !d.IsCancelLane))
+        {
+            var lane = new KanbanLane(def);
+            Lanes.Add(lane);
+            columnByKey[def.Key] = lane;
+        }
+        OnPropertyChanged(nameof(CreatedOrders));
+        OnPropertyChanged(nameof(PackedOrders));
+        OnPropertyChanged(nameof(ShippedOrders));
+        OnPropertyChanged(nameof(CompletedOrders));
 
         Customers.Clear();
         foreach (var c in customerService.GetAll()) Customers.Add(c);
@@ -155,15 +192,20 @@ public partial class OrdersViewModel(
                 o.LineTotal = s.Total;
             }
 
+            // Resolve the lane an order belongs to: prefer its exact StageKey, else the first lane
+            // sharing its behavior (legacy orders with no StageKey, or orders whose lane was
+            // deleted). A cancel-behavior lane routes the card to the strip.
+            var def = laneDefs.FirstOrDefault(l => l.Key == o.StageKey)
+                      ?? laneDefs.FirstOrDefault(l => l.Behavior == o.Status);
+            o.StageColorDisplay = def?.Color ?? "#9E9E9E";
+
             Orders.Add(o);
-            (o.Status switch
-            {
-                OrderStatus.Created => CreatedOrders,
-                OrderStatus.Packed => PackedOrders,
-                OrderStatus.Shipped => ShippedOrders,
-                OrderStatus.Completed => CompletedOrders,
-                _ => CancelledOrders,
-            }).Add(o);
+            if (def is { IsCancelLane: true } || (def is null && o.Status == OrderStatus.Cancelled))
+                CancelledOrders.Add(o);
+            else if (def is not null && columnByKey.TryGetValue(def.Key, out var lane))
+                lane.Orders.Add(o);
+            else
+                Lanes.FirstOrDefault()?.Orders.Add(o); // last resort: keep the card visible somewhere
         }
 
         AvailableStacks.Clear();
@@ -355,22 +397,41 @@ public partial class OrdersViewModel(
         StatusMessage = "Saved.";
     }
 
-    /// <summary>Applies a drag-drop status move (or programmatic move). Validates the transition;
-    /// on Packed→Shipped this runs the existing ship accounting via OrderService.SetStatus.</summary>
-    public async Task MoveOrder(Order? order, OrderStatus target)
+    /// <summary>Moves an order to the lane with the given key (the drag-drop entry point). Resolves
+    /// the lane's behavior, validates the transition, and — on a move into a Shipped-behavior lane —
+    /// runs the existing ship accounting via <see cref="IOrderService.SetStatusAsync"/>.</summary>
+    public async Task MoveOrderToStage(Order? order, string stageKey)
     {
         if (order is null) return;
-        if (order.Status == target) return;
-        if (!IsValidTransition(order.Status, target))
+        var target = LaneDefs().FirstOrDefault(l => l.Key == stageKey);
+        if (target is null) return;
+        if (order.StageKey == target.Key) return; // already in this exact lane
+        if (!IsValidTransition(order.Status, target.Behavior))
         {
-            StatusMessage = $"Can't move {order.Status} → {target}.";
+            StatusMessage = $"Can't move {order.Status} → {target.Name}.";
             return;
         }
-        await orderService.SetStatusAsync(order.Id, target);
+        await orderService.SetStatusAsync(order.Id, target.Behavior, target.Key);
         var id = order.Id;
         Load();
         SelectedOrder = Orders.FirstOrDefault(o => o.Id == id);
-        StatusMessage = $"Order moved to {target}.";
+        StatusMessage = $"Order moved to {target.Name}.";
+    }
+
+    /// <summary>Programmatic/behavior-based move (used by tests and the Cancel command): routes to
+    /// the first lane sharing <paramref name="target"/>'s behavior, then delegates to
+    /// <see cref="MoveOrderToStage"/>.</summary>
+    public Task MoveOrder(Order? order, OrderStatus target)
+    {
+        if (order is null) return Task.CompletedTask;
+        if (!IsValidTransition(order.Status, target))
+        {
+            StatusMessage = $"Can't move {order.Status} → {target}.";
+            return Task.CompletedTask;
+        }
+        var key = LaneDefs().FirstOrDefault(l => l.Behavior == target)?.Key
+                  ?? target.ToString().ToLowerInvariant();
+        return MoveOrderToStage(order, key);
     }
 
     [RelayCommand(CanExecute = nameof(CanCancelOrder))]
@@ -493,18 +554,25 @@ public partial class OrdersViewModel(
         }
     }
 
-    /// <summary>Enforces the kanban board's move rules: Created ⇄ Packed (un-pack allowed),
-    /// Packed → Shipped (runs ship accounting), Shipped → Completed, and Cancel only from
-    /// Created or Packed (no restock support once Shipped/Completed).</summary>
-    private static bool IsValidTransition(OrderStatus from, OrderStatus to) => to switch
+    /// <summary>Enforces the kanban board's move rules in terms of lane <em>behavior</em> (so any
+    /// number of custom lanes sharing a behavior obey the same guardrails): free movement among
+    /// pre-ship lanes (Created/Packed); into a Shipped-behavior lane only from pre-ship (runs ship
+    /// accounting); into Completed only from Shipped; Cancel only from pre-ship (no restock once
+    /// shipped/completed). A move between two lanes that share a behavior is always allowed (it just
+    /// re-tags the order — no accounting re-runs).</summary>
+    private static bool IsValidTransition(OrderStatus from, OrderStatus to)
     {
-        OrderStatus.Created => from is OrderStatus.Packed,          // un-pack
-        OrderStatus.Packed => from is OrderStatus.Created,
-        OrderStatus.Shipped => from is OrderStatus.Packed,
-        OrderStatus.Completed => from is OrderStatus.Shipped,
-        OrderStatus.Cancelled => from is OrderStatus.Created or OrderStatus.Packed,
-        _ => false,
-    };
+        if (from == to) return true; // same behavior, different lane — just re-tag, no accounting
+        return to switch
+        {
+            OrderStatus.Created => from is OrderStatus.Packed,          // un-pack
+            OrderStatus.Packed => from is OrderStatus.Created,
+            OrderStatus.Shipped => from is OrderStatus.Packed,          // must pack before shipping
+            OrderStatus.Completed => from is OrderStatus.Shipped,
+            OrderStatus.Cancelled => from is OrderStatus.Created or OrderStatus.Packed,
+            _ => false,
+        };
+    }
 
     internal static bool IsValidTransitionPublic(OrderStatus from, OrderStatus to) => IsValidTransition(from, to);
 

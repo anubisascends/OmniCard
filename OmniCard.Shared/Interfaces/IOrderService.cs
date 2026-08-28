@@ -20,9 +20,12 @@ public interface IOrderService
     /// foil/price) from the grouped picker so N additions cost one DB round trip instead of N.</summary>
     List<OrderLine> AddLines(int orderId, IEnumerable<int> lotIds, decimal unitSalePrice);
     void RemoveLine(int orderLineId);
-    /// <summary>Applies a status change. On a transition into Shipped it records the sale,
-    /// marks listings sold, and best-effort auto-ends any active eBay listing for the sold lots.</summary>
-    Task SetStatusAsync(int orderId, OrderStatus status);
+    /// <summary>Applies a status change and, optionally, records the exact customizable lane the
+    /// order now occupies (<paramref name="stageKey"/> → <see cref="Order.StageKey"/>; defaults to
+    /// the built-in lane for <paramref name="status"/> when omitted). On a transition into Shipped
+    /// it records the sale, marks listings sold, and best-effort auto-ends any active eBay listing
+    /// for the sold lots.</summary>
+    Task SetStatusAsync(int orderId, OrderStatus status, string? stageKey = null);
 
     /// <summary>Deletes a pre-ship order and its lines. Throws if the order is Shipped or
     /// Completed (its sale is recorded and inventory already removed).</summary>
