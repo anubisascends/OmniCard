@@ -23,7 +23,10 @@
         </CollectionViewSource>
 
         <!-- Card container: strip the default ListBoxItem chrome so the card Border is the whole
-             visual; show a primary outline when the card is selected. -->
+             visual; show a primary outline when the card is the VM's SelectedOrder. Selection is
+             driven purely by the VM (not per-list ListBox.SelectedItem) because the four lanes share
+             one SelectedOrder — binding each lane's SelectedItem to it leaves stale highlights in the
+             other lanes, so multiple cards appear selected at once. -->
         <Style x:Key="CardItemContainerStyle" TargetType="ListBoxItem">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="Padding" Value="0"/>
@@ -36,10 +39,16 @@
                             <ContentPresenter/>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
+                            <DataTrigger Value="True">
+                                <DataTrigger.Binding>
+                                    <MultiBinding Converter="{conv:ReferenceEqualsConverter}">
+                                        <Binding/>
+                                        <Binding Path="DataContext.SelectedOrder" RelativeSource="{RelativeSource AncestorType=UserControl}"/>
+                                    </MultiBinding>
+                                </DataTrigger.Binding>
                                 <Setter TargetName="wrap" Property="BorderBrush"
                                         Value="{DynamicResource MaterialDesign.Brush.Primary}"/>
-                            </Trigger>
+                            </DataTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -197,7 +206,6 @@
                     </Border>
                     <ListBox ItemsSource="{Binding CreatedOrders}" AllowDrop="True" Tag="Created"
                              Drop="Column_Drop" DragOver="Column_DragOver"
-                             SelectedItem="{Binding SelectedOrder}"
                              Background="Transparent" BorderThickness="0"
                              ItemTemplate="{StaticResource OrderCardTemplate}"
                              ItemContainerStyle="{StaticResource CardItemContainerStyle}"
@@ -223,7 +231,6 @@
                     </Border>
                     <ListBox ItemsSource="{Binding PackedOrders}" AllowDrop="True" Tag="Packed"
                              Drop="Column_Drop" DragOver="Column_DragOver"
-                             SelectedItem="{Binding SelectedOrder}"
                              Background="Transparent" BorderThickness="0"
                              ItemTemplate="{StaticResource OrderCardTemplate}"
                              ItemContainerStyle="{StaticResource CardItemContainerStyle}"
@@ -249,7 +256,6 @@
                     </Border>
                     <ListBox ItemsSource="{Binding ShippedOrders}" AllowDrop="True" Tag="Shipped"
                              Drop="Column_Drop" DragOver="Column_DragOver"
-                             SelectedItem="{Binding SelectedOrder}"
                              Background="Transparent" BorderThickness="0"
                              ItemTemplate="{StaticResource OrderCardTemplate}"
                              ItemContainerStyle="{StaticResource CardItemContainerStyle}"
@@ -275,7 +281,6 @@
                     </Border>
                     <ListBox ItemsSource="{Binding CompletedOrders}" AllowDrop="True" Tag="Completed"
                              Drop="Column_Drop" DragOver="Column_DragOver"
-                             SelectedItem="{Binding SelectedOrder}"
                              Background="Transparent" BorderThickness="0"
                              ItemTemplate="{StaticResource OrderCardTemplate}"
                              ItemContainerStyle="{StaticResource CardItemContainerStyle}"
