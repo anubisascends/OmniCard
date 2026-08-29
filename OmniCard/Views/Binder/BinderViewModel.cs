@@ -159,7 +159,9 @@ public sealed partial class BinderViewModel(
 
     /// <summary>The physical-sheet layout of the loaded binder — the source of truth for which
     /// logical page sits on the reverse of which, used to light up the card-back hint in empty
-    /// pockets whose reverse pocket is filled. Refreshed with every <see cref="Load"/>.</summary>
+    /// pockets whose reverse pocket is filled. Re-read from the container service at the top of
+    /// every <see cref="Refresh"/> so page mutations (add/insert/move/remove) don't leave it stale
+    /// — otherwise reverse-side card backs never appear on newly added pages.</summary>
     private BinderSheetLayout? _sheetLayout;
 
     /// <summary>Loads a binder into the dialog. Always starts on the first spread.</summary>
@@ -231,6 +233,11 @@ public sealed partial class BinderViewModel(
     private void Refresh()
     {
         PopulateUnplaced();
+
+        // Re-read the sheet layout so reverse-side card backs stay correct after page mutations
+        // (add/insert/move/remove) — the cached copy would otherwise be stale for new pages.
+        var layout = containerService.GetBinderLayout(_containerId);
+        _sheetLayout = BinderSheetLayout.Parse(string.Join(",", layout.SheetSides), layout.TotalPages);
 
         if (SpreadIndex >= TotalSpreads) SpreadIndex = Math.Max(0, TotalSpreads - 1);
         if (SpreadIndex < 0) SpreadIndex = 0;
