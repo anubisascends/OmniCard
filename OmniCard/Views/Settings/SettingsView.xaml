@@ -41,6 +41,7 @@
             <ListBoxItem Content="Sales Workflow" Padding="16,10" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <ListBoxItem Content="eBay Selling" Padding="16,10" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
             <ListBoxItem Content="Scan Workflow" Padding="16,10" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            <ListBoxItem Content="Scanner Capabilities" Padding="16,10" Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
         </ListBox>
 
         <!-- Section content: the selected group's view is shown; the others are collapsed.
@@ -64,6 +65,9 @@
             </ContentControl>
             <ContentControl Visibility="{Binding Settings.ShowScanner, Converter={StaticResource BoolToVis}}">
                 <local:ScannerSettingsView DataContext="{Binding Settings.Scanner}"/>
+            </ContentControl>
+            <ContentControl Visibility="{Binding Settings.ShowScannerCapabilities, Converter={StaticResource BoolToVis}}">
+                <local:ScannerCapabilitiesSettingsView DataContext="{Binding Settings.ScannerCapabilities}"/>
             </ContentControl>
         </Grid>
     </Grid>

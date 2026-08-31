@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Reflection;
 using NTwain;
 using NTwain.Data;
+using OmniCard.Scanner;
 
 namespace OmniCard.ScannerHost;
 
@@ -17,11 +19,17 @@ static class Program
         int dpi = 200;
         bool showUI = false;
         bool foil = false;
+        float foilBrightness = ScanSettings.DefaultFoilBrightness;
+        float foilContrast = ScanSettings.DefaultFoilContrast;
+        string? settingsPath = null;
 
         for (int i = 0; i < args.Length; i++)
         {
             switch (args[i])
             {
+                case "--settings" when i + 1 < args.Length:
+                    settingsPath = args[++i];
+                    break;
                 case "--scanner" when i + 1 < args.Length:
                     scannerName = args[++i];
                     break;
@@ -36,6 +44,12 @@ static class Program
                     break;
                 case "--foil":
                     foil = true;
+                    break;
+                case "--foil-brightness" when i + 1 < args.Length:
+                    float.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out foilBrightness);
+                    break;
+                case "--foil-contrast" when i + 1 < args.Length:
+                    float.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out foilContrast);
                     break;
             }
         }
@@ -77,7 +91,30 @@ static class Program
             }
 
             source.Open();
-            ApplySettings(source, dpi, foil);
+            // Same shared applier the in-process ScannerService uses, so both paths configure
+            // the scanner identically. dpi of 0 => native default (resolved inside the applier).
+            var settings = new ScanSettings(dpi, foil, foilBrightness, foilContrast);
+            ScanSettingsApplier.Apply(
+                source.Capabilities,
+                settings,
+                onDebug: msg => Console.Error.WriteLine(msg));
+
+            // Layer the scanner's saved capability profile on top of the baseline (same as the
+            // in-process path). The profile is a self-contained JSON file written by the app.
+            if (settingsPath is not null)
+            {
+                try
+                {
+                    var profile = System.Text.Json.JsonSerializer.Deserialize<OmniCard.Models.ScannerProfile>(
+                        File.ReadAllText(settingsPath));
+                    if (profile is not null)
+                        CapabilityProfileApplier.Apply(source, profile.Capabilities, msg => Console.Error.WriteLine(msg));
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Could not apply scanner profile: {ex.Message}");
+                }
+            }
 
             // Create a hidden form to provide a proper window handle and
             // message pump for the TWAIN driver. Some drivers (e.g., Canon RS40)
@@ -131,42 +168,4 @@ static class Program
         }
     }
 
-    private static void ApplySettings(DataSource ds, int dpi, bool foil)
-    {
-        var caps = ds.Capabilities;
-
-        // Pixel type: RGB
-        try { if (caps.ICapPixelType.CanSet) caps.ICapPixelType.SetValue(PixelType.RGB); }
-        catch { }
-
-        // ICC profile: Embed
-        try { if (caps.ICapICCProfile.CanSet) caps.ICapICCProfile.SetValue(IccProfile.Embed); }
-        catch { }
-
-        // Duplex: off
-        try { if (caps.CapDuplexEnabled.CanSet) caps.CapDuplexEnabled.SetValue(BoolType.False); }
-        catch { }
-
-        // Resolution
-        try { if (caps.ICapXResolution.CanSet) caps.ICapXResolution.SetValue((TWFix32)(float)dpi); }
-        catch { }
-        try { if (caps.ICapYResolution.CanSet) caps.ICapYResolution.SetValue((TWFix32)(float)dpi); }
-        catch { }
-
-        // Reset image processing
-        try { if (caps.ICapAutoBright.CanReset) caps.ICapAutoBright.Reset(); } catch { }
-        try { if (caps.ICapBrightness.CanReset) caps.ICapBrightness.Reset(); } catch { }
-        try { if (caps.ICapContrast.CanReset) caps.ICapContrast.Reset(); } catch { }
-        try { if (caps.ICapGamma.CanReset) caps.ICapGamma.Reset(); } catch { }
-        try { if (caps.ICapHighlight.CanReset) caps.ICapHighlight.Reset(); } catch { }
-        try { if (caps.ICapShadow.CanReset) caps.ICapShadow.Reset(); } catch { }
-
-        // Foil adjustments
-        if (foil)
-        {
-            try { if (caps.ICapAutoBright.CanSet) caps.ICapAutoBright.SetValue(BoolType.False); } catch { }
-            try { if (caps.ICapBrightness.CanSet) caps.ICapBrightness.SetValue((TWFix32)(-200f)); } catch { }
-            try { if (caps.ICapContrast.CanSet) caps.ICapContrast.SetValue((TWFix32)333.3333f); } catch { }
-        }
-    }
 }

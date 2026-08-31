@@ -14,4 +14,14 @@
   <ItemGroup>
     <PackageReference Include="NTwain" Version="3.7.6" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Compile the shared scan-tuning logic directly into the host so it stays dependency-light
+         (a ProjectReference to OmniCard.Scanner would drag in OmniCard.Data -> EF Core). These
+         files depend only on NTwain, which the host already references. -->
+    <Compile Include="..\OmniCard.Scanner\ScanSettings.cs" Link="Shared\ScanSettings.cs" />
+    <Compile Include="..\OmniCard.Scanner\ScanSettingsApplier.cs" Link="Shared\ScanSettingsApplier.cs" />
+    <Compile Include="..\OmniCard.Scanner\CapabilityProfileApplier.cs" Link="Shared\CapabilityProfileApplier.cs" />
+    <Compile Include="..\OmniCard.Shared\Models\ScannerCapabilitySetting.cs" Link="Shared\ScannerCapabilitySetting.cs" />
+    <Compile Include="..\OmniCard.Shared\Models\ScannerProfile.cs" Link="Shared\ScannerProfile.cs" />
+  </ItemGroup>
 </Project>
