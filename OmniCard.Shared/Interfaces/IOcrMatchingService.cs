@@ -13,5 +13,9 @@ public interface IOcrMatchingService
     Task<(string? CollectorNumber, double Confidence)> DetectRiftboundCollectorNumberAsync(byte[] imageData);
     /// <summary>OCR a collector number using a per-game crop/regex spec (Pokémon, Yu-Gi-Oh!, FFTCG).</summary>
     Task<(string? CollectorNumber, double Confidence)> DetectCollectorNumberAsync(byte[] imageData, OcrCollectorSpec spec);
+    /// <summary>OCR the modern MTG bottom-left corner, returning the set code (e.g. "MKC") and collector
+    /// number (e.g. "66"). Both are needed to identify a printing; either being null means the read
+    /// isn't usable for a ground-truth lookup (e.g. pre-2015 cards that print neither).</summary>
+    Task<(string? SetCode, string? CollectorNumber, double Confidence)> DetectMtgSetAndNumberAsync(byte[] imageData);
     Dictionary<string, ulong> SymbolHashes { get; set; }
 }

@@ -12,11 +12,46 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="1*"/>
         </Grid.RowDefinitions>
 
-        <!-- Audit mode banner -->
+        <!-- Scan session bar: New / Open / Save / Save As / Close + session status.
+             A session is required before any scanning; hidden in audit mode (its own flow). -->
         <Border Grid.Row="0"
+                Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                BorderBrush="{DynamicResource MaterialDesign.Brush.TextBox.HoverBackground}"
+                BorderThickness="0,0,0,1"
+                Padding="8,4"
+                Visibility="{Binding ViewModel.IsAuditMode, Converter={conv:InverseBoolToVisibilityConverter}}">
+            <DockPanel>
+                <Button DockPanel.Dock="Left" Content="New Scan Session"
+                        Command="{Binding ViewModel.NewScanSessionCommand}"
+                        Style="{StaticResource MaterialDesignFlatSecondaryButton}"
+                        Margin="0,0,6,0"/>
+                <Button DockPanel.Dock="Left" Content="Open..."
+                        ToolTip="Open a saved scan session (.ocss)"
+                        Command="{Binding ViewModel.OpenScanSessionCommand}"
+                        Margin="0,0,6,0"/>
+                <Button DockPanel.Dock="Left" Content="Save"
+                        Command="{Binding ViewModel.SaveScanSessionCommand}"
+                        Margin="0,0,6,0"/>
+                <Button DockPanel.Dock="Left" Content="Save As..."
+                        Command="{Binding ViewModel.SaveScanSessionAsCommand}"
+                        Margin="0,0,6,0"/>
+                <Button DockPanel.Dock="Left" Content="Close"
+                        Command="{Binding ViewModel.CloseScanSessionCommand}"
+                        Margin="0,0,12,0"/>
+                <TextBlock Text="{Binding ViewModel.SessionStatusText}"
+                           VerticalAlignment="Center"
+                           FontStyle="Italic"
+                           TextTrimming="CharacterEllipsis"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Audit mode banner -->
+        <Border Grid.Row="1"
                 Background="#FF1565C0"
                 Padding="12,8"
                 Visibility="{Binding ViewModel.IsAuditMode, Converter={StaticResource BoolToVis}}">
@@ -33,7 +68,8 @@
             </DockPanel>
         </Border>
 
-        <ToolBarPanel Grid.Row="1">
+        <ToolBarPanel Grid.Row="2"
+                      IsEnabled="{Binding ViewModel.ScanControlsEnabled}">
             <ToolBarTray>
                 <ToolBar>
                     <TextBlock Text="Only match from set(s):"
@@ -275,7 +311,8 @@
             </ToolBarTray>
         </ToolBarPanel>
 
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="3"
+              IsEnabled="{Binding ViewModel.ScanControlsEnabled}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="ScannerListColumn"
                                   Width=".35*"/>
@@ -827,8 +864,49 @@
                                           Grid.Column="2"/>
         </Grid>
 
+        <!-- No-session overlay: blocks the scan toolbar + queue (below the session bar) until a
+             session is active. Hidden in audit mode. Sits under the game overlay (ZIndex 100) so a
+             "select a game" prompt still wins when no game is chosen. -->
+        <Border Grid.Row="1" Grid.RowSpan="3"
+                Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
+                Panel.ZIndex="90">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding ViewModel.HasActiveSession}" Value="False"/>
+                                <Condition Binding="{Binding ViewModel.IsAuditMode}" Value="False"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="&#xE8F1;" FontFamily="Segoe MDL2 Assets" FontSize="40"
+                           HorizontalAlignment="Center" Opacity="0.5"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                <TextBlock Text="No scan session is active."
+                           Margin="0,12,0,4" FontSize="16" HorizontalAlignment="Center"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                <TextBlock Text="Start a new session to begin scanning, or open a saved one."
+                           Margin="0,0,0,12" FontSize="12" HorizontalAlignment="Center"
+                           Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button Content="New Scan Session"
+                            Command="{Binding ViewModel.NewScanSessionCommand}"
+                            Style="{StaticResource MaterialDesignRaisedButton}"
+                            Margin="0,0,8,0"/>
+                    <Button Content="Open Session..."
+                            Command="{Binding ViewModel.OpenScanSessionCommand}"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
         <!-- Disabled-scanner placeholder: shown when no specific game is selected ("All Games"). -->
-        <Border Grid.RowSpan="3"
+        <Border Grid.RowSpan="4"
                 Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
                 Visibility="{Binding ViewModel.IsScannerEnabled, Converter={conv:InverseBoolToVisibilityConverter}}"
                 Panel.ZIndex="100">

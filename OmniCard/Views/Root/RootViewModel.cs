@@ -52,6 +52,7 @@ public sealed partial class RootViewModel(
     IPriceSheetPdfExporter priceSheetPdfExporter,
     ISealedPriceUpdateService sealedPriceUpdateService,
     ITagService tagService,
+    IScanSessionService scanSessionService,
     ILogger<RootViewModel> logger) : ViewModel
 {
     private readonly ILogger<RootViewModel> _logger = logger;
@@ -1413,7 +1414,12 @@ public sealed partial class RootViewModel(
         // Keep HasMatchedScans in sync with the ScannedCards collection
         if (_scannedCardsHandler is not null)
             CardService.ScannedCards.CollectionChanged -= _scannedCardsHandler;
-        _scannedCardsHandler = (_, _) => OnPropertyChanged(nameof(HasMatchedScans));
+        _scannedCardsHandler = (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasMatchedScans));
+            // A scan added/removed/cleared is a session change worth persisting (crash recovery).
+            OnScanSessionMutated();
+        };
         CardService.ScannedCards.CollectionChanged += _scannedCardsHandler;
 
         LoadAvailableSets();
@@ -1464,6 +1470,7 @@ public sealed partial class RootViewModel(
     public async Task Scan()
     {
         if (IsAuditComplete) return;
+        if (!IsAuditMode && !HasActiveSession) { PromptStartSession(); return; }
         if (ConnectToScanner(false) ?? false)
         {
             _logger.LogInformation("User initiated scan");
@@ -1479,6 +1486,7 @@ public sealed partial class RootViewModel(
     [RelayCommand]
     public void ImportFromFolder()
     {
+        if (!IsAuditMode && !HasActiveSession) { PromptStartSession(); return; }
         var dlg = new Microsoft.Win32.OpenFolderDialog
         {
             Title = "Select Folder with Scanned Card Images"
@@ -2078,6 +2086,11 @@ public sealed partial class RootViewModel(
 
             _ = Collection.SearchCollection();
             InvalidateHomeTab();
+
+            // The data is safely committed: close the current session and open a fresh empty one so
+            // scanning can continue immediately (see the scan-session workflow).
+            OnScansCommitted();
+
             Message = $"Committed {count} cards to collection.";
         }
         catch (Exception ex)

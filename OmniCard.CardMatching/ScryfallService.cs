@@ -103,6 +103,31 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
     {
         _logger.LogDebug("Finding closest match for pHash {Hash:X16} (set filter: {SetFilter}, max distance: {MaxDistance})", imageHash, setFilter is not null ? string.Join(",", setFilter) : "none", maxDistance);
 
+        // Phase 0: OCR ground-truth lookup. For MTG the (set code, collector number) pair uniquely
+        // identifies a printing, so a confident OCR read of both is authoritative and used ahead of —
+        // and in preference to — perceptual-hash matching (see CardService's MTG scan branch). Only
+        // when the pair doesn't resolve to a catalog card do we fall through to pHash below.
+        if (ocrResult?.SetCode is not null && ocrResult.CollectorNumber is not null
+            && ocrResult.CollectorNumberConfidence >= 0.5)
+        {
+            var groundTruth = LookupBySetAndNumber(ocrResult.SetCode, ocrResult.CollectorNumber, imageHash, setFilter);
+            if (groundTruth is not null)
+            {
+                _logger.LogInformation("MTG matched by OCR set+collector: {Set} #{Number} → \"{Name}\"",
+                    ocrResult.SetCode, ocrResult.CollectorNumber, groundTruth.Name);
+                _lastMatchDiagnostics = new MatchDiagnostics
+                {
+                    SetFilterActive = setFilter is not null,
+                    ActiveSets = setFilter?.ToList(),
+                    PreferredSets = preferredSets?.ToList(),
+                    DecisionPhase = "OcrSetCollector",
+                };
+                return groundTruth;
+            }
+            _logger.LogDebug("MTG OCR set+collector {Set} #{Number} did not resolve to a catalog card — falling back to pHash",
+                ocrResult.SetCode, ocrResult.CollectorNumber);
+        }
+
         // Load caches
         if (_hashCache is null)
         {
@@ -741,6 +766,57 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
     {
         using var ctx = _dbContextFactory.CreateDbContext();
         return ctx.Cards.AsNoTracking().Where(c => c.Id == cardId).Select(c => c.Name).FirstOrDefault();
+    }
+
+    // Direct (set code, collector number) lookup — the MTG ground-truth path from OCR. Set codes are
+    // matched case-insensitively (the catalog stores them lower-case); the collector number is compared
+    // with leading zeros stripped on both sides so an OCR'd "0066" matches a stored "66". In the rare
+    // case more than one row shares the pair, the closest pHash wins.
+    private CardMatch? LookupBySetAndNumber(string setCode, string collectorNumber, ulong imageHash, IReadOnlySet<string>? setFilter)
+    {
+        var setUpper = setCode.Trim().ToUpperInvariant();
+        var num = NormalizeCollectorNumber(collectorNumber);
+        if (setUpper.Length == 0 || num.Length == 0) return null;
+
+        var candidates = _readContext.Cards.AsNoTracking()
+            .Where(c => c.SetCode.ToUpper() == setUpper)
+            .AsEnumerable()
+            .Where(c => NormalizeCollectorNumber(c.CollectorNumber) == num)
+            .ToList();
+
+        // Honour an active set filter against the card's real set code (filter holds catalog casing).
+        if (setFilter is not null)
+            candidates = candidates.Where(c => setFilter.Contains(c.SetCode)).ToList();
+
+        if (candidates.Count == 0) return null;
+
+        var best = candidates.Count == 1
+            ? candidates[0]
+            : (candidates.Where(c => c.ImageHash != null)
+                  .OrderBy(c => PerceptualHashService.HammingDistance(imageHash, c.ImageHash!.Value))
+                  .FirstOrDefault() ?? candidates[0]);
+
+        return new CardMatch
+        {
+            Name = best.Name,
+            SetCode = best.SetCode,
+            SetName = best.SetName,
+            CollectorNumber = best.CollectorNumber,
+            Rarity = best.Rarity,
+            ImageUri = best.ImageUris?.Normal ?? best.ImageUris?.Small,
+            GameSpecificId = best.Id.ToString(),
+            LocalImagePath = best.LocalImagePath,
+            Confidence = 100,
+            Source = best,
+        };
+    }
+
+    // Collector-number normalization for equality: trim, upper-case, strip leading zeros ("0066" → "66").
+    // A number that is all zeros collapses to "0".
+    private static string NormalizeCollectorNumber(string? cn)
+    {
+        var t = (cn ?? "").Trim().ToUpperInvariant().TrimStart('0');
+        return t.Length == 0 && !string.IsNullOrEmpty(cn?.Trim()) ? "0" : t;
     }
 
     private CardMatch? LookupCard(Guid cardId, double? confidence = null)

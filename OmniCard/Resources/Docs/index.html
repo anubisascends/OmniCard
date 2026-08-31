@@ -203,6 +203,26 @@
       to a trade (<em>right-click ▸ Link to Trade</em>) before committing.</div>
     </section>
 
+    <section id="scan-sessions" data-group="Scanning &amp; Matching">
+      <h2>Scan Sessions</h2>
+      <p>A big scanning batch doesn't have to be finished in one sitting. Scanning happens inside a <strong>scan session</strong>
+      you can save to a file and reopen later, exactly where you left off.</p>
+      <p>The scan tab is disabled until a session is active. Click <strong>New Scan Session</strong> in the session bar (top of
+      the Scanner tab) to begin; every card you scan is added to that session. When you're ready to stop, <strong>Save</strong>
+      (or <strong>Save As…</strong>) writes the whole session — scan images and all your edits (matches, condition, foil, tags,
+      location overrides, flags) — to a single <code>.ocss</code> file. Later, <strong>Open…</strong> restores it and you continue.</p>
+      <ul>
+        <li><strong>One session at a time.</strong> Starting a new session, opening another, or exiting the app while the current
+        session has unsaved changes prompts you to save first.</li>
+        <li><strong>Commit closes the session.</strong> When you <em>Commit Scans to Collection</em>, the cards are written to your
+        collection and — once they're safely saved — the session is closed and a fresh empty one is started automatically, ready
+        for the next batch.</li>
+        <li><strong>Crash recovery.</strong> The active session is auto-saved in the background. If the app closes unexpectedly,
+        the next launch offers to restore the unsaved session so nothing is lost.</li>
+      </ul>
+      <div class="callout note">Audit mode has its own workflow and doesn't require a scan session.</div>
+    </section>
+
     <section id="scanner-capabilities" data-group="Scanning &amp; Matching">
       <h2>Scanner Capabilities</h2>
       <p>Every scanner exposes a different set of TWAIN settings. Rather than hard-code a few, OmniCard can
@@ -267,12 +287,18 @@
       </ul>
       <p>The higher the combined score, the more confident the match. Low-confidence scans are flagged so you can correct them.</p>
 
-      <h3>Set-code reading (One Piece, Riftbound, Pokémon, Yu-Gi-Oh!, Final Fantasy)</h3>
-      <p>For these games OmniCard reads the printed collector / set code first and uses it as the primary matcher, falling
+      <h3>Set-code reading (all games — OCR first)</h3>
+      <p>OmniCard reads the printed collector / set code first and uses it as the primary matcher, falling
       back to perceptual hashing only when the code can't be read. <strong>Final Fantasy TCG</strong> cards print their code
       centered along the bottom credit line as <code>opus-number-rarity</code> (for example <code>29-048C</code> = set 29,
       card 48, Common; rarities are C, R, H, L, and P for premium/foil). Reprints that share art across sets still resolve to
       the correct printing this way.</p>
+      <p><strong>Magic: The Gathering</strong> — modern cards (2015 frame onward) print the set code and collector number in the
+      bottom-left corner (for example <code>MKC</code> and <code>0066</code>). Because that pair uniquely identifies a Scryfall
+      printing, OmniCard reads it and treats it as ground truth: a clean read is used as the match even over a confident art
+      match, which fixes the common case of two printings that share the same artwork. Cards where the corner can't be read —
+      older frames that never printed a collector number, or heavy foil glare — fall back to perceptual-hash matching
+      automatically.</p>
       <p><strong>Newly released sets:</strong> a scan can only match a card the local catalog knows about. When a brand-new set
       appears, refresh that game's card data so its singles are downloaded; until then, cards from that set fall back to hash
       matching and may be flagged for correction. (A set the vendor hasn't published as individual cards yet — only sealed

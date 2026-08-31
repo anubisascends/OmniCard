@@ -361,9 +361,37 @@ public sealed class CardService : ICardService
                     }
                     else
                     {
-                        // MTG: name recognition + symbol detection
-                        ocrResult = await _ocrService.AnalyzeCardAsync(rawBytes);
-                        if (ocrResult?.RecognizedName is not null)
+                        // MTG: OCR-first. The (set code, collector number) printed in the bottom-left
+                        // corner uniquely identifies a Scryfall printing, so try it as ground truth
+                        // before anything else — it is authoritative and overrides even a confident
+                        // pHash guess (see ScryfallService Phase 0). Only when it doesn't resolve do we
+                        // fall back to name + set-symbol OCR (which merely nudges the pHash match).
+                        bool groundTruthResolved = false;
+                        var (ocrSet, ocrNumber, setNumConf) = await _ocrService.DetectMtgSetAndNumberAsync(rawBytes);
+                        if (ocrSet is not null && ocrNumber is not null && setNumConf >= 0.5)
+                        {
+                            var gtResult = new OcrMatchResult
+                            {
+                                SetCode = ocrSet,
+                                CollectorNumber = ocrNumber,
+                                CollectorNumberConfidence = setNumConf,
+                            };
+                            _logger.LogInformation("MTG set/collector detected: {Set} #{Number} (confidence {Conf:F2})", ocrSet, ocrNumber, setNumConf);
+                            var (gtMatch, gtGame) = FindBestMatch(capturedHash, scannedCard.ArtHashes, gtResult, capturedSetFilter, null, scannedCard.ScanEdgeHash);
+                            if (gtMatch is not null)
+                            {
+                                ocrResult = gtResult;
+                                scannedCard.Match = gtMatch;
+                                scannedCard.Game = gtGame;
+                                scannedCard.FlagReason = FlagReason.None;
+                                groundTruthResolved = true;
+                                _logger.LogInformation("MTG OCR (ground truth) matched to \"{CardName}\" ({SetCode} #{Number})", gtMatch.Name, gtMatch.SetCode, gtMatch.CollectorNumber);
+                            }
+                        }
+
+                        // Fallback: name recognition + symbol detection (pHash stays primary here).
+                        ocrResult = groundTruthResolved ? ocrResult : await _ocrService.AnalyzeCardAsync(rawBytes);
+                        if (!groundTruthResolved && ocrResult?.RecognizedName is not null)
                         {
                             _logger.LogInformation("OCR recognized: \"{Name}\" (confidence: {Conf:F2})", ocrResult.RecognizedName, ocrResult.NameConfidence);
 
