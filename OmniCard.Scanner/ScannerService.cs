@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.Logging;
 using NTwain;
@@ -23,9 +24,14 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
     public ScanQuality ScanQuality { get; set; } = ScanQuality.Fast;
     public IntPtr WindowHandle { get; set; }
 
-    public ScannerService(ICardService cardService, ILogger<ScannerService> logger)
+    // Per-scanner tuning (DPI, foil brightness/contrast) and arbitrary user-set capabilities now
+    // come from the active scanner's saved profile; see BuildScanSettings/ApplyProfileCapabilities.
+    private readonly IScannerProfileService _profileService;
+
+    public ScannerService(ICardService cardService, IScannerProfileService profileService, ILogger<ScannerService> logger)
     {
         _logger = logger;
+        _profileService = profileService;
 
         _logger.LogInformation("Initializing TWAIN session");
 
@@ -105,6 +111,7 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
     {
         LogCapabilities(DataSource);
         ApplyScanSettings(DataSource);
+        ApplyProfileCapabilities(DataSource);
         _logger.LogInformation("Starting in-process scan on {DataSourceName} (quality={Quality})",
             DataSource.Name, ScanQuality);
 
@@ -130,10 +137,35 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         }
 
         var outputPath = Path.Combine(Path.GetTempPath(), $"omnicard_scan_{Guid.NewGuid()}.bmp");
-        var dpi = ScanQuality == ScanQuality.Fast ? 200 : 300;
+        var settings = BuildScanSettings();
 
-        var args = $"--scanner \"{DataSource.Name}\" --output \"{outputPath}\" --dpi {dpi} --show-ui";
-        if (CardService.DefaultIsFoil) args += " --foil";
+        // Pass the resolved settings so the out-of-process host applies exactly what the
+        // in-process path would (same DPI/foil tuning via the shared ScanSettingsApplier).
+        // InvariantCulture so the host parses floats identically regardless of locale.
+        var args = $"--scanner \"{DataSource.Name}\" --output \"{outputPath}\" --dpi {settings.Dpi} --show-ui";
+        if (settings.Foil)
+            args += $" --foil --foil-brightness {settings.FoilBrightness.ToString(CultureInfo.InvariantCulture)}" +
+                    $" --foil-contrast {settings.FoilContrast.ToString(CultureInfo.InvariantCulture)}";
+
+        // Hand the host the active scanner profile (its user-set capability layer) via a temp file,
+        // so the out-of-process path applies the same caps the in-process path does. Written only
+        // when there are caps to apply; cleaned up in the finally below.
+        string? settingsPath = null;
+        var activeProfile = GetActiveProfile();
+        if (activeProfile is { Capabilities.Count: > 0 })
+        {
+            try
+            {
+                settingsPath = Path.Combine(Path.GetTempPath(), $"omnicard_profile_{Guid.NewGuid()}.json");
+                File.WriteAllText(settingsPath, System.Text.Json.JsonSerializer.Serialize(activeProfile));
+                args += $" --settings \"{settingsPath}\"";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not write scanner profile for host; scanning without the capability layer");
+                settingsPath = null;
+            }
+        }
 
         _logger.LogInformation("Launching scanner host: {Args}", args);
 
@@ -211,6 +243,9 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         finally
         {
             try { if (File.Exists(outputPath)) File.Delete(outputPath); }
+            catch { }
+
+            try { if (settingsPath is not null && File.Exists(settingsPath)) File.Delete(settingsPath); }
             catch { }
 
             // Reopen session and data source for future scans / discovery
@@ -325,132 +360,53 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
 
     private void ApplyScanSettings(DataSource ds)
     {
-        var caps = ds.Capabilities;
+        var settings = BuildScanSettings();
+        ScanSettingsApplier.Apply(
+            ds.Capabilities,
+            settings,
+            onInfo: msg => _logger.LogInformation("{ScanSetting}", msg),
+            onDebug: msg => _logger.LogDebug("{ScanSetting}", msg));
+    }
 
-        TrySetPixelType(caps);
-        TrySetColorProfile(caps);
-        TryDisableDuplex(caps);
-        TryResetImageProcessing(caps);
-        TrySetXferCount(caps, -1);
-        TryEnableAutoScan(caps);
+    /// <summary>Layer the active scanner profile's user-set capabilities on top of the baseline
+    /// (applied after <see cref="ApplyScanSettings"/>). No-op when there's no profile / no caps.</summary>
+    private void ApplyProfileCapabilities(DataSource ds)
+    {
+        var profile = GetActiveProfile();
+        if (profile is null || profile.Capabilities.Count == 0) return;
 
-        if (ScanQuality == ScanQuality.Fast)
+        CapabilityProfileApplier.Apply(
+            ds,
+            profile.Capabilities,
+            onDebug: msg => _logger.LogDebug("{CapSetting}", msg));
+    }
+
+    /// <summary>Resolve the current quality choice + the active scanner profile's tuning into the
+    /// shared <see cref="ScanSettings"/>. Null profile values fall back to the shared defaults;
+    /// a HighQualityDpi of 0 means "use the source's native default resolution".</summary>
+    private ScanSettings BuildScanSettings()
+    {
+        var p = GetActiveProfile();
+        return ScanSettings.Resolve(
+            ScanQuality,
+            CardService.DefaultIsFoil,
+            p?.FastDpi ?? ScanSettings.DefaultFastDpi,
+            p?.HighQualityDpi ?? ScanSettings.DefaultHighQualityDpi,
+            (float)(p?.FoilBrightness ?? ScanSettings.DefaultFoilBrightness),
+            (float)(p?.FoilContrast ?? ScanSettings.DefaultFoilContrast));
+    }
+
+    /// <summary>Load the saved profile for the connected source (null when nothing is connected
+    /// or the profile can't be read — scanning then uses OmniCard's defaults).</summary>
+    private ScannerProfile? GetActiveProfile()
+    {
+        if (DataSource is null) return null;
+        try { return _profileService.GetProfile(DataSource.Name); }
+        catch (Exception ex)
         {
-            TrySetResolution(caps, 200f);
+            _logger.LogDebug(ex, "Could not load scanner profile for {Name}", DataSource.Name);
+            return null;
         }
-        else
-        {
-            TrySetResolution(caps, caps.ICapXNativeResolution.GetDefault().Whole);
-        }
-
-        if (CardService.DefaultIsFoil)
-        {
-            TrySetAutoBright(caps, false);
-            TrySetBrightness(caps, -200f);
-            TrySetContrast(caps, 333.3333f);
-            _logger.LogInformation("Foil mode: brightness reduced, auto-bright disabled, contrast boosted");
-        }
-    }
-
-    private void TrySetResolution(ICapabilities caps, float dpi)
-    {
-        try { if (caps.ICapXResolution.CanSet) caps.ICapXResolution.SetValue((TWFix32)dpi); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set XResolution"); }
-
-        try { if (caps.ICapYResolution.CanSet) caps.ICapYResolution.SetValue((TWFix32)dpi); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set YResolution"); }
-    }
-
-    private void TryResetResolution(ICapabilities caps)
-    {
-        try { if (caps.ICapXResolution.CanReset) caps.ICapXResolution.SetValue(caps.ICapXNativeResolution.GetDefault()); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset XResolution"); }
-
-        try { if (caps.ICapYResolution.CanReset) caps.ICapYResolution.SetValue(caps.ICapYNativeResolution.GetDefault()); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset YResolution"); }
-    }
-
-    private void TrySetBrightness(ICapabilities caps, float value)
-    {
-        try { if (caps.ICapBrightness.CanSet) caps.ICapBrightness.SetValue((TWFix32)value); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set Brightness to {Value}", value); }
-    }
-
-    private void TrySetContrast(ICapabilities caps, float value)
-    {
-        try { if (caps.ICapContrast.CanSet) caps.ICapContrast.SetValue((TWFix32)value); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set Contrast to {Value}", value); }
-    }
-
-    private void TrySetAutoBright(ICapabilities caps, bool enabled)
-    {
-        try { if (caps.ICapAutoBright.CanSet) caps.ICapAutoBright.SetValue(enabled ? BoolType.True : BoolType.False); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set AutoBright to {Enabled}", enabled); }
-    }
-
-    private void TryResetImageProcessing(ICapabilities caps)
-    {
-        try { if (caps.ICapAutoBright.CanReset) caps.ICapAutoBright.Reset(); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset AutoBright"); }
-
-        try { if (caps.ICapBrightness.CanReset) caps.ICapBrightness.Reset(); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset Brightness"); }
-
-        try { if (caps.ICapContrast.CanReset) caps.ICapContrast.Reset(); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset Contrast"); }
-
-        try { if (caps.ICapGamma.CanReset) caps.ICapGamma.Reset(); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset Gamma"); }
-
-        try { if (caps.ICapHighlight.CanReset) caps.ICapHighlight.Reset(); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset Highlight"); }
-
-        try { if (caps.ICapShadow.CanReset) caps.ICapShadow.Reset(); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot reset Shadow"); }
-    }
-
-    private void TrySetPixelType(ICapabilities caps)
-    {
-        try { if (caps.ICapPixelType.CanSet) caps.ICapPixelType.SetValue(PixelType.RGB); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set PixelType to RGB"); }
-    }
-
-    private void TrySetColorProfile(ICapabilities caps)
-    {
-        try { if (caps.ICapICCProfile.CanSet) caps.ICapICCProfile.SetValue(IccProfile.Embed); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set ICC profile"); }
-    }
-
-    private void TrySetXferCount(ICapabilities caps, int count)
-    {
-        // Pin the transfer count explicitly (-1 = unlimited) so a previous app's
-        // leftover value (e.g. a low count from a single-page job) doesn't cut the
-        // ADF batch short on this scanner.
-        try { if (caps.CapXferCount.CanSet) caps.CapXferCount.SetValue(count); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot set XferCount to {Count}", count); }
-    }
-
-    private void TryEnableAutoScan(ICapabilities caps)
-    {
-        // The RS40 is ADF-only. AutoScan=TRUE is what makes the driver keep
-        // pulling cards from the feeder automatically instead of stopping after
-        // one; pin it on each scan so a previous app leaving it off doesn't stick.
-        try { if (caps.CapAutoScan.CanSet) caps.CapAutoScan.SetValue(BoolType.True); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot enable AutoScan"); }
-    }
-
-
-    private void TryDisableDuplex(ICapabilities caps)
-    {
-        try
-        {
-            if (caps.CapDuplexEnabled.CanSet)
-            {
-                caps.CapDuplexEnabled.SetValue(BoolType.False);
-                _logger.LogInformation("Duplex scanning disabled (single-sided)");
-            }
-        }
-        catch (Exception ex) { _logger.LogDebug(ex, "Cannot disable duplex"); }
     }
 
     private void Session_SourceDisabled(object? sender, EventArgs e)

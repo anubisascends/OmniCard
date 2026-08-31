@@ -203,6 +203,40 @@
       to a trade (<em>right-click ▸ Link to Trade</em>) before committing.</div>
     </section>
 
+    <section id="scanner-capabilities" data-group="Scanning &amp; Matching">
+      <h2>Scanner Capabilities</h2>
+      <p>Every scanner exposes a different set of TWAIN settings. Rather than hard-code a few, OmniCard can
+      <strong>probe your scanner live</strong> and let you adjust whatever it reports as adjustable — saved
+      <strong>per scanner</strong> and reused on every scan (both direct and <em>Show Scanner UI</em>).</p>
+      <p>Open <em>Settings ▸ Scanner Capabilities</em>, pick your scanner, and click <strong>Test Capabilities</strong>.
+      OmniCard connects and lists everything the scanner supports, grouped by category (Image, Color, Resolution,
+      Feeder &amp; Paper, …). Each setting shows an editor matched to its type — a checkbox, a dropdown of allowed
+      values, a slider for numeric ranges, or a text box — plus a short plain-English description of what it does
+      and the scanner's current value. (Hover a setting's name to see its underlying TWAIN capability id.)</p>
+      <p>Where possible the values are spelled out for you: dropdown choices show their <strong>meaning</strong> rather
+      than a raw number (for example a color-mode value of <em>2</em> is shown as "Color (RGB)", or a units value of
+      <em>1</em> as "Centimeters"), and numeric settings show their <strong>valid range</strong> — e.g. "Valid range:
+      −1000 to 1000 (step 1)" — so you know the limits before you drag the slider.</p>
+      <ul>
+        <li><strong>OmniCard Tuning</strong> — Fast / High-Quality DPI and foil brightness/contrast live at the top of this
+        page and are saved with the scanner's profile. High-Quality DPI of <strong>0</strong> means "use the scanner's
+        native default". Foil brightness defaults negative (darker) because foil cards reflect the lamp and wash out.</li>
+        <li><strong>Vendor-specific settings (hidden by default)</strong> — many scanners expose dozens of proprietary,
+        undocumented capabilities (shown only as a number like <em>Custom 0x8001</em>). Because their meaning is defined
+        only by the manufacturer's driver and isn't published, OmniCard can't describe them and hides them by default.
+        Tick <em>Show vendor-specific (advanced) capabilities</em> to reveal them — but change them only if the
+        manufacturer's own documentation tells you what they do.</li>
+        <li><strong>Locked settings (🔒)</strong> — a few capabilities OmniCard manages itself for reliable matching
+        (color mode, transfer mechanics, document-feeder auto-scan) are shown read-only. This prevents a change from
+        silently breaking scanning or card matching.</li>
+        <li><strong>Save</strong> stores your overrides; <strong>Reset to Defaults</strong> returns everything to the
+        scanner's own defaults. Only settings you actually change are saved, so a profile stays minimal.</li>
+      </ul>
+      <div class="callout tip">Overrides are layered on top of OmniCard's safe baseline every scan. If a scanner
+      rejects a value, that one setting is skipped and the scan still runs. The quick <strong>Scan Quality</strong> and
+      <strong>Is Foil</strong> toggles remain on the scan toolbar.</div>
+    </section>
+
     <section id="foil-finishes" data-group="Scanning &amp; Matching">
       <h2>Foil Finishes</h2>
       <p>Beyond a simple foil / non-foil flag, OmniCard records <strong>which foil finish</strong> a card is — because a Rainbow Foil, a

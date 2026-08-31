@@ -14,17 +14,19 @@ public partial class SettingsViewModel(
     SalesWorkflowSettingsViewModel salesWorkflow,
     DataLocationViewModel dataLocation,
     EbaySellingSettingsViewModel ebaySelling,
-    ScannerSettingsViewModel scanner) : ObservableObject
+    ScannerSettingsViewModel scanner,
+    ScannerCapabilitiesSettingsViewModel scannerCapabilities) : ObservableObject
 {
     public SalesSettingsViewModel Sales { get; } = sales;
     public SalesWorkflowSettingsViewModel SalesWorkflow { get; } = salesWorkflow;
     public DataLocationViewModel DataLocation { get; } = dataLocation;
     public EbaySellingSettingsViewModel EbaySelling { get; } = ebaySelling;
     public ScannerSettingsViewModel Scanner { get; } = scanner;
+    public ScannerCapabilitiesSettingsViewModel ScannerCapabilities { get; } = scannerCapabilities;
 
     /// <summary>Index of the section selected in the dialog's left-hand nav
     /// (0 = Display, 1 = Data Location, 2 = Sales &amp; Receipts, 3 = Sales Workflow,
-    /// 4 = eBay Selling, 5 = Scan Workflow).</summary>
+    /// 4 = eBay Selling, 5 = Scan Workflow, 6 = Scanner Capabilities).</summary>
     [ObservableProperty]
     public partial int SelectedSectionIndex { get; set; }
 
@@ -34,6 +36,7 @@ public partial class SettingsViewModel(
     public bool ShowSalesWorkflow => SelectedSectionIndex == 3;
     public bool ShowEbaySelling => SelectedSectionIndex == 4;
     public bool ShowScanner => SelectedSectionIndex == 5;
+    public bool ShowScannerCapabilities => SelectedSectionIndex == 6;
 
     partial void OnSelectedSectionIndexChanged(int value)
     {
@@ -43,6 +46,7 @@ public partial class SettingsViewModel(
         OnPropertyChanged(nameof(ShowSalesWorkflow));
         OnPropertyChanged(nameof(ShowEbaySelling));
         OnPropertyChanged(nameof(ShowScanner));
+        OnPropertyChanged(nameof(ShowScannerCapabilities));
     }
 
     /// <summary>Loads section data. Called when the Settings dialog opens.</summary>
@@ -53,5 +57,6 @@ public partial class SettingsViewModel(
         await DataLocation.LoadAsync();
         EbaySelling.Load();
         Scanner.Load();
+        ScannerCapabilities.Load();
     }
 }
