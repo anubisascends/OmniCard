@@ -67,6 +67,22 @@ public class OcrMatchingServiceEngineTests
     }
 
     [Fact]
+    public async Task DetectMtgSetAndNumberAsync_ReadsBottomLeftBlock()
+    {
+        // Render the modern MTG two-line corner block into the real crop region and confirm the
+        // set code + collector number are read back. This is the MTG OCR-first ground-truth path.
+        var region = OcrMatchingService.MtgCollectorRegion;
+        var image = RenderCard(717, 1001, region, "66\nMKC EN", fontSize: 20);
+
+        using var service = CreateService();
+        var (setCode, collectorNumber, confidence) = await service.DetectMtgSetAndNumberAsync(image);
+
+        Assert.Equal("MKC", setCode);
+        Assert.Equal("66", collectorNumber);
+        Assert.True(confidence >= 0.5, $"confidence {confidence} should clear the downstream lookup gate");
+    }
+
+    [Fact]
     public async Task AnalyzeCardAsync_ReadsCardName()
     {
         var image = RenderCard(600, 840, OcrMatchingService.NameCropRegions[0], "Lightning Bolt", fontSize: 32);

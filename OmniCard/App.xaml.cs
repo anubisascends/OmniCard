@@ -161,6 +161,7 @@ public partial class App : Application
             services.AddSingleton<IScannerSettingsService, ScannerSettingsService>();
             services.AddSingleton<IScannerProfileService, ScannerProfileService>();
             services.AddSingleton<IScanArchiveService, ScanArchiveService>();
+            services.AddSingleton<IScanSessionService, ScanSessionService>();
             services.AddSingleton<IEbaySellingSettingsService, EbaySellingSettingsService>();
             services.AddSingleton<IListingService, ListingService>();
             services.AddSingleton<ICustomerService, CustomerService>();

@@ -71,6 +71,40 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         new(@"([A-Za-z]{2,4})\s*[•·.\-]{0,2}\s*(\d{1,3})\s*/\s*\d{1,3}",
             System.Text.RegularExpressions.RegexOptions.Compiled);
 
+    // MTG bottom-left corner (modern frame, 2015+): two small lines that read as
+    //   line 1: "{rarity} {collector}"        e.g. "R 0066"  (or older "066/281")
+    //   line 2: "{setcode} • {lang} {artist}" e.g. "MKC • EN  SVETLIN VELINOV"
+    // The (set code, collector number) pair uniquely identifies a Scryfall printing, so this is the
+    // primary MTG match signal — see CardService's MTG scan branch and ScryfallService Phase 0. The
+    // crop starts at the far left and is kept narrow so most of the artist credit on line 2 falls
+    // outside it; the multi-line block read is robust to the two lines drifting vertically card-to-card.
+    internal static readonly (double X, double Y, double W, double H) MtgCollectorRegion =
+        (0.02, 0.945, 0.34, 0.05);
+
+    // Whitelist: the codes are upper-case letters + digits; the bullet/separator and slash vary
+    // (the • often OCRs as ., *, or nothing), so allow the common separators through for the regex.
+    private const string MtgCollectorWhitelist = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/•·.*- ";
+
+    // Language codes that print after the set code on line 2. Used to anchor the set-code parse
+    // (the token immediately before the language is the set code) and to reject a language token
+    // being mistaken for a set code.
+    private static readonly HashSet<string> MtgLanguageCodes =
+        new(StringComparer.OrdinalIgnoreCase) { "EN", "DE", "FR", "IT", "ES", "PT", "JA", "JP", "KO", "RU", "ZH", "CT", "CS", "PH" };
+
+    // Matches "{setcode} {sep} {lang}" on line 2, e.g. "MKC • EN", "DMU•EN", "M21 . EN".
+    // Group 1 is the set code (3-5 alphanumerics); the separator and language anchor it. At least one
+    // separator (space and/or bullet/punctuation) is required between the set code and the language so
+    // the language can't be matched as a substring of an ordinary word (e.g. "ES" inside "RULES").
+    private static readonly System.Text.RegularExpressions.Regex MtgSetCodePattern =
+        new(@"\b([A-Z0-9]{3,5})[\s•·.*\-]+(EN|DE|FR|IT|ES|PT|JA|JP|KO|RU|ZH|CT|CS|PH)\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    // Matches the collector number: a run of 1-4 digits, optionally "{collector}/{total}".
+    // Group 1 is the collector number (the numerator).
+    private static readonly System.Text.RegularExpressions.Regex MtgCollectorNumberPattern =
+        new(@"\b(\d{1,4})\s*(?:/\s*\d{1,4})?\b",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
     public Dictionary<string, ulong> SymbolHashes { get; set; } = [];
 
     public OcrMatchingService(IPerceptualHashService hashService, ILogger<OcrMatchingService> logger)
@@ -511,6 +545,101 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         yield return RunOcr(otsu, psm, spec.Whitelist);
         using var gray = UpscaleGray(crop, CollectorBinarizeTargetWidth, 1.7f);
         yield return RunOcr(gray, psm, spec.Whitelist);
+    }
+
+    public Task<(string? SetCode, string? CollectorNumber, double Confidence)> DetectMtgSetAndNumberAsync(byte[] imageData)
+        => Task.Run(() => DetectMtgSetAndNumber(imageData));
+
+    private (string? SetCode, string? CollectorNumber, double Confidence) DetectMtgSetAndNumber(byte[] imageData)
+    {
+        if (!_ocrAvailable) return (null, null, 0);
+        try
+        {
+            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            // Only meaningful for portrait card scans; skip clearly non-card / landscape crops.
+            if (bitmap.Width > bitmap.Height) return (null, null, 0);
+
+            var rect = ToPixelRect(MtgCollectorRegion, bitmap.Width, bitmap.Height);
+            if (rect.Width < 10 || rect.Height < 5) return (null, null, 0);
+
+            // Read the two-line block. The corner text is small and low-contrast on dark borders and
+            // foils, so try passes in order of cheap-to-aggressive and stop at the first that yields
+            // both a set code and a collector number: plain crop → Otsu binarization → high-contrast
+            // grayscale upscale (each wins on different finishes; the gray pass rescues foil glare that
+            // the binarization crushes).
+            using var crop = bitmap.Clone(rect, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+
+            IEnumerable<(string Text, double Confidence)> Passes()
+            {
+                yield return OcrCroppedRegion(bitmap, rect, PageSegMode.SingleBlock, MtgCollectorWhitelist);
+                using var otsu = BinarizeOtsu(crop, CollectorBinarizeTargetWidth);
+                yield return RunOcr(otsu, PageSegMode.SingleBlock, MtgCollectorWhitelist);
+                using var gray = UpscaleGray(crop, CollectorBinarizeTargetWidth, 1.7f);
+                yield return RunOcr(gray, PageSegMode.SingleBlock, MtgCollectorWhitelist);
+            }
+
+            foreach (var (text, confidence) in Passes())
+            {
+                if (string.IsNullOrWhiteSpace(text)) continue;
+                if (TryExtractMtgSetAndNumber(text, out var setCode, out var number))
+                {
+                    // Floor the reported confidence: the real gate is the exact (set, collector) DB
+                    // lookup downstream, which either resolves to one printing or it doesn't.
+                    var reported = Math.Max(0.9, confidence);
+                    _logger.LogInformation("MTG set/number detected: {Set} #{Number} (raw: {Raw}, ocrConf: {Conf:F2})",
+                        setCode, number, text.Replace("\n", " ").Trim(), confidence);
+                    return (setCode, number, reported);
+                }
+            }
+
+            _logger.LogDebug("MTG set/number OCR found no usable (set, collector) pair");
+            return (null, null, 0);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "MTG set/number detection failed");
+            return (null, null, 0);
+        }
+    }
+
+    // Parses the modern MTG bottom-left block into (set code, collector number). Both must be found
+    // for a usable result. Exposed internal for the OCR tuning tests.
+    internal static bool TryExtractMtgSetAndNumber(string ocrText, out string? setCode, out string? collectorNumber)
+    {
+        setCode = null;
+        collectorNumber = null;
+        if (string.IsNullOrWhiteSpace(ocrText)) return false;
+
+        var upper = ocrText.ToUpperInvariant();
+
+        // Set code: the alphanumeric token immediately before the "• EN" language marker on line 2.
+        var setMatch = MtgSetCodePattern.Match(upper);
+        if (setMatch.Success)
+        {
+            var candidate = setMatch.Groups[1].Value;
+            // A language code can't be a set code (guards "EN • EN"-style misreads); a valid set code
+            // carries at least one letter (pure-digit tokens are the collector/total, not a set).
+            if (!MtgLanguageCodes.Contains(candidate) && candidate.Any(char.IsLetter))
+                setCode = candidate;
+        }
+
+        // Collector number: the first digit run (line 1), leading zeros stripped to match how Scryfall
+        // stores it ("0066" → "66"). Guard against picking up a stray year like "2024" from the
+        // copyright line by preferring a run that isn't a plausible 4-digit year when a shorter one exists.
+        var numbers = MtgCollectorNumberPattern.Matches(upper)
+            .Select(m => m.Groups[1].Value)
+            .ToList();
+        if (numbers.Count > 0)
+        {
+            // Drop 4-digit tokens in the 1990-2099 year range if any other number is present (the
+            // copyright year prints on the same corner block on some frames).
+            var nonYear = numbers.Where(n => !(n.Length == 4 && int.TryParse(n, out var y) && y is >= 1990 and <= 2099)).ToList();
+            var chosen = (nonYear.Count > 0 ? nonYear : numbers)[0];
+            var normalized = chosen.TrimStart('0');
+            collectorNumber = normalized.Length == 0 ? "0" : normalized;
+        }
+
+        return setCode is not null && collectorNumber is not null;
     }
 
     // Best code-like token from noisy OCR text: split on non-code characters, then take the run

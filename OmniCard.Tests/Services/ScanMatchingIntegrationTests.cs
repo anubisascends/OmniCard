@@ -69,6 +69,49 @@ public class ScanMatchingIntegrationTests : IDisposable
         try { File.Delete(_tempDbPath); } catch { /* best effort */ }
     }
 
+    [Fact]
+    public void FindClosestMatch_OcrSetAndNumber_ReturnsExactPrinting_OverridingPHash()
+    {
+        // Pick a real card from the test catalog.
+        using var ctx = _dbFactory.CreateDbContext();
+        var card = ctx.Cards.AsNoTracking().First(c => c.ImageHash != null);
+
+        // OCR ground truth: this card's set + collector (with a leading zero, as the OCR reads it),
+        // paired with a deliberately wrong pHash of 0 that would never match this card by distance.
+        // Phase 0 must return the exact printing anyway — proving OCR wins over perceptual hashing.
+        var ocr = new OcrMatchResult
+        {
+            SetCode = card.SetCode.ToUpperInvariant(),
+            CollectorNumber = "0" + card.CollectorNumber,
+            CollectorNumberConfidence = 0.9,
+        };
+
+        var match = _scryfallService.FindClosestMatch(0UL, ocrResult: ocr);
+
+        Assert.NotNull(match);
+        Assert.Equal(card.SetCode, match!.SetCode);
+        Assert.Equal(card.CollectorNumber, match.CollectorNumber);
+        Assert.Equal(100, match.Confidence);
+        Assert.Equal("OcrSetCollector", _scryfallService.LastMatchDiagnostics?.DecisionPhase);
+    }
+
+    [Fact]
+    public void FindClosestMatch_OcrSetAndNumber_UnknownPair_FallsBackToPHash()
+    {
+        // A set/collector that resolves to no catalog card must not short-circuit — the method
+        // falls through to perceptual-hash matching (DecisionPhase is anything but the OCR phase).
+        var ocr = new OcrMatchResult
+        {
+            SetCode = "ZZZ",
+            CollectorNumber = "9999",
+            CollectorNumberConfidence = 0.9,
+        };
+
+        _scryfallService.FindClosestMatch(0UL, ocrResult: ocr);
+
+        Assert.NotEqual("OcrSetCollector", _scryfallService.LastMatchDiagnostics?.DecisionPhase);
+    }
+
     /// <summary>
     /// Known pipeline limitations — scans that exceed the Hamming distance threshold.
     /// Key: (setCode lowercase, collectorNumber)

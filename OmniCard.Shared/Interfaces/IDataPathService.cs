@@ -13,6 +13,10 @@ public interface IDataPathService
     string ArtCacheDirectory => Path.Combine(DataDirectory, "art_cache");
     string LogsDirectory { get; }
     string TradesDirectory { get; }
+    // Default location for saved scan-session files, and the crash-recovery autosave path. Default-
+    // implemented so existing implementers (incl. test stubs) don't have to change.
+    string SessionsDirectory => Path.Combine(DataDirectory, "sessions");
+    string ScanSessionRecoveryPath => Path.Combine(DataDirectory, "scan-session.recovery.ocss");
 
     string? PendingDataDirectory { get; }
     bool IsMigrationPending { get; }

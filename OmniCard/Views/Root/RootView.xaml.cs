@@ -102,6 +102,11 @@ public partial class RootView : IView<RootViewModel>, IHostedService
         // triggered by InvalidateHomeTab() inside Initialize().
         ViewModel.Dashboard.Load();
 
+        // After the window is up, offer to restore an unsaved scan session from a previous run.
+        Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Loaded,
+            new Action(() => _ = ViewModel.CheckScanSessionRecoveryAsync()));
+
         _logger.LogInformation("Application initialized and ready");
         return Task.CompletedTask;
     }
@@ -142,11 +147,26 @@ public partial class RootView : IView<RootViewModel>, IHostedService
         ScannerMenuTagsPopup.IsOpen = true;
     }
 
+    private bool _closeConfirmed;
+
     protected override void OnClosing(CancelEventArgs e)
     {
         base.OnClosing(e);
-        if (!e.Cancel)
-            Application.Current.Shutdown();
+        if (e.Cancel) return;
+
+        // Prompt-to-save guard for an unsaved scan session. Only runs once — StopAsync's Close() below
+        // re-enters OnClosing after we've already confirmed.
+        if (!_closeConfirmed)
+        {
+            if (!ViewModel.ConfirmExitWithUnsavedSession())
+            {
+                e.Cancel = true;
+                return;
+            }
+            _closeConfirmed = true;
+        }
+
+        Application.Current.Shutdown();
     }
 
     public Task StopAsync(CancellationToken cancellationToken)

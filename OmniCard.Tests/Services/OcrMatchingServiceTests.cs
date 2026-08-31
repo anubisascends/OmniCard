@@ -43,4 +43,56 @@ public class OcrMatchingServiceTests
         Assert.Equal(5, rect.Width);   // Clamped: min(20, 100-95)
         Assert.Equal(5, rect.Height);  // Clamped
     }
+
+    // --- MTG bottom-left (set code + collector number) parser ---
+    // Inputs are real (or realistic) OCR reads of the modern MTG corner block; leading zeros are
+    // stripped to match how Scryfall stores the collector number.
+
+    [Theory]
+    [InlineData("R 0066\nMKC • EN SVETLIN VELINOV", "MKC", "66")]   // standard modern two-line block
+    [InlineData("C 0062\nEOC • EN ALLEN PANAKAL", "EOC", "62")]     // observed sample
+    [InlineData("025\nSCD • EN JOHANN BODIN", "SCD", "25")]         // rarity on its own, collector first
+    [InlineData("066/281 M\nDMU • EN", "DMU", "66")]                // older "{collector}/{total}" format
+    [InlineData("M 0004\nBLC EN", "BLC", "4")]                      // star separator dropped by whitelist
+    [InlineData("U 0173\nM3C • EN JESPER EJSING", "M3C", "173")]    // digit-bearing set code
+    public void TryExtractMtgSetAndNumber_ParsesRealReads(string ocr, string expectedSet, string expectedNumber)
+    {
+        var ok = OcrMatchingService.TryExtractMtgSetAndNumber(ocr, out var set, out var number);
+
+        Assert.True(ok);
+        Assert.Equal(expectedSet, set);
+        Assert.Equal(expectedNumber, number);
+    }
+
+    [Fact]
+    public void TryExtractMtgSetAndNumber_PrefersCollectorOverCopyrightYear()
+    {
+        // The copyright year can share the corner block; a shorter non-year number must win.
+        var ok = OcrMatchingService.TryExtractMtgSetAndNumber("EOC • EN\nTM & © 2024 WIZARDS 100", out var set, out var number);
+
+        Assert.True(ok);
+        Assert.Equal("EOC", set);
+        Assert.Equal("100", number);
+    }
+
+    [Theory]
+    [InlineData("SOME RULES TEXT 123")]     // no language marker → no anchored set code
+    [InlineData("MKC • EN")]                 // set code but no collector number
+    [InlineData("0066")]                     // collector number but no set code
+    [InlineData("")]                         // empty
+    public void TryExtractMtgSetAndNumber_RejectsIncompleteReads(string ocr)
+    {
+        Assert.False(OcrMatchingService.TryExtractMtgSetAndNumber(ocr, out _, out _));
+    }
+
+    [Fact]
+    public void ToPixelRect_MtgCollectorRegion_IsBottomLeftCorner()
+    {
+        var rect = OcrMatchingService.ToPixelRect(OcrMatchingService.MtgCollectorRegion, 717, 1001);
+
+        Assert.Equal(14, rect.X);    // 2% of 717
+        Assert.Equal(945, rect.Y);   // 94.5% of 1001
+        Assert.True(rect.Width > 200 && rect.Width < 260);   // ~34% of 717
+        Assert.True(rect.Y + rect.Height <= 1001);           // stays on card
+    }
 }
