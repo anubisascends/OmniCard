@@ -763,6 +763,23 @@ public sealed class RiftboundService : ICardGameService, IDisposable
             .OrderBy(m => m.CollectorNumber).ToList();
     }
 
+    public List<SetCatalogCard> GetSetCards(string setCode)
+        => _readContext.Cards.AsNoTracking()
+            .Where(c => c.SetId == setCode).AsEnumerable()
+            .GroupBy(c => c.CollectorNumber)
+            .Select(g => g.OrderBy(c => c.AlternateArt).First())
+            .Select(c => new SetCatalogCard
+            {
+                GameCardId = c.Id,
+                Name = c.Name, CollectorNumber = c.CollectorNumber.ToString(),
+                SetCode = c.SetId, SetName = c.SetName, Rarity = c.Rarity,
+                ImageUri = c.CardImageUri, LocalImagePath = c.LocalImagePath,
+                NormalPrice = c.MarketPrice, FoilPrice = c.FoilMarketPrice,
+                HasFoil = c.FoilMarketPrice.HasValue,
+            })
+            .OrderBy(c => c.CollectorNumber, CollectorNumberComparer.Instance)
+            .ToList();
+
     public List<CardMatch> SearchCards(string query, int maxResults = 20)
     {
         if (string.IsNullOrWhiteSpace(query)) return [];

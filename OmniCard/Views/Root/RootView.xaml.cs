@@ -98,8 +98,7 @@ public partial class RootView : IView<RootViewModel>, IHostedService
         ViewModel.Initialize();
 
         // Dashboard is the default-selected tab (index 0); no SelectionChanged fires for the
-        // initial selection, so load its financials explicitly. Collection stats are already
-        // triggered by InvalidateHomeTab() inside Initialize().
+        // initial selection, so load its financials explicitly.
         ViewModel.Dashboard.Load();
 
         // After the window is up, offer to restore an unsaved scan session from a previous run.

@@ -86,8 +86,9 @@
     <!-- ===================== VIEWS ===================== -->
     <section id="dashboard" data-group="Views">
       <h2>Dashboard</h2>
-      <p>The Dashboard is your portfolio and collection-stats landing page. A single <strong>Refresh</strong>
-      button recomputes everything. It has two halves: financial/valuation on top, collection statistics below.</p>
+      <p>The Dashboard is your portfolio landing page — a financial and valuation overview of everything you
+      hold. A single <strong>Refresh</strong> button recomputes it. (Per-set completion now lives on the
+      dedicated <a href="#sets-view">Sets</a> tab.)</p>
 
       <figure class="shot" data-img="dashboard.png"><span>Screenshot placeholder — <code>images/dashboard.png</code></span></figure>
 
@@ -113,15 +114,33 @@
       (each showing Units, Cost, Market, Unrealized, and a share bar), plus <strong>Realized P&amp;L by Game</strong>
       (Sold count, Proceeds, Cost, Profit).</p>
 
-      <h3>Collection stats</h3>
-      <ul>
-        <li><strong>Total Cards / Sets / Foils / Total Value</strong> — headline counts for the selected game.</li>
-        <li><strong>Rarity breakdown</strong> — Common, Uncommon, Rare, Mythic, Other.</li>
-        <li><strong>Sets in Collection</strong> — a tile per set showing the set symbol, owned / total (percent complete),
-        and total physical copies. Click a set to expand it.</li>
-      </ul>
       <div class="callout note">"No holdings yet…" appears until you own something. Prices come from the latest catalog
       download — run a price refresh if values look stale.</div>
+    </section>
+
+    <section id="sets-view" data-group="Views">
+      <h2>Sets</h2>
+      <p>The <strong>Sets</strong> tab is a read-only set checklist: pick a game and a set to see <em>every</em>
+      card in that set, sorted by collector number, so you can tell at a glance what you still need for a
+      complete set.</p>
+
+      <figure class="shot" data-img="sets-checklist.png"><span>Screenshot placeholder — <code>images/sets-checklist.png</code></span></figure>
+
+      <h3>Browsing a set</h3>
+      <ul>
+        <li>Choose a <strong>Game</strong>, then a <strong>Set</strong> — type in the <em>Filter sets</em> box to
+        jump to a set by name or code — and click <strong>Load</strong>.</li>
+        <li>Cards you own show a green <strong>check</strong>; a <strong>×N</strong> badge appears when you own more
+        than one copy. Cards you don't own are dimmed.</li>
+        <li>The header shows your completion, e.g. <em>"184 / 271 owned (67.9%)"</em>.</li>
+      </ul>
+
+      <h3>Printing a want list</h3>
+      <p>Click <strong>Print Want List…</strong> to save (and open) a PDF of just the cards you <em>don't</em> own —
+      collector number, name, rarity, and the current <strong>standard</strong> and <strong>foil</strong> market
+      prices, each with a blank tick-box. Take it to a shop or show and hunt for cards without a computer.</p>
+      <div class="callout tip">Prices come from the latest catalog download — run a price refresh first if you want
+      the want list to reflect current market values.</div>
     </section>
 
     <section id="collection" data-group="Views">

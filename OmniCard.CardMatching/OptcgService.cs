@@ -837,6 +837,22 @@ public sealed class OptcgService : ICardGameService, IDisposable
             .ToList();
     }
 
+    public List<SetCatalogCard> GetSetCards(string setCode)
+        => _readContext.Cards.AsNoTracking()
+            .Where(c => c.SetId == setCode).AsEnumerable()
+            .GroupBy(c => c.CardNumber)
+            .Select(g => g.OrderBy(c => c.VariantIndex).First())
+            .Select(c => new SetCatalogCard
+            {
+                GameCardId = c.CardSetId,
+                Name = c.CardName, CollectorNumber = c.CardNumber,
+                SetCode = c.SetId, SetName = c.SetName, Rarity = c.Rarity,
+                ImageUri = c.CardImageUri, LocalImagePath = c.LocalImagePath,
+                NormalPrice = c.MarketPrice, FoilPrice = null, HasFoil = false,
+            })
+            .OrderBy(c => c.CollectorNumber, CollectorNumberComparer.Instance)
+            .ToList();
+
     private CardMatch? LookupOptcgCard(string cardSetId, double? confidence = null)
     {
         var card = _readContext.Cards.AsNoTracking().FirstOrDefault(c => c.CardSetId == cardSetId);

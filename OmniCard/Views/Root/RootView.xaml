@@ -7,6 +7,7 @@
         xmlns:dashboard="clr-namespace:OmniCard.Views.Dashboard"
         xmlns:sales="clr-namespace:OmniCard.Views.Sales"
         xmlns:lists="clr-namespace:OmniCard.Views.Lists"
+        xmlns:sets="clr-namespace:OmniCard.Views.Sets"
         xmlns:conv="clr-namespace:OmniCard.Controls.Converters;assembly=OmniCard.Controls"
         xmlns:helpers="clr-namespace:OmniCard.Controls;assembly=OmniCard.Controls"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
@@ -401,6 +402,17 @@
                     </StackPanel>
                 </TabItem.Header>
                 <lists:ListsView DataContext="{Binding ViewModel.Lists}"/>
+            </TabItem>
+
+            <TabItem x:Name="tabItemSets" Style="{StaticResource SidebarTabItemStyle}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="CheckboxMultipleMarkedOutline" Width="22" Height="22" VerticalAlignment="Center"/>
+                        <TextBlock Text="Sets" Margin="12,0,0,0" VerticalAlignment="Center"
+                                   Visibility="{Binding ViewModel.IsSidebarExpanded, Converter={conv:BoolToVisibilityConverter}}"/>
+                    </StackPanel>
+                </TabItem.Header>
+                <sets:SetsView DataContext="{Binding ViewModel.Sets}"/>
             </TabItem>
 
         </TabControl>

@@ -40,6 +40,7 @@ public sealed partial class RootViewModel(
     Views.Dashboard.DashboardViewModel dashboard,
     Views.Sales.SalesViewModel sales,
     Views.Lists.ListsViewModel lists,
+    Views.Sets.SetsViewModel sets,
     Views.Settings.SettingsViewModel settings,
     IMismatchLogService mismatchLogService,
     SetSymbolCache setSymbolCache,
@@ -182,6 +183,9 @@ public sealed partial class RootViewModel(
 
     /// <summary>The nested ListsViewModel that owns the user-defined card lists.</summary>
     public Views.Lists.ListsViewModel Lists { get; } = lists;
+
+    /// <summary>The nested SetsViewModel that backs the read-only set-checklist tab.</summary>
+    public Views.Sets.SetsViewModel Sets { get; } = sets;
 
     /// <summary>The nested SettingsViewModel that composes the Settings tab's section view-models.</summary>
     public Views.Settings.SettingsViewModel Settings { get; } = settings;
@@ -634,7 +638,6 @@ public sealed partial class RootViewModel(
         Collection.SetGame(value);
         Lists.SetGame(value);
         Inventory.SetGame(value);
-        InvalidateHomeTab();
 
         // Keep the ComboBox selection in sync when SelectedGame changes programmatically
         // (Initialize, dashboard tile drill-in, guard revert). No-op when the change
@@ -1305,86 +1308,14 @@ public sealed partial class RootViewModel(
 
     public bool ShowPrintingSelector => HasSelection && AllMatched && SharedMatchName is not null;
 
-    // Home tab — collection stats + set completion
-    public ObservableCollection<SetCompletionSummary> SetCompletionResults { get; } = [];
-
-    // Collection summary stats
-    [ObservableProperty]
-    public partial int StatTotalCards { get; set; }
-
-    [ObservableProperty]
-    public partial int StatTotalSets { get; set; }
-
-    [ObservableProperty]
-    public partial int StatFoilCount { get; set; }
-
-    [ObservableProperty]
-    public partial int StatCommonCount { get; set; }
-
-    [ObservableProperty]
-    public partial int StatUncommonCount { get; set; }
-
-    [ObservableProperty]
-    public partial int StatRareCount { get; set; }
-
-    [ObservableProperty]
-    public partial int StatMythicCount { get; set; }
-
-    [ObservableProperty]
-    public partial int StatOtherRarityCount { get; set; }
-
-    [ObservableProperty]
-    public partial decimal StatTotalValue { get; set; }
-
-    [ObservableProperty]
-    public partial SetCompletionSummary? SelectedSetCompletion { get; set; }
-
-    private bool _suppressSetSelection;
-
-    partial void OnSelectedSetCompletionChanged(SetCompletionSummary? value)
-    {
-        if (_suppressSetSelection || value is null)
-            return;
-
-        // Drill into the collection: show this set's owned cards (of its game) as tiles.
-        // Sync the global selector to the tile's game so it doesn't desync from the
-        // collection view (matters under All Games, where the selector is null).
-        SelectedGame = value.Game;
-        Collection.BrowseSet(value.Game, value.SetCode);
-        SelectedTabIndex = 1; // Collection tab
-
-        // Reset selection so re-clicking the same tile after returning re-triggers navigation.
-        _suppressSetSelection = true;
-        SelectedSetCompletion = null;
-        _suppressSetSelection = false;
-    }
-
-    [ObservableProperty]
-    public partial bool IsCalculatingCompletion { get; set; }
-
-    [ObservableProperty]
-    public partial string CompletionStatusMessage { get; set; } = "";
-
     [ObservableProperty]
     public partial int SelectedTabIndex { get; set; }
 
-    /// <summary>When true the next Home-tab activation will recalculate stats.</summary>
-    private bool _homeTabDirty = true;
-
-    /// <summary>Mark the home tab as needing a refresh. If the tab is currently
-    /// visible the refresh fires immediately; otherwise it fires on next activation.</summary>
-    private void InvalidateHomeTab()
-    {
-        _homeTabDirty = true;
-        if (SelectedTabIndex == 0)
-            _ = CalculateSetCompletionCommand.ExecuteAsync(null);
-    }
-
     partial void OnSelectedTabIndexChanged(int value)
     {
-        if (value == 0 && _homeTabDirty) // Home tab — only reload when dirty
-            _ = CalculateSetCompletionCommand.ExecuteAsync(null);
-        else if (value == 1 && !Collection.ShowCardList) // Collection tab - refresh overview
+        // Dashboard (index 0) self-loads its valuation via RootView's SelectionChanged handler;
+        // the old collection-stats recompute here was retired with the Sets tab.
+        if (value == 1 && !Collection.ShowCardList) // Collection tab - refresh overview
             Collection.LoadOverview();
     }
 
@@ -1400,7 +1331,6 @@ public sealed partial class RootViewModel(
         // Wire Collection delegates before Initialize so PersistSettings works
         Collection.PersistSettings = PersistDisplaySettings;
         Collection.ReportMessage = msg => Message = msg;
-        Collection.CollectionChanged = InvalidateHomeTab;
 
         // Refresh visible collection prices in place when a background price update completes
         priceUpdateService.PricesUpdated += (_, _) =>
@@ -1429,7 +1359,6 @@ public sealed partial class RootViewModel(
         RefreshTagSuggestions();
 
         IsEbayConnected = ebayAuthService.IsConnected;
-        InvalidateHomeTab();
         RefreshDiagnosticCount();
 
         // Start eBay listing sync timer (every 5 minutes)
@@ -1609,8 +1538,6 @@ public sealed partial class RootViewModel(
             var sets = _allSets.Select(s => (s.SetCode, s.SetName)).ToList();
             await setSymbolCache.PreloadSymbolsAsync(sets, progress);
         }
-
-        InvalidateHomeTab();
     }
 
     [RelayCommand]
@@ -1646,7 +1573,6 @@ public sealed partial class RootViewModel(
 
         await CardService.ActiveGameService.ComputeImageHashesAsync(forceAll: true, progress);
         LoadAvailableSets();
-        InvalidateHomeTab();
     }
 
     [RelayCommand]
@@ -1663,7 +1589,6 @@ public sealed partial class RootViewModel(
 
         await CardService.ActiveGameService.ComputeImageHashesAsync(forceAll: false, progress);
         LoadAvailableSets();
-        InvalidateHomeTab();
     }
 
     // Matches SET-NUM patterns like TMT-002, OP15-041, BRC-85a.
@@ -2220,7 +2145,6 @@ public sealed partial class RootViewModel(
             IsAuditComplete = false;
 
             _ = Collection.SearchCollection();
-            InvalidateHomeTab();
 
             // The data is safely committed: close the current session and open a fresh empty one so
             // scanning can continue immediately (see the scan-session workflow).
@@ -2780,117 +2704,12 @@ public sealed partial class RootViewModel(
         Message = $"Reprocess complete: {matched}/{total} cards matched.";
     }
 
-    [RelayCommand]
-    public void RefreshHomeTab() => InvalidateHomeTab();
-
-    /// <summary>Single Refresh for the merged Dashboard view: recomputes the collection stats
-    /// (Home section) and the financial valuation (Dashboard section) together.</summary>
+    /// <summary>Refresh for the Dashboard view: recomputes the financial valuation. (The former
+    /// per-set collection-stats block was moved to the dedicated Sets tab.)</summary>
     [RelayCommand]
     private async Task RefreshDashboard()
     {
-        RefreshHomeTab();                                  // recompute collection stats (fires now; index 0)
-        await Dashboard.RefreshCommand.ExecuteAsync(null); // recompute financial valuation
-    }
-
-    [RelayCommand]
-    public async Task CalculateSetCompletion()
-    {
-        IsCalculatingCompletion = true;
-        CompletionStatusMessage = "Loading collection stats...";
-
-        try
-        {
-            var progress = new Progress<string>(msg =>
-            {
-                Application.Current.Dispatcher.Invoke(() => CompletionStatusMessage = msg);
-            });
-
-            // Compute collection stats on background thread
-            var allCards = new System.Collections.ObjectModel.ObservableCollection<CollectionCard>();
-            await Task.Run(() => CardService.SearchCollection("", SelectedGame, null, allCards));
-
-            StatTotalCards = allCards.Count;
-            StatFoilCount = allCards.Count(c => c.IsFoil);
-
-            // Calculate total value: use purchase price if set, otherwise look up market price
-            decimal totalValue = 0;
-            var cardsNeedingPrice = allCards.Where(c => !c.PurchasePrice.HasValue).ToList();
-            var batchPrices = new Dictionary<(string GameCardId, bool Foil), decimal>();
-            foreach (var grp in cardsNeedingPrice.GroupBy(c => (c.Game, c.IsFoil)))
-            {
-                var prices = CardService.GetCurrentPrices(
-                    grp.Key.Game, grp.Select(c => c.GameCardId).Distinct(), grp.Key.IsFoil);
-                foreach (var kvp in prices)
-                    batchPrices.TryAdd((kvp.Key, grp.Key.IsFoil), kvp.Value);
-            }
-            foreach (var card in allCards)
-            {
-                if (card.PurchasePrice.HasValue)
-                    totalValue += card.PurchasePrice.Value;
-                else
-                    totalValue += batchPrices.GetValueOrDefault((card.GameCardId, card.IsFoil));
-            }
-            StatTotalValue = totalValue;
-
-            var rarityGroups = allCards.GroupBy(c => c.Rarity.ToLowerInvariant()).ToDictionary(g => g.Key, g => g.Count());
-            StatCommonCount = rarityGroups.GetValueOrDefault("common", 0);
-            StatUncommonCount = rarityGroups.GetValueOrDefault("uncommon", 0);
-            StatRareCount = rarityGroups.GetValueOrDefault("rare", 0);
-            StatMythicCount = rarityGroups.GetValueOrDefault("mythic", 0);
-            StatOtherRarityCount = allCards.Count - StatCommonCount - StatUncommonCount - StatRareCount - StatMythicCount;
-
-            // Compute set completion — only for sets in collection
-            var results = await Task.Run<Task<List<SetCompletionSummary>>>(() =>
-                CardService.CalculateSetCompletionAsync(SelectedGame, progress)).Unwrap();
-
-            foreach (var old in SetCompletionResults)
-                old.MissingCards = null;
-            SelectedSetCompletion = null;
-            SetCompletionResults.Clear();
-
-            // Only show sets the user owns cards in, ordered by set code
-            var ownedSets = results
-                .Where(s => s.OwnedCount > 0)
-                .OrderBy(s => s.SetCode, StringComparer.OrdinalIgnoreCase);
-
-            foreach (var summary in ownedSets)
-                SetCompletionResults.Add(summary);
-
-            StatTotalSets = SetCompletionResults.Count;
-            var complete = SetCompletionResults.Count(s => s.CompletionPercent >= 100);
-            CompletionStatusMessage = $"{StatTotalCards} cards across {StatTotalSets} sets — {complete} complete";
-            _homeTabDirty = false;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to calculate collection stats");
-            CompletionStatusMessage = "Failed to load collection stats.";
-        }
-        finally
-        {
-            IsCalculatingCompletion = false;
-        }
-    }
-
-    [RelayCommand]
-    public async Task ExpandSetCompletion(SetCompletionSummary summary)
-    {
-        if (summary is null || summary.MissingCards is not null) return; // null row or already loaded
-        summary.IsLoadingMissing = true;
-        try
-        {
-            var missing = await Task.Run(() =>
-                CardService.GetMissingCardsForSet(summary.Game, summary.SetCode));
-            summary.MissingCards = new(missing);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to load missing cards for set {SetCode}", summary.SetCode);
-        }
-        finally
-        {
-            summary.IsLoadingMissing = false;
-        }
+        await Dashboard.RefreshCommand.ExecuteAsync(null);
     }
 
     [RelayCommand]
