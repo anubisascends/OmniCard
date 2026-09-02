@@ -108,6 +108,94 @@ public class AuditServiceTests : IDisposable
     }
 
     [Fact]
+    public void GenerateFileAuditReport_MatchesByGameCardId_AndFallsBackToSetCollector()
+    {
+        int containerId;
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+        {
+            var container = new StorageContainer { Name = "Box", ContainerType = ContainerType.Box };
+            ctx.StorageContainers.Add(container);
+            ctx.SaveChanges();
+            containerId = container.Id;
+
+            // CardA has a resolvable id; CardB's id is blank so it must fall back to set+number.
+            var cardA = NewSingle("id-a", "Card A", "set");
+            cardA.CollectorNumber = "10";
+            var cardB = NewSingle("", "Card B", "SET");
+            cardB.CollectorNumber = "20";
+            ctx.Products.AddRange(cardA, cardB);
+            ctx.SaveChanges();
+
+            ctx.Lots.AddRange(
+                new InventoryLot { ProductId = cardA.Id, LocationId = containerId },
+                new InventoryLot { ProductId = cardB.Id, LocationId = containerId }
+            );
+            ctx.SaveChanges();
+        }
+
+        var service = CreateService();
+
+        var imported = new List<CollectionCard>
+        {
+            // Matches CardA by id even though set casing differs.
+            new() { Game = CardGame.Mtg, GameCardId = "id-a", Name = "Card A", SetCode = "SET", Number = "10", Condition = "NM" },
+            // No id — must match CardB by set code (case-insensitive) + collector number.
+            new() { Game = CardGame.Mtg, GameCardId = "", Name = "Card B", SetCode = "set", Number = "20", Condition = "NM" },
+            // Not in the location at all → Extra.
+            new() { Game = CardGame.Mtg, GameCardId = "id-c", Name = "Card C", SetCode = "SET", Number = "30", Condition = "NM" },
+        };
+
+        var report = service.GenerateFileAuditReport(containerId, imported);
+
+        Assert.Equal("In File", report.SourceLabel);
+        Assert.Equal(2, report.ExpectedCount);
+        Assert.Equal(3, report.ActualCount);
+        Assert.Equal(2, report.Matched.Count);   // A by id, B by set+number
+        Assert.Empty(report.Missing);
+        Assert.Single(report.Extra);              // Card C
+        Assert.Equal("Card C", report.Extra[0].Name);
+    }
+
+    [Fact]
+    public void GenerateFileAuditReport_FlagsConditionAndFoilMismatches()
+    {
+        int containerId;
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+        {
+            var container = new StorageContainer { Name = "Box", ContainerType = ContainerType.Box };
+            ctx.StorageContainers.Add(container);
+            ctx.SaveChanges();
+            containerId = container.Id;
+
+            var cardA = NewSingle("id-a", "Card A", "SET");
+            cardA.Foil = false;
+            ctx.Products.Add(cardA);
+            ctx.SaveChanges();
+
+            // Stored copy is NM.
+            ctx.Lots.Add(new InventoryLot { ProductId = cardA.Id, LocationId = containerId, Condition = "NM" });
+            ctx.SaveChanges();
+        }
+
+        var service = CreateService();
+
+        // File reports the same card as LP and foil — both a condition and a foil discrepancy.
+        var imported = new List<CollectionCard>
+        {
+            new() { Game = CardGame.Mtg, GameCardId = "id-a", Name = "Card A", SetCode = "SET", Condition = "LP", IsFoil = true },
+        };
+
+        var report = service.GenerateFileAuditReport(containerId, imported);
+
+        Assert.Single(report.Matched);            // still present
+        Assert.Empty(report.Missing);
+        Assert.Empty(report.Extra);
+        Assert.Single(report.Mismatched);
+        Assert.Contains("Condition", report.Mismatched[0].Discrepancy);
+        Assert.Contains("Foil", report.Mismatched[0].Discrepancy);
+    }
+
+    [Fact]
     public void StartAudit_SetsActiveState()
     {
         using (var ctx = new OmniCardDbContext(_omniOptions))

@@ -26,6 +26,16 @@ public interface IDialogService
     /// mark each pocket (correct/missing/wrong/extra) then review and apply the corrections.</summary>
     void ShowBinderAudit(int containerId);
 
+    /// <summary>Asks how the user wants to audit a binder <paramref name="locationName"/>: the
+    /// pocket-marking audit or an import-file + drag-drop reconcile. Returns the choice, or
+    /// <see cref="BinderAuditChoice.Cancel"/> if dismissed.</summary>
+    BinderAuditChoice PromptBinderAuditMode(string locationName);
+
+    /// <summary>Opens the import-driven binder audit: <paramref name="importedCards"/> populate a
+    /// sideboard tray the user drags into the binder's pockets, then applies to reconcile the binder.
+    /// Returns true if changes were applied (so the caller can refresh).</summary>
+    bool ShowBinderImportAudit(int containerId, IReadOnlyList<CollectionCard> importedCards);
+
     /// <summary>Prompts for where to insert a new binder sheet and whether it's double- or
     /// single-sided. <paramref name="nearPage"/> pre-selects the sheet the user is currently viewing.
     /// Returns the target sheet index and side choice, or null if cancelled.</summary>
@@ -46,6 +56,11 @@ public interface IDialogService
     /// Returns null if cancelled.</summary>
     IReadOnlyList<ScanListTargetResult>? PickListTargetsForScans(IReadOnlyList<(CardGame Game, int Count)> groups, string defaultName);
     void ShowAuditReport(AuditReport report);
+
+    /// <summary>Asks how the user wants to audit <paramref name="locationName"/>: by scanning each
+    /// card or by importing a known-good collection file (Manabox / Mythic Tools). Returns the chosen
+    /// source, or <see cref="AuditSourceChoice.Cancel"/> if dismissed.</summary>
+    AuditSourceChoice PromptAuditSource(string locationName);
     bool? OpenEbayListingDialog(CollectionCard card);
 
     /// <summary>Opens the eBay listing dialog for a sealed inventory product, keyed by the owning

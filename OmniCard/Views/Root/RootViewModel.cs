@@ -1973,6 +1973,89 @@ public sealed partial class RootViewModel(
 
     public string AuditLocationName => auditService.AuditLocationName ?? "";
 
+    /// <summary>Single entry point for auditing a location, used by both the location tiles and the
+    /// collection-view toolbar's Audit button. Binders go to the binder audit (mark vs import);
+    /// every other location goes to the scan-vs-import prompt.</summary>
+    [RelayCommand]
+    public void AuditContainer(int containerId)
+    {
+        var container = containerService.GetAll().FirstOrDefault(c => c.Id == containerId);
+        if (container is null) return;
+
+        if (container.ContainerType == ContainerType.Binder)
+            StartBinderAudit(containerId);
+        else
+            AuditLocation(containerId);
+    }
+
+    /// <summary>Entry point for "Audit Location…" on a non-binder location: asks whether to scan the
+    /// cards or import a known-good collection file, then runs the chosen flow.</summary>
+    [RelayCommand]
+    public void AuditLocation(int containerId)
+    {
+        if (IsAuditMode) return;
+
+        var name = containerService.GetAll().FirstOrDefault(c => c.Id == containerId)?.Name ?? "";
+        switch (DialogService.PromptAuditSource(name))
+        {
+            case AuditSourceChoice.Scan:
+                StartAudit(containerId);
+                break;
+            case AuditSourceChoice.File:
+                StartFileAudit(containerId);
+                break;
+        }
+    }
+
+    /// <summary>File-based audit: import a Manabox / Mythic Tools CSV and diff it against the
+    /// location's stored cards, showing the same audit report the scan flow produces. This is a
+    /// one-shot — it never enters scan audit mode.</summary>
+    public void StartFileAudit(int containerId)
+    {
+        var name = containerService.GetAll().FirstOrDefault(c => c.Id == containerId)?.Name ?? "";
+
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = $"Import Audit File for \"{name}\"",
+            Filter = "Collection files (*.csv)|*.csv|All files (*.*)|*.*",
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        CsvImportPreview preview;
+        try
+        {
+            preview = csvService.PreviewImport(dlg.FileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to parse audit import file {Path}", dlg.FileName);
+            MessageBox.Show($"Could not read the file:\n{ex.Message}", "Audit Import Failed",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (preview.Cards.Count == 0)
+        {
+            MessageBox.Show(
+                preview.Warnings.Count > 0
+                    ? $"No cards could be read from the file.\n\n{preview.Warnings[0]}"
+                    : "No cards could be read from the file. It may be an unsupported format.",
+                "Audit Import", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var report = auditService.GenerateFileAuditReport(containerId, preview.Cards);
+        _logger.LogInformation(
+            "File audit for {Id}: {Expected} expected, {InFile} in file, {Missing} missing, {Extra} extra, {Mismatch} mismatched",
+            containerId, report.ExpectedCount, report.ActualCount, report.Missing.Count, report.Extra.Count, report.Mismatched.Count);
+
+        Message = preview.Warnings.Count > 0
+            ? $"Audited \"{name}\" against {preview.Cards.Count} cards ({preview.Warnings.Count} rows skipped)."
+            : $"Audited \"{name}\" against {preview.Cards.Count} cards.";
+
+        DialogService.ShowAuditReport(report);
+    }
+
     [RelayCommand]
     public void StartAudit(int containerId)
     {
@@ -2000,12 +2083,24 @@ public sealed partial class RootViewModel(
         _logger.LogInformation("Audit mode started for location {Id}", containerId);
     }
 
-    /// <summary>Opens the read-only visual audit for a Binder location (no scanning). On close,
-    /// refreshes the collection/tiles so any applied corrections show immediately.</summary>
+    /// <summary>Audits a Binder location. Asks whether to mark pockets (the read-only visual audit)
+    /// or import a known-good file and drag its cards into the pockets. On close, refreshes the
+    /// collection/tiles so any applied corrections/placements show immediately.</summary>
     [RelayCommand]
     public void StartBinderAudit(int containerId)
     {
-        DialogService.ShowBinderAudit(containerId);
+        var name = containerService.GetAll().FirstOrDefault(c => c.Id == containerId)?.Name ?? "";
+        switch (DialogService.PromptBinderAuditMode(name))
+        {
+            case BinderAuditChoice.Mark:
+                DialogService.ShowBinderAudit(containerId);
+                break;
+            case BinderAuditChoice.Import:
+                if (!StartBinderImportAudit(containerId)) return;
+                break;
+            default:
+                return; // cancelled — nothing to refresh
+        }
 
         Collection.LoadContainers();
         if (Collection.ShowCardList)
@@ -2014,6 +2109,46 @@ public sealed partial class RootViewModel(
             Collection.LoadOverview();
 
         _logger.LogInformation("Binder audit closed for location {Id}", containerId);
+    }
+
+    /// <summary>Import branch of the binder audit: pick a Manabox / Mythic Tools CSV, parse it, and
+    /// open the drag-drop reconcile dialog. Returns false (no refresh needed) if the user cancelled
+    /// the file picker or the file yielded no cards.</summary>
+    private bool StartBinderImportAudit(int containerId)
+    {
+        var name = containerService.GetAll().FirstOrDefault(c => c.Id == containerId)?.Name ?? "";
+
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = $"Import Audit File for \"{name}\"",
+            Filter = "Collection files (*.csv)|*.csv|All files (*.*)|*.*",
+        };
+        if (dlg.ShowDialog() != true) return false;
+
+        CsvImportPreview preview;
+        try
+        {
+            preview = csvService.PreviewImport(dlg.FileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to parse binder audit import file {Path}", dlg.FileName);
+            MessageBox.Show($"Could not read the file:\n{ex.Message}", "Audit Import Failed",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+
+        if (preview.Cards.Count == 0)
+        {
+            MessageBox.Show(
+                preview.Warnings.Count > 0
+                    ? $"No cards could be read from the file.\n\n{preview.Warnings[0]}"
+                    : "No cards could be read from the file. It may be an unsupported format.",
+                "Audit Import", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+
+        return DialogService.ShowBinderImportAudit(containerId, preview.Cards);
     }
 
     [RelayCommand]

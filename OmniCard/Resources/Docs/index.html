@@ -440,15 +440,32 @@
     <section id="audit" data-group="Storage &amp; Locations">
       <h2>Location Audit</h2>
       <p>The Audit Report verifies a location's expected contents against what's physically there and exports a PDF. Use it to reconcile
-      a box after a busy day of scanning and selling. Right-click a location tile and choose <strong>Audit Location…</strong> to re-scan
-      its cards and compare them against the record.</p>
+      a box after a busy day of scanning and selling. Right-click a location tile and choose <strong>Audit Location…</strong>. You're
+      then asked how you want to audit:</p>
+      <ul>
+        <li><strong>Scan Cards</strong> — enters audit mode and re-scans every card with your scanner, comparing each match against the record.</li>
+        <li><strong>Import File…</strong> — pick a known-good collection export (a <strong>Manabox</strong> or <strong>Mythic Tools</strong>
+        CSV, or any of the app's supported import formats) and OmniCard diffs it against what's stored in the location. No scanning required.</li>
+      </ul>
+      <p>Either way you get the same report: <em>Matched</em>, <em>Missing</em> (expected here but not in the audit source), and
+      <em>Extra</em> (in the source but not expected here). Cards are matched first by their catalog ID and then by set code + collector
+      number, so files without an ID still line up. A file import additionally flags a <strong>Mismatched</strong> section for cards whose
+      condition or foil treatment differs between the file and the stored copy. Export the whole thing to PDF from the report window.</p>
+      <div class="callout note">Binders get a visual pocket-by-pocket audit instead — see <a href="#binder-audit">Binder Audit</a>.</div>
     </section>
 
     <section id="binder-audit" data-group="Storage &amp; Locations">
       <h2>Binder Audit</h2>
       <p>Binders are laid out pocket by pocket, so they get a <strong>visual audit</strong> instead of the scan-based one — no need to pull
-      every card out to scan it. Right-click a <em>binder</em> location and choose <strong>Audit Location…</strong> to open a read-only view
-      of the binder. Flip through it and tag each pocket against what you physically see:</p>
+      every card out to scan it. Right-click a <em>binder</em> location and choose <strong>Audit Location…</strong>. You're asked how you
+      want to audit:</p>
+      <ul>
+        <li><strong>Mark Pockets</strong> — the pocket-by-pocket review below.</li>
+        <li><strong>Import File…</strong> — load a known-good export (Manabox / Mythic Tools CSV) into a <strong>tray</strong> and drag each
+        card into the pocket where it physically sits. See <a href="#binder-import-audit">Binder Import Audit</a>.</li>
+      </ul>
+      <p>The <strong>Mark Pockets</strong> flow opens a read-only view of the binder. Flip through it and tag each pocket against what you
+      physically see:</p>
       <ul>
         <li><strong>✓ Correct</strong> — the card is present and right. No change.</li>
         <li><strong>− Missing</strong> — the card the app expects here isn't physically in the pocket.</li>
@@ -460,6 +477,24 @@
       printing, and Extra pockets let you search for and add the card that's really there. Nothing is written until you click
       <strong>Apply Corrections</strong>.</p>
       <figure class="shot" data-img="binder-audit.png"><span>Screenshot placeholder — images/binder-audit.png</span></figure>
+    </section>
+
+    <section id="binder-import-audit" data-group="Storage &amp; Locations">
+      <h2>Binder Import Audit</h2>
+      <p>If you already have a known-good list of what's in a binder — a <strong>Manabox</strong> or <strong>Mythic Tools</strong> export, say —
+      you can reconcile the binder by dragging rather than marking. On a binder's <strong>Audit Location…</strong>, choose
+      <strong>Import File…</strong> and pick the CSV. This opens the full <a href="#binder">binder editor</a>, but with the imported cards
+      loaded into the left-hand <strong>tray</strong> in place of the usual Unplaced pool. Everything else — page navigation, add / insert /
+      move / remove pages, the layout controls, and the slot right-click menu — works exactly as it does in the normal binder view.</p>
+      <ul>
+        <li><strong>Drag</strong> a card from the tray into the pocket where it physically sits. It's placed there right away and leaves the
+        tray.</li>
+        <li>When you place a card, OmniCard reuses an <em>unplaced copy you already own</em> of that printing if it can find one (matched by
+        card ID, then set + collector number, with the foil treatment agreeing); otherwise it creates a new card from the file.</li>
+        <li>Filter the tray by name to find a card quickly, and flip through pages while you work.</li>
+      </ul>
+      <p>Because it's the real binder editor, placements are saved as you go — there's no separate apply step.</p>
+      <figure class="shot" data-img="binder-import-audit.png"><span>Screenshot placeholder — images/binder-import-audit.png</span></figure>
     </section>
 
     <!-- ===================== INVENTORY ===================== -->

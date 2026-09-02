@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Options;
+using OmniCard.CardMatching;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 
@@ -48,6 +49,27 @@ public sealed partial class BinderViewModel(
     public string DataDirectory => dataPathService.DataDirectory;
     public bool IsStacked => false;
 
+    // --- Import-audit mode -----------------------------------------------------------------------
+    // When the binder is opened for a file-import audit, the left pane shows the imported cards (a
+    // "tray") instead of the DB's unplaced pool, and dragging one into a pocket places it there
+    // immediately — matching an owned unplaced copy of that printing if one exists, else creating a
+    // new lot. Everything else (page management, navigation, layout, the slot context menu) is the
+    // same real binder editor. Imported cards carry synthetic negative ids so they never collide with
+    // real (positive) lot ids in the drag payload / selection.
+
+    private bool _isImportAudit;
+    private readonly List<CollectionCard> _importCards = [];
+
+    public bool IsImportAudit => _isImportAudit;
+    public bool PlacedAnyImport { get; private set; }
+
+    public string WindowTitle => $"{(_isImportAudit ? "Audit Binder" : "Binder")} — {ContainerName}";
+    public string UnplacedPaneTitle => _isImportAudit ? "Imported Cards" : "Unplaced Cards";
+
+    // Same Scryfall filter syntax in both modes (the import tray filters in-memory via
+    // CollectionCardMatcher; the DB pool filters server-side) — so the hint is identical.
+    public string UnplacedFilterHint => "Filter (Scryfall syntax) — e.g. c:u, r>=rare";
+
     public ObservableCollection<CollectionCard> UnplacedCards { get; } = [];
 
     /// <summary>The left-hand page of the current spread. Empty for spread 0 — page 1 opens alone
@@ -61,6 +83,8 @@ public sealed partial class BinderViewModel(
 
     [ObservableProperty]
     public partial string ContainerName { get; set; } = "";
+
+    partial void OnContainerNameChanged(string value) => OnPropertyChanged(nameof(WindowTitle));
 
     /// <summary>0-based index of the current spread. Spread 0 is page 1 alone (right side); spread
     /// N&gt;=1 shows pages (2N, 2N+1) — mirroring how a real binder opens: page 1 stands alone
@@ -184,6 +208,31 @@ public sealed partial class BinderViewModel(
         Refresh();
     }
 
+    /// <summary>Loads the binder for a file-import audit: <paramref name="importedCards"/> populate
+    /// the left-pane tray (each given a synthetic negative id) and dragging one into a pocket places
+    /// it immediately. Reuses the full binder editor — only the pane's contents and the drop handling
+    /// differ.</summary>
+    public void LoadForImportAudit(int containerId, IReadOnlyList<CollectionCard> importedCards)
+    {
+        _isImportAudit = true;
+        _importCards.Clear();
+
+        var syntheticId = -1;
+        foreach (var card in importedCards)
+        {
+            card.Id = syntheticId--;
+            _importCards.Add(card);
+        }
+        HydrateImportCards(_importCards);
+
+        Load(containerId); // Refresh → PopulateUnplaced now takes the import branch
+
+        OnPropertyChanged(nameof(IsImportAudit));
+        OnPropertyChanged(nameof(WindowTitle));
+        OnPropertyChanged(nameof(UnplacedPaneTitle));
+        OnPropertyChanged(nameof(UnplacedFilterHint));
+    }
+
     [RelayCommand]
     public void ApplyLayout()
     {
@@ -218,6 +267,18 @@ public sealed partial class BinderViewModel(
 
     private void PopulateUnplaced()
     {
+        // Import-audit mode: the tray is the imported file (not the DB's unplaced pool), filtered by
+        // the same Scryfall syntax — evaluated in-memory since these cards aren't DB rows. Placed
+        // imports are removed from _importCards, so they drop out of the tray on the next refresh.
+        if (_isImportAudit)
+        {
+            var filtered = OmniCard.Collection.CollectionCardMatcher.Filter(_importCards, UnplacedFilterQuery);
+            UnplacedCards.Clear();
+            foreach (var c in filtered.OrderBy(c => c.Name))
+                UnplacedCards.Add(c);
+            return;
+        }
+
         var preset = string.IsNullOrWhiteSpace(UnplacedFilterQuery)
             ? null
             : new FilterPreset { Query = UnplacedFilterQuery };
@@ -273,11 +334,16 @@ public sealed partial class BinderViewModel(
         .Concat(LeftPageSlots.Select(s => s.Card))
         .Concat(RightPageSlots.Select(s => s.Card))
         .Where(c => c is not null)
-        .Select(c => c!));
+        .Select(c => c!)
+        // Imported tray cards (import-audit mode) have synthetic negative ids and aren't real lots —
+        // never hand them to the tag service.
+        .Where(c => c.Id > 0));
 
     private void AttachTagsTo(IEnumerable<CollectionCard> cards)
     {
-        var list = cards.ToList();
+        // Imported tray cards (import-audit mode) carry synthetic negative ids and aren't real lots —
+        // never hand them to the tag service.
+        var list = cards.Where(c => c.Id > 0).ToList();
         if (list.Count == 0) return;
 
         var tagsByLot = tagService.GetTagsByLots(list.Select(c => c.Id));
@@ -341,6 +407,37 @@ public sealed partial class BinderViewModel(
                 {
                     // Leave ImageUri null; the tile falls back to scan art or a placeholder.
                 }
+            }
+        }
+    }
+
+    /// <summary>Fills in the catalog-derived attributes a filed CSV doesn't carry — art, colour and
+    /// card type — by looking each imported card up in the game catalog, so the import tray's Scryfall
+    /// filter works across every field (<c>c:</c>, <c>t:</c>, …), not just the ones the file exports
+    /// (name / set / collector / rarity). Rarity is left as the file gives it. Display-only.</summary>
+    private void HydrateImportCards(IReadOnlyList<CollectionCard> cards)
+    {
+        foreach (var gameGroup in cards.GroupBy(c => c.Game))
+        {
+            ICardGameService gameService;
+            try { gameService = cardService.GetGameService(gameGroup.Key); }
+            catch { continue; }
+
+            foreach (var card in gameGroup)
+            {
+                if (string.IsNullOrEmpty(card.GameCardId)) continue;
+
+                object? source;
+                try { source = gameService.FindCardById(card.GameCardId); }
+                catch { continue; }
+                if (source is null) continue;
+
+                if (string.IsNullOrEmpty(card.ImageUri))
+                    card.ImageUri = CardImageUriResolver.From(source);
+
+                var match = new CardMatch { Source = source };
+                card.Color ??= CardAttributeExtractor.ExtractColor(match, card.Game);
+                card.CardType ??= CardAttributeExtractor.ExtractCardType(match, card.Game);
             }
         }
     }
@@ -512,7 +609,38 @@ public sealed partial class BinderViewModel(
 
     public void DropOnSlot(int lotId, int page, int slot)
     {
+        // In import-audit mode a dragged tray card is an imported (synthetic-id) card, not a real
+        // lot — place it by reconciling against the binder's owned unplaced copies.
+        if (_isImportAudit && _importCards.FirstOrDefault(c => c.Id == lotId) is { } import)
+        {
+            PlaceImport(import, page, slot);
+            return;
+        }
+
         containerService.AssignCardToSlot(lotId, _containerId, page, slot);
+        Refresh();
+    }
+
+    /// <summary>Places an imported card into a pocket: reuses an owned unplaced copy of that printing
+    /// if the binder has one, otherwise creates a new lot there. Removes the card from the import
+    /// tray. See <see cref="BinderImportMatcher"/> for the match rule.</summary>
+    private void PlaceImport(CollectionCard import, int page, int slot)
+    {
+        var pool = cardService.GetUnplacedBinderCards(_containerId, null);
+        var match = BinderImportMatcher.FindOwnedMatch(pool, import);
+        if (match is not null)
+        {
+            containerService.AssignCardToSlot(match.Id, _containerId, page, slot);
+        }
+        else
+        {
+            cardService.AddMissingCardToSlot(
+                BinderImportMatcher.ToCardMatch(import), import.Game, import.Condition,
+                import.IsFoil, import.FoilType, import.PurchasePrice, _containerId, page, slot);
+        }
+
+        _importCards.Remove(import);
+        PlacedAnyImport = true;
         Refresh();
     }
 
