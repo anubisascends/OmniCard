@@ -18,5 +18,11 @@ public interface ICardGameService
     IReadOnlyList<SetInfo> GetAvailableSets();
     Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null);
     List<MissingCard> GetMissingCards(string setCode, IEnumerable<string> ownedCollectorNumbers);
+
+    /// <summary>Every printing in <paramref name="setCode"/> (one row per collector number),
+    /// with catalog market prices, independent of ownership. Backs the Sets-tab checklist and
+    /// the printable want-list. Ordered by collector number (numeric-aware).</summary>
+    List<SetCatalogCard> GetSetCards(string setCode);
+
     object? FindCardById(string gameCardId);
 }

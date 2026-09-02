@@ -62,6 +62,7 @@ public class PriceUpdateServiceTests : IDisposable
         public IReadOnlyList<SetInfo> GetAvailableSets() => throw new NotImplementedException();
         public Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null) => throw new NotImplementedException();
         public List<MissingCard> GetMissingCards(string setCode, IEnumerable<string> ownedCollectorNumbers) => throw new NotImplementedException();
+        public List<SetCatalogCard> GetSetCards(string setCode) => [];
         public object? FindCardById(string gameCardId) => throw new NotImplementedException();
     }
 

@@ -10,7 +10,8 @@ Expected filenames (each maps to a placeholder in index.html):
 
   overview.png             The main window on first launch
   main-window-regions.png  Main window with the menu / toolbar / sidebar / status bar labelled
-  dashboard.png            The Dashboard tab (financial tiles + charts + stats)
+  dashboard.png            The Dashboard tab (financial tiles + charts)
+  sets-checklist.png       The Sets tab: a set's cards with check / ×N badges, missing ones dimmed
   collection.png           The Collection tab in Cards mode
   scanner.png              The Scanner tab mid-scan (queue + match)
   binder.png               The binder page-slot editor

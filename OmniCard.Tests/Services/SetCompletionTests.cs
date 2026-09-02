@@ -124,6 +124,7 @@ public class CardServiceAllGamesSetCompletionTests : IDisposable
             return Task.FromResult(new List<SetCompletionSummary> { summary });
         }
         public List<MissingCard> GetMissingCards(string setCode, IEnumerable<string> ownedCollectorNumbers) => [];
+        public List<SetCatalogCard> GetSetCards(string setCode) => [];
         public object? FindCardById(string gameCardId) => null;
     }
 
@@ -329,6 +330,38 @@ public class ScryfallSetCompletionTests : IDisposable
         var svc = CreateService();
         var missing = svc.GetMissingCards("setb", ["001", "002"]);
         Assert.Empty(missing);
+    }
+
+    [Fact]
+    public void GetSetCards_ReturnsEveryPrinting_SortedByCollectorNumber_WithGameCardId()
+    {
+        var svc = CreateService();
+        var cards = svc.GetSetCards("seta");
+
+        Assert.Equal(3, cards.Count); // ownership-independent: all 3 printings
+        Assert.Equal(["001", "002", "003"], cards.Select(c => c.CollectorNumber).ToArray());
+        // GameCardId is the Scryfall GUID and image is carried through for the tile.
+        Assert.Equal("00000000-0000-0000-0000-000000000001", cards[0].GameCardId);
+        Assert.All(cards, c => Assert.NotNull(c.ImageUri));
+    }
+
+    [Fact]
+    public void GetSetCards_ParsesNormalAndFoilPrices()
+    {
+        using (var ctx = _factory.CreateDbContext())
+        {
+            var priced = MakeCard("00000000-0000-0000-0000-0000000000aa", "Priced", "setp", "Set P", "001", "rare");
+            priced.Prices = new Prices { Usd = "1.50", UsdFoil = "4.00" };
+            ctx.Cards.Add(priced);
+            ctx.SaveChanges();
+        }
+
+        var svc = CreateService();
+        var card = Assert.Single(svc.GetSetCards("setp"));
+
+        Assert.Equal(1.50m, card.NormalPrice);
+        Assert.Equal(4.00m, card.FoilPrice);
+        Assert.True(card.HasFoil);
     }
 
     private class TestScryfallDbFactory(DbContextOptions<ScryfallDbContext> options) : IDbContextFactory<ScryfallDbContext>

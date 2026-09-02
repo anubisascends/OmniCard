@@ -766,6 +766,23 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
             .OrderBy(m => m.CollectorNumber).ToList();
     }
 
+    public List<SetCatalogCard> GetSetCards(string setCode)
+        => _readContext.Cards.AsNoTracking()
+            .Where(c => c.SetCode == setCode).AsEnumerable()
+            .GroupBy(c => c.CollectorNumber)
+            .Select(g => g.First())
+            .Select(c => new SetCatalogCard
+            {
+                GameCardId = c.ProductId.ToString(),
+                Name = c.Name, CollectorNumber = c.CollectorNumber,
+                SetCode = c.SetCode, SetName = c.SetName, Rarity = c.Rarity,
+                ImageUri = c.ImageUrl, LocalImagePath = c.LocalImagePath,
+                NormalPrice = c.MarketPrice, FoilPrice = c.FoilMarketPrice,
+                HasFoil = c.FoilMarketPrice.HasValue,
+            })
+            .OrderBy(c => c.CollectorNumber, CollectorNumberComparer.Instance)
+            .ToList();
+
     public List<CardMatch> SearchCards(string query, int maxResults = 20)
     {
         if (string.IsNullOrWhiteSpace(query)) return [];

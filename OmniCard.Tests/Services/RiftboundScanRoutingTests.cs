@@ -104,6 +104,7 @@ public class RiftboundScanRoutingTests : IDisposable
         public IReadOnlyList<SetInfo> GetAvailableSets() => [];
         public Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null) => Task.FromResult(new List<SetCompletionSummary>());
         public List<MissingCard> GetMissingCards(string setCode, IEnumerable<string> ownedCollectorNumbers) => [];
+        public List<SetCatalogCard> GetSetCards(string setCode) => [];
         public object? FindCardById(string gameCardId) => null;
     }
 

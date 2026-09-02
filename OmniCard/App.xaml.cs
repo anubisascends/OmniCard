@@ -86,6 +86,7 @@ public partial class App : Application
             services.AddSingleton<Views.Settings.ScannerSettingsViewModel>();
             services.AddSingleton<Views.Settings.ScannerCapabilitiesSettingsViewModel>();
             services.AddSingleton<Views.Settings.SettingsViewModel>();
+            services.AddSingleton<Views.Sets.SetsViewModel>();
             services.AddSingleton<RootViewModel>();
             services.AddSingleton<ScannerService>();
             services.AddSingleton<WebScannerService>();
@@ -155,6 +156,8 @@ public partial class App : Application
             // Location price sheet
             services.AddSingleton<IPriceSheetService, PriceSheetService>();
             services.AddSingleton<IPriceSheetPdfExporter, PriceSheetPdfExporter>();
+            services.AddSingleton<ISetChecklistService, SetChecklistService>();
+            services.AddSingleton<ISetChecklistPdfExporter, SetChecklistPdfExporter>();
 
             // Sales & fulfillment
             services.AddSingleton<ISalesSettingsService, SalesSettingsService>();

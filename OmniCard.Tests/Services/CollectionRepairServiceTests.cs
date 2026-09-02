@@ -169,6 +169,7 @@ public class CollectionRepairServiceTests : IDisposable
         public List<CardMatch> SearchCards(string query, int maxResults = 20) => [];
         public Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null) => Task.FromResult(new List<SetCompletionSummary>());
         public List<MissingCard> GetMissingCards(string setCode, IEnumerable<string> ownedCollectorNumbers) => [];
+        public List<SetCatalogCard> GetSetCards(string setCode) => [];
     }
 
     private sealed class MockOmniDbContextFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>

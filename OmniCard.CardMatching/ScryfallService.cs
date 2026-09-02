@@ -762,6 +762,28 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
             .ToList();
     }
 
+    public List<SetCatalogCard> GetSetCards(string setCode)
+        => _readContext.Cards.AsNoTracking()
+            .Where(c => c.SetCode == setCode).AsEnumerable()
+            .GroupBy(c => c.CollectorNumber).Select(g => g.First())
+            .Select(c => new SetCatalogCard
+            {
+                GameCardId = c.Id.ToString(),
+                Name = c.Name, CollectorNumber = c.CollectorNumber,
+                SetCode = c.SetCode, SetName = c.SetName, Rarity = c.Rarity,
+                ImageUri = c.ImageUris?.Normal ?? c.ImageUris?.Small,
+                LocalImagePath = c.LocalImagePath,
+                NormalPrice = ParseUsd(c.Prices?.Usd),
+                FoilPrice = ParseUsd(c.Prices?.UsdFoil) ?? ParseUsd(c.Prices?.UsdEtched),
+                HasFoil = c.Prices?.UsdFoil is not null || c.Prices?.UsdEtched is not null,
+            })
+            .OrderBy(c => c.CollectorNumber, CollectorNumberComparer.Instance)
+            .ToList();
+
+    private static decimal? ParseUsd(string? value)
+        => decimal.TryParse(value, System.Globalization.NumberStyles.Number,
+            System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : null;
+
     private string? LookupCardName(Guid cardId)
     {
         using var ctx = _dbContextFactory.CreateDbContext();
