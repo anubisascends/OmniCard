@@ -175,6 +175,7 @@ public class CardServiceCommitScansWorkflowTests : IDisposable
         public void EndAudit() { }
         public CardMatch? FindScopedMatch(ulong hash, ulong[]? artHashes) => null;
         public AuditReport GenerateReport(IEnumerable<ScannedCard> scannedCards) => throw new NotImplementedException();
+        public AuditReport GenerateFileAuditReport(int containerId, IEnumerable<CollectionCard> importedCards) => throw new NotImplementedException();
     }
 
     private class StubScannerSettingsService : IScannerSettingsService

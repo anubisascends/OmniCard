@@ -38,6 +38,19 @@ public sealed class AuditService : IAuditService
         _logger = logger;
     }
 
+    /// <summary>Loads the owned singles in a location as <see cref="CollectionCard"/> DTOs — the set
+    /// of cards a scan or an imported file is audited against. Shared by the scan and file paths.</summary>
+    private static List<CollectionCard> LoadExpectedCards(OmniCardDbContext omniCtx, int containerId)
+    {
+        return omniCtx.Lots
+            .AsNoTracking()
+            .Include(l => l.Product)
+            .Where(l => l.LocationId == containerId && l.Product.Category == ProductCategory.Single)
+            .ToList()
+            .Select(l => CollectionCardMapper.ToDto(l, l.Product, 0m))
+            .ToList();
+    }
+
     public void StartAudit(int containerId)
     {
         using var omniCtx = _omniDbFactory.CreateDbContext();
@@ -50,13 +63,7 @@ public sealed class AuditService : IAuditService
 
         // Load expected cards from the location — project Lots⋈Products (owned singles) into the
         // CollectionCard DTO shape, same as CardService's read facade.
-        _expectedCards = omniCtx.Lots
-            .AsNoTracking()
-            .Include(l => l.Product)
-            .Where(l => l.LocationId == containerId && l.Product.Category == ProductCategory.Single)
-            .ToList()
-            .Select(l => CollectionCardMapper.ToDto(l, l.Product, 0m))
-            .ToList();
+        _expectedCards = LoadExpectedCards(omniCtx, containerId);
 
         // Get distinct GameCardIds (as Guids) to build scoped hash index — filter server-side
         var gameCardGuids = _expectedCards
@@ -174,79 +181,211 @@ public sealed class AuditService : IAuditService
         if (_expectedCards is null)
             throw new InvalidOperationException("No audit is active");
 
-        var scans = scannedCards.ToList();
-
-        // Build a bag of expected cards (with duplicates for quantity)
-        var expectedBag = _expectedCards
-            .Select(c => (c.GameCardId, c.Name, c.SetCode, c.SetName, CollectorNumber: c.Number))
+        // A scanned card contributes one observation. Unmatched scans carry only an image path.
+        var observations = scannedCards.Select(scan => new AuditObservation(
+            GameCardId: scan.Match?.GameSpecificId,
+            Name: scan.Match?.Name,
+            SetCode: scan.Match?.SetCode,
+            CollectorNumber: scan.Match?.CollectorNumber,
+            SetName: scan.Match?.SetName,
+            Confidence: scan.Match?.Confidence,
+            Condition: scan.Condition,
+            IsFoil: scan.IsFoil,
+            FoilType: scan.FoilType,
+            ScanImagePath: scan.TempImagePath))
             .ToList();
+
+        // Condition/foil discrepancies are noise from a scanner (condition isn't detected), so the
+        // scan audit only reports presence — matched / missing / extra.
+        return BuildReport(AuditLocationName ?? "Unknown", _expectedCards, observations,
+            sourceLabel: "Scanned", detectMismatches: false);
+    }
+
+    public AuditReport GenerateFileAuditReport(int containerId, IEnumerable<CollectionCard> importedCards)
+    {
+        using var omniCtx = _omniDbFactory.CreateDbContext();
+        var container = omniCtx.StorageContainers.FirstOrDefault(c => c.Id == containerId)
+            ?? throw new InvalidOperationException($"Container {containerId} not found");
+
+        // Self-contained one-shot: load the location's expected cards fresh (independent of any
+        // active scan audit) and diff the imported file against them.
+        var expected = LoadExpectedCards(omniCtx, containerId);
+
+        var observations = importedCards.Select(c => new AuditObservation(
+            GameCardId: string.IsNullOrWhiteSpace(c.GameCardId) ? null : c.GameCardId,
+            Name: c.Name,
+            SetCode: c.SetCode,
+            CollectorNumber: c.Number,
+            SetName: c.SetName,
+            Confidence: null,
+            Condition: c.Condition,
+            IsFoil: c.IsFoil,
+            FoilType: c.FoilType,
+            ScanImagePath: null))
+            .ToList();
+
+        _logger.LogInformation("File audit for container {Id} ({Name}): {Expected} expected, {Observed} in file",
+            containerId, container.Name, expected.Count, observations.Count);
+
+        // A known-good export carries reliable condition/foil, so flag those discrepancies too.
+        return BuildReport(container.Name, expected, observations,
+            sourceLabel: "In File", detectMismatches: true);
+    }
+
+    /// <summary>One observed card from an audit source (a scan or an imported row), normalized so the
+    /// diff logic is source-agnostic.</summary>
+    private sealed record AuditObservation(
+        string? GameCardId,
+        string? Name,
+        string? SetCode,
+        string? CollectorNumber,
+        string? SetName,
+        double? Confidence,
+        string? Condition,
+        bool IsFoil,
+        string? FoilType,
+        string? ScanImagePath);
+
+    /// <summary>Diffs a set of observed cards against the expected cards of a location, producing the
+    /// matched / missing / extra buckets (and, when <paramref name="detectMismatches"/> is set,
+    /// condition/foil discrepancies). Each observation consumes at most one expected copy, matched
+    /// first by GameCardId and then by (set code + collector number) as a fallback.</summary>
+    private static AuditReport BuildReport(
+        string locationName,
+        List<CollectionCard> expected,
+        List<AuditObservation> observations,
+        string sourceLabel,
+        bool detectMismatches)
+    {
+        // Working copy — expected cards are removed as they're consumed; the remainder are "missing".
+        var expectedBag = expected.ToList();
 
         var matched = new List<AuditReportItem>();
         var extra = new List<AuditReportItem>();
+        var mismatched = new List<AuditReportItem>();
 
-        foreach (var scan in scans)
+        foreach (var obs in observations)
         {
-            if (scan.Match is not null)
+            var idx = FindExpectedIndex(expectedBag, obs);
+            if (idx >= 0)
             {
-                // Try to consume one expected card with the same GameCardId
-                var idx = expectedBag.FindIndex(e => e.GameCardId == scan.Match.GameSpecificId);
-                if (idx >= 0)
+                var consumed = expectedBag[idx];
+                expectedBag.RemoveAt(idx);
+
+                matched.Add(new AuditReportItem
                 {
-                    var consumed = expectedBag[idx];
-                    expectedBag.RemoveAt(idx);
-                    matched.Add(new AuditReportItem
-                    {
-                        Name = consumed.Name,
-                        SetCode = consumed.SetCode,
-                        SetName = consumed.SetName,
-                        CollectorNumber = consumed.CollectorNumber,
-                        GameCardId = consumed.GameCardId,
-                        Confidence = scan.Match.Confidence,
-                    });
-                }
-                else
+                    Name = consumed.Name,
+                    SetCode = consumed.SetCode,
+                    SetName = consumed.SetName,
+                    CollectorNumber = consumed.Number,
+                    GameCardId = consumed.GameCardId,
+                    Confidence = obs.Confidence,
+                });
+
+                if (detectMismatches)
                 {
-                    // Matched a card but it's not expected in this location
-                    extra.Add(new AuditReportItem
+                    var discrepancy = DescribeDiscrepancy(consumed, obs);
+                    if (discrepancy is not null)
                     {
-                        Name = scan.Match.Name,
-                        SetCode = scan.Match.SetCode,
-                        SetName = scan.Match.SetName,
-                        CollectorNumber = scan.Match.CollectorNumber,
-                        GameCardId = scan.Match.GameSpecificId,
-                        Confidence = scan.Match.Confidence,
-                        ScanImagePath = scan.TempImagePath,
-                    });
+                        mismatched.Add(new AuditReportItem
+                        {
+                            Name = consumed.Name,
+                            SetCode = consumed.SetCode,
+                            SetName = consumed.SetName,
+                            CollectorNumber = consumed.Number,
+                            GameCardId = consumed.GameCardId,
+                            Discrepancy = discrepancy,
+                        });
+                    }
                 }
             }
             else
             {
-                // Unmatched scan — extra with no card data
+                // Observed but not expected in this location (or an unidentified scan).
                 extra.Add(new AuditReportItem
                 {
-                    ScanImagePath = scan.TempImagePath,
+                    Name = obs.Name,
+                    SetCode = obs.SetCode,
+                    SetName = obs.SetName,
+                    CollectorNumber = obs.CollectorNumber,
+                    GameCardId = obs.GameCardId,
+                    Confidence = obs.Confidence,
+                    ScanImagePath = obs.ScanImagePath,
                 });
             }
         }
 
-        // Remaining expected cards are missing
+        // Whatever expected copies weren't consumed are missing from the audit source.
         var missing = expectedBag.Select(e => new AuditReportItem
         {
             Name = e.Name,
             SetCode = e.SetCode,
             SetName = e.SetName,
-            CollectorNumber = e.CollectorNumber,
+            CollectorNumber = e.Number,
             GameCardId = e.GameCardId,
         }).ToList();
 
         return new AuditReport
         {
-            LocationName = AuditLocationName ?? "Unknown",
-            ExpectedCount = _expectedCards.Count,
-            ActualCount = scans.Count,
+            LocationName = locationName,
+            SourceLabel = sourceLabel,
+            ExpectedCount = expected.Count,
+            ActualCount = observations.Count,
             Matched = matched,
             Missing = missing,
             Extra = extra,
+            Mismatched = mismatched,
         };
+    }
+
+    /// <summary>Finds the expected copy an observation should consume: first an exact GameCardId
+    /// match, then a (set code + collector number) fallback for sources without a resolvable id.
+    /// Returns -1 if nothing matches.</summary>
+    private static int FindExpectedIndex(List<CollectionCard> bag, AuditObservation obs)
+    {
+        if (!string.IsNullOrWhiteSpace(obs.GameCardId))
+        {
+            var byId = bag.FindIndex(e => string.Equals(e.GameCardId, obs.GameCardId, StringComparison.OrdinalIgnoreCase));
+            if (byId >= 0)
+                return byId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(obs.SetCode) && !string.IsNullOrWhiteSpace(obs.CollectorNumber))
+        {
+            return bag.FindIndex(e =>
+                Norm(e.SetCode) == Norm(obs.SetCode) &&
+                Norm(e.Number) == Norm(obs.CollectorNumber));
+        }
+
+        return -1;
+    }
+
+    private static string Norm(string? s) => (s ?? "").Trim().ToLowerInvariant();
+
+    /// <summary>Describes a condition/foil discrepancy between an expected copy and its matched
+    /// observation, or null if they agree. Condition is only compared when the source reports one.</summary>
+    private static string? DescribeDiscrepancy(CollectionCard expected, AuditObservation obs)
+    {
+        var parts = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(obs.Condition) &&
+            !string.Equals(expected.Condition, obs.Condition, StringComparison.OrdinalIgnoreCase))
+        {
+            parts.Add($"Condition {expected.Condition} → {obs.Condition}");
+        }
+
+        if (expected.IsFoil != obs.IsFoil)
+        {
+            parts.Add($"Foil {(expected.IsFoil ? "foil" : "normal")} → {(obs.IsFoil ? "foil" : "normal")}");
+        }
+        else if (expected.IsFoil && obs.IsFoil &&
+                 !string.IsNullOrWhiteSpace(obs.FoilType) &&
+                 !string.IsNullOrWhiteSpace(expected.FoilType) &&
+                 !string.Equals(expected.FoilType, obs.FoilType, StringComparison.OrdinalIgnoreCase))
+        {
+            parts.Add($"Foil type {expected.FoilType} → {obs.FoilType}");
+        }
+
+        return parts.Count > 0 ? string.Join("; ", parts) : null;
     }
 }

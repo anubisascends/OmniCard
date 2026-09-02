@@ -18,6 +18,7 @@
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <conv:NullToCollapsedConverter x:Key="NullToCollapsed"/>
         <conv:NullToVisibleConverter x:Key="NullToVisible"/>
+        <conv:NonZeroToVisibleConverter x:Key="CountToVis"/>
 
         <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource MaterialDesign.Brush.Foreground}"/>
@@ -71,7 +72,7 @@
                         <TextBlock Text="{Binding Report.ActualCount}" FontSize="20" FontWeight="Bold"
                                    Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
                                    HorizontalAlignment="Center"/>
-                        <TextBlock Text="Scanned" FontSize="10"
+                        <TextBlock Text="{Binding Report.SourceLabel, FallbackValue='Scanned'}" FontSize="10"
                                    Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
                                    HorizontalAlignment="Center"/>
                     </StackPanel>
@@ -93,6 +94,13 @@
                         <TextBlock Text="{Binding Report.Extra.Count}" FontSize="20" FontWeight="Bold"
                                    Foreground="DodgerBlue" HorizontalAlignment="Center"/>
                         <TextBlock Text="Extra" FontSize="10"
+                                   Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel Margin="12,0" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding Report.Mismatched.Count}" FontSize="20" FontWeight="Bold"
+                                   Foreground="#B8860B" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Mismatched" FontSize="10"
                                    Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
                                    HorizontalAlignment="Center"/>
                     </StackPanel>
@@ -256,6 +264,35 @@
                                             </DataTemplate>
                                         </GridViewColumn.CellTemplate>
                                     </GridViewColumn>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Expander>
+
+                    <!-- Mismatched (condition/foil discrepancies — file audits only) -->
+                    <Expander IsExpanded="True" Margin="0,0,0,6"
+                              Visibility="{Binding Report.Mismatched.Count, Converter={StaticResource CountToVis}}">
+                        <Expander.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Mismatched" Style="{StaticResource SectionHeaderStyle}"
+                                           Foreground="#B8860B"/>
+                                <TextBlock Text="{Binding Report.Mismatched.Count, StringFormat='({0})'}"
+                                           Style="{StaticResource CountBadgeStyle}"/>
+                            </StackPanel>
+                        </Expander.Header>
+                        <ListView ItemsSource="{Binding Report.Mismatched}"
+                                  MaxHeight="200"
+                                  SelectionMode="Single">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Name" Width="180"
+                                                    DisplayMemberBinding="{Binding Name}"/>
+                                    <GridViewColumn Header="Set" Width="55"
+                                                    DisplayMemberBinding="{Binding SetCode}"/>
+                                    <GridViewColumn Header="#" Width="45"
+                                                    DisplayMemberBinding="{Binding CollectorNumber}"/>
+                                    <GridViewColumn Header="Discrepancy" Width="200"
+                                                    DisplayMemberBinding="{Binding Discrepancy}"/>
                                 </GridView>
                             </ListView.View>
                         </ListView>

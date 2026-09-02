@@ -208,6 +208,92 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         wnd.ShowDialog();
     }
 
+    public BinderAuditChoice PromptBinderAuditMode(string locationName)
+    {
+        var app = Application.Current;
+        var dialog = new Window
+        {
+            Title = "Audit Binder",
+            SizeToContent = SizeToContent.WidthAndHeight,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            ShowInTaskbar = false,
+            Background = (System.Windows.Media.Brush)app.FindResource("MaterialDesign.Brush.Background"),
+            Foreground = (System.Windows.Media.Brush)app.FindResource("MaterialDesign.Brush.Foreground"),
+        };
+        SetOwner(dialog);
+
+        var choice = BinderAuditChoice.Cancel;
+
+        var markButton = new System.Windows.Controls.Button
+        {
+            Content = "Mark Pockets",
+            Padding = new Thickness(16, 6, 16, 6),
+            Margin = new Thickness(0, 0, 8, 0),
+            IsDefault = true,
+        };
+        var importButton = new System.Windows.Controls.Button
+        {
+            Content = "Import File…",
+            Padding = new Thickness(16, 6, 16, 6),
+            Margin = new Thickness(0, 0, 8, 0),
+        };
+        var cancelButton = new System.Windows.Controls.Button
+        {
+            Content = "Cancel",
+            Padding = new Thickness(16, 6, 16, 6),
+            IsCancel = true,
+        };
+
+        markButton.Click += (_, _) => { choice = BinderAuditChoice.Mark; dialog.DialogResult = true; };
+        importButton.Click += (_, _) => { choice = BinderAuditChoice.Import; dialog.DialogResult = true; };
+
+        var buttonPanel = new System.Windows.Controls.StackPanel
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 20, 0, 0),
+        };
+        buttonPanel.Children.Add(markButton);
+        buttonPanel.Children.Add(importButton);
+        buttonPanel.Children.Add(cancelButton);
+
+        var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(24), MaxWidth = 440 };
+        panel.Children.Add(new System.Windows.Controls.TextBlock
+        {
+            Text = $"How do you want to audit \"{locationName}\"?",
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            TextWrapping = TextWrapping.Wrap,
+        });
+        panel.Children.Add(new System.Windows.Controls.TextBlock
+        {
+            Text = "Mark Pockets walks the binder pocket by pocket to flag missing / wrong / extra "
+                 + "cards. Import File loads a known-good export (Manabox / Mythic Tools CSV) into a "
+                 + "tray you drag into the pockets to reconcile the binder.",
+            FontSize = 12,
+            Opacity = 0.8,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 8, 0, 0),
+        });
+        panel.Children.Add(buttonPanel);
+
+        dialog.Content = panel;
+        dialog.ShowDialog();
+        return choice;
+    }
+
+    public bool ShowBinderImportAudit(int containerId, IReadOnlyList<CollectionCard> importedCards)
+    {
+        // Reuses the full binder editor (page management, navigation, layout, slot context menu) with
+        // the imported cards seeded into the left-pane tray — see BinderViewModel.LoadForImportAudit.
+        var wnd = Services.GetRequiredService<Views.Binder.BinderView>();
+        SetOwner(wnd);
+        wnd.ViewModel.LoadForImportAudit(containerId, importedCards);
+        wnd.ShowDialog();
+        return wnd.ViewModel.PlacedAnyImport;
+    }
+
     public (int InsertIndex, bool DoubleSided)? InsertBinderPage(int containerId, int? nearPage)
     {
         var sheets = Services.GetRequiredService<IStorageContainerService>().GetSheets(containerId);
@@ -279,6 +365,80 @@ public sealed class DialogService(IServiceProvider services) : IDialogService
         SetOwner(wnd);
         wnd.ViewModel.Load(report);
         wnd.ShowDialog();
+    }
+
+    public AuditSourceChoice PromptAuditSource(string locationName)
+    {
+        var app = Application.Current;
+        var dialog = new Window
+        {
+            Title = "Audit Location",
+            SizeToContent = SizeToContent.WidthAndHeight,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            ShowInTaskbar = false,
+            Background = (System.Windows.Media.Brush)app.FindResource("MaterialDesign.Brush.Background"),
+            Foreground = (System.Windows.Media.Brush)app.FindResource("MaterialDesign.Brush.Foreground"),
+        };
+        SetOwner(dialog);
+
+        var choice = AuditSourceChoice.Cancel;
+
+        var scanButton = new System.Windows.Controls.Button
+        {
+            Content = "Scan Cards",
+            Padding = new Thickness(16, 6, 16, 6),
+            Margin = new Thickness(0, 0, 8, 0),
+            IsDefault = true,
+        };
+        var fileButton = new System.Windows.Controls.Button
+        {
+            Content = "Import File…",
+            Padding = new Thickness(16, 6, 16, 6),
+            Margin = new Thickness(0, 0, 8, 0),
+        };
+        var cancelButton = new System.Windows.Controls.Button
+        {
+            Content = "Cancel",
+            Padding = new Thickness(16, 6, 16, 6),
+            IsCancel = true,
+        };
+
+        scanButton.Click += (_, _) => { choice = AuditSourceChoice.Scan; dialog.DialogResult = true; };
+        fileButton.Click += (_, _) => { choice = AuditSourceChoice.File; dialog.DialogResult = true; };
+
+        var buttonPanel = new System.Windows.Controls.StackPanel
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 20, 0, 0),
+        };
+        buttonPanel.Children.Add(scanButton);
+        buttonPanel.Children.Add(fileButton);
+        buttonPanel.Children.Add(cancelButton);
+
+        var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(24), MaxWidth = 420 };
+        panel.Children.Add(new System.Windows.Controls.TextBlock
+        {
+            Text = $"How do you want to audit \"{locationName}\"?",
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            TextWrapping = TextWrapping.Wrap,
+        });
+        panel.Children.Add(new System.Windows.Controls.TextBlock
+        {
+            Text = "Scan Cards re-scans every card with your scanner. Import File compares a "
+                 + "known-good export (Manabox / Mythic Tools CSV) against what's stored here.",
+            FontSize = 12,
+            Opacity = 0.8,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 8, 0, 0),
+        });
+        panel.Children.Add(buttonPanel);
+
+        dialog.Content = panel;
+        dialog.ShowDialog();
+        return choice;
     }
 
     public bool? OpenEbayListingDialog(CollectionCard card)

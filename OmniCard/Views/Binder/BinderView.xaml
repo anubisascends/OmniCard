@@ -9,7 +9,7 @@
              ShowInTaskbar="False"
              WindowStartupLocation="CenterOwner"
              WindowState="Maximized"
-             Title="{Binding ContainerName, StringFormat='Binder — {0}'}"
+             Title="{Binding WindowTitle}"
              Height="900" Width="1400"
              Background="{DynamicResource MaterialDesign.Brush.Background}"
              TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
@@ -169,31 +169,39 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Left pane: unplaced cards, draggable into the binder grid -->
+        <!-- Left pane: unplaced cards (or, in an import audit, the imported-card tray), draggable
+             into the binder grid -->
         <DockPanel Grid.Column="0">
-            <TextBlock DockPanel.Dock="Top" Text="Unplaced Cards" FontWeight="Bold" FontSize="15" Margin="0,0,0,8"
+            <TextBlock DockPanel.Dock="Top" Text="{Binding UnplacedPaneTitle}" FontWeight="Bold" FontSize="15" Margin="0,0,0,8"
                        Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
 
-            <!-- Filters the Unplaced pool using the same Scryfall query syntax as the main
-                 collection search (server-side re-query), e.g. c:u, r>=rare, t:creature.
-                 Applies on Enter, like the main search box. -->
+            <!-- Import audit: how-to hint above the tray. -->
+            <TextBlock DockPanel.Dock="Top" Margin="0,0,0,8" TextWrapping="Wrap"
+                       Foreground="{DynamicResource MaterialDesign.Brush.Foreground.Light}"
+                       Visibility="{Binding IsImportAudit, Converter={conv:BoolToVisibilityConverter}}"
+                       Text="Drag each imported card into the pocket where it physically sits. It's placed right away — matching a copy you already own, or added new if you don't."/>
+
+            <!-- Filters the pool. Normal mode uses the same Scryfall query syntax as the main
+                 collection search (server-side re-query), e.g. c:u, r>=rare; import mode filters the
+                 tray by name. Applies on Enter, like the main search box. -->
             <TextBox x:Name="UnplacedQuickFilterBox"
                      DockPanel.Dock="Top"
                      Margin="0,0,0,6"
                      Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
-                     materialDesign:HintAssist.Hint="Filter (Scryfall syntax) — e.g. c:u, r>=rare"
+                     materialDesign:HintAssist.Hint="{Binding UnplacedFilterHint}"
                      Text="{Binding UnplacedFilterQuery, UpdateSourceTrigger=PropertyChanged}">
                 <TextBox.InputBindings>
                     <KeyBinding Key="Return" Command="{Binding ApplyUnplacedFilterCommand}"/>
                 </TextBox.InputBindings>
             </TextBox>
 
+            <!-- ContextMenu is suppressed in import mode: tray cards are imported (not real lots yet),
+                 so the lot-level actions (delete, list, tags, …) don't apply until they're placed. -->
             <ListBox x:Name="UnplacedListBox"
                      ItemsSource="{Binding UnplacedCards}"
                      ItemTemplate="{StaticResource CardTileTemplate}"
                      SelectionMode="Extended"
                      HorizontalContentAlignment="Stretch"
-                     ContextMenu="{StaticResource BinderCardContextMenu}"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                      ScrollViewer.CanContentScroll="True"
@@ -206,6 +214,18 @@
                      PreviewMouseRightButtonDown="UnplacedListBox_PreviewMouseRightButtonDown"
                      PreviewTextInput="UnplacedListBox_PreviewTextInput"
                      PreviewKeyDown="UnplacedListBox_PreviewKeyDown">
+                <!-- BasedOn the implicit MaterialDesign ListBox style so we keep the themed
+                     background/foreground — a bare TargetType style would revert to a white default. -->
+                <ListBox.Style>
+                    <Style TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
+                        <Setter Property="ContextMenu" Value="{StaticResource BinderCardContextMenu}"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsImportAudit}" Value="True">
+                                <Setter Property="ContextMenu" Value="{x:Null}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ListBox.Style>
                 <ListBox.ItemsPanel>
                     <ItemsPanelTemplate>
                         <vwp:VirtualizingWrapPanel Orientation="Horizontal" SpacingMode="None"/>
@@ -256,7 +276,7 @@
         <!-- Right pane: current two-page spread -->
         <DockPanel Grid.Column="2" Margin="12,0,0,0">
             <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
-                <TextBlock Text="{Binding ContainerName, StringFormat='Binder — {0}'}" FontWeight="Bold" FontSize="15"
+                <TextBlock Text="{Binding WindowTitle}" FontWeight="Bold" FontSize="15"
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"/>
                 <TextBlock VerticalAlignment="Center" Margin="12,0,0,0"

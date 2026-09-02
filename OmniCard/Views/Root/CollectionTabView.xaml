@@ -98,10 +98,11 @@
                         RelativeSource={RelativeSource AncestorType=Window},
                         Converter={conv:BoolToVisibilityConverter}}"/>
 
-                    <!-- Audit button (single location only) -->
+                    <!-- Audit button (single location only). Routes through AuditContainer so it
+                         prompts (scan vs import, or mark vs import for binders) like the tile menu. -->
                     <Button Content="Audit"
                             Style="{StaticResource SingleLocationButtonStyle}"
-                            Command="{Binding DataContext.ViewModel.StartAuditCommand,
+                            Command="{Binding DataContext.ViewModel.AuditContainerCommand,
                                 RelativeSource={RelativeSource AncestorType=Window}}"
                             CommandParameter="{Binding DataContext.ViewModel.Collection.CurrentLocationId,
                                 RelativeSource={RelativeSource AncestorType=Window}}"/>
