@@ -1409,10 +1409,18 @@ public sealed class CardService : ICardService
             int cropW = right - left + 1;
             int cropH = bottom - top + 1;
 
-            // Skip if the card already fills the frame (no crop needed)
-            if (cropW >= w * 0.95 && cropH >= h * 0.95)
+            // Skip only when the card is already flush to all four edges. A thin (~1mm)
+            // white scanner border is just a few pixels per side, but every fractional
+            // OCR/art crop region (name, set symbol, bottom-left set+collector) is measured
+            // from the frame edges — so even a small uniform border shifts them off the card
+            // and clips the low, tight collector-number strip. Trimming it here re-anchors
+            // every downstream region at once. The old 5% tolerance left these borders in.
+            int borderInset = Math.Max(
+                Math.Max(left, top),
+                Math.Max(w - 1 - right, h - 1 - bottom));
+            if (borderInset <= 2)
             {
-                _logger.LogDebug("Auto-crop: card fills frame ({W}x{H}), no crop needed", w, h);
+                _logger.LogDebug("Auto-crop: card already flush to frame ({W}x{H}), no crop needed", w, h);
                 input.Position = 0;
                 return input;
             }
