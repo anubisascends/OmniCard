@@ -13,7 +13,7 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance {x:Type local:RootView}}"
-        Title="TCG Card Scanner"
+        Title="OmniCard"
         Icon="/Resources/Images/OmniCard_Logo.png"
         Height="600"
         Width="1000"
@@ -418,7 +418,21 @@
         </TabControl>
 
         <StatusBar Grid.Row="3">
-            <StatusBarItem>v0.2</StatusBarItem>
+            <StatusBarItem Content="{Binding ViewModel.AppVersion}"/>
+            <!-- Non-intrusive "update available" hint: hidden unless a newer GitHub release exists.
+                 Clicking opens the release page in the browser. No popups, checked once per launch. -->
+            <StatusBarItem Visibility="{Binding ViewModel.UpdateAvailable, Converter={conv:BoolToVisibilityConverter}}">
+                <Button Style="{StaticResource MaterialDesignFlatButton}"
+                        Command="{Binding ViewModel.OpenReleasePageCommand}"
+                        ToolTip="{Binding ViewModel.UpdateTooltip}"
+                        Padding="6,0" MinWidth="0" Height="22"
+                        Foreground="{DynamicResource MaterialDesign.Brush.Primary}">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="ArrowUpBoldCircleOutline" Width="14" Height="14" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding ViewModel.UpdatePrompt}" Margin="4,0,0,0" VerticalAlignment="Center" FontSize="11"/>
+                    </StackPanel>
+                </Button>
+            </StatusBarItem>
             <StatusBarItem Content="{Binding ViewModel.Message}"/>
             <StatusBarItem Content="{Binding ViewModel.PriceUpdates.StatusText}"
                            Visibility="{Binding ViewModel.PriceUpdates.IsRunning, Converter={conv:BoolToVisibilityConverter}}"/>

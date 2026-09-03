@@ -75,12 +75,15 @@
       <p>Along the bottom edge:</p>
       <table class="ref">
         <tr><th>Element</th><th>Meaning</th></tr>
-        <tr><td>Version</td><td>The running app version.</td></tr>
+        <tr><td>Version</td><td>The running app version (e.g. <code>v1.2.0</code>), matching the release tag it was built from.</td></tr>
+        <tr><td>Update available</td><td>A small <strong>"vX.Y.Z available"</strong> link appears next to the version only when a newer release exists on GitHub. Click it to open the release page in your browser. It never pops up or interrupts you; the app checks quietly once per launch and stays silent when you're up to date or offline.</td></tr>
         <tr><td>Status message</td><td>What the app is currently doing (e.g. "Refreshing prices…").</td></tr>
         <tr><td>Price-update progress</td><td>A progress indicator while catalog/price data downloads.</td></tr>
         <tr><td>Diagnostics count</td><td>Number of diagnostic events logged this session — click to open the Log Viewer.</td></tr>
         <tr><td>eBay status</td><td>Whether an eBay account is connected.</td></tr>
       </table>
+      <p>The version is derived automatically from the project's GitHub release tag at build time, so
+         it always reflects the actual build you're running.</p>
     </section>
 
     <!-- ===================== VIEWS ===================== -->

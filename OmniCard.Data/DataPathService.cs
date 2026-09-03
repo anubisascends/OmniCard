@@ -7,15 +7,6 @@ namespace OmniCard.Data;
 
 public sealed class DataPathService : IDataPathService
 {
-    private static readonly string DefaultDataDirectory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "OmniCard");
-
-    // Legacy path for users upgrading from TCGCardScanner
-    private static readonly string LegacyDataDirectory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "TCGCardScanner");
-
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -23,12 +14,29 @@ public sealed class DataPathService : IDataPathService
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
+    // The OmniCard-branded default data directory, and the legacy TCGCardScanner directory a user
+    // upgrading from the old app would already have. Computed from the local-app-data root so they
+    // can be pointed at a temp folder in tests.
+    private readonly string _defaultDataDirectory;
+    private readonly string _legacyDataDirectory;
+
     private readonly string _configPath;
     private string _dataDirectory;
     private string? _pendingDataDirectory;
 
     public DataPathService(string baseDirectory)
+        : this(baseDirectory, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData))
     {
+    }
+
+    /// <summary>
+    /// Testable overload. <paramref name="localAppDataRoot"/> is the directory under which the
+    /// <c>OmniCard</c> (default) and <c>TCGCardScanner</c> (legacy) data folders live.
+    /// </summary>
+    public DataPathService(string baseDirectory, string localAppDataRoot)
+    {
+        _defaultDataDirectory = Path.Combine(localAppDataRoot, "OmniCard");
+        _legacyDataDirectory = Path.Combine(localAppDataRoot, "TCGCardScanner");
         _configPath = Path.Combine(baseDirectory, "datapath.json");
         (_dataDirectory, _pendingDataDirectory) = LoadConfig();
     }
@@ -70,23 +78,30 @@ public sealed class DataPathService : IDataPathService
 
     private (string dataDir, string? pendingDir) LoadConfig()
     {
-        if (!File.Exists(_configPath))
+        // A saved config means the user explicitly chose a data directory (the default or a custom
+        // location, via the migration flow) — respect it and do nothing else. This covers the
+        // "user put a directory somewhere on purpose" case.
+        if (File.Exists(_configPath))
         {
-            // If legacy data directory exists but new one doesn't, use legacy path
-            if (Directory.Exists(LegacyDataDirectory) && !Directory.Exists(DefaultDataDirectory))
-                return (LegacyDataDirectory, null);
+            var json = File.ReadAllText(_configPath);
+            var config = JsonSerializer.Deserialize<DataPathConfig>(json, JsonOptions);
 
-            return (DefaultDataDirectory, null);
+            var configuredDir = string.IsNullOrWhiteSpace(config?.DataDirectory)
+                ? _defaultDataDirectory
+                : config.DataDirectory;
+
+            return (configuredDir, config?.PendingDataDirectory);
         }
 
-        var json = File.ReadAllText(_configPath);
-        var config = JsonSerializer.Deserialize<DataPathConfig>(json, JsonOptions);
+        // No explicit choice yet. If a legacy TCGCardScanner data directory already exists, keep
+        // using it (upgrade in place, preserving the user's existing data). Note we do NOT require
+        // the OmniCard folder to be absent: it is always created early for settings, so gating on
+        // its absence would wrongly hide legacy data. Otherwise fall back to the OmniCard-branded
+        // default, which startup creates on demand.
+        if (Directory.Exists(_legacyDataDirectory))
+            return (_legacyDataDirectory, null);
 
-        var dataDir = string.IsNullOrWhiteSpace(config?.DataDirectory)
-            ? DefaultDataDirectory
-            : config.DataDirectory;
-
-        return (dataDir, config?.PendingDataDirectory);
+        return (_defaultDataDirectory, null);
     }
 
     private void SaveConfig()

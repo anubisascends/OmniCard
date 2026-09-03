@@ -144,6 +144,7 @@ public partial class App : Application
                 options.UseSqlite($"Data Source={Path.Combine(DataPathServiceInstance.DataDirectory, "inventory.db")}"));
             services.AddSingleton<IInventoryService, InventoryService>();
             services.AddSingleton<IUpcLookupService, UpcLookupService>();
+            services.AddSingleton<IUpdateCheckService, UpdateCheckService>();
             services.AddSingleton<IAnalyticsService, AnalyticsService>();
             services.AddSingleton<ISealedPriceUpdateService, SealedPriceUpdateService>();
             services.AddSingleton<ITradeImportService, TradeImportService>();

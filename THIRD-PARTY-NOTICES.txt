@@ -147,6 +147,16 @@ Homepage:    https://github.com/mnottale/AdysTech.CredentialManager
 Copyright (c) AdysTech and contributors.
 
 --------------------------------------------------------------------------------
+MinVer 7.0.0 — MIT License (build-time tool, NOT distributed)
+--------------------------------------------------------------------------------
+Homepage:    https://github.com/adamralph/minver
+License:     MIT License
+Used only at build time to derive the assembly version from git tags
+(PrivateAssets="all"). It is not bundled with or shipped in OmniCard; listed here
+for completeness of the dependency inventory.
+Copyright (c) Adam Ralph and contributors.
+
+--------------------------------------------------------------------------------
 Card data & imagery
 --------------------------------------------------------------------------------
 Card data, prices, and images are provided by third parties including Scryfall

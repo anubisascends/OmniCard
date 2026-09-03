@@ -11,7 +11,10 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # fetch-depth: 0 pulls full history + tags so MinVer can derive the version from the git tag.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4

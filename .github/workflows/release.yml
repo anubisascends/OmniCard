@@ -18,7 +18,10 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # fetch-depth: 0 pulls full history + tags so MinVer can derive the version from the release tag.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -35,7 +38,7 @@ jobs:
       - name: Publish desktop app
         run: >
           dotnet publish OmniCard/OmniCard.csproj -c Release -r win-x64
-          -p:Version=${{ steps.version.outputs.VERSION }}
+          -p:MinVerVersionOverride=${{ steps.version.outputs.VERSION }}
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
           --self-contained true
@@ -62,7 +65,7 @@ jobs:
         run: >
           dotnet publish OmniCard.Web/OmniCard.Web.csproj -c Release -r win-x64
           --self-contained false
-          -p:Version=${{ steps.version.outputs.VERSION }}
+          -p:MinVerVersionOverride=${{ steps.version.outputs.VERSION }}
           -o publish-web
 
       - name: Package web companion release

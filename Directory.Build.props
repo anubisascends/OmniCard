@@ -1,15 +1,25 @@
 <Project>
 
-  <!-- Solution-wide assembly/product metadata. Consumed at runtime by the About dialog
-       (reads AssemblyInformationalVersion / product / company) and stamped into every
-       assembly in the solution. Bump <Version> on each release. -->
+  <!-- Solution-wide assembly/product metadata. Consumed at runtime by the About dialog and the
+       status-bar version label (both read AssemblyInformationalVersion via Helpers.AppVersionInfo)
+       and stamped into every assembly in the solution.
+
+       The version is derived automatically from git tags by MinVer (see the PackageReference
+       below) so it always reflects the current tag on GitHub — no manual bump needed. On a commit
+       tagged e.g. `v1.2.0` the version is `1.2.0`; on commits after a tag it is the next
+       pre-release (e.g. `1.2.1-alpha.0.3`). MinVerTagPrefix="v" matches our `vX.Y.Z` tag scheme. -->
   <PropertyGroup>
-    <Version>1.0.0</Version>
-    <InformationalVersion>1.0.0</InformationalVersion>
     <Product>OmniCard</Product>
     <Company>Andrew Riebe</Company>
     <Authors>Andrew Riebe</Authors>
     <Copyright>Copyright © 2026 Andrew Riebe</Copyright>
+    <MinVerTagPrefix>v</MinVerTagPrefix>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Build-time only (PrivateAssets=all): computes Version/AssemblyVersion/FileVersion/
+         InformationalVersion from git tags. Not shipped in the app. -->
+    <PackageReference Include="MinVer" Version="7.0.0" PrivateAssets="all" />
+  </ItemGroup>
 
 </Project>

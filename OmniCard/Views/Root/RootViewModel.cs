@@ -54,6 +54,7 @@ public sealed partial class RootViewModel(
     ISealedPriceUpdateService sealedPriceUpdateService,
     ITagService tagService,
     IScanSessionService scanSessionService,
+    IUpdateCheckService updateCheckService,
     ILogger<RootViewModel> logger) : ViewModel
 {
     private readonly ILogger<RootViewModel> _logger = logger;
@@ -64,6 +65,62 @@ public sealed partial class RootViewModel(
     private CardGame? _previousGame;
 
     public PriceUpdateService PriceUpdates => priceUpdateService;
+
+    /// <summary>Running app version for the status bar (e.g. <c>v1.2.0</c>), read from the entry
+    /// assembly (stamped by MinVer from the current git tag).</summary>
+    public string AppVersion => Helpers.AppVersionInfo.Display;
+
+    /// <summary>True when a newer OmniCard release exists on GitHub; drives the status-bar notice.</summary>
+    [ObservableProperty]
+    public partial bool UpdateAvailable { get; set; }
+
+    /// <summary>Short status-bar label for the update notice (e.g. <c>v1.3.0 available</c>).</summary>
+    [ObservableProperty]
+    public partial string UpdatePrompt { get; set; } = "";
+
+    /// <summary>Tooltip shown on the update notice.</summary>
+    [ObservableProperty]
+    public partial string UpdateTooltip { get; set; } = "";
+
+    private string? _releaseUrl;
+
+    /// <summary>Opens the GitHub release page for the available update in the default browser.</summary>
+    [RelayCommand]
+    private void OpenReleasePage()
+    {
+        if (string.IsNullOrWhiteSpace(_releaseUrl)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_releaseUrl) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to open release page {Url}", _releaseUrl);
+        }
+    }
+
+    /// <summary>
+    /// Best-effort, non-intrusive background check for a newer GitHub release. Runs once per launch;
+    /// any failure (offline, rate-limited) silently leaves the notice hidden. Exposed as a Task so
+    /// tests can await the completion (see async-vm-test-determinism).
+    /// </summary>
+    public async Task CheckForUpdatesAsync()
+    {
+        try
+        {
+            var result = await updateCheckService.CheckForUpdateAsync(Helpers.AppVersionInfo.Version);
+            if (result is null || !result.UpdateAvailable) return;
+
+            _releaseUrl = result.ReleaseUrl;
+            UpdatePrompt = $"v{result.LatestVersion} available";
+            UpdateTooltip = $"OmniCard v{result.LatestVersion} is available (you have v{result.CurrentVersion}). Click to view the release.";
+            UpdateAvailable = true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Update check failed");
+        }
+    }
 
     public string PhoneScanUrl
     {
@@ -1360,6 +1417,9 @@ public sealed partial class RootViewModel(
 
         IsEbayConnected = ebayAuthService.IsConnected;
         RefreshDiagnosticCount();
+
+        // Non-intrusive: check GitHub for a newer release in the background (fire-and-forget).
+        _ = CheckForUpdatesAsync();
 
         // Start eBay listing sync timer (every 5 minutes)
         if (ebayAuthService.IsConnected)

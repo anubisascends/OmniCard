@@ -30,21 +30,12 @@ public sealed partial class AboutViewModel : ViewModel
     public AboutViewModel()
     {
         var asm = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
-        var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
         var product = asm.GetCustomAttribute<AssemblyProductAttribute>()?.Product;
         var copyright = asm.GetCustomAttribute<AssemblyCopyrightAttribute>()?.Copyright;
 
-        // InformationalVersion often carries a "+<git-sha>" build suffix — trim it for display.
-        if (!string.IsNullOrWhiteSpace(info))
-        {
-            var plus = info.IndexOf('+');
-            if (plus >= 0) info = info[..plus];
-        }
-
         ProductName = string.IsNullOrWhiteSpace(product) ? "OmniCard" : product;
-        Version = string.IsNullOrWhiteSpace(info)
-            ? (asm.GetName().Version?.ToString() ?? "1.0.0")
-            : info;
+        // Single source of truth for the running version (stamped by MinVer from the git tag).
+        Version = Helpers.AppVersionInfo.Version;
         Copyright = string.IsNullOrWhiteSpace(copyright) ? "Copyright © 2026 Andrew Riebe" : copyright;
         Framework = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
 
@@ -86,6 +77,7 @@ public sealed partial class AboutViewModel : ViewModel
         new("SharpVectors.Wpf", "1.8.5", "BSD-3-Clause", "https://github.com/ElinamLLC/SharpVectors"),
         new("VirtualizingWrapPanel", "2.5.3", "MIT", "https://github.com/sbaeumlisberger/VirtualizingWrapPanel"),
         new("AdysTech.CredentialManager", "3.1.0", "Apache-2.0", "https://github.com/mnottale/AdysTech.CredentialManager"),
+        new("MinVer (build-time versioning tool; not shipped)", "7.0.0", "MIT", "https://github.com/adamralph/minver"),
     ];
 }
 

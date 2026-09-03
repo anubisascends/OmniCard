@@ -21,21 +21,51 @@ public class DataPathServiceTests : IDisposable
             Directory.Delete(_tempDir, true);
     }
 
-    private DataPathService CreateService() => new(_tempDir);
+    // Use the temp dir as BOTH the config base and the local-app-data root, so the OmniCard/
+    // TCGCardScanner folder probing is hermetic and never touches the real %LOCALAPPDATA%.
+    private DataPathService CreateService() => new(_tempDir, _tempDir);
+
+    private string DefaultDir => Path.Combine(_tempDir, "OmniCard");
+    private string LegacyDir => Path.Combine(_tempDir, "TCGCardScanner");
 
     [Fact]
-    public void NoConfigFile_DefaultsToLocalAppData()
+    public void NoConfig_NeitherFolderExists_DefaultsToOmniCard()
     {
         var service = CreateService();
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var defaultPath = Path.Combine(localAppData, "OmniCard");
-        var legacyPath = Path.Combine(localAppData, "TCGCardScanner");
+        Assert.Equal(DefaultDir, service.DataDirectory);
+    }
 
-        // Falls back to legacy path if it exists and new default doesn't
-        var expected = Directory.Exists(legacyPath) && !Directory.Exists(defaultPath)
-            ? legacyPath
-            : defaultPath;
-        Assert.Equal(expected, service.DataDirectory);
+    [Fact]
+    public void NoConfig_LegacyFolderExists_UsesLegacy()
+    {
+        Directory.CreateDirectory(LegacyDir);
+
+        var service = CreateService();
+        Assert.Equal(LegacyDir, service.DataDirectory);
+    }
+
+    [Fact]
+    public void NoConfig_LegacyAndDefaultBothExist_PrefersLegacy()
+    {
+        // The OmniCard folder is always created early (for settings), so legacy must still win
+        // when both are present.
+        Directory.CreateDirectory(LegacyDir);
+        Directory.CreateDirectory(DefaultDir);
+
+        var service = CreateService();
+        Assert.Equal(LegacyDir, service.DataDirectory);
+    }
+
+    [Fact]
+    public void ConfigWithCustomPath_IgnoresLegacyFolder()
+    {
+        // An explicit user choice wins even if a legacy folder is lying around.
+        Directory.CreateDirectory(LegacyDir);
+        var customPath = Path.Combine(_tempDir, "custom-data");
+        File.WriteAllText(_configPath, JsonSerializer.Serialize(new { dataDirectory = customPath }));
+
+        var service = CreateService();
+        Assert.Equal(customPath, service.DataDirectory);
     }
 
     [Fact]
