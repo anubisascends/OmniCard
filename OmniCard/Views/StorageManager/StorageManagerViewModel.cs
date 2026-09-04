@@ -1,14 +1,13 @@
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Options;
+using OmniCard.Helpers;
 using OmniCard.Interfaces;
 using OmniCard.Models;
 
@@ -16,76 +15,123 @@ namespace OmniCard.Views.StorageManager;
 
 public sealed partial class StorageManagerViewModel(
     IStorageContainerService containerService,
-    IOptionsMonitor<WebCompanionSettings> webCompanionSettings) : ViewModel
+    IOptionsMonitor<WebCompanionSettings> webCompanionSettings,
+    IDataPathService dataPathService) : ViewModel
 {
-    public ObservableCollection<ContainerDisplayItem> Containers { get; } = [];
-    public ListCollectionView GroupedContainers { get; private set; } = null!;
+    // The editable container types shown as groups, in display order. The system Bulk location is
+    // deliberately excluded — it can't be edited, added to, renamed, or deleted.
+    private static readonly (ContainerType Type, string Display)[] EditableGroups =
+    [
+        (ContainerType.Binder, "Binder"),
+        (ContainerType.Box, "Box"),
+        (ContainerType.DeckBox, "Deck Box"),
+        (ContainerType.DisplayCase, "Display Case"),
+    ];
 
-    [ObservableProperty]
-    public partial ContainerDisplayItem? SelectedContainer { get; set; }
+    public ObservableCollection<LocationGroupViewModel> Groups { get; } = [];
 
-    [ObservableProperty]
-    public partial string NewContainerName { get; set; } = "";
-
-    [ObservableProperty]
-    public partial ContainerType NewContainerType { get; set; } = ContainerType.Binder;
-
-    [ObservableProperty]
-    public partial int NewSlotsPerPage { get; set; } = 9;
-
-    public bool ShowSlotsPerPage => NewContainerType == ContainerType.Binder;
-
-    partial void OnNewContainerTypeChanged(ContainerType value) => OnPropertyChanged(nameof(ShowSlotsPerPage));
-
-    [ObservableProperty]
-    public partial bool IsAdding { get; set; }
-
-    [ObservableProperty]
-    public partial bool IsEditing { get; set; }
-
-    [ObservableProperty]
-    public partial string EditName { get; set; } = "";
+    // Every existing container name (including the system Bulk location), lower-cased, for live
+    // uniqueness validation in the inline add/rename fields. Rebuilt on each Load().
+    private readonly HashSet<string> _allNames = new(StringComparer.OrdinalIgnoreCase);
 
     [ObservableProperty]
     public partial string BaseUrl { get; set; } = "";
 
     public Action? CloseDialog { get; set; }
 
-    partial void OnSelectedContainerChanged(ContainerDisplayItem? value)
-    {
-        OnPropertyChanged(nameof(CanEdit));
-        OnPropertyChanged(nameof(CanDelete));
-    }
-
-    public bool CanEdit => SelectedContainer is { IsSystem: false };
-    public bool CanDelete => SelectedContainer is not null && !SelectedContainer.IsSystem;
-
     public void Load()
     {
         BaseUrl = webCompanionSettings.CurrentValue.BaseUrl;
-        var previousSelectedId = SelectedContainer?.Id;
-        Containers.Clear();
-        foreach (var c in containerService.GetAll().OrderBy(c => c.ContainerType).ThenBy(c => c.Name))
+
+        var all = containerService.GetAll();
+        _allNames.Clear();
+        foreach (var c in all)
+            _allNames.Add(c.Name);
+
+        // Build the four editable groups once (preserving expander/typing state across reloads),
+        // then refill each with its (non-system) containers.
+        if (Groups.Count == 0)
         {
-            Containers.Add(new ContainerDisplayItem
+            var expanded = StorageManagerUiState.LoadExpandedState(dataPathService.DataDirectory);
+            foreach (var (type, display) in EditableGroups)
             {
-                Id = c.Id,
-                Name = c.Name,
-                ContainerType = c.ContainerType,
-                IsSystem = c.IsSystem,
-                CardCount = containerService.GetCardCount(c.Id),
-                ExcludeFromDeckCheck = c.ExcludeFromDeckCheck,
-                AlwaysAvailable = c.AlwaysAvailable,
-            });
+                var isExpanded = expanded.GetValueOrDefault(type.ToString(), true);
+                Groups.Add(new LocationGroupViewModel(this, type, display, isExpanded));
+            }
         }
 
-        GroupedContainers = new ListCollectionView(Containers);
-        GroupedContainers.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ContainerDisplayItem.TypeDisplay)));
-        OnPropertyChanged(nameof(GroupedContainers));
+        foreach (var group in Groups)
+        {
+            group.Items.Clear();
+            foreach (var c in all
+                         .Where(c => !c.IsSystem && c.ContainerType == group.ContainerType)
+                         .OrderBy(c => c.Name))
+            {
+                group.Items.Add(new ContainerDisplayItem
+                {
+                    Id = c.Id,
+                    Name = c.Name,
+                    ContainerType = c.ContainerType,
+                    IsSystem = c.IsSystem,
+                    CardCount = containerService.GetCardCount(c.Id),
+                    ExcludeFromDeckCheck = c.ExcludeFromDeckCheck,
+                    AlwaysAvailable = c.AlwaysAvailable,
+                });
+            }
+            group.RevalidateNewName();
+        }
+    }
 
-        // Restore selection if the item still exists
-        if (previousSelectedId is not null)
-            SelectedContainer = Containers.FirstOrDefault(c => c.Id == previousSelectedId);
+    /// <summary>True if <paramref name="name"/> (trimmed, case-insensitive) is already taken by any
+    /// container, including the reserved system Bulk location. <paramref name="excludeId"/> ignores
+    /// one container (for rename-to-same-name).</summary>
+    public bool NameInUse(string name, int? excludeId = null)
+    {
+        var trimmed = (name ?? "").Trim();
+        if (trimmed.Length == 0) return false;
+        if (excludeId is null)
+            return _allNames.Contains(trimmed);
+
+        // Exclude the container being renamed by comparing against every other name.
+        return containerService.NameExists(trimmed, excludeId);
+    }
+
+    public void AddLocation(ContainerType type, string name)
+    {
+        // Binders default to 9 slots/page (adjustable later in the binder view); ignored otherwise.
+        containerService.Create(name.Trim(), type, slotsPerPage: 9);
+        Load();
+    }
+
+    public bool TryRename(int id, string newName, out string? error)
+    {
+        var trimmed = (newName ?? "").Trim();
+        if (trimmed.Length == 0)
+        {
+            error = "Name can't be empty.";
+            return false;
+        }
+        if (containerService.NameExists(trimmed, excludeId: id))
+        {
+            error = "This name is already in use";
+            return false;
+        }
+        containerService.Rename(id, trimmed);
+        Load();
+        error = null;
+        return true;
+    }
+
+    public void DeleteLocation(int id, bool moveCardsToBulk)
+    {
+        containerService.Delete(id, moveCardsToBulk);
+        Load();
+    }
+
+    internal void SaveCollapseState()
+    {
+        var state = Groups.ToDictionary(g => g.ContainerType.ToString(), g => g.IsExpanded);
+        StorageManagerUiState.SaveExpandedState(dataPathService.DataDirectory, state);
     }
 
     [RelayCommand]
@@ -95,109 +141,6 @@ public sealed partial class StorageManagerViewModel(
             return;
         var text = $"displaybarcode \"{BaseUrl.TrimEnd('/')}/location/{containerId}\" QR \\q 3";
         System.Windows.Clipboard.SetText(text);
-    }
-
-    [RelayCommand]
-    public void ShowAdd()
-    {
-        IsAdding = true;
-        IsEditing = false;
-        NewContainerName = "";
-        NewContainerType = ContainerType.Binder;
-        NewSlotsPerPage = 9;
-    }
-
-    [RelayCommand]
-    public void ConfirmAdd()
-    {
-        if (string.IsNullOrWhiteSpace(NewContainerName))
-            return;
-
-        containerService.Create(NewContainerName.Trim(), NewContainerType, NewSlotsPerPage);
-        IsAdding = false;
-        Load();
-    }
-
-    [RelayCommand]
-    public void CancelAdd()
-    {
-        IsAdding = false;
-    }
-
-    [RelayCommand]
-    public void ShowEdit()
-    {
-        if (SelectedContainer is null || SelectedContainer.IsSystem)
-            return;
-        IsEditing = true;
-        IsAdding = false;
-        EditName = SelectedContainer.Name;
-    }
-
-    [RelayCommand]
-    public void ConfirmEdit()
-    {
-        if (SelectedContainer is null || string.IsNullOrWhiteSpace(EditName))
-            return;
-
-        containerService.Rename(SelectedContainer.Id, EditName.Trim());
-        IsEditing = false;
-        Load();
-    }
-
-    [RelayCommand]
-    public void CancelEdit()
-    {
-        IsEditing = false;
-    }
-
-    [RelayCommand]
-    public void DeleteSelected()
-    {
-        if (SelectedContainer is null || SelectedContainer.IsSystem)
-            return;
-
-        var cardCount = containerService.GetCardCount(SelectedContainer.Id);
-        if (cardCount > 0)
-        {
-            // Ask user: move to Bulk or delete all items?
-            var result = System.Windows.MessageBox.Show(
-                $"\"{SelectedContainer.Name}\" contains {cardCount} card(s).\n\n" +
-                "Yes = Move cards to Bulk and delete location\n" +
-                "No = Delete all cards and location\n" +
-                "Cancel = Keep location",
-                "Delete Location",
-                System.Windows.MessageBoxButton.YesNoCancel,
-                System.Windows.MessageBoxImage.Warning);
-
-            if (result == System.Windows.MessageBoxResult.Cancel)
-                return;
-
-            if (result == System.Windows.MessageBoxResult.No)
-            {
-                // Double-confirm before deleting all cards
-                var confirm = System.Windows.MessageBox.Show(
-                    $"Are you sure you want to permanently delete {cardCount} card(s) from \"{SelectedContainer.Name}\"?\n\nThis cannot be undone.",
-                    "Confirm Delete All Cards",
-                    System.Windows.MessageBoxButton.YesNo,
-                    System.Windows.MessageBoxImage.Exclamation);
-                if (confirm != System.Windows.MessageBoxResult.Yes)
-                    return;
-
-                containerService.Delete(SelectedContainer.Id, moveCardsToBulk: false);
-            }
-            else
-            {
-                containerService.Delete(SelectedContainer.Id, moveCardsToBulk: true);
-            }
-        }
-        else
-        {
-            containerService.Delete(SelectedContainer.Id);
-        }
-
-        SelectedContainer = null;
-        Load();
     }
 
     [RelayCommand]
@@ -256,15 +199,101 @@ public sealed partial class StorageManagerViewModel(
     }
 }
 
-public class ContainerDisplayItem
+/// <summary>A collapsible group of locations of one <see cref="ContainerType"/>, with an inline
+/// "add" field (name + validation) at its top.</summary>
+public sealed partial class LocationGroupViewModel : ObservableObject
+{
+    private readonly StorageManagerViewModel _parent;
+
+    private readonly bool _initialized;
+
+    public LocationGroupViewModel(StorageManagerViewModel parent, ContainerType type, string typeDisplay, bool isExpanded)
+    {
+        _parent = parent;
+        ContainerType = type;
+        TypeDisplay = typeDisplay;
+        IsExpanded = isExpanded;
+        _initialized = true; // don't persist the constructor's initial value
+    }
+
+    public ContainerType ContainerType { get; }
+    public string TypeDisplay { get; }
+    public ObservableCollection<ContainerDisplayItem> Items { get; } = [];
+
+    [ObservableProperty]
+    public partial bool IsExpanded { get; set; }
+
+    partial void OnIsExpandedChanged(bool value)
+    {
+        if (_initialized)
+            _parent.SaveCollapseState();
+    }
+
+    [ObservableProperty]
+    public partial string NewName { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string NameError { get; set; } = "";
+
+    public bool CanAdd { get; private set; }
+
+    partial void OnNewNameChanged(string value) => RevalidateNewName();
+
+    /// <summary>Re-runs uniqueness validation on the inline add field. Called on each keystroke and
+    /// after a reload (the set of existing names may have changed).</summary>
+    public void RevalidateNewName()
+    {
+        var trimmed = (NewName ?? "").Trim();
+        if (trimmed.Length == 0)
+        {
+            NameError = "";
+            CanAdd = false;
+        }
+        else if (_parent.NameInUse(trimmed))
+        {
+            NameError = "This name is already in use";
+            CanAdd = false;
+        }
+        else
+        {
+            NameError = "";
+            CanAdd = true;
+        }
+        OnPropertyChanged(nameof(CanAdd));
+        AddCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanAdd))]
+    private void Add()
+    {
+        var trimmed = (NewName ?? "").Trim();
+        if (trimmed.Length == 0 || _parent.NameInUse(trimmed))
+            return;
+        NewName = "";
+        _parent.AddLocation(ContainerType, trimmed);
+    }
+}
+
+public sealed partial class ContainerDisplayItem : ObservableObject
 {
     public int Id { get; init; }
-    public string Name { get; init; } = "";
+
+    [ObservableProperty]
+    public partial string Name { get; set; } = "";
+
     public ContainerType ContainerType { get; init; }
     public bool IsSystem { get; init; }
     public int CardCount { get; init; }
     public bool ExcludeFromDeckCheck { get; init; }
     public bool AlwaysAvailable { get; init; }
+
+    /// <summary>True while the name is being edited inline (double-click to rename).</summary>
+    [ObservableProperty]
+    public partial bool IsEditing { get; set; }
+
+    /// <summary>Working copy of the name shown in the inline rename textbox; committed on Enter/blur.</summary>
+    [ObservableProperty]
+    public partial string EditName { get; set; } = "";
 
     /// <summary>The system Bulk location is always available intrinsically; its checkbox reflects
     /// that (checked) but is disabled so it can't be turned off.</summary>

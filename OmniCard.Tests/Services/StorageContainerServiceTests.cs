@@ -486,6 +486,65 @@ public class StorageContainerServiceTests : IDisposable
         Assert.True(bulk.IsAlwaysAvailable);  // but always available intrinsically
     }
 
+    [Fact]
+    public void Create_DuplicateName_CaseInsensitive_Throws()
+    {
+        var service = CreateService();
+        service.Create("Trades", ContainerType.Box);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => service.Create("trades", ContainerType.Binder));
+        Assert.Contains("already exists", ex.Message);
+    }
+
+    [Fact]
+    public void Create_ReservedBulkName_Throws()
+    {
+        using (var ctx = new OmniCardDbContext(_options))
+        {
+            ctx.StorageContainers.Add(new StorageContainer
+            {
+                Name = "Bulk", ContainerType = ContainerType.Bulk, IsSystem = true, SortOrder = 0,
+            });
+            ctx.SaveChanges();
+        }
+        var service = CreateService();
+
+        Assert.Throws<InvalidOperationException>(() => service.Create("bulk", ContainerType.Box));
+    }
+
+    [Fact]
+    public void Rename_ToExistingName_Throws()
+    {
+        var service = CreateService();
+        service.Create("Box One", ContainerType.Box);
+        var two = service.Create("Box Two", ContainerType.Box);
+
+        Assert.Throws<InvalidOperationException>(() => service.Rename(two.Id, "Box One"));
+    }
+
+    [Fact]
+    public void Rename_ToOwnName_Allowed()
+    {
+        var service = CreateService();
+        var box = service.Create("Keep Me", ContainerType.Box);
+
+        service.Rename(box.Id, "Keep Me"); // same name, only case/whitespace could differ
+
+        var updated = new OmniCardDbContext(_options).StorageContainers.Single(c => c.Id == box.Id);
+        Assert.Equal("Keep Me", updated.Name);
+    }
+
+    [Fact]
+    public void NameExists_RespectsExcludeId_AndCaseInsensitivity()
+    {
+        var service = CreateService();
+        var box = service.Create("Shelf", ContainerType.Box);
+
+        Assert.True(service.NameExists("SHELF"));
+        Assert.False(service.NameExists("Shelf", excludeId: box.Id));
+        Assert.False(service.NameExists("Other"));
+    }
+
     private class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
         public OmniCardDbContext CreateDbContext() => new(options);

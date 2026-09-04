@@ -168,6 +168,9 @@ public sealed class RecordingContainerService : IStorageContainerService
 
     public List<StorageContainer> GetAll() => Containers;
     public StorageContainer GetBulk() => Bulk;
+    public bool NameExists(string name, int? excludeId = null) =>
+        Containers.Any(c => (excludeId == null || c.Id != excludeId)
+            && string.Equals(c.Name, name?.Trim(), StringComparison.OrdinalIgnoreCase));
     public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9)
     {
         Created.Add((name, type));

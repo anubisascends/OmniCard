@@ -364,6 +364,9 @@ public class CsvImportTests : IDisposable
 
         public List<StorageContainer> GetAll() => _containers;
         public StorageContainer GetBulk() => _containers.First(c => c.IsSystem);
+        public bool NameExists(string name, int? excludeId = null) =>
+            _containers.Any(c => (excludeId == null || c.Id != excludeId)
+                && string.Equals(c.Name, name?.Trim(), StringComparison.OrdinalIgnoreCase));
         public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9)
         {
             var c = new StorageContainer { Id = _nextId++, Name = name, ContainerType = type, SlotsPerPage = slotsPerPage };
