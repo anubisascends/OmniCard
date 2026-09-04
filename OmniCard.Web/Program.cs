@@ -49,6 +49,7 @@ builder.Services.AddRazorPages();
 builder.Services.AddSignalR();
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
+builder.Services.AddOpenApi();
 
 // Database contexts
 builder.Services.AddDbContextFactory<OmniCardDbContext>(options =>
@@ -89,6 +90,11 @@ builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<Fina
 // Card & decklist services
 builder.Services.AddSingleton<ICardService, WebCardService>();
 builder.Services.AddSingleton<IDecklistService, DecklistService>();
+
+// Read-only reporting/query services backing the SPA API (they read via the Mode=ReadOnly
+// OmniCardDbContext factory registered above).
+builder.Services.AddSingleton<IAnalyticsService, AnalyticsService>();
+builder.Services.AddSingleton<ICollectionQueryService, CollectionQueryService>();
 
 // --- Binder editor: the one deliberate WRITE surface in the otherwise read-only web app ---
 // A single writable factory against inventory.db, injected only into the binder-edit services so the
@@ -131,6 +137,9 @@ if (Directory.Exists(scansDir))
 app.MapRazorPages();
 app.MapControllers();
 app.MapHub<OmniCard.Web.Hubs.ScanHub>("/hubs/scan");
+
+// OpenAPI document at /openapi/v1.json — consumed by the SPA's typed client generator.
+app.MapOpenApi();
 
 Console.WriteLine($"Serving collection from: {dataDir}");
 app.Run();

@@ -7,10 +7,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\OmniCard.Shared\OmniCard.Shared.csproj" />
     <ProjectReference Include="..\OmniCard.Data\OmniCard.Data.csproj" />
     <ProjectReference Include="..\OmniCard.Collection\OmniCard.Collection.csproj" />
     <ProjectReference Include="..\OmniCard.CardMatching\OmniCard.CardMatching.csproj" />
+    <ProjectReference Include="..\OmniCard.Api.Contracts\OmniCard.Api.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

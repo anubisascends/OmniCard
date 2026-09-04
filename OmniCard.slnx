@@ -10,6 +10,7 @@
   <Project Path="OmniCard.Controls/OmniCard.Controls.csproj" />
   <Project Path="OmniCard/OmniCard.csproj" />
   <Project Path="OmniCard.Tests/OmniCard.Tests.csproj" />
+  <Project Path="OmniCard.Api.Contracts/OmniCard.Api.Contracts.csproj" />
   <Project Path="OmniCard.Web/OmniCard.Web.csproj" />
   <Project Path="OmniCard.ScannerHost/OmniCard.ScannerHost.csproj" />
 </Solution>
