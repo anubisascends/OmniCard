@@ -205,5 +205,28 @@ public class OmniCardDbContext : DbContext
         {
             e.HasKey(m => m.Key);
         });
+
+        // Optimistic-concurrency tokens for the networked (multi-user) web deployment, which runs on
+        // SQL Server. Added as a SQL Server `rowversion` shadow column so it's invisible to the
+        // desktop app, which keeps running on SQLite (single-writer, no token needed) with an
+        // unchanged schema. A concurrent web write to a stale row throws DbUpdateConcurrencyException,
+        // which the API surfaces as HTTP 409. Applied only to the mutable, contention-prone entities.
+        if (Database.IsSqlServer())
+        {
+            foreach (var clrType in ConcurrencyTrackedEntities)
+                modelBuilder.Entity(clrType).Property<byte[]>("RowVersion").IsRowVersion();
+        }
     }
+
+    /// <summary>Entity types that get a SQL Server concurrency token (see <see cref="OnModelCreating"/>).</summary>
+    internal static readonly Type[] ConcurrencyTrackedEntities =
+    [
+        typeof(Product),
+        typeof(InventoryLot),
+        typeof(Listing),
+        typeof(StorageContainer),
+        typeof(Order),
+        typeof(OrderLine),
+        typeof(Customer),
+    ];
 }

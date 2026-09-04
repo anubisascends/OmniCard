@@ -27,33 +27,23 @@ if (string.IsNullOrWhiteSpace(dataDir))
     return 1;
 }
 
-var dbPath = Path.Combine(dataDir, "inventory.db");
-if (!File.Exists(dbPath))
-{
-    Console.Error.WriteLine($"Error: Database not found at {dbPath}");
-    return 1;
-}
-
-// Patch any schema drift on the shared inventory.db — new columns get added to the EF model
-// over time, and normally the desktop app's own startup (UnifiedMigrationService) is what
-// applies them to the on-disk file. The web app can run for long stretches without the desktop
-// ever restarting, so without this it 500s on "no such column" until the desktop happens to
-// launch first. This opens its own short-lived, writable connection to the raw file — separate
-// from (and unaffected by) the Mode=ReadOnly connections registered below.
-using (var schemaLoggerFactory = LoggerFactory.Create(b => b.AddConsole()))
-    UnifiedMigrationService.EnsureUnifiedSchema(dataDir, schemaLoggerFactory.CreateLogger("SchemaCheck"));
+// The unified store (collection / inventory / sales) now lives in SQL Server for multi-user
+// concurrency; the per-game catalog DBs below stay on SQLite (read-mostly reference caches). The
+// connection string comes from ConnectionStrings:OmniCard, falling back to the local dev default.
+var connectionString = OmniCard.Web.Data.SqlServerDb.ConnectionString(builder.Configuration);
 
 var scansDir = Path.Combine(dataDir, "scans");
 
 builder.Services.AddRazorPages();
 builder.Services.AddSignalR();
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+    options.Filters.Add<OmniCard.Web.Api.ConcurrencyExceptionFilter>());
 builder.Services.AddHttpClient();
 builder.Services.AddOpenApi();
 
-// Database contexts
+// Unified store on SQL Server; catalog DBs on SQLite (read-only).
 builder.Services.AddDbContextFactory<OmniCardDbContext>(options =>
-    options.UseSqlite($"Data Source={dbPath};Mode=ReadOnly"));
+    OmniCard.Web.Data.SqlServerDb.Configure(options, connectionString));
 builder.Services.AddDbContextFactory<ScryfallDbContext>(options =>
     options.UseSqlite($"Data Source={Path.Combine(dataDir, "scryfall.db")};Mode=ReadOnly"));
 builder.Services.AddDbContextFactory<OptcgDbContext>(options =>
@@ -101,7 +91,7 @@ builder.Services.AddSingleton<ISetChecklistService, SetChecklistService>();
 // A single writable factory against inventory.db, injected only into the binder-edit services so the
 // read-only invariant holds everywhere else. Editing is gated by a passphrase (Binder:EditPassphrase)
 // held in the session.
-var writableFactory = new WritableOmniCardDbContextFactory(dbPath);
+var writableFactory = new WritableOmniCardDbContextFactory(connectionString);
 builder.Services.AddSingleton(writableFactory);
 builder.Services.AddSingleton<IStorageContainerService>(_ => new StorageContainerService(writableFactory));
 builder.Services.AddSingleton<ITagService>(_ => new TagService(writableFactory));
@@ -121,6 +111,15 @@ builder.Services.AddSession(options =>
 });
 
 var app = builder.Build();
+
+// Apply any pending SQL Server migrations to the unified store on startup (creates the DB on first
+// run). The catalog SQLite DBs are unaffected.
+using (var scope = app.Services.CreateScope())
+{
+    var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<OmniCardDbContext>>();
+    using var db = factory.CreateDbContext();
+    db.Database.Migrate();
+}
 
 app.UseStaticFiles();
 app.UseSession();
