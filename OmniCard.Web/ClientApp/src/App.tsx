@@ -8,6 +8,7 @@ import { BinderPage } from './pages/BinderPage';
 import { SetsPage } from './pages/SetsPage';
 import { SalesPage } from './pages/SalesPage';
 import { InventoryPage } from './pages/InventoryPage';
+import { ImportPage } from './pages/ImportPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 
 export function App() {
@@ -21,7 +22,7 @@ export function App() {
         <Route path="/binder/:id" element={<BinderPage />} />
         <Route path="/sets" element={<SetsPage />} />
         <Route path="/inventory" element={<InventoryPage />} />
-        <Route path="/import" element={<PlaceholderPage title="Import" />} />
+        <Route path="/import" element={<ImportPage />} />
         <Route path="/sales" element={<SalesPage />} />
         <Route path="*" element={<PlaceholderPage title="Not Found" />} />
       </Routes>

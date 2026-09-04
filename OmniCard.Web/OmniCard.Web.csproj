@@ -29,6 +29,7 @@
     <ProjectReference Include="..\OmniCard.Data\OmniCard.Data.csproj" />
     <ProjectReference Include="..\OmniCard.Collection\OmniCard.Collection.csproj" />
     <ProjectReference Include="..\OmniCard.CardMatching\OmniCard.CardMatching.csproj" />
+    <ProjectReference Include="..\OmniCard.Audit\OmniCard.Audit.csproj" />
     <ProjectReference Include="..\OmniCard.Api.Contracts\OmniCard.Api.Contracts.csproj" />
   </ItemGroup>
 

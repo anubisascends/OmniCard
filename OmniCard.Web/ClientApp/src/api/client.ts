@@ -3,8 +3,10 @@ import type {
   AuthStatusDto,
   BinderStateDto,
   CardDto,
+  CsvImportResultDto,
   CustomerDto,
   DashboardDto,
+  DecklistCheckDto,
   GameDto,
   InventoryValuationDto,
   LocationSummaryDto,
@@ -150,4 +152,30 @@ export const api = {
   inventoryProducts: (game?: string, category?: string) =>
     request<ProductDto[]>(`/api/inventory/products${qs({ game, category })}`),
   inventoryValuation: () => request<InventoryValuationDto>('/api/inventory/valuation'),
+
+  // Import / Export
+  exportUrl: (format: string, game?: string, q?: string) =>
+    `/api/export/collection${qs({ format, game, q })}`,
+  importCsv: async (file: File, skipDuplicates: boolean, targetContainerId?: number) => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`/api/import/csv${qs({ skipDuplicates, targetContainerId })}`, {
+      method: 'POST',
+      body: form,
+      credentials: 'same-origin',
+    });
+    if (!res.ok) {
+      let message = res.statusText;
+      try {
+        const b = await res.json();
+        if (b?.error) message = b.error;
+      } catch {
+        /* ignore */
+      }
+      throw new ApiError(res.status, message);
+    }
+    return (await res.json()) as CsvImportResultDto;
+  },
+  decklistCheck: (body: { url?: string; text?: string; game: string }) =>
+    request<DecklistCheckDto>('/api/decklist/check', { method: 'POST', body: JSON.stringify(body) }),
 };

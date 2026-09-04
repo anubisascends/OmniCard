@@ -10,8 +10,19 @@ namespace OmniCard.Web.Api;
 public sealed class OrdersController(
     IOrderService orders,
     ICustomerService customers,
-    ISalesSettingsService settings) : ApiControllerBase
+    ISalesSettingsService settings,
+    IReceiptService receipts,
+    IReceiptPdfExporter receiptPdf) : ApiControllerBase
 {
+    /// <summary>Downloadable PDF receipt for an order.</summary>
+    [HttpGet("{id:int}/receipt.pdf")]
+    public IActionResult Receipt(int id)
+    {
+        var doc = receipts.BuildReceipt(id);
+        var bytes = TempFile.Produce(".pdf", p => receiptPdf.Export(doc, p));
+        return File(bytes, "application/pdf", $"receipt-{id}.pdf");
+    }
+
     /// <summary>The kanban lanes in board order (customizable; falls back to built-in defaults).</summary>
     [HttpGet("lanes")]
     public ActionResult<IReadOnlyList<WorkflowLaneDto>> Lanes() =>

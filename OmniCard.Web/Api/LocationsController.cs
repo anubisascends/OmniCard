@@ -9,8 +9,21 @@ namespace OmniCard.Web.Api;
 /// desktop Manage Storage Locations dialog). Writes go to the SQL Server unified store.</summary>
 public sealed class LocationsController(
     ICollectionQueryService queryService,
-    IStorageContainerService containers) : ApiControllerBase
+    IStorageContainerService containers,
+    IPriceSheetService priceSheets,
+    IPriceSheetPdfExporter priceSheetPdf) : ApiControllerBase
 {
+    /// <summary>Printable price-sheet PDF for a location's cards.</summary>
+    [HttpGet("{id:int}/pricesheet.pdf")]
+    public IActionResult PriceSheet(int id)
+    {
+        var container = containers.GetAll().FirstOrDefault(c => c.Id == id);
+        if (container is null) return NotFound();
+        var report = priceSheets.BuildReport(id, container.Name);
+        var bytes = TempFile.Produce(".pdf", p => priceSheetPdf.Export(report, p));
+        return File(bytes, "application/pdf", $"pricesheet-{container.Name}.pdf");
+    }
+
     /// <summary>All locations (optionally filtered to one game) with card counts and valuations.</summary>
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<LocationSummaryDto>>> Get([FromQuery] string? game)

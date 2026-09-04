@@ -228,6 +228,32 @@ public sealed record InventoryLotDto
 
 public sealed record InventoryValuationDto(int TotalUnits, decimal TotalCost, decimal TotalMarket);
 
+// --- Decklist check ---
+
+public sealed record DecklistCheckRequest
+{
+    public string? Url { get; init; }
+    public string? Text { get; init; }
+    public string Game { get; init; } = "Mtg";
+}
+
+public sealed record DecklistEntryDto(string CardName, int QuantityNeeded, string? SetCode, decimal? MarketPrice, string? ImageUri);
+
+public sealed record DecklistCheckDto
+{
+    public string DeckName { get; init; } = "";
+    public int TotalOwned { get; init; }
+    public int TotalMissing { get; init; }
+    public int TotalCards { get; init; }
+    public decimal EstimatedCost { get; init; }
+    public IReadOnlyList<DecklistEntryDto> Owned { get; init; } = [];
+    public IReadOnlyList<DecklistEntryDto> Missing { get; init; } = [];
+}
+
+// --- Import result ---
+
+public sealed record CsvImportResultDto(int Imported, int TotalRows, string DetectedFormat, IReadOnlyList<string> Warnings);
+
 // --- Auth ---
 
 /// <summary>Whether the site requires a passphrase and whether this session is authenticated.</summary>

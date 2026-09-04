@@ -8,8 +8,21 @@ namespace OmniCard.Web.Api;
 /// <summary>Set browser: the list of a game's sets, and the per-set completion checklist.</summary>
 public sealed class SetsController(
     IEnumerable<ICardGameService> gameServices,
-    ISetChecklistService checklistService) : ApiControllerBase
+    ISetChecklistService checklistService,
+    ISetChecklistPdfExporter wantListPdf) : ApiControllerBase
 {
+    /// <summary>Printable want-list PDF (unowned cards) for a set.</summary>
+    [HttpGet("{game}/{setCode}/wantlist.pdf")]
+    public async Task<IActionResult> WantList(string game, string setCode)
+    {
+        if (!Enum.TryParse<CardGame>(game, ignoreCase: true, out var g))
+            return NotFound();
+        var checklist = await checklistService.BuildAsync(g, setCode);
+        var report = checklistService.BuildWantListReport(checklist);
+        var bytes = TempFile.Produce(".pdf", p => wantListPdf.Export(report, p));
+        return File(bytes, "application/pdf", $"wantlist-{setCode}.pdf");
+    }
+
     private ICardGameService? Game(string game) =>
         Enum.TryParse<CardGame>(game, ignoreCase: true, out var g)
             ? gameServices.FirstOrDefault(s => s.Game == g)

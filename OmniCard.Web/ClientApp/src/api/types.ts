@@ -151,6 +151,31 @@ export interface InventoryValuationDto {
   totalMarket: number;
 }
 
+export interface DecklistEntryDto {
+  cardName: string;
+  quantityNeeded: number;
+  setCode?: string | null;
+  marketPrice?: number | null;
+  imageUri?: string | null;
+}
+
+export interface DecklistCheckDto {
+  deckName: string;
+  totalOwned: number;
+  totalMissing: number;
+  totalCards: number;
+  estimatedCost: number;
+  owned: DecklistEntryDto[];
+  missing: DecklistEntryDto[];
+}
+
+export interface CsvImportResultDto {
+  imported: number;
+  totalRows: number;
+  detectedFormat: string;
+  warnings: string[];
+}
+
 export interface SetInfoDto {
   setCode: string;
   setName: string;
