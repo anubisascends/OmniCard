@@ -1,10 +1,11 @@
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import {
   AppBar,
   Box,
   Drawer,
   FormControl,
+  IconButton,
   List,
   ListItemButton,
   ListItemIcon,
@@ -13,7 +14,10 @@ import {
   Select,
   Toolbar,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
 import GridViewIcon from '@mui/icons-material/GridView';
@@ -43,15 +47,50 @@ export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const { game, setGame } = useGame();
   const gamesQuery = useQuery({ queryKey: ['games'], queryFn: api.games });
+  const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const navList = (
+    <List>
+      {NAV.map((item) => {
+        const selected =
+          item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to);
+        return (
+          <ListItemButton
+            key={item.to}
+            component={RouterLink}
+            to={item.to}
+            selected={selected}
+            onClick={() => setMobileOpen(false)}
+          >
+            <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
+            <ListItemText primary={item.label} />
+          </ListItemButton>
+        );
+      })}
+    </List>
+  );
 
   return (
     <Box sx={{ display: 'flex' }}>
       <AppBar position="fixed" sx={{ zIndex: (t) => t.zIndex.drawer + 1 }}>
         <Toolbar variant="dense">
+          {!isDesktop && (
+            <IconButton
+              color="inherit"
+              edge="start"
+              aria-label="Open navigation"
+              onClick={() => setMobileOpen((v) => !v)}
+              sx={{ mr: 1 }}
+            >
+              <MenuIcon />
+            </IconButton>
+          )}
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             OmniCard
           </Typography>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
+          <FormControl size="small" sx={{ minWidth: { xs: 130, sm: 200 } }}>
             <Select
               value={game ?? '__all__'}
               onChange={(e) => setGame(e.target.value === '__all__' ? undefined : e.target.value)}
@@ -68,35 +107,32 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Toolbar>
       </AppBar>
 
-      <Drawer
-        variant="permanent"
-        sx={{
-          width: DRAWER_WIDTH,
-          flexShrink: 0,
-          [`& .MuiDrawer-paper`]: { width: DRAWER_WIDTH, boxSizing: 'border-box' },
-        }}
-      >
-        <Toolbar variant="dense" />
-        <List>
-          {NAV.map((item) => {
-            const selected =
-              item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to);
-            return (
-              <ListItemButton
-                key={item.to}
-                component={RouterLink}
-                to={item.to}
-                selected={selected}
-              >
-                <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
-                <ListItemText primary={item.label} />
-              </ListItemButton>
-            );
-          })}
-        </List>
-      </Drawer>
+      {isDesktop ? (
+        <Drawer
+          variant="permanent"
+          sx={{
+            width: DRAWER_WIDTH,
+            flexShrink: 0,
+            [`& .MuiDrawer-paper`]: { width: DRAWER_WIDTH, boxSizing: 'border-box' },
+          }}
+        >
+          <Toolbar variant="dense" />
+          {navList}
+        </Drawer>
+      ) : (
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={() => setMobileOpen(false)}
+          ModalProps={{ keepMounted: true }}
+          sx={{ [`& .MuiDrawer-paper`]: { width: DRAWER_WIDTH, boxSizing: 'border-box' } }}
+        >
+          <Toolbar variant="dense" />
+          {navList}
+        </Drawer>
+      )}
 
-      <Box component="main" sx={{ flexGrow: 1, p: 3, minHeight: '100vh' }}>
+      <Box component="main" sx={{ flexGrow: 1, p: { xs: 1.5, sm: 3 }, minHeight: '100vh', width: 0 }}>
         <Toolbar variant="dense" />
         {children}
       </Box>

@@ -19,6 +19,7 @@ import {
   Typography,
 } from '@mui/material';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
+import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
 import { api } from '../api/client';
@@ -208,6 +209,7 @@ export function ScanPage() {
   const [containerId, setContainerId] = useState<number | ''>('');
   const [items, setItems] = useState<ScanItem[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
 
   const gamesQuery = useQuery({ queryKey: ['games'], queryFn: api.games });
   const locations = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations() });
@@ -320,11 +322,31 @@ export function ScanPage() {
           />
           <Button
             variant="contained"
+            startIcon={<CameraAltIcon />}
+            onClick={() => cameraInput.current?.click()}
+          >
+            Take photo
+          </Button>
+          <Button
+            variant="outlined"
             startIcon={<AddPhotoAlternateIcon />}
             onClick={() => fileInput.current?.click()}
           >
             Add images
           </Button>
+          {/* Camera capture: on a phone this opens the rear camera directly; on desktop the
+              `capture` hint is ignored and it falls back to a normal file picker. */}
+          <input
+            ref={cameraInput}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            onChange={(e) => {
+              void handleFiles(e.target.files);
+              e.target.value = '';
+            }}
+          />
           <input
             ref={fileInput}
             type="file"
