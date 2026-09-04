@@ -118,6 +118,19 @@ public sealed class WebBinderCardService
         context.SaveChanges();
     }
 
+    /// <summary>Sets the owned copy count on a lot. Kept separate from
+    /// <see cref="UpdateCollectionCard"/> (which mirrors the binder editor's identity/attribute copy
+    /// and does not touch quantity, since binder pockets hold single copies).</summary>
+    public void SetQuantity(int lotId, int quantity)
+    {
+        using var context = _dbFactory.CreateDbContext();
+        var lot = context.Lots.FirstOrDefault(l => l.Id == lotId && l.Product.Category == ProductCategory.Single);
+        if (lot is null)
+            return;
+        lot.Quantity = Math.Max(1, quantity);
+        context.SaveChanges();
+    }
+
     public void DeleteCollectionCard(int id)
     {
         using var context = _dbFactory.CreateDbContext();

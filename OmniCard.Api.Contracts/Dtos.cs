@@ -22,6 +22,9 @@ public sealed record CardDto
     public string? ScanImagePath { get; init; }
     public string Condition { get; init; } = "NM";
     public bool IsFoil { get; init; }
+    public string? FoilType { get; init; }
+    public int Quantity { get; init; } = 1;
+    public IReadOnlyList<string> Tags { get; init; } = [];
     public decimal? PurchasePrice { get; init; }
     public decimal MarketPrice { get; init; }
     public int? ContainerId { get; init; }
@@ -107,6 +110,53 @@ public sealed record SetChecklistCardDto
     public decimal? NormalPrice { get; init; }
     public decimal? FoilPrice { get; init; }
     public bool HasFoil { get; init; }
+}
+
+// --- Tags ---
+
+public sealed record TagDto(int Id, string Name, int UsageCount);
+
+// --- Write requests ---
+
+public sealed record CreateLocationRequest
+{
+    public string Name { get; init; } = "";
+    /// <summary>ContainerType name: Binder, Box, DeckBox, DisplayCase (Bulk not allowed).</summary>
+    public string Type { get; init; } = "Box";
+    public int SlotsPerPage { get; init; } = 9;
+}
+
+public sealed record RenameRequest
+{
+    public string Name { get; init; } = "";
+}
+
+public sealed record BoolValueRequest
+{
+    public bool Value { get; init; }
+}
+
+public sealed record NameAvailableDto(bool Available);
+
+public sealed record UpdateCardRequest
+{
+    public string Condition { get; init; } = "NM";
+    public bool IsFoil { get; init; }
+    public string? FoilType { get; init; }
+    public int Quantity { get; init; } = 1;
+    public decimal? PurchasePrice { get; init; }
+}
+
+public sealed record MoveCardsRequest
+{
+    public IReadOnlyList<int> CardIds { get; init; } = [];
+    public int ContainerId { get; init; }
+    public string? Section { get; init; }
+}
+
+public sealed record SetTagsRequest
+{
+    public IReadOnlyList<string> Tags { get; init; } = [];
 }
 
 // --- Auth ---

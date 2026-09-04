@@ -87,4 +87,43 @@ export const api = {
     skip?: number;
     take?: number;
   }) => request<PagedResult<CardDto>>(`/api/collection${qs(opts)}`),
+
+  // Location writes
+  locationNameAvailable: (name: string, excludeId?: number) =>
+    request<{ available: boolean }>(`/api/locations/name-available${qs({ name, excludeId })}`),
+  locationCreate: (body: { name: string; type: string; slotsPerPage?: number }) =>
+    request<LocationSummaryDto>('/api/locations', { method: 'POST', body: JSON.stringify(body) }),
+  locationRename: (id: number, name: string) =>
+    request<void>(`/api/locations/${id}`, { method: 'PUT', body: JSON.stringify({ name }) }),
+  locationDelete: (id: number, moveToBulk: boolean) =>
+    request<void>(`/api/locations/${id}${qs({ moveToBulk })}`, { method: 'DELETE' }),
+  locationSetAlwaysAvailable: (id: number, value: boolean) =>
+    request<void>(`/api/locations/${id}/always-available`, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
+    }),
+
+  // Card writes
+  card: (id: number) => request<CardDto>(`/api/collection/${id}`),
+  cardUpdate: (
+    id: number,
+    body: {
+      condition: string;
+      isFoil: boolean;
+      foilType?: string | null;
+      quantity: number;
+      purchasePrice?: number | null;
+    },
+  ) => request<void>(`/api/collection/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  cardDelete: (id: number) => request<void>(`/api/collection/${id}`, { method: 'DELETE' }),
+  cardMove: (cardIds: number[], containerId: number, section?: string) =>
+    request<void>('/api/collection/move', {
+      method: 'POST',
+      body: JSON.stringify({ cardIds, containerId, section }),
+    }),
+  cardSetTags: (id: number, tags: string[]) =>
+    request<void>(`/api/collection/${id}/tags`, { method: 'PUT', body: JSON.stringify({ tags }) }),
+
+  // Tags
+  tags: () => request<{ id: number; name: string; usageCount: number }[]>('/api/tags'),
 };

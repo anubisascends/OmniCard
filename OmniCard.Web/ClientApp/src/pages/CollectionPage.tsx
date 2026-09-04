@@ -5,6 +5,7 @@ import { DataGrid, type GridColDef, type GridPaginationModel } from '@mui/x-data
 import { api } from '../api/client';
 import type { CardDto } from '../api/types';
 import { useGame } from '../context/GameContext';
+import { CardEditDrawer } from '../components/CardEditDrawer';
 
 const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 
@@ -36,6 +37,7 @@ export function CollectionPage() {
   const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
   const [pagination, setPagination] = useState<GridPaginationModel>({ page: 0, pageSize: 50 });
+  const [editId, setEditId] = useState<number | null>(null);
 
   const query = useQuery({
     queryKey: ['collection', game, q, pagination.page, pagination.pageSize],
@@ -81,7 +83,10 @@ export function CollectionPage() {
         pageSizeOptions={[25, 50, 100]}
         disableRowSelectionOnClick
         density="compact"
+        onRowClick={(p) => setEditId(p.row.id)}
+        sx={{ '& .MuiDataGrid-row': { cursor: 'pointer' } }}
       />
+      <CardEditDrawer cardId={editId} onClose={() => setEditId(null)} />
     </Stack>
   );
 }

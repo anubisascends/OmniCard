@@ -26,6 +26,9 @@ export interface CardDto {
   scanImagePath?: string | null;
   condition: string;
   isFoil: boolean;
+  foilType?: string | null;
+  quantity: number;
+  tags: string[];
   purchasePrice?: number | null;
   marketPrice: number;
   containerId?: number | null;
