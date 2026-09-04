@@ -254,6 +254,61 @@ public sealed record DecklistCheckDto
 
 public sealed record CsvImportResultDto(int Imported, int TotalRows, string DetectedFormat, IReadOnlyList<string> Warnings);
 
+// --- Scan (server-side image matching) ---
+
+/// <summary>The result of matching one uploaded card image against a game's catalog. When
+/// <see cref="Matched"/> is false the identity fields are null and the client falls through to the
+/// correction search. <see cref="ScanHash"/> is the scan's 64-bit pHash as a decimal string so it
+/// round-trips through JSON/JS without the 53-bit precision loss a JS number would incur.</summary>
+public sealed record ScanMatchDto
+{
+    public bool Matched { get; init; }
+    public string Game { get; init; } = "";
+    public string? GameCardId { get; init; }
+    public string? Name { get; init; }
+    public string? SetName { get; init; }
+    public string? SetCode { get; init; }
+    public string? CollectorNumber { get; init; }
+    public string? Rarity { get; init; }
+    public string? ImageUri { get; init; }
+    public double? Confidence { get; init; }
+    public string ScanHash { get; init; } = "";
+    /// <summary>Set when matching could not run at all (e.g. game catalog unavailable); distinct
+    /// from a clean "no match" (<see cref="Matched"/> false, no error).</summary>
+    public string? Error { get; init; }
+}
+
+/// <summary>One catalog card returned by the correction search (<c>GET /api/scan/search</c>).</summary>
+public sealed record ScanSearchResultDto(
+    string GameCardId, string Name, string SetCode, string SetName,
+    string CollectorNumber, string Rarity, string? ImageUri);
+
+/// <summary>One card the user confirmed from a scan, to be written to inventory as an owned lot.</summary>
+public sealed record ScanCommitItem
+{
+    public string Game { get; init; } = "";
+    public string GameCardId { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string SetCode { get; init; } = "";
+    public string SetName { get; init; } = "";
+    public string CollectorNumber { get; init; } = "";
+    public string Rarity { get; init; } = "";
+    public string? ImageUri { get; init; }
+    public string Condition { get; init; } = "NM";
+    public bool IsFoil { get; init; }
+    public int Quantity { get; init; } = 1;
+    public decimal? PurchasePrice { get; init; }
+}
+
+/// <summary>Commit a batch of confirmed scans into a storage location.</summary>
+public sealed record ScanCommitRequest
+{
+    public int ContainerId { get; init; }
+    public IReadOnlyList<ScanCommitItem> Items { get; init; } = [];
+}
+
+public sealed record ScanCommitResultDto(int Imported);
+
 // --- Auth ---
 
 /// <summary>Whether the site requires a passphrase and whether this session is authenticated.</summary>

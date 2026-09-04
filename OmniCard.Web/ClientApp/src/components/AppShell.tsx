@@ -19,6 +19,7 @@ import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
 import GridViewIcon from '@mui/icons-material/GridView';
 import ChecklistIcon from '@mui/icons-material/Checklist';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import { useQuery } from '@tanstack/react-query';
@@ -29,6 +30,7 @@ const DRAWER_WIDTH = 200;
 
 const NAV: { to: string; label: string; icon: ReactNode }[] = [
   { to: '/', label: 'Dashboard', icon: <DashboardIcon /> },
+  { to: '/scan', label: 'Scan', icon: <PhotoCameraIcon /> },
   { to: '/collection', label: 'Collection', icon: <CollectionsBookmarkIcon /> },
   { to: '/locations', label: 'Locations', icon: <GridViewIcon /> },
   { to: '/sets', label: 'Sets', icon: <ChecklistIcon /> },

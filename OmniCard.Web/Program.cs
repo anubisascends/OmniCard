@@ -60,6 +60,7 @@ builder.Services.AddDbContextFactory<FinalFantasyDbContext>(options =>
 // Infrastructure services needed by game services
 builder.Services.AddSingleton<IDataPathService>(new WebDataPathService(dataDir));
 builder.Services.AddSingleton<IPerceptualHashService, OmniCard.Imaging.PerceptualHashService>();
+builder.Services.AddSingleton<IOcrMatchingService, OmniCard.Imaging.OcrMatchingService>();
 builder.Services.AddSingleton<SetSymbolCache>();
 builder.Services.Configure<ScryfallSettings>(builder.Configuration.GetSection("Scryfall"));
 
@@ -79,6 +80,7 @@ builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<Fina
 
 // Card & decklist services
 builder.Services.AddSingleton<ICardService, WebCardService>();
+builder.Services.AddSingleton<WebScanMatchingService>();
 builder.Services.AddSingleton<IDecklistService, DecklistService>();
 
 // Read-only reporting/query services backing the SPA API (they read via the Mode=ReadOnly

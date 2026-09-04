@@ -9,6 +9,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="OmniCard" />
     <InternalsVisibleTo Include="OmniCard.Collection" />
+    <InternalsVisibleTo Include="OmniCard.Web" />
     <InternalsVisibleTo Include="OmniCard.Tests" />
   </ItemGroup>
   <ItemGroup>

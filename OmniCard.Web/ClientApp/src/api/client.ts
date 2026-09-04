@@ -13,6 +13,10 @@ import type {
   OrderDto,
   PagedResult,
   ProductDto,
+  ScanCommitItem,
+  ScanCommitResultDto,
+  ScanMatchDto,
+  ScanSearchResultDto,
   SetChecklistDto,
   SetInfoDto,
   WorkflowLaneDto,
@@ -178,4 +182,35 @@ export const api = {
   },
   decklistCheck: (body: { url?: string; text?: string; game: string }) =>
     request<DecklistCheckDto>('/api/decklist/check', { method: 'POST', body: JSON.stringify(body) }),
+
+  // Scan (server-side image matching)
+  scanMatch: async (image: File, game: string, isFoil: boolean) => {
+    const form = new FormData();
+    form.append('image', image);
+    form.append('game', game);
+    form.append('isFoil', String(isFoil));
+    const res = await fetch('/api/scan/match', {
+      method: 'POST',
+      body: form,
+      credentials: 'same-origin',
+    });
+    if (!res.ok) {
+      let message = res.statusText;
+      try {
+        const b = await res.json();
+        if (b?.error) message = b.error;
+      } catch {
+        /* ignore */
+      }
+      throw new ApiError(res.status, message);
+    }
+    return (await res.json()) as ScanMatchDto;
+  },
+  scanSearch: (game: string, q: string) =>
+    request<ScanSearchResultDto[]>(`/api/scan/search${qs({ game, q })}`),
+  scanCommit: (containerId: number, items: ScanCommitItem[]) =>
+    request<ScanCommitResultDto>('/api/scan/commit', {
+      method: 'POST',
+      body: JSON.stringify({ containerId, items }),
+    }),
 };

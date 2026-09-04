@@ -9,6 +9,7 @@ import { SetsPage } from './pages/SetsPage';
 import { SalesPage } from './pages/SalesPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { ImportPage } from './pages/ImportPage';
+import { ScanPage } from './pages/ScanPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 
 export function App() {
@@ -16,6 +17,7 @@ export function App() {
     <AppShell>
       <Routes>
         <Route path="/" element={<DashboardPage />} />
+        <Route path="/scan" element={<ScanPage />} />
         <Route path="/collection" element={<CollectionPage />} />
         <Route path="/locations" element={<LocationsPage />} />
         <Route path="/location/:id" element={<LocationDetailPage />} />

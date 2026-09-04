@@ -257,3 +257,49 @@ export interface BinderStateDto {
   rightSlots: BinderSlotDto[];
   spreadTabs: SpreadTabDto[];
 }
+
+// --- Scan (server-side image matching; mirrors OmniCard.Api.Contracts scan DTOs) ---
+
+export interface ScanMatchDto {
+  matched: boolean;
+  game: string;
+  gameCardId?: string | null;
+  name?: string | null;
+  setName?: string | null;
+  setCode?: string | null;
+  collectorNumber?: string | null;
+  rarity?: string | null;
+  imageUri?: string | null;
+  confidence?: number | null;
+  scanHash: string;
+  error?: string | null;
+}
+
+export interface ScanSearchResultDto {
+  gameCardId: string;
+  name: string;
+  setCode: string;
+  setName: string;
+  collectorNumber: string;
+  rarity: string;
+  imageUri?: string | null;
+}
+
+export interface ScanCommitItem {
+  game: string;
+  gameCardId: string;
+  name: string;
+  setCode: string;
+  setName: string;
+  collectorNumber: string;
+  rarity: string;
+  imageUri?: string | null;
+  condition: string;
+  isFoil: boolean;
+  quantity: number;
+  purchasePrice?: number | null;
+}
+
+export interface ScanCommitResultDto {
+  imported: number;
+}
