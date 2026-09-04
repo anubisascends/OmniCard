@@ -141,6 +141,11 @@ app.MapHub<OmniCard.Web.Hubs.ScanHub>("/hubs/scan");
 // OpenAPI document at /openapi/v1.json — consumed by the SPA's typed client generator.
 app.MapOpenApi();
 
+// Serve the React SPA (built into wwwroot/app by `npm run build`) at /app, with a fallback so
+// client-side deep links (e.g. /app/collection) resolve to its index.html. The legacy Razor pages
+// stay at the root during the migration; the SPA is additive under /app for now.
+app.MapFallbackToFile("/app/{*path:nonfile}", "/app/index.html");
+
 Console.WriteLine($"Serving collection from: {dataDir}");
 app.Run();
 return 0;
