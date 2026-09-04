@@ -1473,7 +1473,7 @@ public sealed partial class RootViewModel(
     }
 
     [RelayCommand]
-    public void ImportFromFolder()
+    public async Task ImportFromFolder()
     {
         if (!IsAuditMode && !HasActiveSession) { PromptStartSession(); return; }
         var dlg = new Microsoft.Win32.OpenFolderDialog
@@ -1510,40 +1510,51 @@ public sealed partial class RootViewModel(
         _logger.LogInformation("Importing {Count} image(s) from {Folder}", imageFiles.Count, folder);
         CardService.StartNewDiagnosticSession();
 
-        for (int i = 0; i < imageFiles.Count; i++)
+        // Matching (pHash + OCR) is CPU-heavy, so run the whole loop off the UI thread.
+        // CardService.AddFromStream marshals every UI/collection touch (ScannedCards.Add,
+        // annotation) back onto the dispatcher itself, so each matched card streams into the
+        // list as it completes instead of the window freezing until the batch is done.
+        // Progress<T> hops the status text back to the UI thread safely.
+        var progress = new Progress<string>(s => Message = s);
+        var total = imageFiles.Count;
+
+        await Task.Run(() =>
         {
-            var sourceFile = imageFiles[i];
-            Message = $"Importing {i + 1}/{imageFiles.Count}...";
-
-            try
+            for (int i = 0; i < imageFiles.Count; i++)
             {
-                var destFile = Path.Combine(tempDir, $"{Guid.NewGuid()}{Path.GetExtension(sourceFile)}");
-                File.Copy(sourceFile, destFile);
+                var sourceFile = imageFiles[i];
+                ((IProgress<string>)progress).Report($"Importing {i + 1}/{total}...");
 
-                // Verify copy
-                var sourceInfo = new FileInfo(sourceFile);
-                var destInfo = new FileInfo(destFile);
-                if (destInfo.Exists && destInfo.Length == sourceInfo.Length)
+                try
                 {
-                    File.Delete(sourceFile);
-                    _logger.LogDebug("Copied and deleted source: {Source} -> {Dest}", sourceFile, destFile);
+                    var destFile = Path.Combine(tempDir, $"{Guid.NewGuid()}{Path.GetExtension(sourceFile)}");
+                    File.Copy(sourceFile, destFile);
+
+                    // Verify copy
+                    var sourceInfo = new FileInfo(sourceFile);
+                    var destInfo = new FileInfo(destFile);
+                    if (destInfo.Exists && destInfo.Length == sourceInfo.Length)
+                    {
+                        File.Delete(sourceFile);
+                        _logger.LogDebug("Copied and deleted source: {Source} -> {Dest}", sourceFile, destFile);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Copy verification failed for {Source}, keeping original", sourceFile);
+                    }
+
+                    using var stream = File.OpenRead(destFile);
+                    CardService.AddFromStream(stream);
                 }
-                else
+                catch (Exception ex)
                 {
-                    _logger.LogWarning("Copy verification failed for {Source}, keeping original", sourceFile);
+                    _logger.LogWarning(ex, "Failed to import {File}", sourceFile);
                 }
-
-                using var stream = File.OpenRead(destFile);
-                CardService.AddFromStream(stream);
             }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to import {File}", sourceFile);
-            }
-        }
+        });
 
-        Message = $"Imported {imageFiles.Count} image(s) from folder.";
-        _logger.LogInformation("Folder import complete: {Count} images", imageFiles.Count);
+        Message = $"Imported {total} image(s) from folder.";
+        _logger.LogInformation("Folder import complete: {Count} images", total);
     }
 
     [RelayCommand]

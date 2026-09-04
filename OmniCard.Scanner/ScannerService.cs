@@ -64,6 +64,37 @@ public sealed partial class ScannerService : ObservableObject, IDisposable
         CardService = cardService;
     }
 
+    /// <summary>
+    /// Merge the 64-bit (in-process) and 32-bit (helper) TWAIN source lists into one
+    /// origin-tagged list. In-process sources come first and always win a name collision
+    /// (case-insensitive): a scanner reachable by both bitnesses stays on its existing
+    /// in-process path and is never routed to the 32-bit helper. Blank/whitespace names
+    /// are ignored.
+    /// </summary>
+    public static IReadOnlyList<ScannerInfo> MergeScannerLists(
+        IEnumerable<string> inProcessNames,
+        IEnumerable<string> helperNames)
+    {
+        var merged = new List<ScannerInfo>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var name in inProcessNames)
+        {
+            if (string.IsNullOrWhiteSpace(name)) continue;
+            if (seen.Add(name))
+                merged.Add(new ScannerInfo(name, ScannerOrigin.InProcess));
+        }
+
+        foreach (var name in helperNames)
+        {
+            if (string.IsNullOrWhiteSpace(name)) continue;
+            if (seen.Add(name))
+                merged.Add(new ScannerInfo(name, ScannerOrigin.X86Host));
+        }
+
+        return merged;
+    }
+
     private bool _sessionOpened;
 
     public void EnsureSessionOpen()
