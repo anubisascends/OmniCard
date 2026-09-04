@@ -78,6 +78,37 @@ public sealed record RealizedDto
     public decimal Profit { get; init; }
 }
 
+// --- Sets ---
+
+/// <summary>A set/expansion available for a game.</summary>
+public sealed record SetInfoDto(string SetCode, string SetName);
+
+/// <summary>A set-completion checklist: every printing with owned quantity + prices.</summary>
+public sealed record SetChecklistDto
+{
+    public string Game { get; init; } = "";
+    public string SetCode { get; init; } = "";
+    public string SetName { get; init; } = "";
+    public int OwnedCount { get; init; }
+    public int TotalCount { get; init; }
+    public int OwnedPhysicalCount { get; init; }
+    public double CompletionPercent { get; init; }
+    public IReadOnlyList<SetChecklistCardDto> Cards { get; init; } = [];
+}
+
+public sealed record SetChecklistCardDto
+{
+    public string GameCardId { get; init; } = "";
+    public string CollectorNumber { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string Rarity { get; init; } = "";
+    public string? ImageUri { get; init; }
+    public int OwnedQuantity { get; init; }
+    public decimal? NormalPrice { get; init; }
+    public decimal? FoilPrice { get; init; }
+    public bool HasFoil { get; init; }
+}
+
 // --- Auth ---
 
 /// <summary>Whether the site requires a passphrase and whether this session is authenticated.</summary>

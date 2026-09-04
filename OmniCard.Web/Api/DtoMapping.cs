@@ -77,6 +77,33 @@ public static class DtoMapping
 
     public static ValuationLineDto ToDto(ValuationLine v) => new(v.Key, v.Units, v.Cost, v.Market);
 
+    public static SetInfoDto ToDto(SetInfo s) => new(s.SetCode, s.SetName);
+
+    public static SetChecklistDto ToDto(SetChecklist c) => new()
+    {
+        Game = GameId(c.Game),
+        SetCode = c.SetCode,
+        SetName = c.SetName,
+        OwnedCount = c.OwnedCount,
+        TotalCount = c.TotalCount,
+        OwnedPhysicalCount = c.OwnedPhysicalCount,
+        CompletionPercent = c.CompletionPercent,
+        Cards = c.Cards.Select(ToDto).ToList(),
+    };
+
+    public static SetChecklistCardDto ToDto(SetChecklistCard c) => new()
+    {
+        GameCardId = c.GameCardId,
+        CollectorNumber = c.CollectorNumber,
+        Name = c.Name,
+        Rarity = c.Rarity,
+        ImageUri = c.Card.ImageUri,
+        OwnedQuantity = c.OwnedQuantity,
+        NormalPrice = c.NormalPrice,
+        FoilPrice = c.FoilPrice,
+        HasFoil = c.HasFoil,
+    };
+
     public static DashboardDto ToDto(HoldingsValuation h, RealizedSummary r) => new()
     {
         TotalUnits = h.TotalUnits,

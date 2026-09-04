@@ -1,10 +1,13 @@
 import type {
   AuthStatusDto,
+  BinderStateDto,
   CardDto,
   DashboardDto,
   GameDto,
   LocationSummaryDto,
   PagedResult,
+  SetChecklistDto,
+  SetInfoDto,
 } from './types';
 
 /** Thrown for non-2xx responses; carries the HTTP status so callers can special-case 401. */
@@ -65,6 +68,16 @@ export const api = {
 
   // Locations
   locations: (game?: string) => request<LocationSummaryDto[]>(`/api/locations${qs({ game })}`),
+  location: (id: number) => request<LocationSummaryDto>(`/api/locations/${id}`),
+
+  // Sets
+  sets: (game: string) => request<SetInfoDto[]>(`/api/sets${qs({ game })}`),
+  setChecklist: (game: string, setCode: string) =>
+    request<SetChecklistDto>(`/api/sets/${encodeURIComponent(game)}/${encodeURIComponent(setCode)}`),
+
+  // Binder
+  binder: (id: number, spread: number) =>
+    request<BinderStateDto>(`/api/binder/${id}${qs({ spread })}`),
 
   // Collection
   collection: (opts: {

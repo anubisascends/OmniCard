@@ -95,6 +95,7 @@ builder.Services.AddSingleton<IDecklistService, DecklistService>();
 // OmniCardDbContext factory registered above).
 builder.Services.AddSingleton<IAnalyticsService, AnalyticsService>();
 builder.Services.AddSingleton<ICollectionQueryService, CollectionQueryService>();
+builder.Services.AddSingleton<ISetChecklistService, SetChecklistService>();
 
 // --- Binder editor: the one deliberate WRITE surface in the otherwise read-only web app ---
 // A single writable factory against inventory.db, injected only into the binder-edit services so the

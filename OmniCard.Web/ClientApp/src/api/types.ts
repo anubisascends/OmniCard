@@ -84,3 +84,85 @@ export interface AuthStatusDto {
   authRequired: boolean;
   authenticated: boolean;
 }
+
+export interface SetInfoDto {
+  setCode: string;
+  setName: string;
+}
+
+export interface SetChecklistCardDto {
+  gameCardId: string;
+  collectorNumber: string;
+  name: string;
+  rarity: string;
+  imageUri?: string | null;
+  ownedQuantity: number;
+  normalPrice?: number | null;
+  foilPrice?: number | null;
+  hasFoil: boolean;
+}
+
+export interface SetChecklistDto {
+  game: string;
+  setCode: string;
+  setName: string;
+  ownedCount: number;
+  totalCount: number;
+  ownedPhysicalCount: number;
+  completionPercent: number;
+  cards: SetChecklistCardDto[];
+}
+
+// --- Binder (matches OmniCard.Web.Services.BinderStateDto) ---
+
+export interface BinderCardDto {
+  id: number;
+  game: number;
+  name: string;
+  setName: string;
+  setCode: string;
+  number: string;
+  rarity: string;
+  color?: string | null;
+  cardType?: string | null;
+  foil: boolean;
+  foilType?: string | null;
+  condition: string;
+  purchasePrice?: number | null;
+  price?: string | null;
+  marketPriceRaw: number;
+  imageUrl?: string | null;
+  isTraded: boolean;
+  tags: string[];
+  page?: number | null;
+  slot?: number | null;
+  containerId?: number | null;
+  tcgPlayerUrl: string;
+}
+
+export interface BinderSlotDto {
+  slotIndex: number;
+  card: BinderCardDto | null;
+  reverseGame?: number | null;
+}
+
+export interface SpreadTabDto {
+  index: number;
+  label: string;
+  isCurrent: boolean;
+}
+
+export interface BinderStateDto {
+  containerName: string;
+  slotsPerPage: number;
+  columns: number;
+  totalPages: number;
+  spreadIndex: number;
+  totalSpreads: number;
+  leftPageNumber?: number | null;
+  rightPageNumber?: number | null;
+  pageRangeLabel: string;
+  leftSlots: BinderSlotDto[];
+  rightSlots: BinderSlotDto[];
+  spreadTabs: SpreadTabDto[];
+}

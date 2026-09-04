@@ -17,6 +17,16 @@ public sealed class LocationsController(ICollectionQueryService queryService) : 
         return summaries.Select(DtoMapping.ToDto).ToList();
     }
 
+    /// <summary>One location's overview tile. Its cards come from
+    /// <c>GET /api/collection?containerId={id}</c>.</summary>
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<LocationSummaryDto>> GetOne(int id)
+    {
+        var summaries = await queryService.GetLocationOverviewsAsync();
+        var match = summaries.FirstOrDefault(s => s.Container.Id == id);
+        return match is null ? NotFound() : DtoMapping.ToDto(match);
+    }
+
     internal static CardGame? ParseGame(string? game) =>
         string.IsNullOrWhiteSpace(game) ? null
         : Enum.TryParse<CardGame>(game, ignoreCase: true, out var g) ? g
