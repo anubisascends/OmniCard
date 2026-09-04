@@ -88,6 +88,69 @@ export interface AuthStatusDto {
   authenticated: boolean;
 }
 
+export interface WorkflowLaneDto {
+  key: string;
+  name: string;
+  color: string;
+  behavior: string;
+}
+
+export interface OrderDto {
+  id: number;
+  customerId: number;
+  customerName?: string | null;
+  channel: string;
+  orderNumber?: string | null;
+  orderDate: string;
+  status: string;
+  stageKey?: string | null;
+  lineItemCount: number;
+  lineTotal: number;
+  shippingChargedToBuyer: number;
+  shippingCost: number;
+  marketplaceFees: number;
+  trackingNumber?: string | null;
+  notes?: string | null;
+}
+
+export interface ActiveListingDto {
+  lotId: number;
+  name: string;
+  setName: string;
+  setCode: string;
+  condition?: string | null;
+  isFoil: boolean;
+  listedPrice: number;
+  status: string;
+}
+
+export interface CustomerDto {
+  id: number;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  city?: string | null;
+  state?: string | null;
+}
+
+export interface ProductDto {
+  id: number;
+  game: string;
+  category: string;
+  name: string;
+  setName?: string | null;
+  setCode?: string | null;
+  upc?: string | null;
+  lastMarketPrice?: number | null;
+  totalQuantity: number;
+}
+
+export interface InventoryValuationDto {
+  totalUnits: number;
+  totalCost: number;
+  totalMarket: number;
+}
+
 export interface SetInfoDto {
   setCode: string;
   setName: string;

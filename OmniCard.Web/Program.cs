@@ -87,6 +87,13 @@ builder.Services.AddSingleton<IAnalyticsService, AnalyticsService>();
 builder.Services.AddSingleton<ICollectionQueryService, CollectionQueryService>();
 builder.Services.AddSingleton<ISetChecklistService, SetChecklistService>();
 
+// Sales & inventory services. On SQL Server the DI-registered OmniCardDbContext factory is
+// read-write, so these write straight through it. eBay is stubbed until Phase 5.
+builder.Services.AddSingleton<IEbayListingService, NoOpEbayListingService>();
+builder.Services.AddSingleton<IInventoryService, InventoryService>();
+builder.Services.AddSingleton<ICustomerService, CustomerService>();
+builder.Services.AddSingleton<IOrderService, OrderService>();
+
 // --- Binder editor: the one deliberate WRITE surface in the otherwise read-only web app ---
 // A single writable factory against inventory.db, injected only into the binder-edit services so the
 // read-only invariant holds everywhere else. Editing is gated by a passphrase (Binder:EditPassphrase)

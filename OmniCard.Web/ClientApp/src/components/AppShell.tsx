@@ -20,6 +20,7 @@ import GridViewIcon from '@mui/icons-material/GridView';
 import ChecklistIcon from '@mui/icons-material/Checklist';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
+import Inventory2Icon from '@mui/icons-material/Inventory2';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useGame } from '../context/GameContext';
@@ -31,6 +32,7 @@ const NAV: { to: string; label: string; icon: ReactNode }[] = [
   { to: '/collection', label: 'Collection', icon: <CollectionsBookmarkIcon /> },
   { to: '/locations', label: 'Locations', icon: <GridViewIcon /> },
   { to: '/sets', label: 'Sets', icon: <ChecklistIcon /> },
+  { to: '/inventory', label: 'Inventory', icon: <Inventory2Icon /> },
   { to: '/import', label: 'Import', icon: <UploadFileIcon /> },
   { to: '/sales', label: 'Sales', icon: <PointOfSaleIcon /> },
 ];

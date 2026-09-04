@@ -159,6 +159,75 @@ public sealed record SetTagsRequest
     public IReadOnlyList<string> Tags { get; init; } = [];
 }
 
+// --- Sales & inventory ---
+
+public sealed record WorkflowLaneDto(string Key, string Name, string Color, string Behavior);
+
+public sealed record OrderDto
+{
+    public int Id { get; init; }
+    public int CustomerId { get; init; }
+    public string? CustomerName { get; init; }
+    public string Channel { get; init; } = "";
+    public string? OrderNumber { get; init; }
+    public string OrderDate { get; init; } = "";
+    public string Status { get; init; } = "";
+    public string? StageKey { get; init; }
+    public int LineItemCount { get; init; }
+    public decimal LineTotal { get; init; }
+    public decimal ShippingChargedToBuyer { get; init; }
+    public decimal ShippingCost { get; init; }
+    public decimal MarketplaceFees { get; init; }
+    public string? TrackingNumber { get; init; }
+    public string? Notes { get; init; }
+}
+
+public sealed record SetOrderStatusRequest
+{
+    public string Status { get; init; } = "";
+    public string? StageKey { get; init; }
+}
+
+public sealed record ActiveListingDto(
+    int LotId, string Name, string SetName, string SetCode,
+    string? Condition, bool IsFoil, decimal ListedPrice, string Status);
+
+public sealed record CustomerDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = "";
+    public string? Email { get; init; }
+    public string? Phone { get; init; }
+    public string? City { get; init; }
+    public string? State { get; init; }
+}
+
+public sealed record ProductDto
+{
+    public int Id { get; init; }
+    public string Game { get; init; } = "";
+    public string Category { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string? SetName { get; init; }
+    public string? SetCode { get; init; }
+    public string? Upc { get; init; }
+    public decimal? LastMarketPrice { get; init; }
+    public int TotalQuantity { get; init; }
+}
+
+public sealed record InventoryLotDto
+{
+    public int Id { get; init; }
+    public int ProductId { get; init; }
+    public int Quantity { get; init; }
+    public decimal? UnitCost { get; init; }
+    public int? LocationId { get; init; }
+    public string? Source { get; init; }
+    public string? AcquisitionDate { get; init; }
+}
+
+public sealed record InventoryValuationDto(int TotalUnits, decimal TotalCost, decimal TotalMarket);
+
 // --- Auth ---
 
 /// <summary>Whether the site requires a passphrase and whether this session is authenticated.</summary>

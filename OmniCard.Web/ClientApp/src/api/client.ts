@@ -1,13 +1,19 @@
 import type {
+  ActiveListingDto,
   AuthStatusDto,
   BinderStateDto,
   CardDto,
+  CustomerDto,
   DashboardDto,
   GameDto,
+  InventoryValuationDto,
   LocationSummaryDto,
+  OrderDto,
   PagedResult,
+  ProductDto,
   SetChecklistDto,
   SetInfoDto,
+  WorkflowLaneDto,
 } from './types';
 
 /** Thrown for non-2xx responses; carries the HTTP status so callers can special-case 401. */
@@ -126,4 +132,22 @@ export const api = {
 
   // Tags
   tags: () => request<{ id: number; name: string; usageCount: number }[]>('/api/tags'),
+
+  // Sales
+  orders: () => request<OrderDto[]>('/api/orders'),
+  orderLanes: () => request<WorkflowLaneDto[]>('/api/orders/lanes'),
+  orderSetStatus: (id: number, status: string, stageKey?: string) =>
+    request<void>(`/api/orders/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status, stageKey }),
+    }),
+  listings: (game?: string) => request<ActiveListingDto[]>(`/api/listings${qs({ game })}`),
+  listingUnlist: (lotId: number) =>
+    request<void>(`/api/listings/lot/${lotId}`, { method: 'DELETE' }),
+  customers: () => request<CustomerDto[]>('/api/customers'),
+
+  // Inventory (sealed)
+  inventoryProducts: (game?: string, category?: string) =>
+    request<ProductDto[]>(`/api/inventory/products${qs({ game, category })}`),
+  inventoryValuation: () => request<InventoryValuationDto>('/api/inventory/valuation'),
 };

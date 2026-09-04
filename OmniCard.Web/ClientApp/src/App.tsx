@@ -6,6 +6,8 @@ import { LocationsPage } from './pages/LocationsPage';
 import { LocationDetailPage } from './pages/LocationDetailPage';
 import { BinderPage } from './pages/BinderPage';
 import { SetsPage } from './pages/SetsPage';
+import { SalesPage } from './pages/SalesPage';
+import { InventoryPage } from './pages/InventoryPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 
 export function App() {
@@ -18,8 +20,9 @@ export function App() {
         <Route path="/location/:id" element={<LocationDetailPage />} />
         <Route path="/binder/:id" element={<BinderPage />} />
         <Route path="/sets" element={<SetsPage />} />
+        <Route path="/inventory" element={<InventoryPage />} />
         <Route path="/import" element={<PlaceholderPage title="Import" />} />
-        <Route path="/sales" element={<PlaceholderPage title="Sales" />} />
+        <Route path="/sales" element={<SalesPage />} />
         <Route path="*" element={<PlaceholderPage title="Not Found" />} />
       </Routes>
     </AppShell>

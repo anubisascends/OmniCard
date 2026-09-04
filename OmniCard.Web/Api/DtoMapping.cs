@@ -107,6 +107,67 @@ public static class DtoMapping
         HasFoil = c.HasFoil,
     };
 
+    public static WorkflowLaneDto ToDto(WorkflowLane l) => new(l.Key, l.Name, l.Color, l.Behavior.ToString());
+
+    public static OrderDto ToDto(Order o) => new()
+    {
+        Id = o.Id,
+        CustomerId = o.CustomerId,
+        CustomerName = o.CustomerNameDisplay,
+        Channel = o.Channel.ToString(),
+        OrderNumber = o.OrderNumber,
+        OrderDate = o.OrderDate.ToString("o"),
+        Status = o.Status.ToString(),
+        StageKey = o.StageKey,
+        LineItemCount = o.LineItemCount,
+        LineTotal = o.LineTotal,
+        ShippingChargedToBuyer = o.ShippingChargedToBuyer,
+        ShippingCost = o.ShippingCost,
+        MarketplaceFees = o.MarketplaceFees,
+        TrackingNumber = o.TrackingNumber,
+        Notes = o.Notes,
+    };
+
+    public static ActiveListingDto ToDto(ActiveListing l) =>
+        new(l.LotId, l.Name, l.SetName, l.SetCode, l.Condition, l.IsFoil, l.ListedPrice, l.Status.ToString());
+
+    public static CustomerDto ToDto(Customer c) => new()
+    {
+        Id = c.Id,
+        Name = c.Name,
+        Email = c.Email,
+        Phone = c.Phone,
+        City = c.City,
+        State = c.State,
+    };
+
+    public static ProductDto ToDto(Product p, int totalQuantity) => new()
+    {
+        Id = p.Id,
+        Game = GameId(p.Game),
+        Category = p.Category.ToString(),
+        Name = p.Name,
+        SetName = p.SetName,
+        SetCode = p.SetCode,
+        Upc = p.Upc,
+        LastMarketPrice = p.LastMarketPrice,
+        TotalQuantity = totalQuantity,
+    };
+
+    public static InventoryLotDto ToDto(InventoryLot l) => new()
+    {
+        Id = l.Id,
+        ProductId = l.ProductId,
+        Quantity = l.Quantity,
+        UnitCost = l.UnitCost,
+        LocationId = l.LocationId,
+        Source = l.Source,
+        AcquisitionDate = l.AcquisitionDate.ToString("o"),
+    };
+
+    public static InventoryValuationDto ToDto(InventoryValuation v) =>
+        new(v.TotalUnits, v.TotalCost, v.TotalMarket);
+
     public static DashboardDto ToDto(HoldingsValuation h, RealizedSummary r) => new()
     {
         TotalUnits = h.TotalUnits,
