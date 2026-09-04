@@ -26,6 +26,7 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
+import SettingsIcon from '@mui/icons-material/Settings';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useGame } from '../context/GameContext';
@@ -41,6 +42,7 @@ const NAV: { to: string; label: string; icon: ReactNode }[] = [
   { to: '/inventory', label: 'Inventory', icon: <Inventory2Icon /> },
   { to: '/import', label: 'Import', icon: <UploadFileIcon /> },
   { to: '/sales', label: 'Sales', icon: <PointOfSaleIcon /> },
+  { to: '/settings', label: 'Settings', icon: <SettingsIcon /> },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {

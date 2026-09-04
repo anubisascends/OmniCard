@@ -15,7 +15,7 @@ Supports **Magic: The Gathering** (via Scryfall) and **One Piece TCG**.
 - **CSV import/export** (Manabox, Moxfield, TCGPlayer, app-native formats)
 - **eBay listing integration** for selling cards
 - **Inventory tracking** for sealed product (booster boxes, packs, bundles, etc.) with lots and valuation
-- **Web companion** for browsing your collection from any device and scanning cards with your phone camera
+- **Web app** for browsing *and managing* your collection from any device — edit cards, manage locations/binders/inventory/sales, and scan with your phone camera (matching runs server-side). See [OmniCard.Web/README.md](OmniCard.Web/README.md).
 - **Location auditing** with PDF reports
 
 ## Requirements
@@ -41,16 +41,23 @@ No installation required -- just extract and run.
 
 ### Installing the Web Companion on IIS
 
-The web companion is a normal ASP.NET Core app and is meant to run alongside the desktop app on
-the same machine (or one with access to the same data directory), so people on your network can
-browse the collection and scan with their phones.
+The web app is a normal ASP.NET Core app (a React SPA served by the backend). It is a full
+read/write app backed by **SQL Server** for the unified collection/inventory/sales store, with the
+per-game catalog databases opened read-only as reference caches. People on your network can browse,
+edit, and scan with their phones.
+
+> The steps below are a quick outline. For the full deployment guide — SPA build, SQL Server setup,
+> the one-time SQLite→SQL Server data migration, configuration keys, and eBay setup — see
+> **[OmniCard.Web/README.md](OmniCard.Web/README.md)**.
 
 **Prerequisites (on the IIS server):**
 
 - IIS with the **ASP.NET Core Module V2** -- install the
   [.NET 10 Hosting Bundle](https://dotnet.microsoft.com/download/dotnet/10.0) (not just the SDK/runtime), then restart the server (or at least run `net stop was /y` followed by `net start w3svc`).
-- The desktop app must have run at least once on a reachable path, so `inventory.db` and the
-  per-game catalog databases exist to point at.
+- **SQL Server 2019+** (Express is fine) for the unified store, plus a one-time data migration from
+  the desktop's `inventory.db` (see the deployment guide).
+- The desktop app must have run at least once on a reachable path, so the per-game catalog databases
+  exist to point at.
 
 **Steps:**
 
@@ -69,10 +76,11 @@ browse the collection and scan with their phones.
    </aspNetCore>
    ```
    Use the same data directory the desktop app uses (default `%LOCALAPPDATA%\OmniCard`).
-5. Grant the app pool identity (`IIS AppPool\<your app pool name>`) **read** access to that data
-   directory -- the web app opens the databases read-only, so no write access is needed.
-6. Browse to the site. You should see the collection browser; `/scan` works from any device on the
-   same network once you're browsing over the LAN.
+5. Grant the app pool identity (`IIS AppPool\<your app pool name>`) **read** access to the catalog
+   SQLite databases + `scans/`, **read/write** on `<DataDirectory>/dataprotection-keys`, and access
+   to SQL Server (via Windows auth or a SQL login in the connection string).
+6. Browse to the site (the SPA lives under `/app`). Scanning works from any device on the same
+   network once you're browsing over the LAN.
 
 ## Building from Source
 

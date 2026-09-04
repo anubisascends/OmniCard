@@ -6,6 +6,9 @@ import type {
   CsvImportResultDto,
   CustomerDto,
   DashboardDto,
+  EbaySetupResultDto,
+  EbayStatusDto,
+  InventoryLotDto,
   DecklistCheckDto,
   GameDto,
   InventoryValuationDto,
@@ -21,6 +24,30 @@ import type {
   SetInfoDto,
   WorkflowLaneDto,
 } from './types';
+
+/** Write-request bodies (mirror the Contracts upsert records). */
+export interface CustomerFields {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  city?: string | null;
+  state?: string | null;
+}
+export interface ProductFields {
+  game: string;
+  category: string;
+  name: string;
+  setName?: string | null;
+  setCode?: string | null;
+  upc?: string | null;
+  lastMarketPrice?: number | null;
+}
+export interface LotFields {
+  quantity: number;
+  unitCost?: number | null;
+  locationId?: number | null;
+  source?: string | null;
+}
 
 /** Thrown for non-2xx responses; carries the HTTP status so callers can special-case 401. */
 export class ApiError extends Error {
@@ -150,12 +177,36 @@ export const api = {
   listings: (game?: string) => request<ActiveListingDto[]>(`/api/listings${qs({ game })}`),
   listingUnlist: (lotId: number) =>
     request<void>(`/api/listings/lot/${lotId}`, { method: 'DELETE' }),
+  pickListPdfUrl: (game?: string) => `/api/listings/picklist.pdf${qs({ game })}`,
   customers: () => request<CustomerDto[]>('/api/customers'),
+  customerCreate: (body: CustomerFields) =>
+    request<CustomerDto>('/api/customers', { method: 'POST', body: JSON.stringify(body) }),
+  customerUpdate: (id: number, body: CustomerFields) =>
+    request<void>(`/api/customers/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  customerDelete: (id: number) =>
+    request<void>(`/api/customers/${id}`, { method: 'DELETE' }),
 
   // Inventory (sealed)
   inventoryProducts: (game?: string, category?: string) =>
     request<ProductDto[]>(`/api/inventory/products${qs({ game, category })}`),
   inventoryValuation: () => request<InventoryValuationDto>('/api/inventory/valuation'),
+  inventoryLots: (productId: number) =>
+    request<InventoryLotDto[]>(`/api/inventory/products/${productId}/lots`),
+  inventoryProductCreate: (body: ProductFields) =>
+    request<ProductDto>('/api/inventory/products', { method: 'POST', body: JSON.stringify(body) }),
+  inventoryProductUpdate: (id: number, body: ProductFields) =>
+    request<void>(`/api/inventory/products/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  inventoryProductDelete: (id: number) =>
+    request<void>(`/api/inventory/products/${id}`, { method: 'DELETE' }),
+  inventoryAddLot: (productId: number, body: LotFields) =>
+    request<InventoryLotDto>(`/api/inventory/products/${productId}/lots`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  inventoryUpdateLot: (lotId: number, body: LotFields) =>
+    request<void>(`/api/inventory/lots/${lotId}`, { method: 'PUT', body: JSON.stringify(body) }),
+  inventoryDeleteLot: (lotId: number) =>
+    request<void>(`/api/inventory/lots/${lotId}`, { method: 'DELETE' }),
 
   // Import / Export
   exportUrl: (format: string, game?: string, q?: string) =>
@@ -182,6 +233,13 @@ export const api = {
   },
   decklistCheck: (body: { url?: string; text?: string; game: string }) =>
     request<DecklistCheckDto>('/api/decklist/check', { method: 'POST', body: JSON.stringify(body) }),
+
+  // eBay
+  ebayStatus: () => request<EbayStatusDto>('/api/ebay/status'),
+  /** Top-level navigation URL to start the eBay OAuth consent flow. */
+  ebayConnectUrl: '/api/ebay/connect',
+  ebayDisconnect: () => request<void>('/api/ebay/disconnect', { method: 'POST' }),
+  ebaySetup: () => request<EbaySetupResultDto>('/api/ebay/setup', { method: 'POST' }),
 
   // Scan (server-side image matching)
   scanMatch: async (image: File, game: string, isFoil: boolean) => {

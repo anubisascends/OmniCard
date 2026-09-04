@@ -151,6 +151,16 @@ export interface InventoryValuationDto {
   totalMarket: number;
 }
 
+export interface InventoryLotDto {
+  id: number;
+  productId: number;
+  quantity: number;
+  unitCost?: number | null;
+  locationId?: number | null;
+  source?: string | null;
+  acquisitionDate?: string | null;
+}
+
 export interface DecklistEntryDto {
   cardName: string;
   quantityNeeded: number;
@@ -302,4 +312,17 @@ export interface ScanCommitItem {
 
 export interface ScanCommitResultDto {
   imported: number;
+}
+
+// --- eBay ---
+
+export interface EbayStatusDto {
+  connected: boolean;
+  configured: boolean;
+  missingConfig: string[];
+}
+
+export interface EbaySetupResultDto {
+  success: boolean;
+  message?: string | null;
 }

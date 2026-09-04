@@ -2,10 +2,15 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   Paper,
   Stack,
@@ -16,12 +21,18 @@ import {
   TableHead,
   TableRow,
   Tabs,
+  TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
-import { api } from '../api/client';
-import type { OrderDto, WorkflowLaneDto } from '../api/types';
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import DownloadIcon from '@mui/icons-material/Download';
+import { api, type CustomerFields } from '../api/client';
+import { useGame } from '../context/GameContext';
+import type { CustomerDto, OrderDto, WorkflowLaneDto } from '../api/types';
 
 const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 
@@ -109,6 +120,7 @@ function OrdersBoard() {
 
 function ListingsTable() {
   const qc = useQueryClient();
+  const { game } = useGame();
   const { data, isLoading } = useQuery({ queryKey: ['listings'], queryFn: () => api.listings() });
   const unlist = useMutation({
     mutationFn: (lotId: number) => api.listingUnlist(lotId),
@@ -117,7 +129,16 @@ function ListingsTable() {
   if (isLoading || !data) return <CircularProgress />;
 
   return (
-    <Paper variant="outlined">
+    <Stack spacing={1} alignItems="flex-start">
+      <Button
+        variant="outlined"
+        startIcon={<DownloadIcon />}
+        component="a"
+        href={api.pickListPdfUrl(game)}
+      >
+        Pick list (PDF)
+      </Button>
+      <Paper variant="outlined" sx={{ alignSelf: 'stretch' }}>
       <Table size="small">
         <TableHead>
           <TableRow>
@@ -153,36 +174,154 @@ function ListingsTable() {
           ))}
         </TableBody>
       </Table>
-    </Paper>
+      </Paper>
+    </Stack>
+  );
+}
+
+const EMPTY_CUSTOMER: CustomerFields = { name: '', email: '', phone: '', city: '', state: '' };
+
+function CustomerDialog({
+  open,
+  initial,
+  onClose,
+}: {
+  open: boolean;
+  initial: CustomerDto | null;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [fields, setFields] = useState<CustomerFields>(EMPTY_CUSTOMER);
+
+  // Reset the form whenever the dialog opens for a different customer (or for "new").
+  const key = initial?.id ?? 'new';
+  const [formKey, setFormKey] = useState<string | number>(key);
+  if (open && formKey !== key) {
+    setFormKey(key);
+    setFields(
+      initial
+        ? {
+            name: initial.name,
+            email: initial.email ?? '',
+            phone: initial.phone ?? '',
+            city: initial.city ?? '',
+            state: initial.state ?? '',
+          }
+        : EMPTY_CUSTOMER,
+    );
+  }
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (initial) await api.customerUpdate(initial.id, fields);
+      else await api.customerCreate(fields);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['customers'] });
+      onClose();
+    },
+  });
+
+  const set = (k: keyof CustomerFields) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setFields((f) => ({ ...f, [k]: e.target.value }));
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>{initial ? 'Edit customer' : 'New customer'}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField label="Name" required value={fields.name} onChange={set('name')} autoFocus />
+          <TextField label="Email" value={fields.email ?? ''} onChange={set('email')} />
+          <TextField label="Phone" value={fields.phone ?? ''} onChange={set('phone')} />
+          <Stack direction="row" spacing={2}>
+            <TextField label="City" value={fields.city ?? ''} onChange={set('city')} fullWidth />
+            <TextField label="State" value={fields.state ?? ''} onChange={set('state')} sx={{ width: 100 }} />
+          </Stack>
+          {save.error && <Typography color="error" variant="body2">{(save.error as Error).message}</Typography>}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          variant="contained"
+          disabled={!fields.name.trim() || save.isPending}
+          onClick={() => save.mutate()}
+        >
+          {save.isPending ? 'Saving…' : 'Save'}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
 function CustomersTable() {
+  const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ['customers'], queryFn: api.customers });
+  const [editing, setEditing] = useState<CustomerDto | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const del = useMutation({
+    mutationFn: (id: number) => api.customerDelete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['customers'] }),
+  });
+
   if (isLoading || !data) return <CircularProgress />;
   return (
-    <Paper variant="outlined">
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>Name</TableCell>
-            <TableCell>Email</TableCell>
-            <TableCell>Phone</TableCell>
-            <TableCell>Location</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {data.map((c) => (
-            <TableRow key={c.id} hover>
-              <TableCell>{c.name}</TableCell>
-              <TableCell>{c.email}</TableCell>
-              <TableCell>{c.phone}</TableCell>
-              <TableCell>{[c.city, c.state].filter(Boolean).join(', ')}</TableCell>
+    <Stack spacing={1} alignItems="flex-start">
+      <Button
+        startIcon={<AddIcon />}
+        variant="outlined"
+        onClick={() => {
+          setEditing(null);
+          setDialogOpen(true);
+        }}
+      >
+        New customer
+      </Button>
+      <Paper variant="outlined" sx={{ alignSelf: 'stretch' }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell>Email</TableCell>
+              <TableCell>Phone</TableCell>
+              <TableCell>Location</TableCell>
+              <TableCell align="right"></TableCell>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </Paper>
+          </TableHead>
+          <TableBody>
+            {data.map((c) => (
+              <TableRow key={c.id} hover>
+                <TableCell>{c.name}</TableCell>
+                <TableCell>{c.email}</TableCell>
+                <TableCell>{c.phone}</TableCell>
+                <TableCell>{[c.city, c.state].filter(Boolean).join(', ')}</TableCell>
+                <TableCell align="right">
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      setEditing(c);
+                      setDialogOpen(true);
+                    }}
+                  >
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      if (confirm(`Delete customer "${c.name}"?`)) del.mutate(c.id);
+                    }}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Paper>
+      <CustomerDialog open={dialogOpen} initial={editing} onClose={() => setDialogOpen(false)} />
+    </Stack>
   );
 }
 

@@ -228,6 +228,49 @@ public sealed record InventoryLotDto
 
 public sealed record InventoryValuationDto(int TotalUnits, decimal TotalCost, decimal TotalMarket);
 
+// --- Customer / inventory writes ---
+
+/// <summary>Create or edit a customer. On edit, only these fields are patched; address/notes not
+/// exposed here are left untouched.</summary>
+public sealed record CustomerUpsertRequest
+{
+    public string Name { get; init; } = "";
+    public string? Email { get; init; }
+    public string? Phone { get; init; }
+    public string? City { get; init; }
+    public string? State { get; init; }
+}
+
+/// <summary>Create or edit a sealed-product catalog entry.</summary>
+public sealed record ProductUpsertRequest
+{
+    public string Game { get; init; } = "";
+    public string Category { get; init; } = "Box";
+    public string Name { get; init; } = "";
+    public string? SetName { get; init; }
+    public string? SetCode { get; init; }
+    public string? Upc { get; init; }
+    public decimal? LastMarketPrice { get; init; }
+}
+
+/// <summary>Add or edit an inventory lot (owned quantity of a product at a location).</summary>
+public sealed record LotUpsertRequest
+{
+    public int Quantity { get; init; } = 1;
+    public decimal? UnitCost { get; init; }
+    public int? LocationId { get; init; }
+    public string? Source { get; init; }
+}
+
+// --- eBay ---
+
+/// <summary>eBay connection state for the settings screen. <see cref="Connected"/> = valid OAuth
+/// tokens on file; <see cref="Configured"/> = the app credentials needed to attempt a connection are
+/// all present (<see cref="MissingConfig"/> lists any that aren't).</summary>
+public sealed record EbayStatusDto(bool Connected, bool Configured, IReadOnlyList<string> MissingConfig);
+
+public sealed record EbaySetupResultDto(bool Success, string? Message);
+
 // --- Decklist check ---
 
 public sealed record DecklistCheckRequest

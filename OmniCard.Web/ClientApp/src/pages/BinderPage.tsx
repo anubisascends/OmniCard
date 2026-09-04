@@ -17,6 +17,44 @@ import {
 import { api } from '../api/client';
 import type { BinderSlotDto } from '../api/types';
 
+// Card-back image slugs indexed by CardGame enum order (Mtg=0 … FinalFantasy=5). Assets live at
+// wwwroot/img/card-back-{slug}.png (served from root, so absolute paths resolve under /app too).
+const CARD_BACK_SLUGS = ['mtg', 'optcg', 'riftbound', 'pokemon', 'yugioh', 'fftcg'];
+const cardBackSrc = (game: number): string | undefined => {
+  const slug = CARD_BACK_SLUGS[game];
+  return slug ? `/img/card-back-${slug}.png` : undefined;
+};
+
+/** An empty pocket whose mirrored pocket on the reverse side of the sheet holds a card: show that
+ * game's card back (as if seeing the back of the card behind the page). Degrades to a subtle
+ * gradient when the user hasn't supplied the PNG. */
+function ReverseCardBack({ game }: { game: number }) {
+  const src = cardBackSrc(game);
+  return (
+    <Tooltip title="Card on the reverse side of this sheet">
+      <Box
+        sx={{
+          width: '100%',
+          height: '100%',
+          display: 'grid',
+          placeItems: 'center',
+          background: (t) =>
+            `repeating-linear-gradient(135deg, ${t.palette.action.hover}, ${t.palette.action.hover} 6px, ${t.palette.action.selected} 6px, ${t.palette.action.selected} 12px)`,
+        }}
+      >
+        {src && (
+          <img
+            src={src}
+            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: 0.85 }}
+            onError={(e) => e.currentTarget.remove()}
+          />
+        )}
+      </Box>
+    </Tooltip>
+  );
+}
+
 function SlotGrid({
   slots,
   columns,
@@ -61,6 +99,8 @@ function SlotGrid({
                   style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                 />
               </Tooltip>
+            ) : s.reverseGame != null ? (
+              <ReverseCardBack game={s.reverseGame} />
             ) : null}
           </Box>
         ))}

@@ -4,8 +4,10 @@ using OmniCard.Interfaces;
 
 namespace OmniCard.Web.Api;
 
-/// <summary>Active for-sale listings, and unlisting.</summary>
-public sealed class ListingsController(IListingService listings) : ApiControllerBase
+/// <summary>Active for-sale listings, unlisting, and the printable pick list.</summary>
+public sealed class ListingsController(
+    IListingService listings,
+    IPickListPdfExporter pickListPdf) : ApiControllerBase
 {
     [HttpGet]
     public ActionResult<IReadOnlyList<ActiveListingDto>> Get([FromQuery] string? game) =>
@@ -17,5 +19,14 @@ public sealed class ListingsController(IListingService listings) : ApiController
     {
         listings.Unlist([lotId]);
         return NoContent();
+    }
+
+    /// <summary>Printable pick list (cards to pull for active listings), optionally game-filtered.</summary>
+    [HttpGet("picklist.pdf")]
+    public IActionResult PickListPdf([FromQuery] string? game)
+    {
+        var entries = listings.GetPickList(LocationsController.ParseGame(game));
+        var bytes = TempFile.Produce(".pdf", p => pickListPdf.Export(entries, p));
+        return File(bytes, "application/pdf", "pick-list.pdf");
     }
 }

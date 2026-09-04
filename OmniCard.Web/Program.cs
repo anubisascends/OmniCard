@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.CardMatching;
 using OmniCard.Collection;
@@ -90,8 +91,23 @@ builder.Services.AddSingleton<ICollectionQueryService, CollectionQueryService>()
 builder.Services.AddSingleton<ISetChecklistService, SetChecklistService>();
 
 // Sales & inventory services. On SQL Server the DI-registered OmniCardDbContext factory is
-// read-write, so these write straight through it. eBay is stubbed until Phase 5.
-builder.Services.AddSingleton<IEbayListingService, NoOpEbayListingService>();
+// read-write, so these write straight through it.
+//
+// eBay (Phase 5b): the entire desktop eBay stack is reused server-side — the only desktop-specific
+// piece was token storage (Windows Credential Manager), replaced here by WebCredentialStore (a
+// DataProtection-encrypted file). All services degrade gracefully when unconfigured/unconnected
+// (GetAccessTokenAsync returns null → listing/end operations return false), so OrderService's
+// best-effort ship-time listing-end keeps working without a live eBay connection. Connect via the
+// OAuth flow in EbayController. Requires the "eBay" config section (AppId/CertId/RuName/AcceptUrl/
+// Environment) — until it's filled in, GetMissingConfiguration() reports what's missing.
+builder.Services.Configure<EbaySettings>(builder.Configuration.GetSection("eBay"));
+builder.Services.AddSingleton<ICredentialStore, WebCredentialStore>();
+builder.Services.AddSingleton<IEbayAuthService, OmniCard.eBay.EbayAuthService>();
+builder.Services.AddSingleton<IEbaySellingSettingsService, EbaySellingSettingsService>();
+builder.Services.AddSingleton<IEbayCatalogService, OmniCard.eBay.EbayCatalogService>();
+builder.Services.AddSingleton<IEbaySellerSetupService, OmniCard.eBay.EbaySellerSetupService>();
+builder.Services.AddSingleton<IEbaySyncService, OmniCard.eBay.EbaySyncService>();
+builder.Services.AddSingleton<IEbayListingService, OmniCard.eBay.EbayListingService>();
 builder.Services.AddSingleton<IInventoryService, InventoryService>();
 builder.Services.AddSingleton<ICustomerService, CustomerService>();
 builder.Services.AddSingleton<IOrderService, OrderService>();
@@ -103,6 +119,7 @@ builder.Services.AddSingleton<IReceiptPdfExporter, OmniCard.Audit.ReceiptPdfExpo
 builder.Services.AddSingleton<ISetChecklistPdfExporter, OmniCard.Audit.SetChecklistPdfExporter>();
 builder.Services.AddSingleton<IPriceSheetService, PriceSheetService>();
 builder.Services.AddSingleton<IPriceSheetPdfExporter, OmniCard.Audit.PriceSheetPdfExporter>();
+builder.Services.AddSingleton<IPickListPdfExporter, OmniCard.Audit.PickListPdfExporter>();
 
 // --- Binder editor: the one deliberate WRITE surface in the otherwise read-only web app ---
 // A single writable factory against inventory.db, injected only into the binder-edit services so the
@@ -118,6 +135,11 @@ builder.Services.AddSingleton<IListingService>(sp =>
 builder.Services.AddSingleton(sp =>
     new WebBinderCardService(writableFactory, sp.GetRequiredService<IDataPathService>()));
 builder.Services.AddScoped<BinderStateBuilder>();
+
+// Persist DataProtection keys to the data dir so WebCredentialStore's encrypted eBay tokens survive
+// app-pool recycles and don't depend on the IIS identity having a roaming profile.
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(dataDir, "dataprotection-keys")));
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
