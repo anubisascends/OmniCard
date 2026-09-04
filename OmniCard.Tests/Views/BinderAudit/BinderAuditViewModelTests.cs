@@ -222,6 +222,7 @@ public class BinderAuditViewModelTests
 
         // Unused by the audit VM.
         public StorageContainer GetBulk() => throw new NotImplementedException();
+        public bool NameExists(string name, int? excludeId = null) => false;
         public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9) => throw new NotImplementedException();
         public void Rename(int id, string newName) => throw new NotImplementedException();
         public void Delete(int id, bool moveCardsToBulk = true) => throw new NotImplementedException();

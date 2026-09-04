@@ -24,8 +24,23 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
         return context.StorageContainers.First(c => c.IsSystem);
     }
 
+    public bool NameExists(string name, int? excludeId = null)
+    {
+        var trimmed = (name ?? "").Trim();
+        using var context = dbContextFactory.CreateDbContext();
+        return context.StorageContainers
+            .AsNoTracking()
+            .Where(c => excludeId == null || c.Id != excludeId)
+            .AsEnumerable()
+            .Any(c => string.Equals(c.Name, trimmed, StringComparison.OrdinalIgnoreCase));
+    }
+
     public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9)
     {
+        var trimmed = (name ?? "").Trim();
+        if (NameExists(trimmed))
+            throw new InvalidOperationException($"A location named \"{trimmed}\" already exists.");
+
         using var context = dbContextFactory.CreateDbContext();
         var maxSort = context.StorageContainers.Any()
             ? context.StorageContainers.Max(c => c.SortOrder)
@@ -33,7 +48,7 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
 
         var container = new StorageContainer
         {
-            Name = name,
+            Name = trimmed,
             ContainerType = type,
             IsSystem = false,
             SortOrder = maxSort + 1,
@@ -56,13 +71,17 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
 
     public void Rename(int id, string newName)
     {
+        var trimmed = (newName ?? "").Trim();
+        if (NameExists(trimmed, excludeId: id))
+            throw new InvalidOperationException($"A location named \"{trimmed}\" already exists.");
+
         using var context = dbContextFactory.CreateDbContext();
         var container = context.StorageContainers.Find(id)
             ?? throw new InvalidOperationException($"Container {id} not found");
         if (container.IsSystem)
             throw new InvalidOperationException("Cannot rename system container");
 
-        container.Name = newName;
+        container.Name = trimmed;
         context.SaveChanges();
     }
 

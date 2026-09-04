@@ -14,6 +14,7 @@ public class SalesSettingsViewModelTests
             [new StorageContainer { Id = 1, Name = "Bulk" }, new StorageContainer { Id = 2, Name = "For Sale" }];
         public List<StorageContainer> GetAll() => Containers;
         public StorageContainer GetBulk() => Containers[0];
+        public bool NameExists(string name, int? excludeId = null) => false;
         public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9) => throw new System.NotImplementedException();
         public void Rename(int id, string newName) { }
         public void Delete(int id, bool moveCardsToBulk = true) { }

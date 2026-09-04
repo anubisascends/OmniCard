@@ -6,6 +6,12 @@ public interface IStorageContainerService
 {
     List<StorageContainer> GetAll();
     StorageContainer GetBulk();
+
+    /// <summary>True if a container already uses <paramref name="name"/> (trimmed, case-insensitive),
+    /// including the system Bulk location. Pass <paramref name="excludeId"/> to ignore one container
+    /// (e.g. the one being renamed). Used to keep location names globally unique.</summary>
+    bool NameExists(string name, int? excludeId = null);
+
     StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9);
     void Rename(int id, string newName);
     void Delete(int id, bool moveCardsToBulk = true);
