@@ -92,20 +92,25 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
 
         _readContext = _dbContextFactory.CreateDbContext();
         var dbPath = _readContext.Database.GetConnectionString();
-        if (dbPath is not null)
+        // SQLite (desktop) bootstraps the file + schema here. On SQL Server (web) the DB/schema are
+        // owned by EnsureCreated at web startup, and the connection string is not a file path.
+        if (_readContext.Database.IsSqlite())
         {
-            var dataSource = dbPath.Replace("Data Source=", "");
-            var dir = Path.GetDirectoryName(dataSource.Replace(";Mode=ReadOnly", ""));
-            if (dir is not null && dir.Length > 0)
-                Directory.CreateDirectory(dir);
-        }
-        _readContext.Database.EnsureCreated();
-        _readContext.ApplySchemaUpgrades();
+            if (dbPath is not null)
+            {
+                var dataSource = dbPath.Replace("Data Source=", "");
+                var dir = Path.GetDirectoryName(dataSource.Replace(";Mode=ReadOnly", ""));
+                if (dir is not null && dir.Length > 0)
+                    Directory.CreateDirectory(dir);
+            }
+            _readContext.Database.EnsureCreated();
+            _readContext.ApplySchemaUpgrades();
 
-        if (_readContext.GetSchemaVersion() < TcgCsvDbContext.TcgCsvSchemaVersion)
-        {
-            _logger.LogWarning("{Game} database predates current schema; wiping for migration", Game);
-            WipeForMigration();
+            if (_readContext.GetSchemaVersion() < TcgCsvDbContext.TcgCsvSchemaVersion)
+            {
+                _logger.LogWarning("{Game} database predates current schema; wiping for migration", Game);
+                WipeForMigration();
+            }
         }
         _logger.LogInformation("{Game} database ready at {DbPath}", Game, dbPath);
     }

@@ -17,7 +17,8 @@ public sealed class CollectionController(
     IDbContextFactory<OmniCardDbContext> dbFactory,
     ICardService cardService,
     WebBinderCardService binderCards,
-    ITagService tags) : ApiControllerBase
+    ITagService tags,
+    CardImageCacheService imageCache) : ApiControllerBase
 {
     /// <summary>Search owned singles. <paramref name="q"/> accepts the Scryfall-style tokens
     /// (<c>set:</c>, <c>cn:</c>, <c>c:</c>, <c>r:</c>, <c>t:</c>, <c>tag:</c>, <c>is:foil</c>, …).</summary>
@@ -42,6 +43,7 @@ public sealed class CollectionController(
         var cards = query.Skip(skip).Take(take).ToList();
 
         CardArtHydrator.HydrateMissingImageUris(cardService, cards);
+        imageCache.PreferCached(cards);
         MarketPriceHydrator.Populate(cardService, cards);
 
         var items = cards.Select(DtoMapping.ToDto).ToList();
@@ -56,6 +58,7 @@ public sealed class CollectionController(
         if (card is null) return NotFound();
 
         CardArtHydrator.HydrateMissingImageUris(cardService, [card]);
+        imageCache.PreferCached([card]);
         MarketPriceHydrator.Populate(cardService, [card]);
         card.Tags = tags.GetTagsForLot(id);
         // CollectionCardMapper doesn't carry Quantity; read it straight from the lot for the editor.

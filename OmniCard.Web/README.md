@@ -116,6 +116,19 @@ Deploy the published output to IIS:
    - **read/write** on `<DataDirectory>/dataprotection-keys`,
    - access to SQL Server (or use a SQL login in the connection string instead of Windows auth).
 
+## Catalog data
+
+The per-game card catalogs, prices, and image hashes are refreshed **server-side** — the web app no
+longer needs the desktop to keep them current. In **Settings → Catalog data**, pick a game and run:
+
+- **Update prices** — refresh market prices.
+- **Download catalog** — pull the latest card data (bulk).
+- **Recompute hashes** — rebuild perceptual hashes used for scan matching.
+
+One job runs at a time; progress is shown live. The catalog SQLite DBs are opened writable for this
+(they were read-only under the old read-only companion), and their schemas are created on first run,
+so a fresh server with an empty data directory can build them from scratch.
+
 ## eBay setup
 
 The full desktop eBay stack runs server-side; the OAuth flow is a normal web redirect.

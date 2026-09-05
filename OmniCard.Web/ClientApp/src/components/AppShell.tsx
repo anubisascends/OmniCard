@@ -26,6 +26,8 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -40,6 +42,8 @@ const NAV: { to: string; label: string; icon: ReactNode }[] = [
   { to: '/locations', label: 'Locations', icon: <GridViewIcon /> },
   { to: '/sets', label: 'Sets', icon: <ChecklistIcon /> },
   { to: '/inventory', label: 'Inventory', icon: <Inventory2Icon /> },
+  { to: '/lists', label: 'Lists', icon: <FormatListBulletedIcon /> },
+  { to: '/trades', label: 'Trades', icon: <SwapHorizIcon /> },
   { to: '/import', label: 'Import', icon: <UploadFileIcon /> },
   { to: '/sales', label: 'Sales', icon: <PointOfSaleIcon /> },
   { to: '/settings', label: 'Settings', icon: <SettingsIcon /> },

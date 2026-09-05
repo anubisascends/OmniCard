@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Sdb = OmniCard.Web.Data.SqlServerDb;
 using OmniCard.CardMatching;
 using OmniCard.Collection;
 using OmniCard.Data;
@@ -42,21 +43,26 @@ builder.Services.AddControllers(options =>
 builder.Services.AddHttpClient();
 builder.Services.AddOpenApi();
 
-// Unified store on SQL Server; catalog DBs on SQLite (read-only).
+// Everything is on SQL Server now — the unified store AND the six per-game catalog DBs (one DB per
+// game, e.g. OmniCard_Scryfall). The catalogs used to be SQLite files owned/refreshed by the desktop;
+// they now live in SQL Server so the web owns them end-to-end (CatalogController refreshes them and
+// the desktop can be retired). Catalog schemas are EnsureCreated at startup (they're disposable
+// reference caches — refresh wipes + reloads — so no migrations). One-time data copy from the old
+// SQLite files: OmniCard.DbMigrator.
 builder.Services.AddDbContextFactory<OmniCardDbContext>(options =>
-    OmniCard.Web.Data.SqlServerDb.Configure(options, connectionString));
+    Sdb.Configure(options, connectionString));
 builder.Services.AddDbContextFactory<ScryfallDbContext>(options =>
-    options.UseSqlite($"Data Source={Path.Combine(dataDir, "scryfall.db")};Mode=ReadOnly"));
+    Sdb.ConfigureCatalog(options, Sdb.CatalogConnectionString(builder.Configuration, "Scryfall")));
 builder.Services.AddDbContextFactory<OptcgDbContext>(options =>
-    options.UseSqlite($"Data Source={Path.Combine(dataDir, "optcg.db")};Mode=ReadOnly"));
+    Sdb.ConfigureCatalog(options, Sdb.CatalogConnectionString(builder.Configuration, "Optcg")));
 builder.Services.AddDbContextFactory<RiftboundDbContext>(options =>
-    options.UseSqlite($"Data Source={Path.Combine(dataDir, "riftbound.db")};Mode=ReadOnly"));
+    Sdb.ConfigureCatalog(options, Sdb.CatalogConnectionString(builder.Configuration, "Riftbound")));
 builder.Services.AddDbContextFactory<PokemonDbContext>(options =>
-    options.UseSqlite($"Data Source={Path.Combine(dataDir, "pokemon.db")};Mode=ReadOnly"));
+    Sdb.ConfigureCatalog(options, Sdb.CatalogConnectionString(builder.Configuration, "Pokemon")));
 builder.Services.AddDbContextFactory<YugiohDbContext>(options =>
-    options.UseSqlite($"Data Source={Path.Combine(dataDir, "yugioh.db")};Mode=ReadOnly"));
+    Sdb.ConfigureCatalog(options, Sdb.CatalogConnectionString(builder.Configuration, "Yugioh")));
 builder.Services.AddDbContextFactory<FinalFantasyDbContext>(options =>
-    options.UseSqlite($"Data Source={Path.Combine(dataDir, "fftcg.db")};Mode=ReadOnly"));
+    Sdb.ConfigureCatalog(options, Sdb.CatalogConnectionString(builder.Configuration, "FinalFantasy")));
 
 // Infrastructure services needed by game services
 builder.Services.AddSingleton<IDataPathService>(new WebDataPathService(dataDir));
@@ -82,7 +88,11 @@ builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<Fina
 // Card & decklist services
 builder.Services.AddSingleton<ICardService, WebCardService>();
 builder.Services.AddSingleton<WebScanMatchingService>();
+builder.Services.AddSingleton<CardImageCacheService>();
+builder.Services.AddSingleton<CatalogRefreshService>();
 builder.Services.AddSingleton<IDecklistService, DecklistService>();
+builder.Services.AddSingleton<ITradeService, TradeService>();
+builder.Services.AddSingleton<IListService, ListService>();
 
 // Read-only reporting/query services backing the SPA API (they read via the Mode=ReadOnly
 // OmniCardDbContext factory registered above).
@@ -160,6 +170,32 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 }
 
+// Ensure the per-game catalog SQL Server databases + schemas exist (one DB per game). EnsureCreated
+// creates the DB and tables on first run and is a no-op once they exist; catalogs are disposable
+// reference caches so they use EnsureCreated rather than migrations. Data is copied in from the old
+// SQLite files by OmniCard.DbMigrator, and refreshed in-place by CatalogController.
+using (var scope = app.Services.CreateScope())
+{
+    void EnsureCatalog<TContext>() where TContext : DbContext
+    {
+        try
+        {
+            using var ctx = scope.ServiceProvider.GetRequiredService<IDbContextFactory<TContext>>().CreateDbContext();
+            ctx.Database.EnsureCreated();
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogWarning(ex, "Failed to ensure catalog schema for {Context}", typeof(TContext).Name);
+        }
+    }
+    EnsureCatalog<ScryfallDbContext>();
+    EnsureCatalog<OptcgDbContext>();
+    EnsureCatalog<RiftboundDbContext>();
+    EnsureCatalog<PokemonDbContext>();
+    EnsureCatalog<YugiohDbContext>();
+    EnsureCatalog<FinalFantasyDbContext>();
+}
+
 app.UseStaticFiles();
 app.UseSession();
 
@@ -170,6 +206,18 @@ if (Directory.Exists(scansDir))
     {
         FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(scansDir),
         RequestPath = "/scans"
+    });
+}
+
+// Serve locally-cached card artwork (populated by CardImageCacheService / the catalog "images"
+// refresh) so the SPA can self-host images instead of hot-linking CDNs.
+{
+    var cardImagesDir = Path.Combine(dataDir, "card-images");
+    Directory.CreateDirectory(cardImagesDir);
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(cardImagesDir),
+        RequestPath = CardImageCacheService.RequestPath,
     });
 }
 

@@ -17,6 +17,11 @@ public class RiftboundDbContext : DbContext
 
     public int GetSchemaVersion()
     {
+        // On SQL Server the schema is owned by EF migrations (PRAGMA is SQLite-only), so report the
+        // current version — the DB is always "up to date" and never triggers a wipe-and-redownload.
+        if (!Database.IsSqlite())
+            return RiftboundSchemaVersion;
+
         var conn = Database.GetDbConnection();
         conn.Open();
         using var cmd = conn.CreateCommand();
@@ -26,6 +31,9 @@ public class RiftboundDbContext : DbContext
 
     public void MarkMigrationComplete()
     {
+        if (!Database.IsSqlite())
+            return;
+
         var conn = Database.GetDbConnection();
         conn.Open();
         using var cmd = conn.CreateCommand();
@@ -36,6 +44,10 @@ public class RiftboundDbContext : DbContext
 
     public void ApplySchemaUpgrades()
     {
+        // SQL Server schema comes from EF migrations; the additive ALTER TABLEs below are SQLite-only.
+        if (!Database.IsSqlite())
+            return;
+
         var conn = Database.GetDbConnection();
         conn.Open();
         // Reserved for future additive columns (see OptcgDbContext for the pattern).

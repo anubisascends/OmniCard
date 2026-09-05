@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>OmniCard.DbMigrator</RootNamespace>
+    <!-- Table/DB names in the raw SQL come from the EF model and a fixed suffix list, never user
+         input, so the interpolated-SQL injection warning doesn't apply. -->
+    <NoWarn>$(NoWarn);EF1002</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

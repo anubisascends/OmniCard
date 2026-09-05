@@ -25,4 +25,24 @@ public static class SqlServerDb
 
     public static void Configure(DbContextOptionsBuilder options, string connectionString) =>
         options.UseSqlServer(connectionString, sql => sql.MigrationsAssembly(MigrationsAssembly));
+
+    /// <summary>Connection string for a per-game catalog database (one SQL Server DB per game, e.g.
+    /// <c>OmniCard_Scryfall</c>). An explicit <c>ConnectionStrings:OmniCard_&lt;suffix&gt;</c> wins;
+    /// otherwise the base <see cref="ConnectionString"/> is reused with the database name swapped.</summary>
+    public static string CatalogConnectionString(IConfiguration config, string suffix)
+    {
+        var explicitConn = config.GetConnectionString($"OmniCard_{suffix}");
+        if (!string.IsNullOrWhiteSpace(explicitConn))
+            return explicitConn;
+
+        return new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(ConnectionString(config))
+        {
+            InitialCatalog = $"OmniCard_{suffix}",
+        }.ConnectionString;
+    }
+
+    /// <summary>Configures a catalog context on SQL Server. Catalog DBs are disposable reference caches
+    /// (refresh wipes + reloads), so they use <c>EnsureCreated</c> at startup rather than migrations.</summary>
+    public static void ConfigureCatalog(DbContextOptionsBuilder options, string connectionString) =>
+        options.UseSqlServer(connectionString);
 }

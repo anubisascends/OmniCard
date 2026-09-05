@@ -326,3 +326,73 @@ export interface EbaySetupResultDto {
   success: boolean;
   message?: string | null;
 }
+
+// --- Catalog refresh ---
+
+export interface CatalogJobDto {
+  game: string;
+  operation: string;
+  state: string;
+  message: string;
+  startedAt: string;
+  finishedAt?: string | null;
+}
+
+export interface CatalogStatusDto {
+  running?: CatalogJobDto | null;
+  recent: CatalogJobDto[];
+}
+
+// --- Trades ---
+
+export interface TradeCardDto {
+  game: string;
+  cardName: string;
+  setCode?: string | null;
+  setName?: string | null;
+  collectorNumber?: string | null;
+  foil: boolean;
+  isOffDatabase: boolean;
+  estimatedValue?: number | null;
+}
+
+export interface TradeSummaryDto {
+  id: number;
+  label: string;
+  note: string;
+  createdAt: string;
+  outgoingValue: number;
+  receivedValue?: number | null;
+  valueDelta?: number | null;
+  replacementCount: number;
+  hasPhoto: boolean;
+  outgoingCards: TradeCardDto[];
+}
+
+// --- Card lists ---
+
+export interface CardListDto {
+  id: number;
+  name: string;
+  game: string;
+  notes?: string | null;
+  itemCount: number;
+}
+
+export interface CardListItemDto {
+  id: number;
+  gameCardId: string;
+  cardName: string;
+  setCode?: string | null;
+  collectorNumber?: string | null;
+  isFoil: boolean;
+  foilType?: string | null;
+  quantity: number;
+  marketPrice?: number | null;
+  isUnpriced: boolean;
+}
+
+export interface CommitListResultDto {
+  imported: number;
+  listDeleted: boolean;
+}

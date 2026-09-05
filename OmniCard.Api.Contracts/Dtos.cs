@@ -262,6 +262,63 @@ public sealed record LotUpsertRequest
     public string? Source { get; init; }
 }
 
+// --- Trades ---
+
+/// <summary>One outgoing card within a trade.</summary>
+public sealed record TradeCardDto(
+    string Game, string CardName, string? SetCode, string? SetName,
+    string? CollectorNumber, bool Foil, bool IsOffDatabase, decimal? EstimatedValue);
+
+/// <summary>A recorded trade session (cards traded away for a received note/photo/value), newest
+/// first, with how many replacement lots have since been linked to it.</summary>
+public sealed record TradeSummaryDto(
+    int Id, string Label, string Note, string CreatedAt, decimal OutgoingValue,
+    decimal? ReceivedValue, decimal? ValueDelta, int ReplacementCount, bool HasPhoto,
+    IReadOnlyList<TradeCardDto> OutgoingCards);
+
+// --- Card lists ---
+
+public sealed record CardListDto(int Id, string Name, string Game, string? Notes, int ItemCount);
+
+public sealed record CardListItemDto(
+    int Id, string GameCardId, string CardName, string? SetCode, string? CollectorNumber,
+    bool IsFoil, string? FoilType, int Quantity, decimal? MarketPrice, bool IsUnpriced);
+
+public sealed record CreateListRequest
+{
+    public string Name { get; init; } = "";
+    public string Game { get; init; } = "Mtg";
+}
+
+public sealed record CommitListRequest
+{
+    public int ContainerId { get; init; }
+    public string Condition { get; init; } = "NM";
+}
+
+public sealed record CommitListResultDto(int Imported, bool ListDeleted);
+
+public sealed record SetQuantityRequest
+{
+    public int Quantity { get; init; } = 1;
+}
+
+// --- Catalog refresh ---
+
+/// <summary>One catalog-refresh job (running or recent). <see cref="State"/> is running|succeeded|failed;
+/// <see cref="Operation"/> is prices|bulk|hashes.</summary>
+public sealed record CatalogJobDto(
+    string Game, string Operation, string State, string Message, string StartedAt, string? FinishedAt);
+
+public sealed record CatalogStatusDto(CatalogJobDto? Running, IReadOnlyList<CatalogJobDto> Recent);
+
+public sealed record CatalogRefreshRequest
+{
+    public string Game { get; init; } = "";
+    /// <summary>prices | bulk | hashes.</summary>
+    public string Operation { get; init; } = "prices";
+}
+
 // --- eBay ---
 
 /// <summary>eBay connection state for the settings screen. <see cref="Connected"/> = valid OAuth

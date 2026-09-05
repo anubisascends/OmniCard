@@ -4,6 +4,10 @@ import type {
   BinderStateDto,
   CardDto,
   CsvImportResultDto,
+  CardListDto,
+  CardListItemDto,
+  CatalogStatusDto,
+  CommitListResultDto,
   CustomerDto,
   DashboardDto,
   EbaySetupResultDto,
@@ -22,6 +26,7 @@ import type {
   ScanSearchResultDto,
   SetChecklistDto,
   SetInfoDto,
+  TradeSummaryDto,
   WorkflowLaneDto,
 } from './types';
 
@@ -233,6 +238,37 @@ export const api = {
   },
   decklistCheck: (body: { url?: string; text?: string; game: string }) =>
     request<DecklistCheckDto>('/api/decklist/check', { method: 'POST', body: JSON.stringify(body) }),
+
+  // Trades (read-only history)
+  trades: () => request<TradeSummaryDto[]>('/api/trades'),
+
+  // Card lists
+  lists: (game: string) => request<CardListDto[]>(`/api/lists${qs({ game })}`),
+  listCreate: (name: string, game: string) =>
+    request<CardListDto>('/api/lists', { method: 'POST', body: JSON.stringify({ name, game }) }),
+  listRename: (id: number, name: string) =>
+    request<void>(`/api/lists/${id}`, { method: 'PUT', body: JSON.stringify({ name }) }),
+  listDelete: (id: number) => request<void>(`/api/lists/${id}`, { method: 'DELETE' }),
+  listItems: (id: number) => request<CardListItemDto[]>(`/api/lists/${id}/items`),
+  listRemoveItem: (itemId: number) =>
+    request<void>(`/api/lists/items/${itemId}`, { method: 'DELETE' }),
+  listSetItemQuantity: (itemId: number, quantity: number) =>
+    request<void>(`/api/lists/items/${itemId}`, { method: 'PUT', body: JSON.stringify({ quantity }) }),
+  listRefreshPrices: (id: number) =>
+    request<void>(`/api/lists/${id}/refresh-prices`, { method: 'POST' }),
+  listCommit: (id: number, containerId: number, condition: string) =>
+    request<CommitListResultDto>(`/api/lists/${id}/commit`, {
+      method: 'POST',
+      body: JSON.stringify({ containerId, condition }),
+    }),
+
+  // Catalog refresh
+  catalogStatus: () => request<CatalogStatusDto>('/api/catalog/status'),
+  catalogRefresh: (game: string, operation: 'prices' | 'bulk' | 'hashes' | 'images') =>
+    request<void>('/api/catalog/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ game, operation }),
+    }),
 
   // eBay
   ebayStatus: () => request<EbayStatusDto>('/api/ebay/status'),
