@@ -125,6 +125,25 @@ export interface ActiveListingDto {
   status: string;
 }
 
+export interface ListingDetailDto {
+  id: number;
+  lotId: number;
+  name: string;
+  setName: string;
+  setCode: string;
+  condition?: string | null;
+  isFoil: boolean;
+  channel: string;
+  status: string;
+  listedPrice: number;
+  quantity: number;
+  note?: string | null;
+}
+
+export interface SalesSettingsDto {
+  forSaleLocationId?: number | null;
+}
+
 export interface CustomerDto {
   id: number;
   name: string;

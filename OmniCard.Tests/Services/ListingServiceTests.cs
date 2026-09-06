@@ -593,4 +593,89 @@ public class ListingServiceTests : IDisposable
 
         Assert.Empty(svc.GetListingDetails());
     }
+
+    /// <summary>Seeds a single lot with an explicit quantity (SeedLot only ever makes qty-1 lots).</summary>
+    private static int SeedLotWithQuantity(DbContextOptions<OmniCardDbContext> opts, int quantity, int locationId)
+    {
+        using var ctx = new OmniCardDbContext(opts);
+        var p = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, Name = "Sol Ring" };
+        ctx.Products.Add(p);
+        ctx.StorageContainers.Add(new StorageContainer { Id = locationId, Name = $"Location {locationId}" });
+        ctx.SaveChanges();
+        var lot = new InventoryLot { ProductId = p.Id, Quantity = quantity, LocationId = locationId, Condition = "NM" };
+        ctx.Lots.Add(lot);
+        ctx.SaveChanges();
+        return lot.Id;
+    }
+
+    [Fact]
+    public void ListForSaleSplitting_WholeStack_ListsExistingLot_WithoutSplitting()
+    {
+        var lotId = SeedLotWithQuantity(_opts, quantity: 3, locationId: 7);
+        var listedLotId = CreateService().ListForSaleSplitting(lotId, SalesChannel.Manual, 2m, 3);
+
+        Assert.Equal(lotId, listedLotId);
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.Single(ctx.Lots.ToList()); // no new lot
+        var listing = Assert.Single(ctx.Listings.ToList());
+        Assert.Equal(lotId, listing.LotId);
+        Assert.Equal(3, listing.Quantity);
+    }
+
+    [Fact]
+    public void ListForSaleSplitting_PartialStack_SplitsOffNewLot_AndListsOnlyThat()
+    {
+        var lotId = SeedLotWithQuantity(_opts, quantity: 4, locationId: 7);
+        var listedLotId = CreateService().ListForSaleSplitting(lotId, SalesChannel.TcgPlayer, 1.5m, 1, "one of four");
+
+        Assert.NotEqual(lotId, listedLotId);
+        using var ctx = new OmniCardDbContext(_opts);
+        var source = ctx.Lots.Single(l => l.Id == lotId);
+        var split = ctx.Lots.Single(l => l.Id == listedLotId);
+        Assert.Equal(3, source.Quantity);
+        Assert.Equal(1, split.Quantity);
+        Assert.Equal(7, split.LocationId); // same location as the source
+        // Only the split lot is listed.
+        var listing = Assert.Single(ctx.Listings.ToList());
+        Assert.Equal(listedLotId, listing.LotId);
+        Assert.Equal(1, listing.Quantity);
+        Assert.Equal("one of four", listing.Note);
+        Assert.Contains(ctx.Movements.ToList(), m => m.LotId == listedLotId && m.Type == MovementType.Move);
+    }
+
+    [Fact]
+    public void ListForSaleSplitting_ThenMarkPicked_MovesOnlyTheSplitLot()
+    {
+        var lotId = SeedLotWithQuantity(_opts, quantity: 4, locationId: 7);
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            ctx.StorageContainers.Add(new StorageContainer { Id = 99, Name = "For Sale" });
+            ctx.SaveChanges();
+        }
+        var svc = CreateService();
+        var splitLotId = svc.ListForSaleSplitting(lotId, SalesChannel.Manual, 1m, 1);
+
+        svc.MarkPicked([splitLotId]);
+
+        using var ctx2 = new OmniCardDbContext(_opts);
+        Assert.Equal(99, ctx2.Lots.Single(l => l.Id == splitLotId).LocationId); // moved to for-sale
+        Assert.Equal(7, ctx2.Lots.Single(l => l.Id == lotId).LocationId); // remainder untouched
+        Assert.Equal(3, ctx2.Lots.Single(l => l.Id == lotId).Quantity);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(5)]
+    public void ListForSaleSplitting_QuantityOutOfRange_Throws(int quantity)
+    {
+        var lotId = SeedLotWithQuantity(_opts, quantity: 4, locationId: 7);
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => CreateService().ListForSaleSplitting(lotId, SalesChannel.Manual, 1m, quantity));
+    }
+
+    [Fact]
+    public void ListForSaleSplitting_UnknownLot_ReturnsZero()
+    {
+        Assert.Equal(0, CreateService().ListForSaleSplitting(999, SalesChannel.Manual, 1m, 1));
+    }
 }

@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -12,6 +14,8 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  InputAdornment,
+  Link,
   Paper,
   Stack,
   Tab,
@@ -28,12 +32,13 @@ import {
 } from '@mui/material';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import AddIcon from '@mui/icons-material/Add';
+import CheckIcon from '@mui/icons-material/Check';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
-import { api, type CustomerFields } from '../api/client';
+import { api, type CustomerFields, type ListingFields } from '../api/client';
 import { useGame } from '../context/GameContext';
-import type { CustomerDto, OrderDto, WorkflowLaneDto } from '../api/types';
+import type { CustomerDto, ListingDetailDto, OrderDto, WorkflowLaneDto } from '../api/types';
 import { OrderDetailDrawer } from '../components/OrderDetailDrawer';
 
 const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
@@ -189,26 +194,170 @@ function OrdersBoard() {
   );
 }
 
+const LISTING_CHANNELS = ['Manual', 'TcgPlayer', 'Ebay'];
+
+function ListingDialog({
+  open,
+  initial,
+  onClose,
+}: {
+  open: boolean;
+  initial: ListingDetailDto | null;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [fields, setFields] = useState<ListingFields>({ listedPrice: 0, channel: 'Manual', quantity: 1, note: '' });
+  // The price field keeps its own text so the user can type freely; it reformats to two decimals on blur.
+  const [priceText, setPriceText] = useState('0.00');
+
+  // Reset the form whenever the dialog opens for a different listing.
+  const key = initial?.id ?? 'none';
+  const [formKey, setFormKey] = useState<string | number>(key);
+  if (open && formKey !== key) {
+    setFormKey(key);
+    setFields(
+      initial
+        ? { listedPrice: initial.listedPrice, channel: initial.channel, quantity: initial.quantity, note: initial.note ?? '' }
+        : { listedPrice: 0, channel: 'Manual', quantity: 1, note: '' },
+    );
+    setPriceText((initial?.listedPrice ?? 0).toFixed(2));
+  }
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (initial) await api.listingUpdate(initial.id, fields);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['listings'] });
+      onClose();
+    },
+  });
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>Edit listing{initial ? ` — ${initial.name}` : ''}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField
+            label="Price"
+            required
+            value={priceText}
+            onChange={(e) => {
+              const text = e.target.value;
+              setPriceText(text);
+              const n = Number(text);
+              if (Number.isFinite(n)) setFields((f) => ({ ...f, listedPrice: n }));
+            }}
+            onBlur={() => {
+              const n = Number(priceText);
+              const price = Number.isFinite(n) && n >= 0 ? n : 0;
+              setPriceText(price.toFixed(2));
+              setFields((f) => ({ ...f, listedPrice: price }));
+            }}
+            slotProps={{
+              input: { startAdornment: <InputAdornment position="start">$</InputAdornment> },
+              htmlInput: { inputMode: 'decimal' },
+            }}
+            autoFocus
+          />
+          <TextField
+            select
+            label="Channel"
+            value={fields.channel}
+            onChange={(e) => setFields((f) => ({ ...f, channel: e.target.value }))}
+          >
+            {LISTING_CHANNELS.map((c) => (
+              <MenuItem key={c} value={c}>{c}</MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            label="Quantity"
+            type="number"
+            required
+            value={fields.quantity}
+            onChange={(e) => setFields((f) => ({ ...f, quantity: Number(e.target.value) }))}
+            slotProps={{ htmlInput: { min: 1, step: 1 } }}
+          />
+          <TextField
+            label="Note"
+            value={fields.note ?? ''}
+            onChange={(e) => setFields((f) => ({ ...f, note: e.target.value }))}
+            multiline
+            minRows={2}
+          />
+          {save.error && <Typography color="error" variant="body2">{(save.error as Error).message}</Typography>}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          variant="contained"
+          disabled={fields.listedPrice < 0 || fields.quantity < 1 || save.isPending}
+          onClick={() => save.mutate()}
+        >
+          {save.isPending ? 'Saving…' : 'Save'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function ListingsTable() {
   const qc = useQueryClient();
   const { game } = useGame();
-  const { data, isLoading } = useQuery({ queryKey: ['listings'], queryFn: () => api.listings() });
+  const { data, isLoading } = useQuery({ queryKey: ['listings'], queryFn: () => api.listingDetails() });
+  const [editing, setEditing] = useState<ListingDetailDto | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [pickError, setPickError] = useState<string | null>(null);
+  const invalidateAfterPick = () => {
+    qc.invalidateQueries({ queryKey: ['listings'] });
+    qc.invalidateQueries({ queryKey: ['collection'] });
+    qc.invalidateQueries({ queryKey: ['location-cards'] });
+    qc.invalidateQueries({ queryKey: ['locations'] });
+    qc.invalidateQueries({ queryKey: ['dashboard'] });
+  };
   const unlist = useMutation({
     mutationFn: (lotId: number) => api.listingUnlist(lotId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['listings'] }),
   });
+  const pick = useMutation({
+    mutationFn: (lotIds: number[]) => api.listingPick(lotIds),
+    onSuccess: () => {
+      setPickError(null);
+      invalidateAfterPick();
+    },
+    onError: (e) => setPickError((e as Error).message),
+  });
   if (isLoading || !data) return <CircularProgress />;
+
+  const listedLotIds = data.filter((l) => l.status === 'Listed').map((l) => l.lotId);
 
   return (
     <Stack spacing={1} alignItems="flex-start">
-      <Button
-        variant="outlined"
-        startIcon={<DownloadIcon />}
-        component="a"
-        href={api.pickListPdfUrl(game)}
-      >
-        Pick list (PDF)
-      </Button>
+      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+        <Button
+          variant="outlined"
+          startIcon={<DownloadIcon />}
+          component="a"
+          href={api.pickListPdfUrl(game)}
+        >
+          Pick list (PDF)
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<CheckIcon />}
+          disabled={listedLotIds.length === 0 || pick.isPending}
+          onClick={() => pick.mutate(listedLotIds)}
+        >
+          Mark all picked ({listedLotIds.length})
+        </Button>
+      </Stack>
+      {pickError && (
+        <Alert severity="error" onClose={() => setPickError(null)} sx={{ alignSelf: 'stretch' }}>
+          {pickError} — set a sales location in{' '}
+          <Link component={RouterLink} to="/settings">Settings</Link>.
+        </Alert>
+      )}
       <Paper variant="outlined" sx={{ alignSelf: 'stretch' }}>
       <Table size="small">
         <TableHead>
@@ -216,6 +365,8 @@ function ListingsTable() {
             <TableCell>Name</TableCell>
             <TableCell>Set</TableCell>
             <TableCell>Cond</TableCell>
+            <TableCell>Channel</TableCell>
+            <TableCell align="right">Qty</TableCell>
             <TableCell align="right">Price</TableCell>
             <TableCell>Status</TableCell>
             <TableCell align="right"></TableCell>
@@ -223,18 +374,38 @@ function ListingsTable() {
         </TableHead>
         <TableBody>
           {data.map((l) => (
-            <TableRow key={l.lotId} hover>
+            <TableRow key={l.id} hover>
               <TableCell>
                 {l.name}
                 {l.isFoil ? ' ✦' : ''}
               </TableCell>
               <TableCell>{l.setCode}</TableCell>
               <TableCell>{l.condition}</TableCell>
+              <TableCell>{l.channel}</TableCell>
+              <TableCell align="right">{l.quantity}</TableCell>
               <TableCell align="right">{money(l.listedPrice)}</TableCell>
               <TableCell>
                 <Chip size="small" label={l.status} />
               </TableCell>
               <TableCell align="right">
+                {l.status === 'Listed' && (
+                  <Tooltip title="Mark picked (move to sales location)">
+                    <IconButton size="small" disabled={pick.isPending} onClick={() => pick.mutate([l.lotId])}>
+                      <CheckIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                <Tooltip title="Edit">
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      setEditing(l);
+                      setDialogOpen(true);
+                    }}
+                  >
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
                 <Tooltip title="Unlist">
                   <IconButton size="small" onClick={() => unlist.mutate(l.lotId)}>
                     <LinkOffIcon fontSize="small" />
@@ -246,6 +417,7 @@ function ListingsTable() {
         </TableBody>
       </Table>
       </Paper>
+      <ListingDialog open={dialogOpen} initial={editing} onClose={() => setDialogOpen(false)} />
     </Stack>
   );
 }

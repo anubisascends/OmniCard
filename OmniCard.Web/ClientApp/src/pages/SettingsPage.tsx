@@ -3,17 +3,28 @@ import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
+  Box,
   Button,
   Chip,
   CircularProgress,
   LinearProgress,
   MenuItem,
   Paper,
+  Slider,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
 import { api } from '../api/client';
+import { LocationPickerDialog } from '../components/LocationPickerDialog';
+import {
+  usePreviewScale,
+  setPreviewScale,
+  PREVIEW_SCALE_MIN,
+  PREVIEW_SCALE_MAX,
+  PREVIEW_BASE_WIDTH,
+  PREVIEW_BASE_MAX_HEIGHT,
+} from '../lib/previewScale';
 
 const OPERATIONS: { key: 'prices' | 'bulk' | 'hashes' | 'images'; label: string }[] = [
   { key: 'prices', label: 'Update prices' },
@@ -218,10 +229,134 @@ function EbayCard() {
   );
 }
 
+function SalesCard() {
+  const qc = useQueryClient();
+  const settings = useQuery({ queryKey: ['settings'], queryFn: api.settings });
+  const locations = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations() });
+  const [pickOpen, setPickOpen] = useState(false);
+
+  const save = useMutation({
+    mutationFn: (forSaleLocationId: number | null) => api.settingsUpdate({ forSaleLocationId }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
+  });
+
+  const currentId = settings.data?.forSaleLocationId ?? null;
+  const currentName = locations.data?.find((l) => l.id === currentId)?.name;
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
+      <Typography variant="h6" gutterBottom>
+        Sales
+      </Typography>
+      <Typography variant="body2" color="text.secondary" gutterBottom>
+        When you mark a listing as picked, its card is automatically moved to this location. Leave it
+        unset to disable picking.
+      </Typography>
+
+      {settings.isLoading ? (
+        <CircularProgress size={24} sx={{ mt: 1 }} />
+      ) : (
+        <Stack spacing={1} sx={{ mt: 1 }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Box sx={{ flexGrow: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                For-sale location
+              </Typography>
+              <Typography variant="body2">
+                {currentName ?? (currentId != null ? `#${currentId}` : '— none —')}
+              </Typography>
+            </Box>
+            <Button size="small" onClick={() => setPickOpen(true)}>
+              Change
+            </Button>
+            {currentId != null && (
+              <Button size="small" color="error" disabled={save.isPending} onClick={() => save.mutate(null)}>
+                Clear
+              </Button>
+            )}
+          </Stack>
+          {save.error && <Alert severity="error">{(save.error as Error).message}</Alert>}
+        </Stack>
+      )}
+
+      <LocationPickerDialog
+        open={pickOpen}
+        title="For-sale location"
+        onPick={(id) => {
+          setPickOpen(false);
+          save.mutate(id);
+        }}
+        onClose={() => setPickOpen(false)}
+      />
+    </Paper>
+  );
+}
+
+function AppearanceCard() {
+  const scale = usePreviewScale();
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
+      <Typography variant="h6" gutterBottom>
+        Appearance
+      </Typography>
+      <Typography variant="body2" color="text.secondary" gutterBottom>
+        Card preview size — how large the artwork popup grows when you hover a card in a list. 100% is
+        the default; drag up to {PREVIEW_SCALE_MAX}%.
+      </Typography>
+
+      <Stack direction="row" spacing={3} alignItems="center" sx={{ mt: 1 }}>
+        <Box sx={{ flex: 1 }}>
+          <Slider
+            value={scale}
+            min={PREVIEW_SCALE_MIN}
+            max={PREVIEW_SCALE_MAX}
+            step={10}
+            marks={[
+              { value: 100, label: '100%' },
+              { value: 200, label: '200%' },
+              { value: 300, label: '300%' },
+            ]}
+            valueLabelDisplay="auto"
+            valueLabelFormat={(v) => `${v}%`}
+            onChange={(_, v) => setPreviewScale(v as number)}
+          />
+          <Typography variant="caption" color="text.secondary">
+            Popup: {Math.round((PREVIEW_BASE_WIDTH * scale) / 100)} ×{' '}
+            {Math.round((PREVIEW_BASE_MAX_HEIGHT * scale) / 100)} px
+          </Typography>
+        </Box>
+        {/* Compact proportional swatch — capped to a display size so the panel never blows out. */}
+        <Box
+          sx={{
+            width: (80 * scale) / 100,
+            height: (112 * scale) / 100,
+            flexShrink: 0,
+            borderRadius: 1,
+            border: '1px dashed',
+            borderColor: 'divider',
+            bgcolor: 'action.hover',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'width 0.1s, height 0.1s',
+          }}
+        >
+          <Typography variant="caption" color="text.secondary">
+            {scale}%
+          </Typography>
+        </Box>
+      </Stack>
+    </Paper>
+  );
+}
+
 export function SettingsPage() {
   return (
     <Stack spacing={3}>
       <Typography variant="h4">Settings</Typography>
+      <SalesCard />
+      <AppearanceCard />
       <CatalogCard />
       <EbayCard />
     </Stack>

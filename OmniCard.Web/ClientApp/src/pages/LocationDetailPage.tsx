@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Box, Breadcrumbs, Chip, Link, Stack, TextField, Typography } from '@mui/material';
+import { Box, Breadcrumbs, Button, Chip, Link, Stack, TextField, Typography } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 import { api } from '../api/client';
 import { useGame } from '../context/GameContext';
 import { CardTable } from '../components/CardTable';
+import { AddCardDialog } from '../components/AddCardDialog';
 
 const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 
@@ -14,6 +16,7 @@ export function LocationDetailPage() {
   const { game } = useGame();
   const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
 
   const locQuery = useQuery({ queryKey: ['location', locationId], queryFn: () => api.location(locationId) });
 
@@ -33,6 +36,10 @@ export function LocationDetailPage() {
             Open binder view
           </Link>
         )}
+        <Box sx={{ flexGrow: 1 }} />
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>
+          Add card
+        </Button>
       </Stack>
       {locQuery.data && (
         <Typography variant="body2" color="text.secondary">
@@ -55,6 +62,14 @@ export function LocationDetailPage() {
         />
       </Box>
       <CardTable game={game} q={q} containerId={locationId} />
+
+      <AddCardDialog
+        open={addOpen}
+        locationId={locationId}
+        locationName={locQuery.data?.name ?? 'this location'}
+        defaultGame={game}
+        onClose={() => setAddOpen(false)}
+      />
     </Stack>
   );
 }

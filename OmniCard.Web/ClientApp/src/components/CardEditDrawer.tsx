@@ -18,9 +18,11 @@ import {
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import SellIcon from '@mui/icons-material/Sell';
 import { Snackbar } from '@mui/material';
 import { api } from '../api/client';
 import { LocationPickerDialog } from './LocationPickerDialog';
+import { ListForSaleDialog } from './ListForSaleDialog';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
@@ -101,6 +103,9 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
       setTradeToast(true);
     },
   });
+
+  const [listOpen, setListOpen] = useState(false);
+  const [listToast, setListToast] = useState(false);
 
   return (
     <Drawer anchor="right" open={open} onClose={onClose}>
@@ -189,6 +194,14 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
 
             <Button
               variant="outlined"
+              startIcon={<SellIcon />}
+              onClick={() => setListOpen(true)}
+            >
+              List for sale
+            </Button>
+
+            <Button
+              variant="outlined"
               startIcon={<SwapHorizIcon />}
               onClick={() => addToTrade.mutate()}
               disabled={addToTrade.isPending}
@@ -225,6 +238,24 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
         onClose={() => setTradeToast(false)}
         message="Added to your trade — finalize it on the Trades page."
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
+
+      <Snackbar
+        open={listToast}
+        autoHideDuration={3000}
+        onClose={() => setListToast(false)}
+        message="Listed for sale — pull it from Sales ▸ Listings."
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
+
+      <ListForSaleDialog
+        target={
+          listOpen && card
+            ? { lotId: card.id, name: card.name, quantity: card.quantity, marketPrice: card.marketPrice }
+            : null
+        }
+        onClose={() => setListOpen(false)}
+        onListed={() => setListToast(true)}
       />
 
       <LocationPickerDialog

@@ -565,6 +565,12 @@ public class RecordingListingService : IListingService
         return ids.Count;
     }
 
+    public int ListForSaleSplitting(int lotId, SalesChannel channel, decimal price, int quantity, string? note = null)
+    {
+        ListForSaleCalls.Add(([lotId], channel, price));
+        return lotId;
+    }
+
     public void Unlist(IEnumerable<int> lotIds) => UnlistCalls.Add(lotIds.ToList());
     public int MarkPicked(IEnumerable<int> lotIds) => 0;
     public List<PickListEntry> GetPickList(CardGame? game = null) => [];

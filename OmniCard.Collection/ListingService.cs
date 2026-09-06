@@ -49,6 +49,56 @@ public class ListingService(
         return created;
     }
 
+    public int ListForSaleSplitting(int lotId, SalesChannel channel, decimal price, int quantity, string? note = null)
+    {
+        int targetLotId;
+        using (var ctx = dbContextFactory.CreateDbContext())
+        {
+            var lot = ctx.Lots.FirstOrDefault(l => l.Id == lotId && l.Product.Category == ProductCategory.Single);
+            if (lot is null) return 0;
+            if (quantity < 1 || quantity > lot.Quantity)
+                throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity must be between 1 and the lot's quantity.");
+
+            if (quantity == lot.Quantity)
+            {
+                targetLotId = lot.Id;
+            }
+            else
+            {
+                // Split off the listed copies into a sibling lot in the same location (loose, no page/slot)
+                // so marking it picked later moves only those copies to the for-sale location.
+                lot.Quantity -= quantity;
+                var split = new InventoryLot
+                {
+                    ProductId = lot.ProductId,
+                    Quantity = quantity,
+                    UnitCost = lot.UnitCost,
+                    AcquisitionDate = lot.AcquisitionDate,
+                    Source = lot.Source,
+                    LocationId = lot.LocationId,
+                    Condition = lot.Condition,
+                    Section = lot.Section,
+                };
+                ctx.Lots.Add(split);
+                ctx.SaveChanges();
+
+                ctx.Movements.Add(new InventoryMovement
+                {
+                    ProductId = split.ProductId,
+                    LotId = split.Id,
+                    Type = MovementType.Move,
+                    Quantity = quantity,
+                    Note = "Split for listing",
+                });
+                ctx.SaveChanges();
+                targetLotId = split.Id;
+            }
+        }
+
+        ListForSale([targetLotId], channel, price, quantity, note);
+        return targetLotId;
+    }
+
     public void Unlist(IEnumerable<int> lotIds)
     {
         using var ctx = dbContextFactory.CreateDbContext();
