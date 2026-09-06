@@ -48,6 +48,7 @@ public static class DtoMapping
         IsFoil = c.IsFoil,
         FoilType = c.FoilType,
         Quantity = c.Quantity,
+        StackedIds = c.StackedIds ?? [],
         Tags = c.Tags.ToList(),
         PurchasePrice = c.PurchasePrice,
         MarketPrice = c.MarketPrice,

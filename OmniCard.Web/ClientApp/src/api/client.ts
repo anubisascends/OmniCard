@@ -130,6 +130,7 @@ export const api = {
     containerId?: number;
     skip?: number;
     take?: number;
+    stacked?: boolean;
   }) => request<PagedResult<CardDto>>(`/api/collection${qs(opts)}`),
 
   // Location writes

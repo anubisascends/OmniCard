@@ -1,15 +1,17 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Button,
+  ButtonBase,
   Card,
   CardActionArea,
   CardContent,
   CardMedia,
   Chip,
   CircularProgress,
+  Collapse,
   IconButton,
   Menu,
   MenuItem,
@@ -19,6 +21,10 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+
+const COLLAPSED_KEY = 'omnicard.locations.collapsed';
 import { api } from '../api/client';
 import type { LocationSummaryDto } from '../api/types';
 import { useGame } from '../context/GameContext';
@@ -31,6 +37,52 @@ const TYPES = [
   { value: 'DeckBox', label: 'Deck Box' },
   { value: 'DisplayCase', label: 'Display Case' },
 ];
+
+// Order the per-type groups follow, and their (plural) section headings. Keys match the display
+// type string the API returns (LocationSummaryDto.Type), e.g. "Deck Box" / "Display Case".
+const TYPE_ORDER = ['Binder', 'Box', 'Deck Box', 'Display Case', 'Bulk'];
+const TYPE_HEADINGS: Record<string, string> = {
+  Binder: 'Binders',
+  Box: 'Boxes',
+  'Deck Box': 'Deck Boxes',
+  'Display Case': 'Display Cases',
+  Bulk: 'Bulk',
+};
+
+const byName = (a: LocationSummaryDto, b: LocationSummaryDto) =>
+  a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+
+/** Always-available locations first, then the rest grouped by type; every group sorted A→Z. */
+function groupLocations(locations: LocationSummaryDto[]): { key: string; heading: string; items: LocationSummaryDto[] }[] {
+  const groups: { key: string; heading: string; items: LocationSummaryDto[] }[] = [];
+
+  const alwaysAvailable = locations.filter((l) => l.isAlwaysAvailable).sort(byName);
+  if (alwaysAvailable.length > 0)
+    groups.push({ key: '__always__', heading: 'Always Available', items: alwaysAvailable });
+
+  const byType = new Map<string, LocationSummaryDto[]>();
+  for (const loc of locations.filter((l) => !l.isAlwaysAvailable)) {
+    (byType.get(loc.type) ?? byType.set(loc.type, []).get(loc.type)!).push(loc);
+  }
+
+  const orderedTypes = [...byType.keys()].sort((a, b) => {
+    const ia = TYPE_ORDER.indexOf(a);
+    const ib = TYPE_ORDER.indexOf(b);
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+    return a.localeCompare(b);
+  });
+
+  for (const type of orderedTypes) {
+    groups.push({
+      key: type,
+      heading: TYPE_HEADINGS[type] ?? type,
+      items: byType.get(type)!.sort(byName),
+    });
+  }
+  return groups;
+}
 
 function AddLocationBar({ onAdded }: { onAdded: () => void }) {
   const [name, setName] = useState('');
@@ -147,6 +199,40 @@ function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: 
   );
 }
 
+function LocationCard({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: () => void }) {
+  return (
+    <Card>
+      <CardActionArea
+        component={RouterLink}
+        to={loc.type === 'Binder' ? `/binder/${loc.id}` : `/location/${loc.id}`}
+      >
+        {loc.coverImageUri && (
+          <CardMedia
+            component="img"
+            image={loc.coverImageUri}
+            sx={{ height: 140, objectFit: 'contain', bgcolor: 'action.hover' }}
+          />
+        )}
+        <CardContent sx={{ pb: 0 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6" noWrap>
+              {loc.name}
+            </Typography>
+            <Chip size="small" label={loc.type} />
+          </Stack>
+          <Typography variant="body2" color="text.secondary">
+            {loc.cardCount.toLocaleString()} cards · {loc.uniquePrintCount.toLocaleString()} unique
+          </Typography>
+          <Typography variant="body2">{money(loc.totalMarketValue)} market</Typography>
+        </CardContent>
+      </CardActionArea>
+      <Stack direction="row" justifyContent="flex-end" sx={{ px: 1, pb: 0.5 }}>
+        <LocationMenu loc={loc} onChanged={onChanged} />
+      </Stack>
+    </Card>
+  );
+}
+
 export function LocationsPage() {
   const { game } = useGame();
   const qc = useQueryClient();
@@ -156,6 +242,23 @@ export function LocationsPage() {
   });
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['locations'] });
+  const groups = useMemo(() => (data ? groupLocations(data) : []), [data]);
+
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    try {
+      return new Set<string>(JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '[]'));
+    } catch {
+      return new Set<string>();
+    }
+  });
+  const toggle = (key: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]));
+      return next;
+    });
 
   return (
     <Stack spacing={3}>
@@ -164,48 +267,39 @@ export function LocationsPage() {
       {isLoading || !data ? (
         <CircularProgress />
       ) : (
-        <Box
-          sx={{
-            display: 'grid',
-            gap: 2,
-            gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-          }}
-        >
-          {data.map((loc) => (
-            <Card key={loc.id}>
-              <CardActionArea
-                component={RouterLink}
-                to={loc.type === 'Binder' ? `/binder/${loc.id}` : `/location/${loc.id}`}
+        groups.map((group) => {
+          const isCollapsed = collapsed.has(group.key);
+          return (
+            <Stack key={group.key} spacing={1.5}>
+              <ButtonBase
+                onClick={() => toggle(group.key)}
+                sx={{ justifyContent: 'flex-start', borderRadius: 1, py: 0.5, px: 0.5, width: 'fit-content' }}
               >
-                {loc.coverImageUri && (
-                  <CardMedia
-                    component="img"
-                    image={loc.coverImageUri}
-                    sx={{ height: 140, objectFit: 'contain', bgcolor: 'action.hover' }}
-                  />
+                {isCollapsed ? (
+                  <ChevronRightIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                ) : (
+                  <ExpandMoreIcon fontSize="small" sx={{ color: 'text.secondary' }} />
                 )}
-                <CardContent sx={{ pb: 0 }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography variant="h6" noWrap>
-                      {loc.name}
-                    </Typography>
-                    <Chip size="small" label={loc.type} />
-                  </Stack>
-                  <Typography variant="body2" color="text.secondary">
-                    {loc.cardCount.toLocaleString()} cards · {loc.uniquePrintCount.toLocaleString()} unique
-                  </Typography>
-                  <Typography variant="body2">{money(loc.totalMarketValue)} market</Typography>
-                  {loc.isAlwaysAvailable && (
-                    <Chip size="small" color="secondary" label="Always Available" sx={{ mt: 1 }} />
-                  )}
-                </CardContent>
-              </CardActionArea>
-              <Stack direction="row" justifyContent="flex-end" sx={{ px: 1, pb: 0.5 }}>
-                <LocationMenu loc={loc} onChanged={refresh} />
-              </Stack>
-            </Card>
-          ))}
-        </Box>
+                <Typography variant="overline" color="text.secondary">
+                  {group.heading} · {group.items.length}
+                </Typography>
+              </ButtonBase>
+              <Collapse in={!isCollapsed} unmountOnExit>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gap: 2,
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+                  }}
+                >
+                  {group.items.map((loc) => (
+                    <LocationCard key={loc.id} loc={loc} onChanged={refresh} />
+                  ))}
+                </Box>
+              </Collapse>
+            </Stack>
+          );
+        })
       )}
     </Stack>
   );

@@ -24,6 +24,9 @@ public sealed record CardDto
     public bool IsFoil { get; init; }
     public string? FoilType { get; init; }
     public int Quantity { get; init; } = 1;
+    /// <summary>When the row is a stack (grouped duplicates), the underlying lot ids it represents;
+    /// empty for a single-lot row. Used by the client for bulk move/delete on a stack.</summary>
+    public IReadOnlyList<int> StackedIds { get; init; } = [];
     public IReadOnlyList<string> Tags { get; init; } = [];
     public decimal? PurchasePrice { get; init; }
     public decimal MarketPrice { get; init; }

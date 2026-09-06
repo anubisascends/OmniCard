@@ -4,6 +4,7 @@ using OmniCard.Api.Contracts;
 using OmniCard.Collection;
 using OmniCard.Data;
 using OmniCard.Interfaces;
+using OmniCard.Models;
 using OmniCard.Web.Services;
 
 namespace OmniCard.Web.Api;
@@ -28,19 +29,17 @@ public sealed class CollectionController(
         [FromQuery] string? q,
         [FromQuery] int? containerId,
         [FromQuery] int skip = 0,
-        [FromQuery] int take = 100)
+        [FromQuery] int take = 100,
+        [FromQuery] bool stacked = false)
     {
         take = Math.Clamp(take, 1, 500);
         skip = Math.Max(0, skip);
         var gameFilter = LocationsController.ParseGame(game);
 
         using var ctx = dbFactory.CreateDbContext();
-        var query = CollectionQueryBuilder
-            .BuildFilteredQuery(ctx, q ?? "", gameFilter, containerId, filterPreset: null)
-            .OrderBy(c => c.Name).ThenBy(c => c.SetCode).ThenBy(c => c.Number).ThenBy(c => c.Id);
+        var query = CollectionQueryBuilder.BuildFilteredQuery(ctx, q ?? "", gameFilter, containerId, filterPreset: null);
 
-        var total = query.Count();
-        var cards = query.Skip(skip).Take(take).ToList();
+        var (total, cards) = stacked ? PageStacked(query, skip, take) : PageFlat(query, skip, take);
 
         CardArtHydrator.HydrateMissingImageUris(cardService, cards);
         imageCache.PreferCached(cards);
@@ -48,6 +47,43 @@ public sealed class CollectionController(
 
         var items = cards.Select(DtoMapping.ToDto).ToList();
         return new PagedResult<CardDto>(total, skip, take, items);
+    }
+
+    /// <summary>One row per lot (unstacked).</summary>
+    private static (int Total, List<CollectionCard> Cards) PageFlat(IQueryable<CollectionCard> query, int skip, int take)
+    {
+        var ordered = query.OrderBy(c => c.Name).ThenBy(c => c.SetCode).ThenBy(c => c.Number).ThenBy(c => c.Id);
+        var total = ordered.Count();
+        var cards = ordered.Skip(skip).Take(take).ToList();
+        foreach (var c in cards)
+            c.StackedIds = [c.Id]; // uniform bulk-op shape with stacked rows
+        return (total, cards);
+    }
+
+    /// <summary>One row per unique card name (stacked), quantities summed. Paginates the distinct
+    /// names first (cheap), then loads just that page's lots to build the representative rows — so it
+    /// scales to the whole collection without materializing everything.</summary>
+    private static (int Total, List<CollectionCard> Cards) PageStacked(IQueryable<CollectionCard> query, int skip, int take)
+    {
+        var names = query.Select(c => c.Name).Distinct();
+        var total = names.Count();
+        var pageNames = names.OrderBy(n => n).Skip(skip).Take(take).ToList();
+        if (pageNames.Count == 0)
+            return (total, []);
+
+        var members = query.Where(c => pageNames.Contains(c.Name)).ToList();
+        var rows = members
+            .GroupBy(c => c.Name)
+            .Select(g =>
+            {
+                var rep = g.OrderBy(c => c.SetCode).ThenBy(c => c.Number).ThenBy(c => c.Id).First();
+                rep.Quantity = g.Sum(c => c.Quantity);
+                rep.StackedIds = g.Select(c => c.Id).ToList();
+                return rep;
+            })
+            .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return (total, rows);
     }
 
     /// <summary>One card with its tags, for the edit drawer.</summary>

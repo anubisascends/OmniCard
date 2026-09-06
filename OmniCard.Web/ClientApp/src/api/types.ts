@@ -28,6 +28,7 @@ export interface CardDto {
   isFoil: boolean;
   foilType?: string | null;
   quantity: number;
+  stackedIds: number[];
   tags: string[];
   purchasePrice?: number | null;
   marketPrice: number;
