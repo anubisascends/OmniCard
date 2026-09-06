@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Breadcrumbs, Chip, Link, Stack, Typography } from '@mui/material';
+import { Box, Breadcrumbs, Chip, Link, Stack, TextField, Typography } from '@mui/material';
 import { api } from '../api/client';
 import { useGame } from '../context/GameContext';
 import { CardTable } from '../components/CardTable';
@@ -11,6 +12,8 @@ export function LocationDetailPage() {
   const { id } = useParams();
   const locationId = Number(id);
   const { game } = useGame();
+  const [search, setSearch] = useState('');
+  const [q, setQ] = useState('');
 
   const locQuery = useQuery({ queryKey: ['location', locationId], queryFn: () => api.location(locationId) });
 
@@ -36,7 +39,22 @@ export function LocationDetailPage() {
           {locQuery.data.cardCount.toLocaleString()} cards · {money(locQuery.data.totalMarketValue)} market
         </Typography>
       )}
-      <CardTable game={game} containerId={locationId} />
+      <Box
+        component="form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setQ(search);
+        }}
+      >
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Filter this location — try name, set:dom, cn:123, c:u, r:rare, is:foil, tag:trade"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </Box>
+      <CardTable game={game} q={q} containerId={locationId} />
     </Stack>
   );
 }
