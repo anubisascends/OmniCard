@@ -12,10 +12,15 @@ $ErrorActionPreference = 'Stop'
 $SiteName       = 'OmniCardWeb'            # IIS site name (matches the publish profile's DeployIisAppPath)
 $AppPool        = 'OmniCardWeb'            # IIS application pool
 $Port           = 8081                     # HTTPS binding port for the site
-$CertDns        = 'localhost'              # host name the self-signed cert is issued for
+$CertExtraNames = @()                       # extra SANs, e.g. @('omnicard.lan','omnicard.home.arpa')
 $PhysicalPath   = 'C:\inetpub\OmniCardWeb' # where the published files live
 $PublishProfile = 'localhos'              # OmniCard.Web/Properties/PublishProfiles/<name>.pubxml
+$SqlServer      = 'localhost'              # SQL Server instance the app connects to (Windows auth)
+$DataDirectory  = 'X:\TCG Card Scanner'   # DataDirectory the app uses (scans/, card-images/, keys)
 # --------------------------------------------------------------------------------
+
+# The app pool runs as this virtual account (New-WebAppPool default = ApplicationPoolIdentity).
+$PoolIdentity = "IIS AppPool\$AppPool"
 
 $Repo = Split-Path -Parent $PSScriptRoot   # repo root (.vscode's parent)
 
@@ -23,13 +28,24 @@ function Pause-Exit($code) { Read-Host 'Press Enter to close'; exit $code }
 
 Import-Module WebAdministration -ErrorAction Stop
 
-# ---- 1a. Self-signed HTTPS certificate (reuse if one already exists) ----
-$cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object { $_.Subject -eq "CN=$CertDns" } | Select-Object -First 1
-if (-not $cert) {
-    Write-Host "Creating self-signed certificate for $CertDns" -ForegroundColor Cyan
-    $cert = New-SelfSignedCertificate -DnsName $CertDns -CertStoreLocation Cert:\LocalMachine\My -FriendlyName 'OmniCard local'
+# ---- 1a. Self-signed HTTPS cert covering localhost + this machine's hostname + LAN IP ----
+# Pick the IPv4 of the adapter that has a default gateway (the real LAN adapter).
+$lanIp = (Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq 'Up' } |
+    Select-Object -First 1).IPv4Address.IPAddress
+$sans = @('localhost', $env:COMPUTERNAME) + $CertExtraNames
+if ($lanIp) { $sans += $lanIp }
+$sans = $sans | Where-Object { $_ } | Select-Object -Unique
+
+# Reuse our cert only if it already covers every name above; otherwise (re)create it (e.g. the LAN IP
+# changed under DHCP). Matched by friendly name so re-runs don't pile up certificates.
+$cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object { $_.FriendlyName -eq 'OmniCard local' } | Select-Object -First 1
+$covered = $cert -and -not (@($sans | Where-Object { $_ -notin @($cert.DnsNameList.Unicode) }))
+if (-not $covered) {
+    if ($cert) { Remove-Item "Cert:\LocalMachine\My\$($cert.Thumbprint)" -Force }
+    Write-Host "Creating self-signed certificate for: $($sans -join ', ')" -ForegroundColor Cyan
+    $cert = New-SelfSignedCertificate -DnsName $sans -CertStoreLocation Cert:\LocalMachine\My -FriendlyName 'OmniCard local'
 }
-# Trust it (copy to LocalMachine Trusted Root) so the browser doesn't warn.
+# Trust it (copy to LocalMachine Trusted Root) so this machine's browser doesn't warn.
 if (-not (Test-Path "Cert:\LocalMachine\Root\$($cert.Thumbprint)")) {
     Write-Host 'Trusting the certificate (LocalMachine\Root)' -ForegroundColor Cyan
     $root = New-Object System.Security.Cryptography.X509Certificates.X509Store('Root', 'LocalMachine')
@@ -61,8 +77,38 @@ if (-not (Test-Path "IIS:\Sites\$SiteName")) {
 # Attach the cert to the https binding.
 (Get-WebBinding -Name $SiteName -Protocol https -Port $Port).AddSslCertificate($cert.Thumbprint, 'My')
 
-# App-pool identity needs write to its own site folder (ASP.NET Core Module logs, etc.).
-& icacls $PhysicalPath /grant "IIS AppPool\${AppPool}:(OI)(CI)M" /T | Out-Null
+# ---- 1e. Grant the app-pool identity what the app needs at runtime ----
+# (a) Site folder: write for ASP.NET Core Module logs, etc.
+& icacls $PhysicalPath /grant "${PoolIdentity}:(OI)(CI)M" /T | Out-Null
+
+# (b) Data directory: the app creates card-images/ + dataprotection-keys/ and writes scans there,
+#     so the pool identity needs Modify (inheritable) on the data dir.
+if (Test-Path $DataDirectory) {
+    & icacls $DataDirectory /grant "${PoolIdentity}:(OI)(CI)M" | Out-Null
+} else {
+    Write-Host "WARNING: DataDirectory '$DataDirectory' not found - the app will fail to start until it exists and the pool identity can write to it." -ForegroundColor Yellow
+}
+
+# (c) SQL Server login: startup runs EF Migrate/EnsureCreated over Windows auth, so the pool identity
+#     needs a login + rights on the OmniCard databases (unified store + per-game catalogs). dbcreator
+#     lets it create any catalog DB that doesn't exist yet; db_owner on the existing ones.
+Write-Host "Granting SQL Server access to $PoolIdentity" -ForegroundColor Cyan
+$sqlLogin = "IIS APPPOOL\$AppPool"
+$tsql = @"
+IF SUSER_ID(N'$sqlLogin') IS NULL CREATE LOGIN [$sqlLogin] FROM WINDOWS;
+IF IS_SRVROLEMEMBER('dbcreator', N'$sqlLogin') = 0 ALTER SERVER ROLE dbcreator ADD MEMBER [$sqlLogin];
+DECLARE @sql nvarchar(max) = N'';
+SELECT @sql += N'USE ' + QUOTENAME(name) + N'; IF DATABASE_PRINCIPAL_ID(''$sqlLogin'') IS NULL CREATE USER [$sqlLogin] FOR LOGIN [$sqlLogin]; ALTER ROLE db_owner ADD MEMBER [$sqlLogin];'
+FROM sys.databases WHERE name = 'OmniCard' OR name LIKE 'OmniCard[_]%';
+EXEC sp_executesql @sql;
+"@
+$sqlFile = Join-Path $env:TEMP 'omnicard-grant.sql'
+$tsql | Out-File -FilePath $sqlFile -Encoding ascii
+& sqlcmd -S $SqlServer -E -b -i $sqlFile
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "WARNING: SQL grant failed (are you a SQL sysadmin?). Grant '$sqlLogin' access to the OmniCard databases manually." -ForegroundColor Yellow
+}
+Remove-Item $sqlFile -ErrorAction SilentlyContinue
 
 # ---- 2. Build the React SPA (dotnet publish does NOT run npm) ----
 Write-Host 'Building SPA...' -ForegroundColor Cyan
@@ -82,4 +128,5 @@ Pop-Location
 
 if ($code -ne 0) { Write-Host 'PUBLISH FAILED' -ForegroundColor Red; Pause-Exit $code }
 Write-Host "DONE - https://localhost:$Port" -ForegroundColor Green
+if ($lanIp) { Write-Host "  LAN:  https://${lanIp}:$Port  (other devices must trust the cert - see note)" -ForegroundColor Green }
 Pause-Exit 0
