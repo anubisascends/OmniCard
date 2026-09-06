@@ -191,6 +191,39 @@ public sealed record SetOrderStatusRequest
     public string? StageKey { get; init; }
 }
 
+public sealed record OrderLineDto(
+    int Id, int? LotId, string Name, string? Set, string? Condition, bool IsFoil,
+    int Quantity, decimal UnitSalePrice);
+
+/// <summary>An order's header (<see cref="Order"/>) plus its line items, for the detail/edit view.</summary>
+public sealed record OrderDetailDto(OrderDto Order, IReadOnlyList<OrderLineDto> Lines);
+
+public sealed record CreateOrderRequest
+{
+    public int CustomerId { get; init; }
+    public string Channel { get; init; } = "Manual";
+    public string? OrderNumber { get; init; }
+}
+
+/// <summary>Editable header fields for a pre-ship order.</summary>
+public sealed record UpdateOrderRequest
+{
+    public string Channel { get; init; } = "Manual";
+    public string? OrderNumber { get; init; }
+    public string? TrackingNumber { get; init; }
+    public string? Carrier { get; init; }
+    public decimal ShippingChargedToBuyer { get; init; }
+    public decimal ShippingCost { get; init; }
+    public decimal MarketplaceFees { get; init; }
+    public string? Notes { get; init; }
+}
+
+public sealed record AddOrderLineRequest
+{
+    public int LotId { get; init; }
+    public decimal UnitSalePrice { get; init; }
+}
+
 public sealed record ActiveListingDto(
     int LotId, string Name, string SetName, string SetCode,
     string? Condition, bool IsFoil, decimal ListedPrice, string Status);

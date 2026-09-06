@@ -4,8 +4,6 @@ import {
   Box,
   Button,
   FormControlLabel,
-  Menu,
-  MenuItem,
   Popover,
   Stack,
   Switch,
@@ -21,8 +19,9 @@ import ChecklistIcon from '@mui/icons-material/Checklist';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
 import { api } from '../api/client';
-import type { CardDto, LocationSummaryDto } from '../api/types';
+import type { CardDto } from '../api/types';
 import { CardEditDrawer } from './CardEditDrawer';
+import { LocationPickerDialog } from './LocationPickerDialog';
 
 const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 const STACK_KEY = 'omnicard.stackDuplicates';
@@ -50,7 +49,7 @@ export function CardTable({
   const [selectMode, setSelectMode] = useState(false);
   const [selection, setSelection] = useState<GridRowSelectionModel>([]);
   const [detailCardId, setDetailCardId] = useState<number | null>(null);
-  const [moveAnchor, setMoveAnchor] = useState<null | HTMLElement>(null);
+  const [moveOpen, setMoveOpen] = useState(false);
   const [hover, setHover] = useState<{ el: HTMLElement; url: string } | null>(null);
 
   // Reset to the first page whenever the scope/mode changes so we never sit on an out-of-range page.
@@ -72,7 +71,6 @@ export function CardTable({
       }),
     placeholderData: keepPreviousData,
   });
-  const locations = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations() });
 
   const rows = query.data?.items ?? [];
   const lotIdsOf = (c: CardDto) => (c.stackedIds.length ? c.stackedIds : [c.id]);
@@ -170,7 +168,7 @@ export function CardTable({
             <Typography variant="body2" color="text.secondary">
               {selectedLotIds.length} card(s) selected
             </Typography>
-            <Button size="small" startIcon={<DriveFileMoveIcon />} onClick={(e) => setMoveAnchor(e.currentTarget)}>
+            <Button size="small" startIcon={<DriveFileMoveIcon />} onClick={() => setMoveOpen(true)}>
               Move to…
             </Button>
             <Button
@@ -184,21 +182,6 @@ export function CardTable({
             >
               Delete
             </Button>
-            <Menu anchorEl={moveAnchor} open={!!moveAnchor} onClose={() => setMoveAnchor(null)}>
-              {locations.data
-                ?.filter((l: LocationSummaryDto) => l.id !== containerId)
-                .map((l) => (
-                  <MenuItem
-                    key={l.id}
-                    onClick={() => {
-                      setMoveAnchor(null);
-                      move.mutate(l.id);
-                    }}
-                  >
-                    {l.name}
-                  </MenuItem>
-                ))}
-            </Menu>
           </>
         )}
       </Stack>
@@ -252,6 +235,17 @@ export function CardTable({
       </Popover>
 
       <CardEditDrawer cardId={detailCardId} onClose={() => setDetailCardId(null)} />
+
+      <LocationPickerDialog
+        open={moveOpen}
+        title={`Move ${selectedLotIds.length} card(s) to…`}
+        excludeId={containerId}
+        onPick={(id) => {
+          setMoveOpen(false);
+          move.mutate(id);
+        }}
+        onClose={() => setMoveOpen(false)}
+      />
     </>
   );
 }

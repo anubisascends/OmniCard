@@ -6,14 +6,15 @@ using OmniCard.Web.Services;
 namespace OmniCard.Web.Api;
 
 /// <summary>
-/// Write API for the web binder editor — the JSON backend the <c>/binder/{id}/edit</c> page calls.
-/// Every endpoint maps to a command on the desktop <c>BinderViewModel</c>. Gated by the passphrase
-/// (<see cref="BinderEditAuthAttribute"/>); all writes go through the writable inventory.db services
-/// registered in <c>Program.cs</c>. Live eBay actions are intentionally out of scope here.
+/// Write API for the binder editor (the SPA's binder edit mode). Every endpoint maps to a command on
+/// the desktop <c>BinderViewModel</c>; all writes go through the writable inventory.db services
+/// registered in <c>Program.cs</c>. Gated by the site-wide passphrase (<see cref="ApiAuthAttribute"/>),
+/// same as every other SPA API — the legacy binder-only <c>BinderEditGate</c> is retired.
+/// Live eBay actions are intentionally out of scope here.
 /// </summary>
 [ApiController]
 [Route("api/binder")]
-[BinderEditAuth]
+[ApiAuth]
 public sealed class BinderEditController : ControllerBase
 {
     private readonly IStorageContainerService _containers;

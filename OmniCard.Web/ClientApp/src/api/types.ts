@@ -397,3 +397,21 @@ export interface CommitListResultDto {
   imported: number;
   listDeleted: boolean;
 }
+
+// --- Order detail / lines ---
+
+export interface OrderLineDto {
+  id: number;
+  lotId?: number | null;
+  name: string;
+  set?: string | null;
+  condition?: string | null;
+  isFoil: boolean;
+  quantity: number;
+  unitSalePrice: number;
+}
+
+export interface OrderDetailDto {
+  order: OrderDto;
+  lines: OrderLineDto[];
+}

@@ -22,6 +22,7 @@ import {
   TableRow,
   Tabs,
   TextField,
+  MenuItem,
   Tooltip,
   Typography,
 } from '@mui/material';
@@ -33,6 +34,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import { api, type CustomerFields } from '../api/client';
 import { useGame } from '../context/GameContext';
 import type { CustomerDto, OrderDto, WorkflowLaneDto } from '../api/types';
+import { OrderDetailDrawer } from '../components/OrderDetailDrawer';
 
 const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 
@@ -41,6 +43,57 @@ function laneOf(order: OrderDto, lanes: WorkflowLaneDto[]): string {
   if (byKey) return byKey.key;
   const byBehavior = lanes.find((l) => l.behavior === order.status);
   return byBehavior?.key ?? lanes[0]?.key ?? '';
+}
+
+function CreateOrderDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: number) => void }) {
+  const customers = useQuery({ queryKey: ['customers'], queryFn: api.customers, enabled: open });
+  const [customerId, setCustomerId] = useState<number | ''>('');
+  const [channel, setChannel] = useState('Manual');
+  const [orderNumber, setOrderNumber] = useState('');
+
+  const create = useMutation({
+    mutationFn: () =>
+      api.orderCreate({ customerId: customerId as number, channel, orderNumber: orderNumber || undefined }),
+    onSuccess: (o) => {
+      setCustomerId('');
+      setOrderNumber('');
+      onCreated(o.id);
+    },
+  });
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>New order</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField
+            select
+            label="Customer"
+            required
+            value={customerId}
+            onChange={(e) => setCustomerId(e.target.value === '' ? '' : Number(e.target.value))}
+          >
+            {customers.data?.map((c) => (
+              <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+            ))}
+          </TextField>
+          <TextField select label="Channel" value={channel} onChange={(e) => setChannel(e.target.value)}>
+            {['Manual', 'TcgPlayer', 'Ebay'].map((c) => (
+              <MenuItem key={c} value={c}>{c}</MenuItem>
+            ))}
+          </TextField>
+          <TextField label="Order # (optional)" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} />
+          {create.error && <Typography color="error" variant="body2">{(create.error as Error).message}</Typography>}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" disabled={customerId === '' || create.isPending} onClick={() => create.mutate()}>
+          {create.isPending ? 'Creating…' : 'Create'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 }
 
 function OrdersBoard() {
@@ -58,13 +111,19 @@ function OrdersBoard() {
   });
 
   const [dragId, setDragId] = useState<number | null>(null);
+  const [detailOrderId, setDetailOrderId] = useState<number | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   if (lanesQuery.isLoading || ordersQuery.isLoading) return <CircularProgress />;
   const lanes = lanesQuery.data ?? [];
   const orders = ordersQuery.data ?? [];
 
   return (
-    <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1 }}>
+    <Stack spacing={1.5} alignItems="flex-start">
+      <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}>
+        New order
+      </Button>
+      <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1, alignSelf: 'stretch' }}>
       {lanes.map((lane) => {
         const laneOrders = orders.filter((o) => laneOf(o, lanes) === lane.key);
         return (
@@ -91,7 +150,8 @@ function OrdersBoard() {
                   key={o.id}
                   draggable
                   onDragStart={() => setDragId(o.id)}
-                  sx={{ cursor: 'grab', borderLeft: `4px solid ${lane.color}` }}
+                  onClick={() => setDetailOrderId(o.id)}
+                  sx={{ cursor: 'pointer', borderLeft: `4px solid ${lane.color}` }}
                 >
                   <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
                     <Typography variant="body2" fontWeight={600} noWrap>
@@ -114,7 +174,18 @@ function OrdersBoard() {
           </Paper>
         );
       })}
-    </Box>
+      </Box>
+      <CreateOrderDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(id) => {
+          setCreateOpen(false);
+          qc.invalidateQueries({ queryKey: ['orders'] });
+          setDetailOrderId(id);
+        }}
+      />
+      <OrderDetailDrawer orderId={detailOrderId} onClose={() => setDetailOrderId(null)} />
+    </Stack>
   );
 }
 

@@ -16,7 +16,9 @@ import {
   Typography,
 } from '@mui/material';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
 import { api } from '../api/client';
+import { LocationPickerDialog } from './LocationPickerDialog';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
@@ -39,6 +41,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
   const [purchasePrice, setPurchasePrice] = useState<string>('');
   const [containerId, setContainerId] = useState<number | ''>('');
   const [tags, setTags] = useState<string[]>([]);
+  const [moveOpen, setMoveOpen] = useState(false);
 
   const card = cardQuery.data;
   useEffect(() => {
@@ -147,19 +150,21 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
               inputProps={{ step: '0.01', min: 0 }}
             />
 
-            <TextField
-              select
-              label="Location"
-              size="small"
-              value={containerId}
-              onChange={(e) => setContainerId(e.target.value === '' ? '' : Number(e.target.value))}
-            >
-              {locationsQuery.data?.map((l) => (
-                <MenuItem key={l.id} value={l.id}>
-                  {l.name}
-                </MenuItem>
-              ))}
-            </TextField>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Box sx={{ flexGrow: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Location
+                </Typography>
+                <Typography variant="body2">
+                  {locationsQuery.data?.find((l) => l.id === containerId)?.name ??
+                    card.containerName ??
+                    '— none —'}
+                </Typography>
+              </Box>
+              <Button size="small" startIcon={<DriveFileMoveIcon />} onClick={() => setMoveOpen(true)}>
+                Change
+              </Button>
+            </Stack>
 
             <Autocomplete
               multiple
@@ -193,6 +198,16 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
           </Stack>
         )}
       </Box>
+
+      <LocationPickerDialog
+        open={moveOpen}
+        title="Move card to…"
+        onPick={(id) => {
+          setContainerId(id);
+          setMoveOpen(false);
+        }}
+        onClose={() => setMoveOpen(false)}
+      />
     </Drawer>
   );
 }

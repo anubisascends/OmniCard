@@ -1,6 +1,7 @@
 import type {
   ActiveListingDto,
   AuthStatusDto,
+  BinderCardDto,
   BinderStateDto,
   CardDto,
   CsvImportResultDto,
@@ -17,7 +18,9 @@ import type {
   GameDto,
   InventoryValuationDto,
   LocationSummaryDto,
+  OrderDetailDto,
   OrderDto,
+  OrderLineDto,
   PagedResult,
   ProductDto,
   ScanCommitItem,
@@ -123,6 +126,20 @@ export const api = {
   binder: (id: number, spread: number) =>
     request<BinderStateDto>(`/api/binder/${id}${qs({ spread })}`),
 
+  // Binder editing (BinderEditController — gated by the binder-edit passphrase, open when unset)
+  binderUnplaced: (containerId: number, filter?: string) =>
+    request<{ cards: BinderCardDto[] }>(`/api/binder/unplaced${qs({ containerId, filter })}`).then((r) => r.cards),
+  binderAssign: (lotId: number, containerId: number, page: number, slot: number) =>
+    request<void>('/api/binder/assign', { method: 'POST', body: JSON.stringify({ lotId, containerId, page, slot }) }),
+  binderUnassign: (lotId: number) =>
+    request<void>('/api/binder/unassign', { method: 'POST', body: JSON.stringify({ lotId }) }),
+  binderAddPage: (containerId: number, mode: 'single' | 'double') =>
+    request<{ spreadIndex: number }>('/api/binder/page/add', { method: 'POST', body: JSON.stringify({ containerId, mode }) }),
+  binderRemovePage: (containerId: number, page: number) =>
+    request<void>('/api/binder/page/remove', { method: 'POST', body: JSON.stringify({ containerId, page }) }),
+  binderLayout: (containerId: number, slotsPerPage: number, columns: number) =>
+    request<void>('/api/binder/layout', { method: 'POST', body: JSON.stringify({ containerId, slotsPerPage, columns }) }),
+
   // Collection
   collection: (opts: {
     game?: string;
@@ -180,6 +197,30 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ status, stageKey }),
     }),
+  order: (id: number) => request<OrderDetailDto>(`/api/orders/${id}`),
+  orderCreate: (body: { customerId: number; channel: string; orderNumber?: string }) =>
+    request<OrderDto>('/api/orders', { method: 'POST', body: JSON.stringify(body) }),
+  orderUpdate: (
+    id: number,
+    body: {
+      channel: string;
+      orderNumber?: string | null;
+      trackingNumber?: string | null;
+      carrier?: string | null;
+      shippingChargedToBuyer: number;
+      shippingCost: number;
+      marketplaceFees: number;
+      notes?: string | null;
+    },
+  ) => request<void>(`/api/orders/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  orderDelete: (id: number) => request<void>(`/api/orders/${id}`, { method: 'DELETE' }),
+  orderAddLine: (id: number, lotId: number, unitSalePrice: number) =>
+    request<OrderLineDto>(`/api/orders/${id}/lines`, {
+      method: 'POST',
+      body: JSON.stringify({ lotId, unitSalePrice }),
+    }),
+  orderRemoveLine: (lineId: number) =>
+    request<void>(`/api/orders/lines/${lineId}`, { method: 'DELETE' }),
   listings: (game?: string) => request<ActiveListingDto[]>(`/api/listings${qs({ game })}`),
   listingUnlist: (lotId: number) =>
     request<void>(`/api/listings/lot/${lotId}`, { method: 'DELETE' }),
