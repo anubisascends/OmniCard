@@ -17,12 +17,14 @@ import type {
   DecklistCheckDto,
   GameDto,
   InventoryValuationDto,
+  ListingDetailDto,
   LocationSummaryDto,
   OrderDetailDto,
   OrderDto,
   OrderLineDto,
   PagedResult,
   ProductDto,
+  SalesSettingsDto,
   ScanCommitItem,
   ScanCommitResultDto,
   ScanMatchDto,
@@ -42,6 +44,24 @@ export interface CustomerFields {
   phone?: string | null;
   city?: string | null;
   state?: string | null;
+}
+export interface ListingFields {
+  listedPrice: number;
+  channel: string;
+  quantity: number;
+  note?: string | null;
+}
+export interface CreateListingBody {
+  lotId: number;
+  quantity: number;
+  price: number;
+  channel: string;
+  note?: string | null;
+}
+export interface BulkListingBody {
+  items: { lotId: number; price: number }[];
+  channel: string;
+  note?: string | null;
 }
 export interface ProductFields {
   game: string;
@@ -241,9 +261,22 @@ export const api = {
   orderRemoveLine: (lineId: number) =>
     request<void>(`/api/orders/lines/${lineId}`, { method: 'DELETE' }),
   listings: (game?: string) => request<ActiveListingDto[]>(`/api/listings${qs({ game })}`),
+  listingDetails: (game?: string) =>
+    request<ListingDetailDto[]>(`/api/listings/details${qs({ game })}`),
+  listingCreate: (body: CreateListingBody) =>
+    request<{ lotId: number }>('/api/listings', { method: 'POST', body: JSON.stringify(body) }),
+  listingBulkCreate: (body: BulkListingBody) =>
+    request<{ listed: number }>('/api/listings/bulk', { method: 'POST', body: JSON.stringify(body) }),
+  listingPick: (lotIds: number[]) =>
+    request<{ picked: number }>('/api/listings/pick', { method: 'POST', body: JSON.stringify({ lotIds }) }),
+  listingUpdate: (id: number, body: ListingFields) =>
+    request<void>(`/api/listings/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   listingUnlist: (lotId: number) =>
     request<void>(`/api/listings/lot/${lotId}`, { method: 'DELETE' }),
   pickListPdfUrl: (game?: string) => `/api/listings/picklist.pdf${qs({ game })}`,
+  settings: () => request<SalesSettingsDto>('/api/settings'),
+  settingsUpdate: (body: { forSaleLocationId: number | null }) =>
+    request<void>('/api/settings', { method: 'PUT', body: JSON.stringify(body) }),
   customers: () => request<CustomerDto[]>('/api/customers'),
   customerCreate: (body: CustomerFields) =>
     request<CustomerDto>('/api/customers', { method: 'POST', body: JSON.stringify(body) }),

@@ -228,6 +228,57 @@ public sealed record ActiveListingDto(
     int LotId, string Name, string SetName, string SetCode,
     string? Condition, bool IsFoil, decimal ListedPrice, string Status);
 
+/// <summary>Full detail of a Listed/Picked listing for the Manage Listings screen, including the
+/// listing <see cref="Id"/> and every editable sale property.</summary>
+public sealed record ListingDetailDto(
+    int Id, int LotId, string Name, string SetName, string SetCode,
+    string? Condition, bool IsFoil, string Channel, string Status,
+    decimal ListedPrice, int Quantity, string? Note);
+
+/// <summary>Editable sale properties of an active listing.</summary>
+public sealed record UpdateListingRequest
+{
+    public decimal ListedPrice { get; init; }
+    public string Channel { get; init; } = "Manual";
+    public int Quantity { get; init; } = 1;
+    public string? Note { get; init; }
+}
+
+/// <summary>List a single lot for sale. When <see cref="Quantity"/> is less than the lot's quantity the
+/// lot is split so only the listed copies move when picked.</summary>
+public sealed record CreateListingRequest
+{
+    public int LotId { get; init; }
+    public int Quantity { get; init; } = 1;
+    public decimal Price { get; init; }
+    public string Channel { get; init; } = "Manual";
+    public string? Note { get; init; }
+}
+
+/// <summary>List several whole lots for sale at once, each at its own price.</summary>
+public sealed record BulkListingItem(int LotId, decimal Price);
+
+public sealed record BulkListingRequest
+{
+    public IReadOnlyList<BulkListingItem> Items { get; init; } = [];
+    public string Channel { get; init; } = "Manual";
+    public string? Note { get; init; }
+}
+
+/// <summary>Lot ids to act on (e.g. mark picked).</summary>
+public sealed record LotIdsRequest
+{
+    public IReadOnlyList<int> LotIds { get; init; } = [];
+}
+
+/// <summary>App/sales settings surfaced to the SPA.</summary>
+public sealed record SalesSettingsDto(int? ForSaleLocationId);
+
+public sealed record UpdateSalesSettingsRequest
+{
+    public int? ForSaleLocationId { get; init; }
+}
+
 public sealed record CustomerDto
 {
     public int Id { get; init; }

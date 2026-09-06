@@ -22,8 +22,10 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
+import SellIcon from '@mui/icons-material/Sell';
 import { api } from '../api/client';
 import type { BinderCardDto, BinderSlotDto } from '../api/types';
+import { ListForSaleDialog } from '../components/ListForSaleDialog';
 
 const CARD_BACK_SLUGS = ['mtg', 'optcg', 'riftbound', 'pokemon', 'yugioh', 'fftcg'];
 const cardBackSrc = (game: number): string | undefined => {
@@ -73,6 +75,7 @@ function SlotGrid({
   editMode,
   onDragCard,
   onDropSlot,
+  onCardContextMenu,
 }: {
   slots: BinderSlotDto[];
   columns: number;
@@ -80,6 +83,7 @@ function SlotGrid({
   editMode: boolean;
   onDragCard: (lotId: number) => void;
   onDropSlot: (page: number, slot: number) => void;
+  onCardContextMenu: (e: React.MouseEvent, card: BinderCardDto) => void;
 }) {
   return (
     <Paper variant="outlined" sx={{ p: 1, flex: 1 }}>
@@ -104,12 +108,13 @@ function SlotGrid({
             }}
           >
             {s.card?.imageUrl ? (
-              <Tooltip title={`${s.card.name} · ${s.card.condition}${s.card.foil ? ' · Foil' : ''}`}>
+              <Tooltip title={`${s.card.name} · ${s.card.condition}${s.card.foil ? ' · Foil' : ''} — right-click to list for sale`}>
                 <img
                   src={s.card.imageUrl}
                   alt={s.card.name}
                   draggable={editMode}
                   onDragStart={editMode ? () => onDragCard(s.card!.id) : undefined}
+                  onContextMenu={(e) => onCardContextMenu(e, s.card!)}
                   style={{
                     width: '100%',
                     height: '100%',
@@ -138,6 +143,7 @@ function UnplacedSidebar({
   onFilter,
   onDragCard,
   onDropUnassign,
+  onCardContextMenu,
 }: {
   cards: BinderCardDto[];
   loading: boolean;
@@ -145,6 +151,7 @@ function UnplacedSidebar({
   onFilter: (v: string) => void;
   onDragCard: (lotId: number) => void;
   onDropUnassign: () => void;
+  onCardContextMenu: (e: React.MouseEvent, card: BinderCardDto) => void;
 }) {
   return (
     <Paper
@@ -206,6 +213,7 @@ function UnplacedSidebar({
                 alignItems="center"
                 draggable
                 onDragStart={() => onDragCard(c.id)}
+                onContextMenu={(e) => onCardContextMenu(e, c)}
                 sx={{
                   p: 0.5,
                   borderRadius: 1,
@@ -248,6 +256,13 @@ export function BinderPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [debouncedFilter, setDebouncedFilter] = useState('');
+  const [cardMenu, setCardMenu] = useState<{ x: number; y: number; card: BinderCardDto } | null>(null);
+  const [listCard, setListCard] = useState<BinderCardDto | null>(null);
+
+  const openCardMenu = (e: React.MouseEvent, card: BinderCardDto) => {
+    e.preventDefault();
+    setCardMenu({ x: e.clientX, y: e.clientY, card });
+  };
 
   // Debounce the search box so each keystroke doesn't hit the server; keeps type-ahead snappy.
   useEffect(() => {
@@ -391,6 +406,7 @@ export function BinderPage() {
             onFilter={setFilter}
             onDragCard={setDragLotId}
             onDropUnassign={dropUnassign}
+            onCardContextMenu={openCardMenu}
           />
         )}
         <Stack direction="row" spacing={2} sx={{ flexGrow: 1, minWidth: 0 }}>
@@ -402,6 +418,7 @@ export function BinderPage() {
               editMode={editMode}
               onDragCard={setDragLotId}
               onDropSlot={dropOnSlot}
+              onCardContextMenu={openCardMenu}
             />
           ) : (
             <Box sx={{ flex: 1 }} />
@@ -414,10 +431,38 @@ export function BinderPage() {
               editMode={editMode}
               onDragCard={setDragLotId}
               onDropSlot={dropOnSlot}
+              onCardContextMenu={openCardMenu}
             />
           )}
         </Stack>
       </Stack>
+
+      <Menu
+        open={cardMenu != null}
+        onClose={() => setCardMenu(null)}
+        anchorReference="anchorPosition"
+        anchorPosition={cardMenu ? { top: cardMenu.y, left: cardMenu.x } : undefined}
+      >
+        <MenuItem
+          onClick={() => {
+            setListCard(cardMenu!.card);
+            setCardMenu(null);
+          }}
+        >
+          <SellIcon fontSize="small" sx={{ mr: 1 }} />
+          List for sale
+        </MenuItem>
+      </Menu>
+
+      <ListForSaleDialog
+        target={
+          listCard
+            ? { lotId: listCard.id, name: listCard.name, quantity: 1, marketPrice: listCard.marketPriceRaw }
+            : null
+        }
+        onClose={() => setListCard(null)}
+        onListed={refresh}
+      />
     </Stack>
   );
 }

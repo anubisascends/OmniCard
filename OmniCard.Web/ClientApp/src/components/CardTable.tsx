@@ -3,10 +3,16 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   Box,
   Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControlLabel,
+  MenuItem,
   Popover,
   Stack,
   Switch,
+  TextField,
   Typography,
 } from '@mui/material';
 import {
@@ -18,10 +24,16 @@ import {
 import ChecklistIcon from '@mui/icons-material/Checklist';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
+import SellIcon from '@mui/icons-material/Sell';
 import { api } from '../api/client';
 import type { CardDto } from '../api/types';
 import { CardEditDrawer } from './CardEditDrawer';
 import { LocationPickerDialog } from './LocationPickerDialog';
+import {
+  usePreviewScale,
+  PREVIEW_BASE_WIDTH,
+  PREVIEW_BASE_MAX_HEIGHT,
+} from '../lib/previewScale';
 
 const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 const STACK_KEY = 'omnicard.stackDuplicates';
@@ -51,6 +63,7 @@ export function CardTable({
   const [detailCardId, setDetailCardId] = useState<number | null>(null);
   const [moveOpen, setMoveOpen] = useState(false);
   const [hover, setHover] = useState<{ el: HTMLElement; url: string } | null>(null);
+  const previewScale = usePreviewScale();
 
   // Reset to the first page whenever the scope/mode changes so we never sit on an out-of-range page.
   useEffect(() => {
@@ -79,6 +92,18 @@ export function CardTable({
     () => selection.flatMap((id) => (rowsById.get(Number(id)) ? lotIdsOf(rowsById.get(Number(id))!) : [])),
     [selection, rowsById],
   );
+  // Bulk listing lists each selected lot as a whole at its row's market price.
+  const selectedListItems = useMemo(
+    () =>
+      selection.flatMap((id) => {
+        const row = rowsById.get(Number(id));
+        return row ? lotIdsOf(row).map((lotId) => ({ lotId, price: row.marketPrice })) : [];
+      }),
+    [selection, rowsById],
+  );
+  const [bulkListOpen, setBulkListOpen] = useState(false);
+  const [bulkChannel, setBulkChannel] = useState('Manual');
+  const [bulkNote, setBulkNote] = useState('');
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['collection'] });
@@ -94,6 +119,16 @@ export function CardTable({
   const del = useMutation({
     mutationFn: () => Promise.all(selectedLotIds.map((id) => api.cardDelete(id))).then(() => undefined),
     onSuccess: refresh,
+  });
+  const bulkList = useMutation({
+    mutationFn: () =>
+      api.listingBulkCreate({ items: selectedListItems, channel: bulkChannel, note: bulkNote || null }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['listings'] });
+      refresh();
+      setBulkListOpen(false);
+      setBulkNote('');
+    },
   });
 
   const toggleStack = (v: boolean) => {
@@ -171,6 +206,9 @@ export function CardTable({
             <Button size="small" startIcon={<DriveFileMoveIcon />} onClick={() => setMoveOpen(true)}>
               Move to…
             </Button>
+            <Button size="small" startIcon={<SellIcon />} onClick={() => setBulkListOpen(true)}>
+              List for sale
+            </Button>
             <Button
               size="small"
               color="error"
@@ -229,7 +267,12 @@ export function CardTable({
             component="img"
             src={hover.url}
             alt=""
-            sx={{ width: 240, maxHeight: 340, objectFit: 'contain', display: 'block' }}
+            sx={{
+              width: (PREVIEW_BASE_WIDTH * previewScale) / 100,
+              maxHeight: (PREVIEW_BASE_MAX_HEIGHT * previewScale) / 100,
+              objectFit: 'contain',
+              display: 'block',
+            }}
           />
         )}
       </Popover>
@@ -246,6 +289,31 @@ export function CardTable({
         }}
         onClose={() => setMoveOpen(false)}
       />
+
+      <Dialog open={bulkListOpen} onClose={() => setBulkListOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>List {selectedListItems.length} card(s) for sale</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Each card is listed as a whole lot at its current market price. Adjust individual prices
+              afterwards on Sales ▸ Listings.
+            </Typography>
+            <TextField select label="Channel" value={bulkChannel} onChange={(e) => setBulkChannel(e.target.value)}>
+              {['Manual', 'TcgPlayer', 'Ebay'].map((c) => (
+                <MenuItem key={c} value={c}>{c}</MenuItem>
+              ))}
+            </TextField>
+            <TextField label="Note" value={bulkNote} onChange={(e) => setBulkNote(e.target.value)} multiline minRows={2} />
+            {bulkList.error && <Typography color="error" variant="body2">{(bulkList.error as Error).message}</Typography>}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkListOpen(false)}>Cancel</Button>
+          <Button variant="contained" disabled={bulkList.isPending || !selectedListItems.length} onClick={() => bulkList.mutate()}>
+            {bulkList.isPending ? 'Listing…' : 'List for sale'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

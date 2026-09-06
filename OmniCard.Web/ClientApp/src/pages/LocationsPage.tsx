@@ -2,23 +2,19 @@ import { useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Box,
   Button,
   ButtonBase,
-  Card,
-  CardActionArea,
-  CardContent,
-  CardMedia,
-  Chip,
   CircularProgress,
   Collapse,
   IconButton,
+  Link,
   Menu,
   MenuItem,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
+import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -155,38 +151,86 @@ function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: 
   );
 }
 
-function LocationCard({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: () => void }) {
-  return (
-    <Card>
-      <CardActionArea
-        component={RouterLink}
-        to={loc.type === 'Binder' ? `/binder/${loc.id}` : `/location/${loc.id}`}
-      >
-        {loc.coverImageUri && (
-          <CardMedia
-            component="img"
-            image={loc.coverImageUri}
-            sx={{ height: 140, objectFit: 'contain', bgcolor: 'action.hover' }}
-          />
-        )}
-        <CardContent sx={{ pb: 0 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6" noWrap>
-              {loc.name}
-            </Typography>
-            <Chip size="small" label={loc.type} />
-          </Stack>
-          <Typography variant="body2" color="text.secondary">
-            {loc.cardCount.toLocaleString()} cards · {loc.uniquePrintCount.toLocaleString()} unique
+const locationHref = (loc: LocationSummaryDto) =>
+  loc.type === 'Binder' ? `/binder/${loc.id}` : `/location/${loc.id}`;
+
+const num = (n: number) => n.toLocaleString();
+
+function buildColumns(onChanged: () => void): GridColDef<LocationSummaryDto>[] {
+  return [
+    {
+      field: 'name',
+      headerName: 'Name',
+      flex: 2,
+      minWidth: 200,
+      renderCell: (p) => (
+        <Link component={RouterLink} to={locationHref(p.row)} underline="hover" noWrap>
+          {p.row.name}
+        </Link>
+      ),
+    },
+    { field: 'type', headerName: 'Type', width: 120 },
+    {
+      field: 'cardCount',
+      headerName: 'Cards',
+      width: 100,
+      align: 'right',
+      headerAlign: 'right',
+      valueFormatter: (v: number) => num(v),
+    },
+    {
+      field: 'uniquePrintCount',
+      headerName: 'Unique',
+      width: 100,
+      align: 'right',
+      headerAlign: 'right',
+      valueFormatter: (v: number) => num(v),
+    },
+    {
+      field: 'totalMarketValue',
+      headerName: 'Market',
+      width: 120,
+      align: 'right',
+      headerAlign: 'right',
+      valueFormatter: (v: number) => money(v),
+    },
+    {
+      field: 'totalPurchaseCost',
+      headerName: 'Cost',
+      width: 120,
+      align: 'right',
+      headerAlign: 'right',
+      valueFormatter: (v: number) => money(v),
+    },
+    {
+      field: 'priceDelta',
+      headerName: 'Δ',
+      width: 130,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: (p) => {
+        const d = p.row.priceDelta;
+        const color = d > 0 ? 'success.main' : d < 0 ? 'error.main' : 'text.secondary';
+        const sign = d > 0 ? '+' : '';
+        return (
+          <Typography variant="body2" sx={{ color }}>
+            {sign}
+            {money(d)} ({sign}
+            {p.row.priceDeltaPercent.toFixed(0)}%)
           </Typography>
-          <Typography variant="body2">{money(loc.totalMarketValue)} market</Typography>
-        </CardContent>
-      </CardActionArea>
-      <Stack direction="row" justifyContent="flex-end" sx={{ px: 1, pb: 0.5 }}>
-        <LocationMenu loc={loc} onChanged={onChanged} />
-      </Stack>
-    </Card>
-  );
+        );
+      },
+    },
+    {
+      field: 'actions',
+      headerName: '',
+      width: 56,
+      sortable: false,
+      filterable: false,
+      align: 'center',
+      renderCell: (p) => <LocationMenu loc={p.row} onChanged={onChanged} />,
+    },
+  ];
 }
 
 export function LocationsPage() {
@@ -199,6 +243,7 @@ export function LocationsPage() {
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['locations'] });
   const groups = useMemo(() => (data ? groupLocations(data) : []), [data]);
+  const columns = useMemo(() => buildColumns(refresh), []);
 
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
     try {
@@ -241,17 +286,17 @@ export function LocationsPage() {
                 </Typography>
               </ButtonBase>
               <Collapse in={!isCollapsed} unmountOnExit>
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gap: 2,
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-                  }}
-                >
-                  {group.items.map((loc) => (
-                    <LocationCard key={loc.id} loc={loc} onChanged={refresh} />
-                  ))}
-                </Box>
+                <DataGrid
+                  rows={group.items}
+                  columns={columns}
+                  getRowId={(r) => r.id}
+                  density="compact"
+                  autoHeight
+                  hideFooter
+                  disableRowSelectionOnClick
+                  disableColumnMenu
+                  initialState={{ sorting: { sortModel: [{ field: 'name', sort: 'asc' }] } }}
+                />
               </Collapse>
             </Stack>
           );
