@@ -17,6 +17,8 @@ import {
 } from '@mui/material';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import { Snackbar } from '@mui/material';
 import { api } from '../api/client';
 import { LocationPickerDialog } from './LocationPickerDialog';
 
@@ -88,6 +90,15 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
     onSuccess: () => {
       invalidate();
       onClose();
+    },
+  });
+
+  const [tradeToast, setTradeToast] = useState(false);
+  const addToTrade = useMutation({
+    mutationFn: () => api.tradeAddOwned(card!.id),
+    onSuccess: (s) => {
+      qc.setQueryData(['trade-session'], s);
+      setTradeToast(true);
     },
   });
 
@@ -176,6 +187,15 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
               renderInput={(params) => <TextField {...params} label="Tags" />}
             />
 
+            <Button
+              variant="outlined"
+              startIcon={<SwapHorizIcon />}
+              onClick={() => addToTrade.mutate()}
+              disabled={addToTrade.isPending}
+            >
+              Add to trade
+            </Button>
+
             <Stack direction="row" spacing={1} justifyContent="space-between">
               <Button
                 color="error"
@@ -198,6 +218,14 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
           </Stack>
         )}
       </Box>
+
+      <Snackbar
+        open={tradeToast}
+        autoHideDuration={3000}
+        onClose={() => setTradeToast(false)}
+        message="Added to your trade — finalize it on the Trades page."
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
 
       <LocationPickerDialog
         open={moveOpen}

@@ -36,7 +36,6 @@ var connectionString = OmniCard.Web.Data.SqlServerDb.ConnectionString(builder.Co
 
 var scansDir = Path.Combine(dataDir, "scans");
 
-builder.Services.AddRazorPages();
 builder.Services.AddSignalR();
 builder.Services.AddControllers(options =>
     options.Filters.Add<OmniCard.Web.Api.ConcurrencyExceptionFilter>());
@@ -92,6 +91,12 @@ builder.Services.AddSingleton<CardImageCacheService>();
 builder.Services.AddSingleton<CatalogRefreshService>();
 builder.Services.AddSingleton<IDecklistService, DecklistService>();
 builder.Services.AddSingleton<ITradeService, TradeService>();
+// Applies finalized trade drafts (single-card + multi-card sessions) written by the SPA's trade
+// builder to the collection. On the desktop this ran once at launch; with the desktop retired the web
+// app now owns application — TradeSessionController calls it on finalize (and it runs once at startup
+// below to catch any drafts finalized while the app was down). Writes go through the DI OmniCardDbContext
+// factory, which is read-write on SQL Server.
+builder.Services.AddSingleton<ITradeImportService, TradeImportService>();
 builder.Services.AddSingleton<IListService, ListService>();
 
 // Read-only reporting/query services backing the SPA API (they read via the Mode=ReadOnly
@@ -196,6 +201,22 @@ using (var scope = app.Services.CreateScope())
     EnsureCatalog<FinalFantasyDbContext>();
 }
 
+// Apply any finalized-but-unapplied trade drafts left in the shared trades folder (e.g. a session
+// finalized just before the app was stopped). Idempotent — already-applied drafts are skipped.
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var applied = scope.ServiceProvider.GetRequiredService<ITradeImportService>().ImportPendingTrades();
+        if (applied > 0)
+            app.Logger.LogInformation("Applied {Count} pending trade draft(s) at startup.", applied);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "Failed to apply pending trades at startup.");
+    }
+}
+
 app.UseStaticFiles();
 app.UseSession();
 
@@ -221,17 +242,17 @@ if (Directory.Exists(scansDir))
     });
 }
 
-app.MapRazorPages();
 app.MapControllers();
 app.MapHub<OmniCard.Web.Hubs.ScanHub>("/hubs/scan");
 
 // OpenAPI document at /openapi/v1.json — consumed by the SPA's typed client generator.
 app.MapOpenApi();
 
-// Serve the React SPA (built into wwwroot/app by `npm run build`) at /app, with a fallback so
-// client-side deep links (e.g. /app/collection) resolve to its index.html. The legacy Razor pages
-// stay at the root during the migration; the SPA is additive under /app for now.
+// The React SPA (built into wwwroot/app by `npm run build`) is the entire app now — the legacy Razor
+// pages have been retired. Serve it at /app, with a fallback so client-side deep links (e.g.
+// /app/collection) resolve to its index.html, and redirect the site root to it.
 app.MapFallbackToFile("/app/{*path:nonfile}", "/app/index.html");
+app.MapGet("/", () => Results.Redirect("/app/"));
 
 Console.WriteLine($"Serving collection from: {dataDir}");
 app.Run();

@@ -29,6 +29,8 @@ import type {
   ScanSearchResultDto,
   SetChecklistDto,
   SetInfoDto,
+  TradeSearchResult,
+  TradeSessionState,
   TradeSummaryDto,
   WorkflowLaneDto,
 } from './types';
@@ -79,6 +81,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     try {
       const body = await res.json();
       if (body?.error) message = body.error;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(res.status, message);
+  }
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
+}
+
+/** POST a multipart/form-data body (for endpoints that accept file uploads). */
+async function postForm<T>(path: string, form: FormData): Promise<T> {
+  const res = await fetch(path, { method: 'POST', body: form, credentials: 'same-origin' });
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const b = await res.json();
+      if (b?.error) message = b.error;
     } catch {
       /* non-JSON error body */
     }
@@ -283,6 +302,39 @@ export const api = {
 
   // Trades (read-only history)
   trades: () => request<TradeSummaryDto[]>('/api/trades'),
+
+  // Trade builder (in-progress draft session → applied to the collection on finalize)
+  tradeSession: () =>
+    request<{ session: TradeSessionState | null }>('/api/trade-session').then((r) => r.session),
+  tradeStart: () =>
+    request<{ session: TradeSessionState }>('/api/trade-session/start', { method: 'POST' }).then((r) => r.session),
+  tradeAddOwned: (lotId: number) =>
+    request<{ session: TradeSessionState }>('/api/trade-session/add-owned', {
+      method: 'POST',
+      body: JSON.stringify({ lotId }),
+    }).then((r) => r.session),
+  tradeRemoveItem: (index: number) =>
+    request<{ session: TradeSessionState }>('/api/trade-session/remove-item', {
+      method: 'POST',
+      body: JSON.stringify({ index }),
+    }).then((r) => r.session),
+  tradeAddOffDb: (name: string, value: number | null, photo: File | null) => {
+    const form = new FormData();
+    if (name) form.append('name', name);
+    if (value != null) form.append('value', String(value));
+    if (photo) form.append('photo', photo);
+    return postForm<{ session: TradeSessionState }>('/api/trade-session/add-offdb', form).then((r) => r.session);
+  },
+  tradeFinalize: (note: string, receivedValue: number | null, receivedPhoto: File | null) => {
+    const form = new FormData();
+    if (note) form.append('note', note);
+    if (receivedValue != null) form.append('receivedValue', String(receivedValue));
+    if (receivedPhoto) form.append('receivedPhoto', receivedPhoto);
+    return postForm<{ applied: number }>('/api/trade-session/finalize', form);
+  },
+  tradeCancel: () => request<void>('/api/trade-session/cancel', { method: 'POST' }),
+  tradeSearch: (q: string) =>
+    request<{ results: TradeSearchResult[] }>(`/api/trade-session/search${qs({ q })}`).then((r) => r.results),
 
   // Card lists
   lists: (game: string) => request<CardListDto[]>(`/api/lists${qs({ game })}`),

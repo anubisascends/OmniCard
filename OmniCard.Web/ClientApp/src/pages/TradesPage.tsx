@@ -12,6 +12,7 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import { api } from '../api/client';
+import { TradeBuilder } from '../components/TradeBuilder';
 
 const money = (n?: number | null) =>
   n == null ? '—' : n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
@@ -19,16 +20,22 @@ const money = (n?: number | null) =>
 export function TradesPage() {
   const { data, isLoading } = useQuery({ queryKey: ['trades'], queryFn: api.trades });
 
-  if (isLoading || !data) return <CircularProgress />;
-
   return (
     <Stack spacing={2}>
       <Typography variant="h4">Trades</Typography>
+
+      <TradeBuilder />
+
+      <Typography variant="h6" sx={{ mt: 1 }}>
+        History
+      </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mt: -1 }}>
-        History of cards you've traded away, newest first.
+        Cards you've traded away, newest first.
       </Typography>
 
-      {data.length === 0 ? (
+      {isLoading || !data ? (
+        <CircularProgress />
+      ) : data.length === 0 ? (
         <Typography color="text.secondary">No trades recorded yet.</Typography>
       ) : (
         data.map((t) => (

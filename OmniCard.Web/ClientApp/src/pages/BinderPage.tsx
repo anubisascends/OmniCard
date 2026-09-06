@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -7,6 +7,7 @@ import {
   Breadcrumbs,
   Button,
   CircularProgress,
+  InputAdornment,
   Link,
   Menu,
   MenuItem,
@@ -20,6 +21,7 @@ import {
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
+import SearchIcon from '@mui/icons-material/Search';
 import { api } from '../api/client';
 import type { BinderCardDto, BinderSlotDto } from '../api/types';
 
@@ -126,14 +128,21 @@ function SlotGrid({
   );
 }
 
-/** The pool of cards in this binder that aren't placed in a slot — drag them onto slots. Drop a
- * placed card back here to unplace it. */
-function UnplacedTray({
+/** Left-hand pool of cards in this binder that aren't placed in a slot. Search it with Scryfall
+ * syntax (set:, cn:, t:, c:, tag:, or plain name) — the filter is applied server-side. Drag a card
+ * onto a slot to place it; drop a placed card back onto this sidebar to unplace it. */
+function UnplacedSidebar({
   cards,
+  loading,
+  filter,
+  onFilter,
   onDragCard,
   onDropUnassign,
 }: {
   cards: BinderCardDto[];
+  loading: boolean;
+  filter: string;
+  onFilter: (v: string) => void;
   onDragCard: (lotId: number) => void;
   onDropUnassign: () => void;
 }) {
@@ -142,31 +151,88 @@ function UnplacedTray({
       variant="outlined"
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDropUnassign}
-      sx={{ p: 1, bgcolor: 'background.default' }}
+      sx={{
+        width: 300,
+        flexShrink: 0,
+        alignSelf: 'flex-start',
+        position: 'sticky',
+        top: 8,
+        maxHeight: 'calc(100vh - 32px)',
+        display: 'flex',
+        flexDirection: 'column',
+        p: 1,
+        bgcolor: 'background.default',
+      }}
     >
-      <Typography variant="subtitle2" gutterBottom>
-        Unplaced cards ({cards.length}) — drag onto a slot; drop a placed card here to remove it
-      </Typography>
-      {cards.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          Everything in this binder is placed.
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+        <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
+          Unplaced cards ({cards.length})
         </Typography>
-      ) : (
-        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', maxHeight: 220, overflowY: 'auto' }}>
-          {cards.map((c) => (
-            <Tooltip key={c.id} title={`${c.name} · ${c.condition}${c.foil ? ' · Foil' : ''}`}>
-              <Box
-                component="img"
-                src={c.imageUrl ?? undefined}
-                alt={c.name}
+        {loading && <CircularProgress size={14} />}
+      </Stack>
+      <TextField
+        size="small"
+        fullWidth
+        autoFocus
+        placeholder="Search — e.g. set:mh3 t:creature"
+        value={filter}
+        onChange={(e) => onFilter(e.target.value)}
+        slotProps={{
+          input: {
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+          },
+        }}
+        sx={{ mb: 0.5 }}
+      />
+      <Typography variant="caption" color="text.secondary" sx={{ mb: 1 }}>
+        Drag onto a slot to place · drop a placed card here to remove it
+      </Typography>
+      <Box sx={{ overflowY: 'auto', flexGrow: 1 }}>
+        {cards.length === 0 ? (
+          <Typography variant="body2" color="text.secondary" sx={{ px: 0.5, py: 1 }}>
+            {filter.trim() ? 'No cards match your search.' : 'Everything in this binder is placed.'}
+          </Typography>
+        ) : (
+          <Stack spacing={0.5}>
+            {cards.map((c) => (
+              <Stack
+                key={c.id}
+                direction="row"
+                spacing={1}
+                alignItems="center"
                 draggable
                 onDragStart={() => onDragCard(c.id)}
-                sx={{ width: 60, aspectRatio: '0.72', objectFit: 'contain', cursor: 'grab', borderRadius: 0.5 }}
-              />
-            </Tooltip>
-          ))}
-        </Box>
-      )}
+                sx={{
+                  p: 0.5,
+                  borderRadius: 1,
+                  cursor: 'grab',
+                  '&:hover': { bgcolor: 'action.hover' },
+                }}
+              >
+                <Box
+                  component="img"
+                  src={c.imageUrl ?? undefined}
+                  alt={c.name}
+                  sx={{ width: 40, aspectRatio: '0.72', objectFit: 'contain', borderRadius: 0.5, flexShrink: 0 }}
+                />
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="body2" noWrap>
+                    {c.name}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                    {c.setCode} · #{c.number} · {c.condition}
+                    {c.foil ? ' · Foil' : ''}
+                  </Typography>
+                </Box>
+              </Stack>
+            ))}
+          </Stack>
+        )}
+      </Box>
     </Paper>
   );
 }
@@ -180,6 +246,14 @@ export function BinderPage() {
   const [dragLotId, setDragLotId] = useState<number | null>(null);
   const [addAnchor, setAddAnchor] = useState<null | HTMLElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState('');
+  const [debouncedFilter, setDebouncedFilter] = useState('');
+
+  // Debounce the search box so each keystroke doesn't hit the server; keeps type-ahead snappy.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedFilter(filter.trim()), 200);
+    return () => clearTimeout(t);
+  }, [filter]);
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['binder', binderId, spread],
@@ -187,9 +261,10 @@ export function BinderPage() {
     placeholderData: keepPreviousData,
   });
   const unplaced = useQuery({
-    queryKey: ['binder-unplaced', binderId],
-    queryFn: () => api.binderUnplaced(binderId),
+    queryKey: ['binder-unplaced', binderId, debouncedFilter],
+    queryFn: () => api.binderUnplaced(binderId, debouncedFilter || undefined),
     enabled: editMode,
+    placeholderData: keepPreviousData,
   });
 
   const refresh = () => {
@@ -306,39 +381,43 @@ export function BinderPage() {
         </Button>
       </Stack>
 
-      {/* Spread */}
-      <Stack direction="row" spacing={2}>
-        {data.leftPageNumber != null ? (
-          <SlotGrid
-            slots={data.leftSlots}
-            columns={data.columns}
-            pageNumber={data.leftPageNumber}
-            editMode={editMode}
+      {/* Spread (+ unplaced sidebar in edit mode) */}
+      <Stack direction="row" spacing={2} alignItems="flex-start">
+        {editMode && (
+          <UnplacedSidebar
+            cards={unplaced.data ?? []}
+            loading={unplaced.isFetching}
+            filter={filter}
+            onFilter={setFilter}
             onDragCard={setDragLotId}
-            onDropSlot={dropOnSlot}
-          />
-        ) : (
-          <Box sx={{ flex: 1 }} />
-        )}
-        {data.rightPageNumber != null && (
-          <SlotGrid
-            slots={data.rightSlots}
-            columns={data.columns}
-            pageNumber={data.rightPageNumber}
-            editMode={editMode}
-            onDragCard={setDragLotId}
-            onDropSlot={dropOnSlot}
+            onDropUnassign={dropUnassign}
           />
         )}
+        <Stack direction="row" spacing={2} sx={{ flexGrow: 1, minWidth: 0 }}>
+          {data.leftPageNumber != null ? (
+            <SlotGrid
+              slots={data.leftSlots}
+              columns={data.columns}
+              pageNumber={data.leftPageNumber}
+              editMode={editMode}
+              onDragCard={setDragLotId}
+              onDropSlot={dropOnSlot}
+            />
+          ) : (
+            <Box sx={{ flex: 1 }} />
+          )}
+          {data.rightPageNumber != null && (
+            <SlotGrid
+              slots={data.rightSlots}
+              columns={data.columns}
+              pageNumber={data.rightPageNumber}
+              editMode={editMode}
+              onDragCard={setDragLotId}
+              onDropSlot={dropOnSlot}
+            />
+          )}
+        </Stack>
       </Stack>
-
-      {editMode && (
-        <UnplacedTray
-          cards={unplaced.data ?? []}
-          onDragCard={setDragLotId}
-          onDropUnassign={dropUnassign}
-        />
-      )}
     </Stack>
   );
 }

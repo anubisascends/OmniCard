@@ -370,6 +370,42 @@ export interface TradeSummaryDto {
   outgoingCards: TradeCardDto[];
 }
 
+// Trade builder (in-progress draft session)
+export interface TradeSessionItem {
+  index: number;
+  lotId?: number | null;
+  isOffDatabase: boolean;
+  game: number;
+  cardName: string;
+  setCode?: string | null;
+  setName?: string | null;
+  collectorNumber?: string | null;
+  foil: boolean;
+  estimatedValue?: number | null;
+  imageUrl?: string | null;
+  tcgPlayerUrl?: string | null;
+}
+
+export interface TradeSessionState {
+  sessionId: string;
+  note: string;
+  receivedValue?: number | null;
+  outgoingTotal: number;
+  items: TradeSessionItem[];
+}
+
+export interface TradeSearchResult {
+  lotId: number;
+  name: string;
+  setName: string;
+  setCode: string;
+  number: string;
+  isFoil: boolean;
+  condition: string;
+  marketPrice?: number | null;
+  imageUrl?: string | null;
+}
+
 // --- Card lists ---
 
 export interface CardListDto {
