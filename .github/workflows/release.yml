@@ -28,47 +28,36 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Extract version from tag
         id: version
         shell: bash
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      # --- Desktop app: single-file self-contained .exe (same flags as the "Publish Single File"
-      #     task in .vscode/tasks.json) ---
-      - name: Publish desktop app
-        run: >
-          dotnet publish OmniCard/OmniCard.csproj -c Release -r win-x64
-          -p:MinVerVersionOverride=${{ steps.version.outputs.VERSION }}
-          -p:PublishSingleFile=true
-          -p:IncludeNativeLibrariesForSelfExtract=true
-          --self-contained true
-
-      - name: Package desktop release
-        shell: bash
+      # --- Build the React SPA into OmniCard.Web/wwwroot/app so `dotnet publish` picks it up. ---
+      - name: Build SPA
+        working-directory: OmniCard.Web/ClientApp
         run: |
-          ROOT="$PWD"
-          PUBLISH_DIR="OmniCard/bin/Release/net10.0-windows10.0.22621.0/win-x64/publish"
-          ARTIFACT="OmniCard-v${{ steps.version.outputs.VERSION }}-win-x64.zip"
-          # Remove PDB/XML files — not needed for end users
-          rm -f "$PUBLISH_DIR"/*.pdb
-          rm -f "$PUBLISH_DIR"/*.xml
-          cd "$PUBLISH_DIR"
-          7z a -tzip "$ROOT/$ARTIFACT" ./*
-          cd "$ROOT"
+          npm ci
+          npm run build
 
-      # --- Web companion: framework-dependent package for IIS. Self-contained=false keeps it
-      #     small; the target IIS server needs the matching .NET 10 ASP.NET Core Hosting Bundle
-      #     installed (see README). -r win-x64 scopes native assets (SQLite, SkiaSharp, etc.) to
-      #     one RID instead of bundling every platform's. dotnet publish auto-generates web.config
-      #     with the ASP.NET Core Module entry, so the zip is drop-in ready for an IIS site root. ---
-      - name: Publish web companion
+      # --- Web app: framework-dependent package for IIS. Self-contained=false keeps it small; the
+      #     target IIS server needs the matching .NET 10 ASP.NET Core Hosting Bundle installed (see
+      #     README). -r win-x64 scopes native assets (SQLite, SkiaSharp, etc.) to one RID. dotnet
+      #     publish auto-generates web.config with the ASP.NET Core Module entry, so the zip is
+      #     drop-in ready for an IIS site root. ---
+      - name: Publish web app
         run: >
           dotnet publish OmniCard.Web/OmniCard.Web.csproj -c Release -r win-x64
           --self-contained false
           -p:MinVerVersionOverride=${{ steps.version.outputs.VERSION }}
           -o publish-web
 
-      - name: Package web companion release
+      - name: Package web release
         shell: bash
         run: |
           ROOT="$PWD"
@@ -81,13 +70,5 @@ jobs:
       - name: Upload to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          eBay_AppID: ${{ secrets.EBAY_APPID }}
-          eBay_CertId: ${{ secrets.EBAY_CERTID }}
-          eBay_AcceptUrl: ${{ secrets.EBAY_ACCEPTURL }}
-          eBay_DeclineUrl: ${{ secrets.EBAY_DECLINEURL }}
-          eBay_DevId: ${{ secrets.EBAY_DEVID }}
-          eBay_RuName: ${{ secrets.EBAY_RUNAME }}
-          eBay_Environment: ${{ secrets.EBAY_ENV }}
         run: |
-          gh release upload ${{ github.event.release.tag_name }} "OmniCard-v${{ steps.version.outputs.VERSION }}-win-x64.zip"
           gh release upload ${{ github.event.release.tag_name }} "OmniCard-Web-v${{ steps.version.outputs.VERSION }}-iis.zip"

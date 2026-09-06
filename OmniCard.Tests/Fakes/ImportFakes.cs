@@ -1,8 +1,6 @@
 using System.Collections.ObjectModel;
 using OmniCard.Interfaces;
 using OmniCard.Models;
-using OmniCard.Services;
-using OmniCard.Views.DecklistImport;
 
 namespace OmniCard.Tests.Fakes;
 
@@ -215,28 +213,3 @@ public sealed class FakeDecklistParseService : IDecklistService
     public DecklistCheckResult CheckAgainstCollection(string deckName, string deckSource, List<DecklistEntry> entries, CardGame game) => throw new NotImplementedException();
 }
 
-/// <summary>IDecklistImportService returning canned rows and recording commits.</summary>
-public sealed class FakeDecklistImportService : IDecklistImportService
-{
-    public Func<string, List<DecklistImportRow>> OnResolve = _ => [];
-    public Func<IEnumerable<DecklistEntry>, List<DecklistImportRow>> OnResolveEntries = _ => [];
-    public List<(int ListId, int Count)> ListCommits { get; } = [];
-    public List<(StorageContainer Container, int Count)> LocationCommits { get; } = [];
-
-    public IReadOnlyList<DecklistImportRow> ResolveFile(string fileText) => OnResolve(fileText);
-    public IReadOnlyList<DecklistImportRow> ResolveEntries(IEnumerable<DecklistEntry> entries) => OnResolveEntries(entries);
-
-    public int CommitToList(int listId, IEnumerable<DecklistImportRow> resolvedRows, bool defaultFoil = false, string? defaultFoilType = null)
-    {
-        var rows = resolvedRows.ToList();
-        ListCommits.Add((listId, rows.Count));
-        return rows.Sum(r => r.Quantity);
-    }
-
-    public int CommitToLocation(StorageContainer container, IEnumerable<DecklistImportRow> resolvedRows, bool defaultFoil = false, string? defaultFoilType = null)
-    {
-        var rows = resolvedRows.ToList();
-        LocationCommits.Add((container, rows.Count));
-        return rows.Sum(r => r.Quantity);
-    }
-}

@@ -1,181 +1,139 @@
 # OmniCard
 
-A desktop scanner and collection manager for trading card games. Scan physical cards with a TWAIN scanner or phone camera, automatically identify them via perceptual hashing and OCR, and organize your collection across storage locations.
+A web app for scanning and managing trading card collections. Upload card images (or snap them with your phone) and OmniCard identifies them via perceptual hashing + OCR, then tracks them across storage locations, sealed-product inventory, and sales/fulfillment — all from any device on your network.
 
-Supports **Magic: The Gathering** (via Scryfall) and **One Piece TCG**.
+Supports **Magic: The Gathering** (Scryfall), **One Piece TCG**, **Riftbound**, **Pokémon**, **Yu-Gi-Oh!**, and **Final Fantasy TCG** (the last three via TCGCSV).
+
+> OmniCard started as a WPF desktop app with a read-only web companion. It has since been rebuilt as a full read/write web app (ASP.NET Core API + React/TypeScript SPA) backed by SQL Server, and the desktop app has been retired — everything now runs through `OmniCard.Web`.
 
 ## Features
 
-- **Bulk scanning** with automatic card identification using perceptual image hashing
-- **OCR-based matching** for One Piece TCG collector numbers
-- **Manual search** by card name or set/collector number (e.g. `TMT-002`, `OP15-041`)
-- **Collection management** with storage locations (binders, boxes, deck boxes, bulk)
-- **Set completion tracking** with missing card reports
-- **Decklist checking** against your collection (Moxfield and Archidekt)
-- **CSV import/export** (Manabox, Moxfield, TCGPlayer, app-native formats)
-- **eBay listing integration** for selling cards
-- **Inventory tracking** for sealed product (booster boxes, packs, bundles, etc.) with lots and valuation
-- **Web companion** for browsing your collection from any device and scanning cards with your phone camera
+- **Image scanning** — upload card photos/scans (or use the phone camera); matching runs **server-side** (pHash + foil edge hash + OCR), with a review-and-commit queue
+- **Collection management** across storage locations (binders, boxes, deck boxes, bulk), with a visual binder editor
+- **Set completion tracking** + printable want-lists
+- **Decklist checking** against your collection (Moxfield / Archidekt)
+- **CSV import/export** (Manabox, Moxfield, TCGplayer, app-native)
+- **Sealed inventory** (booster boxes, packs, cases…) with lots and valuation
+- **Sales & fulfillment** — orders kanban, listings, customers, pick-list & receipt PDFs
+- **eBay listing integration** (server-side OAuth)
+- **Card lists** and **trade history**
 - **Location auditing** with PDF reports
+- **Server-hosted artwork** — card images cached on the server and served locally
 
 ## Requirements
 
-- **OS:** Windows 10 22H2 (build 22621) or later
-- **Runtime:** [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (for building from source)
-- **Scanner:** Any TWAIN-compatible scanner (optional -- you can also import images or scan with a phone)
+- **.NET 10 SDK** — <https://dotnet.microsoft.com/download/dotnet/10.0>
+- **Node 18+** (to build the SPA)
+- **SQL Server 2019+** (Express is fine) — the unified store and per-game catalogs
+- **Windows** — the imaging/OCR stack uses `System.Drawing` (target framework `net10.0-windows`)
 
 ## Download
 
-Grab the latest release from the [Releases](../../releases) page. Each release includes two downloads:
+Grab the latest release from the [Releases](../../releases) page:
 
 | Asset | What it is |
 |-------|------------|
-| `OmniCard-v{VERSION}-win-x64.zip` | The desktop app -- a single self-contained `OmniCard.exe` plus a handful of native scanner/OCR support files |
-| `OmniCard-Web-v{VERSION}-iis.zip` | The web companion, packaged for installation on IIS |
+| `OmniCard-Web-v{VERSION}-iis.zip` | The web app, packaged for installation on IIS |
 
-### Installing the Desktop App
+## Installing on IIS
 
-Download `OmniCard-v{VERSION}-win-x64.zip`, extract it anywhere, and run `OmniCard.exe`.
+1. Install the **.NET 10 Hosting Bundle** (provides the ASP.NET Core Module V2) and **SQL Server**.
+2. Create an **Application Pool** with **No Managed Code**, and a **Site/Application** pointing at the extracted zip.
+3. Configure `DataDirectory`, `ConnectionStrings__OmniCard`, `Auth__Passphrase`, and (optionally) the `eBay__*` keys via `web.config` `environmentVariables` or `appsettings.json`.
+4. Run the one-time data migration and grant the app-pool identity the needed permissions.
 
-No installation required -- just extract and run.
-
-### Installing the Web Companion on IIS
-
-The web companion is a normal ASP.NET Core app and is meant to run alongside the desktop app on
-the same machine (or one with access to the same data directory), so people on your network can
-browse the collection and scan with their phones.
-
-**Prerequisites (on the IIS server):**
-
-- IIS with the **ASP.NET Core Module V2** -- install the
-  [.NET 10 Hosting Bundle](https://dotnet.microsoft.com/download/dotnet/10.0) (not just the SDK/runtime), then restart the server (or at least run `net stop was /y` followed by `net start w3svc`).
-- The desktop app must have run at least once on a reachable path, so `inventory.db` and the
-  per-game catalog databases exist to point at.
-
-**Steps:**
-
-1. Download `OmniCard-Web-v{VERSION}-iis.zip` and extract it to a folder, e.g. `C:\inetpub\OmniCardWeb`.
-2. In IIS Manager, create an **Application Pool** for the site with **.NET CLR version** set to
-   **No Managed Code** (the ASP.NET Core Module hosts the runtime itself, IIS doesn't need to).
-3. Create a **Site** (or **Application** under an existing site) with its physical path pointing at
-   the folder from step 1, using the app pool from step 2.
-4. Point the app at your data directory. Open the generated `web.config` in that folder and add an
-   `environmentVariables` entry inside the `<aspNetCore>` element:
-   ```xml
-   <aspNetCore processPath="dotnet" arguments=".\OmniCard.Web.dll" ...>
-     <environmentVariables>
-       <environmentVariable name="DataDirectory" value="C:\Users\<you>\AppData\Local\OmniCard" />
-     </environmentVariables>
-   </aspNetCore>
-   ```
-   Use the same data directory the desktop app uses (default `%LOCALAPPDATA%\OmniCard`).
-5. Grant the app pool identity (`IIS AppPool\<your app pool name>`) **read** access to that data
-   directory -- the web app opens the databases read-only, so no write access is needed.
-6. Browse to the site. You should see the collection browser; `/scan` works from any device on the
-   same network once you're browsing over the LAN.
+**Full step-by-step deployment/operations guide — SQL Server setup, data migration, config keys, artwork, and eBay — is in [OmniCard.Web/README.md](OmniCard.Web/README.md).**
 
 ## Building from Source
-
-### Prerequisites
-
-- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (win-x64)
-- Windows 10 22H2 or later
-
-### Build
 
 ```bash
 git clone https://github.com/anubisascends/OmniCard.git
 cd OmniCard
+
+# Build the SPA (into OmniCard.Web/wwwroot/app)
+cd OmniCard.Web/ClientApp && npm install && npm run build && cd ../..
+
+# Build the backend
 dotnet build OmniCard.slnx
 ```
 
-### Run
+### Run (development)
+
+Two terminals — the backend serves the API, Vite serves the SPA with hot-reload and proxies `/api`:
 
 ```bash
-dotnet run --project OmniCard/OmniCard.csproj
+# terminal 1 — backend on :5000
+dotnet run --project OmniCard.Web/OmniCard.Web.csproj -- --db "C:\path\to\your\data"
+
+# terminal 2 — SPA dev server on :5173
+cd OmniCard.Web/ClientApp && npm run dev
 ```
 
-On first launch, the app creates its data directory at `%LOCALAPPDATA%\OmniCard` and will prompt you to download card data.
+Open <http://localhost:5173>. For a production-like check, `npm run build` then browse <http://localhost:5000/app/>.
 
-### Run Tests
+### Tests
 
 ```bash
 dotnet test OmniCard.Tests/OmniCard.Tests.csproj
 ```
 
-### Publish (Release Build)
+### Publish (for IIS)
 
 ```bash
-dotnet publish OmniCard/OmniCard.csproj -c Release -r win-x64
+cd OmniCard.Web/ClientApp && npm run build && cd ../..
+dotnet publish OmniCard.Web/OmniCard.Web.csproj -c Release -r win-x64 --self-contained false
 ```
 
-Output goes to `OmniCard/bin/Release/net10.0-windows10.0.22621.0/win-x64/publish/`.
+## SPA pages
 
-## Web Companion
+The React app is served at `/app`:
 
-The web companion lets you browse your collection from any device on your network and scan cards using your phone's camera.
-
-### Running the Web Companion
-
-```bash
-dotnet run --project OmniCard.Web/OmniCard.Web.csproj -- --db "C:\path\to\your\data"
-```
-
-Point `--db` at the same data directory the desktop app uses (default: `%LOCALAPPDATA%\OmniCard`). The web app opens the databases in read-only mode.
-
-### Web Companion Pages
-
-| Page | Description |
-|------|-------------|
-| `/` | Collection browser with search, game filter, and storage location overview |
-| `/location/{id}` | Cards in a specific storage location |
-| `/card/{id}` | Card detail with scan image |
-| `/scan` | Phone scanner -- capture cards with your phone camera |
-| `/decklist` | Check a Moxfield or Archidekt decklist against your collection |
+| Route | Description |
+|-------|-------------|
+| `/` | Dashboard — holdings + realized P&L |
+| `/scan` | Upload/scan cards; server-side match, review, and commit |
+| `/collection` | Searchable collection grid with edit drawer |
+| `/locations`, `/location/:id`, `/binder/:id` | Storage locations + visual binder |
+| `/sets` | Set-completion checklist + want-list PDF |
+| `/inventory` | Sealed product + lots + valuation |
+| `/lists`, `/trades` | Saved card lists; trade history |
+| `/import` | CSV import/export + decklist check |
+| `/sales` | Orders kanban, listings, customers |
+| `/settings` | eBay connection, catalog refresh, artwork download |
 
 ## Tech Stack
 
 | Component | Technology |
 |-----------|------------|
-| Desktop App | WPF (.NET 10), CommunityToolkit.Mvvm, MaterialDesignThemes |
-| Web Companion | ASP.NET Core Razor Pages, SignalR |
-| Database | SQLite via Entity Framework Core |
-| Card Identification | Perceptual hashing (pHash), OCR |
-| Scanner Integration | NTwain (TWAIN protocol) |
-| MTG Card Data | Scryfall API |
-| PDF Reports | QuestPDF |
-| eBay Integration | eBay REST API + OAuth |
-| SVG Rendering | SharpVectors |
+| Backend | ASP.NET Core (.NET 10), EF Core |
+| Frontend | React + TypeScript + Vite + MUI, TanStack Query |
+| Database | SQL Server (unified store + per-game catalogs) |
+| Card identification | Perceptual hashing (pHash), OCR |
+| Card data | Scryfall API, TCGCSV, poneglyph (One Piece) |
+| PDF reports | QuestPDF |
+| eBay integration | eBay REST API + OAuth |
 | Logging | Serilog |
 
 ## Project Structure
 
 ```
-OmniCard/                  Main WPF desktop application
-OmniCard.Web/              ASP.NET Core web companion
-OmniCard.Shared/           Shared models and interfaces
-OmniCard.Data/             EF Core database contexts (SQLite)
-OmniCard.CardMatching/     Scryfall + OPTCG game services, hash matching
-OmniCard.Collection/       Collection management, CSV, decklist service
-OmniCard.Imaging/          Perceptual hashing, OCR, image caching
-OmniCard.Scanner/          TWAIN scanner coordination
-OmniCard.ScannerHost/      Out-of-process TWAIN bridge
-OmniCard.Controls/         Reusable WPF controls and themes
-OmniCard.eBay/             eBay OAuth, catalog, and listing services
-OmniCard.Audit/            Location auditing and PDF export
-OmniCard.Tests/            Unit and integration tests (xUnit)
+OmniCard.Web/           ASP.NET Core API + React/TS SPA (ClientApp/) — the app
+OmniCard.Api.Contracts/ Pure DTO records (the SPA's request/response contract)
+OmniCard.Shared/        Shared models and interfaces
+OmniCard.Data/          EF Core DbContexts (unified store + per-game catalogs)
+OmniCard.CardMatching/  Per-game card services + hash/OCR matching
+OmniCard.Collection/    Collection, inventory, sales, decklist, lists, trades
+OmniCard.Imaging/       Perceptual hashing, OCR, image caching
+OmniCard.eBay/          eBay OAuth, catalog, and listing services
+OmniCard.Audit/         Location auditing and PDF export
+OmniCard.DbMigrator/    One-time SQLite → SQL Server data copy
+OmniCard.Tests/         Unit and integration tests (xUnit)
 ```
 
 ## Data Storage
 
-Card data and scans are stored locally in `%LOCALAPPDATA%\OmniCard` by default (configurable via the app's Data Location settings):
-
-- `collection.db` -- your scanned cards and storage locations
-- `scryfall.db` -- MTG card reference data (downloaded from Scryfall)
-- `optcg.db` -- One Piece TCG reference data
-- `inventory.db` -- sealed product inventory (products, lots, valuation)
-- `scans/` -- saved scan images
-- `logs/` -- application logs (14-day rolling retention)
+- **SQL Server** — the unified store (`OmniCard`: collection, inventory, sales) and one catalog DB per game (`OmniCard_Scryfall`, `OmniCard_Pokemon`, …).
+- **Data directory** (`--db` / `DataDirectory`, default `%LOCALAPPDATA%\OmniCard`) — `scans/`, `card-images/` (server-hosted artwork), `symbols/`, `dataprotection-keys/`, and `logs/` (14-day rolling retention).
 
 ## License
 

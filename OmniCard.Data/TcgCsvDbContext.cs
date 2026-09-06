@@ -19,6 +19,11 @@ public abstract class TcgCsvDbContext : DbContext
 
     public int GetSchemaVersion()
     {
+        // On SQL Server the schema is owned by EF migrations (PRAGMA is SQLite-only), so report the
+        // current version — the DB is always "up to date" and never triggers a wipe-and-redownload.
+        if (!Database.IsSqlite())
+            return TcgCsvSchemaVersion;
+
         var conn = Database.GetDbConnection();
         conn.Open();
         using var cmd = conn.CreateCommand();
@@ -28,6 +33,9 @@ public abstract class TcgCsvDbContext : DbContext
 
     public void MarkMigrationComplete()
     {
+        if (!Database.IsSqlite())
+            return;
+
         var conn = Database.GetDbConnection();
         conn.Open();
         using var cmd = conn.CreateCommand();
@@ -37,6 +45,10 @@ public abstract class TcgCsvDbContext : DbContext
 
     public void ApplySchemaUpgrades()
     {
+        // SQL Server schema comes from EF migrations; the additive ALTER TABLEs below are SQLite-only.
+        if (!Database.IsSqlite())
+            return;
+
         var conn = Database.GetDbConnection();
         conn.Open();
         // Additive columns for forward-compatibility (idempotent; safe on read-only DBs).

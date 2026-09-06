@@ -39,6 +39,7 @@ public static class CollectionQueryBuilder
                 Game = p.Game,
                 GameCardId = p.GameCardId ?? "",
                 Name = p.Name,
+                Quantity = l.Quantity,
                 SetName = p.SetName ?? "",
                 SetCode = p.SetCode ?? "",
                 Number = p.CollectorNumber ?? "",

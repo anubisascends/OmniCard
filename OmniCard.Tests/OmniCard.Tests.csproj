@@ -26,10 +26,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\OmniCard\OmniCard.csproj" />
     <ProjectReference Include="..\OmniCard.Shared\OmniCard.Shared.csproj" />
     <ProjectReference Include="..\OmniCard.Audit\OmniCard.Audit.csproj" />
-    <ProjectReference Include="..\OmniCard.Controls\OmniCard.Controls.csproj" />
+    <ProjectReference Include="..\OmniCard.Collection\OmniCard.Collection.csproj" />
+    <ProjectReference Include="..\OmniCard.CardMatching\OmniCard.CardMatching.csproj" />
+    <ProjectReference Include="..\OmniCard.Data\OmniCard.Data.csproj" />
+    <ProjectReference Include="..\OmniCard.Imaging\OmniCard.Imaging.csproj" />
+    <ProjectReference Include="..\OmniCard.eBay\OmniCard.eBay.csproj" />
     <ProjectReference Include="..\OmniCard.Web\OmniCard.Web.csproj" />
   </ItemGroup>
 

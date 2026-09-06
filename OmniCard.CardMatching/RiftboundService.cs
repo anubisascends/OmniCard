@@ -62,20 +62,25 @@ public sealed class RiftboundService : ICardGameService, IDisposable
         _logger.LogInformation("Initializing Riftbound service");
         _readContext = _dbContextFactory.CreateDbContext();
         var dbPath = _readContext.Database.GetConnectionString();
-        if (dbPath is not null)
+        // SQLite (desktop) bootstraps the file + schema here. On SQL Server (web) the DB/schema are
+        // owned by EnsureCreated at web startup, and the connection string is not a file path.
+        if (_readContext.Database.IsSqlite())
         {
-            var dataSource = dbPath.Replace("Data Source=", "");
-            var dir = Path.GetDirectoryName(dataSource.Replace(";Mode=ReadOnly", ""));
-            if (dir is not null && dir.Length > 0)
-                Directory.CreateDirectory(dir);
-        }
-        _readContext.Database.EnsureCreated();
-        _readContext.ApplySchemaUpgrades();
+            if (dbPath is not null)
+            {
+                var dataSource = dbPath.Replace("Data Source=", "");
+                var dir = Path.GetDirectoryName(dataSource.Replace(";Mode=ReadOnly", ""));
+                if (dir is not null && dir.Length > 0)
+                    Directory.CreateDirectory(dir);
+            }
+            _readContext.Database.EnsureCreated();
+            _readContext.ApplySchemaUpgrades();
 
-        if (_readContext.GetSchemaVersion() < RiftboundDbContext.RiftboundSchemaVersion)
-        {
-            _logger.LogWarning("Riftbound database predates current schema; wiping for migration");
-            WipeForMigration();
+            if (_readContext.GetSchemaVersion() < RiftboundDbContext.RiftboundSchemaVersion)
+            {
+                _logger.LogWarning("Riftbound database predates current schema; wiping for migration");
+                WipeForMigration();
+            }
         }
 
         _logger.LogInformation("Riftbound database ready at {DbPath}", dbPath);

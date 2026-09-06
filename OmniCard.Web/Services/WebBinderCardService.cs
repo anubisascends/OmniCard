@@ -118,6 +118,65 @@ public sealed class WebBinderCardService
         context.SaveChanges();
     }
 
+    /// <summary>Imports parsed collection cards as new lots (find-or-create product per card).
+    /// Ports <c>CardService.ImportCollectionCards</c> for the web write path. <paramref name="skipDuplicates"/>
+    /// skips a card when a lot with the same product identity + condition already exists.</summary>
+    public int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates)
+    {
+        using var context = _dbFactory.CreateDbContext();
+        var productCache = new Dictionary<(CardGame Game, string GameCardId, bool Foil, string? FoilType), Product>();
+        var imported = 0;
+
+        foreach (var card in cards)
+        {
+            var cardFoilType = card.IsFoil ? card.FoilType : null;
+            if (skipDuplicates)
+            {
+                var exists = context.Lots.Any(l => l.Product.Game == card.Game
+                    && l.Product.GameCardId == card.GameCardId
+                    && l.Product.Foil == card.IsFoil
+                    && l.Product.FoilType == cardFoilType
+                    && l.Condition == card.Condition);
+                if (exists)
+                    continue;
+            }
+
+            var product = FindOrCreateProduct(context, productCache, card.Game, card.GameCardId, card.IsFoil,
+                cardFoilType, card.Name, card.SetCode, card.SetName, card.Number, card.Rarity, card.ImageUri,
+                card.Color, card.CardType);
+
+            context.Lots.Add(new InventoryLot
+            {
+                Product = product,
+                Condition = card.Condition,
+                Quantity = Math.Max(1, card.Quantity),
+                UnitCost = card.PurchasePrice,
+                AcquisitionDate = card.DateAdded,
+                LocationId = card.ContainerId,
+                Page = card.Page,
+                Slot = card.Slot,
+                Section = card.Section,
+            });
+            imported++;
+        }
+
+        context.SaveChanges();
+        return imported;
+    }
+
+    /// <summary>Sets the owned copy count on a lot. Kept separate from
+    /// <see cref="UpdateCollectionCard"/> (which mirrors the binder editor's identity/attribute copy
+    /// and does not touch quantity, since binder pockets hold single copies).</summary>
+    public void SetQuantity(int lotId, int quantity)
+    {
+        using var context = _dbFactory.CreateDbContext();
+        var lot = context.Lots.FirstOrDefault(l => l.Id == lotId && l.Product.Category == ProductCategory.Single);
+        if (lot is null)
+            return;
+        lot.Quantity = Math.Max(1, quantity);
+        context.SaveChanges();
+    }
+
     public void DeleteCollectionCard(int id)
     {
         using var context = _dbFactory.CreateDbContext();

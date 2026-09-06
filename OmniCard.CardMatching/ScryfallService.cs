@@ -44,18 +44,20 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IDispo
         _logger.LogInformation("Initializing Scryfall service");
         _readContext = _dbContextFactory.CreateDbContext();
         var dbPath = _readContext.Database.GetConnectionString();
-        if (dbPath is not null)
+        // SQLite (desktop): create the file's directory, EnsureCreated, and run the hand-rolled
+        // ALTER-TABLE migrations. On SQL Server (web) the schema is owned by EF migrations applied at
+        // startup, so none of the file-path/SQLite bootstrapping applies.
+        if (_readContext.Database.IsSqlite())
         {
-            var dataSource = dbPath.Replace("Data Source=", "");
-            var dir = Path.GetDirectoryName(dataSource);
-            if (dir is not null && dir.Length > 0)
-                Directory.CreateDirectory(dir);
-        }
-        _readContext.Database.EnsureCreated();
-        if (dbPath is not null)
-        {
-            var dataSourcePath = dbPath.Replace("Data Source=", "");
-            ScryfallDbContext.RunScryfallMigrations(dataSourcePath);
+            if (dbPath is not null)
+            {
+                var dataSource = dbPath.Replace("Data Source=", "");
+                var dir = Path.GetDirectoryName(dataSource);
+                if (dir is not null && dir.Length > 0)
+                    Directory.CreateDirectory(dir);
+                _readContext.Database.EnsureCreated();
+                ScryfallDbContext.RunScryfallMigrations(dataSource);
+            }
         }
         _logger.LogInformation("Scryfall database ready at {DbPath}", dbPath);
     }
