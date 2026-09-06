@@ -5,13 +5,9 @@
   <Project Path="OmniCard.CardMatching/OmniCard.CardMatching.csproj" />
   <Project Path="OmniCard.Collection/OmniCard.Collection.csproj" />
   <Project Path="OmniCard.eBay/OmniCard.eBay.csproj" />
-  <Project Path="OmniCard.Scanner/OmniCard.Scanner.csproj" />
   <Project Path="OmniCard.Audit/OmniCard.Audit.csproj" />
-  <Project Path="OmniCard.Controls/OmniCard.Controls.csproj" />
-  <Project Path="OmniCard/OmniCard.csproj" />
   <Project Path="OmniCard.Tests/OmniCard.Tests.csproj" />
   <Project Path="OmniCard.Api.Contracts/OmniCard.Api.Contracts.csproj" />
   <Project Path="OmniCard.DbMigrator/OmniCard.DbMigrator.csproj" />
   <Project Path="OmniCard.Web/OmniCard.Web.csproj" />
-  <Project Path="OmniCard.ScannerHost/OmniCard.ScannerHost.csproj" />
 </Solution>

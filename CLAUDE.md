@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-OmniCard is a Windows desktop app (WPF, .NET 10) for scanning and managing trading card collections. It identifies physical cards scanned via TWAIN scanner or phone camera using perceptual image hashing + OCR, then tracks them across storage locations, sealed-product inventory, and sales/fulfillment (including eBay listing). A read-only ASP.NET Core web companion lets you browse the collection and scan with a phone from any device on the network.
+OmniCard is a web app (ASP.NET Core backend + React/TypeScript SPA, .NET 10) for scanning and managing trading card collections. It identifies physical cards from uploaded images / phone-camera photos using perceptual image hashing + OCR, then tracks them across storage locations, sealed-product inventory, and sales/fulfillment (including eBay listing). It is LAN-accessible and IIS-hostable; matching runs server-side (no scanner drivers, no desktop agent).
+
+> The original WPF desktop app and the TWAIN scanner projects were **retired** once the web app reached parity (see `docs/superpowers/plans/` for the migration history). Everything now runs through `OmniCard.Web`.
 
 Supported games: Magic: The Gathering (Scryfall), One Piece TCG, Riftbound, Pokémon, Yu-Gi-Oh!, Final Fantasy TCG (the last three via TCGCSV).
 
@@ -14,71 +16,74 @@ Supported games: Magic: The Gathering (Scryfall), One Piece TCG, Riftbound, Pok�
 # Build everything
 dotnet build OmniCard.slnx
 
-# Run the desktop app
-dotnet run --project OmniCard/OmniCard.csproj
-
-# Run the web companion (point --db at the desktop app's data dir; opens DBs read-only)
+# Run the web app (backend on :5000; point --db at the data directory)
 dotnet run --project OmniCard.Web/OmniCard.Web.csproj -- --db "%LOCALAPPDATA%\OmniCard"
+
+# Run the SPA dev server (Vite, HMR, proxies /api → :5000) — separate terminal
+cd OmniCard.Web/ClientApp && npm install && npm run dev   # http://localhost:5173
+
+# Build the SPA into wwwroot/app (required before publish / prod-ish serving at :5000/app)
+cd OmniCard.Web/ClientApp && npm run build
+
+# One-time data copy: desktop SQLite (inventory.db + per-game catalogs) → SQL Server
+dotnet run --project OmniCard.DbMigrator -- "X:\TCG Card Scanner"
 
 # Run all tests
 dotnet test OmniCard.Tests/OmniCard.Tests.csproj
 
 # Run a single test / fixture (standard dotnet test filter syntax)
 dotnet test OmniCard.Tests/OmniCard.Tests.csproj --filter "FullyQualifiedName~InventoryServiceTests"
-dotnet test OmniCard.Tests/OmniCard.Tests.csproj --filter "FullyQualifiedName~InventoryServiceTests.CreateProduct_RoundTrips"
 
-# Publish a release build (win-x64, framework-dependent)
-dotnet publish OmniCard/OmniCard.csproj -c Release -r win-x64
+# Publish for IIS (framework-dependent; build the SPA first so wwwroot/app is populated)
+dotnet publish OmniCard.Web/OmniCard.Web.csproj -c Release -r win-x64 --self-contained false
 ```
 
-CI (`.github/workflows/ci.yml`) runs `dotnet build` + `dotnet test` with coverage on `windows-latest` for every push to `master` and every PR — there is no Linux/macOS target, and platform-specific (WPF/TWAIN) code is expected. Releases (`.github/workflows/release.yml`) publish a zipped win-x64 build and attach it to the GitHub Release when a release is published.
+See **`OmniCard.Web/README.md`** for the full deployment/operations guide (SQL Server setup, data migration, config keys, eBay, artwork).
 
-Requires the .NET 10 SDK and Windows 10 22H2+ (target framework `net10.0-windows10.0.22621.0`). On first launch the app creates `%LOCALAPPDATA%\OmniCard` and writes a default `appsettings.json` there — see `App.xaml.cs` `InitSettingsDirectory()`.
+CI (`.github/workflows/ci.yml`) runs `dotnet build` + `dotnet test` with coverage on `windows-latest` for every push to `master` and every PR — Windows-only (the imaging/OCR stack uses `System.Drawing`). Releases (`.github/workflows/release.yml`) build the SPA, publish a framework-dependent win-x64 web build, and attach the IIS zip to the GitHub Release.
+
+Requires the .NET 10 SDK, Node 18+ (SPA), SQL Server 2019+ (unified store + catalogs), and Windows (target framework `net10.0-windows10.0.22621.0`; the imaging code is Windows-only). Gotcha: `dotnet run` spawns `OmniCard.Web.exe` that lingers and locks DLLs — `taskkill //F //IM OmniCard.Web.exe` before rebuilding.
 
 ## Solution layout
 
-Projects are wired together as dependencies flow downward; `OmniCard.Shared` is the common core everything else references for interfaces/models.
+Dependencies flow downward; `OmniCard.Shared` is the common core everything references for interfaces/models.
 
 ```
 OmniCard.Shared/       Interfaces (I*Service) and models shared across every project — no implementation logic
-OmniCard.Data/         EF Core DbContexts (SQLite) — one per game DB, plus the unified OmniCardDbContext
+OmniCard.Data/         EF Core DbContexts — per-game catalog contexts + the unified OmniCardDbContext (multi-provider: SQLite + SQL Server)
 OmniCard.Imaging/      Perceptual hashing (pHash, foil-aware edge hash), OCR, image caching
 OmniCard.CardMatching/ Per-game ICardGameService implementations (Scryfall, OPTCG, Riftbound, TCGCSV-backed games)
 OmniCard.Collection/   Business logic: collection queries, CSV import/export, decklists, inventory, sales/fulfillment
 OmniCard.eBay/         eBay OAuth, catalog lookup, listing create/sync, seller setup
-OmniCard.Scanner/      TWAIN scanner coordination (talks to OmniCard.ScannerHost over IPC)
-OmniCard.ScannerHost/  Out-of-process TWAIN bridge — kept separate because TWAIN drivers are often 32-bit/unstable
 OmniCard.Audit/        Location auditing + PDF export (QuestPDF)
-OmniCard.Controls/     Reusable WPF controls, converters, themes (MaterialDesignThemes)
-OmniCard/              WPF desktop app: Views/ViewModels (MVVM), DI composition root (App.xaml.cs)
-OmniCard.Web/          ASP.NET Core Razor Pages + SignalR web companion (reads the same SQLite DBs read-only)
+OmniCard.Api.Contracts/ Pure DTO records — the SPA's request/response contract (never serialize EF/domain types)
+OmniCard.Web/          ASP.NET Core API + React/TS SPA (ClientApp/, built to wwwroot/app). The app.
+OmniCard.DbMigrator/   Console tool: one-time SQLite → SQL Server copy (unified store + per-game catalogs)
 OmniCard.Tests/        xUnit tests for everything above
 ```
 
 ## Architecture
 
 ### DI composition root
-`OmniCard/App.xaml.cs` builds a single `IHost` with every service registered as `Singleton` (services, caches, one `IDbContextFactory<T>` per game DB) or `Transient` (dialog Views/ViewModels created per-open). `RootView` is registered as an `IHostedService` and drives the WPF window lifecycle. Startup (`OnStartup`) runs DB migrations and cache warmup on a background thread behind a splash screen before showing the main window — read this method before touching startup/migration behavior.
+`OmniCard.Web/Program.cs` builds the app: services registered `Singleton` (game services, caches, one `IDbContextFactory<T>` per DB) and the API controllers under `Api/`. On startup it `Migrate()`s the unified `OmniCardDbContext` (SQL Server) and `EnsureCreated()`s the per-game catalog DBs, then serves the SPA at `/app`. Read `Program.cs` before touching startup/DI/serving behavior.
+
+### Databases (all SQL Server)
+- **Unified store** — `OmniCardDbContext` (`OmniCard.Data/OmniCardDbContext.cs`): the game-agnostic store for `Product`/`InventoryLot`/`Listing`/`Order`/`Customer`/`StorageContainer`/`CardList`/`Trade` etc. On SQL Server it carries shadow `rowversion` concurrency tokens (see `ConcurrencyTrackedEntities`); EF **migrations** live in `OmniCard.Web/Migrations`. `ConcurrencyExceptionFilter` maps `DbUpdateConcurrencyException` → HTTP 409. **Gotcha:** the desktop services' detached `Update()` fails the rowversion check on SQL Server — web edits **load-then-patch** through the DB factory (see `WebBinderCardService`, and the load-patch update paths in `CustomersController`/`InventoryController`).
+- **Per-game catalogs** — one SQL Server DB per game (`OmniCard_Scryfall`, `OmniCard_Optcg`, …), via `SqlServerDb.CatalogConnectionString`. They're disposable reference caches (refresh wipes + reloads), so they use `EnsureCreated`, not migrations. `ulong` hashes map to `decimal(20,0)` (matching is done in memory, so no perf cost). The DbContexts are **multi-provider**: SQLite-specific schema code (`PRAGMA user_version`, `ALTER TABLE`, file-path bootstrap) is guarded by `Database.IsSqlite()` and no-ops on SQL Server.
+- **Config:** `ConnectionStrings:OmniCard` (base; per-game DBs swap the database name), `DataDirectory`/`--db` (holds `scans/`, `card-images/`, `symbols/`, `dataprotection-keys/`), `Auth:Passphrase` (site gate), `eBay` section.
 
 ### Per-game card matching (`ICardGameService`)
-Every supported card game implements `ICardGameService` (`OmniCard.Shared/Interfaces/ICardGameService.cs`) and is registered in DI as one of several `IEnumerable<ICardGameService>` — consumers resolve the game they need by `.Game` (a `CardGame` enum value) rather than by concrete type. `ScryfallService` and `OptcgService` are bespoke per-source implementations; Pokémon, Yu-Gi-Oh!, Final Fantasy TCG, and Riftbound all share one abstract base, `TcgCsvGameService<TContext>` (`OmniCard.CardMatching/TcgCsvGameService.cs`), which implements catalog download, price refresh, image hashing, and matching once against the TCGCSV API — subclasses only supply a category id, extended-data field mapping, and price sub-type mapping. When adding a new TCGCSV-backed game, subclass `TcgCsvGameService<T>`, not `ICardGameService` directly.
+Every game implements `ICardGameService` (`OmniCard.Shared/Interfaces/ICardGameService.cs`), registered as `IEnumerable<ICardGameService>` — resolve by `.Game` (a `CardGame` enum value), not concrete type. `ScryfallService` and `OptcgService` are bespoke; Pokémon, Yu-Gi-Oh!, Final Fantasy TCG, and Riftbound share the abstract base `TcgCsvGameService<TContext>` (subclass it, not `ICardGameService`, for a new TCGCSV game). Matching combines pHash distance, a foil edge hash (color shift breaks plain pHash — see `OmniCard.Imaging`), and OCR into a combined confidence; user corrections persist per-game (`RecordCorrection`) and boost future matches.
 
-Card matching combines perceptual image hash (pHash) distance, an edge hash for foils (color shift breaks plain pHash — see `OmniCard.Imaging`), and OCR (used for OPTCG collector numbers) into a combined confidence score; corrections a user makes are persisted per-game (`RecordCorrection`) and boost future matches for that hash.
+Server-side scanning lives in `OmniCard.Web/Services/WebScanMatchingService` (a WPF-free port of the old desktop `CardService.AddFromStream`), driven by `CardScanController` (`/api/scan/*`).
 
-### Unified inventory/sales model
-`OmniCardDbContext` (`OmniCard.Data/OmniCardDbContext.cs`) is the newer, game-agnostic store for `Product`/`InventoryLot`/`Listing`/`Order`/`Customer` etc., used by `IInventoryService`, `IListingService`, `IOrderService`, and the rest of the sales/fulfillment stack in `OmniCard.Collection`. It superseded per-game collection data; `UnifiedMigrationService` (`OmniCard.Data/UnifiedMigrationService.cs`) one-time-migrates legacy `collection.db` singles into it on first launch of a build that has it, guarded by a `MigrationState` DB marker so it only runs once and is safe to retry on failure. Don't assume `collection.db` is authoritative for new work — check whether the unified store already covers it.
-
-### Data storage
-Each game and subsystem gets its own SQLite file under `%LOCALAPPDATA%\OmniCard` (configurable): `scryfall.db`, `optcg.db`, `riftbound.db`, `pokemon.db`, `yugioh.db`, `fftcg.db`, `inventory.db` (the unified `OmniCardDbContext`), plus `scans/` and `logs/` (14-day rolling Serilog retention). `OmniCard.Web` opens the same files read-only via `--db <path>`.
-
-### MVVM conventions (WPF app)
-Views/ViewModels live paired under `OmniCard/Views/<Feature>/`. ViewModels use `CommunityToolkit.Mvvm` (`ObservableObject`, `[RelayCommand]`, `[ObservableProperty]`). Page-level ViewModels tied to the main window (Collection, Inventory, Dashboard, Sales, Settings, etc.) are DI singletons; dialog/editor ViewModels are transient and constructed per-open. Async work fired from a ViewModel without being awaited by the caller (fire-and-forget, `Task.Run`) needs an explicit completion signal for tests to await — see `async-vm-test-determinism` pattern used across the ViewModel test suite (tests otherwise flake against `Task.Yield`-based mocks).
+### Artwork
+`CardImageCacheService` caches card images on the server filesystem under `{dataDir}/card-images` (keyed by game + card id), served at `/card-images`; the collection prefers the local URL, falling back to the CDN. The catalog-refresh "images" op (`CatalogController` / Settings → Catalog data) bulk-downloads a game's art.
 
 ### Tests
-xUnit, one test class per service/feature, mirroring the `OmniCard.Tests/<Area>/` folder to the project under test. DB-backed tests typically spin up an in-memory SQLite connection (`Data Source=:memory:`, kept open for the test's lifetime) against the real `DbContext` and call `EnsureCreated()` — see `OmniCard.Tests/Services/InventoryServiceTests.cs` for the pattern. `OmniCard.Tests/Tools/SyncTestData` is a standalone console tool (not a test suite) for syncing test fixture data.
+xUnit, one test class per service/feature, mirroring `OmniCard.Tests/<Area>/` to the project under test. DB-backed tests spin up an in-memory SQLite connection (`Data Source=:memory:`, kept open for the fixture's lifetime) against the real `DbContext` and call `EnsureCreated()` — see `OmniCard.Tests/Services/InventoryServiceTests.cs` and the web-controller tests under `OmniCard.Tests/Web/`. Note the desktop path is still SQLite in tests; the SQL-Server-specific behavior (rowversion, per-game catalog DBs) is verified against a live SQL Server manually, not in the unit suite.
 
-## Keeping docs & licenses current
+## Keeping docs current
 
-Whenever you add or change a feature, or fix a bug that alters user-facing behavior, update the in-app documentation in the SAME change — do not leave it for later. The docs are a bundled HTML help site under `OmniCard/Resources/Docs/` (`index.html` + `styles.css` + `docs.js`), shown in the Help ▸ Documentation dialog (WebView2) and reachable via F1. Add or edit the relevant `<section data-group="...">` in `index.html`; the sidebar TOC and client-side search are generated automatically, so no wiring is needed. When a feature warrants a screenshot, add a placeholder — `<figure class="shot" data-img="my-shot.png"><span>Screenshot placeholder — images/my-shot.png</span></figure>` — and note the expected filename in `OmniCard/Resources/Docs/images/README.txt` (docs.js auto-swaps the placeholder for `images/my-shot.png` once the PNG exists).
-
-Whenever you add, remove, or upgrade a NuGet package (or bundle any other third-party asset), update BOTH attribution surfaces in the same change: the `Attributions` list in `OmniCard/Views/About/AboutViewModel.cs` (shown in Help ▸ About) and `THIRD-PARTY-NOTICES.txt` at the repo root. Include the package name, version, license type, and homepage. Flag any non-permissive or special terms (e.g. QuestPDF's dual Community/Professional license and its revenue threshold; WebView2's proprietary Microsoft SDK EULA). Bump `<Version>`/`<InformationalVersion>` in `Directory.Build.props` (repo root) when cutting a release — the About dialog reads it at runtime.
+- **User-facing web features:** there is no bundled in-app help site anymore (that was the retired desktop app). Keep **`OmniCard.Web/README.md`** (deployment/ops) accurate when you change setup, config, or add a major surface.
+- **NuGet / third-party assets:** when you add, remove, or upgrade a package, update `THIRD-PARTY-NOTICES.txt` at the repo root (name, version, license, homepage; flag special terms like QuestPDF's Community/Professional threshold). Bump `<Version>`/`<InformationalVersion>` in `Directory.Build.props` when cutting a release.
