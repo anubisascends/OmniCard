@@ -427,6 +427,23 @@ export function ScanPage() {
   const updateItem = (key: string, patch: Partial<ScanItem>) =>
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
 
+  // Remove staged scans AND free the blob URL backing each one's preview. Each scan's thumbnail is
+  // an `URL.createObjectURL(file)` that pins the image in the tab's memory until explicitly revoked;
+  // without this a long scanning session (removes + commits of hundreds of cards) slowly leaks that
+  // memory. Revoke is idempotent, so a dev-mode double-invoked updater is harmless.
+  const dropItems = (shouldDrop: (it: ScanItem) => boolean | undefined) =>
+    setItems((prev) => {
+      prev.forEach((it) => {
+        if (shouldDrop(it)) URL.revokeObjectURL(it.previewUrl);
+      });
+      return prev.filter((it) => !shouldDrop(it));
+    });
+
+  // Free every remaining preview URL when the page unmounts (navigating away mid-session).
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  useEffect(() => () => itemsRef.current.forEach((it) => URL.revokeObjectURL(it.previewUrl)), []);
+
   const gamesQuery = useQuery({ queryKey: ['games'], queryFn: api.games });
   const setsQuery = useQuery({ queryKey: ['sets', game], queryFn: () => api.sets(game), enabled: !!game });
   const locations = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations() });
@@ -449,7 +466,7 @@ export function ScanPage() {
     },
     onSuccess: (res) => {
       // Drop the cards that were just committed; keep everything else (unchecked or unconfirmed).
-      setItems((prev) => prev.filter((it) => !isCommittable(it)));
+      dropItems(isCommittable);
       qc.invalidateQueries({ queryKey: ['collection'] });
       qc.invalidateQueries({ queryKey: ['locations'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
@@ -686,7 +703,7 @@ export function ScanPage() {
               onCorrect={(r) =>
                 updateItem(selectedItem.key, { override: r, include: true, verified: true })
               }
-              onRemove={() => setItems((prev) => prev.filter((it) => it.key !== selectedItem.key))}
+              onRemove={() => dropItems((it) => it.key === selectedItem.key)}
             />
           ) : (
             <Paper
