@@ -1,15 +1,15 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  CardMedia,
   Checkbox,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogContent,
+  Divider,
   FormControlLabel,
   IconButton,
   MenuItem,
@@ -20,8 +20,10 @@ import {
 } from '@mui/material';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
-import EditIcon from '@mui/icons-material/Edit';
+import SearchIcon from '@mui/icons-material/Search';
+import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import { api } from '../api/client';
 import { useGame } from '../context/GameContext';
 import type { ScanMatchDto, ScanSearchResultDto } from '../api/types';
@@ -40,7 +42,10 @@ interface ScanItem {
   /** A manual correction chosen from the catalog search; overrides `match` when committing. */
   override?: ScanSearchResultDto;
   error?: string;
+  /** Whether this card is included in the commit. */
   include: boolean;
+  /** The user eyeballed the scan vs. art and confirmed the match (or corrected it). */
+  verified?: boolean;
 }
 
 let seq = 0;
@@ -128,75 +133,267 @@ function CorrectionSearch({
   );
 }
 
-function ScanItemCard({
+/** One labelled image pane (half-width) in the detail-panel compare row. */
+function ImagePane({
+  label,
+  src,
+  alt,
+  placeholder,
+}: {
+  label: string;
+  src?: string | null;
+  alt: string;
+  placeholder?: string;
+}) {
+  return (
+    <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0, alignItems: 'center' }}>
+      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+        {label}
+      </Typography>
+      <Box
+        sx={{
+          width: '100%',
+          height: { xs: 260, sm: 340, md: 420 },
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: 'action.hover',
+          borderRadius: 1,
+          overflow: 'hidden',
+        }}
+      >
+        {src ? (
+          <Box
+            component="img"
+            src={src}
+            alt={alt}
+            sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+          />
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            {placeholder ?? '—'}
+          </Typography>
+        )}
+      </Box>
+    </Stack>
+  );
+}
+
+/** A letterboxed thumbnail used in the master list. */
+function Thumb({ src, alt }: { src?: string | null; alt: string }) {
+  return (
+    <Box
+      sx={{
+        width: 84,
+        height: 116,
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        bgcolor: 'action.hover',
+        borderRadius: 1,
+        overflow: 'hidden',
+      }}
+    >
+      {src ? (
+        <Box
+          component="img"
+          src={src}
+          alt={alt}
+          sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+        />
+      ) : (
+        <Typography variant="caption" color="text.secondary">
+          —
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
+/** Master-list row: scan thumbnail beside matched-art thumbnail + identity + status. */
+function MasterRow({
+  item,
+  selected,
+  onSelect,
+  onToggle,
+}: {
+  item: ScanItem;
+  selected: boolean;
+  onSelect: () => void;
+  onToggle: (v: boolean) => void;
+}) {
+  const id = identityOf(item);
+  return (
+    <Box
+      onClick={onSelect}
+      sx={{
+        p: 1.5,
+        display: 'flex',
+        gap: 1.5,
+        alignItems: 'center',
+        cursor: 'pointer',
+        borderLeft: 4,
+        borderColor: selected ? 'primary.main' : 'transparent',
+        bgcolor: selected ? 'action.selected' : 'transparent',
+        '&:hover': { bgcolor: selected ? 'action.selected' : 'action.hover' },
+      }}
+    >
+      <Checkbox
+        checked={item.include}
+        disabled={!id}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => onToggle(e.target.checked)}
+        sx={{ p: 0 }}
+      />
+      <Stack direction="row" spacing={0.75}>
+        <Thumb src={item.previewUrl} alt="uploaded scan" />
+        <Thumb src={id?.imageUri ?? null} alt="matched art" />
+      </Stack>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Stack direction="row" spacing={0.5} alignItems="center">
+          {item.verified && <CheckCircleIcon color="success" sx={{ fontSize: 20 }} />}
+          <Typography variant="subtitle1" noWrap sx={{ fontWeight: 600 }}>
+            {id?.name ?? item.fileName}
+          </Typography>
+        </Stack>
+        <Typography variant="body2" color="text.secondary" noWrap display="block">
+          {id
+            ? `${id.setName} · ${id.setCode.toUpperCase()} #${id.collectorNumber}`
+            : (item.error ?? 'No match')}
+        </Typography>
+        <Box sx={{ mt: 0.75 }}>
+          <ConfidenceChip item={item} />
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+/** Detail panel for the selected scan: identity + verify/correct/remove + a zoom-to-read scan popup. */
+function DetailPanel({
   item,
   game,
-  onRemove,
   onToggle,
+  onVerify,
   onCorrect,
+  onRemove,
 }: {
   item: ScanItem;
   game: string;
-  onRemove: () => void;
   onToggle: (v: boolean) => void;
+  onVerify: () => void;
   onCorrect: (r: ScanSearchResultDto) => void;
+  onRemove: () => void;
 }) {
   const [correcting, setCorrecting] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
   const id = identityOf(item);
-  const art = id?.imageUri ?? item.previewUrl;
 
   return (
-    <Card variant="outlined" sx={{ display: 'flex', position: 'relative' }}>
-      <CardMedia
-        component="img"
-        image={art}
-        alt={id?.name ?? item.fileName}
-        sx={{ width: 88, objectFit: 'contain', bgcolor: 'action.hover' }}
-      />
-      <CardContent sx={{ flex: 1, py: 1.5 }}>
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-          <Checkbox
-            size="small"
-            checked={item.include}
-            disabled={!id}
-            onChange={(e) => onToggle(e.target.checked)}
-            sx={{ p: 0 }}
+    <Paper variant="outlined" sx={{ p: 3 }}>
+      <Stack spacing={2}>
+        {/* Side-by-side compare at the top: uploaded scan vs. matched art, each half width. */}
+        <Stack direction="row" spacing={2}>
+          <ImagePane label="Uploaded scan" src={item.previewUrl} alt={item.fileName} />
+          <ImagePane
+            label="Matched art"
+            src={id?.imageUri ?? null}
+            alt={id?.name ?? 'No match'}
+            placeholder={item.status === 'matching' ? 'Matching…' : 'No match'}
           />
-          <ConfidenceChip item={item} />
-          <Box sx={{ flexGrow: 1 }} />
-          <IconButton size="small" onClick={() => setCorrecting((v) => !v)} title="Correct match">
-            <EditIcon fontSize="small" />
-          </IconButton>
-          <IconButton size="small" onClick={onRemove} title="Remove">
-            <CloseIcon fontSize="small" />
-          </IconButton>
         </Stack>
+
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+          <ConfidenceChip item={item} />
+          {item.verified && <Chip size="small" color="success" label="Verified" />}
+          <Box sx={{ flexGrow: 1 }} />
+          <Button variant="outlined" startIcon={<ZoomInIcon />} onClick={() => setScanOpen(true)}>
+            View scan
+          </Button>
+        </Stack>
+
         {id ? (
-          <>
-            <Typography variant="subtitle2" noWrap>
-              {id.name}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" noWrap>
+          <Box>
+            <Typography variant="h5">{id.name}</Typography>
+            <Typography variant="subtitle1" color="text.secondary">
               {id.setName} · {id.setCode.toUpperCase()} #{id.collectorNumber}
               {id.rarity ? ` · ${id.rarity}` : ''}
             </Typography>
-          </>
+          </Box>
         ) : (
-          <Typography variant="body2" color="text.secondary" noWrap>
-            {item.error ?? item.fileName}
-          </Typography>
+          <Alert severity="warning">
+            No confident match. Use “Search catalog” to pick the correct card, or “View scan” to read
+            it.
+          </Alert>
         )}
-        {correcting && (
-          <CorrectionSearch
-            game={game}
-            onPick={(r) => {
-              onCorrect(r);
-              setCorrecting(false);
-            }}
+
+        {correcting ? (
+          <Box>
+            <CorrectionSearch
+              game={game}
+              onPick={(r) => {
+                onCorrect(r);
+                setCorrecting(false);
+              }}
+            />
+            <Button size="small" onClick={() => setCorrecting(false)} sx={{ mt: 1 }}>
+              Cancel
+            </Button>
+          </Box>
+        ) : (
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Button
+              variant={item.verified ? 'outlined' : 'contained'}
+              color="success"
+              startIcon={<CheckCircleIcon />}
+              disabled={!id}
+              onClick={onVerify}
+            >
+              {item.verified ? 'Looks correct' : 'Confirm match'}
+            </Button>
+            <Button variant="outlined" startIcon={<SearchIcon />} onClick={() => setCorrecting(true)}>
+              Search catalog
+            </Button>
+            {item.include ? (
+              <Button variant="text" onClick={() => onToggle(false)}>
+                Exclude from commit
+              </Button>
+            ) : (
+              <Button variant="text" disabled={!id} onClick={() => onToggle(true)}>
+                Include in commit
+              </Button>
+            )}
+            <Box sx={{ flexGrow: 1 }} />
+            <Button variant="text" color="error" startIcon={<CloseIcon />} onClick={onRemove}>
+              Remove
+            </Button>
+          </Stack>
+        )}
+
+        <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
+          {item.fileName}
+        </Typography>
+      </Stack>
+
+      {/* Zoom-to-read popup of the uploaded scan. */}
+      <Dialog open={scanOpen} onClose={() => setScanOpen(false)} maxWidth="lg">
+        <DialogContent sx={{ p: 1, position: 'relative', bgcolor: 'action.hover' }}>
+          <IconButton
+            onClick={() => setScanOpen(false)}
+            sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'background.paper', boxShadow: 1 }}
+          >
+            <CloseIcon />
+          </IconButton>
+          <Box
+            component="img"
+            src={item.previewUrl}
+            alt={item.fileName}
+            sx={{ display: 'block', maxWidth: '88vw', maxHeight: '85vh', objectFit: 'contain' }}
           />
-        )}
-      </CardContent>
-    </Card>
+        </DialogContent>
+      </Dialog>
+    </Paper>
   );
 }
 
@@ -204,35 +401,64 @@ export function ScanPage() {
   const qc = useQueryClient();
   const { game: contextGame } = useGame();
   const [game, setGame] = useState(contextGame ?? 'Mtg');
+  const [setCode, setSetCode] = useState('');
   const [isFoil, setIsFoil] = useState(false);
   const [condition, setCondition] = useState('NM');
   const [containerId, setContainerId] = useState<number | ''>('');
   const [items, setItems] = useState<ScanItem[]>([]);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
 
+  const selectedItem = items.find((it) => it.key === selectedKey) ?? null;
+
+  // Keep a valid selection: default to the first item, and re-point if the selected one is removed.
+  useEffect(() => {
+    if (items.length === 0) {
+      if (selectedKey !== null) setSelectedKey(null);
+    } else if (!items.some((it) => it.key === selectedKey)) {
+      setSelectedKey(items[0].key);
+    }
+  }, [items, selectedKey]);
+
+  const updateItem = (key: string, patch: Partial<ScanItem>) =>
+    setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
+
   const gamesQuery = useQuery({ queryKey: ['games'], queryFn: api.games });
+  const setsQuery = useQuery({ queryKey: ['sets', game], queryFn: () => api.sets(game), enabled: !!game });
   const locations = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations() });
+
+  // Reset the set filter whenever the game changes (a set only belongs to one game).
+  useEffect(() => {
+    setSetCode('');
+  }, [game]);
+
+  // A scan is committable only when it is BOTH confirmed (verified) AND checked (include).
+  const isCommittable = (it: ScanItem) => it.include && it.verified && !!identityOf(it);
 
   const commit = useMutation({
     mutationFn: () => {
-      const payload = items
-        .filter((it) => it.include && identityOf(it))
-        .map((it) => {
-          const id = identityOf(it)!;
-          return { ...id, game, condition, isFoil, quantity: 1, purchasePrice: null };
-        });
+      const payload = items.filter(isCommittable).map((it) => {
+        const id = identityOf(it)!;
+        return { ...id, game, condition, isFoil, quantity: 1, purchasePrice: null };
+      });
       return api.scanCommit(containerId as number, payload);
     },
     onSuccess: (res) => {
-      // Drop the cards that were just committed; keep any the user left unchecked.
-      setItems((prev) => prev.filter((it) => !(it.include && identityOf(it))));
+      // Drop the cards that were just committed; keep everything else (unchecked or unconfirmed).
+      setItems((prev) => prev.filter((it) => !isCommittable(it)));
       qc.invalidateQueries({ queryKey: ['collection'] });
       qc.invalidateQueries({ queryKey: ['locations'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       return res;
     },
   });
+
+  /** Confirm every checked-and-matched item at once (batch verify). */
+  const confirmChecked = () =>
+    setItems((prev) =>
+      prev.map((it) => (it.include && identityOf(it) ? { ...it, verified: true } : it)),
+    );
 
   async function handleFiles(files: FileList | null) {
     if (!files) return;
@@ -246,34 +472,34 @@ export function ScanPage() {
       include: false,
     }));
     setItems((prev) => [...staged, ...prev]);
+    // Auto-select the first newly-added card so the detail panel has something to show.
+    setSelectedKey((cur) => cur ?? staged[0]?.key ?? null);
 
-    // Match each concurrently; update rows as they resolve.
-    await Promise.all(
-      staged.map(async (staging) => {
+    // Match with BOUNDED concurrency. Firing an entire batch at once overwhelmed the server
+    // (each match is heavy CPU: hashing + OCR + rotation retries) and raced the game services'
+    // shared read context — the source of the batch "internal server error"s. A small worker
+    // pool keeps a few matches in flight without stampeding it.
+    const MAX_IN_FLIGHT = 4;
+    const queue = [...staged];
+    async function worker() {
+      for (;;) {
+        const staging = queue.shift();
+        if (!staging) return;
         try {
-          const match = await api.scanMatch(staging.file, game, isFoil);
-          setItems((prev) =>
-            prev.map((it) =>
-              it.key === staging.key
-                ? { ...it, status: 'done', match, include: match.matched }
-                : it,
-            ),
-          );
+          const match = await api.scanMatch(staging.file, game, isFoil, setCode || undefined);
+          updateItem(staging.key, { status: 'done', match, include: match.matched });
         } catch (e) {
-          setItems((prev) =>
-            prev.map((it) =>
-              it.key === staging.key
-                ? { ...it, status: 'error', error: (e as Error).message }
-                : it,
-            ),
-          );
+          updateItem(staging.key, { status: 'error', error: (e as Error).message });
         }
-      }),
-    );
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(MAX_IN_FLIGHT, staged.length) }, worker));
   }
 
-  const includableCount = useMemo(
-    () => items.filter((it) => it.include && identityOf(it)).length,
+  const committableCount = useMemo(() => items.filter(isCommittable).length, [items]);
+  // Checked + matched but not yet confirmed — the batch "Confirm checked" button targets these.
+  const confirmableCount = useMemo(
+    () => items.filter((it) => it.include && !it.verified && identityOf(it)).length,
     [items],
   );
   const stillMatching = items.some((it) => it.status === 'matching');
@@ -299,6 +525,21 @@ export function ScanPage() {
             {gamesQuery.data?.map((g) => (
               <MenuItem key={g.id} value={g.id}>
                 {g.displayName}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            size="small"
+            label="Set (art fallback)"
+            value={setCode}
+            onChange={(e) => setSetCode(e.target.value)}
+            sx={{ minWidth: 220 }}
+          >
+            <MenuItem value="">All sets</MenuItem>
+            {setsQuery.data?.map((s) => (
+              <MenuItem key={s.setCode} value={s.setCode}>
+                {s.setName}
               </MenuItem>
             ))}
           </TextField>
@@ -380,16 +621,28 @@ export function ScanPage() {
               ))}
             </TextField>
             <Button
+              variant="outlined"
+              color="success"
+              startIcon={<CheckCircleIcon />}
+              disabled={confirmableCount === 0}
+              onClick={confirmChecked}
+            >
+              Confirm {confirmableCount} checked
+            </Button>
+            <Button
               variant="contained"
               disabled={
-                includableCount === 0 || containerId === '' || commit.isPending || stillMatching
+                committableCount === 0 || containerId === '' || commit.isPending || stillMatching
               }
               onClick={() => commit.mutate()}
             >
               {commit.isPending
                 ? 'Adding…'
-                : `Add ${includableCount} card${includableCount === 1 ? '' : 's'}`}
+                : `Add ${committableCount} confirmed card${committableCount === 1 ? '' : 's'}`}
             </Button>
+            <Typography variant="caption" color="text.secondary">
+              Only confirmed &amp; checked scans are added.
+            </Typography>
             {commit.error && <Alert severity="error">{(commit.error as Error).message}</Alert>}
             {commit.data && (
               <Alert severity="success">Added {commit.data.imported} card(s) to your collection.</Alert>
@@ -398,32 +651,53 @@ export function ScanPage() {
         </Paper>
       )}
 
-      <Box
-        sx={{
-          display: 'grid',
-          gap: 2,
-          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: '1fr 1fr 1fr' },
-        }}
-      >
-        {items.map((item) => (
-          <ScanItemCard
-            key={item.key}
-            item={item}
-            game={game}
-            onRemove={() => setItems((prev) => prev.filter((it) => it.key !== item.key))}
-            onToggle={(v) =>
-              setItems((prev) => prev.map((it) => (it.key === item.key ? { ...it, include: v } : it)))
-            }
-            onCorrect={(r) =>
-              setItems((prev) =>
-                prev.map((it) =>
-                  it.key === item.key ? { ...it, override: r, include: true } : it,
-                ),
-              )
-            }
-          />
-        ))}
-      </Box>
+      {items.length > 0 && (
+        <Box
+          sx={{
+            display: 'grid',
+            gap: 2,
+            gridTemplateColumns: { xs: '1fr', md: '440px 1fr' },
+            alignItems: 'start',
+          }}
+        >
+          {/* Master: the list of scanned cards (scan thumb + matched-art thumb per row). */}
+          <Paper variant="outlined" sx={{ overflow: 'hidden', maxHeight: { md: '75vh' }, overflowY: { md: 'auto' } }}>
+            <Stack divider={<Divider />}>
+              {items.map((item) => (
+                <MasterRow
+                  key={item.key}
+                  item={item}
+                  selected={item.key === selectedKey}
+                  onSelect={() => setSelectedKey(item.key)}
+                  onToggle={(v) => updateItem(item.key, { include: v })}
+                />
+              ))}
+            </Stack>
+          </Paper>
+
+          {/* Detail: the selected card's full-size compare + verify/correct/remove. */}
+          {selectedItem ? (
+            <DetailPanel
+              key={selectedItem.key}
+              item={selectedItem}
+              game={game}
+              onToggle={(v) => updateItem(selectedItem.key, { include: v })}
+              onVerify={() => updateItem(selectedItem.key, { verified: true, include: true })}
+              onCorrect={(r) =>
+                updateItem(selectedItem.key, { override: r, include: true, verified: true })
+              }
+              onRemove={() => setItems((prev) => prev.filter((it) => it.key !== selectedItem.key))}
+            />
+          ) : (
+            <Paper
+              variant="outlined"
+              sx={{ p: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Typography color="text.secondary">Select a scanned card to review it.</Typography>
+            </Paper>
+          )}
+        </Box>
+      )}
     </Stack>
   );
 }
