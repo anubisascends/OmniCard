@@ -25,6 +25,14 @@ public sealed class WebScanMatchingService
     private readonly object _symbolLock = new();
     private bool _symbolsLoaded;
 
+    // The per-game ICardGameService instances are singletons that each share ONE read-only DbContext
+    // (their `_readContext`), which EF Core forbids using concurrently. The SPA uploads a whole scan
+    // batch at once, so without this gate concurrent requests race that shared context into
+    // "a second operation was started on this context instance" 500s. Serialize just the catalog
+    // match — it's fast (in-memory hash caches + a few small queries); the expensive OCR stays
+    // parallel, so batch throughput is barely affected.
+    private readonly SemaphoreSlim _matchGate = new(1, 1);
+
     public WebScanMatchingService(
         IPerceptualHashService hashService,
         IOcrMatchingService ocrService,
@@ -38,12 +46,19 @@ public sealed class WebScanMatchingService
     }
 
     /// <summary>Match a single uploaded card image against <paramref name="game"/>'s catalog.</summary>
-    public async Task<ScanMatchDto> MatchAsync(byte[] imageBytes, CardGame game, bool isFoil, CancellationToken ct = default)
+    /// <param name="setCode">Optional set to constrain matching to — the user tells us which set they're
+    /// scanning, which bounds the pHash/artwork fallback (and every other match path) to that set.</param>
+    public async Task<ScanMatchDto> MatchAsync(byte[] imageBytes, CardGame game, bool isFoil, string? setCode = null, CancellationToken ct = default)
     {
         if (!_gameServices.TryGetValue(game, out var gameService))
             return new ScanMatchDto { Matched = false, Game = game.ToString(), Error = $"Game {game} is not available" };
 
         EnsureSymbolHashes();
+
+        // User-chosen set filter (hard constraint on the candidate pool, all match paths).
+        IReadOnlySet<string>? setFilter = string.IsNullOrWhiteSpace(setCode)
+            ? null
+            : new HashSet<string>([setCode], StringComparer.OrdinalIgnoreCase);
 
         // 1. pHash from the full image.
         ulong hash = _hashService.ComputeHash(new MemoryStream(imageBytes));
@@ -69,15 +84,15 @@ public sealed class WebScanMatchingService
         }
 
         // 5. Initial pHash/art/edge match.
-        var match = gameService.FindClosestMatch(hash, artHashes, null, null, detectedSets, scanEdgeHash: edgeHash);
+        var match = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, null, setFilter, detectedSets, scanEdgeHash: edgeHash));
 
         // 6. OCR refinement — for MTG the printed (set, collector) is ground truth and overrides even
         //    a confident pHash guess; the other games use the collector number to pin the printing.
-        match = await RefineWithOcrAsync(imageBytes, game, gameService, hash, artHashes, edgeHash, detectedSets, match);
+        match = await RefineWithOcrAsync(imageBytes, game, gameService, hash, artHashes, edgeHash, detectedSets, setFilter, match);
 
         // 7. If still nothing, retry rotated 180° (cards are often fed upside down).
         if (match is null)
-            (match, hash) = await RetryRotatedAsync(imageBytes, game, gameService, isFoil, hash);
+            (match, hash) = await RetryRotatedAsync(imageBytes, game, gameService, isFoil, setFilter, hash);
 
         _logger.LogInformation(
             match is null ? "Scan produced no match for {Game} (pHash {Hash:X16})"
@@ -87,9 +102,18 @@ public sealed class WebScanMatchingService
         return ToDto(match, game, hash);
     }
 
+    /// <summary>Run one catalog match under the shared-context gate (see <see cref="_matchGate"/>).</summary>
+    private async Task<CardMatch?> FindMatchAsync(Func<CardMatch?> find)
+    {
+        await _matchGate.WaitAsync();
+        try { return find(); }
+        finally { _matchGate.Release(); }
+    }
+
     private async Task<CardMatch?> RefineWithOcrAsync(
         byte[] imageBytes, CardGame game, ICardGameService gameService, ulong hash,
-        ulong[]? artHashes, ulong? edgeHash, IReadOnlySet<string>? detectedSets, CardMatch? current)
+        ulong[]? artHashes, ulong? edgeHash, IReadOnlySet<string>? detectedSets,
+        IReadOnlySet<string>? setFilter, CardMatch? current)
     {
         try
         {
@@ -98,13 +122,10 @@ public sealed class WebScanMatchingService
                 case CardGame.OnePiece:
                 {
                     var (cn, conf) = await _ocrService.DetectOptcgCollectorNumberAsync(imageBytes);
-                    return ApplyCollectorOcr(gameService, hash, artHashes, edgeHash, cn, conf, current);
+                    return await ApplyCollectorOcrAsync(gameService, hash, artHashes, edgeHash, setFilter, cn, conf, current);
                 }
                 case CardGame.Riftbound:
-                {
-                    var (cn, conf) = await _ocrService.DetectRiftboundCollectorNumberAsync(imageBytes);
-                    return ApplyCollectorOcr(gameService, hash, artHashes, edgeHash, cn, conf, current);
-                }
+                    return await RefineRiftboundAsync(imageBytes, gameService, hash, edgeHash, setFilter, current);
                 case CardGame.Pokemon or CardGame.YuGiOh or CardGame.FinalFantasy:
                 {
                     var spec = game switch
@@ -114,7 +135,7 @@ public sealed class WebScanMatchingService
                         _ => FinalFantasyService.OcrSpec,
                     };
                     var (cn, conf) = await _ocrService.DetectCollectorNumberAsync(imageBytes, spec);
-                    return ApplyCollectorOcr(gameService, hash, artHashes, edgeHash, cn, conf, current);
+                    return await ApplyCollectorOcrAsync(gameService, hash, artHashes, edgeHash, setFilter, cn, conf, current);
                 }
                 default: // MTG
                 {
@@ -123,7 +144,7 @@ public sealed class WebScanMatchingService
                     if (ocrSet is not null && ocrNumber is not null && conf >= 0.5)
                     {
                         var gt = new OcrMatchResult { SetCode = ocrSet, CollectorNumber = ocrNumber, CollectorNumberConfidence = conf };
-                        var gtMatch = gameService.FindClosestMatch(hash, artHashes, gt, null, detectedSets, scanEdgeHash: edgeHash);
+                        var gtMatch = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, gt, setFilter, detectedSets, scanEdgeHash: edgeHash));
                         if (gtMatch is not null)
                             return gtMatch;
                     }
@@ -139,7 +160,7 @@ public sealed class WebScanMatchingService
                             foreach (var code in ocr.CandidateSetCodes)
                                 preferred.Add(code);
                         }
-                        var ocrMatch = gameService.FindClosestMatch(hash, artHashes, ocr, null, preferred, scanEdgeHash: edgeHash);
+                        var ocrMatch = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, ocr, setFilter, preferred, scanEdgeHash: edgeHash));
                         if (ocrMatch is not null && (current is null || ocrMatch.GameSpecificId != current.GameSpecificId))
                             return ocrMatch;
                     }
@@ -154,30 +175,113 @@ public sealed class WebScanMatchingService
         }
     }
 
-    private static CardMatch? ApplyCollectorOcr(
+    private async Task<CardMatch?> ApplyCollectorOcrAsync(
         ICardGameService gameService, ulong hash, ulong[]? artHashes, ulong? edgeHash,
-        string? collectorNumber, double conf, CardMatch? current)
+        IReadOnlySet<string>? setFilter, string? collectorNumber, double conf, CardMatch? current)
     {
         if (collectorNumber is null || conf < 0.5)
             return current;
         var ocr = new OcrMatchResult { CollectorNumber = collectorNumber, CollectorNumberConfidence = conf };
-        var ocrMatch = gameService.FindClosestMatch(hash, artHashes, ocr, null, null, scanEdgeHash: edgeHash);
+        var ocrMatch = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, ocr, setFilter, null, scanEdgeHash: edgeHash));
         return ocrMatch is not null && (current is null || ocrMatch.GameSpecificId != current.GameSpecificId)
             ? ocrMatch
             : current;
     }
 
+    // Riftbound orientations to try, in order. The printed collector line ("{SET} • {n}/{total}",
+    // lower-left) uniquely identifies the printing and is the source of truth, so we lead with it.
+    // Portrait cards (Units/Spells/Legends) read at 0°; landscape Battlefield cards are fed sideways,
+    // so we then try both 90° rotations (the collector line only lands in the lower-left crop region
+    // under the correct one) and finally 180° for upside-down feeds.
+    private static readonly (System.Drawing.RotateFlipType Rot, string Label)[] RiftboundOrientations =
+    [
+        (System.Drawing.RotateFlipType.RotateNoneFlipNone, "0"),
+        (System.Drawing.RotateFlipType.Rotate90FlipNone, "90cw"),
+        (System.Drawing.RotateFlipType.Rotate270FlipNone, "90ccw"),
+        (System.Drawing.RotateFlipType.Rotate180FlipNone, "180"),
+    ];
+
+    /// <summary>
+    /// Resolve a Riftbound scan OCR-first: read the printed set code + collector number across
+    /// orientations and match the exact printing. This is what recognizes and auto-rotates landscape
+    /// Battlefield cards (fed sideways) without any UI — the orientation under which the collector line
+    /// reads is the card's true rotation. Falls back to <paramref name="current"/> (the pHash guess)
+    /// only when the line can't be read in any orientation.
+    /// </summary>
+    private async Task<CardMatch?> RefineRiftboundAsync(
+        byte[] imageBytes, ICardGameService gameService, ulong hash, ulong? edgeHash,
+        IReadOnlySet<string>? setFilter, CardMatch? current)
+    {
+        // Best landscape-artwork match found across rotated orientations, used as the Battlefield
+        // fallback when OCR can't read the (small, often holofoil) collector line at any rotation.
+        CardMatch? bestLandscapeArt = null;
+
+        foreach (var (rot, label) in RiftboundOrientations)
+        {
+            var atZero = rot == System.Drawing.RotateFlipType.RotateNoneFlipNone;
+            var bytes = atZero ? imageBytes : RotateImage(imageBytes, rot);
+            var rotHash = atZero ? hash : _hashService.ComputeHash(new MemoryStream(bytes));
+
+            // OCR is the source of truth: feed the printed collector number to Phase 0 (exact
+            // set+number lookup, confidence 100). A confident read wins outright, in any orientation.
+            var (cn, conf) = await _ocrService.DetectRiftboundCollectorNumberAsync(bytes);
+            if (cn is not null && conf >= 0.5)
+            {
+                var ocr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
+                var match = await FindMatchAsync(() => gameService.FindClosestMatch(rotHash, null, ocr, setFilter, null, scanEdgeHash: atZero ? edgeHash : null));
+                if (match is not null)
+                {
+                    if (!atZero)
+                        _logger.LogInformation(
+                            "Riftbound scan matched after {Rot} rotation (\"{Name}\" {Set} #{Num}) — landscape Battlefield card fed sideways",
+                            label, match.Name, match.SetCode, match.CollectorNumber);
+                    return match;
+                }
+            }
+
+            // Battlefield artwork fallback: if the collector line is unreadable, still try to match the
+            // landscape ART once rotated upright. Only rotated orientations (0° is the step-5 `current`),
+            // and only ACCEPT a landscape/Battlefield card — a portrait card must never be matched from a
+            // rotated scan. pHash distance is minimized at the card's true orientation, so keeping the
+            // highest-confidence landscape hit picks the correct rotation (incl. a 180°-flipped feed).
+            if (!atZero)
+            {
+                var art = await FindMatchAsync(() => gameService.FindClosestMatch(rotHash, null, null, setFilter, null, scanEdgeHash: null));
+                if (art is not null
+                    && (art.Source as RiftboundCard)?.Orientation == "landscape"
+                    && (bestLandscapeArt is null || (art.Confidence ?? 0) > (bestLandscapeArt.Confidence ?? 0)))
+                    bestLandscapeArt = art;
+            }
+        }
+
+        // Trust a strong existing portrait match; otherwise fall back to the best rotated Battlefield art.
+        if (bestLandscapeArt is not null && (current is null || (current.Confidence ?? 0) < 50))
+        {
+            _logger.LogInformation(
+                "Riftbound scan matched by rotated Battlefield artwork (\"{Name}\" {Set} #{Num}, conf {Conf:F0}) — collector line unreadable",
+                bestLandscapeArt.Name, bestLandscapeArt.SetCode, bestLandscapeArt.CollectorNumber, bestLandscapeArt.Confidence ?? 0);
+            return bestLandscapeArt;
+        }
+        return current;
+    }
+
+    // Rotate/flip an encoded image and re-encode as PNG. Used to try alternate scan orientations.
+    private static byte[] RotateImage(byte[] imageBytes, System.Drawing.RotateFlipType rot)
+    {
+        using var bmp = new System.Drawing.Bitmap(new MemoryStream(imageBytes));
+        bmp.RotateFlip(rot);
+        using var ms = new MemoryStream();
+        bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+        return ms.ToArray();
+    }
+
     private async Task<(CardMatch? Match, ulong Hash)> RetryRotatedAsync(
-        byte[] imageBytes, CardGame game, ICardGameService gameService, bool isFoil, ulong originalHash)
+        byte[] imageBytes, CardGame game, ICardGameService gameService, bool isFoil,
+        IReadOnlySet<string>? setFilter, ulong originalHash)
     {
         try
         {
-            using var bmp = new System.Drawing.Bitmap(new MemoryStream(imageBytes));
-            bmp.RotateFlip(System.Drawing.RotateFlipType.Rotate180FlipNone);
-            using var rotated = new MemoryStream();
-            bmp.Save(rotated, System.Drawing.Imaging.ImageFormat.Png);
-            var rotatedBytes = rotated.ToArray();
-
+            var rotatedBytes = RotateImage(imageBytes, System.Drawing.RotateFlipType.Rotate180FlipNone);
             ulong rotatedHash = _hashService.ComputeHash(new MemoryStream(rotatedBytes));
 
             OcrMatchResult? ocr = null;
@@ -213,7 +317,7 @@ public sealed class WebScanMatchingService
                 ? _hashService.ComputeEdgeHash(new MemoryStream(rotatedBytes))
                 : null;
 
-            var match = gameService.FindClosestMatch(rotatedHash, null, ocr, null, null, scanEdgeHash: rotatedEdge);
+            var match = await FindMatchAsync(() => gameService.FindClosestMatch(rotatedHash, null, ocr, setFilter, null, scanEdgeHash: rotatedEdge));
             return match is not null ? (match, rotatedHash) : (null, originalHash);
         }
         catch (Exception ex)

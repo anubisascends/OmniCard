@@ -30,7 +30,7 @@ public sealed class CardScanController(
     [HttpPost("match")]
     [RequestSizeLimit(MaxFileSize)]
     public async Task<ActionResult<ScanMatchDto>> Match(
-        IFormFile image, [FromForm] string game, [FromForm] bool isFoil, CancellationToken ct)
+        IFormFile image, [FromForm] string game, [FromForm] bool isFoil, [FromForm] string? set, CancellationToken ct)
     {
         if (image is null || image.Length == 0)
             return BadRequest(new { error = "No image provided" });
@@ -44,7 +44,7 @@ public sealed class CardScanController(
         using var ms = new MemoryStream();
         await image.CopyToAsync(ms, ct);
 
-        var result = await matcher.MatchAsync(ms.ToArray(), parsedGame, isFoil, ct);
+        var result = await matcher.MatchAsync(ms.ToArray(), parsedGame, isFoil, string.IsNullOrWhiteSpace(set) ? null : set, ct);
         return Ok(result);
     }
 

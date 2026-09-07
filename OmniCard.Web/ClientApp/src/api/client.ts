@@ -405,11 +405,12 @@ export const api = {
   ebaySetup: () => request<EbaySetupResultDto>('/api/ebay/setup', { method: 'POST' }),
 
   // Scan (server-side image matching)
-  scanMatch: async (image: File, game: string, isFoil: boolean) => {
+  scanMatch: async (image: File, game: string, isFoil: boolean, set?: string) => {
     const form = new FormData();
     form.append('image', image);
     form.append('game', game);
     form.append('isFoil', String(isFoil));
+    if (set) form.append('set', set);
     const res = await fetch('/api/scan/match', {
       method: 'POST',
       body: form,

@@ -62,7 +62,7 @@ public class CardScanControllerTests : IDisposable
     [Fact]
     public async Task Match_NoImage_Returns400()
     {
-        var result = await CreateController().Match(null!, "Mtg", false, CancellationToken.None);
+        var result = await CreateController().Match(null!, "Mtg", false, null, CancellationToken.None);
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
@@ -70,7 +70,7 @@ public class CardScanControllerTests : IDisposable
     public async Task Match_WrongContentType_Returns400()
     {
         var file = CreateFormFile(contentType: "text/plain", fileName: "x.txt");
-        var result = await CreateController().Match(file, "Mtg", false, CancellationToken.None);
+        var result = await CreateController().Match(file, "Mtg", false, null, CancellationToken.None);
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
@@ -78,7 +78,7 @@ public class CardScanControllerTests : IDisposable
     public async Task Match_Oversized_Returns400()
     {
         var file = CreateFormFile(content: [0xFF], overrideLength: 11 * 1024 * 1024);
-        var result = await CreateController().Match(file, "Mtg", false, CancellationToken.None);
+        var result = await CreateController().Match(file, "Mtg", false, null, CancellationToken.None);
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
@@ -86,7 +86,7 @@ public class CardScanControllerTests : IDisposable
     public async Task Match_UnknownGame_Returns400()
     {
         var file = CreateFormFile(new byte[1024]);
-        var result = await CreateController().Match(file, "Nonsense", false, CancellationToken.None);
+        var result = await CreateController().Match(file, "Nonsense", false, null, CancellationToken.None);
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 

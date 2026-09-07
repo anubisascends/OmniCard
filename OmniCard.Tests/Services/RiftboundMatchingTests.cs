@@ -104,6 +104,32 @@ public class RiftboundMatchingTests : IDisposable
     }
 
     [Fact]
+    public void Ocr_ResolvesLandscapeBattlefield_ByPrintedCollectorNumber()
+    {
+        // A landscape Battlefield printing (fed sideways at scan time, auto-rotated upstream so its
+        // collector line reads). Once the "UNL • 208/219" line is OCR'd, Phase 0 resolves the exact
+        // printing regardless of the (rotated) pHash — the printed set+number is ground truth.
+        using (var ctx = _factory.CreateDbContext())
+        {
+            ctx.Cards.Add(new RiftboundCard
+            {
+                Id = "battlefield", CollectorNumber = 208, SetId = "UNL", SetName = "Unlocked",
+                Name = "Black Flame Altar", Rarity = "Rare", CardType = "Battlefield",
+                Orientation = "landscape", ImageHash = 0x0UL, CardImageUri = "u",
+            });
+            ctx.SaveChanges();
+        }
+
+        var ocr = new OcrMatchResult { CollectorNumber = "UNL-208", CollectorNumberConfidence = 0.9 };
+        var match = _svc.FindClosestMatch(0xABCDUL, ocrResult: ocr);
+
+        Assert.NotNull(match);
+        Assert.Equal("battlefield", match!.GameSpecificId);
+        Assert.Equal("Black Flame Altar", match.Name);
+        Assert.Equal(100, match.Confidence);
+    }
+
+    [Fact]
     public void Ocr_SingleCandidate_ReturnsExactMatch()
     {
         var ocr = new OcrMatchResult { CollectorNumber = "OGN-5", CollectorNumberConfidence = 0.95 };
