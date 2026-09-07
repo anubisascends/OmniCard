@@ -101,10 +101,7 @@ public sealed class WebScanMatchingService
                     return ApplyCollectorOcr(gameService, hash, artHashes, edgeHash, cn, conf, current);
                 }
                 case CardGame.Riftbound:
-                {
-                    var (cn, conf) = await _ocrService.DetectRiftboundCollectorNumberAsync(imageBytes);
-                    return ApplyCollectorOcr(gameService, hash, artHashes, edgeHash, cn, conf, current);
-                }
+                    return await RefineRiftboundAsync(imageBytes, gameService, hash, edgeHash, current);
                 case CardGame.Pokemon or CardGame.YuGiOh or CardGame.FinalFantasy:
                 {
                     var spec = game switch
@@ -167,17 +164,72 @@ public sealed class WebScanMatchingService
             : current;
     }
 
+    // Riftbound orientations to try, in order. The printed collector line ("{SET} • {n}/{total}",
+    // lower-left) uniquely identifies the printing and is the source of truth, so we lead with it.
+    // Portrait cards (Units/Spells/Legends) read at 0°; landscape Battlefield cards are fed sideways,
+    // so we then try both 90° rotations (the collector line only lands in the lower-left crop region
+    // under the correct one) and finally 180° for upside-down feeds.
+    private static readonly (System.Drawing.RotateFlipType Rot, string Label)[] RiftboundOrientations =
+    [
+        (System.Drawing.RotateFlipType.RotateNoneFlipNone, "0"),
+        (System.Drawing.RotateFlipType.Rotate90FlipNone, "90cw"),
+        (System.Drawing.RotateFlipType.Rotate270FlipNone, "90ccw"),
+        (System.Drawing.RotateFlipType.Rotate180FlipNone, "180"),
+    ];
+
+    /// <summary>
+    /// Resolve a Riftbound scan OCR-first: read the printed set code + collector number across
+    /// orientations and match the exact printing. This is what recognizes and auto-rotates landscape
+    /// Battlefield cards (fed sideways) without any UI — the orientation under which the collector line
+    /// reads is the card's true rotation. Falls back to <paramref name="current"/> (the pHash guess)
+    /// only when the line can't be read in any orientation.
+    /// </summary>
+    private async Task<CardMatch?> RefineRiftboundAsync(
+        byte[] imageBytes, ICardGameService gameService, ulong hash, ulong? edgeHash, CardMatch? current)
+    {
+        foreach (var (rot, label) in RiftboundOrientations)
+        {
+            var atZero = rot == System.Drawing.RotateFlipType.RotateNoneFlipNone;
+            var bytes = atZero ? imageBytes : RotateImage(imageBytes, rot);
+            var rotHash = atZero ? hash : _hashService.ComputeHash(new MemoryStream(bytes));
+
+            var (cn, conf) = await _ocrService.DetectRiftboundCollectorNumberAsync(bytes);
+            if (cn is null || conf < 0.5)
+                continue;
+
+            // Feed the printed collector number to Phase 0 (exact set+number lookup, confidence 100);
+            // pHash on the correctly-rotated image disambiguates alt-art printings that share a number.
+            var ocr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
+            var match = gameService.FindClosestMatch(rotHash, null, ocr, null, null, scanEdgeHash: atZero ? edgeHash : null);
+            if (match is not null)
+            {
+                if (!atZero)
+                    _logger.LogInformation(
+                        "Riftbound scan matched after {Rot} rotation (\"{Name}\" {Set} #{Num}) — landscape Battlefield card fed sideways",
+                        label, match.Name, match.SetCode, match.CollectorNumber);
+                return match;
+            }
+        }
+
+        return current;
+    }
+
+    // Rotate/flip an encoded image and re-encode as PNG. Used to try alternate scan orientations.
+    private static byte[] RotateImage(byte[] imageBytes, System.Drawing.RotateFlipType rot)
+    {
+        using var bmp = new System.Drawing.Bitmap(new MemoryStream(imageBytes));
+        bmp.RotateFlip(rot);
+        using var ms = new MemoryStream();
+        bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+        return ms.ToArray();
+    }
+
     private async Task<(CardMatch? Match, ulong Hash)> RetryRotatedAsync(
         byte[] imageBytes, CardGame game, ICardGameService gameService, bool isFoil, ulong originalHash)
     {
         try
         {
-            using var bmp = new System.Drawing.Bitmap(new MemoryStream(imageBytes));
-            bmp.RotateFlip(System.Drawing.RotateFlipType.Rotate180FlipNone);
-            using var rotated = new MemoryStream();
-            bmp.Save(rotated, System.Drawing.Imaging.ImageFormat.Png);
-            var rotatedBytes = rotated.ToArray();
-
+            var rotatedBytes = RotateImage(imageBytes, System.Drawing.RotateFlipType.Rotate180FlipNone);
             ulong rotatedHash = _hashService.ComputeHash(new MemoryStream(rotatedBytes));
 
             OcrMatchResult? ocr = null;
