@@ -22,10 +22,12 @@ import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
+import PlaceIcon from '@mui/icons-material/Place';
 import SearchIcon from '@mui/icons-material/Search';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import { api } from '../api/client';
 import { useGame } from '../context/GameContext';
+import { LocationPickerDialog } from '../components/LocationPickerDialog';
 import type { ScanMatchDto, ScanSearchResultDto } from '../api/types';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
@@ -405,6 +407,7 @@ export function ScanPage() {
   const [isFoil, setIsFoil] = useState(false);
   const [condition, setCondition] = useState('NM');
   const [containerId, setContainerId] = useState<number | ''>('');
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [items, setItems] = useState<ScanItem[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -503,6 +506,10 @@ export function ScanPage() {
     [items],
   );
   const stillMatching = items.some((it) => it.status === 'matching');
+  const selectedLocationName = useMemo(
+    () => (containerId === '' ? null : locations.data?.find((l) => l.id === containerId)?.name ?? null),
+    [containerId, locations.data],
+  );
 
   return (
     <Stack spacing={3}>
@@ -605,21 +612,14 @@ export function ScanPage() {
       {items.length > 0 && (
         <Paper variant="outlined" sx={{ p: 2, position: 'sticky', top: 56, zIndex: 1 }}>
           <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
-            <TextField
-              select
-              size="small"
-              label="Add to location"
-              value={containerId}
-              onChange={(e) => setContainerId(e.target.value === '' ? '' : Number(e.target.value))}
-              sx={{ minWidth: 220 }}
+            <Button
+              variant="outlined"
+              startIcon={<PlaceIcon />}
+              onClick={() => setPickerOpen(true)}
+              sx={{ minWidth: 220, justifyContent: 'flex-start', textTransform: 'none' }}
             >
-              <MenuItem value="">— choose —</MenuItem>
-              {locations.data?.map((l) => (
-                <MenuItem key={l.id} value={l.id}>
-                  {l.name}
-                </MenuItem>
-              ))}
-            </TextField>
+              {selectedLocationName ?? 'Add to location…'}
+            </Button>
             <Button
               variant="outlined"
               color="success"
@@ -698,6 +698,16 @@ export function ScanPage() {
           )}
         </Box>
       )}
+
+      <LocationPickerDialog
+        open={pickerOpen}
+        title="Add scanned cards to location"
+        onPick={(id) => {
+          setContainerId(id);
+          setPickerOpen(false);
+        }}
+        onClose={() => setPickerOpen(false)}
+      />
     </Stack>
   );
 }
