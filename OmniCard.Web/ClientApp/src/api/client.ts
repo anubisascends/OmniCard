@@ -34,6 +34,7 @@ import type {
   TradeSearchResult,
   TradeSessionState,
   TradeSummaryDto,
+  UserDto,
   WorkflowLaneDto,
 } from './types';
 
@@ -139,12 +140,28 @@ function qs(params: Record<string, string | number | boolean | undefined | null>
 export const api = {
   // Auth
   authStatus: () => request<AuthStatusDto>('/api/auth/status'),
-  login: (passphrase: string) =>
+  login: (username: string, password: string, rememberMe: boolean) =>
     request<AuthStatusDto>('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ passphrase }),
+      body: JSON.stringify({ username, password, rememberMe }),
     }),
   logout: () => request<AuthStatusDto>('/api/auth/logout', { method: 'POST' }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<void>('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
+
+  // Users (Administration ▸ Users — admin only)
+  users: () => request<UserDto[]>('/api/users'),
+  userCreate: (body: { username: string; password: string; isAdmin: boolean }) =>
+    request<UserDto>('/api/users', { method: 'POST', body: JSON.stringify(body) }),
+  userDelete: (id: number) => request<void>(`/api/users/${id}`, { method: 'DELETE' }),
+  userResetPassword: (id: number, newPassword: string) =>
+    request<void>(`/api/users/${id}/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({ newPassword }),
+    }),
 
   // Meta
   games: () => request<GameDto[]>('/api/meta/games'),

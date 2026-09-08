@@ -5,17 +5,35 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  IconButton,
   LinearProgress,
   MenuItem,
   Paper,
   Slider,
   Stack,
+  Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Tabs,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
-import { api } from '../api/client';
+import DeleteIcon from '@mui/icons-material/Delete';
+import KeyIcon from '@mui/icons-material/Key';
+import { api, ApiError } from '../api/client';
+import type { UserDto } from '../api/types';
 import { LocationPickerDialog } from '../components/LocationPickerDialog';
 import {
   usePreviewScale,
@@ -351,14 +369,355 @@ function AppearanceCard() {
   );
 }
 
-export function SettingsPage() {
+/** Self-service password change for the signed-in user — requires the current password + confirm. */
+function ChangePasswordCard() {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+
+  const change = useMutation({
+    mutationFn: () => api.changePassword(current, next),
+    onSuccess: () => {
+      setCurrent('');
+      setNext('');
+      setConfirm('');
+    },
+  });
+
+  const mismatch = confirm.length > 0 && next !== confirm;
+  const canSubmit = !!current && !!next && next === confirm && !change.isPending;
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
+      <Typography variant="h6" gutterBottom>
+        Your password
+      </Typography>
+      <Typography variant="body2" color="text.secondary" gutterBottom>
+        Change the password for your own account. You must enter your current password.
+      </Typography>
+
+      <Stack
+        component="form"
+        spacing={2}
+        sx={{ mt: 1, maxWidth: 360 }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (canSubmit) change.mutate();
+        }}
+      >
+        <TextField
+          type="password"
+          label="Current password"
+          size="small"
+          value={current}
+          autoComplete="current-password"
+          onChange={(e) => setCurrent(e.target.value)}
+        />
+        <TextField
+          type="password"
+          label="New password"
+          size="small"
+          value={next}
+          autoComplete="new-password"
+          onChange={(e) => setNext(e.target.value)}
+        />
+        <TextField
+          type="password"
+          label="Confirm new password"
+          size="small"
+          value={confirm}
+          autoComplete="new-password"
+          error={mismatch}
+          helperText={mismatch ? "Passwords don't match." : ' '}
+          onChange={(e) => setConfirm(e.target.value)}
+        />
+        {change.error instanceof ApiError && (
+          <Alert severity="error">{change.error.message}</Alert>
+        )}
+        {change.isSuccess && <Alert severity="success">Password changed.</Alert>}
+        <Box>
+          <Button type="submit" variant="contained" disabled={!canSubmit}>
+            {change.isPending ? 'Saving…' : 'Change password'}
+          </Button>
+        </Box>
+      </Stack>
+    </Paper>
+  );
+}
+
+/** Dialog to set a password (create user or admin reset). Requires confirmation. */
+function PasswordDialog({
+  open,
+  title,
+  withUsername,
+  submitLabel,
+  onClose,
+  onSubmit,
+  pending,
+  error,
+}: {
+  open: boolean;
+  title: string;
+  withUsername: boolean;
+  submitLabel: string;
+  onClose: () => void;
+  onSubmit: (v: { username: string; password: string; isAdmin: boolean }) => void;
+  pending: boolean;
+  error?: string | null;
+}) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Reset fields whenever the dialog is (re)opened.
+  const reset = () => {
+    setUsername('');
+    setPassword('');
+    setConfirm('');
+    setIsAdmin(false);
+  };
+
+  const mismatch = confirm.length > 0 && password !== confirm;
+  const canSubmit =
+    !!password && password === confirm && (!withUsername || !!username.trim()) && !pending;
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="xs"
+      TransitionProps={{ onExited: reset }}
+    >
+      <DialogTitle>{title}</DialogTitle>
+      <DialogContent>
+        <Stack
+          component="form"
+          spacing={2}
+          sx={{ mt: 1 }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (canSubmit) onSubmit({ username: username.trim(), password, isAdmin });
+          }}
+        >
+          {withUsername && (
+            <TextField
+              label="Username"
+              size="small"
+              value={username}
+              autoFocus
+              onChange={(e) => setUsername(e.target.value)}
+            />
+          )}
+          <TextField
+            type="password"
+            label="Password"
+            size="small"
+            value={password}
+            autoComplete="new-password"
+            autoFocus={!withUsername}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <TextField
+            type="password"
+            label="Confirm password"
+            size="small"
+            value={confirm}
+            autoComplete="new-password"
+            error={mismatch}
+            helperText={mismatch ? "Passwords don't match." : ' '}
+            onChange={(e) => setConfirm(e.target.value)}
+          />
+          {withUsername && (
+            <FormControlLabel
+              control={
+                <Checkbox checked={isAdmin} onChange={(e) => setIsAdmin(e.target.checked)} />
+              }
+              label="Administrator (full access)"
+            />
+          )}
+          {error && <Alert severity="error">{error}</Alert>}
+          {/* Hidden submit so Enter works. */}
+          <button type="submit" style={{ display: 'none' }} />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          variant="contained"
+          disabled={!canSubmit}
+          onClick={() => onSubmit({ username: username.trim(), password, isAdmin })}
+        >
+          {pending ? 'Saving…' : submitLabel}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/** Admin-only management of all accounts (create / delete / reset password). */
+function ManageUsersCard() {
+  const qc = useQueryClient();
+  const usersQuery = useQuery({ queryKey: ['users'], queryFn: api.users });
+  const [createOpen, setCreateOpen] = useState(false);
+  const [resetFor, setResetFor] = useState<UserDto | null>(null);
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['users'] });
+
+  const create = useMutation({
+    mutationFn: (v: { username: string; password: string; isAdmin: boolean }) =>
+      api.userCreate(v),
+    onSuccess: () => {
+      setCreateOpen(false);
+      invalidate();
+    },
+  });
+  const del = useMutation({
+    mutationFn: (id: number) => api.userDelete(id),
+    onSuccess: invalidate,
+  });
+  const reset = useMutation({
+    mutationFn: (v: { id: number; password: string }) => api.userResetPassword(v.id, v.password),
+    onSuccess: () => setResetFor(null),
+  });
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between">
+        <Typography variant="h6">Users</Typography>
+        <Button variant="contained" size="small" onClick={() => setCreateOpen(true)}>
+          Add user
+        </Button>
+      </Stack>
+      <Typography variant="body2" color="text.secondary" gutterBottom>
+        Accounts that can sign in. The built-in Admin account can't be deleted.
+      </Typography>
+
+      {del.error instanceof ApiError && (
+        <Alert severity="error" sx={{ mt: 1 }}>
+          {del.error.message}
+        </Alert>
+      )}
+
+      {usersQuery.isLoading ? (
+        <CircularProgress size={24} sx={{ mt: 1 }} />
+      ) : (
+        <Table size="small" sx={{ mt: 1 }}>
+          <TableHead>
+            <TableRow>
+              <TableCell>Username</TableCell>
+              <TableCell>Role</TableCell>
+              <TableCell align="right">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {usersQuery.data?.map((u) => (
+              <TableRow key={u.id}>
+                <TableCell>
+                  {u.username}
+                  {u.isSystem && (
+                    <Chip label="system" size="small" sx={{ ml: 1 }} variant="outlined" />
+                  )}
+                </TableCell>
+                <TableCell>{u.isAdmin ? 'Administrator' : 'User'}</TableCell>
+                <TableCell align="right">
+                  <Tooltip title="Reset password">
+                    <IconButton size="small" onClick={() => setResetFor(u)}>
+                      <KeyIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title={u.isSystem ? "The system account can't be deleted" : 'Delete user'}>
+                    <span>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        disabled={u.isSystem || del.isPending}
+                        onClick={() => {
+                          if (confirm(`Delete user "${u.username}"?`)) del.mutate(u.id);
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+
+      <PasswordDialog
+        open={createOpen}
+        title="Add user"
+        withUsername
+        submitLabel="Create"
+        pending={create.isPending}
+        error={create.error instanceof ApiError ? create.error.message : null}
+        onClose={() => setCreateOpen(false)}
+        onSubmit={(v) => create.mutate(v)}
+      />
+      <PasswordDialog
+        open={!!resetFor}
+        title={resetFor ? `Reset password — ${resetFor.username}` : 'Reset password'}
+        withUsername={false}
+        submitLabel="Reset"
+        pending={reset.isPending}
+        error={reset.error instanceof ApiError ? reset.error.message : null}
+        onClose={() => setResetFor(null)}
+        onSubmit={(v) => resetFor && reset.mutate({ id: resetFor.id, password: v.password })}
+      />
+    </Paper>
+  );
+}
+
+function UsersTab() {
+  const authQuery = useQuery({ queryKey: ['auth-status'], queryFn: api.authStatus });
   return (
     <Stack spacing={3}>
-      <Typography variant="h4">Settings</Typography>
-      <SalesCard />
-      <AppearanceCard />
-      <CatalogCard />
-      <EbayCard />
+      <ChangePasswordCard />
+      {authQuery.data?.isAdmin && <ManageUsersCard />}
+    </Stack>
+  );
+}
+
+const TABS = [
+  { key: 'sales', label: 'Sales', render: () => <SalesCard /> },
+  { key: 'appearance', label: 'Appearance', render: () => <AppearanceCard /> },
+  { key: 'catalog', label: 'Catalog Data', render: () => <CatalogCard /> },
+  { key: 'ebay', label: 'eBay', render: () => <EbayCard /> },
+  { key: 'users', label: 'Users', render: () => <UsersTab /> },
+] as const;
+
+export function SettingsPage() {
+  const [params, setParams] = useSearchParams();
+  const requested = params.get('tab');
+  const active = Math.max(
+    0,
+    TABS.findIndex((t) => t.key === requested),
+  );
+
+  return (
+    <Stack spacing={3}>
+      <Typography variant="h4">Administration</Typography>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs
+          value={active}
+          onChange={(_, v) => {
+            const nextParams = new URLSearchParams(params);
+            nextParams.set('tab', TABS[v].key);
+            setParams(nextParams, { replace: true });
+          }}
+          variant="scrollable"
+          scrollButtons="auto"
+        >
+          {TABS.map((t) => (
+            <Tab key={t.key} label={t.label} />
+          ))}
+        </Tabs>
+      </Box>
+      <Box>{TABS[active].render()}</Box>
     </Stack>
   );
 }

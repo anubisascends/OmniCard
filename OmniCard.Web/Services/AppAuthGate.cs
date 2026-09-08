@@ -1,48 +1,61 @@
-using System.Security.Cryptography;
-using System.Text;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using OmniCard.Models;
 
 namespace OmniCard.Web.Services;
 
 /// <summary>
-/// Site-wide passphrase gate for the full web app (the read/write SPA), distinct from the older
-/// binder-only <see cref="BinderEditGate"/>. A single shared passphrase is configured under
-/// <c>Auth:Passphrase</c>; unlock state is kept per-browser in the session.
+/// Site-wide authentication for the SPA, now backed by per-user accounts (see <see cref="UserService"/>)
+/// instead of the old shared passphrase. Identity is carried in an encrypted, HttpOnly cookie issued
+/// by ASP.NET Core cookie authentication; "remember me" makes that cookie persistent
+/// (<see cref="SignInAsync"/>), otherwise it's a session cookie cleared when the browser closes.
 ///
-/// Policy: auth is only <em>enforced</em> when a passphrase is configured. With no passphrase set
-/// the site is open (suitable for a trusted, isolated LAN or local development) — set the passphrase
-/// in production to lock it down. <see cref="Verify"/> uses a constant-time comparison.
+/// Auth is always enforced — there is always at least the seeded Admin account — so every API
+/// controller except <see cref="Api.AuthController"/> requires a signed-in user.
 /// </summary>
 public static class AppAuthGate
 {
-    public const string ConfigKey = "Auth:Passphrase";
-    private const string SessionKey = "app-unlocked";
+    /// <summary>Cookie auth scheme used for the app login.</summary>
+    public const string Scheme = CookieAuthenticationDefaults.AuthenticationScheme;
 
-    public static string? ConfiguredPassphrase(IConfiguration config) => config[ConfigKey];
+    /// <summary>Persistent "remember me" cookies last this long; session cookies expire on browser close.</summary>
+    public static readonly TimeSpan RememberDuration = TimeSpan.FromDays(30);
 
-    /// <summary>True when a passphrase is configured — i.e. auth is required on this server.</summary>
-    public static bool IsEnabled(IConfiguration config) => !string.IsNullOrWhiteSpace(ConfiguredPassphrase(config));
+    private const string IsAdminClaim = "omnicard:is_admin";
 
-    public static bool IsUnlocked(HttpContext ctx) => ctx.Session.GetString(SessionKey) == "1";
+    public static bool IsAuthenticated(HttpContext ctx) => ctx.User?.Identity?.IsAuthenticated == true;
 
-    public static void Unlock(HttpContext ctx) => ctx.Session.SetString(SessionKey, "1");
+    public static bool IsAdmin(HttpContext ctx) =>
+        IsAuthenticated(ctx) && ctx.User.HasClaim(IsAdminClaim, "true");
 
-    public static void Lock(HttpContext ctx) => ctx.Session.Remove(SessionKey);
+    public static string? CurrentUsername(HttpContext ctx) =>
+        IsAuthenticated(ctx) ? ctx.User.Identity?.Name : null;
 
-    /// <summary>True if the request should be allowed through: either auth is disabled (no
-    /// passphrase configured) or this session has been unlocked.</summary>
-    public static bool IsAuthorized(HttpContext ctx, IConfiguration config) =>
-        !IsEnabled(config) || IsUnlocked(ctx);
-
-    /// <summary>Constant-time check of an entered passphrase against the configured one. Returns
-    /// false when auth is disabled (nothing to unlock) or the entry doesn't match.</summary>
-    public static bool Verify(IConfiguration config, string? entered)
+    /// <summary>The signed-in user's id, or null when not authenticated.</summary>
+    public static int? CurrentUserId(HttpContext ctx)
     {
-        var expected = ConfiguredPassphrase(config);
-        if (string.IsNullOrWhiteSpace(expected) || string.IsNullOrEmpty(entered))
-            return false;
-
-        var a = Encoding.UTF8.GetBytes(entered);
-        var b = Encoding.UTF8.GetBytes(expected);
-        return CryptographicOperations.FixedTimeEquals(a, b);
+        var raw = ctx.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+        return int.TryParse(raw, out var id) ? id : null;
     }
+
+    /// <summary>Issue the auth cookie for <paramref name="user"/>. Persistent when <paramref name="rememberMe"/>.</summary>
+    public static Task SignInAsync(HttpContext ctx, User user, bool rememberMe)
+    {
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Name, user.Username),
+            new(IsAdminClaim, (user.IsAdmin || user.IsSystem) ? "true" : "false"),
+        };
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, Scheme));
+        var props = new AuthenticationProperties
+        {
+            IsPersistent = rememberMe,
+            ExpiresUtc = rememberMe ? DateTimeOffset.UtcNow.Add(RememberDuration) : null,
+        };
+        return ctx.SignInAsync(Scheme, principal, props);
+    }
+
+    public static Task SignOutAsync(HttpContext ctx) => ctx.SignOutAsync(Scheme);
 }
