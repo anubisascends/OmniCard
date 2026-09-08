@@ -13,6 +13,15 @@ export interface GameDto {
   displayName: string;
 }
 
+export interface ComponentDto {
+  category: string;
+  name: string;
+  version: string;
+  license: string;
+  homepageUrl: string | null;
+  licenseUrl: string | null;
+}
+
 export interface CardDto {
   id: number;
   game: string;

@@ -7,6 +7,17 @@ public sealed record PagedResult<T>(int Total, int Skip, int Take, IReadOnlyList
 /// name (e.g. "Mtg", "OnePiece"); <see cref="DisplayName"/> is the human label.</summary>
 public sealed record GameDto(string Id, string DisplayName);
 
+/// <summary>One third-party (or first-party) software component OmniCard ships or runs on, for the
+/// Administration ▸ Components license inventory. <see cref="HomepageUrl"/> / <see cref="LicenseUrl"/>
+/// may be null when no canonical link exists.</summary>
+public sealed record ComponentDto(
+    string Category,
+    string Name,
+    string Version,
+    string License,
+    string? HomepageUrl,
+    string? LicenseUrl);
+
 /// <summary>A single collection card (one owned lot of a single printing) for list/detail views.</summary>
 public sealed record CardDto
 {

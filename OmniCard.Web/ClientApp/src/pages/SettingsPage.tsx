@@ -32,8 +32,9 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import KeyIcon from '@mui/icons-material/Key';
+import Link from '@mui/material/Link';
 import { api, ApiError } from '../api/client';
-import type { UserDto } from '../api/types';
+import type { ComponentDto, UserDto } from '../api/types';
 import { LocationPickerDialog } from '../components/LocationPickerDialog';
 import {
   usePreviewScale,
@@ -682,12 +683,92 @@ function UsersTab() {
   );
 }
 
+/** Read-only inventory of the software/components OmniCard ships or runs on, with versions + links. */
+function ComponentsCard() {
+  const components = useQuery({ queryKey: ['components'], queryFn: api.components });
+
+  // Preserve server order but split into visual groups by category.
+  const groups: { category: string; items: ComponentDto[] }[] = [];
+  for (const c of components.data ?? []) {
+    let g = groups.find((x) => x.category === c.category);
+    if (!g) {
+      g = { category: c.category, items: [] };
+      groups.push(g);
+    }
+    g.items.push(c);
+  }
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2, maxWidth: 880 }}>
+      <Typography variant="h6" gutterBottom>
+        Components
+      </Typography>
+      <Typography variant="body2" color="text.secondary" gutterBottom>
+        Software and third-party components that OmniCard ships or runs on, with their versions and
+        links to each project's website and license.
+      </Typography>
+
+      {components.isLoading ? (
+        <CircularProgress size={24} sx={{ mt: 1 }} />
+      ) : components.error ? (
+        <Alert severity="error" sx={{ mt: 1 }}>
+          {(components.error as Error).message}
+        </Alert>
+      ) : (
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          {groups.map((g) => (
+            <Box key={g.category}>
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>
+                {g.category}
+              </Typography>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Component</TableCell>
+                    <TableCell>Version</TableCell>
+                    <TableCell>License</TableCell>
+                    <TableCell align="right">Links</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {g.items.map((c) => (
+                    <TableRow key={`${c.category}:${c.name}`}>
+                      <TableCell>{c.name}</TableCell>
+                      <TableCell>{c.version}</TableCell>
+                      <TableCell>{c.license}</TableCell>
+                      <TableCell align="right">
+                        <Stack direction="row" spacing={1.5} justifyContent="flex-end">
+                          {c.homepageUrl && (
+                            <Link href={c.homepageUrl} target="_blank" rel="noopener noreferrer">
+                              Website
+                            </Link>
+                          )}
+                          {c.licenseUrl && (
+                            <Link href={c.licenseUrl} target="_blank" rel="noopener noreferrer">
+                              License
+                            </Link>
+                          )}
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+          ))}
+        </Stack>
+      )}
+    </Paper>
+  );
+}
+
 const TABS = [
   { key: 'sales', label: 'Sales', render: () => <SalesCard /> },
   { key: 'appearance', label: 'Appearance', render: () => <AppearanceCard /> },
   { key: 'catalog', label: 'Catalog Data', render: () => <CatalogCard /> },
   { key: 'ebay', label: 'eBay', render: () => <EbayCard /> },
   { key: 'users', label: 'Users', render: () => <UsersTab /> },
+  { key: 'components', label: 'Components', render: () => <ComponentsCard /> },
 ] as const;
 
 export function SettingsPage() {
