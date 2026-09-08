@@ -29,6 +29,7 @@ public sealed record CardDto
     public IReadOnlyList<int> StackedIds { get; init; } = [];
     public IReadOnlyList<string> Tags { get; init; } = [];
     public decimal? PurchasePrice { get; init; }
+    public string? Note { get; init; }
     public decimal MarketPrice { get; init; }
     public int? ContainerId { get; init; }
     public string? ContainerName { get; init; }
@@ -148,6 +149,7 @@ public sealed record UpdateCardRequest
     public string? FoilType { get; init; }
     public int Quantity { get; init; } = 1;
     public decimal? PurchasePrice { get; init; }
+    public string? Note { get; init; }
 }
 
 public sealed record MoveCardsRequest
@@ -460,6 +462,10 @@ public sealed record ScanMatchDto
     public string? ImageUri { get; init; }
     public double? Confidence { get; init; }
     public string ScanHash { get; init; } = "";
+    /// <summary>A browser-renderable (JPEG data-URI) preview of the uploaded scan, populated by the
+    /// server only when the upload's own format can't be shown in an <c>&lt;img&gt;</c> (e.g. TIFF).
+    /// Null for JPEG/PNG, where the client previews its local copy directly.</summary>
+    public string? ScanPreviewDataUri { get; init; }
     /// <summary>Set when matching could not run at all (e.g. game catalog unavailable); distinct
     /// from a clean "no match" (<see cref="Matched"/> false, no error).</summary>
     public string? Error { get; init; }
@@ -483,8 +489,11 @@ public sealed record ScanCommitItem
     public string? ImageUri { get; init; }
     public string Condition { get; init; } = "NM";
     public bool IsFoil { get; init; }
+    public string? FoilType { get; init; }
     public int Quantity { get; init; } = 1;
     public decimal? PurchasePrice { get; init; }
+    public string? Note { get; init; }
+    public IReadOnlyList<string> Tags { get; init; } = [];
 }
 
 /// <summary>Commit a batch of confirmed scans into a storage location.</summary>

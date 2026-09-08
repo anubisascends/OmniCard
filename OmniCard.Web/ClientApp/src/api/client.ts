@@ -214,6 +214,7 @@ export const api = {
       foilType?: string | null;
       quantity: number;
       purchasePrice?: number | null;
+      note?: string | null;
     },
   ) => request<void>(`/api/collection/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   cardDelete: (id: number) => request<void>(`/api/collection/${id}`, { method: 'DELETE' }),
@@ -405,12 +406,13 @@ export const api = {
   ebaySetup: () => request<EbaySetupResultDto>('/api/ebay/setup', { method: 'POST' }),
 
   // Scan (server-side image matching)
-  scanMatch: async (image: File, game: string, isFoil: boolean, set?: string) => {
+  scanMatch: async (image: File, game: string, isFoil: boolean, sets?: string[]) => {
     const form = new FormData();
     form.append('image', image);
     form.append('game', game);
     form.append('isFoil', String(isFoil));
-    if (set) form.append('set', set);
+    // One `set` entry per chosen art-fallback set; the server unions them.
+    for (const s of sets ?? []) if (s) form.append('set', s);
     const res = await fetch('/api/scan/match', {
       method: 'POST',
       body: form,
@@ -428,8 +430,9 @@ export const api = {
     }
     return (await res.json()) as ScanMatchDto;
   },
-  scanSearch: (game: string, q: string) =>
-    request<ScanSearchResultDto[]>(`/api/scan/search${qs({ game, q })}`),
+  scanSearch: (game: string, q: string, set?: string, cn?: string) =>
+    request<ScanSearchResultDto[]>(`/api/scan/search${qs({ game, q, set, cn })}`),
+  scanFoilTypes: (game: string) => request<string[]>(`/api/scan/foil-types${qs({ game })}`),
   scanCommit: (containerId: number, items: ScanCommitItem[]) =>
     request<ScanCommitResultDto>('/api/scan/commit', {
       method: 'POST',

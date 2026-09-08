@@ -21,6 +21,8 @@ public class CollectionCard : INotifyPropertyChanged
     /// Mirrors <see cref="Product.FoilType"/>. See <see cref="FoilTypes"/>.</summary>
     public string? FoilType { get; set; }
     public decimal? PurchasePrice { get; set; }
+    /// <summary>Free-text user note on this physical copy. Mirrors <see cref="InventoryLot.Note"/>.</summary>
+    public string? Note { get; set; }
     public DateTime DateAdded { get; set; } = DateTime.UtcNow;
 
     public int? ContainerId { get; set; }
