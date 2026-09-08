@@ -233,7 +233,7 @@ export function CardTable({
           paginationMode="server"
           paginationModel={pagination}
           onPaginationModelChange={setPagination}
-          pageSizeOptions={[50, 100, 250]}
+          pageSizeOptions={[25, 50, 100]}
           density="compact"
           checkboxSelection={selectMode}
           disableRowSelectionOnClick

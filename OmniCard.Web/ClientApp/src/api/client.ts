@@ -4,6 +4,7 @@ import type {
   BinderCardDto,
   BinderStateDto,
   CardDto,
+  ComponentDto,
   CsvImportResultDto,
   CardListDto,
   CardListItemDto,
@@ -165,6 +166,7 @@ export const api = {
 
   // Meta
   games: () => request<GameDto[]>('/api/meta/games'),
+  components: () => request<ComponentDto[]>('/api/meta/components'),
 
   // Dashboard
   dashboard: () => request<DashboardDto>('/api/dashboard'),
