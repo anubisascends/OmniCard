@@ -27,6 +27,7 @@ public class CardScanControllerTests : IDisposable
     private readonly WebBinderCardService _binderCards;
     private readonly StorageContainerService _containers;
     private readonly Mock<ICardService> _cardService = new();
+    private readonly Mock<ITagService> _tagService = new();
 
     public CardScanControllerTests()
     {
@@ -45,7 +46,7 @@ public class CardScanControllerTests : IDisposable
     // Match is constructed with a null matcher for the validation cases below — they all short-circuit
     // before the matcher is ever invoked (no image / bad type / oversized / unknown game).
     private CardScanController CreateController() =>
-        new(matcher: null!, _cardService.Object, _binderCards, NullLogger<CardScanController>.Instance);
+        new(matcher: null!, _cardService.Object, _binderCards, _tagService.Object, NullLogger<CardScanController>.Instance);
 
     private static IFormFile CreateFormFile(byte[]? content = null, string contentType = "image/jpeg",
         string fileName = "test.jpg", long? overrideLength = null)
@@ -77,10 +78,24 @@ public class CardScanControllerTests : IDisposable
     [Fact]
     public async Task Match_Oversized_Returns400()
     {
-        var file = CreateFormFile(content: [0xFF], overrideLength: 11 * 1024 * 1024);
+        var file = CreateFormFile(content: [0xFF], overrideLength: 31L * 1024 * 1024);
         var result = await CreateController().Match(file, "Mtg", false, null, CancellationToken.None);
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
+
+    [Theory]
+    [InlineData("image/jpeg", "card.jpg", true)]
+    [InlineData("image/png", "card.png", true)]
+    [InlineData("image/tiff", "card.tif", true)]
+    [InlineData("image/tiff", "card.tiff", true)]
+    // Some OSes hand a .tif up as octet-stream / blank — the extension must still let it through.
+    [InlineData("application/octet-stream", "scan.tif", true)]
+    [InlineData(null, "scan.tiff", true)]
+    [InlineData("text/plain", "notes.txt", false)]
+    [InlineData("application/pdf", "sheet.pdf", false)]
+    [InlineData(null, "", false)]
+    public void IsAcceptedImage_AllowsImagesByTypeOrExtension(string? contentType, string fileName, bool expected)
+        => Assert.Equal(expected, CardScanController.IsAcceptedImage(contentType, fileName));
 
     [Fact]
     public async Task Match_UnknownGame_Returns400()
@@ -110,7 +125,7 @@ public class CardScanControllerTests : IDisposable
     public void Search_MapsGameServiceResults()
     {
         var game = new Mock<ICardGameService>();
-        game.Setup(s => s.SearchCards("bolt", 20)).Returns([
+        game.Setup(s => s.SearchCards("bolt", 500)).Returns([
             new CardMatch { Name = "Lightning Bolt", SetCode = "lea", SetName = "Alpha",
                 CollectorNumber = "161", Rarity = "common", GameSpecificId = "abc", ImageUri = "u" }
         ]);

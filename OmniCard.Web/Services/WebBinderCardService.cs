@@ -149,6 +149,7 @@ public sealed class WebBinderCardService
             {
                 Product = product,
                 Condition = card.Condition,
+                Note = card.Note,
                 Quantity = Math.Max(1, card.Quantity),
                 UnitCost = card.PurchasePrice,
                 AcquisitionDate = card.DateAdded,
@@ -162,6 +163,40 @@ public sealed class WebBinderCardService
 
         context.SaveChanges();
         return imported;
+    }
+
+    /// <summary>Imports confirmed scans as new lots and returns the created lot id per input card
+    /// (parallel to <paramref name="cards"/>). Unlike <see cref="ImportCollectionCards"/> this never
+    /// skips duplicates (a scanned card is a real physical copy) and surfaces the ids so the caller
+    /// can attach per-copy tags after the lots exist.</summary>
+    public IReadOnlyList<int> AddScannedLots(IReadOnlyList<CollectionCard> cards)
+    {
+        using var context = _dbFactory.CreateDbContext();
+        var productCache = new Dictionary<(CardGame Game, string GameCardId, bool Foil, string? FoilType), Product>();
+        var lots = new List<InventoryLot>(cards.Count);
+
+        foreach (var card in cards)
+        {
+            var product = FindOrCreateProduct(context, productCache, card.Game, card.GameCardId, card.IsFoil,
+                card.IsFoil ? card.FoilType : null, card.Name, card.SetCode, card.SetName, card.Number, card.Rarity,
+                card.ImageUri, card.Color, card.CardType);
+
+            var lot = new InventoryLot
+            {
+                Product = product,
+                Condition = card.Condition,
+                Note = card.Note,
+                Quantity = Math.Max(1, card.Quantity),
+                UnitCost = card.PurchasePrice,
+                AcquisitionDate = card.DateAdded,
+                LocationId = card.ContainerId,
+            };
+            context.Lots.Add(lot);
+            lots.Add(lot);
+        }
+
+        context.SaveChanges();
+        return lots.Select(l => l.Id).ToList();
     }
 
     /// <summary>Sets the owned copy count on a lot. Kept separate from
@@ -323,6 +358,7 @@ public sealed class WebBinderCardService
         }
 
         lot.Condition = card.Condition;
+        lot.Note = card.Note;
         lot.UnitCost = card.PurchasePrice;
         lot.LocationId = card.ContainerId;
         lot.Page = card.Page;

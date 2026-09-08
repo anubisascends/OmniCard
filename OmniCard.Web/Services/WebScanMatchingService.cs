@@ -46,9 +46,10 @@ public sealed class WebScanMatchingService
     }
 
     /// <summary>Match a single uploaded card image against <paramref name="game"/>'s catalog.</summary>
-    /// <param name="setCode">Optional set to constrain matching to — the user tells us which set they're
-    /// scanning, which bounds the pHash/artwork fallback (and every other match path) to that set.</param>
-    public async Task<ScanMatchDto> MatchAsync(byte[] imageBytes, CardGame game, bool isFoil, string? setCode = null, CancellationToken ct = default)
+    /// <param name="setCodes">Optional set(s) to constrain matching to — the user tells us which set(s)
+    /// they're scanning, which bounds the pHash/artwork fallback (and every other match path) to their
+    /// union. Empty/null ⇒ no set constraint.</param>
+    public async Task<ScanMatchDto> MatchAsync(byte[] imageBytes, CardGame game, bool isFoil, IReadOnlyCollection<string>? setCodes = null, CancellationToken ct = default)
     {
         if (!_gameServices.TryGetValue(game, out var gameService))
             return new ScanMatchDto { Matched = false, Game = game.ToString(), Error = $"Game {game} is not available" };
@@ -56,9 +57,10 @@ public sealed class WebScanMatchingService
         EnsureSymbolHashes();
 
         // User-chosen set filter (hard constraint on the candidate pool, all match paths).
-        IReadOnlySet<string>? setFilter = string.IsNullOrWhiteSpace(setCode)
+        var chosenSets = setCodes?.Where(s => !string.IsNullOrWhiteSpace(s)).ToArray() ?? [];
+        IReadOnlySet<string>? setFilter = chosenSets.Length == 0
             ? null
-            : new HashSet<string>([setCode], StringComparer.OrdinalIgnoreCase);
+            : new HashSet<string>(chosenSets, StringComparer.OrdinalIgnoreCase);
 
         // 1. pHash from the full image.
         ulong hash = _hashService.ComputeHash(new MemoryStream(imageBytes));
@@ -263,6 +265,39 @@ public sealed class WebScanMatchingService
             return bestLandscapeArt;
         }
         return current;
+    }
+
+    /// <summary>Render a downscaled JPEG <c>data:</c> URI so the SPA can preview an uploaded scan whose
+    /// own format a browser can't display in an <c>&lt;img&gt;</c> (TIFF). GDI+ decodes the source, so
+    /// this works for any format <see cref="System.Drawing.Bitmap"/> reads. Returns null on failure —
+    /// the caller falls back to a placeholder; matching itself is unaffected.</summary>
+    public static string? RenderPreviewDataUri(byte[] imageBytes, int maxDim = 1400)
+    {
+        try
+        {
+            using var src = new System.Drawing.Bitmap(new MemoryStream(imageBytes));
+            var scale = Math.Min(1.0, (double)maxDim / Math.Max(src.Width, src.Height));
+            var w = Math.Max(1, (int)Math.Round(src.Width * scale));
+            var h = Math.Max(1, (int)Math.Round(src.Height * scale));
+            using var dst = new System.Drawing.Bitmap(w, h);
+            using (var g = System.Drawing.Graphics.FromImage(dst))
+            {
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                g.DrawImage(src, 0, 0, w, h);
+            }
+            var encoder = System.Drawing.Imaging.ImageCodecInfo.GetImageEncoders()
+                .First(c => c.FormatID == System.Drawing.Imaging.ImageFormat.Jpeg.Guid);
+            using var ep = new System.Drawing.Imaging.EncoderParameters(1);
+            ep.Param[0] = new System.Drawing.Imaging.EncoderParameter(
+                System.Drawing.Imaging.Encoder.Quality, 85L);
+            using var ms = new MemoryStream();
+            dst.Save(ms, encoder, ep);
+            return "data:image/jpeg;base64," + Convert.ToBase64String(ms.ToArray());
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     // Rotate/flip an encoded image and re-encode as PNG. Used to try alternate scan orientations.

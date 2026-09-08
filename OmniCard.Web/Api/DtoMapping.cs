@@ -51,6 +51,7 @@ public static class DtoMapping
         StackedIds = c.StackedIds ?? [],
         Tags = c.Tags.ToList(),
         PurchasePrice = c.PurchasePrice,
+        Note = c.Note,
         MarketPrice = c.MarketPrice,
         ContainerId = c.ContainerId,
         ContainerName = c.Container?.Name,

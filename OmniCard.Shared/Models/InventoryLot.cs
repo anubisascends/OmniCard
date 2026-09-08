@@ -12,6 +12,8 @@ public class InventoryLot
     public int? LocationId { get; set; }   // existing StorageContainer.Id
     // Single copy attributes (unused in Phase 1; filled by Phase 2 migration).
     public string? Condition { get; set; }
+    /// <summary>Free-text user note on this physical copy (e.g. "signed", "creased corner").</summary>
+    public string? Note { get; set; }
     public string? ScanImagePath { get; set; }
     public int? Page { get; set; }
     public int? Slot { get; set; }

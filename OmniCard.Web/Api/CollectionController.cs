@@ -114,6 +114,7 @@ public sealed class CollectionController(
         card.IsFoil = req.IsFoil;
         card.FoilType = req.FoilType;
         card.PurchasePrice = req.PurchasePrice;
+        card.Note = req.Note;
         binderCards.UpdateCollectionCard(card);
         // Quantity isn't part of the identity/attribute copy above — persist it directly.
         binderCards.SetQuantity(id, req.Quantity);

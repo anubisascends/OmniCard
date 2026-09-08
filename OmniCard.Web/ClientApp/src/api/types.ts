@@ -31,6 +31,7 @@ export interface CardDto {
   stackedIds: number[];
   tags: string[];
   purchasePrice?: number | null;
+  note?: string | null;
   marketPrice: number;
   containerId?: number | null;
   containerName?: string | null;
@@ -302,6 +303,9 @@ export interface ScanMatchDto {
   imageUri?: string | null;
   confidence?: number | null;
   scanHash: string;
+  /** Server-rendered JPEG data URI, set only when the upload's own format (e.g. TIFF) can't render
+   * in a browser <img>. Null for JPEG/PNG. */
+  scanPreviewDataUri?: string | null;
   error?: string | null;
 }
 
@@ -326,8 +330,11 @@ export interface ScanCommitItem {
   imageUri?: string | null;
   condition: string;
   isFoil: boolean;
+  foilType?: string | null;
   quantity: number;
   purchasePrice?: number | null;
+  note?: string | null;
+  tags?: string[];
 }
 
 export interface ScanCommitResultDto {

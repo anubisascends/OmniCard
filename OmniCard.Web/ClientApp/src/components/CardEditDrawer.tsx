@@ -43,6 +43,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
   const [isFoil, setIsFoil] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [purchasePrice, setPurchasePrice] = useState<string>('');
+  const [note, setNote] = useState<string>('');
   const [containerId, setContainerId] = useState<number | ''>('');
   const [tags, setTags] = useState<string[]>([]);
   const [moveOpen, setMoveOpen] = useState(false);
@@ -54,6 +55,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
       setIsFoil(card.isFoil);
       setQuantity(card.quantity);
       setPurchasePrice(card.purchasePrice?.toString() ?? '');
+      setNote(card.note ?? '');
       setContainerId(card.containerId ?? '');
       setTags(card.tags);
     }
@@ -75,6 +77,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
         foilType: card.foilType,
         quantity,
         purchasePrice: purchasePrice === '' ? null : Number(purchasePrice),
+        note: note.trim() === '' ? null : note.trim(),
       });
       await api.cardSetTags(card.id, tags);
       if (containerId !== '' && containerId !== card.containerId) {
@@ -164,6 +167,16 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
               value={purchasePrice}
               onChange={(e) => setPurchasePrice(e.target.value)}
               inputProps={{ step: '0.01', min: 0 }}
+            />
+
+            <TextField
+              label="Note"
+              size="small"
+              multiline
+              minRows={2}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. signed, played, misprint…"
             />
 
             <Stack direction="row" spacing={1} alignItems="center">
