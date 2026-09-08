@@ -25,6 +25,7 @@ public class OmniCardDbContext : DbContext
     public DbSet<MigrationState> MigrationState => Set<MigrationState>();
     public DbSet<CardList> CardLists => Set<CardList>();
     public DbSet<CardListItem> CardListItems => Set<CardListItem>();
+    public DbSet<User> Users => Set<User>();
 
     public OmniCardDbContext(DbContextOptions<OmniCardDbContext> options) : base(options) { }
 
@@ -204,6 +205,17 @@ public class OmniCardDbContext : DbContext
         modelBuilder.Entity<MigrationState>(e =>
         {
             e.HasKey(m => m.Key);
+        });
+
+        modelBuilder.Entity<User>(e =>
+        {
+            e.HasKey(u => u.Id);
+            e.Property(u => u.Id).ValueGeneratedOnAdd();
+            e.Property(u => u.Username).IsRequired();
+            e.Property(u => u.PasswordHash).IsRequired();
+            // Usernames are unique (case-insensitive matching is handled in the service; the DB index
+            // enforces the hard uniqueness constraint under SQL Server's default case-insensitive collation).
+            e.HasIndex(u => u.Username).IsUnique();
         });
 
         // Optimistic-concurrency tokens for the networked (multi-user) web deployment, which runs on

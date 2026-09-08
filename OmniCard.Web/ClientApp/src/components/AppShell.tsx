@@ -3,6 +3,7 @@ import { Link as RouterLink, useLocation } from 'react-router-dom';
 import {
   AppBar,
   Box,
+  Divider,
   Drawer,
   FormControl,
   IconButton,
@@ -10,6 +11,7 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Menu,
   MenuItem,
   Select,
   Toolbar,
@@ -18,6 +20,8 @@ import {
   useTheme,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import LogoutIcon from '@mui/icons-material/Logout';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
 import GridViewIcon from '@mui/icons-material/GridView';
@@ -28,8 +32,8 @@ import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import SettingsIcon from '@mui/icons-material/Settings';
-import { useQuery } from '@tanstack/react-query';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useGame } from '../context/GameContext';
 
@@ -46,16 +50,29 @@ const NAV: { to: string; label: string; icon: ReactNode }[] = [
   { to: '/trades', label: 'Trades', icon: <SwapHorizIcon /> },
   { to: '/import', label: 'Import', icon: <UploadFileIcon /> },
   { to: '/sales', label: 'Sales', icon: <PointOfSaleIcon /> },
-  { to: '/settings', label: 'Settings', icon: <SettingsIcon /> },
+  { to: '/settings', label: 'Administration', icon: <AdminPanelSettingsIcon /> },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const { game, setGame } = useGame();
+  const qc = useQueryClient();
   const gamesQuery = useQuery({ queryKey: ['games'], queryFn: api.games });
+  const authQuery = useQuery({ queryKey: ['auth-status'], queryFn: api.authStatus });
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [accountAnchor, setAccountAnchor] = useState<null | HTMLElement>(null);
+
+  const logout = useMutation({
+    mutationFn: () => api.logout(),
+    onSuccess: (status) => {
+      setAccountAnchor(null);
+      qc.setQueryData(['auth-status'], status);
+    },
+  });
+
+  const username = authQuery.data?.username;
 
   const navList = (
     <List>
@@ -110,6 +127,45 @@ export function AppShell({ children }: { children: ReactNode }) {
               ))}
             </Select>
           </FormControl>
+
+          <IconButton
+            color="inherit"
+            aria-label="Account"
+            onClick={(e) => setAccountAnchor(e.currentTarget)}
+            sx={{ ml: 0.5 }}
+          >
+            <AccountCircleIcon />
+          </IconButton>
+          <Menu
+            anchorEl={accountAnchor}
+            open={Boolean(accountAnchor)}
+            onClose={() => setAccountAnchor(null)}
+          >
+            {username && (
+              <MenuItem disabled sx={{ opacity: '1 !important' }}>
+                <Typography variant="body2" color="text.secondary">
+                  Signed in as <strong>{username}</strong>
+                </Typography>
+              </MenuItem>
+            )}
+            {username && <Divider />}
+            <MenuItem
+              component={RouterLink}
+              to="/settings?tab=users"
+              onClick={() => setAccountAnchor(null)}
+            >
+              <ListItemIcon>
+                <AdminPanelSettingsIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Account &amp; users</ListItemText>
+            </MenuItem>
+            <MenuItem disabled={logout.isPending} onClick={() => logout.mutate()}>
+              <ListItemIcon>
+                <LogoutIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Sign out</ListItemText>
+            </MenuItem>
+          </Menu>
         </Toolbar>
       </AppBar>
 

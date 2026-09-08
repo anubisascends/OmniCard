@@ -151,6 +151,27 @@ builder.Services.AddSingleton(sp =>
     new WebBinderCardService(writableFactory, sp.GetRequiredService<IDataPathService>()));
 builder.Services.AddScoped<BinderStateBuilder>();
 
+// User accounts + authentication. Passwords are stored only as salted PBKDF2 hashes; the built-in
+// Admin account (default password "admin") is seeded at startup below. Identity is carried in an
+// encrypted, HttpOnly cookie (DataProtection keys persisted above), so "remember me" survives
+// app-pool recycles and browser restarts. This replaces the old shared-passphrase gate.
+builder.Services.AddSingleton(new UserService(writableFactory));
+builder.Services
+    .AddAuthentication(AppAuthGate.Scheme)
+    .AddCookie(AppAuthGate.Scheme, options =>
+    {
+        options.Cookie.Name = "OmniCard.Auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.IsEssential = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.SlidingExpiration = true;
+        options.ExpireTimeSpan = AppAuthGate.RememberDuration;
+        // This is an API, not a server-rendered site: never 302-redirect to a login page — return the
+        // status code so the SPA's fetch layer can react (surface the login screen / a 403).
+        options.Events.OnRedirectToLogin = ctx => { ctx.Response.StatusCode = 401; return Task.CompletedTask; };
+        options.Events.OnRedirectToAccessDenied = ctx => { ctx.Response.StatusCode = 403; return Task.CompletedTask; };
+    });
+
 // Persist DataProtection keys to the data dir so WebCredentialStore's encrypted eBay tokens survive
 // app-pool recycles and don't depend on the IIS identity having a roaming profile.
 builder.Services.AddDataProtection()
@@ -173,6 +194,13 @@ using (var scope = app.Services.CreateScope())
     var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<OmniCardDbContext>>();
     using var db = factory.CreateDbContext();
     db.Database.Migrate();
+}
+
+// Seed the built-in Admin account (username "Admin", password "admin") if no users exist yet. The
+// admin can change the password after first sign-in. Runs after Migrate() so the Users table exists.
+using (var scope = app.Services.CreateScope())
+{
+    scope.ServiceProvider.GetRequiredService<UserService>().EnsureSeeded();
 }
 
 // Ensure the per-game catalog SQL Server databases + schemas exist (one DB per game). EnsureCreated
@@ -219,6 +247,8 @@ using (var scope = app.Services.CreateScope())
 
 app.UseStaticFiles();
 app.UseSession();
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Serve scan images from the data directory
 if (Directory.Exists(scansDir))

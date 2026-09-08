@@ -507,10 +507,39 @@ public sealed record ScanCommitResultDto(int Imported);
 
 // --- Auth ---
 
-/// <summary>Whether the site requires a passphrase and whether this session is authenticated.</summary>
-public sealed record AuthStatusDto(bool AuthRequired, bool Authenticated);
+/// <summary>
+/// Current authentication state for the SPA. <see cref="AuthRequired"/> is always true now (the app
+/// uses per-user accounts) but is kept so older clients that branch on it keep working. When
+/// <see cref="Authenticated"/>, <see cref="Username"/>/<see cref="IsAdmin"/> describe the signed-in user.
+/// </summary>
+public sealed record AuthStatusDto(bool AuthRequired, bool Authenticated, string? Username = null, bool IsAdmin = false);
 
 public sealed record LoginRequest
 {
-    public string Passphrase { get; init; } = "";
+    public string Username { get; init; } = "";
+    public string Password { get; init; } = "";
+    public bool RememberMe { get; init; }
+}
+
+/// <summary>A user account as exposed to the Administration UI (never carries the password hash).</summary>
+public sealed record UserDto(int Id, string Username, bool IsSystem, bool IsAdmin, DateTime CreatedAt);
+
+public sealed record CreateUserRequest
+{
+    public string Username { get; init; } = "";
+    public string Password { get; init; } = "";
+    public bool IsAdmin { get; init; }
+}
+
+/// <summary>Self-service password change — the current password is required to set a new one.</summary>
+public sealed record ChangePasswordRequest
+{
+    public string CurrentPassword { get; init; } = "";
+    public string NewPassword { get; init; } = "";
+}
+
+/// <summary>Admin password reset for another user (no current password needed).</summary>
+public sealed record ResetPasswordRequest
+{
+    public string NewPassword { get; init; } = "";
 }

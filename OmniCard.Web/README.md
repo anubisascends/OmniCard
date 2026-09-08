@@ -17,7 +17,11 @@ whole app — the original WPF desktop app has been retired.
   `OmniCard_Riftbound`, `OmniCard_Pokemon`, `OmniCard_Yugioh`, `OmniCard_FinalFantasy`). They're
   disposable reference caches (refresh wipes + reloads), so they use `EnsureCreated` at startup, not
   migrations. Refreshed in-place via the catalog "refresh" operations (Settings → Catalog data).
-- **Site-wide passphrase gate** — one shared passphrase (`Auth:Passphrase`); open when unconfigured.
+- **Per-user accounts** — username + password sign-in (passwords stored as salted PBKDF2 hashes).
+  A built-in `Admin` account (default password `admin`) is seeded on first run — change it after
+  signing in. "Remember me" issues a persistent, encrypted auth cookie. Manage accounts under
+  **Administration → Users**; per-user permissions are planned but not yet enforced (any admin has
+  full access today).
 - **Server-side scanning** — image upload → perceptual hash + OCR matching via the per-game
   `ICardGameService` pipeline; no TWAIN, no desktop agent.
 - **Server-hosted artwork** — card images cached under `{dataDir}/card-images`, served at
@@ -41,8 +45,7 @@ loaded automatically if present). Key settings:
 |-----|---------|
 | `DataDirectory` (or `--db <path>` CLI arg) | Folder holding `scans/`, `card-images/`, `symbols/`, `dataprotection-keys/`. |
 | `ConnectionStrings:OmniCard` | SQL Server unified store. Default: `Server=localhost;Database=OmniCard;Trusted_Connection=True;TrustServerCertificate=True;` The per-game catalog DBs reuse this with the database name swapped (or set `ConnectionStrings:OmniCard_<Game>` explicitly). |
-| `Auth:Passphrase` | Site-wide passphrase. Leave blank to run open (LAN-trusted only). |
-| `Binder:EditPassphrase` | Legacy binder-editor gate (separate from the site gate). |
+| `Binder:EditPassphrase` | Legacy binder-editor gate (separate from the per-user sign-in). |
 | `eBay` section | eBay app credentials — see [eBay](#ebay-setup). |
 
 DataProtection keys (used to encrypt stored eBay tokens) are persisted to
@@ -121,7 +124,7 @@ Deploy the published output to IIS:
 2. Create an **Application Pool** with **No Managed Code**.
 3. Create a **Site/Application** pointing at the published folder, using that app pool.
 4. Set config via `web.config` `environmentVariables` (or `appsettings.json`): `DataDirectory`,
-   `ConnectionStrings__OmniCard`, `Auth__Passphrase`, and the `eBay__*` keys as needed.
+   `ConnectionStrings__OmniCard`, and the `eBay__*` keys as needed.
 5. Grant the app-pool identity (`IIS AppPool\<name>`):
    - **read/write** on the data directory (`scans/`, `card-images/`, `dataprotection-keys/`),
    - access to SQL Server (or use a SQL login in the connection string instead of Windows auth).

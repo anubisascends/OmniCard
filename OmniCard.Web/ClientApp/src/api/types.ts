@@ -88,6 +88,16 @@ export interface DashboardDto {
 export interface AuthStatusDto {
   authRequired: boolean;
   authenticated: boolean;
+  username?: string | null;
+  isAdmin?: boolean;
+}
+
+export interface UserDto {
+  id: number;
+  username: string;
+  isSystem: boolean;
+  isAdmin: boolean;
+  createdAt: string;
 }
 
 export interface WorkflowLaneDto {

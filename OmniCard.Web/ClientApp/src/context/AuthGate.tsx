@@ -4,8 +4,10 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   Container,
+  FormControlLabel,
   Paper,
   Stack,
   TextField,
@@ -21,10 +23,12 @@ import { api, ApiError } from '../api/client';
 export function AuthGate({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
   const statusQuery = useQuery({ queryKey: ['auth-status'], queryFn: api.authStatus });
-  const [passphrase, setPassphrase] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
 
   const login = useMutation({
-    mutationFn: () => api.login(passphrase),
+    mutationFn: () => api.login(username, password, rememberMe),
     onSuccess: (status) => qc.setQueryData(['auth-status'], status),
   });
 
@@ -53,19 +57,37 @@ export function AuthGate({ children }: { children: ReactNode }) {
         >
           <Typography variant="h5">OmniCard</Typography>
           <Typography variant="body2" color="text.secondary">
-            Enter the passphrase to continue.
+            Sign in to continue.
           </Typography>
           <TextField
-            type="password"
-            label="Passphrase"
-            value={passphrase}
-            onChange={(e) => setPassphrase(e.target.value)}
+            label="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             autoFocus
+            autoComplete="username"
             fullWidth
           />
+          <TextField
+            type="password"
+            label="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            fullWidth
+          />
+          <FormControlLabel
+            control={
+              <Checkbox checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
+            }
+            label="Remember me"
+          />
           {login.error instanceof ApiError && <Alert severity="error">{login.error.message}</Alert>}
-          <Button type="submit" variant="contained" disabled={login.isPending || !passphrase}>
-            {login.isPending ? 'Checking…' : 'Unlock'}
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={login.isPending || !username || !password}
+          >
+            {login.isPending ? 'Signing in…' : 'Sign in'}
           </Button>
         </Stack>
       </Paper>
