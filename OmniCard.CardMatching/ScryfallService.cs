@@ -15,8 +15,14 @@ using OmniCard.Models;
 
 namespace OmniCard.CardMatching;
 
-public sealed class ScryfallService : IScryfallService, ICardGameService, IDisposable
+public sealed class ScryfallService : IScryfallService, ICardGameService, IGameFieldResolver, IDisposable
 {
+    // MTG's search vocabulary is exactly the shared/Scryfall core (name/set/cn/type/color/rarity/…),
+    // which SearchCards already handles as columns — so it has no extra game-specific fields, and
+    // owned-card search never needs the cross-catalog id-resolution path.
+    public SearchSchema SearchSchema => SharedSearchSchema.Default;
+    public IReadOnlySet<string>? ResolveFieldCardIds(string field, ComparisonOp op, string value) => null;
+
     private static readonly JsonSerializerOptions ScryfallJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower

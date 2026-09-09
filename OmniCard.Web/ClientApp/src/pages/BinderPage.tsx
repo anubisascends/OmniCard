@@ -7,7 +7,6 @@ import {
   Breadcrumbs,
   Button,
   CircularProgress,
-  InputAdornment,
   Link,
   Menu,
   MenuItem,
@@ -21,11 +20,11 @@ import {
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
-import SearchIcon from '@mui/icons-material/Search';
 import SellIcon from '@mui/icons-material/Sell';
 import { api } from '../api/client';
 import type { BinderCardDto, BinderSlotDto } from '../api/types';
 import { ListForSaleDialog } from '../components/ListForSaleDialog';
+import { SearchBox } from '../components/SearchBox';
 
 const CARD_BACK_SLUGS = ['mtg', 'optcg', 'riftbound', 'pokemon', 'yugioh', 'fftcg'];
 const cardBackSrc = (game: number): string | undefined => {
@@ -177,24 +176,9 @@ function UnplacedSidebar({
         </Typography>
         {loading && <CircularProgress size={14} />}
       </Stack>
-      <TextField
-        size="small"
-        fullWidth
-        autoFocus
-        placeholder="Search — e.g. set:mh3 t:creature"
-        value={filter}
-        onChange={(e) => onFilter(e.target.value)}
-        slotProps={{
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-          },
-        }}
-        sx={{ mb: 0.5 }}
-      />
+      <Box sx={{ mb: 0.5 }}>
+        <SearchBox value={filter} onChange={onFilter} autoFocus />
+      </Box>
       <Typography variant="caption" color="text.secondary" sx={{ mb: 1 }}>
         Drag onto a slot to place · drop a placed card here to remove it
       </Typography>

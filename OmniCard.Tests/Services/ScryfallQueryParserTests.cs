@@ -279,4 +279,79 @@ public class ScryfallQueryParserTests
         Assert.Equal("rarity", rarity.Field);
         Assert.Equal(ComparisonOp.GreaterOrEqual, rarity.Op);
     }
+
+    // --- Game-aware schema resolution ---
+
+    private static SearchSchema FfSchema() => SharedSearchSchema.WithGameFields(
+    [
+        new SearchFieldDefinition
+        {
+            Canonical = "element",
+            Aliases = ["element", "e", "el"],
+            ValueAliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["f"] = "Fire" },
+            Kind = SearchFieldKind.GameSpecific,
+            SourceKey = "Element",
+        },
+    ]);
+
+    [Fact]
+    public void ParseFilter_NoSchema_EResolvesToSet()
+    {
+        // Default/global behavior is unchanged: e: is an alias for set.
+        var f = Assert.IsType<FieldFilter>(ScryfallQueryParser.ParseFilter("e:f"));
+        Assert.Equal("set", f.Field);
+        Assert.Equal("f", f.Value);
+    }
+
+    [Fact]
+    public void ParseFilter_DefaultSchema_EStillResolvesToSet()
+    {
+        var f = Assert.IsType<FieldFilter>(ScryfallQueryParser.ParseFilter("e:f", SharedSearchSchema.Default));
+        Assert.Equal("set", f.Field);
+    }
+
+    [Fact]
+    public void ParseFilter_FfSchema_EResolvesToElement()
+    {
+        // Same token, different game schema: e: now means element (collision resolved per game).
+        var f = Assert.IsType<FieldFilter>(ScryfallQueryParser.ParseFilter("e:f", FfSchema()));
+        Assert.Equal("element", f.Field);
+        Assert.Equal("f", f.Value); // value aliases are applied by consumers, not the parser
+    }
+
+    [Theory]
+    [InlineData("element:fire")]
+    [InlineData("e:f")]
+    [InlineData("el:fire")]
+    public void ParseFilter_FfSchema_ElementAliasesAllResolve(string query)
+    {
+        var f = Assert.IsType<FieldFilter>(ScryfallQueryParser.ParseFilter(query, FfSchema()));
+        Assert.Equal("element", f.Field);
+    }
+
+    [Fact]
+    public void ParseFilter_FfSchema_CoreFieldsStillWork()
+    {
+        // Core aliases survive when a game schema is active.
+        var f = Assert.IsType<FieldFilter>(ScryfallQueryParser.ParseFilter("t:forward", FfSchema()));
+        Assert.Equal("type", f.Field);
+    }
+
+    [Fact]
+    public void SearchSchema_ResolveValue_AppliesValueAlias()
+    {
+        var schema = FfSchema();
+        Assert.Equal("Fire", schema.ResolveValue("element", "f"));
+        Assert.Equal("Ice", schema.ResolveValue("element", "Ice")); // unknown alias returns input
+        Assert.Equal("f", schema.ResolveValue("name", "f"));         // non-aliased field returns input
+    }
+
+    [Fact]
+    public void SearchSchema_IsGameSpecific_TrueForElementFalseForCore()
+    {
+        var schema = FfSchema();
+        Assert.True(schema.IsGameSpecific("element"));
+        Assert.False(schema.IsGameSpecific("set"));
+        Assert.False(schema.IsGameSpecific("name"));
+    }
 }

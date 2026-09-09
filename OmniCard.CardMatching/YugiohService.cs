@@ -18,6 +18,26 @@ public sealed class YugiohService : TcgCsvGameService<YugiohDbContext>
     public override CardGame Game => CardGame.YuGiOh;
     protected override string GameKey => "yugioh";
 
+    // Searchable Yu-Gi-Oh! attributes (from ExtendedDataJson). SourceKeys are TCGCSV extendedData names
+    // (best-effort; tune against a live catalog if a field returns no matches).
+    protected override IEnumerable<SearchFieldDefinition> GameSearchFields =>
+    [
+        new() { Canonical = "attribute", Aliases = ["attribute", "attr"], SourceKey = "Attribute",
+                Description = "Monster attribute (DARK, LIGHT, …).", Example = "attribute:dark" },
+        new() { Canonical = "level", Aliases = ["level", "lvl", "rank"], SourceKey = "Level",
+                SupportedOps = [ComparisonOp.Contains, ComparisonOp.Exact, ComparisonOp.NotEqual,
+                    ComparisonOp.LessThan, ComparisonOp.GreaterThan, ComparisonOp.LessOrEqual, ComparisonOp.GreaterOrEqual],
+                Description = "Level / Rank (supports <, >, <=, >=).", Example = "level>=8" },
+        new() { Canonical = "atk", Aliases = ["atk"], SourceKey = "Attack",
+                SupportedOps = [ComparisonOp.Contains, ComparisonOp.Exact, ComparisonOp.NotEqual,
+                    ComparisonOp.LessThan, ComparisonOp.GreaterThan, ComparisonOp.LessOrEqual, ComparisonOp.GreaterOrEqual],
+                Description = "ATK (supports <, >, <=, >=).", Example = "atk>=3000" },
+        new() { Canonical = "def", Aliases = ["def"], SourceKey = "Defense",
+                SupportedOps = [ComparisonOp.Contains, ComparisonOp.Exact, ComparisonOp.NotEqual,
+                    ComparisonOp.LessThan, ComparisonOp.GreaterThan, ComparisonOp.LessOrEqual, ComparisonOp.GreaterOrEqual],
+                Description = "DEF (supports <, >, <=, >=).", Example = "def>=2500" },
+    ];
+
     protected override (decimal? Normal, decimal? Foil) MapSubtypePrices(List<TcgCsvPrice> rows) => MapSubtypePricesForTest(rows);
 
     // Yu-Gi-Oh! sub-types are editions, not foils. Use Unlimited as the reference "normal" price

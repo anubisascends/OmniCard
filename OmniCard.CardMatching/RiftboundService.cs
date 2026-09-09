@@ -14,7 +14,7 @@ using OmniCard.Models;
 
 namespace OmniCard.CardMatching;
 
-public sealed class RiftboundService : ICardGameService, IDisposable
+public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDisposable
 {
     private const string ApiBaseUrl = "https://api.riftcodex.com";
     private const int CorrectionTrustBonus = 5;
@@ -785,35 +785,68 @@ public sealed class RiftboundService : ICardGameService, IDisposable
             .OrderBy(c => c.CollectorNumber, CollectorNumberComparer.Instance)
             .ToList();
 
+    // Riftbound searchable fields. Core name/set/cn/type/rarity map to columns; domain/energy/might/
+    // power/supertype are game-specific (also resolvable for owned-card search).
+    private SearchSchema? _searchSchema;
+    public SearchSchema SearchSchema => _searchSchema ??= SharedSearchSchema.WithGameFields(
+    [
+        new SearchFieldDefinition { Canonical = "domain", Aliases = ["domain", "d"], SourceKey = nameof(RiftboundCard.Domain),
+            Description = "Domain (Body, Order, …). Matches any of a card's domains.", Example = "domain:body" },
+        new SearchFieldDefinition { Canonical = "energy", Aliases = ["energy"], SourceKey = nameof(RiftboundCard.Energy),
+            SupportedOps = [ComparisonOp.Contains, ComparisonOp.Exact, ComparisonOp.NotEqual,
+                ComparisonOp.LessThan, ComparisonOp.GreaterThan, ComparisonOp.LessOrEqual, ComparisonOp.GreaterOrEqual],
+            Description = "Energy cost (supports <, >, <=, >=).", Example = "energy>=4" },
+        new SearchFieldDefinition { Canonical = "might", Aliases = ["might", "m"], SourceKey = nameof(RiftboundCard.Might),
+            SupportedOps = [ComparisonOp.Contains, ComparisonOp.Exact, ComparisonOp.NotEqual,
+                ComparisonOp.LessThan, ComparisonOp.GreaterThan, ComparisonOp.LessOrEqual, ComparisonOp.GreaterOrEqual],
+            Description = "Might (supports <, >, <=, >=).", Example = "might>=5" },
+        new SearchFieldDefinition { Canonical = "power", Aliases = ["power", "pow"], SourceKey = nameof(RiftboundCard.Power),
+            SupportedOps = [ComparisonOp.Contains, ComparisonOp.Exact, ComparisonOp.NotEqual,
+                ComparisonOp.LessThan, ComparisonOp.GreaterThan, ComparisonOp.LessOrEqual, ComparisonOp.GreaterOrEqual],
+            Description = "Power (supports <, >, <=, >=).", Example = "power>=3" },
+        new SearchFieldDefinition { Canonical = "supertype", Aliases = ["supertype", "super"], SourceKey = nameof(RiftboundCard.Supertype),
+            Description = "Supertype.", Example = "supertype:champion" },
+    ]);
+
+    private static readonly CatalogFieldMap<RiftboundCard> FieldMap = BuildFieldMap();
+
+    private static CatalogFieldMap<RiftboundCard> BuildFieldMap()
+    {
+        var map = new CatalogFieldMap<RiftboundCard>
+        {
+            NamePredicate = (p, op, v) => CatalogSearchExpressionBuilder.StringPredicate(p, nameof(RiftboundCard.Name), op, v),
+        };
+        map.Str("name", nameof(RiftboundCard.Name))
+           .Field("set", (p, op, v) => System.Linq.Expressions.Expression.OrElse(
+               CatalogSearchExpressionBuilder.StringPredicate(p, nameof(RiftboundCard.SetId), op, v),
+               CatalogSearchExpressionBuilder.StringPredicate(p, nameof(RiftboundCard.SetName), op, v)))
+           .Num("cn", nameof(RiftboundCard.CollectorNumber))
+           .Str("type", nameof(RiftboundCard.CardType))
+           .Str("rarity", nameof(RiftboundCard.Rarity))
+           .Str("domain", nameof(RiftboundCard.Domain))
+           .Num("energy", nameof(RiftboundCard.Energy))
+           .Num("might", nameof(RiftboundCard.Might))
+           .Num("power", nameof(RiftboundCard.Power))
+           .Str("supertype", nameof(RiftboundCard.Supertype));
+        return map;
+    }
+
     public List<CardMatch> SearchCards(string query, int maxResults = 20)
     {
         if (string.IsNullOrWhiteSpace(query)) return [];
+        var node = ScryfallQueryParser.ParseFilter(query, SearchSchema);
         IQueryable<RiftboundCard> cards = _readContext.Cards.AsNoTracking();
-        foreach (var term in query.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-        {
-            var t = term;
-            if (t.StartsWith("set:", StringComparison.OrdinalIgnoreCase))
-            {
-                var val = t[4..];
-                cards = cards.Where(c => EF.Functions.Like(c.SetId, $"%{val}%") || EF.Functions.Like(c.SetName, $"%{val}%"));
-            }
-            else if (t.StartsWith("cn:", StringComparison.OrdinalIgnoreCase))
-            {
-                var val = t[3..];
-                if (int.TryParse(val, out var cn))
-                    cards = cards.Where(c => c.CollectorNumber == cn);
-            }
-            else if (t.StartsWith("type:", StringComparison.OrdinalIgnoreCase) || t.StartsWith("t:", StringComparison.OrdinalIgnoreCase))
-            {
-                var val = t[(t.IndexOf(':') + 1)..];
-                cards = cards.Where(c => EF.Functions.Like(c.CardType, $"%{val}%"));
-            }
-            else
-            {
-                cards = cards.Where(c => EF.Functions.Like(c.Name, $"%{t}%"));
-            }
-        }
+        var lambda = CatalogSearchExpressionBuilder.Build(node, SearchSchema, FieldMap);
+        if (lambda is not null) cards = cards.Where(lambda);
         return cards.OrderBy(c => c.Name).Take(maxResults).AsEnumerable().Select(c => ToMatch(c)).ToList();
+    }
+
+    public IReadOnlySet<string>? ResolveFieldCardIds(string field, ComparisonOp op, string value)
+    {
+        if (!SearchSchema.IsGameSpecific(field)) return null;
+        var resolved = SearchSchema.ResolveValue(field, value);
+        var lambda = CatalogSearchExpressionBuilder.SingleField(field, op, resolved, FieldMap);
+        return _readContext.Cards.AsNoTracking().Where(lambda).Select(c => c.Id).ToHashSet();
     }
 
     public List<CardMatch> GetPrintings(string cardName)
