@@ -3,9 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using OmniCard.Api.Contracts;
 using OmniCard.Collection;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
 using OmniCard.Web.Services;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Tags;
 
 namespace OmniCard.Web.Api;
 

@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using OmniCard.Models;
+using OmniCard.Shared.Games;
 
 namespace OmniCard.Tests.Services;
 

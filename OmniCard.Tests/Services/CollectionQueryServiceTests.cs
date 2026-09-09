@@ -3,8 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using Moq;
 using OmniCard.Collection;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Sales;
+using OmniCard.Shared.Storage;
 
 namespace OmniCard.Tests.Services;
 

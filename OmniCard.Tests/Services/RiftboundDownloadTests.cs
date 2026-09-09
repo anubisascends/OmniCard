@@ -6,8 +6,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.CardMatching;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services;
 

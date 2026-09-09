@@ -1,7 +1,5 @@
-using System.IO;
 using OmniCard.Audit;
-using OmniCard.Models;
-using Xunit;
+using OmniCard.Shared.Sales;
 
 namespace OmniCard.Tests.Services;
 

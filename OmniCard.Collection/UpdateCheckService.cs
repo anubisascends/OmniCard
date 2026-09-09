@@ -1,7 +1,5 @@
-using System.Net.Http;
 using System.Text.Json;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Collection;
 

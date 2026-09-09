@@ -2,14 +2,22 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.IO;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OmniCard.CardMatching;
 using OmniCard.Data;
-using OmniCard.Imaging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Audit;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Ebay;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Sets;
+using OmniCard.Shared.Settings;
+using OmniCard.Shared.Storage;
+using OmniCard.Shared.Tags;
 
 namespace OmniCard.Collection;
 

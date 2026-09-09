@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Inventory;
 
 namespace OmniCard.Collection;
 

@@ -2,8 +2,9 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Models;
 using OmniCard.CardMatching;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services;
 
@@ -54,7 +55,7 @@ public class OptcgCorrectionTests : IDisposable
 
     private OptcgService CreateService()
     {
-        var dataPath = new Moq.Mock<OmniCard.Interfaces.IDataPathService>();
+        var dataPath = new Moq.Mock<IDataPathService>();
         dataPath.Setup(d => d.DataDirectory).Returns(Path.GetTempPath());
         return new OptcgService(
             new StubHttpClientFactory(),

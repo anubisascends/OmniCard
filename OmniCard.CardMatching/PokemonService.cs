@@ -1,10 +1,10 @@
-using System.Net.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OmniCard.Data;
-using OmniCard.Imaging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.CardMatching;
 

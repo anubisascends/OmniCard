@@ -1,8 +1,8 @@
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Audit;
+using OmniCard.Shared.Scanning;
 
 namespace OmniCard.Audit;
 

@@ -4,8 +4,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.CardMatching;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services;
 
@@ -30,14 +32,38 @@ public class FftcgOcrMatchTests : IDisposable
         ctx.Database.EnsureCreated();
         ctx.MarkMigrationComplete(); // else the service ctor wipes Cards as "pre-schema"
         ctx.Cards.AddRange(
-            new TcgCsvCard { ProductId = 1, Game = CardGame.FinalFantasy, Name = "Cloud",
-                SetCode = "9", SetName = "Opus IX", CollectorNumber = "9-085C", ImageHash = 0x1UL },
-            new TcgCsvCard { ProductId = 2, Game = CardGame.FinalFantasy, Name = "Reprint Card",
-                SetCode = "RE", SetName = "Reprint", CollectorNumber = "Re-103C/11-072R", ImageHash = 0x2UL },
+            new TcgCsvCard
+            {
+                ProductId = 1,
+                Game = CardGame.FinalFantasy,
+                Name = "Cloud",
+                SetCode = "9",
+                SetName = "Opus IX",
+                CollectorNumber = "9-085C",
+                ImageHash = 0x1UL
+            },
+            new TcgCsvCard
+            {
+                ProductId = 2,
+                Game = CardGame.FinalFantasy,
+                Name = "Reprint Card",
+                SetCode = "RE",
+                SetName = "Reprint",
+                CollectorNumber = "Re-103C/11-072R",
+                ImageHash = 0x2UL
+            },
             // Shares the "072R" tail with the reprint's second part but is a distinct number — proves
             // the '/'-boundary match doesn't substring-collide.
-            new TcgCsvCard { ProductId = 3, Game = CardGame.FinalFantasy, Name = "Other",
-                SetCode = "29", SetName = "Blissful Eternity", CollectorNumber = "29-072R", ImageHash = 0x3UL });
+            new TcgCsvCard
+            {
+                ProductId = 3,
+                Game = CardGame.FinalFantasy,
+                Name = "Other",
+                SetCode = "29",
+                SetName = "Blissful Eternity",
+                CollectorNumber = "29-072R",
+                ImageHash = 0x3UL
+            });
         ctx.SaveChanges();
     }
 

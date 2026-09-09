@@ -1,6 +1,15 @@
 using System.Collections.ObjectModel;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Binder;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Lists;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Sets;
+using OmniCard.Shared.Storage;
+using OmniCard.Shared.Tags;
 
 namespace OmniCard.Tests.Fakes;
 
@@ -29,7 +38,7 @@ public sealed class ConfigurableGameService : ICardGameService
     public IReadOnlyList<SetInfo> GetAvailableSets() => Sets;
     public Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null) => Task.FromResult(new List<SetCompletionSummary>());
     public List<MissingCard> GetMissingCards(string setCode, IEnumerable<string> ownedCollectorNumbers) => [];
-        public List<SetCatalogCard> GetSetCards(string setCode) => [];
+    public List<SetCatalogCard> GetSetCards(string setCode) => [];
     public object? FindCardById(string gameCardId) => OnFindCardById(gameCardId);
 }
 

@@ -1,8 +1,7 @@
-using System.IO;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Settings;
+using OmniCard.Shared.Trades;
 
 namespace OmniCard.Collection;
 
@@ -67,16 +66,16 @@ public sealed class TradeService(
         IEnumerable<Trade> trades,
         int replacementCount,
         IReadOnlyDictionary<int, string?> lotScanPaths) => new()
-    {
-        Id = session.Id,
-        Note = session.Note,
-        ReceivedPhotoPath = session.ReceivedPhotoPath,
-        OutgoingValue = session.OutgoingValue,
-        ReceivedValue = session.ReceivedValue,
-        CreatedAt = session.CreatedAt,
-        FirstFulfilledAt = session.FirstFulfilledAt,
-        ReplacementCount = replacementCount,
-        OutgoingCards = trades
+        {
+            Id = session.Id,
+            Note = session.Note,
+            ReceivedPhotoPath = session.ReceivedPhotoPath,
+            OutgoingValue = session.OutgoingValue,
+            ReceivedValue = session.ReceivedValue,
+            CreatedAt = session.CreatedAt,
+            FirstFulfilledAt = session.FirstFulfilledAt,
+            ReplacementCount = replacementCount,
+            OutgoingCards = trades
             .OrderBy(t => t.Id)
             .Select(t => new TradeCardSummary
             {
@@ -92,5 +91,5 @@ public sealed class TradeService(
                     ?? (t.OriginalLotId is int lotId ? lotScanPaths.GetValueOrDefault(lotId) : null),
             })
             .ToList(),
-    };
+        };
 }

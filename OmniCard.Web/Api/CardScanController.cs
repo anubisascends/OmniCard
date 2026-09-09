@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
-using OmniCard.Interfaces;
-using OmniCard.Models;
 using OmniCard.Web.Services;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Tags;
 
 namespace OmniCard.Web.Api;
 

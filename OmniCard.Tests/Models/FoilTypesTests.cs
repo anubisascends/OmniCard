@@ -1,4 +1,4 @@
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
 
 namespace OmniCard.Tests.Models;
 

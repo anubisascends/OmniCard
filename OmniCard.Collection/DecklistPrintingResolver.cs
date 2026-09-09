@@ -1,5 +1,6 @@
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Lists;
+using OmniCard.Shared.Matching;
 
 namespace OmniCard.Collection;
 

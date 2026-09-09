@@ -1,12 +1,11 @@
-using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Ebay;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.eBay;
 

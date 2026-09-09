@@ -1,7 +1,6 @@
-using System.IO;
 using System.Text.Json;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Collection;
 

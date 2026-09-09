@@ -7,8 +7,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.CardMatching;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services;
 
@@ -29,8 +29,13 @@ public class RiftboundHashingTests : IDisposable
         ctx.MarkMigrationComplete();
         ctx.Cards.Add(new RiftboundCard
         {
-            Id = "c1", RiftboundId = "ogn-1-298", CollectorNumber = 1, Name = "Test",
-            SetId = "OGN", SetName = "Origins", CardImageUri = "https://cdn/c1.png",
+            Id = "c1",
+            RiftboundId = "ogn-1-298",
+            CollectorNumber = 1,
+            Name = "Test",
+            SetId = "OGN",
+            SetName = "Origins",
+            CardImageUri = "https://cdn/c1.png",
         });
         ctx.SaveChanges();
 

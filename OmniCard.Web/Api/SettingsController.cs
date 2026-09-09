@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
-using OmniCard.Interfaces;
+using OmniCard.Shared.Sales;
 
 namespace OmniCard.Web.Api;
 

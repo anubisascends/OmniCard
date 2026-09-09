@@ -4,8 +4,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.CardMatching;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services;
 
@@ -63,8 +64,14 @@ public class FinalFantasyElementSearchTests : IDisposable
 
     private static TcgCsvCard Card(int id, string name, string element, int cost) => new()
     {
-        ProductId = id, Game = CardGame.FinalFantasy, Name = name, SetCode = "OP1", SetName = "Opus I",
-        CollectorNumber = $"1-00{id}H", Rarity = "Hero", CardType = "Forward",
+        ProductId = id,
+        Game = CardGame.FinalFantasy,
+        Name = name,
+        SetCode = "OP1",
+        SetName = "Opus I",
+        CollectorNumber = $"1-00{id}H",
+        Rarity = "Hero",
+        CardType = "Forward",
         ExtendedDataJson =
             $"[{{\"name\":\"Element\",\"displayName\":\"Element\",\"value\":\"{element}\"}}," +
             $"{{\"name\":\"Cost\",\"displayName\":\"Cost\",\"value\":\"{cost}\"}}]",

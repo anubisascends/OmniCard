@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.IO;
-using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -9,8 +7,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Sets;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.CardMatching;
 
@@ -776,10 +780,15 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
             .Select(c => new SetCatalogCard
             {
                 GameCardId = c.Id,
-                Name = c.Name, CollectorNumber = c.CollectorNumber.ToString(),
-                SetCode = c.SetId, SetName = c.SetName, Rarity = c.Rarity,
-                ImageUri = c.CardImageUri, LocalImagePath = c.LocalImagePath,
-                NormalPrice = c.MarketPrice, FoilPrice = c.FoilMarketPrice,
+                Name = c.Name,
+                CollectorNumber = c.CollectorNumber.ToString(),
+                SetCode = c.SetId,
+                SetName = c.SetName,
+                Rarity = c.Rarity,
+                ImageUri = c.CardImageUri,
+                LocalImagePath = c.LocalImagePath,
+                NormalPrice = c.MarketPrice,
+                FoilPrice = c.FoilMarketPrice,
                 HasFoil = c.FoilMarketPrice.HasValue,
             })
             .OrderBy(c => c.CollectorNumber, CollectorNumberComparer.Instance)

@@ -1,9 +1,14 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System.IO;
 using System.Text.Json;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Ebay;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Settings;
+using OmniCard.Shared.Storage;
 
 namespace OmniCard.Data;
 
@@ -39,7 +44,7 @@ public static class UnifiedMigrationService
     private const string InventoryBackupSuffix = ".pre-unified-migration.bak";
 
     /// <summary>
-    /// Key of the <see cref="Models.MigrationState"/> row inserted (atomically, in the same
+    /// Key of the <see cref="MigrationState"/> row inserted (atomically, in the same
     /// transaction as the migrated data) once the one-time migration completes. This DB marker —
     /// not the file flag below — is authoritative for "has this migration already run?", because
     /// it commits (or rolls back) together with the data it describes.

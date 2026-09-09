@@ -1,5 +1,5 @@
 using OmniCard.Audit;
-using OmniCard.Models;
+using OmniCard.Shared.Lists;
 
 namespace OmniCard.Tests.Services;
 

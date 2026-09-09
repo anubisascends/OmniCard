@@ -4,8 +4,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.CardMatching;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services;
 
@@ -24,9 +24,15 @@ public class OptcgVariantMatchTests : IDisposable
         ctx.Database.EnsureCreated();
         ctx.Cards.Add(new OptcgCard
         {
-            CardSetId = "OP01-001_p1", CardNumber = "OP01-001", VariantIndex = 1,
-            CardName = "Zoro", SetId = "OP01", SetName = "Romance Dawn", Rarity = "SEC",
-            ImageHash = 0x0UL, MarketPrice = 40m,
+            CardSetId = "OP01-001_p1",
+            CardNumber = "OP01-001",
+            VariantIndex = 1,
+            CardName = "Zoro",
+            SetId = "OP01",
+            SetName = "Romance Dawn",
+            Rarity = "SEC",
+            ImageHash = 0x0UL,
+            MarketPrice = 40m,
         });
         ctx.SaveChanges();
         ctx.MarkMigrationComplete();

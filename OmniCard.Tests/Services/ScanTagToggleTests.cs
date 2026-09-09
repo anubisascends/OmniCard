@@ -1,6 +1,5 @@
 using OmniCard.Collection;
-using OmniCard.Models;
-using Xunit;
+using OmniCard.Shared.Scanning;
 
 namespace OmniCard.Tests.Services;
 

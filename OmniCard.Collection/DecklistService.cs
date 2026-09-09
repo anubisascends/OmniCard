@@ -1,11 +1,12 @@
 using System.Diagnostics;
-using System.Net.Http;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Lists;
+using OmniCard.Shared.Matching;
 
 namespace OmniCard.Collection;
 

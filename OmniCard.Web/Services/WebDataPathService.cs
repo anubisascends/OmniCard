@@ -1,4 +1,4 @@
-using OmniCard.Interfaces;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Web.Services;
 

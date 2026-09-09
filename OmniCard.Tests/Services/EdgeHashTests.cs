@@ -1,6 +1,5 @@
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.IO;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Imaging;
 

@@ -1,8 +1,6 @@
 using System.Net;
-using System.Net.Http;
 using System.Text;
 using OmniCard.Collection;
-using Xunit;
 
 namespace OmniCard.Tests.Services;
 

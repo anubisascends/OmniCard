@@ -1,7 +1,5 @@
-using System.IO;
 using OmniCard.Collection;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services;
 

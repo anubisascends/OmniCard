@@ -1,9 +1,9 @@
-using System.Globalization;
-using CsvHelper;
-using CsvHelper.Configuration;
-using OmniCard.Models;
-using OmniCard.Interfaces;
 using OmniCard.Collection;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Storage;
 
 namespace OmniCard.Tests.Services;
 

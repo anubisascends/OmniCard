@@ -1,8 +1,7 @@
-using System.IO;
-using System.Text.Json;
 using OmniCard.Data;
-using OmniCard.Models;
 using OmniCard.Collection;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
 
 namespace OmniCard.Tests.Services;
 

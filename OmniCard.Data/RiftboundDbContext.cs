@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using OmniCard.Models;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Matching;
 
 namespace OmniCard.Data;
 

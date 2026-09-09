@@ -3,8 +3,15 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Collection;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Lists;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Sets;
+using OmniCard.Shared.Storage;
 
 namespace OmniCard.Tests.Services;
 
@@ -27,8 +34,10 @@ public class DecklistMatchingTests : IDisposable
         // Seed Bulk container
         ctx.StorageContainers.Add(new StorageContainer
         {
-            Name = "Bulk", ContainerType = ContainerType.Bulk,
-            IsSystem = true, SortOrder = 0,
+            Name = "Bulk",
+            ContainerType = ContainerType.Bulk,
+            IsSystem = true,
+            SortOrder = 0,
         });
         ctx.SaveChanges();
     }
@@ -46,10 +55,14 @@ public class DecklistMatchingTests : IDisposable
         using var ctx = _dbFactory.CreateDbContext();
         var product = new Product
         {
-            Game = CardGame.Mtg, GameCardId = Guid.NewGuid().ToString(),
+            Game = CardGame.Mtg,
+            GameCardId = Guid.NewGuid().ToString(),
             Category = ProductCategory.Single,
-            Name = name, SetCode = setCode, CollectorNumber = number,
-            SetName = setCode, Rarity = "common",
+            Name = name,
+            SetCode = setCode,
+            CollectorNumber = number,
+            SetName = setCode,
+            Rarity = "common",
             Foil = isFoil,
         };
         ctx.Products.Add(product);
@@ -57,8 +70,12 @@ public class DecklistMatchingTests : IDisposable
 
         ctx.Lots.Add(new InventoryLot
         {
-            ProductId = product.Id, Condition = "NM",
-            LocationId = containerId, Page = page, Slot = slot, Section = section,
+            ProductId = product.Id,
+            Condition = "NM",
+            LocationId = containerId,
+            Page = page,
+            Slot = slot,
+            Section = section,
         });
         ctx.SaveChanges();
     }

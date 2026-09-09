@@ -1,4 +1,3 @@
-using System.IO;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Imaging;
 

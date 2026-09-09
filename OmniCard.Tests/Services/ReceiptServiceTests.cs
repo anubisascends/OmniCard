@@ -1,11 +1,12 @@
-using System.IO;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Collection;
 using OmniCard.Data;
-using OmniCard.Models;
-using Xunit;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Sales;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services;
 
@@ -32,7 +33,7 @@ public class ReceiptServiceTests : IDisposable
     private sealed class Factory(DbContextOptions<OmniCardDbContext> o) : IDbContextFactory<OmniCardDbContext>
     { public OmniCardDbContext CreateDbContext() => new(o); }
 
-    private sealed class DataPathStub(string dir) : OmniCard.Interfaces.IDataPathService
+    private sealed class DataPathStub(string dir) : IDataPathService
     {
         public string DataDirectory => dir;
         public string ScansDirectory => dir;

@@ -3,8 +3,13 @@ using Microsoft.EntityFrameworkCore;
 using OmniCard.CardMatching;
 using OmniCard.Collection;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Sets;
 
 namespace OmniCard.Tests.Services;
 
@@ -36,8 +41,14 @@ public class CollectionGameFieldSearchTests : IDisposable
         using var ctx = _factory.CreateDbContext();
         var product = new Product
         {
-            Game = game, Category = ProductCategory.Single, GameCardId = gameCardId, Name = name,
-            SetName = "Opus I", SetCode = "OP1", CollectorNumber = "1", Rarity = "hero",
+            Game = game,
+            Category = ProductCategory.Single,
+            GameCardId = gameCardId,
+            Name = name,
+            SetName = "Opus I",
+            SetCode = "OP1",
+            CollectorNumber = "1",
+            Rarity = "hero",
         };
         ctx.Products.Add(product);
         ctx.SaveChanges();

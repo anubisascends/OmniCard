@@ -3,11 +3,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
 using OmniCard.eBay;
 using System.Net;
 using System.Text.Json;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Ebay;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Sales;
 
 namespace OmniCard.Tests.Services;
 
@@ -63,8 +66,13 @@ public class EbayListingServiceTests : IDisposable
     {
         var product = new Product
         {
-            Game = CardGame.Mtg, Category = ProductCategory.Single, Name = name,
-            SetName = "Alpha", SetCode = "LEA", CollectorNumber = "232", Rarity = "Rare",
+            Game = CardGame.Mtg,
+            Category = ProductCategory.Single,
+            Name = name,
+            SetName = "Alpha",
+            SetCode = "LEA",
+            CollectorNumber = "232",
+            Rarity = "Rare",
             GameCardId = "scryfall-123",
         };
         ctx.Products.Add(product);
@@ -175,8 +183,10 @@ public class EbayListingServiceTests : IDisposable
             lotId = SeedLot(ctx, "Test");
             ctx.EbayListings.Add(new EbayListing
             {
-                LotId = lotId, EbayItemId = "ebay-123",
-                Status = EbayListingStatus.Active, ListedPrice = 10m,
+                LotId = lotId,
+                EbayItemId = "ebay-123",
+                Status = EbayListingStatus.Active,
+                ListedPrice = 10m,
             });
             ctx.SaveChanges();
         }
@@ -317,8 +327,12 @@ public class EbayListingServiceTests : IDisposable
 
         var product = new Product
         {
-            Game = CardGame.Mtg, Category = ProductCategory.Box, Name = "Bloomburrow Booster Box",
-            SetName = "Bloomburrow", SetCode = "BLB", ImageUri = "https://boxes.example/blb.jpg",
+            Game = CardGame.Mtg,
+            Category = ProductCategory.Box,
+            Name = "Bloomburrow Booster Box",
+            SetName = "Bloomburrow",
+            SetCode = "BLB",
+            ImageUri = "https://boxes.example/blb.jpg",
         };
         var ok = await svc.CreateSealedListingAsync(product, lotId,
             new EbayListingOptions { Title = "t", Description = "d", Price = 120m, IncludeStockImage = true, ListingType = EbayListingType.FixedPrice });
@@ -483,7 +497,10 @@ public class EbayListingServiceTests : IDisposable
             lotId = SeedLot(ctx, "Cascade Test");
             ctx.EbayListings.Add(new EbayListing
             {
-                LotId = lotId, EbayItemId = "ebay-cascade", Status = EbayListingStatus.Active, ListedPrice = 1m,
+                LotId = lotId,
+                EbayItemId = "ebay-cascade",
+                Status = EbayListingStatus.Active,
+                ListedPrice = 1m,
             });
             ctx.SaveChanges();
         }

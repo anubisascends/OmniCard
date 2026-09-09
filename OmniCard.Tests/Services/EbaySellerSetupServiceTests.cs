@@ -1,12 +1,10 @@
 using System.Net;
-using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using OmniCard.Interfaces;
-using OmniCard.Models;
 using OmniCard.eBay;
+using OmniCard.Shared.Ebay;
 
 namespace OmniCard.Tests.Services;
 

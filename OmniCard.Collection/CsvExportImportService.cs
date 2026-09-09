@@ -1,10 +1,12 @@
 using System.Globalization;
-using System.IO;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.ImportExport;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Storage;
 
 namespace OmniCard.Collection;
 

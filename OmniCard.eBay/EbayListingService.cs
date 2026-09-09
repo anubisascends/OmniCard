@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -7,8 +6,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Ebay;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Sales;
 
 namespace OmniCard.eBay;
 

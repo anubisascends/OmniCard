@@ -4,8 +4,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Models;
 using OmniCard.CardMatching;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
 
 namespace OmniCard.Tests.Services;
 
@@ -59,33 +60,45 @@ public class TieZoneScoringTests : IDisposable
                 Id = Guid.Parse("00000000-0000-0000-0000-000000000001"),
                 OracleId = Guid.NewGuid(),
                 Name = "Wrong Card A",
-                Lang = "en", Layout = "normal", TypeLine = "Creature",
-                SetCode = "TST", SetName = "Test Set",
-                CollectorNumber = "001", Rarity = "common",
+                Lang = "en",
+                Layout = "normal",
+                TypeLine = "Creature",
+                SetCode = "TST",
+                SetName = "Test Set",
+                CollectorNumber = "001",
+                Rarity = "common",
                 ImageHash = 0x0000_0000_0000_0003, // dist 2 from scan 0x00
-                ArtHash =   0x0000_0000_0000_7F00, // art dist ~14 from scan art
+                ArtHash = 0x0000_0000_0000_7F00, // art dist ~14 from scan art
             },
             new Card
             {
                 Id = Guid.Parse("00000000-0000-0000-0000-000000000002"),
                 OracleId = Guid.NewGuid(),
                 Name = "Correct Card",
-                Lang = "en", Layout = "normal", TypeLine = "Creature",
-                SetCode = "TST", SetName = "Test Set",
-                CollectorNumber = "002", Rarity = "common",
+                Lang = "en",
+                Layout = "normal",
+                TypeLine = "Creature",
+                SetCode = "TST",
+                SetName = "Test Set",
+                CollectorNumber = "002",
+                Rarity = "common",
                 ImageHash = 0x0000_0000_0000_0005, // dist 2 from scan 0x00 (tied)
-                ArtHash =   0x0000_0000_0000_00F0, // art dist ~4 from scan art 0xF1
+                ArtHash = 0x0000_0000_0000_00F0, // art dist ~4 from scan art 0xF1
             },
             new Card
             {
                 Id = Guid.Parse("00000000-0000-0000-0000-000000000003"),
                 OracleId = Guid.NewGuid(),
                 Name = "Wrong Card C",
-                Lang = "en", Layout = "normal", TypeLine = "Creature",
-                SetCode = "TST", SetName = "Test Set",
-                CollectorNumber = "003", Rarity = "common",
+                Lang = "en",
+                Layout = "normal",
+                TypeLine = "Creature",
+                SetCode = "TST",
+                SetName = "Test Set",
+                CollectorNumber = "003",
+                Rarity = "common",
                 ImageHash = 0x0000_0000_0000_0006, // dist 2 from scan 0x00 (tied)
-                ArtHash =   0x0000_0000_0000_3F00, // art dist ~12 from scan art
+                ArtHash = 0x0000_0000_0000_3F00, // art dist ~12 from scan art
             }
         );
         ctx.SaveChanges();
@@ -119,22 +132,30 @@ public class TieZoneScoringTests : IDisposable
                 Id = Guid.Parse("00000000-0000-0000-0000-000000000001"),
                 OracleId = Guid.NewGuid(),
                 Name = "Wrong Card",
-                Lang = "en", Layout = "normal", TypeLine = "Creature",
-                SetCode = "TST", SetName = "Test Set",
-                CollectorNumber = "001", Rarity = "common",
+                Lang = "en",
+                Layout = "normal",
+                TypeLine = "Creature",
+                SetCode = "TST",
+                SetName = "Test Set",
+                CollectorNumber = "001",
+                Rarity = "common",
                 ImageHash = 0x0000_0000_0000_0003, // dist 2 from scan 0x00
-                ArtHash =   0xFFFF_FFFF_FFFF_FFFF, // far from scan art (dist ~64)
+                ArtHash = 0xFFFF_FFFF_FFFF_FFFF, // far from scan art (dist ~64)
             },
             new Card
             {
                 Id = Guid.Parse("00000000-0000-0000-0000-000000000002"),
                 OracleId = Guid.NewGuid(),
                 Name = "Correct Card",
-                Lang = "en", Layout = "normal", TypeLine = "Creature",
-                SetCode = "TST", SetName = "Test Set",
-                CollectorNumber = "002", Rarity = "common",
+                Lang = "en",
+                Layout = "normal",
+                TypeLine = "Creature",
+                SetCode = "TST",
+                SetName = "Test Set",
+                CollectorNumber = "002",
+                Rarity = "common",
                 ImageHash = 0x0000_0000_0000_000F, // dist 4 from scan 0x00 (within tie zone)
-                ArtHash =   0x0000_0000_0000_0010, // close to scan art (dist 0)
+                ArtHash = 0x0000_0000_0000_0010, // close to scan art (dist 0)
             }
         );
         ctx.SaveChanges();
@@ -164,22 +185,30 @@ public class TieZoneScoringTests : IDisposable
                 Id = Guid.Parse("00000000-0000-0000-0000-000000000001"),
                 OracleId = Guid.NewGuid(),
                 Name = "Close pHash Card",
-                Lang = "en", Layout = "normal", TypeLine = "Creature",
-                SetCode = "TST", SetName = "Test Set",
-                CollectorNumber = "001", Rarity = "common",
+                Lang = "en",
+                Layout = "normal",
+                TypeLine = "Creature",
+                SetCode = "TST",
+                SetName = "Test Set",
+                CollectorNumber = "001",
+                Rarity = "common",
                 ImageHash = 0x0000_0000_0000_0001, // dist 1 from scan
-                ArtHash =   0xFFFF_FFFF_FFFF_FFFF, // far art
+                ArtHash = 0xFFFF_FFFF_FFFF_FFFF, // far art
             },
             new Card
             {
                 Id = Guid.Parse("00000000-0000-0000-0000-000000000002"),
                 OracleId = Guid.NewGuid(),
                 Name = "Far pHash Card",
-                Lang = "en", Layout = "normal", TypeLine = "Creature",
-                SetCode = "TST", SetName = "Test Set",
-                CollectorNumber = "002", Rarity = "common",
+                Lang = "en",
+                Layout = "normal",
+                TypeLine = "Creature",
+                SetCode = "TST",
+                SetName = "Test Set",
+                CollectorNumber = "002",
+                Rarity = "common",
                 ImageHash = 0x0000_0000_0000_FFFF, // dist 16 from scan (way outside TZ=4)
-                ArtHash =   0x0000_0000_0000_0010, // perfect art match
+                ArtHash = 0x0000_0000_0000_0010, // perfect art match
             }
         );
         ctx.SaveChanges();
@@ -209,22 +238,30 @@ public class TieZoneScoringTests : IDisposable
                 Id = Guid.Parse("00000000-0000-0000-0000-000000000001"),
                 OracleId = Guid.NewGuid(),
                 Name = "Closest Card",
-                Lang = "en", Layout = "normal", TypeLine = "Creature",
-                SetCode = "TST", SetName = "Test Set",
-                CollectorNumber = "001", Rarity = "common",
+                Lang = "en",
+                Layout = "normal",
+                TypeLine = "Creature",
+                SetCode = "TST",
+                SetName = "Test Set",
+                CollectorNumber = "001",
+                Rarity = "common",
                 ImageHash = 0x0000_0000_0000_0001, // dist 1
-                ArtHash =   0xAAAA_AAAA_AAAA_AAAA,
+                ArtHash = 0xAAAA_AAAA_AAAA_AAAA,
             },
             new Card
             {
                 Id = Guid.Parse("00000000-0000-0000-0000-000000000002"),
                 OracleId = Guid.NewGuid(),
                 Name = "Farther Card",
-                Lang = "en", Layout = "normal", TypeLine = "Creature",
-                SetCode = "TST", SetName = "Test Set",
-                CollectorNumber = "002", Rarity = "common",
+                Lang = "en",
+                Layout = "normal",
+                TypeLine = "Creature",
+                SetCode = "TST",
+                SetName = "Test Set",
+                CollectorNumber = "002",
+                Rarity = "common",
                 ImageHash = 0x0000_0000_0000_00FF, // dist 8
-                ArtHash =   0xBBBB_BBBB_BBBB_BBBB,
+                ArtHash = 0xBBBB_BBBB_BBBB_BBBB,
             }
         );
         ctx.SaveChanges();
@@ -252,22 +289,30 @@ public class TieZoneScoringTests : IDisposable
                 Id = Guid.Parse("00000000-0000-0000-0000-000000000001"),
                 OracleId = Guid.NewGuid(),
                 Name = "Clear Winner",
-                Lang = "en", Layout = "normal", TypeLine = "Creature",
-                SetCode = "TST", SetName = "Test Set",
-                CollectorNumber = "001", Rarity = "common",
+                Lang = "en",
+                Layout = "normal",
+                TypeLine = "Creature",
+                SetCode = "TST",
+                SetName = "Test Set",
+                CollectorNumber = "001",
+                Rarity = "common",
                 ImageHash = 0x0000_0000_0000_0000, // exact pHash match
-                ArtHash =   0x0000_0000_0000_FF00, // moderate art distance
+                ArtHash = 0x0000_0000_0000_FF00, // moderate art distance
             },
             new Card
             {
                 Id = Guid.Parse("00000000-0000-0000-0000-000000000002"),
                 OracleId = Guid.NewGuid(),
                 Name = "Far Card",
-                Lang = "en", Layout = "normal", TypeLine = "Creature",
-                SetCode = "TST", SetName = "Test Set",
-                CollectorNumber = "002", Rarity = "common",
+                Lang = "en",
+                Layout = "normal",
+                TypeLine = "Creature",
+                SetCode = "TST",
+                SetName = "Test Set",
+                CollectorNumber = "002",
+                Rarity = "common",
                 ImageHash = 0x0000_0000_FFFF_FFFF, // dist 32
-                ArtHash =   0x0000_0000_0000_0010, // close art but irrelevant
+                ArtHash = 0x0000_0000_0000_0010, // close art but irrelevant
             }
         );
         ctx.SaveChanges();

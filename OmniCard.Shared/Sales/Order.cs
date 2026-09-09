@@ -1,0 +1,46 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace OmniCard.Shared.Sales;
+
+public class Order
+{
+    public int Id { get; set; }
+    public int CustomerId { get; set; }
+    public SalesChannel Channel { get; set; }
+    public string? OrderNumber { get; set; }
+    public DateTime OrderDate { get; set; } = DateTime.UtcNow;
+    public OrderStatus Status { get; set; }
+
+    /// <summary>Key of the customizable <see cref="WorkflowLane"/> this order currently occupies on
+    /// the kanban board. <see cref="Status"/> holds the lane's behavior (which drives accounting);
+    /// this remembers the exact lane so two lanes sharing a behavior stay distinct. Null on legacy
+    /// orders created before customizable lanes — those fall back to the default lane whose
+    /// behavior matches <see cref="Status"/>.</summary>
+    public string? StageKey { get; set; }
+
+    public string? TrackingNumber { get; set; }
+    public string? Carrier { get; set; }
+    public decimal ShippingChargedToBuyer { get; set; }
+    public decimal ShippingCost { get; set; }
+    public decimal MarketplaceFees { get; set; }
+    public string? Notes { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? ShippedAt { get; set; }
+
+    /// <summary>Buyer-paid item count from a TCGPlayer import (null for non-imported orders);
+    /// used for the order-editor reconciliation hint.</summary>
+    public int? ImportedItemCount { get; set; }
+    /// <summary>Buyer-paid product subtotal from a TCGPlayer import (null for non-imported orders).</summary>
+    public decimal? ImportedProductValue { get; set; }
+
+    // ── Display-only fields (not persisted) hydrated for the kanban cards in OrdersViewModel.Load ──
+
+    /// <summary>Customer name, resolved for card display.</summary>
+    [NotMapped] public string? CustomerNameDisplay { get; set; }
+    /// <summary>Sum of line quantities on this order (card display).</summary>
+    [NotMapped] public int LineItemCount { get; set; }
+    /// <summary>Sum of line (qty × unit price) on this order (card display).</summary>
+    [NotMapped] public decimal LineTotal { get; set; }
+    /// <summary>Accent colour (hex) of the lane this order sits in, resolved for the card stripe.</summary>
+    [NotMapped] public string? StageColorDisplay { get; set; }
+}

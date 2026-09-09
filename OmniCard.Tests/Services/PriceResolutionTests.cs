@@ -1,12 +1,13 @@
-using System.IO;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Models;
 using OmniCard.CardMatching;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services;
 
@@ -54,11 +55,20 @@ public class PriceResolutionTests : IDisposable
                 Name = "Test Card",
                 Prices = new Prices { Usd = "1.50", UsdFoil = "3.00" },
                 // required fields
-                SetCode = "tst", SetName = "Test", CollectorNumber = "1",
-                Rarity = "rare", SetId = Guid.NewGuid(), SetType = "expansion",
-                SetUri = "", SetSearchUri = "", ScryfallSetUri = "",
-                RulingsUri = "", PrintsSearchUri = "", TypeLine = "Creature",
-                BorderColor = "black", Frame = "2015",
+                SetCode = "tst",
+                SetName = "Test",
+                CollectorNumber = "1",
+                Rarity = "rare",
+                SetId = Guid.NewGuid(),
+                SetType = "expansion",
+                SetUri = "",
+                SetSearchUri = "",
+                ScryfallSetUri = "",
+                RulingsUri = "",
+                PrintsSearchUri = "",
+                TypeLine = "Creature",
+                BorderColor = "black",
+                Frame = "2015",
             });
             ctx.SaveChanges();
         }
@@ -86,8 +96,11 @@ public class PriceResolutionTests : IDisposable
             {
                 CardSetId = "OP01-001",
                 CardName = "Roronoa Zoro",
-                SetId = "OP01", SetName = "Romance Dawn",
-                Rarity = "SR", CardColor = "Green", CardType = "Character",
+                SetId = "OP01",
+                SetName = "Romance Dawn",
+                Rarity = "SR",
+                CardColor = "Green",
+                CardType = "Character",
                 MarketPrice = 5.99m,
             });
             ctx.SaveChanges();
@@ -95,7 +108,7 @@ public class PriceResolutionTests : IDisposable
         }
 
         var dbFactory = new MockOptcgDbContextFactory(_optcgOptions);
-        var dataPath = new Moq.Mock<OmniCard.Interfaces.IDataPathService>();
+        var dataPath = new Moq.Mock<IDataPathService>();
         dataPath.Setup(d => d.DataDirectory).Returns(Path.GetTempPath());
         var service = new OptcgService(
             new MockHttpClientFactory(new MockNoOpHandler()),

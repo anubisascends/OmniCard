@@ -4,8 +4,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.CardMatching;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services;
 
@@ -26,13 +27,45 @@ public class RiftboundMatchingTests : IDisposable
             ctx.Database.EnsureCreated();
             ctx.MarkMigrationComplete();
             // Two printings of collector 310 (base + alt art) — OCR gives (OGN,310); pHash must disambiguate.
-            ctx.Cards.Add(new RiftboundCard { Id = "base", CollectorNumber = 310, SetId = "OGN", SetName = "Origins",
-                Name = "Vex", Rarity = "Epic", CardType = "Legend", ImageHash = 0x0UL, AlternateArt = false, CardImageUri="u" });
-            ctx.Cards.Add(new RiftboundCard { Id = "alt", CollectorNumber = 310, SetId = "OGN", SetName = "Origins",
-                Name = "Vex", Rarity = "Epic", CardType = "Legend", ImageHash = 0xFFFFFFFFFFFFFFFFUL, AlternateArt = true, CardImageUri="u" });
+            ctx.Cards.Add(new RiftboundCard
+            {
+                Id = "base",
+                CollectorNumber = 310,
+                SetId = "OGN",
+                SetName = "Origins",
+                Name = "Vex",
+                Rarity = "Epic",
+                CardType = "Legend",
+                ImageHash = 0x0UL,
+                AlternateArt = false,
+                CardImageUri = "u"
+            });
+            ctx.Cards.Add(new RiftboundCard
+            {
+                Id = "alt",
+                CollectorNumber = 310,
+                SetId = "OGN",
+                SetName = "Origins",
+                Name = "Vex",
+                Rarity = "Epic",
+                CardType = "Legend",
+                ImageHash = 0xFFFFFFFFFFFFFFFFUL,
+                AlternateArt = true,
+                CardImageUri = "u"
+            });
             // A different card for pure pHash fallback.
-            ctx.Cards.Add(new RiftboundCard { Id = "solo", CollectorNumber = 5, SetId = "OGN", SetName = "Origins",
-                Name = "Solo", Rarity = "Common", CardType = "Unit", ImageHash = 0x00FF00FF00FF00FFUL, CardImageUri="u" });
+            ctx.Cards.Add(new RiftboundCard
+            {
+                Id = "solo",
+                CollectorNumber = 5,
+                SetId = "OGN",
+                SetName = "Origins",
+                Name = "Solo",
+                Rarity = "Common",
+                CardType = "Unit",
+                ImageHash = 0x00FF00FF00FF00FFUL,
+                CardImageUri = "u"
+            });
             ctx.SaveChanges();
         }
         var dataPath = new Moq.Mock<IDataPathService>();
@@ -113,9 +146,16 @@ public class RiftboundMatchingTests : IDisposable
         {
             ctx.Cards.Add(new RiftboundCard
             {
-                Id = "battlefield", CollectorNumber = 208, SetId = "UNL", SetName = "Unlocked",
-                Name = "Black Flame Altar", Rarity = "Rare", CardType = "Battlefield",
-                Orientation = "landscape", ImageHash = 0x0UL, CardImageUri = "u",
+                Id = "battlefield",
+                CollectorNumber = 208,
+                SetId = "UNL",
+                SetName = "Unlocked",
+                Name = "Black Flame Altar",
+                Rarity = "Rare",
+                CardType = "Battlefield",
+                Orientation = "landscape",
+                ImageHash = 0x0UL,
+                CardImageUri = "u",
             });
             ctx.SaveChanges();
         }
@@ -148,10 +188,30 @@ public class RiftboundMatchingTests : IDisposable
         // is visible to _svc without reconstructing the service.
         using (var ctx = _factory.CreateDbContext())
         {
-            ctx.Cards.Add(new RiftboundCard { Id = "fallback1", CollectorNumber = 99, SetId = "OGN", SetName = "Origins",
-                Name = "Nohash1", Rarity = "Common", CardType = "Unit", ImageHash = null, CardImageUri = "u" });
-            ctx.Cards.Add(new RiftboundCard { Id = "fallback2", CollectorNumber = 99, SetId = "OGN", SetName = "Origins",
-                Name = "Nohash2", Rarity = "Common", CardType = "Unit", ImageHash = null, CardImageUri = "u" });
+            ctx.Cards.Add(new RiftboundCard
+            {
+                Id = "fallback1",
+                CollectorNumber = 99,
+                SetId = "OGN",
+                SetName = "Origins",
+                Name = "Nohash1",
+                Rarity = "Common",
+                CardType = "Unit",
+                ImageHash = null,
+                CardImageUri = "u"
+            });
+            ctx.Cards.Add(new RiftboundCard
+            {
+                Id = "fallback2",
+                CollectorNumber = 99,
+                SetId = "OGN",
+                SetName = "Origins",
+                Name = "Nohash2",
+                Rarity = "Common",
+                CardType = "Unit",
+                ImageHash = null,
+                CardImageUri = "u"
+            });
             ctx.SaveChanges();
         }
 

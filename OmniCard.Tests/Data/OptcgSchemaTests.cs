@@ -1,7 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
-using OmniCard.Models;
+using OmniCard.Shared.Games;
 
 namespace OmniCard.Tests.Data;
 
@@ -109,7 +109,7 @@ public class OptcgSchemaTests : IDisposable
     {
         using var ctx = NewContext();
         ctx.Database.EnsureCreated();
-        ctx.Cards.Add(new OmniCard.Models.OptcgCard { CardSetId = "OP01-001", CardNumber = "OP01-001", EdgeHash = 12345UL });
+        ctx.Cards.Add(new OptcgCard { CardSetId = "OP01-001", CardNumber = "OP01-001", EdgeHash = 12345UL });
         ctx.SaveChanges();
         Assert.Equal(12345UL, ctx.Cards.Single(c => c.CardSetId == "OP01-001").EdgeHash);
     }

@@ -1,9 +1,16 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
 using OmniCard.Collection;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Sales;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Sets;
+using OmniCard.Shared.Storage;
 
 namespace OmniCard.Tests.Services;
 
@@ -596,8 +603,8 @@ public class AnalyticsServiceTests : IDisposable
         public void SetOrdersEditorWidth(double width) { }
         public bool OrdersEditorCollapsed => false;
         public void SetOrdersEditorCollapsed(bool collapsed) { }
-        public IReadOnlyList<OmniCard.Models.WorkflowLane> GetWorkflowLanes() => OmniCard.Models.WorkflowLane.Defaults();
-        public void SaveWorkflowLanes(IEnumerable<OmniCard.Models.WorkflowLane> lanes) { }
+        public IReadOnlyList<WorkflowLane> GetWorkflowLanes() => WorkflowLane.Defaults();
+        public void SaveWorkflowLanes(IEnumerable<WorkflowLane> lanes) { }
     }
 
     private class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>

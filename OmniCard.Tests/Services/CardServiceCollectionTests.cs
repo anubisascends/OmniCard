@@ -1,14 +1,19 @@
 using System.Collections.ObjectModel;
-using System.IO;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Data;
-using OmniCard.Imaging;
-using OmniCard.Models;
-using OmniCard.Interfaces;
 using OmniCard.Collection;
 using OmniCard.Tests.Fakes;
+using OmniCard.Shared.Audit;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Ebay;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Storage;
 
 namespace OmniCard.Tests.Services;
 
@@ -353,16 +358,24 @@ public class CardServiceCollectionTests : IDisposable
         {
             Card c => new CardMatch
             {
-                Name = c.Name, SetCode = c.SetCode, SetName = c.SetName,
-                CollectorNumber = c.CollectorNumber, Rarity = c.Rarity,
-                ImageUri = c.ImageUris?.Normal, GameSpecificId = c.Id.ToString(),
+                Name = c.Name,
+                SetCode = c.SetCode,
+                SetName = c.SetName,
+                CollectorNumber = c.CollectorNumber,
+                Rarity = c.Rarity,
+                ImageUri = c.ImageUris?.Normal,
+                GameSpecificId = c.Id.ToString(),
                 Source = c,
             },
             OptcgCard c => new CardMatch
             {
-                Name = c.CardName, SetCode = c.SetId, SetName = c.SetName,
-                CollectorNumber = c.CardSetId, Rarity = c.Rarity,
-                ImageUri = c.CardImageUri, GameSpecificId = c.CardSetId,
+                Name = c.CardName,
+                SetCode = c.SetId,
+                SetName = c.SetName,
+                CollectorNumber = c.CardSetId,
+                Rarity = c.Rarity,
+                ImageUri = c.CardImageUri,
+                GameSpecificId = c.CardSetId,
                 Source = c,
             },
             _ => throw new ArgumentException("Unknown card type")
@@ -428,9 +441,9 @@ public class CardServiceCollectionTests : IDisposable
 
     private class StubHashService : IPerceptualHashService
     {
-        public ulong ComputeHash(System.IO.Stream imageStream, Action<OmniCard.Models.HashStageResult>? onStage = null) => 0;
-        public ulong ComputeEdgeHash(System.IO.Stream imageStream, Action<OmniCard.Models.HashStageResult>? onStage = null) => 0;
-        public ulong[] ComputeArtHash(System.IO.Stream imageStream, (double X, double Y, double W, double H)[] cropRegions, Action<OmniCard.Models.HashStageResult>? onStage = null) => new ulong[cropRegions.Length];
+        public ulong ComputeHash(System.IO.Stream imageStream, Action<HashStageResult>? onStage = null) => 0;
+        public ulong ComputeEdgeHash(System.IO.Stream imageStream, Action<HashStageResult>? onStage = null) => 0;
+        public ulong[] ComputeArtHash(System.IO.Stream imageStream, (double X, double Y, double W, double H)[] cropRegions, Action<HashStageResult>? onStage = null) => new ulong[cropRegions.Length];
     }
 
     private class StubOcrService : IOcrMatchingService

@@ -1,11 +1,11 @@
-using System.IO;
 using System.IO.Compression;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.ImportExport;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Collection;
 

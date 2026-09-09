@@ -6,9 +6,10 @@ using Microsoft.Extensions.Options;
 using OmniCard.CardMatching;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
 using Xunit.Abstractions;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services;
 

@@ -1,4 +1,3 @@
-using System.IO;
 using System.IO.Compression;
 using System.Net;
 using System.Text;
@@ -9,8 +8,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Models;
 using OmniCard.CardMatching;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
 
 namespace OmniCard.Tests.Services;
 

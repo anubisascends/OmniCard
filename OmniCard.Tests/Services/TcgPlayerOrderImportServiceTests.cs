@@ -1,11 +1,8 @@
-using System.IO;
-using System.Linq;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Collection;
 using OmniCard.Data;
-using OmniCard.Models;
-using Xunit;
+using OmniCard.Shared.Sales;
 
 namespace OmniCard.Tests.Services;
 

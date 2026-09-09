@@ -2,7 +2,7 @@ using System.Reflection;
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
 using OmniCard.CardMatching;
-using OmniCard.Interfaces;
+using OmniCard.Shared.Games;
 
 namespace OmniCard.Web.Api;
 

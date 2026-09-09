@@ -2,7 +2,8 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Collection;
 using OmniCard.Data;
-using OmniCard.Models;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
 
 namespace OmniCard.Tests.Services;
 
@@ -28,14 +29,14 @@ public class MismatchLogServiceTests : IDisposable
 
     private static CardMatch MakeMatch(string id, string name, string setCode,
         string number, double? confidence) => new()
-    {
-        GameSpecificId = id,
-        Name = name,
-        SetCode = setCode,
-        CollectorNumber = number,
-        Confidence = confidence,
-        Source = new object(),
-    };
+        {
+            GameSpecificId = id,
+            Name = name,
+            SetCode = setCode,
+            CollectorNumber = number,
+            Confidence = confidence,
+            Source = new object(),
+        };
 
     private static ScannedCard MakeScannedCard(ulong hash = 0x1234UL) => new()
     {

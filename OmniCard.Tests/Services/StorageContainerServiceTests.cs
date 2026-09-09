@@ -1,9 +1,11 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
 using OmniCard.Collection;
+using OmniCard.Shared.Binder;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Storage;
 
 namespace OmniCard.Tests.Services;
 
@@ -152,7 +154,10 @@ public class StorageContainerServiceTests : IDisposable
         {
             ctx.StorageContainers.Add(new StorageContainer
             {
-                Name = "Legacy", ContainerType = ContainerType.Binder, SlotsPerPage = 9, TotalPages = 5,
+                Name = "Legacy",
+                ContainerType = ContainerType.Binder,
+                SlotsPerPage = 9,
+                TotalPages = 5,
             });
             ctx.SaveChanges();
         }
@@ -186,8 +191,12 @@ public class StorageContainerServiceTests : IDisposable
         var total = sheetSides.Split(',').Sum(int.Parse);
         var container = new StorageContainer
         {
-            Name = name, ContainerType = ContainerType.Binder, SlotsPerPage = 9, Columns = 3,
-            TotalPages = total, SheetSides = sheetSides,
+            Name = name,
+            ContainerType = ContainerType.Binder,
+            SlotsPerPage = 9,
+            Columns = 3,
+            TotalPages = total,
+            SheetSides = sheetSides,
         };
         ctx.StorageContainers.Add(container);
         var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, Name = name + " Card" };
@@ -471,7 +480,10 @@ public class StorageContainerServiceTests : IDisposable
         {
             ctx.StorageContainers.Add(new StorageContainer
             {
-                Name = "Bulk", ContainerType = ContainerType.Bulk, IsSystem = true, SortOrder = 0,
+                Name = "Bulk",
+                ContainerType = ContainerType.Bulk,
+                IsSystem = true,
+                SortOrder = 0,
             });
             ctx.SaveChanges();
         }
@@ -503,7 +515,10 @@ public class StorageContainerServiceTests : IDisposable
         {
             ctx.StorageContainers.Add(new StorageContainer
             {
-                Name = "Bulk", ContainerType = ContainerType.Bulk, IsSystem = true, SortOrder = 0,
+                Name = "Bulk",
+                ContainerType = ContainerType.Bulk,
+                IsSystem = true,
+                SortOrder = 0,
             });
             ctx.SaveChanges();
         }

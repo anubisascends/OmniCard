@@ -1,13 +1,14 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
+using OmniCard.Shared.Cards;
 
 namespace OmniCard.Web;
 
 /// <summary>
 /// Resolves MTG cards' real TCGplayer product ids from the read-only <c>scryfall.db</c> catalog.
 /// The owned-collection store only keeps the Scryfall id (a GUID, in <c>Product.GameCardId</c>);
-/// the TCGplayer product id lives on the catalog <see cref="OmniCard.Models.Card"/>. Batched so a
+/// the TCGplayer product id lives on the catalog <see cref="Card"/>. Batched so a
 /// binder page of many MTG cards is a single query. Missing/locked catalog DBs degrade to empty
 /// (no link deep-linking), matching the SqliteException-swallowing pattern used for extended data.
 /// </summary>

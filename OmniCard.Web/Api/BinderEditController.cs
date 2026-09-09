@@ -1,7 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
-using OmniCard.Interfaces;
-using OmniCard.Models;
 using OmniCard.Web.Services;
+using OmniCard.Shared.Binder;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Sales;
+using OmniCard.Shared.Storage;
+using OmniCard.Shared.Tags;
 
 namespace OmniCard.Web.Api;
 

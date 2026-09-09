@@ -1,8 +1,9 @@
+using OmniCard.Shared.Cards;
 namespace OmniCard.Web;
 
 /// <summary>
 /// Resolves the browser-facing image URL for a card, matching the desktop art pipeline
-/// (<see cref="OmniCard.Models.CardArtCandidateResolver"/>): the downloaded/catalog art
+/// (<see cref="CardArtCandidateResolver"/>): the downloaded/catalog art
 /// (<c>ImageUri</c>) is preferred, and the local scan (served from <c>/scans/&lt;file&gt;</c>)
 /// is only a fallback. Returns <c>null</c> when no art is available, so callers can render a
 /// placeholder. Shared by the Card detail page, the Location/Binder views, and the Index search tiles.

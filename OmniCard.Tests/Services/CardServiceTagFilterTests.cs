@@ -1,13 +1,16 @@
 using System.Collections.ObjectModel;
-using System.IO;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Data;
-using OmniCard.Imaging;
-using OmniCard.Models;
-using OmniCard.Interfaces;
 using OmniCard.Collection;
+using OmniCard.Shared.Audit;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Tags;
 
 namespace OmniCard.Tests.Services;
 

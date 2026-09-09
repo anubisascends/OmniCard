@@ -2,8 +2,9 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Ebay;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Sales;
 
 namespace OmniCard.Collection;
 

@@ -2,7 +2,7 @@ using Moq;
 using Moq.Protected;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.CardMatching;
-using OmniCard.Interfaces;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services;
 

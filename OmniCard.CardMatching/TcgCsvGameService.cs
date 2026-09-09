@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.IO;
-using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -9,8 +7,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Sets;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.CardMatching;
 
@@ -757,9 +761,12 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
             ownedPerSet.TryGetValue(setCode, out var owned);
             results.Add(new SetCompletionSummary
             {
-                SetCode = setCode, SetName = setName,
-                OwnedCount = owned.Distinct, OwnedPhysicalCount = owned.Physical,
-                TotalCount = total, Game = Game,
+                SetCode = setCode,
+                SetName = setName,
+                OwnedCount = owned.Distinct,
+                OwnedPhysicalCount = owned.Physical,
+                TotalCount = total,
+                Game = Game,
             });
         }
         return Task.FromResult(results);
@@ -775,8 +782,12 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
             .Select(g => g.First())
             .Select(c => new MissingCard
             {
-                Name = c.Name, CollectorNumber = c.CollectorNumber, SetCode = c.SetCode,
-                Rarity = c.Rarity, ImageUri = c.ImageUrl, TypeLine = c.CardType,
+                Name = c.Name,
+                CollectorNumber = c.CollectorNumber,
+                SetCode = c.SetCode,
+                Rarity = c.Rarity,
+                ImageUri = c.ImageUrl,
+                TypeLine = c.CardType,
             })
             .OrderBy(m => m.CollectorNumber).ToList();
     }
@@ -789,10 +800,15 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
             .Select(c => new SetCatalogCard
             {
                 GameCardId = c.ProductId.ToString(),
-                Name = c.Name, CollectorNumber = c.CollectorNumber,
-                SetCode = c.SetCode, SetName = c.SetName, Rarity = c.Rarity,
-                ImageUri = c.ImageUrl, LocalImagePath = c.LocalImagePath,
-                NormalPrice = c.MarketPrice, FoilPrice = c.FoilMarketPrice,
+                Name = c.Name,
+                CollectorNumber = c.CollectorNumber,
+                SetCode = c.SetCode,
+                SetName = c.SetName,
+                Rarity = c.Rarity,
+                ImageUri = c.ImageUrl,
+                LocalImagePath = c.LocalImagePath,
+                NormalPrice = c.MarketPrice,
+                FoilPrice = c.FoilMarketPrice,
                 HasFoil = c.FoilMarketPrice.HasValue,
             })
             .OrderBy(c => c.CollectorNumber, CollectorNumberComparer.Instance)

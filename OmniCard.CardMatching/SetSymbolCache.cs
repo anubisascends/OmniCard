@@ -1,10 +1,8 @@
 using System.Collections.Concurrent;
-using System.IO;
-using System.Net.Http;
 using Microsoft.Extensions.Logging;
 using SkiaSharp;
 using Svg.Skia;
-using OmniCard.Interfaces;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.CardMatching;
 

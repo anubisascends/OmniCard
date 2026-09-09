@@ -4,8 +4,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Models;
 using OmniCard.CardMatching;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
 
 namespace OmniCard.Tests.Services;
 
@@ -153,7 +154,7 @@ public class ArtHashMatchingTests : IDisposable
             Rarity = "common",
             // Distinctly far from all existing seed hashes (which start 0x1000...)
             ImageHash = 0x8000_0000_0000_0000UL,
-            ArtHash  = 0xDEAD_BEEF_0000_0000UL,
+            ArtHash = 0xDEAD_BEEF_0000_0000UL,
         });
         ctx.SaveChanges();
 

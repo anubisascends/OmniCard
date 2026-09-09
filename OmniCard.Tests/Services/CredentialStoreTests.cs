@@ -1,4 +1,3 @@
-using System.Linq;
 using OmniCard.eBay;
 
 namespace OmniCard.Tests.Services;

@@ -1,8 +1,8 @@
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Audit;
+using OmniCard.Shared.Sets;
 
 namespace OmniCard.Audit;
 

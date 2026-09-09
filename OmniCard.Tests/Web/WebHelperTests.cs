@@ -1,7 +1,7 @@
-using OmniCard.Interfaces;
-using OmniCard.Models;
 using OmniCard.Web;
 using OmniCard.Web.Services;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
 
 namespace OmniCard.Tests.Web;
 

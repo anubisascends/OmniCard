@@ -1,13 +1,16 @@
-using System.Collections.ObjectModel;
-using System.IO;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Data;
-using OmniCard.Imaging;
-using OmniCard.Models;
-using OmniCard.Interfaces;
 using OmniCard.Collection;
+using OmniCard.Shared.Audit;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Sets;
 
 namespace OmniCard.Tests.Services;
 
@@ -242,9 +245,9 @@ public class FallbackMatchingTests : IDisposable
 
     private class StubHashService : IPerceptualHashService
     {
-        public ulong ComputeHash(System.IO.Stream imageStream, Action<OmniCard.Models.HashStageResult>? onStage = null) => 0;
-        public ulong ComputeEdgeHash(System.IO.Stream imageStream, Action<OmniCard.Models.HashStageResult>? onStage = null) => 0;
-        public ulong[] ComputeArtHash(System.IO.Stream imageStream, (double X, double Y, double W, double H)[] cropRegions, Action<OmniCard.Models.HashStageResult>? onStage = null) => new ulong[cropRegions.Length];
+        public ulong ComputeHash(System.IO.Stream imageStream, Action<HashStageResult>? onStage = null) => 0;
+        public ulong ComputeEdgeHash(System.IO.Stream imageStream, Action<HashStageResult>? onStage = null) => 0;
+        public ulong[] ComputeArtHash(System.IO.Stream imageStream, (double X, double Y, double W, double H)[] cropRegions, Action<HashStageResult>? onStage = null) => new ulong[cropRegions.Length];
     }
 
     private class StubOcrService : IOcrMatchingService

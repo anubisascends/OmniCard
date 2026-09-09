@@ -1,4 +1,3 @@
-using System.Drawing;
 using OmniCard.Imaging;
 
 namespace OmniCard.Tests.Services;

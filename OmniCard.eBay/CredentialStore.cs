@@ -1,6 +1,6 @@
 using System.Text;
 using AdysTech.CredentialManager;
-using OmniCard.Interfaces;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.eBay;
 

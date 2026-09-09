@@ -2,8 +2,10 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Collection;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Settings;
+using OmniCard.Shared.Trades;
 
 namespace OmniCard.Tests.Services;
 

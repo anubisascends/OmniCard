@@ -1,8 +1,5 @@
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Sales;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Collection;
 

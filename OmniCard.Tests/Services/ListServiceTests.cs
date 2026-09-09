@@ -3,9 +3,15 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Collection;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
-using Xunit;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Lists;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Sets;
+using OmniCard.Shared.Storage;
 
 namespace OmniCard.Tests.Services;
 
@@ -43,8 +49,12 @@ public class ListServiceTests : IDisposable
             ctx.SaveChanges();
             ctx.CardListItems.Add(new CardListItem
             {
-                CardListId = list.Id, Quantity = 2, GameCardId = "abc",
-                CardName = "Sol Ring", SetCode = "C21", AddedMarketPrice = 1.23m,
+                CardListId = list.Id,
+                Quantity = 2,
+                GameCardId = "abc",
+                CardName = "Sol Ring",
+                SetCode = "C21",
+                AddedMarketPrice = 1.23m,
                 Source = ListItemSource.Paste,
             });
             ctx.SaveChanges();

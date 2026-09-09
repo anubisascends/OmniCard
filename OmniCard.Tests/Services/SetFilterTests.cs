@@ -1,12 +1,13 @@
-using System.IO;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Models;
 using OmniCard.CardMatching;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services;
 
@@ -181,7 +182,7 @@ public class OptcgSetFilterTests : IDisposable
 
     private OptcgService CreateService()
     {
-        var dataPath = new Moq.Mock<OmniCard.Interfaces.IDataPathService>();
+        var dataPath = new Moq.Mock<IDataPathService>();
         dataPath.Setup(d => d.DataDirectory).Returns(Path.GetTempPath());
         return new OptcgService(
             new StubHttpClientFactory(),

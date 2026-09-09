@@ -1,5 +1,5 @@
-using OmniCard.Models;
 using System.Collections.ObjectModel;
+using OmniCard.Shared.Scanning;
 
 namespace OmniCard.Tests.Services;
 

@@ -1,5 +1,6 @@
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Ebay;
+using OmniCard.Shared.Inventory;
 
 namespace OmniCard.Tests.Services;
 

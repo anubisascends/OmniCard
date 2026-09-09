@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using OmniCard.Interfaces;
-using OmniCard.Models;
 using OmniCard.Web.Services;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.ImportExport;
 
 namespace OmniCard.Web.Api;
 

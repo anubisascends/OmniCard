@@ -1,4 +1,6 @@
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
 
 namespace OmniCard.Tests.Services;
 

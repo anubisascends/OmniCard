@@ -1,7 +1,6 @@
-using System.IO;
-using System.Linq;
 using OmniCard.Collection;
-using Xunit;
+using OmniCard.Shared.Sales;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services;
 
@@ -78,8 +77,8 @@ public class SalesSettingsServiceTests
         {
             var dps = new DataPathServiceStub(dir);
             var svc = new SalesSettingsService(dps);
-            svc.SaveCompany(new OmniCard.Models.CompanyProfile { Name = "Acme Cards", City = "Reno", State = "NV" });
-            svc.SaveReceipt(new OmniCard.Models.ReceiptSettings { WidthMm = 58, ShowPrices = false, FooterText = "Thanks!" });
+            svc.SaveCompany(new CompanyProfile { Name = "Acme Cards", City = "Reno", State = "NV" });
+            svc.SaveReceipt(new ReceiptSettings { WidthMm = 58, ShowPrices = false, FooterText = "Thanks!" });
 
             var reloaded = new SalesSettingsService(dps);
             Assert.Equal("Acme Cards", reloaded.GetCompany().Name);
@@ -142,9 +141,9 @@ public class SalesSettingsServiceTests
         {
             var svc = new SalesSettingsService(new DataPathServiceStub(dir));
             var lanes = svc.GetWorkflowLanes();
-            Assert.Equal(OmniCard.Models.WorkflowLane.Defaults().Count, lanes.Count);
+            Assert.Equal(WorkflowLane.Defaults().Count, lanes.Count);
             Assert.Equal("created", lanes[0].Key);
-            Assert.Contains(lanes, l => l.Behavior == OmniCard.Models.OrderStatus.Shipped);
+            Assert.Contains(lanes, l => l.Behavior == OrderStatus.Shipped);
         }
         finally { Directory.Delete(dir, recursive: true); }
     }
@@ -159,21 +158,21 @@ public class SalesSettingsServiceTests
             var dps = new DataPathServiceStub(dir);
             new SalesSettingsService(dps).SaveWorkflowLanes(
             [
-                new() { Key = "new", Name = "New", Color = "#111111", Behavior = OmniCard.Models.OrderStatus.Created },
-                new() { Key = "await", Name = "Awaiting Payment", Color = "#222222", Behavior = OmniCard.Models.OrderStatus.Created },
-                new() { Key = "ship", Name = "Out the Door", Color = "#333333", Behavior = OmniCard.Models.OrderStatus.Shipped },
+                new() { Key = "new", Name = "New", Color = "#111111", Behavior = OrderStatus.Created },
+                new() { Key = "await", Name = "Awaiting Payment", Color = "#222222", Behavior = OrderStatus.Created },
+                new() { Key = "ship", Name = "Out the Door", Color = "#333333", Behavior = OrderStatus.Shipped },
             ]);
 
             var reloaded = new SalesSettingsService(dps).GetWorkflowLanes();
             Assert.Equal(3, reloaded.Count);
             Assert.Equal(["new", "await", "ship"], reloaded.Select(l => l.Key));
             Assert.Equal("Awaiting Payment", reloaded[1].Name);
-            Assert.Equal(OmniCard.Models.OrderStatus.Shipped, reloaded[2].Behavior);
+            Assert.Equal(OrderStatus.Shipped, reloaded[2].Behavior);
         }
         finally { Directory.Delete(dir, recursive: true); }
     }
 
-    private sealed class DataPathServiceStub(string dir) : OmniCard.Interfaces.IDataPathService
+    private sealed class DataPathServiceStub(string dir) : IDataPathService
     {
         public string DataDirectory => dir;
         public string ScansDirectory => dir;

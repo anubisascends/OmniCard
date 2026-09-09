@@ -1,10 +1,7 @@
-using System;
-using System.IO;
 using Moq;
 using OmniCard.Collection;
-using OmniCard.Interfaces;
-using OmniCard.Models;
-using Xunit;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services;
 

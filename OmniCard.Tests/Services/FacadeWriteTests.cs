@@ -1,12 +1,15 @@
-using System.IO;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Data;
-using OmniCard.Imaging;
-using OmniCard.Models;
-using OmniCard.Interfaces;
 using OmniCard.Collection;
+using OmniCard.Shared.Audit;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Storage;
 
 namespace OmniCard.Tests.Services;
 
@@ -50,30 +53,30 @@ public class FacadeWriteTests : IDisposable
 
     private static CardMatch MakeMatch(string gameCardId, string name, string setCode = "lea", string setName = "Alpha",
         string number = "1", string rarity = "common", string? imageUri = "https://img/card.jpg") => new()
-    {
-        Name = name,
-        SetCode = setCode,
-        SetName = setName,
-        CollectorNumber = number,
-        Rarity = rarity,
-        ImageUri = imageUri,
-        GameSpecificId = gameCardId,
-    };
+        {
+            Name = name,
+            SetCode = setCode,
+            SetName = setName,
+            CollectorNumber = number,
+            Rarity = rarity,
+            ImageUri = imageUri,
+            GameSpecificId = gameCardId,
+        };
 
     private static ScannedCard MakeScan(CardMatch? match, CardGame game = CardGame.Mtg, bool isFoil = false,
         decimal? price = null, string condition = "NM", FlagReason flagReason = FlagReason.None,
         StorageContainer? overrideContainer = null) => new()
-    {
-        TempImagePath = Path.GetTempFileName(),
-        Hash = 0,
-        Game = game,
-        Match = match,
-        IsFoil = isFoil,
-        PurchasePrice = price,
-        Condition = condition,
-        FlagReason = flagReason,
-        OverrideContainer = overrideContainer,
-    };
+        {
+            TempImagePath = Path.GetTempFileName(),
+            Hash = 0,
+            Game = game,
+            Match = match,
+            IsFoil = isFoil,
+            PurchasePrice = price,
+            Condition = condition,
+            FlagReason = flagReason,
+            OverrideContainer = overrideContainer,
+        };
 
     // --- CommitScans: Product dedup + Lot + Acquire movement ---
 

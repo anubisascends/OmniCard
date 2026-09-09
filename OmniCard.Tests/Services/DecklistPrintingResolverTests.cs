@@ -1,7 +1,7 @@
 using OmniCard.Collection;
-using OmniCard.Models;
 using OmniCard.Tests.Fakes;
-using Xunit;
+using OmniCard.Shared.Lists;
+using OmniCard.Shared.Matching;
 
 namespace OmniCard.Tests.Services;
 

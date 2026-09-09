@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore;
 using OmniCard.Api.Contracts;
 using OmniCard.Collection;
 using OmniCard.Data;
-using OmniCard.Models;
 using OmniCard.Web.Api;
-using Xunit;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Sales;
 
 namespace OmniCard.Tests.Web;
 
@@ -49,7 +49,10 @@ public class InventoryCustomerWriteTests : IDisposable
     {
         var created = Value(_customersController.Create(new CustomerUpsertRequest
         {
-            Name = "Ada Lovelace", Email = "ada@example.com", City = "London", State = "ENG",
+            Name = "Ada Lovelace",
+            Email = "ada@example.com",
+            City = "London",
+            State = "ENG",
         }));
         Assert.True(created.Id > 0);
 
@@ -114,14 +117,20 @@ public class InventoryCustomerWriteTests : IDisposable
     {
         var created = Value(_inventoryController.CreateProduct(new ProductUpsertRequest
         {
-            Game = "Mtg", Category = "Box", Name = "Foundations Play Booster Box", Upc = "195166",
+            Game = "Mtg",
+            Category = "Box",
+            Name = "Foundations Play Booster Box",
+            Upc = "195166",
         }));
         Assert.True(created.Id > 0);
         Assert.Equal("Foundations Play Booster Box", created.Name);
 
         var upd = _inventoryController.UpdateProduct(created.Id, new ProductUpsertRequest
         {
-            Game = "Mtg", Category = "Case", Name = "Foundations Case", LastMarketPrice = 1200m,
+            Game = "Mtg",
+            Category = "Case",
+            Name = "Foundations Case",
+            LastMarketPrice = 1200m,
         });
         Assert.IsType<NoContentResult>(upd);
 
@@ -143,7 +152,9 @@ public class InventoryCustomerWriteTests : IDisposable
     {
         var result = _inventoryController.CreateProduct(new ProductUpsertRequest
         {
-            Game = "Mtg", Category = "Single", Name = "A single",
+            Game = "Mtg",
+            Category = "Single",
+            Name = "A single",
         });
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
@@ -162,12 +173,16 @@ public class InventoryCustomerWriteTests : IDisposable
     {
         var product = Value(_inventoryController.CreateProduct(new ProductUpsertRequest
         {
-            Game = "Pokemon", Category = "Box", Name = "151 Booster Box",
+            Game = "Pokemon",
+            Category = "Box",
+            Name = "151 Booster Box",
         }));
 
         var lot = Value(_inventoryController.AddLot(product.Id, new LotUpsertRequest
         {
-            Quantity = 3, UnitCost = 120m, Source = "distributor",
+            Quantity = 3,
+            UnitCost = 120m,
+            Source = "distributor",
         }));
         Assert.Equal(3, lot.Quantity);
 
@@ -196,7 +211,9 @@ public class InventoryCustomerWriteTests : IDisposable
     {
         var product = Value(_inventoryController.CreateProduct(new ProductUpsertRequest
         {
-            Game = "Mtg", Category = "Box", Name = "Box",
+            Game = "Mtg",
+            Category = "Box",
+            Name = "Box",
         }));
         var result = _inventoryController.AddLot(product.Id, new LotUpsertRequest { Quantity = 0 });
         Assert.IsType<BadRequestObjectResult>(result.Result);

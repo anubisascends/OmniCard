@@ -1,8 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
 using System.IO.Compression;
-using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -10,8 +8,14 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Sets;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.CardMatching;
 
@@ -777,8 +781,11 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             .Select(c => new SetCatalogCard
             {
                 GameCardId = c.Id.ToString(),
-                Name = c.Name, CollectorNumber = c.CollectorNumber,
-                SetCode = c.SetCode, SetName = c.SetName, Rarity = c.Rarity,
+                Name = c.Name,
+                CollectorNumber = c.CollectorNumber,
+                SetCode = c.SetCode,
+                SetName = c.SetName,
+                Rarity = c.Rarity,
                 ImageUri = c.ImageUris?.Normal ?? c.ImageUris?.Small,
                 LocalImagePath = c.LocalImagePath,
                 NormalPrice = ParseUsd(c.Prices?.Usd),

@@ -2,8 +2,10 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Collection;
 using OmniCard.Data;
-using OmniCard.Models;
-using Xunit;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Sales;
+using OmniCard.Shared.Storage;
 
 namespace OmniCard.Tests.Services;
 
@@ -112,21 +114,21 @@ public class ListingServiceTests : IDisposable
         : IDbContextFactory<OmniCardDbContext>
     { public OmniCardDbContext CreateDbContext() => new(o); }
 
-    private sealed class StubSalesSettings : OmniCard.Interfaces.ISalesSettingsService
+    private sealed class StubSalesSettings : ISalesSettingsService
     {
         public int? ForSaleLocationId { get; private set; } = 99;
         public void SetForSaleLocationId(int? id) => ForSaleLocationId = id;
-        public OmniCard.Models.CompanyProfile GetCompany() => new();
-        public void SaveCompany(OmniCard.Models.CompanyProfile company) { }
-        public OmniCard.Models.ReceiptSettings GetReceipt() => new();
-        public void SaveReceipt(OmniCard.Models.ReceiptSettings receipt) { }
+        public CompanyProfile GetCompany() => new();
+        public void SaveCompany(CompanyProfile company) { }
+        public ReceiptSettings GetReceipt() => new();
+        public void SaveReceipt(ReceiptSettings receipt) { }
         public string SetLogo(string sourcePath) => "company-logo.png";
         public double? OrdersEditorWidth => null;
         public void SetOrdersEditorWidth(double width) { }
         public bool OrdersEditorCollapsed => false;
         public void SetOrdersEditorCollapsed(bool collapsed) { }
-        public System.Collections.Generic.IReadOnlyList<OmniCard.Models.WorkflowLane> GetWorkflowLanes() => OmniCard.Models.WorkflowLane.Defaults();
-        public void SaveWorkflowLanes(System.Collections.Generic.IEnumerable<OmniCard.Models.WorkflowLane> lanes) { }
+        public System.Collections.Generic.IReadOnlyList<WorkflowLane> GetWorkflowLanes() => WorkflowLane.Defaults();
+        public void SaveWorkflowLanes(System.Collections.Generic.IEnumerable<WorkflowLane> lanes) { }
     }
 
     [Fact]

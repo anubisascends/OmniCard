@@ -1,10 +1,13 @@
-using System.IO;
 using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Settings;
+using OmniCard.Shared.Storage;
 
 namespace OmniCard.Collection;
 

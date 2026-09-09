@@ -1,4 +1,3 @@
-using OmniCard.Interfaces;
 using OmniCard.Tests.Services;
 using OmniCard.Web.Api;
 

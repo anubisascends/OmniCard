@@ -1,12 +1,13 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.CardMatching;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services;
 
@@ -35,12 +36,36 @@ public class YugiohFuzzyMatchTests : IDisposable
         ctx.Database.EnsureCreated();
         ctx.MarkMigrationComplete(); // else the service ctor wipes Cards as "pre-schema"
         ctx.Cards.AddRange(
-            new TcgCsvCard { ProductId = 1, Game = CardGame.YuGiOh, Name = "Card One",
-                SetCode = "GRCR", SetName = "Genesis", CollectorNumber = "GRCR-EN060", ImageHash = Hash1 },
-            new TcgCsvCard { ProductId = 2, Game = CardGame.YuGiOh, Name = "Card Two",
-                SetCode = "GRCR", SetName = "Genesis", CollectorNumber = "GRCR-EN033", ImageHash = Hash2 },
-            new TcgCsvCard { ProductId = 3, Game = CardGame.YuGiOh, Name = "Card Three",
-                SetCode = "PHHY", SetName = "Phantom", CollectorNumber = "PHHY-EN060", ImageHash = Hash3 });
+            new TcgCsvCard
+            {
+                ProductId = 1,
+                Game = CardGame.YuGiOh,
+                Name = "Card One",
+                SetCode = "GRCR",
+                SetName = "Genesis",
+                CollectorNumber = "GRCR-EN060",
+                ImageHash = Hash1
+            },
+            new TcgCsvCard
+            {
+                ProductId = 2,
+                Game = CardGame.YuGiOh,
+                Name = "Card Two",
+                SetCode = "GRCR",
+                SetName = "Genesis",
+                CollectorNumber = "GRCR-EN033",
+                ImageHash = Hash2
+            },
+            new TcgCsvCard
+            {
+                ProductId = 3,
+                Game = CardGame.YuGiOh,
+                Name = "Card Three",
+                SetCode = "PHHY",
+                SetName = "Phantom",
+                CollectorNumber = "PHHY-EN060",
+                ImageHash = Hash3
+            });
         ctx.SaveChanges();
     }
 
@@ -106,7 +131,8 @@ public class YugiohFuzzyMatchTests : IDisposable
     {
         public FuzzyService(IDbContextFactory<PokemonDbContext> factory)
             : base(new NoHttp(), factory, new PerceptualHashService(NullLogger<PerceptualHashService>.Instance),
-                   new DataPath(), NullLogger<FuzzyService>.Instance) { }
+                   new DataPath(), NullLogger<FuzzyService>.Instance)
+        { }
 
         protected override int CategoryId => 2;
         public override CardGame Game => CardGame.YuGiOh;

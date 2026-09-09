@@ -1,11 +1,8 @@
 using System.Collections.Concurrent;
 using System.Drawing;
-using System.Drawing.Imaging;
-using System.IO;
 using Microsoft.Extensions.Logging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
 using Tesseract;
+using OmniCard.Shared.Matching;
 
 namespace OmniCard.Imaging;
 

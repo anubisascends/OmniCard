@@ -1,6 +1,6 @@
-using System.IO;
 using OmniCard.Audit;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Sets;
 
 namespace OmniCard.Tests.Services;
 

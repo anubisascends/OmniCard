@@ -1,5 +1,3 @@
-using System.IO;
-
 namespace OmniCard.Collection;
 
 public enum ImportKind { Csv, Decklist, Unknown }

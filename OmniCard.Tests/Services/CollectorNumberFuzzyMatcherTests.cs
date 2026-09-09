@@ -1,5 +1,5 @@
 using OmniCard.Imaging;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
 
 namespace OmniCard.Tests.Services;
 

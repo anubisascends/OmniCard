@@ -1,0 +1,43 @@
+using System.ComponentModel.DataAnnotations.Schema;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
+
+namespace OmniCard.Shared.Inventory;
+
+public class Product
+{
+    public int Id { get; set; }
+    public CardGame Game { get; set; }
+    public ProductCategory Category { get; set; }
+    public string Name { get; set; } = "";
+    public string? SetCode { get; set; }
+    public string? Upc { get; set; }
+    // Single-oriented fields (unused in Phase 1; present so Phase 2 needs no schema change).
+    public string? GameCardId { get; set; }
+    public string? CollectorNumber { get; set; }
+    public string? Rarity { get; set; }
+    public bool Foil { get; set; }
+    /// <summary>Foil finish sub-type (e.g. "Etched", "Reverse Holofoil", "Premium"). Null for
+    /// non-foil cards. Part of the product's catalog identity alongside <see cref="Foil"/>, so a
+    /// different finish of the same print is a distinct product. See <see cref="FoilTypes"/>.</summary>
+    public string? FoilType { get; set; }
+    public string? ImageUri { get; set; }
+    // Added in the Phase 2a unified-store migration (Task 2) to carry the remaining
+    // CollectionCard fields faithfully — the Phase-1 model omitted these.
+    public string? SetName { get; set; }
+    public string? Color { get; set; }
+    public string? CardType { get; set; }
+
+    /// <summary>Cached market price for display/valuation. Not persisted.</summary>
+    [NotMapped] public decimal MarketPrice { get; set; }
+
+    // Added by Task 1 (Phase 3): automated sealed pricing via eBay median. Persisted so a
+    // sealed product's last-known market price survives across app restarts without needing
+    // a live re-query every time it's displayed.
+    /// <summary>Last eBay-derived median market price for this product (sealed products only;
+    /// singles are priced live via <see cref="ICardGameService"/>). Null until a refresh runs.</summary>
+    public decimal? LastMarketPrice { get; set; }
+
+    /// <summary>UTC timestamp of the last successful <see cref="LastMarketPrice"/> update.</summary>
+    public DateTime? PriceUpdatedAt { get; set; }
+}

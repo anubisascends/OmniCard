@@ -1,4 +1,5 @@
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Inventory;
 
 namespace OmniCard.Web;
 

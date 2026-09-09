@@ -1,5 +1,3 @@
-using System.Net;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Data.Sqlite;
@@ -8,8 +6,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.CardMatching;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services;
 
@@ -161,8 +161,16 @@ public class TcgCsvDownloadTests : IDisposable
     {
         using (var seed = _factory.CreateDbContext())
         {
-            seed.Cards.Add(new TcgCsvCard { ProductId = 132375, Game = CardGame.Pokemon, Name = "Stale",
-                CollectorNumber = "999", ImageHash = 12345UL, LocalImagePath = "pokemon-art/132375.png", MarketPrice = 7.77m });
+            seed.Cards.Add(new TcgCsvCard
+            {
+                ProductId = 132375,
+                Game = CardGame.Pokemon,
+                Name = "Stale",
+                CollectorNumber = "999",
+                ImageHash = 12345UL,
+                LocalImagePath = "pokemon-art/132375.png",
+                MarketPrice = 7.77m
+            });
             seed.SaveChanges();
         }
         var svc = CreateService();

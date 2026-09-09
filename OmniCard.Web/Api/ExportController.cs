@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Collection;
 using OmniCard.Data;
-using OmniCard.Interfaces;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.ImportExport;
 
 namespace OmniCard.Web.Api;
 
@@ -13,7 +15,7 @@ public sealed class ExportController(
     ICsvExportImportService csv,
     IEnumerable<ICardGameService> gameServices) : ApiControllerBase
 {
-    private readonly IReadOnlyDictionary<OmniCard.Models.CardGame, ICardGameService> _gameServices = gameServices.ToDictionary(s => s.Game);
+    private readonly IReadOnlyDictionary<CardGame, ICardGameService> _gameServices = gameServices.ToDictionary(s => s.Game);
 
     /// <summary>Export the (optionally filtered) collection as CSV. <paramref name="format"/> =
     /// appnative | tcgplayer | moxfield | manabox.</summary>

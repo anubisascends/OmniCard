@@ -4,11 +4,13 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OmniCard.Collection;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
 using OmniCard.eBay;
 using System.Net;
 using System.Text.Json;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Ebay;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Inventory;
 
 namespace OmniCard.Tests.Services;
 
@@ -43,8 +45,13 @@ public class EbaySyncServiceTests : IDisposable
     {
         var product = new Product
         {
-            Game = CardGame.Mtg, Category = ProductCategory.Single, Name = name,
-            SetName = "Set", SetCode = "TST", CollectorNumber = "1", Rarity = "Common",
+            Game = CardGame.Mtg,
+            Category = ProductCategory.Single,
+            Name = name,
+            SetName = "Set",
+            SetCode = "TST",
+            CollectorNumber = "1",
+            Rarity = "Common",
             GameCardId = "test-1",
         };
         ctx.Products.Add(product);
@@ -68,14 +75,19 @@ public class EbaySyncServiceTests : IDisposable
             productId = ctx.Lots.Single(l => l.Id == lotId).ProductId;
             ctx.EbayListings.Add(new EbayListing
             {
-                LotId = lotId, EbayItemId = "ebay-sold-123",
-                Status = EbayListingStatus.Active, ListedPrice = 10m,
+                LotId = lotId,
+                EbayItemId = "ebay-sold-123",
+                Status = EbayListingStatus.Active,
+                ListedPrice = 10m,
             });
             // Acquire movement so realized P&L (cost basis) has something to net against.
             ctx.Movements.Add(new InventoryMovement
             {
-                ProductId = productId, LotId = lotId, Type = MovementType.Acquire,
-                Quantity = 1, UnitValue = 4m,
+                ProductId = productId,
+                LotId = lotId,
+                Type = MovementType.Acquire,
+                Quantity = 1,
+                UnitValue = 4m,
             });
             ctx.SaveChanges();
         }
@@ -150,8 +162,10 @@ public class EbaySyncServiceTests : IDisposable
             lotId = SeedLot(ctx, "Multi-Qty Card", quantity: 2);
             ctx.EbayListings.Add(new EbayListing
             {
-                LotId = lotId, EbayItemId = "ebay-sold-qty2",
-                Status = EbayListingStatus.Active, ListedPrice = 15m,
+                LotId = lotId,
+                EbayItemId = "ebay-sold-qty2",
+                Status = EbayListingStatus.Active,
+                ListedPrice = 15m,
             });
             ctx.SaveChanges();
         }
@@ -210,8 +224,10 @@ public class EbaySyncServiceTests : IDisposable
             lotId = SeedLot(ctx, "Double Sync Card");
             ctx.EbayListings.Add(new EbayListing
             {
-                LotId = lotId, EbayItemId = "ebay-sold-777",
-                Status = EbayListingStatus.Active, ListedPrice = 20m,
+                LotId = lotId,
+                EbayItemId = "ebay-sold-777",
+                Status = EbayListingStatus.Active,
+                ListedPrice = 20m,
             });
             ctx.SaveChanges();
         }
@@ -283,8 +299,11 @@ public class EbaySyncServiceTests : IDisposable
             lotId = SeedLot(ctx, "Already Sold Card");
             var listing = new EbayListing
             {
-                LotId = lotId, EbayItemId = "ebay-sold-999",
-                Status = EbayListingStatus.Sold, ListedPrice = 5m, SoldPrice = 5m,
+                LotId = lotId,
+                EbayItemId = "ebay-sold-999",
+                Status = EbayListingStatus.Sold,
+                ListedPrice = 5m,
+                SoldPrice = 5m,
             };
             ctx.EbayListings.Add(listing);
             ctx.SaveChanges();

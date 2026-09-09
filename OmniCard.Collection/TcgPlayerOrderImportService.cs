@@ -1,11 +1,10 @@
 using System.Globalization;
-using System.IO;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.ImportExport;
+using OmniCard.Shared.Sales;
 
 namespace OmniCard.Collection;
 
