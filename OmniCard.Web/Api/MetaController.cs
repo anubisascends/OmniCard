@@ -1,8 +1,8 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
-using OmniCard.CardMatching;
 using OmniCard.Shared.Games;
+using OmniCard.CardMatching.Search;
 
 namespace OmniCard.Web.Api;
 

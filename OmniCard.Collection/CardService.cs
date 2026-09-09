@@ -18,6 +18,7 @@ using OmniCard.Shared.Sets;
 using OmniCard.Shared.Settings;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
+using OmniCard.CardMatching.Games;
 
 namespace OmniCard.Collection;
 

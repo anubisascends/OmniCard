@@ -4,7 +4,7 @@ using QuestPDF.Infrastructure;
 using OmniCard.Shared.Audit;
 using OmniCard.Shared.Sets;
 
-namespace OmniCard.Audit;
+namespace OmniCard.Audit.Exporters;
 
 /// <summary>Renders a set's want-list (unowned cards + standard/foil prices + a blank tick-box)
 /// to PDF for hunting cards away from a computer. Mirrors <see cref="PriceSheetPdfExporter"/>.</summary>

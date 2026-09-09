@@ -1,4 +1,4 @@
-using OmniCard.CardMatching;
+using OmniCard.CardMatching.Search;
 
 namespace OmniCard.Tests.Services;
 

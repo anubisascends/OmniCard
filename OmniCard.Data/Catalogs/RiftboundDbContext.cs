@@ -3,27 +3,25 @@ using Microsoft.EntityFrameworkCore;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Matching;
 
-namespace OmniCard.Data;
+namespace OmniCard.Data.Catalogs;
 
-// Shared abstract context for all TCGCSV-backed games. Concrete per-game subclasses
-// (PokemonDbContext etc.) exist only to give EF distinct types → distinct .db files.
-public abstract class TcgCsvDbContext : DbContext
+public class RiftboundDbContext : DbContext
 {
-    public DbSet<TcgCsvCard> Cards => Set<TcgCsvCard>();
+    public DbSet<RiftboundCard> Cards => Set<RiftboundCard>();
     public DbSet<HashCorrection> HashCorrections => Set<HashCorrection>();
 
-    protected TcgCsvDbContext(DbContextOptions options) : base(options) { }
+    public RiftboundDbContext(DbContextOptions<RiftboundDbContext> options) : base(options) { }
 
-    // Bump when the on-disk schema/data source changes incompatibly; a stored user_version
-    // below this triggers a wipe-and-redownload in TcgCsvGameService.
-    public const int TcgCsvSchemaVersion = 1;
+    // Bump when the on-disk schema/data source changes incompatibly; a stored
+    // user_version below this triggers a wipe-and-redownload in RiftboundService.
+    public const int RiftboundSchemaVersion = 1;
 
     public int GetSchemaVersion()
     {
         // On SQL Server the schema is owned by EF migrations (PRAGMA is SQLite-only), so report the
         // current version — the DB is always "up to date" and never triggers a wipe-and-redownload.
         if (!Database.IsSqlite())
-            return TcgCsvSchemaVersion;
+            return RiftboundSchemaVersion;
 
         var conn = Database.GetDbConnection();
         conn.Open();
@@ -40,7 +38,8 @@ public abstract class TcgCsvDbContext : DbContext
         var conn = Database.GetDbConnection();
         conn.Open();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = $"PRAGMA user_version = {TcgCsvSchemaVersion};";
+        // PRAGMA does not accept parameters; value is a compile-time constant.
+        cmd.CommandText = $"PRAGMA user_version = {RiftboundSchemaVersion};";
         cmd.ExecuteNonQuery();
     }
 
@@ -52,10 +51,9 @@ public abstract class TcgCsvDbContext : DbContext
 
         var conn = Database.GetDbConnection();
         conn.Open();
-        // Additive columns for forward-compatibility (idempotent; safe on read-only DBs).
+        // Reserved for future additive columns (see OptcgDbContext for the pattern).
         AddColumnIfMissing(conn, "EdgeHash INTEGER");
         AddColumnIfMissing(conn, "LocalImagePath TEXT");
-        AddColumnIfMissing(conn, "ExtendedDataJson TEXT");
         AddColumnIfMissing(conn, "MarketPrice TEXT");
         AddColumnIfMissing(conn, "FoilMarketPrice TEXT");
         AddColumnIfMissing(conn, "PriceUpdatedAt TEXT");
@@ -77,11 +75,10 @@ public abstract class TcgCsvDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        var card = modelBuilder.Entity<TcgCsvCard>();
-        card.HasKey(c => c.ProductId);
-        card.Property(c => c.ProductId).ValueGeneratedNever();
+        var card = modelBuilder.Entity<RiftboundCard>();
+        card.HasKey(c => c.Id);
         card.HasIndex(c => c.Name);
-        card.HasIndex(c => c.SetCode);
+        card.HasIndex(c => c.SetId);
         card.HasIndex(c => c.CollectorNumber);
         card.HasIndex(c => c.ImageHash);
         card.HasIndex(c => c.EdgeHash);

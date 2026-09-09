@@ -8,6 +8,8 @@ using OmniCard.CardMatching;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Settings;
+using OmniCard.CardMatching.Games;
+using OmniCard.Data.Catalogs;
 
 namespace OmniCard.Tests.Services;
 

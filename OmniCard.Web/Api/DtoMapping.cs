@@ -1,11 +1,11 @@
 using OmniCard.Api.Contracts;
-using OmniCard.CardMatching;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Sales;
 using OmniCard.Shared.Sets;
 using OmniCard.Shared.Storage;
+using OmniCard.CardMatching.Search;
 
 namespace OmniCard.Web.Api;
 

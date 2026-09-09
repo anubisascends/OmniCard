@@ -3,25 +3,25 @@ using Microsoft.EntityFrameworkCore;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Matching;
 
-namespace OmniCard.Data;
+namespace OmniCard.Data.Catalogs;
 
-public class RiftboundDbContext : DbContext
+public class OptcgDbContext : DbContext
 {
-    public DbSet<RiftboundCard> Cards => Set<RiftboundCard>();
+    public DbSet<OptcgCard> Cards => Set<OptcgCard>();
     public DbSet<HashCorrection> HashCorrections => Set<HashCorrection>();
 
-    public RiftboundDbContext(DbContextOptions<RiftboundDbContext> options) : base(options) { }
+    public OptcgDbContext(DbContextOptions<OptcgDbContext> options) : base(options) { }
 
-    // Bump when the on-disk schema/data source changes incompatibly; a stored
-    // user_version below this triggers a wipe-and-redownload in RiftboundService.
-    public const int RiftboundSchemaVersion = 1;
+    // Identifies data sourced from api.poneglyph.one. A stored user_version below
+    // this value means the DB still holds old-API data and must be wiped.
+    public const int PoneglyphSchemaVersion = 1;
 
     public int GetSchemaVersion()
     {
         // On SQL Server the schema is owned by EF migrations (PRAGMA is SQLite-only), so report the
         // current version — the DB is always "up to date" and never triggers a wipe-and-redownload.
         if (!Database.IsSqlite())
-            return RiftboundSchemaVersion;
+            return PoneglyphSchemaVersion;
 
         var conn = Database.GetDbConnection();
         conn.Open();
@@ -39,7 +39,7 @@ public class RiftboundDbContext : DbContext
         conn.Open();
         using var cmd = conn.CreateCommand();
         // PRAGMA does not accept parameters; value is a compile-time constant.
-        cmd.CommandText = $"PRAGMA user_version = {RiftboundSchemaVersion};";
+        cmd.CommandText = $"PRAGMA user_version = {PoneglyphSchemaVersion};";
         cmd.ExecuteNonQuery();
     }
 
@@ -51,12 +51,13 @@ public class RiftboundDbContext : DbContext
 
         var conn = Database.GetDbConnection();
         conn.Open();
-        // Reserved for future additive columns (see OptcgDbContext for the pattern).
-        AddColumnIfMissing(conn, "EdgeHash INTEGER");
+
         AddColumnIfMissing(conn, "LocalImagePath TEXT");
-        AddColumnIfMissing(conn, "MarketPrice TEXT");
-        AddColumnIfMissing(conn, "FoilMarketPrice TEXT");
-        AddColumnIfMissing(conn, "PriceUpdatedAt TEXT");
+        AddColumnIfMissing(conn, "CardNumber TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(conn, "VariantIndex INTEGER NOT NULL DEFAULT 0");
+        AddColumnIfMissing(conn, "VariantLabel TEXT");
+        AddColumnIfMissing(conn, "Artist TEXT");
+        AddColumnIfMissing(conn, "EdgeHash INTEGER");
     }
 
     private static void AddColumnIfMissing(System.Data.Common.DbConnection conn, string columnDef)
@@ -69,24 +70,26 @@ public class RiftboundDbContext : DbContext
         }
         catch (SqliteException ex) when (ex.Message.Contains("duplicate column name") || ex.Message.Contains("readonly"))
         {
-            // Column already exists, or the DB is read-only (Web app hitting a not-yet-migrated DB).
+            // Column already exists, or the database is read-only (e.g. the Web app's
+            // read-only connection hitting a not-yet-migrated DB). Either way, skip
+            // the ALTER and let the caller serve whatever schema/data already exists.
         }
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        var card = modelBuilder.Entity<RiftboundCard>();
-        card.HasKey(c => c.Id);
-        card.HasIndex(c => c.Name);
+        var card = modelBuilder.Entity<OptcgCard>();
+
+        card.HasKey(c => c.CardSetId);
+
+        card.HasIndex(c => c.CardName);
         card.HasIndex(c => c.SetId);
-        card.HasIndex(c => c.CollectorNumber);
+        card.HasIndex(c => c.CardNumber);
+        card.HasIndex(c => c.CardColor);
         card.HasIndex(c => c.ImageHash);
         card.HasIndex(c => c.EdgeHash);
-        card.Property(c => c.PriceUpdatedAt)
-            .HasConversion(
-                v => v,
-                v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v);
 
+        // HashCorrection entity
         modelBuilder.Entity<HashCorrection>(e =>
         {
             e.HasKey(h => h.Id);

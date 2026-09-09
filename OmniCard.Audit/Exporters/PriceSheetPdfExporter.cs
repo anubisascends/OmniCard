@@ -4,7 +4,7 @@ using QuestPDF.Infrastructure;
 using OmniCard.Shared.Audit;
 using OmniCard.Shared.Sales;
 
-namespace OmniCard.Audit;
+namespace OmniCard.Audit.Exporters;
 
 public sealed class PriceSheetPdfExporter : IPriceSheetPdfExporter
 {

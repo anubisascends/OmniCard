@@ -1,7 +1,7 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 
-namespace OmniCard.CardMatching;
+namespace OmniCard.CardMatching.Search;
 
 /// <summary>
 /// Per-game map from canonical field name to an EF-translatable predicate builder over the game's

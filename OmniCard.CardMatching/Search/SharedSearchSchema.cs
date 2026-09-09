@@ -1,4 +1,4 @@
-namespace OmniCard.CardMatching;
+namespace OmniCard.CardMatching.Search;
 
 /// <summary>
 /// The MTG-agnostic core search fields every game inherits — the ones backed by columns on

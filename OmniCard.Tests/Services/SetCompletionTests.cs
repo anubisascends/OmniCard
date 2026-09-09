@@ -15,6 +15,8 @@ using OmniCard.Shared.Matching;
 using OmniCard.Shared.Scanning;
 using OmniCard.Shared.Sets;
 using OmniCard.Shared.Settings;
+using OmniCard.CardMatching.Games;
+using OmniCard.Data.Catalogs;
 
 namespace OmniCard.Tests.Services;
 

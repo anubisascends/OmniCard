@@ -1,4 +1,4 @@
-namespace OmniCard.Data;
+namespace OmniCard.Data.Logging;
 
 /// <summary>The six Serilog levels, matching the [{Level:u3}] codes written to the log file.</summary>
 public enum LogEntryLevel

@@ -1,13 +1,13 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
-using OmniCard.CardMatching;
-using OmniCard.Data;
 using OmniCard.Imaging;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Matching;
 using OmniCard.Shared.Settings;
+using OmniCard.CardMatching.Games;
+using OmniCard.Data.Catalogs;
 
 namespace OmniCard.Tests.Services;
 

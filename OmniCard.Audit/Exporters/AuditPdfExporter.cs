@@ -3,7 +3,7 @@ using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using OmniCard.Shared.Audit;
 
-namespace OmniCard.Audit;
+namespace OmniCard.Audit.Exporters;
 
 public sealed class AuditPdfExporter : IAuditPdfExporter
 {

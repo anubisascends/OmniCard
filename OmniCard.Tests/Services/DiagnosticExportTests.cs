@@ -1,5 +1,5 @@
-using OmniCard.Audit;
 using OmniCard.Shared.Scanning;
+using OmniCard.Audit.Exporters;
 
 namespace OmniCard.Tests.Services;
 

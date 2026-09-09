@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace OmniCard.Data;
+namespace OmniCard.Data.Catalogs;
 
 public class PokemonDbContext : TcgCsvDbContext
 {

@@ -1,4 +1,4 @@
-using OmniCard.Data;
+using OmniCard.Data.Logging;
 
 namespace OmniCard.Tests.Services;
 

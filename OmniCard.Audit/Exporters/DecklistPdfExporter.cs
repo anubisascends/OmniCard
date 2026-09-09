@@ -5,7 +5,7 @@ using OmniCard.Shared.Audit;
 using OmniCard.Shared.Lists;
 using OmniCard.Collection.Lists;
 
-namespace OmniCard.Audit;
+namespace OmniCard.Audit.Exporters;
 
 public sealed class DecklistPdfExporter(IHttpClientFactory httpClientFactory) : IDecklistPdfExporter
 {

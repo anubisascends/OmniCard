@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace OmniCard.Data;
+namespace OmniCard.Data.Logging;
 
 /// <summary>
 /// Parses Serilog text log files (written with the app's output template) back into

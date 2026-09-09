@@ -1,12 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using OmniCard.Data;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Matching;
 using OmniCard.Shared.Settings;
+using OmniCard.CardMatching.Search;
+using OmniCard.Data.Catalogs;
 
-namespace OmniCard.CardMatching;
+namespace OmniCard.CardMatching.Games;
 
 public sealed class YugiohService : TcgCsvGameService<YugiohDbContext>
 {

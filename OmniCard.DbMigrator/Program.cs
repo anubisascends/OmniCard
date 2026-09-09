@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Data;
 using OmniCard.DbMigrator;
+using OmniCard.Data.Catalogs;
 
 // One-time copier: SQLite inventory.db (desktop's unified store) -> SQL Server (the web app's
 // multi-user store). Preserves primary-key ids (so every FK stays valid) via SET IDENTITY_INSERT,

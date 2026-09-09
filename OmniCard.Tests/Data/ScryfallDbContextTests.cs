@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using OmniCard.Data;
 using OmniCard.Shared.Cards;
+using OmniCard.Data.Catalogs;
 
 namespace OmniCard.Tests.Data;
 

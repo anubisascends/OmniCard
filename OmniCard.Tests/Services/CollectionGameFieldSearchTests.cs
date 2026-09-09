@@ -1,6 +1,5 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using OmniCard.CardMatching;
 using OmniCard.Collection;
 using OmniCard.Data;
 using OmniCard.Shared.Cards;
@@ -10,6 +9,7 @@ using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Matching;
 using OmniCard.Shared.Scanning;
 using OmniCard.Shared.Sets;
+using OmniCard.CardMatching.Search;
 
 namespace OmniCard.Tests.Services;
 

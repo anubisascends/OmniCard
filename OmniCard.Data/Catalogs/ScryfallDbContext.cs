@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Matching;
 
-namespace OmniCard.Data;
+namespace OmniCard.Data.Catalogs;
 
 public class ScryfallDbContext : DbContext
 {

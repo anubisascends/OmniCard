@@ -4,7 +4,7 @@ using QuestPDF.Infrastructure;
 using OmniCard.Shared.Audit;
 using OmniCard.Shared.Sales;
 
-namespace OmniCard.Audit;
+namespace OmniCard.Audit.Exporters;
 
 /// <summary>Renders the pick list to PDF: one tickable row per card to pull, with where to find it
 /// (location + section/page/slot). The web equivalent of the desktop's <c>PickListPrinter</c>

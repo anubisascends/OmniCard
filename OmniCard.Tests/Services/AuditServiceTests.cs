@@ -10,6 +10,7 @@ using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Matching;
 using OmniCard.Shared.Scanning;
 using OmniCard.Shared.Storage;
+using OmniCard.Data.Catalogs;
 
 namespace OmniCard.Tests.Services;
 

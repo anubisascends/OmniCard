@@ -5,7 +5,6 @@ using System.Text.Json.Serialization;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using OmniCard.Data;
 using OmniCard.Imaging;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
@@ -15,8 +14,10 @@ using OmniCard.Shared.Matching;
 using OmniCard.Shared.Scanning;
 using OmniCard.Shared.Sets;
 using OmniCard.Shared.Settings;
+using OmniCard.CardMatching.Search;
+using OmniCard.Data.Catalogs;
 
-namespace OmniCard.CardMatching;
+namespace OmniCard.CardMatching.Games;
 
 // Abstract base for all TCGCSV-backed games. Concrete games subclass this, supplying a
 // category id, extended-data mapping, and sub-type→price mapping. Catalog download, image

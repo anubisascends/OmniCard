@@ -9,6 +9,7 @@ using OmniCard.Shared.Collection;
 using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Settings;
 using OmniCard.Shared.Trades;
+using OmniCard.Data.Catalogs;
 
 namespace OmniCard.Web.Api;
 

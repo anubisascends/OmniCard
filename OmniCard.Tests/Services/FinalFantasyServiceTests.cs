@@ -1,5 +1,5 @@
-using OmniCard.CardMatching;
 using OmniCard.Shared.Games;
+using OmniCard.CardMatching.Games;
 
 namespace OmniCard.Tests.Services;
 

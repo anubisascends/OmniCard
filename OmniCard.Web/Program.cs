@@ -25,6 +25,9 @@ using OmniCard.Collection.Inventory;
 using OmniCard.Collection.Lists;
 using OmniCard.Collection.Sales;
 using OmniCard.Collection.Trades;
+using OmniCard.CardMatching.Games;
+using OmniCard.Data.Catalogs;
+using OmniCard.Audit.Exporters;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -148,11 +151,11 @@ builder.Services.AddSingleton<IOrderService, OrderService>();
 // Import/export + PDF generation (QuestPDF exporters set their own Community license internally).
 builder.Services.AddSingleton<ICsvExportImportService, CsvExportImportService>();
 builder.Services.AddSingleton<IReceiptService, ReceiptService>();
-builder.Services.AddSingleton<IReceiptPdfExporter, OmniCard.Audit.ReceiptPdfExporter>();
-builder.Services.AddSingleton<ISetChecklistPdfExporter, OmniCard.Audit.SetChecklistPdfExporter>();
+builder.Services.AddSingleton<IReceiptPdfExporter, ReceiptPdfExporter>();
+builder.Services.AddSingleton<ISetChecklistPdfExporter, SetChecklistPdfExporter>();
 builder.Services.AddSingleton<IPriceSheetService, PriceSheetService>();
-builder.Services.AddSingleton<IPriceSheetPdfExporter, OmniCard.Audit.PriceSheetPdfExporter>();
-builder.Services.AddSingleton<IPickListPdfExporter, OmniCard.Audit.PickListPdfExporter>();
+builder.Services.AddSingleton<IPriceSheetPdfExporter, PriceSheetPdfExporter>();
+builder.Services.AddSingleton<IPickListPdfExporter, PickListPdfExporter>();
 
 // --- Binder editor: the one deliberate WRITE surface in the otherwise read-only web app ---
 // A single writable factory against inventory.db, injected only into the binder-edit services so the

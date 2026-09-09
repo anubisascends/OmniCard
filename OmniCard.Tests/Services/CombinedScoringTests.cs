@@ -1,4 +1,4 @@
-using OmniCard.CardMatching;
+using OmniCard.CardMatching.Games;
 
 namespace OmniCard.Tests.Services;
 

@@ -1,8 +1,8 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using OmniCard.Data;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Games;
+using OmniCard.Data.Catalogs;
 
 namespace OmniCard.Tests.Services;
 

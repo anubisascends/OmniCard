@@ -6,7 +6,6 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using OmniCard.Data;
 using OmniCard.Imaging;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
@@ -16,8 +15,10 @@ using OmniCard.Shared.Matching;
 using OmniCard.Shared.Scanning;
 using OmniCard.Shared.Sets;
 using OmniCard.Shared.Settings;
+using OmniCard.CardMatching.Search;
+using OmniCard.Data.Catalogs;
 
-namespace OmniCard.CardMatching;
+namespace OmniCard.CardMatching.Games;
 
 public sealed class ScryfallService : IScryfallService, ICardGameService, IGameFieldResolver, IDisposable
 {

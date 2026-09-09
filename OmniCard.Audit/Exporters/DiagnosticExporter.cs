@@ -4,7 +4,7 @@ using System.Text.Json;
 using OmniCard.Shared.Audit;
 using OmniCard.Shared.Scanning;
 
-namespace OmniCard.Audit;
+namespace OmniCard.Audit.Exporters;
 
 public class DiagnosticExporter : IDiagnosticExporter
 {
