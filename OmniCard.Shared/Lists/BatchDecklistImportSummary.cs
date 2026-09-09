@@ -1,0 +1,12 @@
+namespace OmniCard.Shared.Lists;
+
+public record BatchFileResult(string FileName, string TargetName, int Added, int Unresolved);
+
+public record BatchDecklistImportSummary(
+    int FileCount,
+    int TotalAdded,
+    int TotalUnresolved,
+    bool AnyListTarget,
+    bool AnyLocationTarget,
+    int CsvImportedCount,
+    IReadOnlyList<BatchFileResult> Files);

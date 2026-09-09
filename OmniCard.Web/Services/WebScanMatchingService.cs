@@ -1,8 +1,8 @@
 using OmniCard.Api.Contracts;
-using OmniCard.CardMatching;
-using OmniCard.Imaging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Matching;
+using OmniCard.CardMatching.Games;
 
 namespace OmniCard.Web.Services;
 
@@ -121,52 +121,52 @@ public sealed class WebScanMatchingService
             switch (game)
             {
                 case CardGame.OnePiece:
-                {
-                    var (cn, conf) = await _ocrService.DetectOptcgCollectorNumberAsync(imageBytes);
-                    return await ApplyCollectorOcrAsync(gameService, hash, artHashes, edgeHash, setFilter, cn, conf, current);
-                }
+                    {
+                        var (cn, conf) = await _ocrService.DetectOptcgCollectorNumberAsync(imageBytes);
+                        return await ApplyCollectorOcrAsync(gameService, hash, artHashes, edgeHash, setFilter, cn, conf, current);
+                    }
                 case CardGame.Riftbound:
                     return await RefineRiftboundAsync(imageBytes, gameService, hash, edgeHash, setFilter, current);
                 case CardGame.Pokemon or CardGame.YuGiOh or CardGame.FinalFantasy:
-                {
-                    var spec = game switch
                     {
-                        CardGame.Pokemon => PokemonService.OcrSpec,
-                        CardGame.YuGiOh => YugiohService.OcrSpec,
-                        _ => FinalFantasyService.OcrSpec,
-                    };
-                    var (cn, conf) = await _ocrService.DetectCollectorNumberAsync(imageBytes, spec);
-                    return await ApplyCollectorOcrAsync(gameService, hash, artHashes, edgeHash, setFilter, cn, conf, current);
-                }
-                default: // MTG
-                {
-                    // Ground truth: bottom-left (set, collector) uniquely identifies a Scryfall printing.
-                    var (ocrSet, ocrNumber, conf) = await _ocrService.DetectMtgSetAndNumberAsync(imageBytes);
-                    if (ocrSet is not null && ocrNumber is not null && conf >= 0.5)
-                    {
-                        var gt = new OcrMatchResult { SetCode = ocrSet, CollectorNumber = ocrNumber, CollectorNumberConfidence = conf };
-                        var gtMatch = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, gt, setFilter, detectedSets, scanEdgeHash: edgeHash));
-                        if (gtMatch is not null)
-                            return gtMatch;
-                    }
-
-                    // Fallback: name + set-symbol recognition, with pHash still primary.
-                    var ocr = await _ocrService.AnalyzeCardAsync(imageBytes);
-                    if (ocr?.RecognizedName is not null)
-                    {
-                        var preferred = detectedSets is null ? null : new HashSet<string>(detectedSets, StringComparer.OrdinalIgnoreCase);
-                        if (ocr.SymbolConfidence >= 0.5 && ocr.CandidateSetCodes is { Count: > 0 })
+                        var spec = game switch
                         {
-                            preferred ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                            foreach (var code in ocr.CandidateSetCodes)
-                                preferred.Add(code);
-                        }
-                        var ocrMatch = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, ocr, setFilter, preferred, scanEdgeHash: edgeHash));
-                        if (ocrMatch is not null && (current is null || ocrMatch.GameSpecificId != current.GameSpecificId))
-                            return ocrMatch;
+                            CardGame.Pokemon => PokemonService.OcrSpec,
+                            CardGame.YuGiOh => YugiohService.OcrSpec,
+                            _ => FinalFantasyService.OcrSpec,
+                        };
+                        var (cn, conf) = await _ocrService.DetectCollectorNumberAsync(imageBytes, spec);
+                        return await ApplyCollectorOcrAsync(gameService, hash, artHashes, edgeHash, setFilter, cn, conf, current);
                     }
-                    return current;
-                }
+                default: // MTG
+                    {
+                        // Ground truth: bottom-left (set, collector) uniquely identifies a Scryfall printing.
+                        var (ocrSet, ocrNumber, conf) = await _ocrService.DetectMtgSetAndNumberAsync(imageBytes);
+                        if (ocrSet is not null && ocrNumber is not null && conf >= 0.5)
+                        {
+                            var gt = new OcrMatchResult { SetCode = ocrSet, CollectorNumber = ocrNumber, CollectorNumberConfidence = conf };
+                            var gtMatch = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, gt, setFilter, detectedSets, scanEdgeHash: edgeHash));
+                            if (gtMatch is not null)
+                                return gtMatch;
+                        }
+
+                        // Fallback: name + set-symbol recognition, with pHash still primary.
+                        var ocr = await _ocrService.AnalyzeCardAsync(imageBytes);
+                        if (ocr?.RecognizedName is not null)
+                        {
+                            var preferred = detectedSets is null ? null : new HashSet<string>(detectedSets, StringComparer.OrdinalIgnoreCase);
+                            if (ocr.SymbolConfidence >= 0.5 && ocr.CandidateSetCodes is { Count: > 0 })
+                            {
+                                preferred ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                                foreach (var code in ocr.CandidateSetCodes)
+                                    preferred.Add(code);
+                            }
+                            var ocrMatch = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, ocr, setFilter, preferred, scanEdgeHash: edgeHash));
+                            if (ocrMatch is not null && (current is null || ocrMatch.GameSpecificId != current.GameSpecificId))
+                                return ocrMatch;
+                        }
+                        return current;
+                    }
             }
         }
         catch (Exception ex)
@@ -322,29 +322,29 @@ public sealed class WebScanMatchingService
             switch (game)
             {
                 case CardGame.OnePiece:
-                {
-                    var (cn, conf) = await _ocrService.DetectOptcgCollectorNumberAsync(rotatedBytes);
-                    if (cn is not null && conf >= 0.5) ocr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
-                    break;
-                }
-                case CardGame.Riftbound:
-                {
-                    var (cn, conf) = await _ocrService.DetectRiftboundCollectorNumberAsync(rotatedBytes);
-                    if (cn is not null && conf >= 0.5) ocr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
-                    break;
-                }
-                case CardGame.Pokemon or CardGame.YuGiOh or CardGame.FinalFantasy:
-                {
-                    var spec = game switch
                     {
-                        CardGame.Pokemon => PokemonService.OcrSpec,
-                        CardGame.YuGiOh => YugiohService.OcrSpec,
-                        _ => FinalFantasyService.OcrSpec,
-                    };
-                    var (cn, conf) = await _ocrService.DetectCollectorNumberAsync(rotatedBytes, spec);
-                    if (cn is not null && conf >= 0.5) ocr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
-                    break;
-                }
+                        var (cn, conf) = await _ocrService.DetectOptcgCollectorNumberAsync(rotatedBytes);
+                        if (cn is not null && conf >= 0.5) ocr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
+                        break;
+                    }
+                case CardGame.Riftbound:
+                    {
+                        var (cn, conf) = await _ocrService.DetectRiftboundCollectorNumberAsync(rotatedBytes);
+                        if (cn is not null && conf >= 0.5) ocr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
+                        break;
+                    }
+                case CardGame.Pokemon or CardGame.YuGiOh or CardGame.FinalFantasy:
+                    {
+                        var spec = game switch
+                        {
+                            CardGame.Pokemon => PokemonService.OcrSpec,
+                            CardGame.YuGiOh => YugiohService.OcrSpec,
+                            _ => FinalFantasyService.OcrSpec,
+                        };
+                        var (cn, conf) = await _ocrService.DetectCollectorNumberAsync(rotatedBytes, spec);
+                        if (cn is not null && conf >= 0.5) ocr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
+                        break;
+                    }
             }
 
             ulong? rotatedEdge = isFoil && IsEdgeHashGame(game)

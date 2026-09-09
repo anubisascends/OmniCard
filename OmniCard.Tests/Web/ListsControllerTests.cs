@@ -2,13 +2,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Api.Contracts;
-using OmniCard.Collection;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
-using OmniCard.Web.Api;
 using OmniCard.Web.Services;
-using Xunit;
+using OmniCard.Shared.Lists;
+using OmniCard.Shared.Settings;
+using OmniCard.Shared.Storage;
+using OmniCard.Collection.Inventory;
+using OmniCard.Collection.Lists;
+using OmniCard.Web.Api.Controllers;
 
 namespace OmniCard.Tests.Web;
 

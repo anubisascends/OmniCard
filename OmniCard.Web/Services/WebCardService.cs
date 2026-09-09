@@ -1,7 +1,11 @@
 using System.Collections.ObjectModel;
-using System.IO;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Sets;
+using OmniCard.Shared.Storage;
 
 namespace OmniCard.Web.Services;
 

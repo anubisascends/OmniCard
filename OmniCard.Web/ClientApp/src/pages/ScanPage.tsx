@@ -33,7 +33,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import { api } from '../api/client';
 import { useGame } from '../context/GameContext';
-import { LocationPickerDialog } from '../components/LocationPickerDialog';
+import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import type { ScanMatchDto, ScanSearchResultDto } from '../api/types';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];

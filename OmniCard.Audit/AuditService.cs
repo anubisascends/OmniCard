@@ -3,8 +3,13 @@ using Microsoft.Extensions.Logging;
 using OmniCard.Collection;
 using OmniCard.Data;
 using OmniCard.Imaging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Audit;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Storage;
+using OmniCard.Data.Catalogs;
 
 namespace OmniCard.Audit;
 

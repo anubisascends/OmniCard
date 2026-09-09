@@ -12,7 +12,7 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import { api } from '../api/client';
-import { TradeBuilder } from '../components/TradeBuilder';
+import { TradeBuilder } from '../components/dialogs/TradeBuilder';
 
 const money = (n?: number | null) =>
   n == null ? '—' : n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });

@@ -25,7 +25,7 @@ namespace OmniCard.Web.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("OmniCard.Models.CardList", b =>
+            modelBuilder.Entity("OmniCard.Shared.Lists.CardList", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -52,7 +52,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("CardLists");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.CardListItem", b =>
+            modelBuilder.Entity("OmniCard.Shared.Lists.CardListItem", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -103,7 +103,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("CardListItems");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.Customer", b =>
+            modelBuilder.Entity("OmniCard.Shared.Sales.Customer", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -160,7 +160,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("Customers");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.EbayListing", b =>
+            modelBuilder.Entity("OmniCard.Shared.Ebay.EbayListing", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -225,7 +225,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("EbayListings");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.FlagResolution", b =>
+            modelBuilder.Entity("OmniCard.Shared.Scanning.FlagResolution", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -271,7 +271,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("FlagResolutions");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.InventoryLot", b =>
+            modelBuilder.Entity("OmniCard.Shared.Inventory.InventoryLot", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -349,7 +349,7 @@ namespace OmniCard.Web.Migrations
                     b.HasAnnotation("Sqlite:Autoincrement", true);
                 });
 
-            modelBuilder.Entity("OmniCard.Models.InventoryMovement", b =>
+            modelBuilder.Entity("OmniCard.Shared.Inventory.InventoryMovement", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -394,7 +394,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("Movements");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.Listing", b =>
+            modelBuilder.Entity("OmniCard.Shared.Sales.Listing", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -451,7 +451,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("Listings");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.LotTag", b =>
+            modelBuilder.Entity("OmniCard.Shared.Tags.LotTag", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -472,7 +472,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("LotTags");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.MigrationState", b =>
+            modelBuilder.Entity("OmniCard.Shared.Settings.MigrationState", b =>
                 {
                     b.Property<string>("Key")
                         .HasColumnType("nvarchar(450)");
@@ -485,7 +485,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("MigrationState");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.MismatchLog", b =>
+            modelBuilder.Entity("OmniCard.Shared.Matching.MismatchLog", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -542,7 +542,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("MismatchLogs");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.Order", b =>
+            modelBuilder.Entity("OmniCard.Shared.Sales.Order", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -614,7 +614,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("Orders");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.OrderEdit", b =>
+            modelBuilder.Entity("OmniCard.Shared.Sales.OrderEdit", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -643,7 +643,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("OrderEdits");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.OrderLine", b =>
+            modelBuilder.Entity("OmniCard.Shared.Sales.OrderLine", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -691,7 +691,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("OrderLines");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.Product", b =>
+            modelBuilder.Entity("OmniCard.Shared.Inventory.Product", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -766,7 +766,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("Products");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.ScanDiagnosticEvent", b =>
+            modelBuilder.Entity("OmniCard.Shared.Scanning.ScanDiagnosticEvent", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -803,7 +803,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("ScanDiagnosticEvents");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.StorageContainer", b =>
+            modelBuilder.Entity("OmniCard.Shared.Storage.StorageContainer", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -859,7 +859,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("StorageContainers");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.Tag", b =>
+            modelBuilder.Entity("OmniCard.Shared.Tags.Tag", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -879,7 +879,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("Tags");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.Trade", b =>
+            modelBuilder.Entity("OmniCard.Shared.Trades.Trade", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -945,7 +945,7 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("Trades");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.TradeSession", b =>
+            modelBuilder.Entity("OmniCard.Shared.Trades.TradeSession", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -983,9 +983,9 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("TradeSessions");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.EbayListing", b =>
+            modelBuilder.Entity("OmniCard.Shared.Ebay.EbayListing", b =>
                 {
-                    b.HasOne("OmniCard.Models.InventoryLot", "Lot")
+                    b.HasOne("OmniCard.Shared.Inventory.InventoryLot", "Lot")
                         .WithMany()
                         .HasForeignKey("LotId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -994,9 +994,9 @@ namespace OmniCard.Web.Migrations
                     b.Navigation("Lot");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.FlagResolution", b =>
+            modelBuilder.Entity("OmniCard.Shared.Scanning.FlagResolution", b =>
                 {
-                    b.HasOne("OmniCard.Models.InventoryLot", "Lot")
+                    b.HasOne("OmniCard.Shared.Inventory.InventoryLot", "Lot")
                         .WithMany()
                         .HasForeignKey("LotId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1005,14 +1005,14 @@ namespace OmniCard.Web.Migrations
                     b.Navigation("Lot");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.InventoryLot", b =>
+            modelBuilder.Entity("OmniCard.Shared.Inventory.InventoryLot", b =>
                 {
-                    b.HasOne("OmniCard.Models.StorageContainer", null)
+                    b.HasOne("OmniCard.Shared.Storage.StorageContainer", null)
                         .WithMany()
                         .HasForeignKey("LocationId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("OmniCard.Models.Product", "Product")
+                    b.HasOne("OmniCard.Shared.Inventory.Product", "Product")
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1021,9 +1021,9 @@ namespace OmniCard.Web.Migrations
                     b.Navigation("Product");
                 });
 
-            modelBuilder.Entity("OmniCard.Models.LotTag", b =>
+            modelBuilder.Entity("OmniCard.Shared.Tags.LotTag", b =>
                 {
-                    b.HasOne("OmniCard.Models.Tag", "Tag")
+                    b.HasOne("OmniCard.Shared.Tags.Tag", "Tag")
                         .WithMany()
                         .HasForeignKey("TagId")
                         .OnDelete(DeleteBehavior.Cascade)

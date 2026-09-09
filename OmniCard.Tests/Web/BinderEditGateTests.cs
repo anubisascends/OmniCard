@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Configuration;
 using OmniCard.Web.Services;
-using Xunit;
 
 namespace OmniCard.Tests.Web;
 

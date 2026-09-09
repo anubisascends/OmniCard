@@ -39,7 +39,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import { api, type CustomerFields, type ListingFields } from '../api/client';
 import { useGame } from '../context/GameContext';
 import type { CustomerDto, ListingDetailDto, OrderDto, WorkflowLaneDto } from '../api/types';
-import { OrderDetailDrawer } from '../components/OrderDetailDrawer';
+import { OrderDetailDrawer } from '../components/dialogs/OrderDetailDrawer';
 
 const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 

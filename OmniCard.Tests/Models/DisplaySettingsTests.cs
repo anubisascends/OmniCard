@@ -1,5 +1,4 @@
-using OmniCard.Models;
-using Xunit;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Models;
 

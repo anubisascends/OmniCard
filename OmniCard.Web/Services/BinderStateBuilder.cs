@@ -1,7 +1,12 @@
 using Microsoft.EntityFrameworkCore;
-using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Binder;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Settings;
+using OmniCard.Shared.Storage;
+using OmniCard.Shared.Tags;
+using OmniCard.Data.Catalogs;
+using OmniCard.Web.Helpers;
 
 namespace OmniCard.Web.Services;
 

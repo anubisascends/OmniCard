@@ -1,4 +1,4 @@
-namespace OmniCard.CardMatching;
+namespace OmniCard.CardMatching.Search;
 
 /// <summary>
 /// Where a search field's data lives, which decides how it is filtered.

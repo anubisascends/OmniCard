@@ -1,4 +1,6 @@
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Matching;
 
 namespace OmniCard.CardMatching;
 

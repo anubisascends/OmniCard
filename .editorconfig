@@ -1,0 +1,24 @@
+root = true
+
+# Baseline conventions for every file
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.cs]
+indent_size = 4
+# Modern C#: prefer file-scoped namespaces and flag unused usings (drives dotnet format cleanup)
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_diagnostic.IDE0005.severity = warning
+
+[*.{ts,tsx,js,jsx,json,css,html}]
+indent_size = 2
+
+[*.{csproj,props,targets,slnx}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false

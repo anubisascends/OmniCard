@@ -1,0 +1,364 @@
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using OmniCard.Data;
+using OmniCard.Audit;
+using OmniCard.Shared.Binder;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Storage;
+using OmniCard.Data.Catalogs;
+
+namespace OmniCard.Tests.Services.Audit;
+
+public class AuditServiceTests : IDisposable
+{
+    private readonly SqliteConnection _omniConn;
+    private readonly DbContextOptions<OmniCardDbContext> _omniOptions;
+    private readonly SqliteConnection _scryfallConn;
+    private readonly DbContextOptions<ScryfallDbContext> _scryfallOptions;
+
+    public AuditServiceTests()
+    {
+        _omniConn = new SqliteConnection("Data Source=:memory:");
+        _omniConn.Open();
+        _omniOptions = new DbContextOptionsBuilder<OmniCardDbContext>()
+            .UseSqlite(_omniConn)
+            .Options;
+        using var omniCtx = new OmniCardDbContext(_omniOptions);
+        omniCtx.Database.EnsureCreated();
+
+        _scryfallConn = new SqliteConnection("Data Source=:memory:");
+        _scryfallConn.Open();
+        _scryfallOptions = new DbContextOptionsBuilder<ScryfallDbContext>()
+            .UseSqlite(_scryfallConn)
+            .Options;
+        using var scryfallCtx = new ScryfallDbContext(_scryfallOptions);
+        scryfallCtx.Database.EnsureCreated();
+    }
+
+    public void Dispose()
+    {
+        _omniConn.Dispose();
+        _scryfallConn.Dispose();
+    }
+
+    private IDbContextFactory<OmniCardDbContext> OmniFactory() => new MockOmniFactory(_omniOptions);
+    private IDbContextFactory<ScryfallDbContext> ScryfallFactory() => new MockScryfallFactory(_scryfallOptions);
+
+    private AuditService CreateService() => new(
+        OmniFactory(),
+        ScryfallFactory(),
+        new StubContainerService(),
+        NullLogger<AuditService>.Instance);
+
+    private static Product NewSingle(string gameCardId, string name, string setCode) => new()
+    {
+        Game = CardGame.Mtg,
+        Category = ProductCategory.Single,
+        GameCardId = gameCardId,
+        Name = name,
+        SetCode = setCode,
+    };
+
+    [Fact]
+    public void GenerateReport_MatchesOneToOneByGameCardId()
+    {
+        // Setup: location has 2x CardA and 1x CardB
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+        {
+            var container = new StorageContainer { Name = "Binder", ContainerType = ContainerType.Binder };
+            ctx.StorageContainers.Add(container);
+            ctx.SaveChanges();
+
+            var cardA = NewSingle("card-a", "Card A", "SET");
+            var cardB = NewSingle("card-b", "Card B", "SET");
+            ctx.Products.AddRange(cardA, cardB);
+            ctx.SaveChanges();
+
+            ctx.Lots.AddRange(
+                new InventoryLot { ProductId = cardA.Id, LocationId = container.Id },
+                new InventoryLot { ProductId = cardA.Id, LocationId = container.Id },
+                new InventoryLot { ProductId = cardB.Id, LocationId = container.Id }
+            );
+            ctx.SaveChanges();
+        }
+
+        var service = CreateService();
+        int containerId;
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+            containerId = ctx.StorageContainers.First().Id;
+
+        service.StartAudit(containerId);
+
+        // Simulate: scanned 1x CardA and 1x unmatched
+        var scans = new List<ScannedCard>
+        {
+            new() { TempImagePath = "t1.png", Hash = 0, Game = CardGame.Mtg,
+                     Match = new CardMatch { GameSpecificId = "card-a", Name = "Card A", SetCode = "SET", Source = new object() } },
+            new() { TempImagePath = "t2.png", Hash = 0, Game = CardGame.Mtg,
+                     Match = null }, // unmatched scan
+        };
+
+        var report = service.GenerateReport(scans);
+
+        Assert.Equal("Binder", report.LocationName);
+        Assert.Equal(3, report.ExpectedCount);
+        Assert.Equal(2, report.ActualCount);
+        Assert.Single(report.Matched);                // 1x CardA matched
+        Assert.Equal(2, report.Missing.Count);         // 1x CardA + 1x CardB missing
+        Assert.Single(report.Extra);                   // 1x unmatched scan
+    }
+
+    [Fact]
+    public void GenerateFileAuditReport_MatchesByGameCardId_AndFallsBackToSetCollector()
+    {
+        int containerId;
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+        {
+            var container = new StorageContainer { Name = "Box", ContainerType = ContainerType.Box };
+            ctx.StorageContainers.Add(container);
+            ctx.SaveChanges();
+            containerId = container.Id;
+
+            // CardA has a resolvable id; CardB's id is blank so it must fall back to set+number.
+            var cardA = NewSingle("id-a", "Card A", "set");
+            cardA.CollectorNumber = "10";
+            var cardB = NewSingle("", "Card B", "SET");
+            cardB.CollectorNumber = "20";
+            ctx.Products.AddRange(cardA, cardB);
+            ctx.SaveChanges();
+
+            ctx.Lots.AddRange(
+                new InventoryLot { ProductId = cardA.Id, LocationId = containerId },
+                new InventoryLot { ProductId = cardB.Id, LocationId = containerId }
+            );
+            ctx.SaveChanges();
+        }
+
+        var service = CreateService();
+
+        var imported = new List<CollectionCard>
+        {
+            // Matches CardA by id even though set casing differs.
+            new() { Game = CardGame.Mtg, GameCardId = "id-a", Name = "Card A", SetCode = "SET", Number = "10", Condition = "NM" },
+            // No id — must match CardB by set code (case-insensitive) + collector number.
+            new() { Game = CardGame.Mtg, GameCardId = "", Name = "Card B", SetCode = "set", Number = "20", Condition = "NM" },
+            // Not in the location at all → Extra.
+            new() { Game = CardGame.Mtg, GameCardId = "id-c", Name = "Card C", SetCode = "SET", Number = "30", Condition = "NM" },
+        };
+
+        var report = service.GenerateFileAuditReport(containerId, imported);
+
+        Assert.Equal("In File", report.SourceLabel);
+        Assert.Equal(2, report.ExpectedCount);
+        Assert.Equal(3, report.ActualCount);
+        Assert.Equal(2, report.Matched.Count);   // A by id, B by set+number
+        Assert.Empty(report.Missing);
+        Assert.Single(report.Extra);              // Card C
+        Assert.Equal("Card C", report.Extra[0].Name);
+    }
+
+    [Fact]
+    public void GenerateFileAuditReport_FlagsConditionAndFoilMismatches()
+    {
+        int containerId;
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+        {
+            var container = new StorageContainer { Name = "Box", ContainerType = ContainerType.Box };
+            ctx.StorageContainers.Add(container);
+            ctx.SaveChanges();
+            containerId = container.Id;
+
+            var cardA = NewSingle("id-a", "Card A", "SET");
+            cardA.Foil = false;
+            ctx.Products.Add(cardA);
+            ctx.SaveChanges();
+
+            // Stored copy is NM.
+            ctx.Lots.Add(new InventoryLot { ProductId = cardA.Id, LocationId = containerId, Condition = "NM" });
+            ctx.SaveChanges();
+        }
+
+        var service = CreateService();
+
+        // File reports the same card as LP and foil — both a condition and a foil discrepancy.
+        var imported = new List<CollectionCard>
+        {
+            new() { Game = CardGame.Mtg, GameCardId = "id-a", Name = "Card A", SetCode = "SET", Condition = "LP", IsFoil = true },
+        };
+
+        var report = service.GenerateFileAuditReport(containerId, imported);
+
+        Assert.Single(report.Matched);            // still present
+        Assert.Empty(report.Missing);
+        Assert.Empty(report.Extra);
+        Assert.Single(report.Mismatched);
+        Assert.Contains("Condition", report.Mismatched[0].Discrepancy);
+        Assert.Contains("Foil", report.Mismatched[0].Discrepancy);
+    }
+
+    [Fact]
+    public void StartAudit_SetsActiveState()
+    {
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+        {
+            var container = new StorageContainer { Name = "Box", ContainerType = ContainerType.Box };
+            ctx.StorageContainers.Add(container);
+            ctx.SaveChanges();
+        }
+
+        var service = CreateService();
+        int containerId;
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+            containerId = ctx.StorageContainers.First().Id;
+
+        Assert.False(service.IsAuditActive);
+        service.StartAudit(containerId);
+        Assert.True(service.IsAuditActive);
+        Assert.Equal(containerId, service.AuditLocationId);
+        Assert.Equal("Box", service.AuditLocationName);
+
+        service.EndAudit();
+        Assert.False(service.IsAuditActive);
+        Assert.Null(service.AuditLocationId);
+    }
+
+    [Fact]
+    public void FindScopedMatch_MatchesOnlyLocationCards()
+    {
+        // Use hashes that are exactly 0 Hamming distance for an exact match,
+        // and a completely different hash (all bits flipped = 64 distance) for no-match.
+        // CardA hash: 0xAAAAAAAAAAAAAAAA (all alternating bits)
+        // CardB hash: 0x5555555555555555 (complement of CardA — 64 bits different = distance 64)
+        // Querying CardA's hash should match CardA (in location).
+        // Querying CardB's hash: CardB is NOT in the location, so the scoped index has no entry
+        // for it, and the only candidate (CardA) is 64 bits away — well above MaxDistance(14).
+        const ulong cardAHash = 0xAAAA_AAAA_AAAA_AAAA;
+        const ulong cardBHash = 0x5555_5555_5555_5555; // Hamming distance 64 from cardAHash
+
+        Guid cardAId, cardBId;
+        using (var ctx = new ScryfallDbContext(_scryfallOptions))
+        {
+            var cardA = CreateMinimalCard("Card A", "SET", "1", imageHash: cardAHash);
+            var cardB = CreateMinimalCard("Card B", "SET", "2", imageHash: cardBHash);
+            ctx.Cards.AddRange(cardA, cardB);
+            ctx.SaveChanges();
+            cardAId = cardA.Id;
+            cardBId = cardB.Id;
+        }
+
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+        {
+            var container = new StorageContainer { Name = "Binder", ContainerType = ContainerType.Binder };
+            ctx.StorageContainers.Add(container);
+            ctx.SaveChanges();
+            // Only CardA is in the location
+            var product = NewSingle(cardAId.ToString(), "Card A", "SET");
+            ctx.Products.Add(product);
+            ctx.SaveChanges();
+            ctx.Lots.Add(new InventoryLot { ProductId = product.Id, LocationId = container.Id });
+            ctx.SaveChanges();
+        }
+
+        var service = CreateService();
+        int containerId;
+        using (var ctx = new OmniCardDbContext(_omniOptions))
+            containerId = ctx.StorageContainers.First().Id;
+
+        service.StartAudit(containerId);
+
+        // CardA's hash should match (exact match, distance 0)
+        var matchA = service.FindScopedMatch(cardAHash, null);
+        Assert.NotNull(matchA);
+        Assert.Equal("Card A", matchA.Name);
+
+        // CardB's hash: CardB is NOT in the location, so the scoped index only has CardA.
+        // Distance from cardBHash to cardAHash is 64 (all bits flipped) — well above MaxDistance.
+        // Should return null.
+        var matchB = service.FindScopedMatch(cardBHash, null);
+        Assert.Null(matchB);
+    }
+
+    // --- Helpers ---
+
+    private static Card CreateMinimalCard(string name, string setCode, string collectorNumber, ulong? imageHash = null)
+    {
+        return new Card
+        {
+            Id = Guid.NewGuid(),
+            OracleId = Guid.NewGuid(),
+            Name = name,
+            Lang = "en",
+            ReleasedAt = "2024-01-01",
+            Uri = "https://api.scryfall.com/cards/test",
+            ScryfallUri = "https://scryfall.com/card/test",
+            Layout = "normal",
+            ImageStatus = "highres_scan",
+            TypeLine = "Creature",
+            ColorIdentity = [],
+            Keywords = [],
+            Games = ["paper"],
+            Finishes = ["nonfoil"],
+            SetId = Guid.NewGuid(),
+            SetCode = setCode,
+            SetName = "Test Set",
+            SetType = "expansion",
+            SetUri = "https://api.scryfall.com/sets/test",
+            SetSearchUri = "https://api.scryfall.com/cards/search?q=test",
+            ScryfallSetUri = "https://scryfall.com/sets/test",
+            RulingsUri = "https://api.scryfall.com/cards/test/rulings",
+            PrintsSearchUri = "https://api.scryfall.com/cards/search?q=test",
+            CollectorNumber = collectorNumber,
+            Rarity = "common",
+            BorderColor = "black",
+            Frame = "2015",
+            Legalities = [],
+            ImageHash = imageHash,
+        };
+    }
+
+    // --- Stubs ---
+
+    private class MockOmniFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
+    {
+        public OmniCardDbContext CreateDbContext() => new(options);
+    }
+
+    private class MockScryfallFactory(DbContextOptions<ScryfallDbContext> options) : IDbContextFactory<ScryfallDbContext>
+    {
+        public ScryfallDbContext CreateDbContext() => new(options);
+    }
+
+    private class StubContainerService : IStorageContainerService
+    {
+        // AuditService reads container name from OmniCardDbContext directly — this stub is unused
+        public List<StorageContainer> GetAll() => [];
+        public StorageContainer GetBulk() => throw new NotImplementedException();
+        public bool NameExists(string name, int? excludeId = null) => false;
+        public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9) => throw new NotImplementedException();
+        public void Rename(int id, string newName) => throw new NotImplementedException();
+        public void Delete(int id, bool moveCardsToBulk = true) => throw new NotImplementedException();
+        public int GetCardCount(int containerId) => throw new NotImplementedException();
+        public void SetCoverCard(int containerId, int? cardId) => throw new NotImplementedException();
+        public List<CollectionCard> GetCardsInContainer(int containerId) => throw new NotImplementedException();
+        public void SetExcludeFromDeckCheck(int containerId, bool exclude) => throw new NotImplementedException();
+        public void SetAlwaysAvailable(int containerId, bool alwaysAvailable) => throw new NotImplementedException();
+        public BinderLayout GetBinderLayout(int containerId) => throw new NotImplementedException();
+        public void AddBinderSheet(int containerId, bool doubleSided) => throw new NotImplementedException();
+        public BinderSheetInfo GetSheetForPage(int containerId, int page) => throw new NotImplementedException();
+        public List<BinderSheetInfo> GetSheets(int containerId) => throw new NotImplementedException();
+        public void InsertBinderSheet(int containerId, int insertIndex, bool doubleSided) => throw new NotImplementedException();
+        public void MoveBinderSheet(int containerId, int fromPage, int toIndex) => throw new NotImplementedException();
+        public void ShiftPage(int containerId, int page, int deltaPages, BinderShiftScope scope) => throw new NotImplementedException();
+        public void RemoveBinderSheet(int containerId, int page) => throw new NotImplementedException();
+        public void SetSlotsPerPage(int containerId, int slotsPerPage) => throw new NotImplementedException();
+        public void SetColumns(int containerId, int columns) => throw new NotImplementedException();
+        public List<CollectionCard> GetPlacedCardsOnPage(int containerId, int page) => throw new NotImplementedException();
+        public void UnassignFromPage(int lotId) => throw new NotImplementedException();
+        public void AssignCardToSlot(int lotId, int containerId, int page, int slot) => throw new NotImplementedException();
+    }
+}

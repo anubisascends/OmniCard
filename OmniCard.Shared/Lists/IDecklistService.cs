@@ -1,0 +1,11 @@
+using OmniCard.Shared.Cards;
+
+namespace OmniCard.Shared.Lists;
+
+public interface IDecklistService
+{
+    Task<(string DeckName, List<DecklistEntry> Entries)?> FetchDecklistAsync(string url);
+    (string DeckName, List<DecklistEntry> Entries) ParseDecklistText(string text);
+    List<DecklistEntry> ParseDecklistPrintings(string text);
+    DecklistCheckResult CheckAgainstCollection(string deckName, string deckSource, List<DecklistEntry> entries, CardGame game);
+}

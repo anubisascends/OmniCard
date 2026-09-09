@@ -1,5 +1,14 @@
 using Microsoft.EntityFrameworkCore;
-using OmniCard.Models;
+using OmniCard.Shared.Ebay;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Lists;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Sales;
+using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Settings;
+using OmniCard.Shared.Storage;
+using OmniCard.Shared.Tags;
+using OmniCard.Shared.Trades;
 
 namespace OmniCard.Data;
 

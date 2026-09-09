@@ -1,7 +1,6 @@
-using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using OmniCard.Interfaces;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Data;
 

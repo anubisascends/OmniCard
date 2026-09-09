@@ -1,6 +1,6 @@
 using System.Text.Json;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Settings;
+using OmniCard.Shared.Trades;
 
 namespace OmniCard.Web.Services;
 

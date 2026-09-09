@@ -2,12 +2,10 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
-using System.IO;
 using System.Numerics;
 using Microsoft.Extensions.Logging;
-using OmniCard.Interfaces;
-using OmniCard.Models;
 using SkiaSharp;
+using OmniCard.Shared.Matching;
 namespace OmniCard.Imaging;
 
 /// <summary>

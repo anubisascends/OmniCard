@@ -1,10 +1,10 @@
-namespace OmniCard.CardMatching;
+namespace OmniCard.CardMatching.Search;
 
 /// <summary>
 /// Opt-in capability a game service implements to expose its per-game searchable fields. Kept in
 /// <c>OmniCard.CardMatching</c> (not on <c>ICardGameService</c> in OmniCard.Shared) because it traffics
 /// in <see cref="ComparisonOp"/>/<see cref="SearchSchema"/>, which live here — and OmniCard.Shared
-/// must not depend on OmniCard.CardMatching. Consumers resolve a game service and cast to this.
+/// must not depend on  Consumers resolve a game service and cast to this.
 /// </summary>
 public interface IGameFieldResolver
 {

@@ -1,6 +1,5 @@
-using OmniCard.Interfaces;
-using OmniCard.Tests.Services;
-using OmniCard.Web.Api;
+using OmniCard.Web.Api.Controllers;
+using OmniCard.Tests.Services.Collection;
 
 namespace OmniCard.Tests.Web;
 

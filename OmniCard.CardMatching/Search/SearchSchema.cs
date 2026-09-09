@@ -1,4 +1,4 @@
-namespace OmniCard.CardMatching;
+namespace OmniCard.CardMatching.Search;
 
 /// <summary>
 /// A game's searchable-field vocabulary. Resolves raw field tokens to canonical names (game aliases

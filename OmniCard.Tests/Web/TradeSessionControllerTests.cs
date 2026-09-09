@@ -3,13 +3,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
-using OmniCard.Collection;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
-using OmniCard.Web;
-using OmniCard.Web.Api;
 using OmniCard.Web.Services;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Trades;
+using OmniCard.Collection.Trades;
+using OmniCard.Web.Api.Controllers;
 
 namespace OmniCard.Tests.Web;
 
@@ -64,8 +64,14 @@ public class TradeSessionControllerTests : IDisposable
         using var ctx = _factory.CreateDbContext();
         var p = new Product
         {
-            Game = CardGame.Mtg, Category = ProductCategory.Single, GameCardId = "bolt",
-            Name = name, SetName = "Alpha", SetCode = "LEA", CollectorNumber = "161", Rarity = "common",
+            Game = CardGame.Mtg,
+            Category = ProductCategory.Single,
+            GameCardId = "bolt",
+            Name = name,
+            SetName = "Alpha",
+            SetCode = "LEA",
+            CollectorNumber = "161",
+            Rarity = "common",
         };
         ctx.Products.Add(p);
         ctx.SaveChanges();

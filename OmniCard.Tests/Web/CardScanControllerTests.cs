@@ -5,13 +5,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using OmniCard.Api.Contracts;
-using OmniCard.Collection;
 using OmniCard.Data;
-using OmniCard.Interfaces;
-using OmniCard.Models;
-using OmniCard.Web.Api;
 using OmniCard.Web.Services;
-using Xunit;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
+using OmniCard.Shared.Matching;
+using OmniCard.Shared.Settings;
+using OmniCard.Shared.Storage;
+using OmniCard.Shared.Tags;
+using OmniCard.Collection.Inventory;
+using OmniCard.Web.Api.Controllers;
 
 namespace OmniCard.Tests.Web;
 

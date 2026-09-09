@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace OmniCard.CardMatching;
+namespace OmniCard.CardMatching.Search;
 
 /// <summary>
 /// Shared in-memory evaluation of a single field predicate against a candidate string value. Used by

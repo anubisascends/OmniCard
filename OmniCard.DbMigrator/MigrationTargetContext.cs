@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using OmniCard.Data;
-using OmniCard.Models;
+using OmniCard.Shared.Collection;
 
 namespace OmniCard.DbMigrator;
 

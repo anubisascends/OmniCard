@@ -1,7 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
-using OmniCard.Interfaces;
-using OmniCard.Models;
+using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Web.Services;
 
