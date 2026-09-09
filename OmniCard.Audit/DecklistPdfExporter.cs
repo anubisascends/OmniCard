@@ -3,6 +3,7 @@ using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using OmniCard.Shared.Audit;
 using OmniCard.Shared.Lists;
+using OmniCard.Collection.Lists;
 
 namespace OmniCard.Audit;
 
@@ -159,7 +160,7 @@ public sealed class DecklistPdfExporter(IHttpClientFactory httpClientFactory) : 
     private static IEnumerable<IGrouping<string, T>> GroupByType<T>(
         IEnumerable<T> entries, Func<T, string?> typeSelector)
     {
-        var order = OmniCard.Collection.DecklistService.TypeCategoryOrder;
+        var order = DecklistService.TypeCategoryOrder;
         return entries
             .GroupBy(e => typeSelector(e) ?? "Other")
             .OrderBy(g => Array.IndexOf(order, g.Key) is var i && i >= 0 ? i : order.Length);

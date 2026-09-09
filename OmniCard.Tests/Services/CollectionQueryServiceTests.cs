@@ -8,6 +8,7 @@ using OmniCard.Shared.Games;
 using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Sales;
 using OmniCard.Shared.Storage;
+using OmniCard.Collection.Sales;
 
 namespace OmniCard.Tests.Services;
 

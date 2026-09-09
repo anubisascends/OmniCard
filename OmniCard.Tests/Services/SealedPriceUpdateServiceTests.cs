@@ -1,11 +1,11 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
-using OmniCard.Collection;
 using OmniCard.Data;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Ebay;
 using OmniCard.Shared.Inventory;
+using OmniCard.Collection.Inventory;
 
 namespace OmniCard.Tests.Services;
 

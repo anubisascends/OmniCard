@@ -1,6 +1,6 @@
-using OmniCard.Collection;
 using OmniCard.Shared.Scanning;
 using OmniCard.Shared.Settings;
+using OmniCard.Collection.Scanning;
 
 namespace OmniCard.Tests.Services;
 

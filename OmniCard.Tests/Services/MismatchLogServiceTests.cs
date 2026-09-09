@@ -1,9 +1,9 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using OmniCard.Collection;
 using OmniCard.Data;
 using OmniCard.Shared.Matching;
 using OmniCard.Shared.Scanning;
+using OmniCard.Collection.Scanning;
 
 namespace OmniCard.Tests.Services;
 

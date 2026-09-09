@@ -1,6 +1,6 @@
-using OmniCard.Collection;
 using OmniCard.Shared.Sales;
 using OmniCard.Shared.Settings;
+using OmniCard.Collection.Sales;
 
 namespace OmniCard.Tests.Services;
 

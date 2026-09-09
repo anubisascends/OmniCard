@@ -11,6 +11,7 @@ using OmniCard.Shared.Sales;
 using OmniCard.Shared.Scanning;
 using OmniCard.Shared.Sets;
 using OmniCard.Shared.Storage;
+using OmniCard.Collection.Sales;
 
 namespace OmniCard.Tests.Services;
 

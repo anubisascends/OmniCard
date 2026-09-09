@@ -1,4 +1,4 @@
-using OmniCard.Collection;
+using OmniCard.Collection.Lists;
 
 namespace OmniCard.Tests.Services;
 

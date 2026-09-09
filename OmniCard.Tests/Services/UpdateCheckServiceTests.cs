@@ -1,6 +1,6 @@
 using System.Net;
 using System.Text;
-using OmniCard.Collection;
+using OmniCard.Collection.Settings;
 
 namespace OmniCard.Tests.Services;
 

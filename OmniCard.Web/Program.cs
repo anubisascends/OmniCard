@@ -20,6 +20,11 @@ using OmniCard.Shared.Settings;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Shared.Trades;
+using OmniCard.Collection.ImportExport;
+using OmniCard.Collection.Inventory;
+using OmniCard.Collection.Lists;
+using OmniCard.Collection.Sales;
+using OmniCard.Collection.Trades;
 
 var builder = WebApplication.CreateBuilder(args);
 

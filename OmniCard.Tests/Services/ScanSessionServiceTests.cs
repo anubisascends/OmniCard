@@ -1,12 +1,12 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using OmniCard.Collection;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Matching;
 using OmniCard.Shared.Scanning;
 using OmniCard.Shared.Settings;
 using OmniCard.Shared.Storage;
+using OmniCard.Collection.Scanning;
 
 namespace OmniCard.Tests.Services;
 

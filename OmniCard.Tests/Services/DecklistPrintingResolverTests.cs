@@ -1,7 +1,7 @@
-using OmniCard.Collection;
 using OmniCard.Tests.Fakes;
 using OmniCard.Shared.Lists;
 using OmniCard.Shared.Matching;
+using OmniCard.Collection.Lists;
 
 namespace OmniCard.Tests.Services;
 

@@ -1,12 +1,12 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using OmniCard.Collection;
 using OmniCard.Data;
 using OmniCard.Tests.Fakes;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Lists;
 using OmniCard.Shared.Storage;
+using OmniCard.Collection.Lists;
 
 namespace OmniCard.Tests.Services;
 

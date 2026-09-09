@@ -1,5 +1,5 @@
 using System.Net;
-using OmniCard.Collection;
+using OmniCard.Collection.Inventory;
 
 namespace OmniCard.Tests.Services;
 

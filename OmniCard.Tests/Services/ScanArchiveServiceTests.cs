@@ -3,13 +3,13 @@ using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
-using OmniCard.Collection;
 using OmniCard.Data;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.ImportExport;
 using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Scanning;
 using OmniCard.Shared.Settings;
+using OmniCard.Collection.Scanning;
 
 namespace OmniCard.Tests.Services;
 
