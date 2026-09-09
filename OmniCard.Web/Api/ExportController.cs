@@ -10,8 +10,11 @@ namespace OmniCard.Web.Api;
 public sealed class ExportController(
     IDbContextFactory<OmniCardDbContext> dbFactory,
     ICardService cardService,
-    ICsvExportImportService csv) : ApiControllerBase
+    ICsvExportImportService csv,
+    IEnumerable<ICardGameService> gameServices) : ApiControllerBase
 {
+    private readonly IReadOnlyDictionary<OmniCard.Models.CardGame, ICardGameService> _gameServices = gameServices.ToDictionary(s => s.Game);
+
     /// <summary>Export the (optionally filtered) collection as CSV. <paramref name="format"/> =
     /// appnative | tcgplayer | moxfield | manabox.</summary>
     [HttpGet("collection")]
@@ -21,7 +24,7 @@ public sealed class ExportController(
         var gameFilter = LocationsController.ParseGame(game);
         using var ctx = dbFactory.CreateDbContext();
         var cards = CollectionQueryBuilder
-            .BuildFilteredQuery(ctx, q ?? "", gameFilter, containerFilter: null, filterPreset: null)
+            .BuildFilteredQuery(ctx, q ?? "", gameFilter, containerFilter: null, filterPreset: null, _gameServices)
             .OrderBy(c => c.Name).ThenBy(c => c.SetCode).ThenBy(c => c.Number)
             .ToList();
 

@@ -18,6 +18,20 @@ public sealed record ComponentDto(
     string? HomepageUrl,
     string? LicenseUrl);
 
+/// <summary>The searchable fields for a game, driving the search box's dynamic placeholder and syntax
+/// help popover. <see cref="Game"/> is the enum name, or "all" for the game-agnostic core schema.</summary>
+public sealed record SearchSchemaDto(string Game, IReadOnlyList<SearchFieldDto> Fields);
+
+/// <summary>One searchable field: its canonical token, accepted aliases, value shorthands
+/// (e.g. "f=Fire"), a human description, an example query, and its kind (core/game/special).</summary>
+public sealed record SearchFieldDto(
+    string Canonical,
+    IReadOnlyList<string> Aliases,
+    IReadOnlyList<string> ValueAliases,
+    string Description,
+    string Example,
+    string Kind);
+
 /// <summary>A single collection card (one owned lot of a single printing) for list/detail views.</summary>
 public sealed record CardDto
 {

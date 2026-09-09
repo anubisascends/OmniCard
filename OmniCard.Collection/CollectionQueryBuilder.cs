@@ -2,6 +2,7 @@ using LinqExpression = System.Linq.Expressions.Expression;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.CardMatching;
 using OmniCard.Data;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Collection;
@@ -25,7 +26,8 @@ public static class CollectionQueryBuilder
     /// "unplaced pool" adds <c>.Where(c =&gt; c.Page == null)</c>).
     /// </summary>
     public static IQueryable<CollectionCard> BuildFilteredQuery(
-        OmniCardDbContext context, string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset)
+        OmniCardDbContext context, string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset,
+        IReadOnlyDictionary<CardGame, ICardGameService>? gameServices = null)
     {
         IQueryable<CollectionCard> cards =
             from l in context.Lots.AsNoTracking()
@@ -69,23 +71,32 @@ public static class CollectionQueryBuilder
         if (containerFilter.HasValue)
             cards = cards.Where(c => c.ContainerId == containerFilter.Value);
 
+        // Resolve the active game's field schema so game-specific aliases (e.g. FFTCG e:→element)
+        // parse correctly. Null when no single game is selected or no resolver is wired — the parser
+        // then uses the shared default aliases and game-specific fields still resolve by full name.
+        SearchSchema? schema = gameFilter.HasValue && gameServices is not null
+            && gameServices.TryGetValue(gameFilter.Value, out var activeSvc) && activeSvc is IGameFieldResolver r
+            ? r.SearchSchema : null;
+
         if (!string.IsNullOrWhiteSpace(query))
-            cards = ApplyScryfallFilter(cards, query, context);
+            cards = ApplyScryfallFilter(cards, query, context, gameFilter, gameServices, schema);
 
         if (filterPreset is not null && !string.IsNullOrWhiteSpace(filterPreset.Query))
-            cards = ApplyScryfallFilter(cards, filterPreset.Query, context);
+            cards = ApplyScryfallFilter(cards, filterPreset.Query, context, gameFilter, gameServices, schema);
 
         return cards;
     }
 
-    private static IQueryable<CollectionCard> ApplyScryfallFilter(IQueryable<CollectionCard> cards, string query, OmniCardDbContext context)
+    private static IQueryable<CollectionCard> ApplyScryfallFilter(
+        IQueryable<CollectionCard> cards, string query, OmniCardDbContext context,
+        CardGame? gameFilter, IReadOnlyDictionary<CardGame, ICardGameService>? gameServices, SearchSchema? schema)
     {
-        var filter = ScryfallQueryParser.ParseFilter(query);
+        var filter = ScryfallQueryParser.ParseFilter(query, schema);
         if (filter is null)
             return cards;
 
         var param = LinqExpression.Parameter(typeof(CollectionCard), "c");
-        var expr = BuildFilterExpression(param, filter, context);
+        var expr = BuildFilterExpression(param, filter, context, gameFilter, gameServices);
         var lambda = LinqExpression.Lambda<Func<CollectionCard, bool>>(expr, param);
         return cards.Where(lambda);
     }
@@ -104,23 +115,25 @@ public static class CollectionQueryBuilder
             LinqExpression.Constant(pattern));
     }
 
-    private static LinqExpression BuildFilterExpression(System.Linq.Expressions.ParameterExpression param, FilterNode node, OmniCardDbContext context)
+    private static LinqExpression BuildFilterExpression(System.Linq.Expressions.ParameterExpression param, FilterNode node, OmniCardDbContext context,
+        CardGame? gameFilter, IReadOnlyDictionary<CardGame, ICardGameService>? gameServices)
     {
         return node switch
         {
-            FieldFilter f => BuildFieldExpression(param, f, context),
+            FieldFilter f => BuildFieldExpression(param, f, context, gameFilter, gameServices),
             AndFilter and => and.Children
-                .Select(c => BuildFilterExpression(param, c, context))
+                .Select(c => BuildFilterExpression(param, c, context, gameFilter, gameServices))
                 .Aggregate(LinqExpression.AndAlso),
             OrFilter or => or.Children
-                .Select(c => BuildFilterExpression(param, c, context))
+                .Select(c => BuildFilterExpression(param, c, context, gameFilter, gameServices))
                 .Aggregate(LinqExpression.OrElse),
-            NotFilter not => LinqExpression.Not(BuildFilterExpression(param, not.Inner, context)),
+            NotFilter not => LinqExpression.Not(BuildFilterExpression(param, not.Inner, context, gameFilter, gameServices)),
             _ => LinqExpression.Constant(true),
         };
     }
 
-    private static LinqExpression BuildFieldExpression(System.Linq.Expressions.ParameterExpression param, FieldFilter filter, OmniCardDbContext context)
+    private static LinqExpression BuildFieldExpression(System.Linq.Expressions.ParameterExpression param, FieldFilter filter, OmniCardDbContext context,
+        CardGame? gameFilter, IReadOnlyDictionary<CardGame, ICardGameService>? gameServices)
     {
         var expr = filter.Field switch
         {
@@ -135,10 +148,53 @@ public static class CollectionQueryBuilder
             "condition" or "cond" => BuildStringExpression(param, nameof(CollectionCard.Condition), filter.Op, filter.Value),
             "location" or "loc" => BuildLocationExpression(param, filter.Op, filter.Value),
             "tag" => BuildTagExpression(param, context, filter.Op, filter.Value),
-            _ => BuildNameExpression(param, filter.Op, filter.Value),
+            // Unknown field: try each game's per-game field resolver (element:, cost:, might:, …),
+            // falling back to a name search when no game recognizes it. Mirrors BuildTagExpression.
+            _ => BuildGameFieldExpression(param, filter, gameFilter, gameServices)
+                 ?? BuildNameExpression(param, filter.Op, filter.Value),
         };
 
         return filter.Negated ? LinqExpression.Not(expr) : expr;
+    }
+
+    private static readonly System.Reflection.MethodInfo HashSetStringContains =
+        typeof(HashSet<string>).GetMethod(nameof(HashSet<string>.Contains), [typeof(string)])!;
+
+    /// <summary>Resolves a game-specific field to the set of matching catalog GameCardIds via the game
+    /// service (crossing the owned-store ↔ catalog DB boundary), then bakes a
+    /// <c>HashSet&lt;string&gt;.Contains(c.GameCardId)</c> check — the same trick as
+    /// <see cref="BuildTagExpression"/>. Returns null when no wired game recognizes the field.</summary>
+    private static LinqExpression? BuildGameFieldExpression(System.Linq.Expressions.ParameterExpression param, FieldFilter filter,
+        CardGame? gameFilter, IReadOnlyDictionary<CardGame, ICardGameService>? gameServices)
+    {
+        if (gameServices is null) return null;
+
+        CardGame[] games = gameFilter.HasValue ? [gameFilter.Value] : gameServices.Keys.ToArray();
+        var clauses = new List<LinqExpression>();
+        bool recognized = false;
+
+        foreach (var g in games)
+        {
+            if (!gameServices.TryGetValue(g, out var svc) || svc is not IGameFieldResolver resolver) continue;
+            var ids = resolver.ResolveFieldCardIds(filter.Field, filter.Op, filter.Value);
+            if (ids is null) continue; // this game doesn't define the field
+
+            recognized = true;
+            var set = ids as HashSet<string> ?? ids.ToHashSet();
+            var contains = LinqExpression.Call(
+                LinqExpression.Constant(set), HashSetStringContains,
+                LinqExpression.Property(param, nameof(CollectionCard.GameCardId)));
+
+            // Under "All Games", guard each game's id-set by its Game so ids can't cross-match.
+            clauses.Add(gameFilter.HasValue
+                ? contains
+                : LinqExpression.AndAlso(
+                    LinqExpression.Equal(LinqExpression.Property(param, nameof(CollectionCard.Game)), LinqExpression.Constant(g)),
+                    contains));
+        }
+
+        if (!recognized) return null;
+        return clauses.Count == 0 ? LinqExpression.Constant(false) : clauses.Aggregate(LinqExpression.OrElse);
     }
 
     /// <summary>Unlike the other field builders, this one isn't pure — it resolves matching lot

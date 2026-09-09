@@ -22,6 +22,33 @@ public sealed class FinalFantasyService : TcgCsvGameService<FinalFantasyDbContex
     // prints only one, so match an OCR'd code against any '/'-delimited part. See FindClosestMatch.
     protected override bool SplitReprintNumbers => true;
 
+    // Searchable FFTCG attributes (stored in ExtendedDataJson, queried in memory). SourceKey is the
+    // TCGCSV extendedData name. Element is the headline field: element:fire / e:f / element:f.
+    protected override IEnumerable<SearchFieldDefinition> GameSearchFields =>
+    [
+        new()
+        {
+            Canonical = "element", Aliases = ["element", "e", "el"], SourceKey = "Element",
+            ValueAliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["f"] = "Fire", ["i"] = "Ice", ["l"] = "Lightning",
+                ["w"] = "Water", ["wi"] = "Wind", ["ea"] = "Earth", ["li"] = "Light", ["d"] = "Dark",
+            },
+            Description = "Element (Fire, Ice, Wind, …). Shorthands: f, i, l, w, wi, ea.",
+            Example = "element:fire",
+        },
+        new() { Canonical = "cost", Aliases = ["cost"], SourceKey = "Cost", Kind = SearchFieldKind.GameSpecific,
+                SupportedOps = [ComparisonOp.Contains, ComparisonOp.Exact, ComparisonOp.NotEqual,
+                    ComparisonOp.LessThan, ComparisonOp.GreaterThan, ComparisonOp.LessOrEqual, ComparisonOp.GreaterOrEqual],
+                Description = "Casting cost (supports <, >, <=, >=).", Example = "cost>=5" },
+        new() { Canonical = "power", Aliases = ["power", "pow"], SourceKey = "Power",
+                SupportedOps = [ComparisonOp.Contains, ComparisonOp.Exact, ComparisonOp.NotEqual,
+                    ComparisonOp.LessThan, ComparisonOp.GreaterThan, ComparisonOp.LessOrEqual, ComparisonOp.GreaterOrEqual],
+                Description = "Power.", Example = "power>=8000" },
+        new() { Canonical = "job", Aliases = ["job"], SourceKey = "Job", Description = "Job.", Example = "job:warrior" },
+        new() { Canonical = "category", Aliases = ["category", "cat"], SourceKey = "Category", Description = "Category (e.g. VII, XIV).", Example = "category:vii" },
+    ];
+
     protected override (decimal? Normal, decimal? Foil) MapSubtypePrices(List<TcgCsvPrice> rows) => MapSubtypePricesForTest(rows);
 
     internal static (decimal? Normal, decimal? Foil) MapSubtypePricesForTest(List<TcgCsvPrice> rows)

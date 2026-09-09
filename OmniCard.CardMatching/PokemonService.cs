@@ -18,6 +18,17 @@ public sealed class PokemonService : TcgCsvGameService<PokemonDbContext>
     public override CardGame Game => CardGame.Pokemon;
     protected override string GameKey => "pokemon";
 
+    // Searchable Pokémon attributes (from ExtendedDataJson). SourceKeys are TCGCSV extendedData names
+    // (best-effort; tune against a live catalog if a field returns no matches).
+    protected override IEnumerable<SearchFieldDefinition> GameSearchFields =>
+    [
+        new() { Canonical = "hp", Aliases = ["hp"], SourceKey = "HP",
+                SupportedOps = [ComparisonOp.Contains, ComparisonOp.Exact, ComparisonOp.NotEqual,
+                    ComparisonOp.LessThan, ComparisonOp.GreaterThan, ComparisonOp.LessOrEqual, ComparisonOp.GreaterOrEqual],
+                Description = "Hit points (supports <, >, <=, >=).", Example = "hp>=200" },
+        new() { Canonical = "stage", Aliases = ["stage"], SourceKey = "Stage", Description = "Evolution stage.", Example = "stage:basic" },
+    ];
+
     protected override (decimal? Normal, decimal? Foil) MapSubtypePrices(List<TcgCsvPrice> rows) => MapSubtypePricesForTest(rows);
 
     // Pokémon prices: Normal + (Holofoil preferred over Reverse Holofoil) as the single foil slot.

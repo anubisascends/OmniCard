@@ -1493,7 +1493,7 @@ public sealed class CardService : ICardService
     // so the web companion's binder editor can run identical filtering; this stays as a thin wrapper
     // to keep CardService's many internal call sites unchanged.
     private IQueryable<CollectionCard> BuildFilteredQuery(OmniCardDbContext context, string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset)
-        => CollectionQueryBuilder.BuildFilteredQuery(context, query, gameFilter, containerFilter, filterPreset);
+        => CollectionQueryBuilder.BuildFilteredQuery(context, query, gameFilter, containerFilter, filterPreset, _gameServices);
 
     /// <summary>
     /// Batch-loads <see cref="EbayListing"/> rows for the given (already-materialized) cards' Lot

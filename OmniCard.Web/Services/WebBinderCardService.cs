@@ -21,17 +21,21 @@ public sealed class WebBinderCardService
 {
     private readonly IDbContextFactory<OmniCardDbContext> _dbFactory;
     private readonly IDataPathService _dataPathService;
+    private readonly IReadOnlyDictionary<CardGame, ICardGameService>? _gameServices;
 
     // Takes the factory interface (not the concrete writable type) so it's unit-testable with an
     // in-memory factory. In production it's constructed explicitly in Program.cs with the writable
     // factory — never via container constructor injection — so it can't accidentally bind to the
-    // app's read-only IDbContextFactory<OmniCardDbContext>.
+    // app's read-only IDbContextFactory<OmniCardDbContext>. The game services (optional) let the
+    // Scryfall-syntax filter resolve game-specific fields (element:, might:, …) in binder presets.
     public WebBinderCardService(
         IDbContextFactory<OmniCardDbContext> dbFactory,
-        IDataPathService dataPathService)
+        IDataPathService dataPathService,
+        IReadOnlyDictionary<CardGame, ICardGameService>? gameServices = null)
     {
         _dbFactory = dbFactory;
         _dataPathService = dataPathService;
+        _gameServices = gameServices;
     }
 
     /// <summary>Cards in the binder that have no page assignment (the "Unplaced pool"), narrowed by
@@ -39,7 +43,7 @@ public sealed class WebBinderCardService
     public List<CollectionCard> GetUnplacedBinderCards(int containerId, FilterPreset? filterPreset)
     {
         using var context = _dbFactory.CreateDbContext();
-        return CollectionQueryBuilder.BuildFilteredQuery(context, "", null, containerId, filterPreset)
+        return CollectionQueryBuilder.BuildFilteredQuery(context, "", null, containerId, filterPreset, _gameServices)
             .Where(c => c.Page == null)
             .OrderBy(c => c.Name)
             .ToList();

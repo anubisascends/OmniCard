@@ -22,6 +22,20 @@ export interface ComponentDto {
   licenseUrl: string | null;
 }
 
+export interface SearchFieldDto {
+  canonical: string;
+  aliases: string[];
+  valueAliases: string[]; // "f=Fire" display strings
+  description: string;
+  example: string;
+  kind: 'core' | 'game' | 'special';
+}
+
+export interface SearchSchemaDto {
+  game: string; // enum name, or "all" for the core schema
+  fields: SearchFieldDto[];
+}
+
 export interface CardDto {
   id: number;
   game: string;

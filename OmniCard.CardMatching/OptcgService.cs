@@ -14,7 +14,7 @@ using OmniCard.Models;
 
 namespace OmniCard.CardMatching;
 
-public sealed class OptcgService : ICardGameService, IDisposable
+public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDisposable
 {
     private const string ApiBaseUrl = "https://api.poneglyph.one";
 
@@ -878,55 +878,62 @@ public sealed class OptcgService : ICardGameService, IDisposable
         };
     }
 
+    // One Piece searchable fields. Core (name/set/cn/type/color/rarity) map to columns below;
+    // cost/power/counter/life/attribute/subtype are game-specific (also resolvable for owned-card search).
+    private SearchSchema? _searchSchema;
+    public SearchSchema SearchSchema => _searchSchema ??= SharedSearchSchema.WithGameFields(
+    [
+        new SearchFieldDefinition { Canonical = "cost", Aliases = ["cost"], SourceKey = nameof(OptcgCard.CardCost),
+            Description = "Play cost.", Example = "cost:4" },
+        new SearchFieldDefinition { Canonical = "power", Aliases = ["power", "pow"], SourceKey = nameof(OptcgCard.CardPower),
+            Description = "Power.", Example = "power:5000" },
+        new SearchFieldDefinition { Canonical = "counter", Aliases = ["counter", "ctr"], SourceKey = nameof(OptcgCard.CounterAmount),
+            SupportedOps = [ComparisonOp.Contains, ComparisonOp.Exact, ComparisonOp.NotEqual,
+                ComparisonOp.LessThan, ComparisonOp.GreaterThan, ComparisonOp.LessOrEqual, ComparisonOp.GreaterOrEqual],
+            Description = "Counter value (supports <, >, <=, >=).", Example = "counter>=1000" },
+        new SearchFieldDefinition { Canonical = "life", Aliases = ["life"], SourceKey = nameof(OptcgCard.Life),
+            Description = "Leader life.", Example = "life:5" },
+        new SearchFieldDefinition { Canonical = "attribute", Aliases = ["attribute", "attr"], SourceKey = nameof(OptcgCard.Attribute),
+            Description = "Attribute (Slash, Strike, …).", Example = "attribute:slash" },
+        new SearchFieldDefinition { Canonical = "subtype", Aliases = ["subtype", "sub", "trait"], SourceKey = nameof(OptcgCard.SubTypes),
+            Description = "Subtype / trait.", Example = "subtype:straw" },
+    ]);
+
+    private static readonly CatalogFieldMap<OptcgCard> FieldMap = BuildFieldMap();
+
+    private static CatalogFieldMap<OptcgCard> BuildFieldMap()
+    {
+        var map = new CatalogFieldMap<OptcgCard>
+        {
+            NamePredicate = (p, op, v) => CatalogSearchExpressionBuilder.StringPredicate(p, nameof(OptcgCard.CardName), op, v),
+        };
+        map.Str("name", nameof(OptcgCard.CardName))
+           .Field("set", (p, op, v) => System.Linq.Expressions.Expression.OrElse(
+               CatalogSearchExpressionBuilder.StringPredicate(p, nameof(OptcgCard.SetId), op, v),
+               CatalogSearchExpressionBuilder.StringPredicate(p, nameof(OptcgCard.SetName), op, v)))
+           .Str("cn", nameof(OptcgCard.CardNumber))
+           .Str("type", nameof(OptcgCard.CardType))
+           .Str("color", nameof(OptcgCard.CardColor))
+           .Str("rarity", nameof(OptcgCard.Rarity))
+           .Str("cost", nameof(OptcgCard.CardCost))
+           .Str("power", nameof(OptcgCard.CardPower))
+           .Num("counter", nameof(OptcgCard.CounterAmount))
+           .Str("life", nameof(OptcgCard.Life))
+           .Str("attribute", nameof(OptcgCard.Attribute))
+           .Str("subtype", nameof(OptcgCard.SubTypes));
+        return map;
+    }
+
     public List<CardMatch> SearchCards(string query, int maxResults = 20)
     {
         if (string.IsNullOrWhiteSpace(query))
             return [];
 
         _logger.LogDebug("Searching OPTCG cards with query: {Query} (max: {MaxResults})", query, maxResults);
+        var node = ScryfallQueryParser.ParseFilter(query, SearchSchema);
         IQueryable<OptcgCard> cards = _readContext.Cards.AsNoTracking();
-
-        // Simple search: filter by name, set, color, or type
-        var terms = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        foreach (var term in terms)
-        {
-            var t = term;
-            if (t.StartsWith("cn:", StringComparison.OrdinalIgnoreCase))
-            {
-                var upper = t[3..].ToUpperInvariant();
-                cards = cards.Where(c => c.CardSetId.ToUpper() == upper);
-            }
-            else if (t.StartsWith("set:", StringComparison.OrdinalIgnoreCase))
-            {
-                var val = t[4..];
-                cards = cards.Where(c => EF.Functions.Like(c.SetId, $"%{val}%")
-                                       || EF.Functions.Like(c.SetName, $"%{val}%"));
-            }
-            else if (t.StartsWith("color:", StringComparison.OrdinalIgnoreCase) || t.StartsWith("c:", StringComparison.OrdinalIgnoreCase))
-            {
-                var val = t.Contains(':') ? t[(t.IndexOf(':') + 1)..] : t;
-                cards = cards.Where(c => EF.Functions.Like(c.CardColor, $"%{val}%"));
-            }
-            else if (t.StartsWith("type:", StringComparison.OrdinalIgnoreCase) || t.StartsWith("t:", StringComparison.OrdinalIgnoreCase))
-            {
-                var val = t.Contains(':') ? t[(t.IndexOf(':') + 1)..] : t;
-                cards = cards.Where(c => EF.Functions.Like(c.CardType, $"%{val}%"));
-            }
-            else if (t.StartsWith("power:", StringComparison.OrdinalIgnoreCase))
-            {
-                var val = t[6..];
-                cards = cards.Where(c => c.CardPower == val);
-            }
-            else if (t.StartsWith("cost:", StringComparison.OrdinalIgnoreCase))
-            {
-                var val = t[5..];
-                cards = cards.Where(c => c.CardCost == val);
-            }
-            else
-            {
-                cards = cards.Where(c => EF.Functions.Like(c.CardName, $"%{t}%"));
-            }
-        }
+        var lambda = CatalogSearchExpressionBuilder.Build(node, SearchSchema, FieldMap);
+        if (lambda is not null) cards = cards.Where(lambda);
 
         var results = cards.OrderBy(c => c.CardName).Take(maxResults).ToList();
         _logger.LogDebug("OPTCG search returned {Count} results for query: {Query}", results.Count, query);
@@ -942,6 +949,14 @@ public sealed class OptcgService : ICardGameService, IDisposable
             LocalImagePath = ResolveLocalArtPath(c.LocalImagePath),
             Source = c
         }).ToList();
+    }
+
+    public IReadOnlySet<string>? ResolveFieldCardIds(string field, ComparisonOp op, string value)
+    {
+        if (!SearchSchema.IsGameSpecific(field)) return null;
+        var resolved = SearchSchema.ResolveValue(field, value);
+        var lambda = CatalogSearchExpressionBuilder.SingleField(field, op, resolved, FieldMap);
+        return _readContext.Cards.AsNoTracking().Where(lambda).Select(c => c.CardSetId).ToHashSet();
     }
 
     public List<CardMatch> GetPrintings(string cardName)

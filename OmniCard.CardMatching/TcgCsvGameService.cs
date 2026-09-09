@@ -17,7 +17,7 @@ namespace OmniCard.CardMatching;
 // Abstract base for all TCGCSV-backed games. Concrete games subclass this, supplying a
 // category id, extended-data mapping, and sub-type→price mapping. Catalog download, image
 // hashing, price refresh, matching, and queries live here — implemented once.
-public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposable
+public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameFieldResolver, IDisposable
     where TContext : TcgCsvDbContext
 {
     protected const string TcgCsvBaseUrl = "https://tcgcsv.com";
@@ -76,6 +76,16 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
     // TCGCSV product images default to _200w; upgrade for usable perceptual hashing.
     protected virtual string? UpgradeImageUrl(string? url)
         => url is null ? null : url.Replace("_200w.", "_400w.");
+
+    // === Per-game search fields ===
+
+    /// <summary>Game-specific searchable fields backed by <c>ExtendedDataJson</c> attributes (queried
+    /// in memory). Each field's <see cref="SearchFieldDefinition.SourceKey"/> is the extendedData name.
+    /// Override per game (FFTCG element/cost/job/…, Pokémon hp/…, Yu-Gi-Oh! atk/def/level/…).</summary>
+    protected virtual IEnumerable<SearchFieldDefinition> GameSearchFields => [];
+
+    private SearchSchema? _searchSchema;
+    public SearchSchema SearchSchema => _searchSchema ??= SharedSearchSchema.WithGameFields(GameSearchFields);
 
     protected TcgCsvGameService(
         IHttpClientFactory httpClientFactory,
@@ -791,31 +801,142 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IDisposabl
     public List<CardMatch> SearchCards(string query, int maxResults = 20)
     {
         if (string.IsNullOrWhiteSpace(query)) return [];
+
+        var schema = SearchSchema;
+        var node = ScryfallQueryParser.ParseFilter(query, schema);
+        if (node is null) return [];
+
         IQueryable<TcgCsvCard> cards = _readContext.Cards.AsNoTracking();
-        foreach (var term in query.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+
+        // Core-only queries (name/set/cn/type/rarity) translate fully to SQL. Queries that touch a
+        // game-specific field must fall back to an in-memory pass over the blob — pre-filtered by the
+        // top-level AND core conjuncts (a safe subset), then the full tree evaluated as the authority.
+        if (!ReferencesGameSpecificField(node, schema))
         {
-            var t = term;
-            if (t.StartsWith("set:", StringComparison.OrdinalIgnoreCase))
+            var full = CatalogSearchExpressionBuilder.Build(node, schema, CoreFieldMap);
+            if (full is not null) cards = cards.Where(full);
+            return cards.OrderBy(c => c.Name).Take(maxResults).AsEnumerable().Select(c => ToMatch(c)).ToList();
+        }
+
+        var preFilter = CatalogSearchExpressionBuilder.Build(CorePreFilter(node), schema, CoreFieldMap);
+        if (preFilter is not null) cards = cards.Where(preFilter);
+
+        return cards.AsEnumerable()
+            .Where(c => MatchesInMemory(c, node, schema))
+            .OrderBy(c => c.Name)
+            .Take(maxResults)
+            .Select(c => ToMatch(c))
+            .ToList();
+    }
+
+    // Core-column field map for the SQL pre-filter (game-specific fields are absent, so a query that
+    // references them contributes nothing here and falls to the in-memory pass).
+    private static readonly CatalogFieldMap<TcgCsvCard> CoreFieldMap = new()
+    {
+        NamePredicate = (p, op, v) => CatalogSearchExpressionBuilder.StringPredicate(p, nameof(TcgCsvCard.Name), op, v),
+    };
+
+    static TcgCsvGameService()
+    {
+        CoreFieldMap
+            .Field("name", (p, op, v) => CatalogSearchExpressionBuilder.StringPredicate(p, nameof(TcgCsvCard.Name), op, v))
+            .Field("set", (p, op, v) => System.Linq.Expressions.Expression.OrElse(
+                CatalogSearchExpressionBuilder.StringPredicate(p, nameof(TcgCsvCard.SetCode), op, v),
+                CatalogSearchExpressionBuilder.StringPredicate(p, nameof(TcgCsvCard.SetName), op, v)))
+            .Field("cn", (p, op, v) => CatalogSearchExpressionBuilder.StringPredicate(p, nameof(TcgCsvCard.CollectorNumber), op, v))
+            .Field("type", (p, op, v) => CatalogSearchExpressionBuilder.StringPredicate(p, nameof(TcgCsvCard.CardType), op, v))
+            .Field("rarity", (p, op, v) => CatalogSearchExpressionBuilder.StringPredicate(p, nameof(TcgCsvCard.Rarity), op, v));
+    }
+
+    /// <summary>The subset of <paramref name="node"/> safe to push to SQL: top-level, non-negated,
+    /// core-column conjuncts. Returns null when nothing is safely pushable (e.g. an OR at the top).</summary>
+    private FilterNode? CorePreFilter(FilterNode node)
+    {
+        var conjuncts = new List<FilterNode>();
+        void Collect(FilterNode n)
+        {
+            switch (n)
             {
-                var val = t[4..];
-                cards = cards.Where(c => EF.Functions.Like(c.SetCode, $"%{val}%") || EF.Functions.Like(c.SetName, $"%{val}%"));
+                case FieldFilter f when !f.Negated && !SearchSchema.IsGameSpecific(f.Field)
+                        && f.Field is "name" or "set" or "cn" or "type" or "rarity":
+                    conjuncts.Add(f);
+                    break;
+                case AndFilter a:
+                    foreach (var c in a.Children) Collect(c);
+                    break;
             }
-            else if (t.StartsWith("type:", StringComparison.OrdinalIgnoreCase) || t.StartsWith("t:", StringComparison.OrdinalIgnoreCase))
+        }
+        Collect(node);
+        return conjuncts.Count switch { 0 => null, 1 => conjuncts[0], _ => new AndFilter(conjuncts) };
+    }
+
+    private static bool ReferencesGameSpecificField(FilterNode node, SearchSchema schema) => node switch
+    {
+        FieldFilter f => schema.IsGameSpecific(f.Field),
+        AndFilter a => a.Children.Any(c => ReferencesGameSpecificField(c, schema)),
+        OrFilter o => o.Children.Any(c => ReferencesGameSpecificField(c, schema)),
+        NotFilter n => ReferencesGameSpecificField(n.Inner, schema),
+        _ => false,
+    };
+
+    private bool MatchesInMemory(TcgCsvCard c, FilterNode node, SearchSchema schema)
+    {
+        Dictionary<string, string>? blob = null;
+        Dictionary<string, string> Blob() => blob ??= ExtendedDataParser.ParseToLookup(c.ExtendedDataJson);
+        return Eval(node);
+
+        bool Eval(FilterNode n) => n switch
+        {
+            AndFilter a => a.Children.All(Eval),
+            OrFilter o => o.Children.Any(Eval),
+            NotFilter not => !Eval(not.Inner),
+            FieldFilter f => EvalField(f),
+            _ => true,
+        };
+
+        bool EvalField(FieldFilter f)
+        {
+            var value = schema.ResolveValue(f.Field, f.Value);
+            bool result;
+            if (schema.IsGameSpecific(f.Field))
             {
-                var val = t[(t.IndexOf(':') + 1)..];
-                cards = cards.Where(c => EF.Functions.Like(c.CardType, $"%{val}%"));
-            }
-            else if (t.StartsWith("cn:", StringComparison.OrdinalIgnoreCase))
-            {
-                var val = t[3..];
-                cards = cards.Where(c => EF.Functions.Like(c.CollectorNumber, $"%{val}%"));
+                var key = schema.Find(f.Field)?.SourceKey ?? f.Field;
+                result = Blob().TryGetValue(key, out var v) && FieldOperatorEvaluator.Matches(v, f.Op, value);
             }
             else
             {
-                cards = cards.Where(c => EF.Functions.Like(c.Name, $"%{t}%"));
+                result = f.Field switch
+                {
+                    "name" => FieldOperatorEvaluator.Matches(c.Name, f.Op, value),
+                    "set" => FieldOperatorEvaluator.Matches(c.SetCode, f.Op, value) || FieldOperatorEvaluator.Matches(c.SetName, f.Op, value),
+                    "cn" => FieldOperatorEvaluator.Matches(c.CollectorNumber, f.Op, value),
+                    "type" => FieldOperatorEvaluator.Matches(c.CardType, f.Op, value),
+                    "rarity" => FieldOperatorEvaluator.Matches(c.Rarity, f.Op, value),
+                    // Ownership-only fields (is/foil/tag/location/price/date) have no catalog meaning.
+                    "is" or "foil" or "tag" or "condition" or "location" or "price" or "date" => true,
+                    _ => FieldOperatorEvaluator.Matches(c.Name, f.Op, value),
+                };
             }
+            return f.Negated ? !result : result;
         }
-        return cards.OrderBy(c => c.Name).Take(maxResults).AsEnumerable().Select(c => ToMatch(c)).ToList();
+    }
+
+    public IReadOnlySet<string>? ResolveFieldCardIds(string field, ComparisonOp op, string value)
+    {
+        if (!SearchSchema.IsGameSpecific(field)) return null;
+        var resolved = SearchSchema.ResolveValue(field, value);
+        var key = SearchSchema.Find(field)?.SourceKey ?? field;
+
+        var ids = new HashSet<string>();
+        // Project only the id + blob (avoids loading images/hashes); parse each in memory.
+        foreach (var row in _readContext.Cards.AsNoTracking()
+                     .Select(c => new { c.ProductId, c.ExtendedDataJson }))
+        {
+            var dict = ExtendedDataParser.ParseToLookup(row.ExtendedDataJson);
+            if (dict.TryGetValue(key, out var v) && FieldOperatorEvaluator.Matches(v, op, resolved))
+                ids.Add(row.ProductId.ToString());
+        }
+        return ids;
     }
 
     public List<CardMatch> GetPrintings(string cardName)

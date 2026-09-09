@@ -19,8 +19,11 @@ public sealed class CollectionController(
     ICardService cardService,
     WebBinderCardService binderCards,
     ITagService tags,
-    CardImageCacheService imageCache) : ApiControllerBase
+    CardImageCacheService imageCache,
+    IEnumerable<ICardGameService> gameServices) : ApiControllerBase
 {
+    private readonly IReadOnlyDictionary<CardGame, ICardGameService> _gameServices = gameServices.ToDictionary(s => s.Game);
+
     /// <summary>Search owned singles. <paramref name="q"/> accepts the Scryfall-style tokens
     /// (<c>set:</c>, <c>cn:</c>, <c>c:</c>, <c>r:</c>, <c>t:</c>, <c>tag:</c>, <c>is:foil</c>, …).</summary>
     [HttpGet]
@@ -37,7 +40,7 @@ public sealed class CollectionController(
         var gameFilter = LocationsController.ParseGame(game);
 
         using var ctx = dbFactory.CreateDbContext();
-        var query = CollectionQueryBuilder.BuildFilteredQuery(ctx, q ?? "", gameFilter, containerId, filterPreset: null);
+        var query = CollectionQueryBuilder.BuildFilteredQuery(ctx, q ?? "", gameFilter, containerId, filterPreset: null, _gameServices);
 
         var (total, cards) = stacked ? PageStacked(query, skip, take) : PageFlat(query, skip, take);
 

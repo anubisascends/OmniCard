@@ -30,6 +30,7 @@ import type {
   ScanCommitResultDto,
   ScanMatchDto,
   ScanSearchResultDto,
+  SearchSchemaDto,
   SetChecklistDto,
   SetInfoDto,
   TradeSearchResult,
@@ -167,6 +168,7 @@ export const api = {
   // Meta
   games: () => request<GameDto[]>('/api/meta/games'),
   components: () => request<ComponentDto[]>('/api/meta/components'),
+  searchFields: (game?: string) => request<SearchSchemaDto>(`/api/meta/search-fields${qs({ game })}`),
 
   // Dashboard
   dashboard: () => request<DashboardDto>('/api/dashboard'),

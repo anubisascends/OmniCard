@@ -1,6 +1,7 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
+using OmniCard.CardMatching;
 using OmniCard.Interfaces;
 
 namespace OmniCard.Web.Api;
@@ -12,6 +13,19 @@ public sealed class MetaController(IEnumerable<ICardGameService> gameServices) :
     [HttpGet("games")]
     public ActionResult<IReadOnlyList<GameDto>> Games() =>
         gameServices.Select(g => DtoMapping.ToDto(g.Game)).ToList();
+
+    /// <summary>The searchable-field schema for a game (its aliases, value shorthands, and help text),
+    /// driving the search box's dynamic placeholder and syntax help popover. With no/unknown
+    /// <paramref name="game"/>, returns the game-agnostic core schema (the "All Games" view).</summary>
+    [HttpGet("search-fields")]
+    public ActionResult<SearchSchemaDto> SearchFields([FromQuery] string? game)
+    {
+        var parsed = LocationsController.ParseGame(game);
+        if (parsed is { } g && gameServices.FirstOrDefault(s => s.Game == g) is IGameFieldResolver resolver)
+            return DtoMapping.ToDto(resolver.SearchSchema, DtoMapping.GameId(g));
+
+        return DtoMapping.ToDto(SharedSearchSchema.Default, "all");
+    }
 
     /// <summary>
     /// The software/components inventory shown in Administration ▸ Components: name, version, license,

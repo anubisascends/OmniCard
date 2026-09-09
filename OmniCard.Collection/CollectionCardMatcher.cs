@@ -1,4 +1,5 @@
 using OmniCard.CardMatching;
+using OmniCard.Interfaces;
 using OmniCard.Models;
 
 namespace OmniCard.Collection;
@@ -18,25 +19,47 @@ public static class CollectionCardMatcher
 {
     /// <summary>Filters <paramref name="cards"/> by a Scryfall-syntax <paramref name="query"/>. An
     /// empty/whitespace or unparseable query returns every card.</summary>
-    public static List<CollectionCard> Filter(IEnumerable<CollectionCard> cards, string? query)
+    /// <summary>Optional per-(game,field,op,value) resolver of catalog GameCardIds for game-specific
+    /// fields (element:, might:, …). Signature matches <see cref="IGameFieldResolver.ResolveFieldCardIds"/>
+    /// per game; returns null when the field isn't game-specific for that game.</summary>
+    public delegate IReadOnlySet<string>? GameFieldResolve(CardGame game, string field, ComparisonOp op, string value);
+
+    public static List<CollectionCard> Filter(IEnumerable<CollectionCard> cards, string? query,
+        IReadOnlyDictionary<CardGame, ICardGameService>? gameServices = null)
     {
         if (string.IsNullOrWhiteSpace(query))
             return cards.ToList();
 
         var filter = ScryfallQueryParser.ParseFilter(query);
-        return filter is null ? cards.ToList() : cards.Where(c => Matches(c, filter)).ToList();
+        if (filter is null) return cards.ToList();
+
+        // Memoize id-set resolution so a game-specific field isn't re-resolved per card.
+        var cache = new Dictionary<(CardGame, string, ComparisonOp, string), IReadOnlySet<string>?>();
+        GameFieldResolve? resolve = gameServices is null ? null : (game, field, op, value) =>
+        {
+            var key = (game, field, op, value);
+            if (!cache.TryGetValue(key, out var set))
+            {
+                set = gameServices.TryGetValue(game, out var svc) && svc is IGameFieldResolver r
+                    ? r.ResolveFieldCardIds(field, op, value) : null;
+                cache[key] = set;
+            }
+            return set;
+        };
+
+        return cards.Where(c => Matches(c, filter, resolve)).ToList();
     }
 
-    public static bool Matches(CollectionCard card, FilterNode node) => node switch
+    public static bool Matches(CollectionCard card, FilterNode node, GameFieldResolve? resolve = null) => node switch
     {
-        FieldFilter f => MatchField(card, f),
-        AndFilter and => and.Children.All(c => Matches(card, c)),
-        OrFilter or => or.Children.Any(c => Matches(card, c)),
-        NotFilter not => !Matches(card, not.Inner),
+        FieldFilter f => MatchField(card, f, resolve),
+        AndFilter and => and.Children.All(c => Matches(card, c, resolve)),
+        OrFilter or => or.Children.Any(c => Matches(card, c, resolve)),
+        NotFilter not => !Matches(card, not.Inner, resolve),
         _ => true,
     };
 
-    private static bool MatchField(CollectionCard c, FieldFilter f)
+    private static bool MatchField(CollectionCard c, FieldFilter f, GameFieldResolve? resolve)
     {
         var result = f.Field switch
         {
@@ -51,10 +74,17 @@ public static class CollectionCardMatcher
             "condition" or "cond" => StrOp(c.Condition, f.Op, f.Value),
             "location" or "loc" => LocationMatch(c.Container?.Name, f.Op, f.Value),
             "tag" => TagMatch(c.Tags, f.Op, f.Value),
-            _ => StrOp(c.Name, f.Op, f.Value),
+            // Unknown field: try the card's game resolver (element:, might:, …); else name search.
+            _ => GameFieldMatch(c, f, resolve) ?? StrOp(c.Name, f.Op, f.Value),
         };
 
         return f.Negated ? !result : result;
+    }
+
+    private static bool? GameFieldMatch(CollectionCard c, FieldFilter f, GameFieldResolve? resolve)
+    {
+        var ids = resolve?.Invoke(c.Game, f.Field, f.Op, f.Value);
+        return ids is null ? null : ids.Contains(c.GameCardId);
     }
 
     // name / condition — matches CollectionQueryBuilder.BuildStringExpression/BuildNameExpression.

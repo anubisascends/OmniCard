@@ -1,4 +1,5 @@
 using OmniCard.Api.Contracts;
+using OmniCard.CardMatching;
 using OmniCard.Models;
 
 namespace OmniCard.Web.Api;
@@ -21,6 +22,22 @@ public static class DtoMapping
     };
 
     public static GameDto ToDto(CardGame game) => new(GameId(game), GameDisplayName(game));
+
+    public static SearchSchemaDto ToDto(SearchSchema schema, string game) =>
+        new(game, schema.Fields.Select(ToDto).ToList());
+
+    public static SearchFieldDto ToDto(SearchFieldDefinition f) => new(
+        f.Canonical,
+        f.Aliases.ToList(),
+        f.ValueAliases.Select(kv => $"{kv.Key}={kv.Value}").ToList(),
+        f.Description,
+        f.Example,
+        f.Kind switch
+        {
+            SearchFieldKind.Core => "core",
+            SearchFieldKind.GameSpecific => "game",
+            _ => "special",
+        });
 
     public static string ContainerTypeDisplay(ContainerType type) => type switch
     {

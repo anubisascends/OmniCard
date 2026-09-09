@@ -16,19 +16,19 @@ public record NotFilter(FilterNode Inner) : FilterNode;
 /// </summary>
 public static class ScryfallQueryParser
 {
-    public static FilterNode? ParseFilter(string query)
+    public static FilterNode? ParseFilter(string query, SearchSchema? schema = null)
     {
         if (string.IsNullOrWhiteSpace(query))
             return null;
         var q = query.Trim();
         int pos = 0;
-        return ParseOrExpr(q, ref pos);
+        return ParseOrExpr(q, ref pos, schema);
     }
 
     /// <summary>Backward-compatible flat parse (loses operator/negation info).</summary>
-    public static List<(string Field, string Value)> Parse(string query)
+    public static List<(string Field, string Value)> Parse(string query, SearchSchema? schema = null)
     {
-        var node = ParseFilter(query);
+        var node = ParseFilter(query, schema);
         if (node is null) return [];
         var result = new List<(string Field, string Value)>();
         Flatten(node, result);
@@ -55,19 +55,19 @@ public static class ScryfallQueryParser
     }
 
     // or_expr := and_expr ('or' and_expr)*
-    private static FilterNode ParseOrExpr(string q, ref int pos)
+    private static FilterNode ParseOrExpr(string q, ref int pos, SearchSchema? schema)
     {
-        var left = ParseAndExpr(q, ref pos);
+        var left = ParseAndExpr(q, ref pos, schema);
         var children = new List<FilterNode> { left };
 
         while (TryConsumeOr(q, ref pos))
-            children.Add(ParseAndExpr(q, ref pos));
+            children.Add(ParseAndExpr(q, ref pos, schema));
 
         return children.Count == 1 ? children[0] : new OrFilter(children);
     }
 
     // and_expr := atom+
-    private static FilterNode ParseAndExpr(string q, ref int pos)
+    private static FilterNode ParseAndExpr(string q, ref int pos, SearchSchema? schema)
     {
         var children = new List<FilterNode>();
 
@@ -76,14 +76,14 @@ public static class ScryfallQueryParser
             SkipWhitespace(q, ref pos);
             if (pos >= q.Length || q[pos] == ')') break;
             if (children.Count > 0 && IsOrKeyword(q, pos)) break;
-            children.Add(ParseAtom(q, ref pos));
+            children.Add(ParseAtom(q, ref pos, schema));
         }
 
         return children.Count == 1 ? children[0] : new AndFilter(children);
     }
 
     // atom := '-'? '(' or_expr ')' | '-'? '!' value | '-'? field_filter | '-'? plain_word
-    private static FilterNode ParseAtom(string q, ref int pos)
+    private static FilterNode ParseAtom(string q, ref int pos, SearchSchema? schema)
     {
         bool negated = false;
         if (pos < q.Length && q[pos] == '-')
@@ -96,7 +96,7 @@ public static class ScryfallQueryParser
         if (pos < q.Length && q[pos] == '(')
         {
             pos++;
-            var inner = ParseOrExpr(q, ref pos);
+            var inner = ParseOrExpr(q, ref pos, schema);
             SkipWhitespace(q, ref pos);
             if (pos < q.Length && q[pos] == ')')
                 pos++;
@@ -119,7 +119,7 @@ public static class ScryfallQueryParser
             var (op, opLen) = ParseOperator(q, fieldEnd);
             pos = fieldEnd + opLen;
             var value = ExtractValue(q, ref pos);
-            var field = NormalizeField(rawField);
+            var field = schema is not null ? schema.ResolveField(rawField) : NormalizeField(rawField);
 
             // not: is syntactic sugar for negated is:
             if (field == "not")

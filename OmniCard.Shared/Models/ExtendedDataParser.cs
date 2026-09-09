@@ -31,4 +31,32 @@ public static class ExtendedDataParser
         catch (JsonException) { /* malformed — show nothing */ }
         return result;
     }
+
+    /// <summary>Case-insensitive name-value lookup over the extendedData array, for searching a card's
+    /// game-specific attributes (Element, HP, ATK...) that aren't promoted to columns. Keyed by both the
+    /// display name and the raw name; first occurrence wins.</summary>
+    public static Dictionary<string, string> ParseToLookup(string? json)
+    {
+        var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(json)) return dict;
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array) return dict;
+
+            foreach (var el in doc.RootElement.EnumerateArray())
+            {
+                var value = el.TryGetProperty("value", out var v) && v.ValueKind == JsonValueKind.String ? v.GetString()
+                    : el.TryGetProperty("value", out var vn) && vn.ValueKind == JsonValueKind.Number ? vn.GetRawText()
+                    : null;
+                if (value is null) continue;
+                if (el.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String && n.GetString() is { } name)
+                    dict.TryAdd(name, value);
+                if (el.TryGetProperty("displayName", out var dn) && dn.ValueKind == JsonValueKind.String && dn.GetString() is { } disp)
+                    dict.TryAdd(disp, value);
+            }
+        }
+        catch (JsonException) { /* malformed - no attributes */ }
+        return dict;
+    }
 }
