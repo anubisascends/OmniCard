@@ -74,7 +74,6 @@ public class CollectionSortFilterTests : IDisposable
         [],
         CreateOmniFactory(),
         new StubOcrService(),
-        new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
         NullLogger<CardService>.Instance,
         new DataPathService(Path.GetTempPath()),
         new NullScanDiagnosticService(),

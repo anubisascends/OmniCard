@@ -42,7 +42,6 @@ public class FacadeWriteTests : IDisposable
         [],
         new MockOmniDbContextFactory(_omniOptions),
         new StubOcrService(),
-        new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
         NullLogger<CardService>.Instance,
         new DataPathService(Path.GetTempPath()),
         new NullScanDiagnosticService(),
@@ -498,7 +497,7 @@ public class FacadeWriteTests : IDisposable
         var lots = ctx.Lots.AsNoTracking().Include(l => l.Product).Where(l => ids.Contains(l.Id)).ToList();
         Assert.All(lots, l => Assert.True(l.Product.Foil));
         // Both lots reassigned to the SAME new foil product (deduped within the batch), not two separate ones.
-        Assert.Equal(1, lots.Select(l => l.ProductId).Distinct().Count());
+        Assert.Single(lots.Select(l => l.ProductId).Distinct());
     }
 
     [Fact]

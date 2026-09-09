@@ -45,7 +45,6 @@ public class CardServiceCommitScansWorkflowTests : IDisposable
         [],
         new MockOmniDbContextFactory(_omniOptions),
         new StubOcrService(),
-        new ScanImageCache(_dataPath, NullLogger<ScanImageCache>.Instance),
         NullLogger<CardService>.Instance,
         _dataPath,
         new NullScanDiagnosticService(),

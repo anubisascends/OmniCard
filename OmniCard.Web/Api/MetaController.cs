@@ -37,7 +37,6 @@ public sealed class MetaController(IEnumerable<ICardGameService> gameServices) :
     {
         const string mit = "https://opensource.org/license/mit";
         const string apache2 = "https://www.apache.org/licenses/LICENSE-2.0";
-        const string bsd3 = "https://opensource.org/license/bsd-3-clause";
 
         var appVersion =
             Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
@@ -72,7 +71,8 @@ public sealed class MetaController(IEnumerable<ICardGameService> gameServices) :
             new("Imaging & OCR", "SkiaSharp", "4.150.1", "MIT", "https://github.com/mono/SkiaSharp", mit),
             new("Imaging & OCR", "Tesseract (.NET wrapper)", "5.2.0", "Apache-2.0", "https://github.com/charlesw/tesseract", apache2),
             new("Imaging & OCR", "Tesseract OCR engine (tesseract, leptonica)", "5.x", "Apache-2.0", "https://github.com/tesseract-ocr/tesseract", apache2),
-            new("Imaging & OCR", "SharpVectors", "1.8.5", "BSD-3-Clause", "https://github.com/ElinamLLC/SharpVectors", bsd3),
+            new("Imaging & OCR", "Svg.Skia", "5.2.2", "MIT", "https://github.com/wieslawsoltes/Svg.Skia", mit),
+            new("Imaging & OCR", "System.Drawing.Common", "10.0.9", "MIT", "https://github.com/dotnet/winforms", mit),
             new("Documents", "QuestPDF", "2026.7.0", "MIT (Community) / dual-licensed", "https://www.questpdf.com", "https://www.questpdf.com/license/"),
 
             // ── Frontend (SPA) ──────────────────────────────────────────────────

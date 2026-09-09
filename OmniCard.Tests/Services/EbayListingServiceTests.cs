@@ -427,7 +427,7 @@ public class EbayListingServiceTests : IDisposable
             new EbayListingOptions { Title = "t", Price = 5m });
 
         Assert.False(ok);
-        Assert.Empty(handler.Requests.Where(r => r.Uri!.ToString().Contains("inventory_item")));
+        Assert.DoesNotContain(handler.Requests, r => r.Uri!.ToString().Contains("inventory_item"));
     }
 
     [Fact]

@@ -3,8 +3,6 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
-using System.Windows;
-using System.Windows.Media.Imaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OmniCard.CardMatching;
@@ -21,7 +19,6 @@ public sealed class CardService : ICardService
     private readonly Dictionary<CardGame, ICardGameService> _gameServices;
     private readonly IDbContextFactory<OmniCardDbContext> _omniDbContextFactory;
     private readonly IOcrMatchingService _ocrService;
-    private readonly ScanImageCache _imageCache;
     private readonly ILogger<CardService> _logger;
     private readonly string _tempScansDir;
     private readonly IDataPathService _dataPathService;
@@ -35,7 +32,6 @@ public sealed class CardService : ICardService
         IEnumerable<ICardGameService> gameServices,
         IDbContextFactory<OmniCardDbContext> omniDbContextFactory,
         IOcrMatchingService ocrService,
-        ScanImageCache imageCache,
         ILogger<CardService> logger,
         IDataPathService dataPathService,
         IScanDiagnosticService diagnosticService,
@@ -46,8 +42,7 @@ public sealed class CardService : ICardService
         _gameServices = gameServices.ToDictionary(s => s.Game);
         _omniDbContextFactory = omniDbContextFactory;
         _ocrService = ocrService;
-        _imageCache = imageCache;
-        _tempScansDir = imageCache.TempScansDirectory;
+        _tempScansDir = dataPathService.TempScansDirectory;
         _logger = logger;
         _dataPathService = dataPathService;
         _diagnosticService = diagnosticService;
@@ -284,11 +279,12 @@ public sealed class CardService : ICardService
             _logger.LogWarning(ex, "Failed to log scan diagnostic event");
         }
 
-        // Use BeginInvoke (non-blocking) for ALL UI thread work.
-        // Dispatcher.Invoke deadlocks because TWAIN's message pump runs on the UI thread.
+        // Run the post-match annotation + async OCR pipeline on a background task (non-blocking) so
+        // the caller returns immediately. (This legacy desktop path predates the web app's
+        // WebScanMatchingService and is retained only for the CardService parity tests.)
         var capturedHash = hash;
         var capturedSetFilter = SelectedSetFilter;
-        Application.Current.Dispatcher.BeginInvoke(async () =>
+        _ = Task.Run(async () =>
         {
             AnnotateScan(scannedCard);
             ScannedCards.Add(scannedCard);
@@ -690,7 +686,6 @@ public sealed class CardService : ICardService
                             try
                             {
                                 File.Delete(scan.TempImagePath);
-                                _imageCache.Evict(scan.TempImagePath);
                             }
                             catch (Exception ex)
                             {
@@ -730,7 +725,6 @@ public sealed class CardService : ICardService
                 try
                 {
                     File.Delete(scan.TempImagePath);
-                    _imageCache.Evict(scan.TempImagePath);
                 }
                 catch (Exception ex)
                 {
@@ -906,7 +900,6 @@ public sealed class CardService : ICardService
                 File.Delete(card.TempImagePath);
                 _logger.LogDebug("Deleted temp scan image: {Path}", card.TempImagePath);
             }
-            _imageCache.Evict(card.TempImagePath);
         }
         catch (Exception ex)
         {
@@ -928,8 +921,7 @@ public sealed class CardService : ICardService
                 _logger.LogWarning(ex, "Failed to delete temp scan image: {Path}", card.TempImagePath);
             }
         }
-        _imageCache.Clear();
-        _logger.LogInformation("Cleared temp scan files and image cache");
+        _logger.LogInformation("Cleared temp scan files");
     }
 
     public (int FlagResolutions, int MismatchLogs, int DiagnosticEvents) ClearDiagnosticLogs()
@@ -1904,16 +1896,15 @@ public sealed class CardService : ICardService
 
     private static void ConvertToJpeg(string sourcePath, string destPath, int quality)
     {
-        var bitmap = new BitmapImage();
-        bitmap.BeginInit();
-        bitmap.UriSource = new Uri(sourcePath, UriKind.Absolute);
-        bitmap.CacheOption = BitmapCacheOption.OnLoad;
-        bitmap.EndInit();
+        // Decode from a stream we own (not Image.FromFile, which keeps the source file locked for
+        // the Image's lifetime) so the caller can delete the temp scan immediately afterwards.
+        using var source = File.OpenRead(sourcePath);
+        using var bitmap = Image.FromStream(source);
 
-        var encoder = new JpegBitmapEncoder { QualityLevel = quality };
-        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        var jpegEncoder = ImageCodecInfo.GetImageEncoders().First(c => c.FormatID == ImageFormat.Jpeg.Guid);
+        using var encoderParams = new EncoderParameters(1);
+        encoderParams.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, (long)quality);
 
-        using var fs = new FileStream(destPath, FileMode.Create, FileAccess.Write);
-        encoder.Save(fs);
+        bitmap.Save(destPath, jpegEncoder, encoderParams);
     }
 }
