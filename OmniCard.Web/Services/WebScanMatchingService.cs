@@ -32,6 +32,19 @@ public sealed class WebScanMatchingService
     // parallel, so batch throughput is barely affected.
     private readonly SemaphoreSlim _matchGate = new(1, 1);
 
+    // The user's "Sets (art fallback)" selection is a HARD filter on the candidate pool — a scan that
+    // doesn't resolve inside those sets gets no match. The one exception: OCR that reads the card's
+    // printed identity (set code + collector number) at or above this confidence is trusted as ground
+    // truth and is allowed to resolve to a printing OUTSIDE the chosen sets. Below it, the set filter
+    // still binds, so an uncertain read can't drag in a wrong-set match.
+    private const double OcrSetOverrideConfidence = 0.95;
+
+    /// <summary>The effective set constraint for an OCR lookup: the user's chosen sets normally, but
+    /// unconstrained (null) once the OCR read is confident enough (<see cref="OcrSetOverrideConfidence"/>)
+    /// to override the "Sets (art fallback)" filter.</summary>
+    private static IReadOnlySet<string>? EffectiveFilter(IReadOnlySet<string>? setFilter, double ocrConfidence)
+        => ocrConfidence >= OcrSetOverrideConfidence ? null : setFilter;
+
     public WebScanMatchingService(
         IPerceptualHashService hashService,
         IOcrMatchingService ocrService,
@@ -145,7 +158,9 @@ public sealed class WebScanMatchingService
                         if (ocrSet is not null && ocrNumber is not null && conf >= 0.5)
                         {
                             var gt = new OcrMatchResult { SetCode = ocrSet, CollectorNumber = ocrNumber, CollectorNumberConfidence = conf };
-                            var gtMatch = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, gt, setFilter, detectedSets, scanEdgeHash: edgeHash));
+                            // A very confident printed (set, collector) read overrides the set filter (see
+                            // EffectiveFilter); a weaker read stays bound to the user's chosen sets.
+                            var gtMatch = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, gt, EffectiveFilter(setFilter, conf), detectedSets, scanEdgeHash: edgeHash));
                             if (gtMatch is not null)
                                 return gtMatch;
                         }
@@ -183,7 +198,8 @@ public sealed class WebScanMatchingService
         if (collectorNumber is null || conf < 0.5)
             return current;
         var ocr = new OcrMatchResult { CollectorNumber = collectorNumber, CollectorNumberConfidence = conf };
-        var ocrMatch = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, ocr, setFilter, null, scanEdgeHash: edgeHash));
+        // A very confident collector-number read overrides the set filter (see EffectiveFilter).
+        var ocrMatch = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, ocr, EffectiveFilter(setFilter, conf), null, scanEdgeHash: edgeHash));
         return ocrMatch is not null && (current is null || ocrMatch.GameSpecificId != current.GameSpecificId)
             ? ocrMatch
             : current;
@@ -229,7 +245,8 @@ public sealed class WebScanMatchingService
             if (cn is not null && conf >= 0.5)
             {
                 var ocr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
-                var match = await FindMatchAsync(() => gameService.FindClosestMatch(rotHash, null, ocr, setFilter, null, scanEdgeHash: atZero ? edgeHash : null));
+                // A very confident printed collector-line read overrides the set filter (see EffectiveFilter).
+                var match = await FindMatchAsync(() => gameService.FindClosestMatch(rotHash, null, ocr, EffectiveFilter(setFilter, conf), null, scanEdgeHash: atZero ? edgeHash : null));
                 if (match is not null)
                 {
                     if (!atZero)

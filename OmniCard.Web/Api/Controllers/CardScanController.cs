@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
 using OmniCard.Web.Services;
 using OmniCard.Shared.Cards;
+using OmniCard.Shared.Matching;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Tags;
 using OmniCard.Web.Api.Infrastructure;
@@ -97,26 +98,63 @@ public sealed class CardScanController(
     }
 
     /// <summary>Catalog search for the correction screen (read-only, scoped to one game). Beyond the
-    /// free-text <paramref name="q"/> (matched against name), an optional <paramref name="set"/> code
-    /// and <paramref name="cn"/> collector number narrow to an exact printing — folded into the same
-    /// <c>set:</c>/<c>cn:</c> query grammar every game's <c>SearchCards</c> already understands.</summary>
+    /// free-text <paramref name="q"/> (matched against name) and optional <paramref name="cn"/>
+    /// collector number, the results are scoped to <paramref name="set"/> — the union of the "Sets
+    /// (art fallback)" the user chose on the scan page (the single source of truth for which sets to
+    /// look through). Empty ⇒ all sets. Each term folds into the same <c>set:</c>/<c>cn:</c> query
+    /// grammar every game's <c>SearchCards</c> already understands.</summary>
     [HttpGet("search")]
     public ActionResult<IReadOnlyList<ScanSearchResultDto>> Search(
-        [FromQuery] string game, [FromQuery] string? q = null, [FromQuery] string? set = null, [FromQuery] string? cn = null)
+        [FromQuery] string game, [FromQuery] string? q = null, [FromQuery] string[]? set = null, [FromQuery] string? cn = null)
     {
         if (LocationsController.ParseGame(game) is not { } parsedGame)
             return BadRequest(new { error = $"Unknown game '{game}'" });
 
-        // Compose the effective query: bare name terms + set:/cn: tokens. A set/collector alone is a
-        // valid search (e.g. "everything in DMU #100"); only a fully empty query returns nothing.
-        var terms = new List<string>();
-        if (!string.IsNullOrWhiteSpace(q)) terms.Add(q.Trim());
-        if (!string.IsNullOrWhiteSpace(set)) terms.Add($"set:{set.Trim()}");
-        if (!string.IsNullOrWhiteSpace(cn)) terms.Add($"cn:{cn.Trim()}");
-        if (terms.Count == 0)
+        var setCodes = (set ?? [])
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s.Trim())
+            .ToArray();
+
+        // Terms shared by every sub-query: bare name + collector number.
+        var baseTerms = new List<string>();
+        if (!string.IsNullOrWhiteSpace(q)) baseTerms.Add(q.Trim());
+        if (!string.IsNullOrWhiteSpace(cn)) baseTerms.Add($"cn:{cn.Trim()}");
+
+        // With no set constraint AND nothing to search on, return empty without touching the catalog.
+        // (A bare set list is still a valid search — it lists the whole set.)
+        if (setCodes.Length == 0 && baseTerms.Count == 0)
             return Ok(Array.Empty<ScanSearchResultDto>());
 
-        var matches = cardService.GetGameService(parsedGame).SearchCards(string.Join(' ', terms), MaxSearchResults);
+        var gameService = cardService.GetGameService(parsedGame);
+        List<CardMatch> matches;
+        if (setCodes.Length == 0)
+        {
+            // No set constraint (no art-fallback sets chosen) — search across all sets, as before.
+            matches = gameService.SearchCards(string.Join(' ', baseTerms), MaxSearchResults);
+        }
+        else
+        {
+            // The query grammar ANDs its terms, so several set:s can't be ORed in a single query.
+            // Run one search per chosen set and union the results — a bare set (no name/cn) simply
+            // lists that whole set. This keeps the correction search scoped to exactly the same
+            // art-fallback sets that constrain auto-matching.
+            var seen = new HashSet<string>();
+            var union = new List<CardMatch>();
+            foreach (var code in setCodes)
+            {
+                var terms = new List<string>(baseTerms) { $"set:{code}" };
+                foreach (var m in gameService.SearchCards(string.Join(' ', terms), MaxSearchResults))
+                {
+                    if (seen.Add($"{m.SetCode}|{m.CollectorNumber}|{m.GameSpecificId}"))
+                        union.Add(m);
+                }
+            }
+            matches = union
+                .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
+                .Take(MaxSearchResults)
+                .ToList();
+        }
+
         var results = matches.Select(m => new ScanSearchResultDto(
             m.GameSpecificId, m.Name, m.SetCode, m.SetName, m.CollectorNumber, m.Rarity, m.ImageUri)).ToList();
         return Ok(results);

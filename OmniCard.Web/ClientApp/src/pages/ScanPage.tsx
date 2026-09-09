@@ -122,24 +122,27 @@ function ConfidenceChip({ item }: { item: ScanItem }) {
   return <Chip size="small" color={color} label={`${Math.round(c)}%`} />;
 }
 
-/** Inline catalog search used to correct a bad/absent match. Searches by name, and/or an exact set
- * + collector number — the results are uncapped server-side, so every printing of a name shows. */
+/** Inline catalog search used to correct a bad/absent match. Searches by name and/or collector
+ * number; results are scoped to the chosen "Sets (art fallback)" (`setCodes`, empty ⇒ all sets) —
+ * that selection is the single source of truth for which sets to look through, so there's no
+ * per-search set picker. Results are uncapped server-side, so every printing shows. */
 function CorrectionSearch({
   game,
-  sets,
+  setCodes,
+  setNames,
   onPick,
 }: {
   game: string;
-  sets: { setCode: string; setName: string }[];
+  setCodes: string[];
+  setNames: string;
   onPick: (r: ScanSearchResultDto) => void;
 }) {
   const [q, setQ] = useState('');
-  const [set, setSet] = useState('');
   const [cn, setCn] = useState('');
-  const active = q.trim().length >= 2 || set !== '' || cn.trim() !== '';
+  const active = q.trim().length >= 2 || cn.trim() !== '';
   const search = useQuery({
-    queryKey: ['scan-search', game, q, set, cn],
-    queryFn: () => api.scanSearch(game, q, set || undefined, cn.trim() || undefined),
+    queryKey: ['scan-search', game, q, cn, setCodes],
+    queryFn: () => api.scanSearch(game, q, setCodes, cn.trim() || undefined),
     enabled: active,
   });
   return (
@@ -154,21 +157,6 @@ function CorrectionSearch({
           sx={{ flex: '1 1 200px' }}
         />
         <TextField
-          select
-          size="small"
-          label="Set"
-          value={set}
-          onChange={(e) => setSet(e.target.value)}
-          sx={{ minWidth: 160 }}
-        >
-          <MenuItem value="">Any set</MenuItem>
-          {sets.map((s) => (
-            <MenuItem key={s.setCode} value={s.setCode}>
-              {s.setName}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
           size="small"
           label="Collector #"
           value={cn}
@@ -176,6 +164,11 @@ function CorrectionSearch({
           sx={{ width: 120 }}
         />
       </Stack>
+      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+        {setCodes.length
+          ? `Searching within: ${setNames}`
+          : 'Searching all sets — pick “Sets (art fallback)” above to narrow.'}
+      </Typography>
       {search.isFetching && (
         <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
           Searching…
@@ -467,7 +460,7 @@ function PropertyFields({
 function DetailPanel({
   item,
   game,
-  sets,
+  artSets,
   foilTypeOptions,
   tagOptions,
   onToggle,
@@ -478,7 +471,7 @@ function DetailPanel({
 }: {
   item: ScanItem;
   game: string;
-  sets: { setCode: string; setName: string }[];
+  artSets: { setCode: string; setName: string }[];
   foilTypeOptions: string[];
   tagOptions: string[];
   onToggle: (v: boolean) => void;
@@ -533,7 +526,8 @@ function DetailPanel({
           <Box>
             <CorrectionSearch
               game={game}
-              sets={sets}
+              setCodes={artSets.map((s) => s.setCode)}
+              setNames={artSets.map((s) => s.setName).join(', ')}
               onPick={(r) => {
                 onCorrect(r);
                 setCorrecting(false);
@@ -1220,7 +1214,7 @@ export function ScanPage() {
               key={selectedItem.key}
               item={selectedItem}
               game={game}
-              sets={sets}
+              artSets={artSets}
               foilTypeOptions={foilTypeOptions}
               tagOptions={tagOptions}
               onToggle={(v) => updateItem(selectedItem.key, { include: v })}
