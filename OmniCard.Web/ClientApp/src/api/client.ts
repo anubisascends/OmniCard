@@ -451,8 +451,15 @@ export const api = {
     }
     return (await res.json()) as ScanMatchDto;
   },
-  scanSearch: (game: string, q: string, set?: string, cn?: string) =>
-    request<ScanSearchResultDto[]>(`/api/scan/search${qs({ game, q, set, cn })}`),
+  // `sets` scopes the correction search to the chosen "Sets (art fallback)" (empty ⇒ all sets); the
+  // server unions them, mirroring the set constraint used for auto-matching.
+  scanSearch: (game: string, q: string, sets?: string[], cn?: string) => {
+    const sp = new URLSearchParams({ game });
+    if (q) sp.set('q', q);
+    if (cn) sp.set('cn', cn);
+    for (const s of sets ?? []) if (s) sp.append('set', s);
+    return request<ScanSearchResultDto[]>(`/api/scan/search?${sp.toString()}`);
+  },
   scanFoilTypes: (game: string) => request<string[]>(`/api/scan/foil-types${qs({ game })}`),
   scanCommit: (containerId: number, items: ScanCommitItem[]) =>
     request<ScanCommitResultDto>('/api/scan/commit', {
