@@ -27,8 +27,8 @@ import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
 import SellIcon from '@mui/icons-material/Sell';
 import { api } from '../api/client';
 import type { CardDto } from '../api/types';
-import { CardEditDrawer } from './CardEditDrawer';
-import { LocationPickerDialog } from './LocationPickerDialog';
+import { CardEditDrawer } from './dialogs/CardEditDrawer';
+import { LocationPickerDialog } from './dialogs/LocationPickerDialog';
 import {
   usePreviewScale,
   PREVIEW_BASE_WIDTH,

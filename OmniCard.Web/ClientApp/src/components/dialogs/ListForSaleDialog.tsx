@@ -12,7 +12,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { api } from '../api/client';
+import { api } from '../../api/client';
 
 const CHANNELS = ['Manual', 'TcgPlayer', 'Ebay'];
 

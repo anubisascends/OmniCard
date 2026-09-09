@@ -23,7 +23,7 @@ import AddIcon from '@mui/icons-material/Add';
 import SellIcon from '@mui/icons-material/Sell';
 import { api } from '../api/client';
 import type { BinderCardDto, BinderSlotDto } from '../api/types';
-import { ListForSaleDialog } from '../components/ListForSaleDialog';
+import { ListForSaleDialog } from '../components/dialogs/ListForSaleDialog';
 import { SearchBox } from '../components/SearchBox';
 
 const CARD_BACK_SLUGS = ['mtg', 'optcg', 'riftbound', 'pokemon', 'yugioh', 'fftcg'];

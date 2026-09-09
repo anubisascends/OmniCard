@@ -21,8 +21,8 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { api } from '../api/client';
-import { useGame } from '../context/GameContext';
+import { api } from '../../api/client';
+import { useGame } from '../../context/GameContext';
 
 const money = (n?: number | null) =>
   n == null ? '—' : n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });

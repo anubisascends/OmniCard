@@ -19,8 +19,8 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import { InputAdornment } from '@mui/material';
-import { api } from '../api/client';
-import { groupLocations } from '../lib/locationGroups';
+import { api } from '../../api/client';
+import { groupLocations } from '../../lib/locationGroups';
 
 const TYPES = [
   { value: 'Binder', label: 'Binder' },

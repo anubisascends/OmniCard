@@ -35,7 +35,7 @@ import KeyIcon from '@mui/icons-material/Key';
 import Link from '@mui/material/Link';
 import { api, ApiError } from '../api/client';
 import type { ComponentDto, UserDto } from '../api/types';
-import { LocationPickerDialog } from '../components/LocationPickerDialog';
+import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import {
   usePreviewScale,
   setPreviewScale,

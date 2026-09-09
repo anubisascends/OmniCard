@@ -17,8 +17,8 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import ImageNotSupportedIcon from '@mui/icons-material/ImageNotSupported';
-import { api } from '../api/client';
-import type { TradeSearchResult, TradeSessionState } from '../api/types';
+import { api } from '../../api/client';
+import type { TradeSearchResult, TradeSessionState } from '../../api/types';
 
 const money = (n?: number | null) =>
   n == null ? '—' : n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });

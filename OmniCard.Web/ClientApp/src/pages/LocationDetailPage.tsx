@@ -6,7 +6,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { api } from '../api/client';
 import { useGame } from '../context/GameContext';
 import { CardTable } from '../components/CardTable';
-import { AddCardDialog } from '../components/AddCardDialog';
+import { AddCardDialog } from '../components/dialogs/AddCardDialog';
 import { SearchBox } from '../components/SearchBox';
 
 const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });

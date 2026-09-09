@@ -20,7 +20,7 @@ import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import SellIcon from '@mui/icons-material/Sell';
 import { Snackbar } from '@mui/material';
-import { api } from '../api/client';
+import { api } from '../../api/client';
 import { LocationPickerDialog } from './LocationPickerDialog';
 import { ListForSaleDialog } from './ListForSaleDialog';
 

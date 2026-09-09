@@ -19,8 +19,8 @@ import {
   Typography,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import { api } from '../api/client';
-import type { ScanSearchResultDto } from '../api/types';
+import { api } from '../../api/client';
+import type { ScanSearchResultDto } from '../../api/types';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
