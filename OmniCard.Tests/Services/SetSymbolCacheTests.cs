@@ -93,55 +93,56 @@ public class SetSymbolCacheTests : IDisposable
         Assert.Equal(expected, SetSymbolCache.FormatRarityDisplay(input!));
     }
 
-    // --- GetSetSymbolAsync ---
+    // --- GetSymbolSvgPathAsync ---
 
     [Fact]
-    public async Task GetSetSymbolAsync_UnsupportedRarity_ReturnsNull()
+    public async Task GetSymbolSvgPathAsync_UnsupportedRarity_ReturnsNull()
     {
         var cache = CreateCache();
-        var result = await cache.GetSetSymbolAsync("M10", "special");
+        var result = await cache.GetSymbolSvgPathAsync("M10", "special");
         Assert.Null(result);
     }
 
-    [StaFact]
-    public async Task GetSetSymbolAsync_Downloads_AndCachesToDisk()
+    [Fact]
+    public async Task GetSymbolSvgPathAsync_Downloads_AndCachesToDisk()
     {
         var cache = CreateCache();
-        var result = await cache.GetSetSymbolAsync("M10", "common");
+        var result = await cache.GetSymbolSvgPathAsync("M10", "common");
 
-        // File should be saved to disk
+        // File should be saved to disk, and the returned path should point at it.
         var filePath = Path.Combine(_tempDir, "M10", "C.svg");
         Assert.True(File.Exists(filePath));
+        Assert.Equal(filePath, result);
     }
 
-    [StaFact]
-    public async Task GetSetSymbolAsync_SecondCall_UsesCache_NoExtraHttp()
+    [Fact]
+    public async Task GetSymbolSvgPathAsync_SecondCall_UsesCache_NoExtraHttp()
     {
         var httpFactory = CreateMockHttpFactory(callLimit: 1);
         var cache = CreateCache(httpFactory);
 
         // First call downloads
-        await cache.GetSetSymbolAsync("M10", "common");
+        await cache.GetSymbolSvgPathAsync("M10", "common");
         // Second call should use in-memory cache (no HTTP)
-        var result = await cache.GetSetSymbolAsync("M10", "common");
+        var result = await cache.GetSymbolSvgPathAsync("M10", "common");
 
         // If this doesn't throw, the HTTP was only called once (callLimit: 1)
         Assert.NotNull(result);
     }
 
-    [StaFact]
-    public async Task GetSetSymbolAsync_404_WritesMissingMarker()
+    [Fact]
+    public async Task GetSymbolSvgPathAsync_404_WritesMissingMarker()
     {
         var cache = CreateCache(CreateNotFoundHttpFactory());
-        var result = await cache.GetSetSymbolAsync("PWAR", "common");
+        var result = await cache.GetSymbolSvgPathAsync("PWAR", "common");
 
         Assert.Null(result);
         var markerPath = Path.Combine(_tempDir, "PWAR", "C.svg.missing");
         Assert.True(File.Exists(markerPath));
     }
 
-    [StaFact]
-    public async Task GetSetSymbolAsync_ExistingMissingMarker_SkipsHttp()
+    [Fact]
+    public async Task GetSymbolSvgPathAsync_ExistingMissingMarker_SkipsHttp()
     {
         // Pre-seed a .missing marker (e.g. written by a prior launch or by RasterizeSymbolAsync).
         // The lazy load must honour it and never touch the network — this is the regression that
@@ -151,19 +152,19 @@ public class SetSymbolCacheTests : IDisposable
 
         // callLimit: 0 → any HTTP call throws.
         var cache = CreateCache(CreateNotFoundHttpFactory(callLimit: 0));
-        var result = await cache.GetSetSymbolAsync("TSB", "common");
+        var result = await cache.GetSymbolSvgPathAsync("TSB", "common");
 
         Assert.Null(result);
     }
 
-    [StaFact]
-    public async Task GetSetSymbolAsync_ConcurrentCalls_SingleHttp()
+    [Fact]
+    public async Task GetSymbolSvgPathAsync_ConcurrentCalls_SingleHttp()
     {
         // Many callers requesting the same symbol at once must coalesce into one network request.
         var httpFactory = CreateMockHttpFactory(callLimit: 1);
         var cache = CreateCache(httpFactory);
 
-        var tasks = Enumerable.Range(0, 16).Select(_ => cache.GetSetSymbolAsync("M10", "common"));
+        var tasks = Enumerable.Range(0, 16).Select(_ => cache.GetSymbolSvgPathAsync("M10", "common"));
         var results = await Task.WhenAll(tasks);
 
         // If more than one request had fired, the mock (callLimit: 1) would have thrown.
@@ -195,7 +196,7 @@ public class SetSymbolCacheTests : IDisposable
         return factory.Object;
     }
 
-    [StaFact]
+    [Fact]
     public async Task RasterizeSymbolAsync_404_WritesMissingMarker()
     {
         var cache = CreateCache(CreateNotFoundHttpFactory());
@@ -206,7 +207,7 @@ public class SetSymbolCacheTests : IDisposable
         Assert.True(File.Exists(markerPath));
     }
 
-    [StaFact]
+    [Fact]
     public async Task RasterizeSymbolAsync_SecondCallAfter404_SkipsHttp()
     {
         var httpFactory = CreateNotFoundHttpFactory(callLimit: 1);
@@ -221,4 +222,17 @@ public class SetSymbolCacheTests : IDisposable
         Assert.Null(result);
     }
 
+    [Fact]
+    public async Task RasterizeSymbolAsync_ValidSvg_ReturnsPngBytes()
+    {
+        // Exercises the SkiaSharp (Svg.Skia) rasterization path end-to-end: download the SVG,
+        // render it to a 32×32 raster, and encode as PNG.
+        var cache = CreateCache();
+        var result = await cache.RasterizeSymbolAsync("M10");
+
+        Assert.NotNull(result);
+        // PNG signature: 89 50 4E 47 0D 0A 1A 0A
+        Assert.True(result!.Length > 8);
+        Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }, result[..8]);
+    }
 }

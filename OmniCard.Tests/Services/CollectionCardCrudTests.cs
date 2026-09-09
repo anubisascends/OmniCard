@@ -353,7 +353,6 @@ public class CollectionCardCrudTests : IDisposable
             [],
             new MockOmniDbContextFactory(_omniOptions),
             new StubOcrService(),
-            new ScanImageCache(new DataPathService(Path.GetTempPath()), NullLogger<ScanImageCache>.Instance),
             NullLogger<CardService>.Instance,
             new DataPathService(Path.GetTempPath()),
             new NullScanDiagnosticService(),

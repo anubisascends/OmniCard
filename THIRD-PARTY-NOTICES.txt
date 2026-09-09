@@ -129,10 +129,16 @@ Homepage:    https://github.com/codebude/QRCoder
 Copyright (c) Raffael Herrmann.
 
 --------------------------------------------------------------------------------
-SharpVectors.Wpf 1.8.5 — BSD 3-Clause License
+Svg.Skia 5.2.2 — MIT License
 --------------------------------------------------------------------------------
-Homepage:    https://github.com/ElinamLLC/SharpVectors
-Copyright (c) 2010-2024, Elinam LLC and SharpVectors contributors.
+Homepage:    https://github.com/wieslawsoltes/Svg.Skia
+Copyright (c) Wiesław Šoltés.
+
+--------------------------------------------------------------------------------
+System.Drawing.Common 10.0.9 — MIT License
+--------------------------------------------------------------------------------
+Homepage:    https://github.com/dotnet/winforms
+Copyright (c) .NET Foundation and Contributors.
 
 --------------------------------------------------------------------------------
 VirtualizingWrapPanel 2.5.3 — MIT License

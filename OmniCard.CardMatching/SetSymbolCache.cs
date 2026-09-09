@@ -1,10 +1,9 @@
 using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Http;
-using System.Windows.Media;
 using Microsoft.Extensions.Logging;
-using SharpVectors.Converters;
-using SharpVectors.Renderers.Wpf;
+using SkiaSharp;
+using Svg.Skia;
 using OmniCard.Interfaces;
 
 namespace OmniCard.CardMatching;
@@ -12,12 +11,6 @@ namespace OmniCard.CardMatching;
 public class SetSymbolCache(IHttpClientFactory httpClientFactory, IDataPathService dataPathService, ILogger<SetSymbolCache> logger)
 {
     private readonly string _cacheDir = dataPathService.SymbolsCacheDirectory;
-
-    private static readonly WpfDrawingSettings SvgSettings = new()
-    {
-        IncludeRuntime = true,
-        TextAsGeometry = false,
-    };
 
     private static readonly Dictionary<string, string> RarityToFile = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -31,7 +24,8 @@ public class SetSymbolCache(IHttpClientFactory httpClientFactory, IDataPathServi
     // the many card rows/tiles that render at once and request the same symbol simultaneously all
     // await one shared task instead of each firing its own network request (a cache stampede that
     // previously fetched each set symbol ~8× on startup). Lazy guarantees the factory runs once.
-    private readonly ConcurrentDictionary<string, Lazy<Task<DrawingImage?>>> _cache = [];
+    // The cached value is the on-disk SVG path (null when the symbol doesn't exist upstream).
+    private readonly ConcurrentDictionary<string, Lazy<Task<string?>>> _cache = [];
     private readonly ConcurrentDictionary<string, string> _setNames = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Register a set code → set name mapping for tooltip display.</summary>
@@ -51,10 +45,15 @@ public class SetSymbolCache(IHttpClientFactory httpClientFactory, IDataPathServi
         _ => rarity ?? ""
     };
 
-    public Task<DrawingImage?> GetSetSymbolAsync(string setCode, string rarity)
+    /// <summary>
+    /// Resolve the on-disk path of a set-symbol SVG, downloading (and disk-caching) it on first use.
+    /// Returns null for unsupported rarities or symbols that don't exist upstream. Concurrent callers
+    /// for the same symbol coalesce onto a single download.
+    /// </summary>
+    public Task<string?> GetSymbolSvgPathAsync(string setCode, string rarity)
     {
         if (!RarityToFile.TryGetValue(rarity, out var rarityFile))
-            return Task.FromResult<DrawingImage?>(null);
+            return Task.FromResult<string?>(null);
 
         var code = setCode.ToUpperInvariant();
         var cacheKey = $"{code}_{rarityFile}";
@@ -63,10 +62,10 @@ public class SetSymbolCache(IHttpClientFactory httpClientFactory, IDataPathServi
         // full of cards requesting the same set symbol triggers a single network request, not one
         // per card.
         return _cache.GetOrAdd(cacheKey,
-            _ => new Lazy<Task<DrawingImage?>>(() => LoadOrDownloadAsync(code, rarityFile))).Value;
+            _ => new Lazy<Task<string?>>(() => LoadOrDownloadAsync(code, rarityFile))).Value;
     }
 
-    private async Task<DrawingImage?> LoadOrDownloadAsync(string setCode, string rarityFile)
+    private async Task<string?> LoadOrDownloadAsync(string setCode, string rarityFile)
     {
         var dir = Path.Combine(_cacheDir, setCode);
         var filePath = Path.Combine(dir, $"{rarityFile}.svg");
@@ -74,7 +73,7 @@ public class SetSymbolCache(IHttpClientFactory httpClientFactory, IDataPathServi
 
         // Try loading from disk cache first
         if (File.Exists(filePath))
-            return LoadSvgFromFile(filePath);
+            return filePath;
 
         // A prior 404 was recorded — this set/rarity has no symbol upstream. Don't hit the network
         // again. Many promo/special sets (TSB, SLD, PWAR, …) have no vector at all, so without this
@@ -106,7 +105,7 @@ public class SetSymbolCache(IHttpClientFactory httpClientFactory, IDataPathServi
             Directory.CreateDirectory(dir);
             await File.WriteAllBytesAsync(filePath, svgContent);
 
-            return LoadSvgFromFile(filePath);
+            return filePath;
         }
         catch (Exception ex)
         {
@@ -177,109 +176,42 @@ public class SetSymbolCache(IHttpClientFactory httpClientFactory, IDataPathServi
         progress?.Report($"Set symbols updated: {downloaded} new, {skipped} already cached");
     }
 
-    private static DrawingImage? LoadSvgFromFile(string filePath)
+    /// <summary>
+    /// Rasterize a set's common-rarity symbol SVG to a 32×32 PNG (shape only — color is irrelevant
+    /// for the perceptual hash used to disambiguate MTG sets). Returns null when the symbol doesn't
+    /// exist upstream. Rendering uses SkiaSharp (no WPF / STA dependency), so it runs on any thread.
+    /// </summary>
+    public async Task<byte[]?> RasterizeSymbolAsync(string setCode)
     {
+        // Reuse the shared download/disk-cache/negative-marker path (common rarity → C.svg).
+        var filePath = await GetSymbolSvgPathAsync(setCode, "common");
+        if (filePath is null)
+            return null;
+
         try
         {
-            using var reader = new FileSvgReader(SvgSettings);
-            var drawing = reader.Read(filePath);
-            if (drawing == null) return null;
-
-            var image = new DrawingImage(drawing);
-            image.Freeze();
-            return image;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    public async Task<System.Drawing.Bitmap?> RasterizeSymbolAsync(string setCode)
-    {
-        var dir = Path.Combine(_cacheDir, setCode.ToUpperInvariant());
-        var filePath = Path.Combine(dir, "C.svg"); // Common rarity — shape only, color irrelevant for pHash
-        var missingMarkerPath = filePath + ".missing";
-
-        // A prior 404 was recorded — don't hit the network again for a set that doesn't exist upstream.
-        if (File.Exists(missingMarkerPath))
-            return null;
-
-        // Download if not cached
-        if (!File.Exists(filePath))
-        {
-            try
-            {
-                var url = $"https://raw.githubusercontent.com/Investigamer/mtg-vectors/main/svg/set/{setCode.ToUpperInvariant()}/C.svg";
-                var client = httpClientFactory.CreateClient();
-                var response = await client.GetAsync(url);
-                if (!response.IsSuccessStatusCode)
-                {
-                    if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-                    {
-                        Directory.CreateDirectory(dir);
-                        await File.WriteAllBytesAsync(missingMarkerPath, []);
-                    }
-                    return null;
-                }
-
-                var svgContent = await response.Content.ReadAsByteArrayAsync();
-                Directory.CreateDirectory(dir);
-                await File.WriteAllBytesAsync(filePath, svgContent);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Error downloading set symbol SVG for {SetCode}", setCode);
+            using var skSvg = new SKSvg();
+            if (skSvg.Load(filePath) is not { } picture)
                 return null;
-            }
-        }
 
-        // Rasterize SVG to 32x32 bitmap — must run on STA thread for WPF rendering
-        try
-        {
-            System.Drawing.Bitmap? bmp = null;
+            var bounds = picture.CullRect;
+            if (bounds.Width <= 0 || bounds.Height <= 0)
+                return null;
 
-            // WPF rendering requires an STA thread with a Dispatcher
-            void RenderOnSta()
-            {
-                using var reader = new FileSvgReader(SvgSettings);
-                var drawing = reader.Read(filePath);
-                if (drawing is null) return;
+            var info = new SKImageInfo(32, 32, SKColorType.Bgra8888, SKAlphaType.Premul);
+            using var surface = SKSurface.Create(info);
+            var canvas = surface.Canvas;
+            canvas.Clear(SKColors.Transparent);
+            // Stretch the SVG's bounding box to fill the 32×32 target, matching the previous
+            // DrawImage-into-Rect behavior so the shape hash stays comparable across sets.
+            canvas.Scale(32f / bounds.Width, 32f / bounds.Height);
+            canvas.Translate(-bounds.Left, -bounds.Top);
+            canvas.DrawPicture(picture);
+            canvas.Flush();
 
-                var drawingImage = new DrawingImage(drawing);
-                drawingImage.Freeze();
-
-                var visual = new System.Windows.Media.DrawingVisual();
-                using (var dc = visual.RenderOpen())
-                {
-                    dc.DrawImage(drawingImage, new System.Windows.Rect(0, 0, 32, 32));
-                }
-                var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(32, 32, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
-                rtb.Render(visual);
-
-                var pixels = new byte[32 * 32 * 4];
-                rtb.CopyPixels(pixels, 32 * 4, 0);
-
-                bmp = new System.Drawing.Bitmap(32, 32, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                var bmpData = bmp.LockBits(
-                    new System.Drawing.Rectangle(0, 0, 32, 32),
-                    System.Drawing.Imaging.ImageLockMode.WriteOnly,
-                    System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                System.Runtime.InteropServices.Marshal.Copy(pixels, 0, bmpData.Scan0, pixels.Length);
-                bmp.UnlockBits(bmpData);
-            }
-
-            if (System.Windows.Application.Current?.Dispatcher is { } dispatcher &&
-                !dispatcher.CheckAccess())
-            {
-                dispatcher.Invoke(RenderOnSta);
-            }
-            else
-            {
-                RenderOnSta();
-            }
-
-            return bmp;
+            using var image = surface.Snapshot();
+            using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+            return data?.ToArray();
         }
         catch (Exception ex)
         {

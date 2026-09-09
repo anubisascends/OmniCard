@@ -1438,12 +1438,10 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
 
             try
             {
-                using var bmp = await _symbolCache.RasterizeSymbolAsync(setCode);
-                if (bmp is null) continue;
+                var png = await _symbolCache.RasterizeSymbolAsync(setCode);
+                if (png is null) continue;
 
-                using var ms = new MemoryStream();
-                bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-                ms.Position = 0;
+                using var ms = new MemoryStream(png);
                 var hash = _hashService.ComputeHash(ms);
 
                 await context.Database.ExecuteSqlRawAsync(

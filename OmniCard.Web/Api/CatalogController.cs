@@ -15,7 +15,7 @@ public sealed class CatalogController(CatalogRefreshService refresh) : ApiContro
     public ActionResult<CatalogStatusDto> Status()
     {
         var s = refresh.Status();
-        return new CatalogStatusDto(Map(s.Running), s.Recent.Select(Map!).ToList());
+        return new CatalogStatusDto(Map(s.Running), s.Recent.Select(j => Map(j)!).ToList());
     }
 
     [HttpPost("refresh")]

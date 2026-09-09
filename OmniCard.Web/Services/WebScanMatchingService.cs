@@ -9,9 +9,8 @@ namespace OmniCard.Web.Services;
 /// <summary>
 /// Server-side card-image matching for the web app. This is the port of the desktop
 /// <c>CardService.AddFromStream</c> pipeline (pHash + MTG art hash + foil edge hash + per-game OCR
-/// refinement + 180° rotation retry) with the WPF coupling (Dispatcher, ScannedCards, temp files,
-/// diagnostics) stripped out. Because there is no UI message pump to avoid deadlocking, the OCR
-/// stages that the desktop defers to a background <c>Dispatcher.BeginInvoke</c> run inline here.
+/// refinement + 180° rotation retry) with the desktop coupling (ScannedCards, temp files,
+/// diagnostics, background task hand-off) stripped out — the OCR stages run inline here.
 ///
 /// Matching stays single-game — the caller picks the game (the desktop's "never fall back across
 /// games" rule). All catalog reads go through the already-registered read-only game services.
