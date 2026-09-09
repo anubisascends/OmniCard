@@ -4,12 +4,12 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Data;
-using OmniCard.Web.Api;
 using OmniCard.Web.Services;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Trades;
 using OmniCard.Collection.Trades;
+using OmniCard.Web.Api.Controllers;
 
 namespace OmniCard.Tests.Web;
 

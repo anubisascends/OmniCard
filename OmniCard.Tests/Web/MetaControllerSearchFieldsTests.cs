@@ -1,5 +1,5 @@
 using OmniCard.Tests.Services;
-using OmniCard.Web.Api;
+using OmniCard.Web.Api.Controllers;
 
 namespace OmniCard.Tests.Web;
 

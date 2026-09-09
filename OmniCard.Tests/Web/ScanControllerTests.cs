@@ -2,9 +2,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using OmniCard.Web.Api;
 using OmniCard.Web.Hubs;
 using Microsoft.AspNetCore.Mvc;
+using OmniCard.Web.Api.Controllers;
 
 namespace OmniCard.Tests.Web;
 

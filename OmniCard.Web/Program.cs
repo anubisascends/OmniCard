@@ -28,6 +28,7 @@ using OmniCard.Collection.Trades;
 using OmniCard.CardMatching.Games;
 using OmniCard.Data.Catalogs;
 using OmniCard.Audit.Exporters;
+using OmniCard.Web.Api.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,7 +60,7 @@ var scansDir = Path.Combine(dataDir, "scans");
 
 builder.Services.AddSignalR();
 builder.Services.AddControllers(options =>
-    options.Filters.Add<OmniCard.Web.Api.ConcurrencyExceptionFilter>());
+    options.Filters.Add<ConcurrencyExceptionFilter>());
 builder.Services.AddHttpClient();
 builder.Services.AddOpenApi();
 

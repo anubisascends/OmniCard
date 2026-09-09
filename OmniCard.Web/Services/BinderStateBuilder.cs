@@ -6,6 +6,7 @@ using OmniCard.Shared.Settings;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Data.Catalogs;
+using OmniCard.Web.Helpers;
 
 namespace OmniCard.Web.Services;
 

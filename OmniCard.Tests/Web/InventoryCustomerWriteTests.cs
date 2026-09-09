@@ -3,11 +3,11 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Api.Contracts;
 using OmniCard.Data;
-using OmniCard.Web.Api;
 using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Sales;
 using OmniCard.Collection.Inventory;
 using OmniCard.Collection.Sales;
+using OmniCard.Web.Api.Controllers;
 
 namespace OmniCard.Tests.Web;
 
