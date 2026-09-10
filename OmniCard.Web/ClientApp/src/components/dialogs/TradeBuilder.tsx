@@ -19,6 +19,7 @@ import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import ImageNotSupportedIcon from '@mui/icons-material/ImageNotSupported';
 import { api } from '../../api/client';
 import type { TradeSearchResult, TradeSessionState } from '../../api/types';
+import { CardImage } from '../CardImage';
 
 const money = (n?: number | null) =>
   n == null ? '—' : n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
@@ -162,11 +163,12 @@ export function TradeBuilder() {
             {session.items.map((it) => (
               <Stack key={it.index} direction="row" spacing={1} alignItems="center" sx={{ py: 0.5 }}>
                 {it.imageUrl ? (
-                  <Box
-                    component="img"
+                  <CardImage
                     src={it.imageUrl}
                     alt={it.cardName}
-                    sx={{ width: 34, aspectRatio: '0.72', objectFit: 'contain', borderRadius: 0.5, flexShrink: 0 }}
+                    foil={it.foil}
+                    wrapperSx={{ flexShrink: 0, borderRadius: 0.5, overflow: 'hidden' }}
+                    sx={{ width: 34, aspectRatio: '0.72', objectFit: 'contain', display: 'block' }}
                   />
                 ) : (
                   <Box
@@ -246,11 +248,12 @@ export function TradeBuilder() {
                   onClick={() => run(addOwned.mutateAsync(r.lotId))}
                   sx={{ p: 0.5, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
                 >
-                  <Box
-                    component="img"
+                  <CardImage
                     src={r.imageUrl ?? undefined}
                     alt={r.name}
-                    sx={{ width: 28, aspectRatio: '0.72', objectFit: 'contain', borderRadius: 0.5, flexShrink: 0 }}
+                    foil={r.isFoil}
+                    wrapperSx={{ flexShrink: 0, borderRadius: 0.5, overflow: 'hidden' }}
+                    sx={{ width: 28, aspectRatio: '0.72', objectFit: 'contain', display: 'block' }}
                   />
                   <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                     <Typography variant="body2" noWrap>

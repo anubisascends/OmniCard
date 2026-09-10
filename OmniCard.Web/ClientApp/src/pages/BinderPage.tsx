@@ -23,6 +23,7 @@ import AddIcon from '@mui/icons-material/Add';
 import SellIcon from '@mui/icons-material/Sell';
 import { api } from '../api/client';
 import type { BinderCardDto, BinderSlotDto } from '../api/types';
+import { CardImage } from '../components/CardImage';
 import { ListForSaleDialog } from '../components/dialogs/ListForSaleDialog';
 import { SearchBox } from '../components/SearchBox';
 
@@ -108,13 +109,15 @@ function SlotGrid({
           >
             {s.card?.imageUrl ? (
               <Tooltip title={`${s.card.name} · ${s.card.condition}${s.card.foil ? ' · Foil' : ''} — right-click to list for sale`}>
-                <img
+                <CardImage
                   src={s.card.imageUrl}
                   alt={s.card.name}
+                  foil={s.card.foil}
                   draggable={editMode}
                   onDragStart={editMode ? () => onDragCard(s.card!.id) : undefined}
                   onContextMenu={(e) => onCardContextMenu(e, s.card!)}
-                  style={{
+                  wrapperSx={{ width: '100%', height: '100%' }}
+                  sx={{
                     width: '100%',
                     height: '100%',
                     objectFit: 'contain',
@@ -205,11 +208,12 @@ function UnplacedSidebar({
                   '&:hover': { bgcolor: 'action.hover' },
                 }}
               >
-                <Box
-                  component="img"
+                <CardImage
                   src={c.imageUrl ?? undefined}
                   alt={c.name}
-                  sx={{ width: 40, aspectRatio: '0.72', objectFit: 'contain', borderRadius: 0.5, flexShrink: 0 }}
+                  foil={c.foil}
+                  wrapperSx={{ flexShrink: 0, borderRadius: 0.5, overflow: 'hidden' }}
+                  sx={{ width: 40, aspectRatio: '0.72', objectFit: 'contain', display: 'block' }}
                 />
                 <Box sx={{ minWidth: 0 }}>
                   <Typography variant="body2" noWrap>
