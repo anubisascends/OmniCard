@@ -90,6 +90,12 @@ public sealed class CardScanController(
             .ToArray();
         var result = await matcher.MatchAsync(bytes, parsedGame, isFoil, setCodes, ct);
 
+        // Flag whether this is a card the collection doesn't already hold (drives the "new card"
+        // gold-star badge). IsNewCard opens its own DbContext, so it's safe alongside concurrent
+        // batch matches.
+        if (result.Matched && !string.IsNullOrEmpty(result.GameCardId))
+            result = result with { IsNew = binderCards.IsNewCard(parsedGame, result.GameCardId) };
+
         // For a TIFF (or any non-browser-native upload) the client can't preview its own copy, so hand
         // back a downscaled JPEG data URI for the side-by-side compare.
         if (NeedsServerPreview(image.ContentType, image.FileName))

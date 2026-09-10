@@ -64,6 +64,18 @@ public sealed class WebBinderCardService
             .ToList();
     }
 
+    /// <summary>Whether the collection holds no lot of this card yet (by game + card id, regardless of
+    /// finish) — i.e. scanning it would add a card you don't already own. Drives the scan page's
+    /// "new card" gold-star badge. Each call opens its own context, so it's safe to call concurrently
+    /// during a batch match (unlike the game services' shared read context).</summary>
+    public bool IsNewCard(CardGame game, string gameCardId)
+    {
+        if (string.IsNullOrEmpty(gameCardId)) return false;
+        using var context = _dbFactory.CreateDbContext();
+        return !context.Lots.AsNoTracking()
+            .Any(l => l.Product.Game == game && l.Product.GameCardId == gameCardId);
+    }
+
     public void MoveCardsToContainer(IEnumerable<int> cardIds, int containerId, string? section = null)
     {
         using var context = _dbFactory.CreateDbContext();

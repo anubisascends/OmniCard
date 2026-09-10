@@ -178,6 +178,13 @@ export interface SalesSettingsDto {
   forSaleLocationId?: number | null;
 }
 
+/** Value-tier badge config for the scan page. `thresholds` is an ascending list of price ceilings
+ * (four of them → five tiers); `currencyCode` is the ISO code they're denominated in. */
+export interface ScanBadgeSettingsDto {
+  currencyCode: string;
+  thresholds: number[];
+}
+
 export interface CustomerDto {
   id: number;
   name: string;
@@ -335,6 +342,11 @@ export interface ScanMatchDto {
   rarity?: string | null;
   imageUri?: string | null;
   confidence?: number | null;
+  /** Current market price of the matched card (catalog currency, USD), or null if unknown. Drives the
+   * value-tier "currency sign" badge. */
+  marketPrice?: number | null;
+  /** True when the collection holds no copy of this card yet — drives the "new card" gold-star badge. */
+  isNew?: boolean;
   scanHash: string;
   /** Server-rendered JPEG data URI, set only when the upload's own format (e.g. TIFF) can't render
    * in a browser <img>. Null for JPEG/PNG. */

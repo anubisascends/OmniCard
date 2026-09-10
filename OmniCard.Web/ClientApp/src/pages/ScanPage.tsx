@@ -34,7 +34,8 @@ import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import { api } from '../api/client';
 import { useGame } from '../context/GameContext';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
-import type { ScanMatchDto, ScanSearchResultDto } from '../api/types';
+import { ScanValueBadges } from '../lib/scanBadges';
+import type { ScanBadgeSettingsDto, ScanMatchDto, ScanSearchResultDto } from '../api/types';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
@@ -305,15 +306,20 @@ function propsSummary(item: ScanItem): string {
 function MasterRow({
   item,
   selected,
+  badgeSettings,
   onSelect,
   onToggle,
 }: {
   item: ScanItem;
   selected: boolean;
+  badgeSettings?: ScanBadgeSettingsDto;
   onSelect: () => void;
   onToggle: (v: boolean, shiftKey: boolean) => void;
 }) {
   const id = identityOf(item);
+  // Badges reflect the auto-match; once the user hand-corrects a card we no longer have its price /
+  // ownership status, so they're suppressed for overrides.
+  const badgeMatch = item.override ? undefined : item.match;
   // Whether Shift was held for the interaction that is about to fire onChange. Set from the mouse
   // (onClick) and keyboard (onKeyDown, for Space-toggle) so range-select works either way, and never
   // goes stale between a mouse click and a later keyboard toggle.
@@ -369,9 +375,14 @@ function MasterRow({
         <Typography variant="caption" color="text.secondary" noWrap display="block">
           {propsSummary(item)}
         </Typography>
-        <Box sx={{ mt: 0.5 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
           <ConfidenceChip item={item} />
-        </Box>
+          <ScanValueBadges
+            isNew={badgeMatch?.isNew}
+            price={badgeMatch?.marketPrice}
+            settings={badgeSettings}
+          />
+        </Stack>
       </Box>
     </Box>
   );
@@ -477,6 +488,7 @@ function DetailPanel({
   artSets,
   foilTypeOptions,
   tagOptions,
+  badgeSettings,
   onToggle,
   onVerify,
   onCorrect,
@@ -488,6 +500,7 @@ function DetailPanel({
   artSets: { setCode: string; setName: string }[];
   foilTypeOptions: string[];
   tagOptions: string[];
+  badgeSettings?: ScanBadgeSettingsDto;
   onToggle: (v: boolean) => void;
   onVerify: () => void;
   onCorrect: (r: ScanSearchResultDto) => void;
@@ -514,6 +527,14 @@ function DetailPanel({
 
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
           <ConfidenceChip item={item} />
+          {!item.override && (
+            <ScanValueBadges
+              isNew={item.match?.isNew}
+              price={item.match?.marketPrice}
+              settings={badgeSettings}
+              size="medium"
+            />
+          )}
           {item.verified && <Chip size="small" color="success" label="Verified" />}
           <Box sx={{ flexGrow: 1 }} />
           <Button variant="outlined" startIcon={<ZoomInIcon />} onClick={() => setScanOpen(true)}>
@@ -909,6 +930,12 @@ export function ScanPage() {
     enabled: !!game,
   });
   const tagsQuery = useQuery({ queryKey: ['tags'], queryFn: api.tags });
+  const badgeSettingsQuery = useQuery({
+    queryKey: ['scan-badge-settings'],
+    queryFn: api.scanBadgeSettings,
+    staleTime: 5 * 60 * 1000,
+  });
+  const badgeSettings = badgeSettingsQuery.data;
   const foilTypeOptions = foilTypesQuery.data ?? [];
   const tagOptions = useMemo(() => (tagsQuery.data ?? []).map((t) => t.name), [tagsQuery.data]);
   const sets = setsQuery.data ?? [];
@@ -1239,6 +1266,7 @@ export function ScanPage() {
                   key={item.key}
                   item={item}
                   selected={item.key === selectedKey}
+                  badgeSettings={badgeSettings}
                   onSelect={() => setSelectedKey(item.key)}
                   onToggle={(v, shiftKey) => toggleInclude(item.key, v, shiftKey)}
                 />
@@ -1255,6 +1283,7 @@ export function ScanPage() {
               artSets={artSets}
               foilTypeOptions={foilTypeOptions}
               tagOptions={tagOptions}
+              badgeSettings={badgeSettings}
               onToggle={(v) => updateItem(selectedItem.key, { include: v })}
               onVerify={() => updateItem(selectedItem.key, { verified: true, include: true })}
               onCorrect={(r) =>

@@ -24,6 +24,7 @@ using OmniCard.Collection.ImportExport;
 using OmniCard.Collection.Inventory;
 using OmniCard.Collection.Lists;
 using OmniCard.Collection.Sales;
+using OmniCard.Collection.Settings;
 using OmniCard.Collection.Trades;
 using OmniCard.CardMatching.Games;
 using OmniCard.Data.Catalogs;
@@ -167,6 +168,7 @@ builder.Services.AddSingleton(writableFactory);
 builder.Services.AddSingleton<IStorageContainerService>(_ => new StorageContainerService(writableFactory));
 builder.Services.AddSingleton<ITagService>(_ => new TagService(writableFactory));
 builder.Services.AddSingleton<ISalesSettingsService, SalesSettingsService>();
+builder.Services.AddSingleton<IScanBadgeSettingsService, ScanBadgeSettingsService>();
 builder.Services.AddSingleton<IListingService>(sp =>
     new ListingService(writableFactory, sp.GetRequiredService<ISalesSettingsService>()));
 builder.Services.AddSingleton(sp =>

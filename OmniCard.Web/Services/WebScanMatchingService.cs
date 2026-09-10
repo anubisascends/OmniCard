@@ -113,7 +113,12 @@ public sealed class WebScanMatchingService
                           : "Scan matched \"{Name}\" ({Set} #{Num}) for {Game}",
             match?.Name, match?.SetCode, match?.CollectorNumber, game, hash);
 
-        return ToDto(match, game, hash);
+        var dto = ToDto(match, game, hash);
+        // Attach the current market price so the client can render the value-tier badge. The lookup
+        // hits the game service's shared read context, so it goes through the same gate as matching.
+        if (match is not null)
+            dto = dto with { MarketPrice = await LookupPriceAsync(gameService, match, isFoil) };
+        return dto;
     }
 
     /// <summary>Run one catalog match under the shared-context gate (see <see cref="_matchGate"/>).</summary>
@@ -121,6 +126,24 @@ public sealed class WebScanMatchingService
     {
         await _matchGate.WaitAsync();
         try { return find(); }
+        finally { _matchGate.Release(); }
+    }
+
+    /// <summary>Current market price of the matched printing (finish-aware), or null if unavailable.
+    /// Serialized behind <see cref="_matchGate"/> because it reads the game service's shared context.</summary>
+    private async Task<decimal?> LookupPriceAsync(ICardGameService gameService, CardMatch match, bool isFoil)
+    {
+        if (string.IsNullOrEmpty(match.GameSpecificId)) return null;
+        await _matchGate.WaitAsync();
+        try
+        {
+            var prices = gameService.GetCurrentPrices([match.GameSpecificId], isFoil);
+            return prices.TryGetValue(match.GameSpecificId, out var price) ? price : null;
+        }
+        catch
+        {
+            return null; // catalog DB missing/locked — badge just won't show a value tier
+        }
         finally { _matchGate.Release(); }
     }
 
