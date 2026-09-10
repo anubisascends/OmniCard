@@ -311,9 +311,13 @@ function MasterRow({
   item: ScanItem;
   selected: boolean;
   onSelect: () => void;
-  onToggle: (v: boolean) => void;
+  onToggle: (v: boolean, shiftKey: boolean) => void;
 }) {
   const id = identityOf(item);
+  // Whether Shift was held for the interaction that is about to fire onChange. Set from the mouse
+  // (onClick) and keyboard (onKeyDown, for Space-toggle) so range-select works either way, and never
+  // goes stale between a mouse click and a later keyboard toggle.
+  const shiftHeld = useRef(false);
   return (
     <Box
       onClick={onSelect}
@@ -332,8 +336,18 @@ function MasterRow({
       <Checkbox
         checked={item.include}
         disabled={!id}
-        onClick={(e) => e.stopPropagation()}
-        onChange={(e) => onToggle(e.target.checked)}
+        // Suppress the browser's shift-click text selection across rows without blocking the toggle.
+        onMouseDown={(e) => {
+          if (e.shiftKey) e.preventDefault();
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          shiftHeld.current = e.shiftKey;
+        }}
+        onKeyDown={(e) => {
+          shiftHeld.current = e.shiftKey;
+        }}
+        onChange={(e) => onToggle(e.target.checked, shiftHeld.current)}
         sx={{ p: 0 }}
       />
       <Stack direction="row" spacing={0.75}>
@@ -845,6 +859,30 @@ export function ScanPage() {
   const updateItem = (key: string, patch: Partial<ScanItem>) =>
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
 
+  // Anchor for Shift-click range selection: the key of the last checkbox toggled by a plain click.
+  // A Shift-click sets every selectable row between the anchor and the clicked row to the clicked
+  // row's new state; the anchor only moves on a plain click, so consecutive Shift-clicks re-range
+  // from the same origin (standard file-explorer / Gmail behaviour).
+  const anchorKeyRef = useRef<string | null>(null);
+  const toggleInclude = (key: string, checked: boolean, shiftKey: boolean) => {
+    const idx = items.findIndex((it) => it.key === key);
+    const anchorIdx = anchorKeyRef.current
+      ? items.findIndex((it) => it.key === anchorKeyRef.current)
+      : -1;
+    if (shiftKey && anchorIdx !== -1 && idx !== -1) {
+      const [lo, hi] = anchorIdx <= idx ? [anchorIdx, idx] : [idx, anchorIdx];
+      // Only rows with a resolved identity are checkable, mirroring the single-toggle guard.
+      setItems((prev) =>
+        prev.map((it, i) =>
+          i >= lo && i <= hi && identityOf(it) ? { ...it, include: checked } : it,
+        ),
+      );
+      return; // Keep the anchor where it is so the range can be adjusted with another Shift-click.
+    }
+    setItems((prev) => prev.map((it) => (it.key === key ? { ...it, include: checked } : it)));
+    anchorKeyRef.current = key;
+  };
+
   // Remove staged scans AND free the blob URL backing each one's preview. Each scan's thumbnail is
   // an `URL.createObjectURL(file)` that pins the image in the tab's memory until explicitly revoked;
   // without this a long scanning session (removes + commits of hundreds of cards) slowly leaks that
@@ -1202,7 +1240,7 @@ export function ScanPage() {
                   item={item}
                   selected={item.key === selectedKey}
                   onSelect={() => setSelectedKey(item.key)}
-                  onToggle={(v) => updateItem(item.key, { include: v })}
+                  onToggle={(v, shiftKey) => toggleInclude(item.key, v, shiftKey)}
                 />
               ))}
             </Stack>
