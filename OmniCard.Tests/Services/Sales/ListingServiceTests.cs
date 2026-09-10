@@ -680,4 +680,39 @@ public class ListingServiceTests : IDisposable
     {
         Assert.Equal(0, CreateService().ListForSaleSplitting(999, SalesChannel.Manual, 1m, 1));
     }
+
+    [Fact]
+    public void ListForSaleSplitting_AlreadyListedLot_Throws_AndDoesNotDuplicate()
+    {
+        var lotId = SeedLotWithQuantity(_opts, quantity: 4, locationId: 7);
+        var svc = CreateService();
+        svc.ListForSaleSplitting(lotId, SalesChannel.Manual, 2m, 4); // whole stack → lists the existing lot
+
+        Assert.Throws<InvalidOperationException>(
+            () => svc.ListForSaleSplitting(lotId, SalesChannel.Manual, 2m, 1));
+
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.Single(ctx.Listings.ToList()); // no second listing
+        Assert.Single(ctx.Lots.ToList());     // no split lot carved off
+    }
+
+    [Fact]
+    public void ListForSaleSplitting_PickedLot_Throws()
+    {
+        var lotId = SeedLotWithQuantity(_opts, quantity: 2, locationId: 7);
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            ctx.StorageContainers.Add(new StorageContainer { Id = 99, Name = "For Sale" });
+            ctx.SaveChanges();
+        }
+        var svc = CreateService();
+        svc.ListForSaleSplitting(lotId, SalesChannel.Manual, 2m, 2);
+        svc.MarkPicked([lotId]); // now Picked and moved to the for-sale location
+
+        Assert.Throws<InvalidOperationException>(
+            () => svc.ListForSaleSplitting(lotId, SalesChannel.Manual, 2m, 1));
+
+        using var ctx2 = new OmniCardDbContext(_opts);
+        Assert.Single(ctx2.Listings.ToList());
+    }
 }

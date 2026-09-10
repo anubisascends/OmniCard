@@ -3,6 +3,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   Box,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -13,6 +14,7 @@ import {
   Stack,
   Switch,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import {
@@ -93,14 +95,22 @@ export function CardTable({
     () => selection.flatMap((id) => (rowsById.get(Number(id)) ? lotIdsOf(rowsById.get(Number(id))!) : [])),
     [selection, rowsById],
   );
-  // Bulk listing lists each selected lot as a whole at its row's market price.
+  const selectedRows = useMemo(
+    () => selection.map((id) => rowsById.get(Number(id))).filter((r): r is CardDto => !!r),
+    [selection, rowsById],
+  );
+  // Bulk listing lists each selected lot as a whole at its row's market price. Rows already on the
+  // market (listingStatus set) are excluded here so we never attempt to re-list them.
   const selectedListItems = useMemo(
     () =>
-      selection.flatMap((id) => {
-        const row = rowsById.get(Number(id));
-        return row ? lotIdsOf(row).map((lotId) => ({ lotId, price: row.marketPrice })) : [];
-      }),
-    [selection, rowsById],
+      selectedRows
+        .filter((row) => !row.listingStatus)
+        .flatMap((row) => lotIdsOf(row).map((lotId) => ({ lotId, price: row.marketPrice }))),
+    [selectedRows],
+  );
+  const alreadyListedCount = useMemo(
+    () => selectedRows.filter((r) => r.listingStatus).length,
+    [selectedRows],
   );
   const [bulkListOpen, setBulkListOpen] = useState(false);
   const [bulkChannel, setBulkChannel] = useState('Manual');
@@ -175,6 +185,24 @@ export function CardTable({
       align: 'right',
       headerAlign: 'right',
       valueFormatter: (v: number) => (v ? money(v) : ''),
+    },
+    {
+      field: 'listingStatus',
+      headerName: 'Status',
+      width: 100,
+      sortable: false,
+      renderCell: (p) =>
+        p.row.listingStatus ? (
+          <Tooltip
+            title={
+              p.row.listingStatus === 'Picked'
+                ? 'Listed for sale and picked into the for-sale location. Unlist it from Sales ▸ Listings to change.'
+                : 'Already listed for sale. Unlist it from Sales ▸ Listings to change.'
+            }
+          >
+            <Chip size="small" color="warning" variant="outlined" label={p.row.listingStatus} />
+          </Tooltip>
+        ) : null,
     },
     ...(showLocation
       ? [{ field: 'containerName', headerName: 'Location', flex: 1, minWidth: 120 } as GridColDef<CardDto>]
@@ -298,6 +326,11 @@ export function CardTable({
               Each card is listed as a whole lot at its current market price. Adjust individual prices
               afterwards on Sales ▸ Listings.
             </Typography>
+            {alreadyListedCount > 0 && (
+              <Typography variant="body2" color="warning.main">
+                {alreadyListedCount} selected card(s) are already listed for sale and will be skipped.
+              </Typography>
+            )}
             <TextField select label="Channel" value={bulkChannel} onChange={(e) => setBulkChannel(e.target.value)}>
               {['Manual', 'TcgPlayer', 'Ebay'].map((c) => (
                 <MenuItem key={c} value={c}>{c}</MenuItem>

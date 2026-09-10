@@ -65,6 +65,10 @@ public sealed record CardDto
     public string? CardType { get; init; }
     public bool IsMissing { get; init; }
     public bool IsTraded { get; init; }
+    /// <summary>Active for-sale status of this lot — "Listed" or "Picked" — or null when it isn't on the
+    /// market. For a stacked row it's only set when every underlying lot is listed, so partially-listed
+    /// stacks stay listable. The client uses it to disable "List for sale" on cards already on the market.</summary>
+    public string? ListingStatus { get; init; }
 }
 
 /// <summary>A storage location tile for the collection/overview screens.</summary>

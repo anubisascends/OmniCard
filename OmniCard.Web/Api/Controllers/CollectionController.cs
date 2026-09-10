@@ -7,6 +7,7 @@ using OmniCard.Web.Services;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Games;
+using OmniCard.Shared.Sales;
 using OmniCard.Shared.Tags;
 using OmniCard.Web.Helpers;
 using OmniCard.Web.Api.Infrastructure;
@@ -25,9 +26,33 @@ public sealed class CollectionController(
     WebBinderCardService binderCards,
     ITagService tags,
     CardImageCacheService imageCache,
+    IListingService listings,
     IEnumerable<ICardGameService> gameServices) : ApiControllerBase
 {
     private readonly IReadOnlyDictionary<CardGame, ICardGameService> _gameServices = gameServices.ToDictionary(s => s.Game);
+
+    /// <summary>Stamps each row's <see cref="CollectionCard.ListingStatus"/> from its active listings so
+    /// the client can disable "List for sale" on cards already on the market. A stacked row is only
+    /// marked when *every* underlying lot is listed — a partially-listed stack stays listable (the
+    /// backend skips the already-listed copies when the remainder is listed).</summary>
+    private void AnnotateListingStatus(IReadOnlyList<CollectionCard> cards)
+    {
+        if (cards.Count == 0) return;
+        var lotIdsFor = (CollectionCard c) => c.StackedIds is { Count: > 0 } ids ? ids : [c.Id];
+
+        var allLotIds = cards.SelectMany(lotIdsFor).Distinct().ToList();
+        var statusByLot = listings.GetActiveListingStatusByLot(allLotIds);
+        if (statusByLot.Count == 0) return;
+
+        foreach (var c in cards)
+        {
+            var statuses = lotIdsFor(c)
+                .Select(id => statusByLot.TryGetValue(id, out var s) ? (ListingStatus?)s : null)
+                .ToList();
+            if (statuses.All(s => s.HasValue))
+                c.ListingStatus = statuses.Max(); // Picked outranks Listed (higher enum value)
+        }
+    }
 
     /// <summary>Search owned singles. <paramref name="q"/> accepts the Scryfall-style tokens
     /// (<c>set:</c>, <c>cn:</c>, <c>c:</c>, <c>r:</c>, <c>t:</c>, <c>tag:</c>, <c>is:foil</c>, …).</summary>
@@ -52,6 +77,7 @@ public sealed class CollectionController(
         CardArtHydrator.HydrateMissingImageUris(cardService, cards);
         imageCache.PreferCached(cards);
         MarketPriceHydrator.Populate(cardService, cards);
+        AnnotateListingStatus(cards);
 
         var items = cards.Select(DtoMapping.ToDto).ToList();
         return new PagedResult<CardDto>(total, skip, take, items);
@@ -119,6 +145,7 @@ public sealed class CollectionController(
         CardArtHydrator.HydrateMissingImageUris(cardService, [card]);
         imageCache.PreferCached([card]);
         MarketPriceHydrator.Populate(cardService, [card]);
+        AnnotateListingStatus([card]);
         card.Tags = tags.GetTagsForLot(id);
         // CollectionCardMapper doesn't carry Quantity; read it straight from the lot for the editor.
         using (var ctx = dbFactory.CreateDbContext())
