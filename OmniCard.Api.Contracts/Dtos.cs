@@ -306,6 +306,18 @@ public sealed record UpdateSalesSettingsRequest
     public int? ForSaleLocationId { get; init; }
 }
 
+/// <summary>Value-tier badge configuration for the scan page: the ISO currency code the thresholds are
+/// denominated in, and the ascending price ceilings that split cards into value tiers. Four thresholds
+/// define five tiers — a card priced at or below <c>Thresholds[0]</c> shows one currency sign, above
+/// the last threshold shows five.</summary>
+public sealed record ScanBadgeSettingsDto(string CurrencyCode, IReadOnlyList<decimal> Thresholds);
+
+public sealed record UpdateScanBadgeSettingsRequest
+{
+    public string CurrencyCode { get; init; } = "USD";
+    public IReadOnlyList<decimal> Thresholds { get; init; } = [];
+}
+
 public sealed record CustomerDto
 {
     public int Id { get; init; }
@@ -486,6 +498,14 @@ public sealed record ScanMatchDto
     public string? Rarity { get; init; }
     public string? ImageUri { get; init; }
     public double? Confidence { get; init; }
+    /// <summary>The card's current market price (from the game catalog), when matched; null if unknown.
+    /// Drives the scan tile's value-tier "currency sign" badge. Denominated in the catalog's currency
+    /// (USD); display formatting/localization happens client-side.</summary>
+    public decimal? MarketPrice { get; init; }
+    /// <summary>True when no lot of this card (by game + card id, any finish) yet exists in the
+    /// collection — i.e. this scan is a card you don't already own. Drives the "new card" gold-star
+    /// badge. False when unmatched.</summary>
+    public bool IsNew { get; init; }
     public string ScanHash { get; init; } = "";
     /// <summary>A browser-renderable (JPEG data-URI) preview of the uploaded scan, populated by the
     /// server only when the upload's own format can't be shown in an <c>&lt;img&gt;</c> (e.g. TIFF).

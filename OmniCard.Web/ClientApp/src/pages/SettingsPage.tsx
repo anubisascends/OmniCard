@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -33,9 +33,11 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import KeyIcon from '@mui/icons-material/Key';
 import Link from '@mui/material/Link';
+import StarIcon from '@mui/icons-material/Star';
 import { api, ApiError } from '../api/client';
 import type { ComponentDto, UserDto } from '../api/types';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
+import { currencySymbol } from '../lib/scanBadges';
 import {
   usePreviewScale,
   setPreviewScale,
@@ -762,8 +764,154 @@ function ComponentsCard() {
   );
 }
 
+/** Admin config for the scan page's value-tier badges: the currency code and the four ascending price
+ * ceilings that split cards into five tiers (one to five currency signs). Editing is admin-only. */
+function ScanBadgesCard() {
+  const qc = useQueryClient();
+  const authQuery = useQuery({ queryKey: ['auth-status'], queryFn: api.authStatus });
+  const settings = useQuery({ queryKey: ['scan-badge-settings'], queryFn: api.scanBadgeSettings });
+  const isAdmin = !!authQuery.data?.isAdmin;
+
+  const [currency, setCurrency] = useState('USD');
+  const [thresholds, setThresholds] = useState<string[]>(['1', '5', '20', '50']);
+
+  // Seed the form from the server once it loads (and after a save re-fetches the canonical values).
+  useEffect(() => {
+    if (settings.data) {
+      setCurrency(settings.data.currencyCode);
+      setThresholds(settings.data.thresholds.map((t) => String(t)));
+    }
+  }, [settings.data]);
+
+  const save = useMutation({
+    mutationFn: () =>
+      api.scanBadgeSettingsUpdate({
+        currencyCode: currency.trim().toUpperCase() || 'USD',
+        thresholds: thresholds.map((t) => Number(t) || 0),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['scan-badge-settings'] }),
+  });
+
+  const nums = thresholds.map((t) => Number(t));
+  const validNumbers = nums.every((n) => Number.isFinite(n) && n > 0);
+  const ascending = nums.every((n, i) => i === 0 || n > nums[i - 1]);
+  const symbol = currencySymbol(currency || 'USD');
+  const money = (n: number) => {
+    try {
+      return n.toLocaleString(undefined, { style: 'currency', currency: currency || 'USD' });
+    } catch {
+      return n.toFixed(2);
+    }
+  };
+
+  // The five tiers, described for the live preview (tier 5 is open-ended above the last threshold).
+  const tierRows = [1, 2, 3, 4, 5].map((tier) => {
+    let range: string;
+    if (!validNumbers) range = '—';
+    else if (tier === 1) range = `≤ ${money(nums[0])}`;
+    else if (tier === 5) range = `> ${money(nums[3])}`;
+    else range = `${money(nums[tier - 2])} – ${money(nums[tier - 1])}`;
+    return { tier, range };
+  });
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
+      <Typography variant="h6" gutterBottom>
+        Scan badges
+      </Typography>
+      <Typography variant="body2" color="text.secondary" gutterBottom>
+        On the Scan page, matched cards show a gold <StarIcon sx={{ fontSize: 16, color: '#f5b301', verticalAlign: 'text-bottom' }} /> when the card
+        isn't in your collection yet, and one to five currency signs indicating its value. Set the
+        currency and the price ceiling for each tier below — a card at or below the first ceiling shows
+        one sign; anything above the last ceiling shows five.
+      </Typography>
+
+      {settings.isLoading ? (
+        <CircularProgress size={24} sx={{ mt: 1 }} />
+      ) : (
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField
+            size="small"
+            label="Currency code (ISO 4217)"
+            value={currency}
+            disabled={!isAdmin}
+            onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))}
+            helperText={`Displayed as "${symbol}", localized to your browser.`}
+            sx={{ maxWidth: 260 }}
+          />
+
+          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+            {thresholds.map((t, i) => (
+              <TextField
+                key={i}
+                size="small"
+                type="number"
+                label={`Tier ${i + 1} max (${symbol.repeat(i + 1)})`}
+                value={t}
+                disabled={!isAdmin}
+                onChange={(e) =>
+                  setThresholds((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))
+                }
+                inputProps={{ min: 0, step: '0.01' }}
+                sx={{ width: 150 }}
+              />
+            ))}
+          </Stack>
+
+          {!ascending && validNumbers && (
+            <Alert severity="warning">
+              Thresholds should increase from tier 1 to tier 4. They'll be sorted automatically when
+              saved.
+            </Alert>
+          )}
+
+          {/* Live preview of the five tiers. */}
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              Preview
+            </Typography>
+            <Stack spacing={0.5}>
+              {tierRows.map(({ tier, range }) => (
+                <Stack key={tier} direction="row" spacing={1.5} alignItems="center">
+                  <Box
+                    component="span"
+                    sx={{ fontWeight: 700, letterSpacing: '-0.05em', minWidth: 72, color: 'success.main' }}
+                  >
+                    {symbol.repeat(tier)}
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    {range}
+                  </Typography>
+                </Stack>
+              ))}
+            </Stack>
+          </Box>
+
+          {save.error && <Alert severity="error">{(save.error as Error).message}</Alert>}
+          {save.isSuccess && <Alert severity="success">Saved.</Alert>}
+
+          {isAdmin ? (
+            <Box>
+              <Button
+                variant="contained"
+                disabled={!validNumbers || save.isPending}
+                onClick={() => save.mutate()}
+              >
+                {save.isPending ? 'Saving…' : 'Save'}
+              </Button>
+            </Box>
+          ) : (
+            <Alert severity="info">Only administrators can change these thresholds.</Alert>
+          )}
+        </Stack>
+      )}
+    </Paper>
+  );
+}
+
 const TABS = [
   { key: 'sales', label: 'Sales', render: () => <SalesCard /> },
+  { key: 'scan', label: 'Scan Badges', render: () => <ScanBadgesCard /> },
   { key: 'appearance', label: 'Appearance', render: () => <AppearanceCard /> },
   { key: 'catalog', label: 'Catalog Data', render: () => <CatalogCard /> },
   { key: 'ebay', label: 'eBay', render: () => <EbayCard /> },

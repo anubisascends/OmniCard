@@ -26,6 +26,7 @@ import type {
   PagedResult,
   ProductDto,
   SalesSettingsDto,
+  ScanBadgeSettingsDto,
   ScanCommitItem,
   ScanCommitResultDto,
   ScanMatchDto,
@@ -299,6 +300,9 @@ export const api = {
   settings: () => request<SalesSettingsDto>('/api/settings'),
   settingsUpdate: (body: { forSaleLocationId: number | null }) =>
     request<void>('/api/settings', { method: 'PUT', body: JSON.stringify(body) }),
+  scanBadgeSettings: () => request<ScanBadgeSettingsDto>('/api/settings/scan-badges'),
+  scanBadgeSettingsUpdate: (body: ScanBadgeSettingsDto) =>
+    request<void>('/api/settings/scan-badges', { method: 'PUT', body: JSON.stringify(body) }),
   customers: () => request<CustomerDto[]>('/api/customers'),
   customerCreate: (body: CustomerFields) =>
     request<CustomerDto>('/api/customers', { method: 'POST', body: JSON.stringify(body) }),
