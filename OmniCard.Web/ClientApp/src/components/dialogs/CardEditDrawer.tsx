@@ -21,6 +21,7 @@ import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import SellIcon from '@mui/icons-material/Sell';
 import { Snackbar } from '@mui/material';
 import { api } from '../../api/client';
+import { CardImage } from '../CardImage';
 import { LocationPickerDialog } from './LocationPickerDialog';
 import { ListForSaleDialog } from './ListForSaleDialog';
 
@@ -122,11 +123,12 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
               {card.setName} · #{card.number} · {card.rarity}
             </Typography>
             {card.imageUri && (
-              <Box
-                component="img"
+              <CardImage
                 src={card.imageUri}
                 alt={card.name}
-                sx={{ maxHeight: 260, objectFit: 'contain', alignSelf: 'center' }}
+                foil={isFoil}
+                wrapperSx={{ alignSelf: 'center' }}
+                sx={{ maxHeight: 260, objectFit: 'contain' }}
               />
             )}
             <Chip label={`Market ${card.marketPrice ? money(card.marketPrice) : 'n/a'}`} sx={{ alignSelf: 'flex-start' }} />

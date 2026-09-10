@@ -27,6 +27,7 @@ import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
 import SellIcon from '@mui/icons-material/Sell';
 import { api } from '../api/client';
 import type { CardDto } from '../api/types';
+import { CardImage } from './CardImage';
 import { CardEditDrawer } from './dialogs/CardEditDrawer';
 import { LocationPickerDialog } from './dialogs/LocationPickerDialog';
 import {
@@ -62,7 +63,7 @@ export function CardTable({
   const [selection, setSelection] = useState<GridRowSelectionModel>([]);
   const [detailCardId, setDetailCardId] = useState<number | null>(null);
   const [moveOpen, setMoveOpen] = useState(false);
-  const [hover, setHover] = useState<{ el: HTMLElement; url: string } | null>(null);
+  const [hover, setHover] = useState<{ el: HTMLElement; url: string; foil: boolean } | null>(null);
   const previewScale = usePreviewScale();
 
   // Reset to the first page whenever the scope/mode changes so we never sit on an out-of-range page.
@@ -147,7 +148,7 @@ export function CardTable({
         return (
           <Box
             component="span"
-            onMouseEnter={(e) => p.row.imageUri && setHover({ el: e.currentTarget, url: p.row.imageUri })}
+            onMouseEnter={(e) => p.row.imageUri && setHover({ el: e.currentTarget, url: p.row.imageUri, foil: p.row.isFoil })}
             onMouseLeave={() => setHover(null)}
           >
             {p.row.name}
@@ -263,10 +264,9 @@ export function CardTable({
         slotProps={{ paper: { sx: { p: 0.5 } } }}
       >
         {hover && (
-          <Box
-            component="img"
+          <CardImage
             src={hover.url}
-            alt=""
+            foil={hover.foil}
             sx={{
               width: (PREVIEW_BASE_WIDTH * previewScale) / 100,
               maxHeight: (PREVIEW_BASE_MAX_HEIGHT * previewScale) / 100,

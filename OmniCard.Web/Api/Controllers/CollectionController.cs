@@ -68,28 +68,43 @@ public sealed class CollectionController(
         return (total, cards);
     }
 
-    /// <summary>One row per unique card name (stacked), quantities summed. Paginates the distinct
-    /// names first (cheap), then loads just that page's lots to build the representative rows — so it
-    /// scales to the whole collection without materializing everything.</summary>
-    private static (int Total, List<CollectionCard> Cards) PageStacked(IQueryable<CollectionCard> query, int skip, int take)
+    /// <summary>One row per unique printing (stacked), quantities summed. A "printing" is identified
+    /// by name + set + collector number + foil — only genuinely identical cards collapse into one
+    /// stack (different sets/printings/foils stay separate). Paginates the distinct printing keys first
+    /// (cheap), then loads just that page's lots to build the representative rows — so it scales to the
+    /// whole collection without materializing everything.</summary>
+    internal static (int Total, List<CollectionCard> Cards) PageStacked(IQueryable<CollectionCard> query, int skip, int take)
     {
-        var names = query.Select(c => c.Name).Distinct();
-        var total = names.Count();
-        var pageNames = names.OrderBy(n => n).Skip(skip).Take(take).ToList();
-        if (pageNames.Count == 0)
+        // Distinct printing identity. Ordered so pagination is stable across requests.
+        var keys = query
+            .Select(c => new { c.Name, c.SetCode, c.Number, c.IsFoil })
+            .Distinct();
+        var total = keys.Count();
+        var pageKeys = keys
+            .OrderBy(k => k.Name).ThenBy(k => k.SetCode).ThenBy(k => k.Number).ThenBy(k => k.IsFoil)
+            .Skip(skip).Take(take)
+            .ToList();
+        if (pageKeys.Count == 0)
             return (total, []);
 
+        // Load lots for the page's names (Contains on a scalar is EF-translatable), then narrow to the
+        // exact page keys in memory — composite-key Contains doesn't translate to SQL.
+        var pageNames = pageKeys.Select(k => k.Name).Distinct().ToList();
+        var pageKeySet = pageKeys.Select(k => (k.Name, k.SetCode, k.Number, k.IsFoil)).ToHashSet();
         var members = query.Where(c => pageNames.Contains(c.Name)).ToList();
         var rows = members
-            .GroupBy(c => c.Name)
+            .Where(c => pageKeySet.Contains((c.Name, c.SetCode, c.Number, c.IsFoil)))
+            .GroupBy(c => (c.Name, c.SetCode, c.Number, c.IsFoil))
             .Select(g =>
             {
-                var rep = g.OrderBy(c => c.SetCode).ThenBy(c => c.Number).ThenBy(c => c.Id).First();
+                var rep = g.OrderBy(c => c.Id).First();
                 rep.Quantity = g.Sum(c => c.Quantity);
                 rep.StackedIds = g.Select(c => c.Id).ToList();
                 return rep;
             })
             .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(c => c.SetCode, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(c => c.Number, StringComparer.OrdinalIgnoreCase)
             .ToList();
         return (total, rows);
     }
