@@ -62,6 +62,11 @@ public sealed class ListingsController(
         {
             return BadRequest(new { error = ex.Message });
         }
+        catch (InvalidOperationException ex)
+        {
+            // e.g. the lot is already listed for sale (possibly already picked).
+            return Conflict(new { error = ex.Message });
+        }
     }
 
     /// <summary>List several whole lots for sale at once, each at its own price.</summary>

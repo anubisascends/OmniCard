@@ -13,6 +13,7 @@ import {
   Stack,
   Switch,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -131,7 +132,17 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
                 sx={{ maxHeight: 260, objectFit: 'contain' }}
               />
             )}
-            <Chip label={`Market ${card.marketPrice ? money(card.marketPrice) : 'n/a'}`} sx={{ alignSelf: 'flex-start' }} />
+            <Stack direction="row" spacing={1} sx={{ alignSelf: 'flex-start' }}>
+              <Chip label={`Market ${card.marketPrice ? money(card.marketPrice) : 'n/a'}`} />
+              {card.listingStatus && (
+                <Chip
+                  color="warning"
+                  variant="outlined"
+                  icon={<SellIcon />}
+                  label={card.listingStatus === 'Picked' ? 'Picked for sale' : 'Listed for sale'}
+                />
+              )}
+            </Stack>
             <Divider />
 
             <TextField
@@ -207,13 +218,26 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
               renderInput={(params) => <TextField {...params} label="Tags" />}
             />
 
-            <Button
-              variant="outlined"
-              startIcon={<SellIcon />}
-              onClick={() => setListOpen(true)}
+            <Tooltip
+              title={
+                card.listingStatus
+                  ? 'This card is already listed for sale. Unlist it from Sales ▸ Listings first.'
+                  : ''
+              }
             >
-              List for sale
-            </Button>
+              {/* span keeps the tooltip working while the button is disabled */}
+              <span>
+                <Button
+                  variant="outlined"
+                  startIcon={<SellIcon />}
+                  onClick={() => setListOpen(true)}
+                  disabled={!!card.listingStatus}
+                  fullWidth
+                >
+                  {card.listingStatus ? 'Already listed for sale' : 'List for sale'}
+                </Button>
+              </span>
+            </Tooltip>
 
             <Button
               variant="outlined"

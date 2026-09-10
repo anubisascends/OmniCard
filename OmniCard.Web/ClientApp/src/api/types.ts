@@ -65,6 +65,8 @@ export interface CardDto {
   cardType?: string | null;
   isMissing: boolean;
   isTraded: boolean;
+  /** "Listed" or "Picked" when this lot is already on the market, else null. Used to block re-listing. */
+  listingStatus?: string | null;
 }
 
 export interface LocationSummaryDto {

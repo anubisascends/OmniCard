@@ -84,6 +84,7 @@ public static class DtoMapping
         CardType = c.CardType,
         IsMissing = c.IsMissing,
         IsTraded = c.IsTraded,
+        ListingStatus = c.ListingStatus?.ToString(),
     };
 
     public static LocationSummaryDto ToDto(LocationTileSummary s) => new()

@@ -60,6 +60,12 @@ public class ListingService(
             if (quantity < 1 || quantity > lot.Quantity)
                 throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity must be between 1 and the lot's quantity.");
 
+            // Reject re-listing a lot that already has an active listing (Listed or Picked). Without this
+            // the split path below would carve off a fresh sibling lot and create a *second* active listing
+            // for cards that are already listed (and possibly already picked into the for-sale location).
+            if (ctx.Listings.Any(l => l.LotId == lotId && ActiveStatuses.Contains(l.Status)))
+                throw new InvalidOperationException("This card is already listed for sale.");
+
             if (quantity == lot.Quantity)
             {
                 targetLotId = lot.Id;
