@@ -14,6 +14,7 @@ namespace OmniCard.Web.Api.Controllers;
 /// <c>CommitToLocation</c> relies on a WPF-only <c>ICardService</c> method.</summary>
 public sealed class ListsController(
     IListService lists,
+    IDecklistService decklists,
     WebBinderCardService binderCards) : ApiControllerBase
 {
     [HttpGet]
@@ -52,6 +53,47 @@ public sealed class ListsController(
     {
         lists.DeleteList(id);
         return NoContent();
+    }
+
+    /// <summary>Fetch a Moxfield/Archidekt decklist by URL and add its cards to a list. Creates a new list
+    /// (named after the deck) when <c>ListId</c> is null, otherwise appends to the existing list. Card names
+    /// are resolved to printings via <see cref="IListService.AddCardsByName"/>; any that don't resolve come
+    /// back in <c>UnresolvedNames</c>.</summary>
+    [HttpPost("import-url")]
+    public async Task<ActionResult<ImportListResultDto>> ImportUrl([FromBody] ImportListUrlRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Url))
+            return BadRequest(new { error = "A decklist URL is required" });
+
+        var fetched = await decklists.FetchDecklistAsync(request.Url);
+        if (fetched is null)
+            return BadRequest(new { error = "Couldn't fetch that decklist URL. Supported: Moxfield, Archidekt." });
+
+        var (deckName, entries) = fetched.Value;
+        if (entries.Count == 0)
+            return BadRequest(new { error = "That decklist has no cards." });
+
+        CardList list;
+        bool created;
+        if (request.ListId is { } listId)
+        {
+            var existing = FindList(listId);
+            if (existing is null)
+                return NotFound();
+            list = existing;
+            created = false;
+        }
+        else
+        {
+            if (LocationsController.ParseGame(request.Game) is not { } game)
+                return BadRequest(new { error = $"Unknown game '{request.Game}'" });
+            var name = string.IsNullOrWhiteSpace(deckName) ? "Imported deck" : deckName;
+            list = lists.CreateList(name, game);
+            created = true;
+        }
+
+        var result = lists.AddCardsByName(list.Id, entries, ListItemSource.Url);
+        return new ImportListResultDto(list.Id, list.Name, created, result.AddedCount, result.UnresolvedNames);
     }
 
     [HttpGet("{id:int}/items")]

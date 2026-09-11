@@ -21,9 +21,11 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { api } from '../api/client';
+import { locationSelectOptions } from '../components/LocationSelectOptions';
 import { useGame } from '../context/GameContext';
 import type { CardListDto } from '../api/types';
 
@@ -38,11 +40,21 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
   const locations = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations() });
   const [containerId, setContainerId] = useState<number | ''>('');
   const [condition, setCondition] = useState('NM');
+  const [addUrl, setAddUrl] = useState('');
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['list-items', list.id] });
     qc.invalidateQueries({ queryKey: ['lists'] });
   };
+
+  const importUrl = useMutation({
+    mutationFn: () => api.listImportUrl(addUrl.trim(), list.game, list.id),
+    onSuccess: (r) => {
+      setAddUrl('');
+      invalidate();
+      return r;
+    },
+  });
 
   const removeItem = useMutation({ mutationFn: (itemId: number) => api.listRemoveItem(itemId), onSuccess: invalidate });
   const setQty = useMutation({
@@ -87,12 +99,7 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
           onChange={(e) => setContainerId(e.target.value === '' ? '' : Number(e.target.value))}
           sx={{ minWidth: 180 }}
         >
-          <MenuItem value="">— choose —</MenuItem>
-          {locations.data?.map((l) => (
-            <MenuItem key={l.id} value={l.id}>
-              {l.name}
-            </MenuItem>
-          ))}
+          {locationSelectOptions(locations.data, { label: '— choose —' })}
         </TextField>
         <TextField
           select
@@ -118,11 +125,40 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
       </Stack>
       {commit.error && <Alert severity="error">{(commit.error as Error).message}</Alert>}
 
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }} flexWrap="wrap" useFlexGap>
+        <TextField
+          size="small"
+          label="Add from URL (Moxfield / Archidekt)"
+          placeholder="https://moxfield.com/decks/…"
+          value={addUrl}
+          onChange={(e) => setAddUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && addUrl.trim() && !importUrl.isPending) importUrl.mutate();
+          }}
+          sx={{ flexGrow: 1, minWidth: 260 }}
+        />
+        <Button
+          startIcon={<DownloadIcon />}
+          disabled={!addUrl.trim() || importUrl.isPending}
+          onClick={() => importUrl.mutate()}
+        >
+          {importUrl.isPending ? 'Importing…' : 'Add'}
+        </Button>
+      </Stack>
+      {importUrl.error && <Alert severity="error">{(importUrl.error as Error).message}</Alert>}
+      {importUrl.data && (
+        <Alert severity={importUrl.data.unresolvedNames.length ? 'warning' : 'success'} sx={{ mb: 1 }}>
+          Added {importUrl.data.addedCount} card{importUrl.data.addedCount === 1 ? '' : 's'}.
+          {importUrl.data.unresolvedNames.length > 0 &&
+            ` Couldn't match: ${importUrl.data.unresolvedNames.join(', ')}.`}
+        </Alert>
+      )}
+
       <Divider sx={{ mb: 1 }} />
 
       {items.data.length === 0 ? (
         <Typography color="text.secondary" variant="body2">
-          This list is empty. (Cards are added to lists from the desktop scan/import flow.)
+          This list is empty. Add cards from a Moxfield/Archidekt URL above, or from the scan/import flow.
         </Typography>
       ) : (
         <Table size="small">
@@ -178,6 +214,7 @@ export function ListsPage() {
   const { game: contextGame } = useGame();
   const [game, setGame] = useState(contextGame ?? 'Mtg');
   const [newName, setNewName] = useState('');
+  const [importUrl, setImportUrl] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const games = useQuery({ queryKey: ['games'], queryFn: api.games });
@@ -189,6 +226,14 @@ export function ListsPage() {
       setNewName('');
       qc.invalidateQueries({ queryKey: ['lists'] });
       setSelectedId(l.id);
+    },
+  });
+  const importNew = useMutation({
+    mutationFn: () => api.listImportUrl(importUrl.trim(), game),
+    onSuccess: (r) => {
+      setImportUrl('');
+      qc.invalidateQueries({ queryKey: ['lists'] });
+      setSelectedId(r.listId);
     },
   });
   const rename = useMutation({
@@ -244,6 +289,46 @@ export function ListsPage() {
             Create
           </Button>
         </Stack>
+
+        <Divider sx={{ my: 2 }}>or import from a URL</Divider>
+
+        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+          <TextField
+            size="small"
+            label="Moxfield / Archidekt deck URL"
+            placeholder="https://moxfield.com/decks/…"
+            value={importUrl}
+            onChange={(e) => setImportUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && importUrl.trim() && !importNew.isPending) importNew.mutate();
+            }}
+            sx={{ flexGrow: 1, minWidth: 280 }}
+          />
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            disabled={!importUrl.trim() || importNew.isPending}
+            onClick={() => importNew.mutate()}
+          >
+            {importNew.isPending ? 'Importing…' : 'Import as new list'}
+          </Button>
+        </Stack>
+        {importNew.error && (
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {(importNew.error as Error).message}
+          </Alert>
+        )}
+        {importNew.data && (
+          <Alert
+            severity={importNew.data.unresolvedNames.length ? 'warning' : 'success'}
+            sx={{ mt: 1 }}
+          >
+            Imported “{importNew.data.listName}” — added {importNew.data.addedCount} card
+            {importNew.data.addedCount === 1 ? '' : 's'}.
+            {importNew.data.unresolvedNames.length > 0 &&
+              ` Couldn't match: ${importNew.data.unresolvedNames.join(', ')}.`}
+          </Alert>
+        )}
       </Paper>
 
       {lists.isLoading || !lists.data ? (

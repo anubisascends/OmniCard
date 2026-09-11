@@ -433,6 +433,21 @@ public sealed record SetQuantityRequest
     public int Quantity { get; init; } = 1;
 }
 
+/// <summary>Import a decklist from a Moxfield/Archidekt URL into a card list. When <see cref="ListId"/> is
+/// null a new list is created (named after the fetched deck); otherwise the deck's cards are appended to the
+/// existing list. <see cref="Game"/> is only used when creating a new list.</summary>
+public sealed record ImportListUrlRequest
+{
+    public string Url { get; init; } = "";
+    public int? ListId { get; init; }
+    public string Game { get; init; } = "Mtg";
+}
+
+/// <summary>Outcome of a URL import. <see cref="ListId"/>/<see cref="ListName"/> identify the target list
+/// (created or existing); <see cref="UnresolvedNames"/> are deck cards that couldn't be matched to a printing.</summary>
+public sealed record ImportListResultDto(
+    int ListId, string ListName, bool ListCreated, int AddedCount, IReadOnlyList<string> UnresolvedNames);
+
 // --- Catalog refresh ---
 
 /// <summary>One catalog-refresh job (running or recent). <see cref="State"/> is running|succeeded|failed;

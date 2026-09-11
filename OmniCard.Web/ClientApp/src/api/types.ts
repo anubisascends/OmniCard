@@ -507,6 +507,14 @@ export interface CommitListResultDto {
   listDeleted: boolean;
 }
 
+export interface ImportListResultDto {
+  listId: number;
+  listName: string;
+  listCreated: boolean;
+  addedCount: number;
+  unresolvedNames: string[];
+}
+
 // --- Order detail / lines ---
 
 export interface OrderLineDto {

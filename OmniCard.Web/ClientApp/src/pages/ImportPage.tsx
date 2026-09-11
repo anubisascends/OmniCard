@@ -8,7 +8,6 @@ import {
   Chip,
   Divider,
   FormControlLabel,
-  MenuItem,
   Paper,
   Stack,
   TextField,
@@ -17,6 +16,7 @@ import {
 import DownloadIcon from '@mui/icons-material/Download';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { api } from '../api/client';
+import { locationSelectOptions } from '../components/LocationSelectOptions';
 import { useGame } from '../context/GameContext';
 
 const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
@@ -100,12 +100,7 @@ function ImportSection() {
           value={targetContainerId}
           onChange={(e) => setTargetContainerId(e.target.value === '' ? '' : Number(e.target.value))}
         >
-          <MenuItem value="">— none —</MenuItem>
-          {locations.data?.map((l) => (
-            <MenuItem key={l.id} value={l.id}>
-              {l.name}
-            </MenuItem>
-          ))}
+          {locationSelectOptions(locations.data, { label: '— none —' })}
         </TextField>
         <Button
           variant="contained"
