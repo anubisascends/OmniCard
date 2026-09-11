@@ -8,6 +8,7 @@ using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Sales;
+using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Web.Helpers;
 using OmniCard.Web.Api.Infrastructure;
@@ -78,6 +79,7 @@ public sealed class CollectionController(
         imageCache.PreferCached(cards);
         MarketPriceHydrator.Populate(cardService, cards);
         AnnotateListingStatus(cards);
+        PopulateTags(cards);
 
         var items = cards.Select(DtoMapping.ToDto).ToList();
         return new PagedResult<CardDto>(total, skip, take, items);
@@ -135,6 +137,28 @@ public sealed class CollectionController(
         return (total, rows);
     }
 
+    /// <summary>Fills each row's tags in one batch query (union of tags across a stacked row's lots),
+    /// so list consumers — e.g. the deck stack view's "Commander" group — can see per-lot tags without
+    /// a request per card. Rows with no tags stay empty.</summary>
+    private void PopulateTags(List<CollectionCard> cards)
+    {
+        if (cards.Count == 0) return;
+        static List<int> LotsOf(CollectionCard c) => c.StackedIds is { Count: > 0 } s ? s : [c.Id];
+
+        var tagsByLot = tags.GetTagsByLots(cards.SelectMany(LotsOf).Distinct());
+        if (tagsByLot.Count == 0) return;
+
+        foreach (var card in cards)
+        {
+            var union = LotsOf(card)
+                .SelectMany(id => tagsByLot.TryGetValue(id, out var t) ? t : [])
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (union.Count > 0)
+                card.Tags = union;
+        }
+    }
+
     /// <summary>One card with its tags, for the edit drawer.</summary>
     [HttpGet("{id:int}")]
     public ActionResult<CardDto> GetOne(int id)
@@ -178,12 +202,65 @@ public sealed class CollectionController(
         return NoContent();
     }
 
-    /// <summary>Move one or more cards to another location.</summary>
+    /// <summary>Move one or more cards to another location. 409 if the target is a game-locked deck
+    /// box and any card belongs to a different game.</summary>
     [HttpPost("move")]
     public IActionResult Move([FromBody] MoveCardsRequest req)
     {
         if (req.CardIds.Count == 0) return BadRequest(new { error = "No cards specified." });
-        binderCards.MoveCardsToContainer(req.CardIds, req.ContainerId, req.Section);
+        try
+        {
+            binderCards.MoveCardsToContainer(req.CardIds, req.ContainerId, req.Section);
+        }
+        catch (DeckBoxGameMismatchException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+        return NoContent();
+    }
+
+    /// <summary>Bulk-edit the selected cards. Only the ticked fields (SetX flags) are applied; each
+    /// otherwise keeps its per-card value. Condition/foil/price/note go through one batched write,
+    /// quantity through the bulk quantity setter, and tags add-union or replace per TagsMode.</summary>
+    [HttpPost("bulk-update")]
+    public IActionResult BulkUpdate([FromBody] BulkUpdateCardsRequest req)
+    {
+        if (req.CardIds.Count == 0)
+            return BadRequest(new { error = "No cards specified." });
+        var ids = req.CardIds;
+
+        // Fields carried by the identity/attribute copy path — set in one pass over the lots.
+        if (req.SetCondition || req.SetFoil || req.SetPurchasePrice || req.SetNote)
+        {
+            binderCards.BulkUpdateField(ids, c =>
+            {
+                if (req.SetCondition && !string.IsNullOrWhiteSpace(req.Condition))
+                    c.Condition = req.Condition;
+                if (req.SetFoil)
+                    c.IsFoil = req.IsFoil;
+                if (req.SetPurchasePrice)
+                    c.PurchasePrice = req.PurchasePrice;
+                if (req.SetNote)
+                    c.Note = string.IsNullOrWhiteSpace(req.Note) ? null : req.Note.Trim();
+            });
+        }
+
+        if (req.SetQuantity)
+            binderCards.SetQuantity(ids, Math.Max(1, req.Quantity));
+
+        if (req.SetTags)
+        {
+            var tagNames = req.Tags
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Select(t => t.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (string.Equals(req.TagsMode, "replace", StringComparison.OrdinalIgnoreCase))
+                foreach (var id in ids) tags.SetTagsForLot(id, tagNames);
+            else
+                foreach (var name in tagNames) tags.AddTagToLots(ids, name);
+        }
+
         return NoContent();
     }
 

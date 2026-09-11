@@ -35,12 +35,16 @@ export function AddCardDialog({
   locationId,
   locationName,
   defaultGame,
+  lockGame = false,
   onClose,
 }: {
   open: boolean;
   locationId: number;
   locationName: string;
   defaultGame?: string;
+  /** When true, the game selector is fixed to `defaultGame` — used for a game-locked deck box so a
+   * card of another game can't be added (the server hard-blocks it too). */
+  lockGame?: boolean;
   onClose: () => void;
 }) {
   const qc = useQueryClient();
@@ -133,6 +137,8 @@ export function AddCardDialog({
             size="small"
             label="Game"
             value={game}
+            disabled={lockGame}
+            helperText={lockGame ? 'Locked to this deck box’s game' : undefined}
             onChange={(e) => {
               setGame(e.target.value);
               setSelected(null);

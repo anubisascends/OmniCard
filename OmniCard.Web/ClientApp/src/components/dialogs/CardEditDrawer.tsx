@@ -300,6 +300,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
       <LocationPickerDialog
         open={moveOpen}
         title="Move card to…"
+        cardGames={card ? [card.game] : undefined}
         onPick={(id) => {
           setContainerId(id);
           setMoveOpen(false);

@@ -108,6 +108,35 @@ public class WebBinderCardServiceTests : IDisposable
     }
 
     [Fact]
+    public void MoveCardsToContainer_IntoMismatchedGameDeckBox_Throws()
+    {
+        var lotId = AddLot("Pikachu"); // AddLot creates Pokémon products
+        // A deck box locked to Magic must reject the Pokémon card.
+        var deckBox = _containers.Create("MTG Deck", ContainerType.DeckBox, game: CardGame.Mtg);
+
+        var ex = Assert.Throws<DeckBoxGameMismatchException>(() =>
+            _service.MoveCardsToContainer([lotId], deckBox.Id));
+        Assert.Equal(CardGame.Mtg, ex.DeckBoxGame);
+        Assert.Equal(CardGame.Pokemon, ex.OffendingGame);
+
+        // The lot stays put — nothing was moved.
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.Equal(_binderId, ctx.Lots.Single(l => l.Id == lotId).LocationId);
+    }
+
+    [Fact]
+    public void MoveCardsToContainer_IntoMatchingGameDeckBox_Succeeds()
+    {
+        var lotId = AddLot("Charizard");
+        var deckBox = _containers.Create("Pokémon Deck", ContainerType.DeckBox, game: CardGame.Pokemon);
+
+        _service.MoveCardsToContainer([lotId], deckBox.Id);
+
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.Equal(deckBox.Id, ctx.Lots.Single(l => l.Id == lotId).LocationId);
+    }
+
+    [Fact]
     public void SetFoil_MovesLotToFoilProduct()
     {
         var lotId = AddLot("Foiler", foil: false);
@@ -128,6 +157,51 @@ public class WebBinderCardServiceTests : IDisposable
 
         using var ctx = new OmniCardDbContext(_opts);
         Assert.Equal("LP", ctx.Lots.Single(l => l.Id == lotId).Condition);
+    }
+
+    [Fact]
+    public void SetQuantity_Bulk_UpdatesEveryLot()
+    {
+        var a = AddLot("Bolt A");
+        var b = AddLot("Bolt B");
+
+        _service.SetQuantity([a, b], 4);
+
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.Equal(4, ctx.Lots.Single(l => l.Id == a).Quantity);
+        Assert.Equal(4, ctx.Lots.Single(l => l.Id == b).Quantity);
+    }
+
+    [Fact]
+    public void SetQuantity_Bulk_FloorsAtOne()
+    {
+        var lotId = AddLot("Clamp");
+
+        _service.SetQuantity([lotId], 0);
+
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.Equal(1, ctx.Lots.Single(l => l.Id == lotId).Quantity);
+    }
+
+    [Fact]
+    public void BulkUpdateField_SetsNoteAndPriceOnEveryLot()
+    {
+        var a = AddLot("Note A");
+        var b = AddLot("Note B");
+
+        _service.BulkUpdateField([a, b], c =>
+        {
+            c.Note = "picked for trade";
+            c.PurchasePrice = 2.50m;
+        });
+
+        using var ctx = new OmniCardDbContext(_opts);
+        foreach (var id in new[] { a, b })
+        {
+            var lot = ctx.Lots.Single(l => l.Id == id);
+            Assert.Equal("picked for trade", lot.Note);
+            Assert.Equal(2.50m, lot.UnitCost);
+        }
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OmniCard.CardMatching;
 using OmniCard.Collection;
+using OmniCard.Collection.Inventory;
 using OmniCard.Data;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
@@ -80,7 +81,12 @@ public sealed class WebBinderCardService
     {
         using var context = _dbFactory.CreateDbContext();
         var ids = cardIds.ToList();
-        var lots = context.Lots.Where(l => ids.Contains(l.Id) && l.Product.Category == ProductCategory.Single).ToList();
+        var lots = context.Lots.Include(l => l.Product)
+            .Where(l => ids.Contains(l.Id) && l.Product.Category == ProductCategory.Single).ToList();
+
+        // Hard block: a game-locked deck box rejects cards from other games (see DeckBoxGameGuard).
+        DeckBoxGameGuard.ValidateIncoming(context, containerId, lots.Select(l => l.Product.Game).Distinct());
+
         foreach (var lot in lots)
         {
             lot.LocationId = containerId;
@@ -143,10 +149,17 @@ public sealed class WebBinderCardService
     public int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates)
     {
         using var context = _dbFactory.CreateDbContext();
+        var cardList = cards as ICollection<CollectionCard> ?? cards.ToList();
+
+        // Hard block: reject an import that would place a card into a game-locked deck box of another
+        // game. Imported cards can target different locations, so validate each target's games.
+        foreach (var group in cardList.Where(c => c.ContainerId != null).GroupBy(c => c.ContainerId))
+            DeckBoxGameGuard.ValidateIncoming(context, group.Key, group.Select(c => c.Game).Distinct());
+
         var productCache = new Dictionary<(CardGame Game, string GameCardId, bool Foil, string? FoilType), Product>();
         var imported = 0;
 
-        foreach (var card in cards)
+        foreach (var card in cardList)
         {
             var cardFoilType = card.IsFoil ? card.FoilType : null;
             if (skipDuplicates)
@@ -191,6 +204,13 @@ public sealed class WebBinderCardService
     public IReadOnlyList<int> AddScannedLots(IReadOnlyList<CollectionCard> cards)
     {
         using var context = _dbFactory.CreateDbContext();
+
+        // Hard block: scanning into a game-locked deck box rejects cards from other games. All scanned
+        // cards target the same location, so validate the batch's games up front.
+        DeckBoxGameGuard.ValidateIncoming(context,
+            cards.Select(c => c.ContainerId).FirstOrDefault(id => id != null),
+            cards.Select(c => c.Game).Distinct());
+
         var productCache = new Dictionary<(CardGame Game, string GameCardId, bool Foil, string? FoilType), Product>();
         var lots = new List<InventoryLot>(cards.Count);
 
@@ -228,6 +248,21 @@ public sealed class WebBinderCardService
         if (lot is null)
             return;
         lot.Quantity = Math.Max(1, quantity);
+        context.SaveChanges();
+    }
+
+    /// <summary>Bulk form of <see cref="SetQuantity(int,int)"/>: sets the copy count on every listed
+    /// lot in one pass. Quantity isn't part of <see cref="BulkUpdateField"/> (that path copies
+    /// identity/attributes, not quantity), so bulk edits route quantity through here.</summary>
+    public void SetQuantity(IEnumerable<int> cardIds, int quantity)
+    {
+        using var context = _dbFactory.CreateDbContext();
+        var ids = cardIds.ToList();
+        var lots = context.Lots
+            .Where(l => ids.Contains(l.Id) && l.Product.Category == ProductCategory.Single)
+            .ToList();
+        foreach (var lot in lots)
+            lot.Quantity = Math.Max(1, quantity);
         context.SaveChanges();
     }
 

@@ -82,6 +82,59 @@ export interface LocationSummaryDto {
   priceDelta: number;
   priceDeltaPercent: number;
   coverImageUri?: string | null;
+  /** Assigned game system (enum id, e.g. "Mtg"); only ever set for deck boxes. */
+  game?: string | null;
+  /** Assigned deck type (format) id; only ever set for deck boxes. */
+  deckTypeId?: number | null;
+  /** Assigned deck type display name. */
+  deckTypeName?: string | null;
+}
+
+export interface DeckTypeDto {
+  id: number;
+  game: string;
+  name: string;
+  isBuiltIn: boolean;
+  deckSizeMin?: number | null;
+  deckSizeMax?: number | null;
+  maxCopiesPerCard?: number | null;
+  singleton: boolean;
+  basicLandsExempt: boolean;
+  commanderSlots: number;
+}
+
+export interface DeckTypeUpsertRequest {
+  game: string;
+  name: string;
+  deckSizeMin?: number | null;
+  deckSizeMax?: number | null;
+  maxCopiesPerCard?: number | null;
+  singleton: boolean;
+  basicLandsExempt: boolean;
+  commanderSlots: number;
+}
+
+export interface DeckBoxNeedsGameDto {
+  id: number;
+  name: string;
+  /** Inferred game (enum id) when all the box's cards are one game; null if empty/mixed. */
+  inferredGame?: string | null;
+  cardGames: string[];
+}
+
+export interface DeckLegalityWarningDto {
+  code: string;
+  message: string;
+}
+
+export interface DeckLegalityDto {
+  ok: boolean;
+  deckTypeName?: string | null;
+  mainDeckCount: number;
+  commanderCount: number;
+  /** Whole-deck count used for size rules: main deck + command zone (99 + 1 = 100 for Commander). */
+  totalDeckCount: number;
+  warnings: DeckLegalityWarningDto[];
 }
 
 export interface ValuationLineDto {

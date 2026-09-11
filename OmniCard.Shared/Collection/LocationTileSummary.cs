@@ -16,4 +16,8 @@ public class LocationTileSummary
     public decimal PriceDelta { get; init; }
     public double PriceDeltaPercent { get; init; }
     public string? CoverImageUri { get; init; }
+
+    /// <summary>Display name of the deck box's assigned deck type, resolved from
+    /// <see cref="StorageContainer.DeckTypeId"/>; null when unset or not a deck box.</summary>
+    public string? DeckTypeName { get; init; }
 }

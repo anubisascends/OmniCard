@@ -1,4 +1,5 @@
 using OmniCard.Shared.Binder;
+using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 namespace OmniCard.Shared.Storage;
 
@@ -11,6 +12,18 @@ public class StorageContainer
     public int SortOrder { get; set; }
     public int? CoverCardId { get; set; }
     public bool ExcludeFromDeckCheck { get; set; }
+
+    /// <summary>The game system this location holds. Only meaningful for
+    /// <see cref="ContainerType.DeckBox"/> — a deck box is assigned one game and rejects cards from
+    /// other games (see the deck-box game guard). Null on every other container type and on legacy
+    /// deck boxes created before this field existed. Stored on all rows for schema simplicity, like
+    /// <see cref="SlotsPerPage"/>.</summary>
+    public CardGame? Game { get; set; }
+
+    /// <summary>FK to the <see cref="DeckType"/> (format) this deck box is built for — Commander,
+    /// Standard, etc. Only meaningful for <see cref="ContainerType.DeckBox"/>. Null when unset or when
+    /// the referenced deck type was deleted (FK is <c>SetNull</c>).</summary>
+    public int? DeckTypeId { get; set; }
 
     /// <summary>When true, this location is grouped under "Always Available" in the collection
     /// overview (alongside the system Bulk location) and is never hidden by the active game filter.

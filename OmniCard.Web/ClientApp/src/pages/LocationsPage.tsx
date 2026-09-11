@@ -27,19 +27,19 @@ import { useGame } from '../context/GameContext';
 
 const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 
-const TYPES = [
-  { value: 'Binder', label: 'Binder' },
-  { value: 'Box', label: 'Box' },
-  { value: 'DeckBox', label: 'Deck Box' },
-  { value: 'DisplayCase', label: 'Display Case' },
-];
-
 import { groupLocations } from '../lib/locationGroups';
+import { LOCATION_TYPES, isDeckBoxType } from '../lib/locationTypes';
+import { DeckBoxGamePicker } from '../components/DeckBoxGamePicker';
+import { DeckBoxGameBanner } from '../components/DeckBoxGameBanner';
+import { DeckBoxGameDialog } from '../components/dialogs/DeckBoxGameDialog';
 
 function AddLocationBar({ onAdded }: { onAdded: () => void }) {
   const [name, setName] = useState('');
   const [type, setType] = useState('Box');
+  const [game, setGame] = useState('');
+  const [deckTypeId, setDeckTypeId] = useState<number | null>(null);
 
+  const isDeckBox = isDeckBoxType(type);
   const trimmed = name.trim();
   const nameCheck = useQuery({
     queryKey: ['loc-name-available', trimmed],
@@ -47,17 +47,26 @@ function AddLocationBar({ onAdded }: { onAdded: () => void }) {
     enabled: trimmed.length > 0,
   });
   const taken = trimmed.length > 0 && nameCheck.data?.available === false;
+  const needsGame = isDeckBox && game.length === 0;
 
   const create = useMutation({
-    mutationFn: () => api.locationCreate({ name: trimmed, type }),
+    mutationFn: () =>
+      api.locationCreate({
+        name: trimmed,
+        type,
+        game: isDeckBox ? game : null,
+        deckTypeId: isDeckBox ? deckTypeId : null,
+      }),
     onSuccess: () => {
       setName('');
+      setGame('');
+      setDeckTypeId(null);
       onAdded();
     },
   });
 
   return (
-    <Stack direction="row" spacing={1} alignItems="flex-start">
+    <Stack direction="row" spacing={1} alignItems="flex-start" flexWrap="wrap" useFlexGap>
       <TextField
         size="small"
         label="New location name"
@@ -75,16 +84,24 @@ function AddLocationBar({ onAdded }: { onAdded: () => void }) {
         onChange={(e) => setType(e.target.value)}
         sx={{ width: 150 }}
       >
-        {TYPES.map((t) => (
+        {LOCATION_TYPES.map((t) => (
           <MenuItem key={t.value} value={t.value}>
             {t.label}
           </MenuItem>
         ))}
       </TextField>
+      {isDeckBox && (
+        <DeckBoxGamePicker
+          game={game}
+          deckTypeId={deckTypeId}
+          onGameChange={setGame}
+          onDeckTypeChange={setDeckTypeId}
+        />
+      )}
       <Button
         variant="contained"
         startIcon={<AddIcon />}
-        disabled={trimmed.length === 0 || taken || create.isPending}
+        disabled={trimmed.length === 0 || taken || needsGame || create.isPending}
         onClick={() => create.mutate()}
         sx={{ mt: 0.5 }}
       >
@@ -96,7 +113,9 @@ function AddLocationBar({ onAdded }: { onAdded: () => void }) {
 
 function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: () => void }) {
   const [anchor, setAnchor] = useState<null | HTMLElement>(null);
+  const [editingDeckBox, setEditingDeckBox] = useState(false);
   const close = () => setAnchor(null);
+  const isDeckBox = loc.type === 'Deck Box';
 
   const rename = useMutation({
     mutationFn: (name: string) => api.locationRename(loc.id, name),
@@ -126,6 +145,16 @@ function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: 
         >
           Rename…
         </MenuItem>
+        {isDeckBox && (
+          <MenuItem
+            onClick={() => {
+              close();
+              setEditingDeckBox(true);
+            }}
+          >
+            Game &amp; deck type…
+          </MenuItem>
+        )}
         <MenuItem
           disabled={loc.isSystem}
           onClick={() => {
@@ -147,6 +176,17 @@ function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: 
           Delete…
         </MenuItem>
       </Menu>
+      {isDeckBox && (
+        <DeckBoxGameDialog
+          open={editingDeckBox}
+          deckBoxId={loc.id}
+          deckBoxName={loc.name}
+          initialGame={loc.game}
+          initialDeckTypeId={loc.deckTypeId}
+          onClose={() => setEditingDeckBox(false)}
+          onSaved={onChanged}
+        />
+      )}
     </>
   );
 }
@@ -156,7 +196,10 @@ const locationHref = (loc: LocationSummaryDto) =>
 
 const num = (n: number) => n.toLocaleString();
 
-function buildColumns(onChanged: () => void): GridColDef<LocationSummaryDto>[] {
+function buildColumns(
+  onChanged: () => void,
+  gameLabel: (id: string) => string,
+): GridColDef<LocationSummaryDto>[] {
   return [
     {
       field: 'name',
@@ -169,7 +212,30 @@ function buildColumns(onChanged: () => void): GridColDef<LocationSummaryDto>[] {
         </Link>
       ),
     },
-    { field: 'type', headerName: 'Type', width: 120 },
+    {
+      field: 'type',
+      headerName: 'Type',
+      width: 200,
+      renderCell: (p) => {
+        // Deck boxes show their game + deck type inline; other types show just the type name.
+        if (p.row.type === 'Deck Box' && (p.row.game || p.row.deckTypeName)) {
+          const bits = [p.row.deckTypeName, 'Deck Box'].filter(Boolean).join(' · ');
+          return (
+            <Stack spacing={0} sx={{ lineHeight: 1.2 }}>
+              <Typography variant="body2" noWrap>
+                {bits}
+              </Typography>
+              {p.row.game && (
+                <Typography variant="caption" color="text.secondary" noWrap>
+                  {gameLabel(p.row.game)}
+                </Typography>
+              )}
+            </Stack>
+          );
+        }
+        return p.row.type;
+      },
+    },
     {
       field: 'cardCount',
       headerName: 'Cards',
@@ -240,10 +306,15 @@ export function LocationsPage() {
     queryKey: ['locations', game],
     queryFn: () => api.locations(game),
   });
+  const games = useQuery({ queryKey: ['games'], queryFn: () => api.games() });
+  const gameLabel = useMemo(() => {
+    const map = new Map((games.data ?? []).map((g) => [g.id, g.displayName]));
+    return (id: string) => map.get(id) ?? id;
+  }, [games.data]);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['locations'] });
   const groups = useMemo(() => (data ? groupLocations(data) : []), [data]);
-  const columns = useMemo(() => buildColumns(refresh), []);
+  const columns = useMemo(() => buildColumns(refresh, gameLabel), [gameLabel]);
 
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
     try {
@@ -264,6 +335,7 @@ export function LocationsPage() {
   return (
     <Stack spacing={3}>
       <Typography variant="h4">Locations</Typography>
+      <DeckBoxGameBanner onResolved={refresh} />
       <AddLocationBar onAdded={refresh} />
       {isLoading || !data ? (
         <CircularProgress />

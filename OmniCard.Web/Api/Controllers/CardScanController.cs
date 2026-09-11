@@ -4,6 +4,7 @@ using OmniCard.Web.Services;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Matching;
 using OmniCard.Shared.Collection;
+using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Web.Api.Infrastructure;
 
@@ -221,7 +222,15 @@ public sealed class CardScanController(
 
         // A scanned card is a real physical copy — always create a new lot (never skip as a duplicate).
         // AddScannedLots returns the created lot ids in input order so we can attach per-copy tags.
-        var lotIds = binderCards.AddScannedLots(cards);
+        IReadOnlyList<int> lotIds;
+        try
+        {
+            lotIds = binderCards.AddScannedLots(cards);
+        }
+        catch (DeckBoxGameMismatchException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
         for (var i = 0; i < lotIds.Count; i++)
         {
             var cardTags = tagsPerCard[i].Where(t => !string.IsNullOrWhiteSpace(t)).ToList();

@@ -183,6 +183,41 @@ public class CollectionQueryServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetLocationOverviews_GameFilter_HidesOtherGameDeckBoxes_KeepsRest()
+    {
+        // Deck boxes are game-specific; the game filter hides ones from another game. Non-deck-box
+        // containers, unassigned deck boxes, and always-available deck boxes stay visible.
+        var mtgDeck = new StorageContainer { Name = "MTG Deck", ContainerType = ContainerType.DeckBox, Game = CardGame.Mtg };
+        var pkmDeck = new StorageContainer { Name = "Pokémon Deck", ContainerType = ContainerType.DeckBox, Game = CardGame.Pokemon };
+        var unassignedDeck = new StorageContainer { Name = "Legacy Deck", ContainerType = ContainerType.DeckBox, Game = null };
+        var alwaysDeck = new StorageContainer { Name = "Loaner Deck", ContainerType = ContainerType.DeckBox, Game = CardGame.Pokemon, AlwaysAvailable = true };
+        var box = new StorageContainer { Name = "Shoebox", ContainerType = ContainerType.Box };
+        var all = new List<StorageContainer> { mtgDeck, pkmDeck, unassignedDeck, alwaysDeck, box };
+
+        var svc = CreateService(all);
+        var result = await svc.GetLocationOverviewsAsync(CardGame.Mtg);
+
+        var names = result.Select(r => r.Container.Name).ToHashSet();
+        Assert.Contains("MTG Deck", names);       // matches the filter
+        Assert.Contains("Legacy Deck", names);     // unassigned → not hidden
+        Assert.Contains("Loaner Deck", names);     // always-available → not hidden
+        Assert.Contains("Shoebox", names);         // not a deck box → not hidden
+        Assert.DoesNotContain("Pokémon Deck", names); // other game → hidden
+    }
+
+    [Fact]
+    public async Task GetLocationOverviews_NoGameFilter_ShowsAllDeckBoxes()
+    {
+        var mtgDeck = new StorageContainer { Name = "MTG Deck", ContainerType = ContainerType.DeckBox, Game = CardGame.Mtg };
+        var pkmDeck = new StorageContainer { Name = "Pokémon Deck", ContainerType = ContainerType.DeckBox, Game = CardGame.Pokemon };
+        var svc = CreateService(new List<StorageContainer> { mtgDeck, pkmDeck });
+
+        var result = await svc.GetLocationOverviewsAsync();
+
+        Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
     public async Task GetLocationOverviews_MarketValue_UsesGameServicePrices()
     {
         var container = SeedContainer("Priced");

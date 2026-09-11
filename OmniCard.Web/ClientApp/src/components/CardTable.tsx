@@ -26,12 +26,14 @@ import {
 import ChecklistIcon from '@mui/icons-material/Checklist';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
+import EditIcon from '@mui/icons-material/Edit';
 import SellIcon from '@mui/icons-material/Sell';
 import { api } from '../api/client';
 import type { CardDto } from '../api/types';
 import { CardImage } from './CardImage';
 import { CardEditDrawer } from './dialogs/CardEditDrawer';
 import { LocationPickerDialog } from './dialogs/LocationPickerDialog';
+import { BulkEditCardsDialog } from './dialogs/BulkEditCardsDialog';
 import {
   usePreviewScale,
   PREVIEW_BASE_WIDTH,
@@ -113,6 +115,7 @@ export function CardTable({
     [selectedRows],
   );
   const [bulkListOpen, setBulkListOpen] = useState(false);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkChannel, setBulkChannel] = useState('Manual');
   const [bulkNote, setBulkNote] = useState('');
 
@@ -235,6 +238,9 @@ export function CardTable({
             <Button size="small" startIcon={<DriveFileMoveIcon />} onClick={() => setMoveOpen(true)}>
               Move to…
             </Button>
+            <Button size="small" startIcon={<EditIcon />} onClick={() => setBulkEditOpen(true)}>
+              Bulk edit
+            </Button>
             <Button size="small" startIcon={<SellIcon />} onClick={() => setBulkListOpen(true)}>
               List for sale
             </Button>
@@ -307,10 +313,18 @@ export function CardTable({
 
       <CardEditDrawer cardId={detailCardId} onClose={() => setDetailCardId(null)} />
 
+      <BulkEditCardsDialog
+        open={bulkEditOpen}
+        lotIds={selectedLotIds}
+        onClose={() => setBulkEditOpen(false)}
+        onApplied={refresh}
+      />
+
       <LocationPickerDialog
         open={moveOpen}
         title={`Move ${selectedLotIds.length} card(s) to…`}
         excludeId={containerId}
+        cardGames={[...new Set(selectedRows.map((r) => r.game))]}
         onPick={(id) => {
           setMoveOpen(false);
           move.mutate(id);

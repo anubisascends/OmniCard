@@ -19,7 +19,25 @@ public sealed class CollectionQueryService(
         var summaries = await Task.Run(() =>
         {
             var containers = containerService.GetAll();
+
+            // Deck boxes are game-specific, so the active game filter hides the ones that belong to
+            // another game. Everything else stays visible: non-deck-box containers are game-agnostic,
+            // an unassigned (legacy) deck box has no game to filter on, and an always-available
+            // location is never hidden by the game filter (by definition).
+            if (gameFilter is { } filterGame)
+                containers = containers
+                    .Where(c => c.ContainerType != ContainerType.DeckBox
+                        || c.Game is null
+                        || c.Game == filterGame
+                        || c.IsAlwaysAvailable)
+                    .ToList();
+
             using var context = dbContextFactory.CreateDbContext();
+
+            // Deck-type id → display name, to label deck-box tiles. Small reference table; one read.
+            var deckTypeNames = context.DeckTypes.AsNoTracking()
+                .Select(d => new { d.Id, d.Name })
+                .ToDictionary(d => d.Id, d => d.Name);
             IQueryable<CollectionCard> cardsQuery =
                 from l in context.Lots.AsNoTracking()
                 join p in context.Products.AsNoTracking() on l.ProductId equals p.Id
@@ -125,6 +143,7 @@ public sealed class CollectionQueryService(
                     PriceDelta = delta,
                     PriceDeltaPercent = deltaPercent,
                     CoverImageUri = coverUri,
+                    DeckTypeName = container.DeckTypeId is int dt ? deckTypeNames.GetValueOrDefault(dt) : null,
                 });
             }
 
