@@ -12,6 +12,10 @@ import type {
   CommitListResultDto,
   CustomerDto,
   DashboardDto,
+  DeckBoxNeedsGameDto,
+  DeckLegalityDto,
+  DeckTypeDto,
+  DeckTypeUpsertRequest,
   ImportListResultDto,
   EbaySetupResultDto,
   EbayStatusDto,
@@ -215,8 +219,13 @@ export const api = {
   // Location writes
   locationNameAvailable: (name: string, excludeId?: number) =>
     request<{ available: boolean }>(`/api/locations/name-available${qs({ name, excludeId })}`),
-  locationCreate: (body: { name: string; type: string; slotsPerPage?: number }) =>
-    request<LocationSummaryDto>('/api/locations', { method: 'POST', body: JSON.stringify(body) }),
+  locationCreate: (body: {
+    name: string;
+    type: string;
+    slotsPerPage?: number;
+    game?: string | null;
+    deckTypeId?: number | null;
+  }) => request<LocationSummaryDto>('/api/locations', { method: 'POST', body: JSON.stringify(body) }),
   locationRename: (id: number, name: string) =>
     request<void>(`/api/locations/${id}`, { method: 'PUT', body: JSON.stringify({ name }) }),
   locationDelete: (id: number, moveToBulk: boolean) =>
@@ -226,6 +235,25 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ value }),
     }),
+  // Deck box: assign/reassign game + deck type; legacy needs-game list; advisory legality check.
+  locationSetDeckBox: (id: number, game: string, deckTypeId?: number | null) =>
+    request<void>(`/api/locations/${id}/deck-box`, {
+      method: 'PUT',
+      body: JSON.stringify({ game, deckTypeId: deckTypeId ?? null }),
+    }),
+  deckBoxesNeedingGame: () =>
+    request<DeckBoxNeedsGameDto[]>('/api/locations/deck-boxes/needs-game'),
+  locationDeckLegality: (id: number) =>
+    request<DeckLegalityDto>(`/api/locations/${id}/deck-legality`),
+
+  // Deck types (per-game formats): built-ins + custom
+  deckTypes: (game: string) => request<DeckTypeDto[]>(`/api/deck-types${qs({ game })}`),
+  deckTypeCreate: (body: DeckTypeUpsertRequest) =>
+    request<DeckTypeDto>('/api/deck-types', { method: 'POST', body: JSON.stringify(body) }),
+  deckTypeUpdate: (id: number, body: DeckTypeUpsertRequest) =>
+    request<void>(`/api/deck-types/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deckTypeDelete: (id: number) =>
+    request<void>(`/api/deck-types/${id}`, { method: 'DELETE' }),
 
   // Card writes
   card: (id: number) => request<CardDto>(`/api/collection/${id}`),
@@ -248,6 +276,23 @@ export const api = {
     }),
   cardSetTags: (id: number, tags: string[]) =>
     request<void>(`/api/collection/${id}/tags`, { method: 'PUT', body: JSON.stringify({ tags }) }),
+  /** Bulk-edit selected lots. Only fields with their `setX` flag are applied. */
+  cardBulkUpdate: (body: {
+    cardIds: number[];
+    setCondition?: boolean;
+    condition?: string;
+    setFoil?: boolean;
+    isFoil?: boolean;
+    setQuantity?: boolean;
+    quantity?: number;
+    setPurchasePrice?: boolean;
+    purchasePrice?: number | null;
+    setNote?: boolean;
+    note?: string | null;
+    setTags?: boolean;
+    tagsMode?: 'add' | 'replace';
+    tags?: string[];
+  }) => request<void>('/api/collection/bulk-update', { method: 'POST', body: JSON.stringify(body) }),
 
   // Tags
   tags: () => request<{ id: number; name: string; usageCount: number }[]>('/api/tags'),

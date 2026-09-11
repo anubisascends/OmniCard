@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
 using OmniCard.Shared.Binder;
+using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Storage;
@@ -37,7 +38,8 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
             .Any(c => string.Equals(c.Name, trimmed, StringComparison.OrdinalIgnoreCase));
     }
 
-    public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9)
+    public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9,
+        CardGame? game = null, int? deckTypeId = null)
     {
         var trimmed = (name ?? "").Trim();
         if (NameExists(trimmed))
@@ -57,6 +59,14 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
             SlotsPerPage = slotsPerPage > 0 ? slotsPerPage : 9
         };
 
+        // Game + deck type are only meaningful for deck boxes; ignore them on every other type so a
+        // stray value can't leak onto a binder/box.
+        if (type == ContainerType.DeckBox)
+        {
+            container.Game = game;
+            container.DeckTypeId = deckTypeId;
+        }
+
         // New binders start with one double-sided sheet (front + back), the default the user asked
         // for; non-binder containers ignore this and keep the single-page default.
         if (type == ContainerType.Binder)
@@ -69,6 +79,60 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
         context.StorageContainers.Add(container);
         context.SaveChanges();
         return container;
+    }
+
+    public void SetDeckBox(int containerId, CardGame game, int? deckTypeId)
+    {
+        using var context = dbContextFactory.CreateDbContext();
+        var container = context.StorageContainers.Find(containerId)
+            ?? throw new InvalidOperationException($"Container {containerId} not found");
+        if (container.ContainerType != ContainerType.DeckBox)
+            throw new InvalidOperationException("Only deck boxes can be assigned a game system.");
+
+        // Guard the single-game invariant: reject if the box already holds cards from a different game.
+        var conflicting = context.Lots
+            .Where(l => l.LocationId == containerId
+                && l.Product.Category == ProductCategory.Single
+                && l.Product.Game != game)
+            .Select(l => l.Product.Game)
+            .Distinct()
+            .ToList();
+        if (conflicting.Count > 0)
+            throw new InvalidOperationException(
+                $"This deck box already contains cards from another game ({string.Join(", ", conflicting)}). " +
+                "Move those cards out before assigning a different game.");
+
+        container.Game = game;
+        container.DeckTypeId = deckTypeId;
+        context.SaveChanges();
+    }
+
+    public List<DeckBoxNeedsGame> GetDeckBoxesMissingGame()
+    {
+        using var context = dbContextFactory.CreateDbContext();
+        var deckBoxes = context.StorageContainers.AsNoTracking()
+            .Where(c => c.ContainerType == ContainerType.DeckBox && c.Game == null)
+            .OrderBy(c => c.SortOrder).ThenBy(c => c.Name)
+            .Select(c => new { c.Id, c.Name })
+            .ToList();
+
+        var result = new List<DeckBoxNeedsGame>(deckBoxes.Count);
+        foreach (var box in deckBoxes)
+        {
+            var games = context.Lots.AsNoTracking()
+                .Where(l => l.LocationId == box.Id && l.Product.Category == ProductCategory.Single)
+                .Select(l => l.Product.Game)
+                .Distinct()
+                .ToList();
+            result.Add(new DeckBoxNeedsGame
+            {
+                Id = box.Id,
+                Name = box.Name,
+                InferredGame = games.Count == 1 ? games[0] : null,
+                CardGames = games,
+            });
+        }
+        return result;
     }
 
     public void Rename(int id, string newName)

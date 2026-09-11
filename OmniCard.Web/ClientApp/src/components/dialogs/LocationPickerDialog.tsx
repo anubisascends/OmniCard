@@ -21,13 +21,8 @@ import AddIcon from '@mui/icons-material/Add';
 import { InputAdornment } from '@mui/material';
 import { api } from '../../api/client';
 import { groupLocations } from '../../lib/locationGroups';
-
-const TYPES = [
-  { value: 'Binder', label: 'Binder' },
-  { value: 'Box', label: 'Box' },
-  { value: 'DeckBox', label: 'Deck Box' },
-  { value: 'DisplayCase', label: 'Display Case' },
-];
+import { LOCATION_TYPES, isDeckBoxType } from '../../lib/locationTypes';
+import { DeckBoxGamePicker } from '../DeckBoxGamePicker';
 
 /** Inline "create a new location" section, revealed from the picker so callers never have to leave. */
 function CreateLocationSection({ onCreated }: { onCreated: (id: number) => void }) {
@@ -35,6 +30,9 @@ function CreateLocationSection({ onCreated }: { onCreated: (id: number) => void 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [type, setType] = useState('Box');
+  const [game, setGame] = useState('');
+  const [deckTypeId, setDeckTypeId] = useState<number | null>(null);
+  const isDeckBox = isDeckBoxType(type);
 
   const trimmed = name.trim();
   const nameCheck = useQuery({
@@ -43,12 +41,21 @@ function CreateLocationSection({ onCreated }: { onCreated: (id: number) => void 
     enabled: open && trimmed.length > 0,
   });
   const taken = trimmed.length > 0 && nameCheck.data?.available === false;
+  const needsGame = isDeckBox && game.length === 0;
 
   const create = useMutation({
-    mutationFn: () => api.locationCreate({ name: trimmed, type }),
+    mutationFn: () =>
+      api.locationCreate({
+        name: trimmed,
+        type,
+        game: isDeckBox ? game : null,
+        deckTypeId: isDeckBox ? deckTypeId : null,
+      }),
     onSuccess: (loc) => {
       qc.invalidateQueries({ queryKey: ['locations'] });
       setName('');
+      setGame('');
+      setDeckTypeId(null);
       setOpen(false);
       onCreated(loc.id);
     },
@@ -68,16 +75,26 @@ function CreateLocationSection({ onCreated }: { onCreated: (id: number) => void 
             error={taken}
             helperText={taken ? 'This name is already in use' : ' '}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && trimmed.length > 0 && !taken && !create.isPending) create.mutate();
+              if (e.key === 'Enter' && trimmed.length > 0 && !taken && !needsGame && !create.isPending)
+                create.mutate();
             }}
           />
           <TextField select size="small" label="Type" value={type} onChange={(e) => setType(e.target.value)}>
-            {TYPES.map((t) => (
+            {LOCATION_TYPES.map((t) => (
               <MenuItem key={t.value} value={t.value}>
                 {t.label}
               </MenuItem>
             ))}
           </TextField>
+          {isDeckBox && (
+            <DeckBoxGamePicker
+              game={game}
+              deckTypeId={deckTypeId}
+              onGameChange={setGame}
+              onDeckTypeChange={setDeckTypeId}
+              direction="column"
+            />
+          )}
           {create.error && (
             <Typography variant="caption" color="error">
               {(create.error as Error).message}
@@ -91,7 +108,7 @@ function CreateLocationSection({ onCreated }: { onCreated: (id: number) => void 
               size="small"
               variant="contained"
               startIcon={<AddIcon />}
-              disabled={trimmed.length === 0 || taken || create.isPending}
+              disabled={trimmed.length === 0 || taken || needsGame || create.isPending}
               onClick={() => create.mutate()}
             >
               Create &amp; select
@@ -118,6 +135,7 @@ export function LocationPickerDialog({
   title = 'Move to location',
   excludeId,
   allowCreate = true,
+  cardGames,
   onPick,
   onClose,
 }: {
@@ -125,9 +143,15 @@ export function LocationPickerDialog({
   title?: string;
   excludeId?: number;
   allowCreate?: boolean;
+  /** Games of the card(s) being moved. When set, deck-box targets locked to a different game are
+   * disabled (the server hard-blocks the move anyway — this is the matching UX guard). */
+  cardGames?: string[];
   onPick: (id: number) => void;
   onClose: () => void;
 }) {
+  // A deck box locked to a game that none of the moving cards share can't receive them.
+  const gameBlocked = (locGame?: string | null) =>
+    !!locGame && cardGames != null && cardGames.length > 0 && !cardGames.includes(locGame);
   const { data, isLoading } = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations(), enabled: open });
   const [search, setSearch] = useState('');
 
@@ -177,23 +201,28 @@ export function LocationPickerDialog({
                   <ListSubheader disableSticky sx={{ bgcolor: 'transparent', lineHeight: '28px' }}>
                     {g.heading}
                   </ListSubheader>
-                  {g.items.map((l) => (
-                    <ListItemButton
-                      key={l.id}
-                      onClick={() => onPick(l.id)}
-                      sx={{ borderRadius: 1 }}
-                    >
-                      <Stack direction="row" spacing={1} alignItems="center" sx={{ width: '100%' }}>
-                        <Typography variant="body2" sx={{ flexGrow: 1 }} noWrap>
-                          {l.name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {l.cardCount.toLocaleString()}
-                        </Typography>
-                        <Chip size="small" variant="outlined" label={l.type} />
-                      </Stack>
-                    </ListItemButton>
-                  ))}
+                  {g.items.map((l) => {
+                    const blocked = gameBlocked(l.game);
+                    return (
+                      <ListItemButton
+                        key={l.id}
+                        disabled={blocked}
+                        onClick={() => onPick(l.id)}
+                        sx={{ borderRadius: 1 }}
+                        title={blocked ? `This deck box only holds ${l.game} cards` : undefined}
+                      >
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ width: '100%' }}>
+                          <Typography variant="body2" sx={{ flexGrow: 1 }} noWrap>
+                            {l.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {l.cardCount.toLocaleString()}
+                          </Typography>
+                          <Chip size="small" variant="outlined" label={l.type} />
+                        </Stack>
+                      </ListItemButton>
+                    );
+                  })}
                 </ul>
               </li>
             ))}

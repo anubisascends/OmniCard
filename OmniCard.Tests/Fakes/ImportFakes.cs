@@ -178,15 +178,23 @@ public sealed class RecordingContainerService : IStorageContainerService
     public bool NameExists(string name, int? excludeId = null) =>
         Containers.Any(c => (excludeId == null || c.Id != excludeId)
             && string.Equals(c.Name, name?.Trim(), StringComparison.OrdinalIgnoreCase));
-    public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9)
+    public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9,
+        CardGame? game = null, int? deckTypeId = null)
     {
         Created.Add((name, type));
-        var c = new StorageContainer { Id = _nextId++, Name = name, ContainerType = type, SlotsPerPage = slotsPerPage };
+        var c = new StorageContainer
+        {
+            Id = _nextId++, Name = name, ContainerType = type, SlotsPerPage = slotsPerPage,
+            Game = type == ContainerType.DeckBox ? game : null,
+            DeckTypeId = type == ContainerType.DeckBox ? deckTypeId : null,
+        };
         Containers.Add(c);
         return c;
     }
 
     // Unused members
+    public void SetDeckBox(int containerId, CardGame game, int? deckTypeId) => throw new NotImplementedException();
+    public List<DeckBoxNeedsGame> GetDeckBoxesMissingGame() => throw new NotImplementedException();
     public void Rename(int id, string newName) => throw new NotImplementedException();
     public void Delete(int id, bool moveCardsToBulk = true) => throw new NotImplementedException();
     public int GetCardCount(int containerId) => throw new NotImplementedException();

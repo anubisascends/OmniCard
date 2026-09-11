@@ -22,6 +22,7 @@ public class OmniCardDbContext : DbContext
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<LotTag> LotTags => Set<LotTag>();
     public DbSet<StorageContainer> StorageContainers => Set<StorageContainer>();
+    public DbSet<DeckType> DeckTypes => Set<DeckType>();
     public DbSet<EbayListing> EbayListings => Set<EbayListing>();
     public DbSet<Listing> Listings => Set<Listing>();
     public DbSet<Customer> Customers => Set<Customer>();
@@ -101,6 +102,15 @@ public class OmniCardDbContext : DbContext
             e.Property(s => s.ContainerType).HasConversion<string>();
             e.HasIndex(s => s.Name).IsUnique();
 
+            // Assigned game for deck boxes; nullable enum stored as string (like InventoryLot.FlagReason).
+            e.Property(s => s.Game).HasConversion<string?>();
+
+            // Deck boxes may reference a DeckType (format). Deleting the type unsets the reference
+            // rather than the box (SetNull), matching how a lot survives losing its container.
+            e.HasOne<DeckType>().WithMany().HasForeignKey(s => s.DeckTypeId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(s => s.DeckTypeId);
+
             // CollectionCard is not part of this context's model (it lives in the
             // Phase-1 CollectionDbContext shim); ignore the nav so EF doesn't try to
             // pull that unmapped type into this model.
@@ -108,6 +118,17 @@ public class OmniCardDbContext : DbContext
 
             // Derived from IsSystem/AlwaysAvailable — not a stored column.
             e.Ignore(s => s.IsAlwaysAvailable);
+        });
+
+        modelBuilder.Entity<DeckType>(e =>
+        {
+            e.HasKey(d => d.Id);
+            e.Property(d => d.Id).ValueGeneratedOnAdd();
+            e.Property(d => d.Game).HasConversion<string>();
+            e.Property(d => d.Name).IsRequired();
+            // One deck-type name per game; the seed key is globally unique (only set on built-ins).
+            e.HasIndex(d => new { d.Game, d.Name }).IsUnique();
+            e.HasIndex(d => d.BuiltInKey).IsUnique();
         });
 
         modelBuilder.Entity<MismatchLog>(e =>

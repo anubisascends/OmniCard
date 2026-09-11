@@ -166,6 +166,9 @@ builder.Services.AddSingleton<IPickListPdfExporter, PickListPdfExporter>();
 var writableFactory = new WritableOmniCardDbContextFactory(connectionString);
 builder.Services.AddSingleton(writableFactory);
 builder.Services.AddSingleton<IStorageContainerService>(_ => new StorageContainerService(writableFactory));
+builder.Services.AddSingleton<IDeckTypeService>(_ => new DeckTypeService(writableFactory));
+builder.Services.AddSingleton<IDeckLegalityService>(sp =>
+    new DeckLegalityService(writableFactory, sp.GetRequiredService<IDeckTypeService>()));
 builder.Services.AddSingleton<ITagService>(_ => new TagService(writableFactory));
 builder.Services.AddSingleton<ISalesSettingsService, SalesSettingsService>();
 builder.Services.AddSingleton<IScanBadgeSettingsService, ScanBadgeSettingsService>();
@@ -226,6 +229,13 @@ using (var scope = app.Services.CreateScope())
 using (var scope = app.Services.CreateScope())
 {
     scope.ServiceProvider.GetRequiredService<UserService>().EnsureSeeded();
+}
+
+// Seed the built-in per-game deck types (Commander, Standard, …) if missing. Idempotent — keyed on
+// each type's stable BuiltInKey — so it never duplicates and never clobbers a user-renamed built-in.
+using (var scope = app.Services.CreateScope())
+{
+    scope.ServiceProvider.GetRequiredService<IDeckTypeService>().EnsureSeeded();
 }
 
 // Ensure the per-game catalog SQL Server databases + schemas exist (one DB per game). EnsureCreated

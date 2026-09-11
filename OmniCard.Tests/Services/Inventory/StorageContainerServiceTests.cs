@@ -560,6 +560,113 @@ public class StorageContainerServiceTests : IDisposable
         Assert.False(service.NameExists("Other"));
     }
 
+    // --- Deck box: game + deck type ---
+
+    private int SeedDeckType(CardGame game, string name)
+    {
+        using var ctx = new OmniCardDbContext(_options);
+        var dt = new DeckType { Game = game, Name = name };
+        ctx.DeckTypes.Add(dt);
+        ctx.SaveChanges();
+        return dt.Id;
+    }
+
+    [Fact]
+    public void Create_DeckBox_PersistsGameAndDeckType()
+    {
+        var service = CreateService();
+        var deckTypeId = SeedDeckType(CardGame.Mtg, "Commander");
+
+        var box = service.Create("Commander Deck", ContainerType.DeckBox, game: CardGame.Mtg, deckTypeId: deckTypeId);
+
+        var saved = new OmniCardDbContext(_options).StorageContainers.Single(c => c.Id == box.Id);
+        Assert.Equal(CardGame.Mtg, saved.Game);
+        Assert.Equal(deckTypeId, saved.DeckTypeId);
+    }
+
+    [Fact]
+    public void Create_NonDeckBox_IgnoresGameAndDeckType()
+    {
+        var service = CreateService();
+
+        // A game/deckType passed for a non-deck-box type must not leak onto the row.
+        var box = service.Create("Just a Box", ContainerType.Box, game: CardGame.Mtg, deckTypeId: 3);
+
+        var saved = new OmniCardDbContext(_options).StorageContainers.Single(c => c.Id == box.Id);
+        Assert.Null(saved.Game);
+        Assert.Null(saved.DeckTypeId);
+    }
+
+    [Fact]
+    public void SetDeckBox_AssignsGameAndDeckType()
+    {
+        var service = CreateService();
+        var box = service.Create("Deck", ContainerType.DeckBox, game: CardGame.Mtg);
+        var deckTypeId = SeedDeckType(CardGame.Pokemon, "Standard");
+
+        service.SetDeckBox(box.Id, CardGame.Pokemon, deckTypeId);
+
+        var saved = new OmniCardDbContext(_options).StorageContainers.Single(c => c.Id == box.Id);
+        Assert.Equal(CardGame.Pokemon, saved.Game);
+        Assert.Equal(deckTypeId, saved.DeckTypeId);
+    }
+
+    [Fact]
+    public void SetDeckBox_NonDeckBox_Throws()
+    {
+        var service = CreateService();
+        var box = service.Create("Plain Box", ContainerType.Box);
+
+        Assert.Throws<InvalidOperationException>(() => service.SetDeckBox(box.Id, CardGame.Mtg, null));
+    }
+
+    [Fact]
+    public void SetDeckBox_WithConflictingCards_Throws()
+    {
+        var service = CreateService();
+        var box = service.Create("Mixed Deck", ContainerType.DeckBox, game: CardGame.Mtg);
+        // Put a Pokémon card in the box, then try to lock it to Magic.
+        using (var ctx = new OmniCardDbContext(_options))
+        {
+            var product = new Product { Game = CardGame.Pokemon, Category = ProductCategory.Single, Name = "Pikachu" };
+            ctx.Products.Add(product);
+            ctx.SaveChanges();
+            ctx.Lots.Add(new InventoryLot { ProductId = product.Id, Quantity = 1, LocationId = box.Id });
+            ctx.SaveChanges();
+        }
+
+        var ex = Assert.Throws<InvalidOperationException>(() => service.SetDeckBox(box.Id, CardGame.Mtg, null));
+        Assert.Contains("another game", ex.Message);
+    }
+
+    [Fact]
+    public void GetDeckBoxesMissingGame_InfersSingleGame_AndFlagsMixed()
+    {
+        var service = CreateService();
+        var single = service.Create("Single-Game Box", ContainerType.DeckBox);   // no game
+        var mixed = service.Create("Mixed Box", ContainerType.DeckBox);          // no game
+        var assigned = service.Create("Assigned Box", ContainerType.DeckBox, game: CardGame.Mtg);
+
+        using (var ctx = new OmniCardDbContext(_options))
+        {
+            var mtg = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, Name = "Sol Ring" };
+            var pkm = new Product { Game = CardGame.Pokemon, Category = ProductCategory.Single, Name = "Pikachu" };
+            ctx.Products.AddRange(mtg, pkm);
+            ctx.SaveChanges();
+            ctx.Lots.Add(new InventoryLot { ProductId = mtg.Id, Quantity = 1, LocationId = single.Id });
+            ctx.Lots.Add(new InventoryLot { ProductId = mtg.Id, Quantity = 1, LocationId = mixed.Id });
+            ctx.Lots.Add(new InventoryLot { ProductId = pkm.Id, Quantity = 1, LocationId = mixed.Id });
+            ctx.SaveChanges();
+        }
+
+        var pending = service.GetDeckBoxesMissingGame();
+
+        // Only the two unassigned deck boxes appear; the assigned one is excluded.
+        Assert.DoesNotContain(pending, p => p.Id == assigned.Id);
+        Assert.Equal(CardGame.Mtg, pending.Single(p => p.Id == single.Id).InferredGame);
+        Assert.Null(pending.Single(p => p.Id == mixed.Id).InferredGame); // mixed → user must choose
+    }
+
     private class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
         public OmniCardDbContext CreateDbContext() => new(options);

@@ -101,6 +101,43 @@ public static class DtoMapping
         PriceDelta = s.PriceDelta,
         PriceDeltaPercent = s.PriceDeltaPercent,
         CoverImageUri = s.CoverImageUri,
+        // Game is surfaced as the enum id ("Mtg"), consistent with the rest of the API — the client
+        // maps it to a display name. Only deck boxes ever carry these.
+        Game = s.Container.Game is { } g ? GameId(g) : null,
+        DeckTypeId = s.Container.DeckTypeId,
+        DeckTypeName = s.DeckTypeName,
+    };
+
+    public static DeckTypeDto ToDto(DeckType d) => new()
+    {
+        Id = d.Id,
+        Game = GameId(d.Game),
+        Name = d.Name,
+        IsBuiltIn = d.IsBuiltIn,
+        DeckSizeMin = d.DeckSizeMin,
+        DeckSizeMax = d.DeckSizeMax,
+        MaxCopiesPerCard = d.MaxCopiesPerCard,
+        Singleton = d.Singleton,
+        BasicLandsExempt = d.BasicLandsExempt,
+        CommanderSlots = d.CommanderSlots,
+    };
+
+    public static DeckBoxNeedsGameDto ToDto(DeckBoxNeedsGame d) => new()
+    {
+        Id = d.Id,
+        Name = d.Name,
+        InferredGame = d.InferredGame is { } g ? GameId(g) : null,
+        CardGames = d.CardGames.Select(GameId).ToList(),
+    };
+
+    public static DeckLegalityDto ToDto(DeckLegality l) => new()
+    {
+        Ok = l.Ok,
+        DeckTypeName = l.DeckTypeName,
+        MainDeckCount = l.MainDeckCount,
+        CommanderCount = l.CommanderCount,
+        TotalDeckCount = l.TotalDeckCount,
+        Warnings = l.Warnings.Select(w => new DeckLegalityWarningDto(w.Code, w.Message)).ToList(),
     };
 
     public static ValuationLineDto ToDto(ValuationLine v) => new(v.Key, v.Units, v.Cost, v.Market);

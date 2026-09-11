@@ -86,6 +86,13 @@ public sealed record LocationSummaryDto
     public decimal PriceDelta { get; init; }
     public double PriceDeltaPercent { get; init; }
     public string? CoverImageUri { get; init; }
+
+    /// <summary>Assigned game system (enum id, e.g. "Mtg"), or null. Only ever set for deck boxes.</summary>
+    public string? Game { get; init; }
+    /// <summary>Assigned deck type (format) id, or null. Only ever set for deck boxes.</summary>
+    public int? DeckTypeId { get; init; }
+    /// <summary>Assigned deck type display name, or null.</summary>
+    public string? DeckTypeName { get; init; }
 }
 
 /// <summary>One row of a valuation breakdown (by game / category / location).</summary>
@@ -157,7 +164,73 @@ public sealed record CreateLocationRequest
     /// <summary>ContainerType name: Binder, Box, DeckBox, DisplayCase (Bulk not allowed).</summary>
     public string Type { get; init; } = "Box";
     public int SlotsPerPage { get; init; } = 9;
+    /// <summary>Required when <see cref="Type"/> is DeckBox: the game system (enum id, e.g. "Mtg").</summary>
+    public string? Game { get; init; }
+    /// <summary>Optional deck type (format) id for a DeckBox.</summary>
+    public int? DeckTypeId { get; init; }
 }
+
+/// <summary>Assign/reassign a deck box's game system and deck type.</summary>
+public sealed record SetDeckBoxRequest
+{
+    /// <summary>Game system enum id, e.g. "Mtg".</summary>
+    public string Game { get; init; } = "";
+    public int? DeckTypeId { get; init; }
+}
+
+// --- Deck types ---
+
+/// <summary>A deck format for a game, with its (advisory) construction rules.</summary>
+public sealed record DeckTypeDto
+{
+    public int Id { get; init; }
+    public string Game { get; init; } = "";
+    public string Name { get; init; } = "";
+    public bool IsBuiltIn { get; init; }
+    public int? DeckSizeMin { get; init; }
+    public int? DeckSizeMax { get; init; }
+    public int? MaxCopiesPerCard { get; init; }
+    public bool Singleton { get; init; }
+    public bool BasicLandsExempt { get; init; }
+    public int CommanderSlots { get; init; }
+}
+
+/// <summary>Create/update a custom deck type. Game is required on create and ignored on update.</summary>
+public sealed record DeckTypeUpsertRequest
+{
+    public string Game { get; init; } = "";
+    public string Name { get; init; } = "";
+    public int? DeckSizeMin { get; init; }
+    public int? DeckSizeMax { get; init; }
+    public int? MaxCopiesPerCard { get; init; }
+    public bool Singleton { get; init; }
+    public bool BasicLandsExempt { get; init; }
+    public int CommanderSlots { get; init; }
+}
+
+/// <summary>A legacy deck box with no game assigned, plus the game inferred from its cards.</summary>
+public sealed record DeckBoxNeedsGameDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = "";
+    /// <summary>Inferred game (enum id) when the box's cards are all one game; null if empty/mixed.</summary>
+    public string? InferredGame { get; init; }
+    /// <summary>Distinct game enum ids present among the box's cards.</summary>
+    public IReadOnlyList<string> CardGames { get; init; } = [];
+}
+
+/// <summary>Advisory deck-legality result for a deck box.</summary>
+public sealed record DeckLegalityDto
+{
+    public bool Ok { get; init; } = true;
+    public string? DeckTypeName { get; init; }
+    public int MainDeckCount { get; init; }
+    public int CommanderCount { get; init; }
+    public int TotalDeckCount { get; init; }
+    public IReadOnlyList<DeckLegalityWarningDto> Warnings { get; init; } = [];
+}
+
+public sealed record DeckLegalityWarningDto(string Code, string Message);
 
 public sealed record RenameRequest
 {
@@ -186,6 +259,34 @@ public sealed record MoveCardsRequest
     public IReadOnlyList<int> CardIds { get; init; } = [];
     public int ContainerId { get; init; }
     public string? Section { get; init; }
+}
+
+/// <summary>Bulk-edit selected cards (lots). Each <c>SetX</c> flag opts that field into the change —
+/// only ticked fields are applied, so unticked fields keep their per-card values. Tags apply either
+/// additively (union) or as a full replacement, per <see cref="TagsMode"/>.</summary>
+public sealed record BulkUpdateCardsRequest
+{
+    public IReadOnlyList<int> CardIds { get; init; } = [];
+
+    public bool SetCondition { get; init; }
+    public string? Condition { get; init; }
+
+    public bool SetFoil { get; init; }
+    public bool IsFoil { get; init; }
+
+    public bool SetQuantity { get; init; }
+    public int Quantity { get; init; } = 1;
+
+    public bool SetPurchasePrice { get; init; }
+    public decimal? PurchasePrice { get; init; }
+
+    public bool SetNote { get; init; }
+    public string? Note { get; init; }
+
+    public bool SetTags { get; init; }
+    /// <summary>"add" (union onto each card) or "replace" (set the exact tag list on each card).</summary>
+    public string TagsMode { get; init; } = "add";
+    public IReadOnlyList<string> Tags { get; init; } = [];
 }
 
 public sealed record SetTagsRequest

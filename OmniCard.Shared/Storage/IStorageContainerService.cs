@@ -1,4 +1,5 @@
 using OmniCard.Shared.Binder;
+using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 
 namespace OmniCard.Shared.Storage;
@@ -13,8 +14,22 @@ public interface IStorageContainerService
     /// (e.g. the one being renamed). Used to keep location names globally unique.</summary>
     bool NameExists(string name, int? excludeId = null);
 
-    StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9);
+    /// <summary>Creates a location. <paramref name="game"/> and <paramref name="deckTypeId"/> are
+    /// applied only when <paramref name="type"/> is <see cref="ContainerType.DeckBox"/> (ignored
+    /// otherwise). A deck box may be created without a game (legacy/unassigned), but callers that
+    /// require one should validate before calling.</summary>
+    StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9,
+        CardGame? game = null, int? deckTypeId = null);
     void Rename(int id, string newName);
+
+    /// <summary>Assigns (or reassigns) a deck box's game system and deck type. Throws
+    /// <see cref="InvalidOperationException"/> if the container isn't a deck box, or if the box
+    /// already holds cards from a different game (which would violate the single-game invariant).</summary>
+    void SetDeckBox(int containerId, CardGame game, int? deckTypeId);
+
+    /// <summary>Deck boxes that have no game assigned yet (legacy, pre-feature), each with the game
+    /// inferred from the cards currently inside it when unambiguous. Backs the "assign game" prompt.</summary>
+    List<DeckBoxNeedsGame> GetDeckBoxesMissingGame();
     void Delete(int id, bool moveCardsToBulk = true);
     int GetCardCount(int containerId);
     void SetCoverCard(int containerId, int? cardId);

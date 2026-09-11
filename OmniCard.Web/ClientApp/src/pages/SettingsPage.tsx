@@ -37,6 +37,7 @@ import StarIcon from '@mui/icons-material/Star';
 import { api, ApiError } from '../api/client';
 import type { ComponentDto, UserDto } from '../api/types';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
+import { DeckTypesCard } from '../components/settings/DeckTypesCard';
 import { currencySymbol } from '../lib/scanBadges';
 import {
   usePreviewScale,
@@ -912,6 +913,7 @@ function ScanBadgesCard() {
 const TABS = [
   { key: 'sales', label: 'Sales', render: () => <SalesCard /> },
   { key: 'scan', label: 'Scan Badges', render: () => <ScanBadgesCard /> },
+  { key: 'deck-types', label: 'Deck Types', render: () => <DeckTypesCard /> },
   { key: 'appearance', label: 'Appearance', render: () => <AppearanceCard /> },
   { key: 'catalog', label: 'Catalog Data', render: () => <CatalogCard /> },
   { key: 'ebay', label: 'eBay', render: () => <EbayCard /> },

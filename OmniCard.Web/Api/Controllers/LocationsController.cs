@@ -15,6 +15,8 @@ namespace OmniCard.Web.Api.Controllers;
 public sealed class LocationsController(
     ICollectionQueryService queryService,
     IStorageContainerService containers,
+    IDeckTypeService deckTypes,
+    IDeckLegalityService deckLegality,
     IPriceSheetService priceSheets,
     IPriceSheetPdfExporter priceSheetPdf) : ApiControllerBase
 {
@@ -61,7 +63,8 @@ public sealed class LocationsController(
     public ActionResult<NameAvailableDto> NameAvailable([FromQuery] string name, [FromQuery] int? excludeId) =>
         new NameAvailableDto(!containers.NameExists(name ?? "", excludeId));
 
-    /// <summary>Create a new location. 409 if the name is taken, 400 for an invalid/Bulk type.</summary>
+    /// <summary>Create a new location. 409 if the name is taken, 400 for an invalid/Bulk type or a
+    /// deck box without a valid game.</summary>
     [HttpPost]
     public ActionResult<LocationSummaryDto> Create([FromBody] CreateLocationRequest req)
     {
@@ -70,12 +73,62 @@ public sealed class LocationsController(
             return BadRequest(new { error = "Name is required." });
         if (!Enum.TryParse<ContainerType>(req.Type, ignoreCase: true, out var type) || type == ContainerType.Bulk)
             return BadRequest(new { error = $"Invalid location type '{req.Type}'." });
+
+        CardGame? game = null;
+        if (type == ContainerType.DeckBox)
+        {
+            game = ParseGame(req.Game);
+            if (game is null)
+                return BadRequest(new { error = "A deck box must be assigned a game." });
+            if (req.DeckTypeId is int dt && !DeckTypeBelongsToGame(dt, game.Value))
+                return BadRequest(new { error = "The selected deck type doesn't belong to that game." });
+        }
+
         if (containers.NameExists(name))
             return Conflict(new { error = $"A location named \"{name}\" already exists." });
 
-        var created = containers.Create(name, type, req.SlotsPerPage);
-        return DtoMapping.ToDto(new LocationTileSummary { Container = created });
+        var created = containers.Create(name, type, req.SlotsPerPage, game, type == ContainerType.DeckBox ? req.DeckTypeId : null);
+        return DtoMapping.ToDto(new LocationTileSummary
+        {
+            Container = created,
+            DeckTypeName = created.DeckTypeId is int id ? deckTypes.GetById(id)?.Name : null,
+        });
     }
+
+    /// <summary>Assign/reassign a deck box's game system and deck type. 400 if not a deck box or the
+    /// game/deck type is invalid; 409 if the box already holds cards from a different game.</summary>
+    [HttpPut("{id:int}/deck-box")]
+    public IActionResult SetDeckBox(int id, [FromBody] SetDeckBoxRequest req)
+    {
+        var game = ParseGame(req.Game);
+        if (game is null)
+            return BadRequest(new { error = "A valid game is required." });
+        if (req.DeckTypeId is int dt && !DeckTypeBelongsToGame(dt, game.Value))
+            return BadRequest(new { error = "The selected deck type doesn't belong to that game." });
+        try
+        {
+            containers.SetDeckBox(id, game.Value, req.DeckTypeId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+        return NoContent();
+    }
+
+    /// <summary>Deck boxes with no game assigned yet (legacy), each with the game inferred from the
+    /// cards inside. Backs the "assign game" prompt on the Locations page.</summary>
+    [HttpGet("deck-boxes/needs-game")]
+    public ActionResult<IReadOnlyList<DeckBoxNeedsGameDto>> DeckBoxesNeedingGame() =>
+        containers.GetDeckBoxesMissingGame().Select(DtoMapping.ToDto).ToList();
+
+    /// <summary>Advisory deck-legality check for a deck box against its deck type's rules.</summary>
+    [HttpGet("{id:int}/deck-legality")]
+    public ActionResult<DeckLegalityDto> DeckLegality(int id) =>
+        DtoMapping.ToDto(deckLegality.Check(id));
+
+    private bool DeckTypeBelongsToGame(int deckTypeId, CardGame game) =>
+        deckTypes.GetById(deckTypeId) is { } dt && dt.Game == game;
 
     /// <summary>Rename a location. 409 if the new name is taken.</summary>
     [HttpPut("{id:int}")]

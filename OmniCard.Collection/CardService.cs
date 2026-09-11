@@ -19,6 +19,7 @@ using OmniCard.Shared.Settings;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.CardMatching.Games;
+using OmniCard.Collection.Inventory;
 
 namespace OmniCard.Collection;
 
@@ -1000,6 +1001,9 @@ public sealed class CardService : ICardService
     {
         using var context = _omniDbContextFactory.CreateDbContext();
 
+        // Hard block: a game-locked deck box rejects cards from other games (shared with the web path).
+        DeckBoxGameGuard.ValidateIncoming(context, container?.Id, [game]);
+
         var product = FindOrCreateProduct(context, game, match.GameSpecificId, isFoil, foilType,
             match.Name, match.SetCode, match.SetName, match.CollectorNumber, match.Rarity, match.ImageUri,
             CardAttributeExtractor.ExtractColor(match, game), CardAttributeExtractor.ExtractCardType(match, game));
@@ -1685,7 +1689,12 @@ public sealed class CardService : ICardService
         var ids = cardIds.ToList();
         // Category=Single guard, defense-in-depth: matches GetCollectionCards' scoping so a stray
         // sealed-lot id passed in from elsewhere can never be mutated via the singles write path.
-        var lots = context.Lots.Where(l => ids.Contains(l.Id) && l.Product.Category == ProductCategory.Single).ToList();
+        var lots = context.Lots.Include(l => l.Product)
+            .Where(l => ids.Contains(l.Id) && l.Product.Category == ProductCategory.Single).ToList();
+
+        // Hard block: a game-locked deck box rejects cards from other games (shared with the web path).
+        DeckBoxGameGuard.ValidateIncoming(context, containerId, lots.Select(l => l.Product.Game).Distinct());
+
         foreach (var lot in lots)
         {
             lot.LocationId = containerId;
@@ -1710,8 +1719,12 @@ public sealed class CardService : ICardService
         if (quantity < 1) throw new ArgumentOutOfRangeException(nameof(quantity));
         using var context = _omniDbContextFactory.CreateDbContext();
         // Category=Single guard mirrors MoveCardsToContainer — the singles write path never mutates a sealed lot.
-        var lot = context.Lots.FirstOrDefault(l => l.Id == lotId && l.Product.Category == ProductCategory.Single);
+        var lot = context.Lots.Include(l => l.Product)
+            .FirstOrDefault(l => l.Id == lotId && l.Product.Category == ProductCategory.Single);
         if (lot is null) return 0;
+
+        // Hard block: a game-locked deck box rejects cards from other games (shared with the web path).
+        DeckBoxGameGuard.ValidateIncoming(context, containerId, [lot.Product.Game]);
 
         // Whole-lot move: no split needed.
         if (quantity >= lot.Quantity)
