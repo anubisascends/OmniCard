@@ -165,6 +165,67 @@ public class ListServiceTests : IDisposable
     }
 
     [Fact]
+    public void AddCardsByName_WithSetAndCollector_PicksExactPrinting_NotCheapest()
+    {
+        var cards = new FakeCardService();
+        cards.Game.Printings.Add(Printing("Sol Ring", "a", "C16", "1"));   // cheaper printing
+        cards.Game.Printings.Add(Printing("Sol Ring", "b", "C21", "263")); // the printing the URL points at
+        cards.Game.Prices["a"] = 1.00m;
+        cards.Game.Prices["b"] = 9.00m;
+        var svc = CreateService(cards);
+        var list = svc.CreateList("L", CardGame.Mtg);
+
+        var result = svc.AddCardsByName(list.Id,
+            new[] { new DecklistEntry(1, "Sol Ring", "C21", "263") }, ListItemSource.Url);
+
+        Assert.Equal(1, result.AddedCount);
+        Assert.Empty(result.UnresolvedNames);
+        var item = Assert.Single(svc.GetItems(list.Id));
+        Assert.Equal("b", item.GameCardId);        // exact printing, not the cheaper "a"
+        Assert.Equal("C21", item.SetCode);
+        Assert.Equal("263", item.CollectorNumber);
+        Assert.Equal(9.00m, item.AddedMarketPrice);
+    }
+
+    [Fact]
+    public void AddCardsByName_ExactPrintingNotInCatalog_FallsBackToCheapestByName()
+    {
+        var cards = new FakeCardService();
+        cards.Game.Printings.Add(Printing("Sol Ring", "a", "C16", "1"));
+        cards.Game.Prices["a"] = 2.00m;
+        var svc = CreateService(cards);
+        var list = svc.CreateList("L", CardGame.Mtg);
+
+        // Asks for a set/collector the catalog doesn't have — still lands in the list via name fallback.
+        var result = svc.AddCardsByName(list.Id,
+            new[] { new DecklistEntry(1, "Sol Ring", "ZZZ", "999") }, ListItemSource.Url);
+
+        Assert.Equal(1, result.AddedCount);
+        var item = Assert.Single(svc.GetItems(list.Id));
+        Assert.Equal("a", item.GameCardId);
+    }
+
+    [Fact]
+    public void RefreshPrices_Url_KeepsExactPrinting()
+    {
+        var cards = new FakeCardService();
+        cards.Game.Printings.Add(Printing("Sol Ring", "a", "C16", "1"));
+        cards.Game.Printings.Add(Printing("Sol Ring", "b", "C21", "263"));
+        cards.Game.Prices["a"] = 1m;
+        cards.Game.Prices["b"] = 9m;
+        var svc = CreateService(cards);
+        var list = svc.CreateList("L", CardGame.Mtg);
+        svc.AddCardsByName(list.Id, new[] { new DecklistEntry(1, "Sol Ring", "C21", "263") }, ListItemSource.Url);
+
+        cards.Game.Prices["b"] = 12m; // the exact printing's price moves
+        svc.RefreshPrices(list.Id);
+
+        var item = Assert.Single(svc.GetItems(list.Id));
+        Assert.Equal("b", item.GameCardId);   // exact printing preserved, NOT re-resolved to the cheaper "a"
+        Assert.Equal(12m, item.AddedMarketPrice);
+    }
+
+    [Fact]
     public void AddCardsByName_NoPrice_FallsBackToFirst_AndFlagsUnpriced()
     {
         var cards = new FakeCardService();

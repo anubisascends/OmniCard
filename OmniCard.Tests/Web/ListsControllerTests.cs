@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using OmniCard.Api.Contracts;
 using OmniCard.Data;
 using OmniCard.Web.Services;
+using OmniCard.Shared.Cards;
 using OmniCard.Shared.Lists;
 using OmniCard.Shared.Settings;
 using OmniCard.Shared.Storage;
@@ -21,6 +22,7 @@ public class ListsControllerTests : IDisposable
     private readonly DbContextOptions<OmniCardDbContext> _opts;
     private readonly ListsController _controller;
     private readonly StorageContainerService _containers;
+    private readonly StubDecklists _decklists = new();
 
     public ListsControllerTests()
     {
@@ -32,7 +34,7 @@ public class ListsControllerTests : IDisposable
         var factory = new MockFactory(_opts);
         var listService = new ListService(factory, new WebCardService([]));
         var binderCards = new WebBinderCardService(factory, new StubDataPath());
-        _controller = new ListsController(listService, binderCards);
+        _controller = new ListsController(listService, _decklists, binderCards);
         _containers = new StorageContainerService(factory);
     }
 
@@ -122,9 +124,35 @@ public class ListsControllerTests : IDisposable
             _controller.Create(new CreateListRequest { Name = " ", Game = "Mtg" }).Result);
     }
 
+    [Fact]
+    public async Task ImportUrl_BlankUrl_Returns400()
+    {
+        var result = await _controller.ImportUrl(new ImportListUrlRequest { Url = " ", Game = "Mtg" });
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task ImportUrl_UnfetchableUrl_Returns400()
+    {
+        _decklists.FetchResult = null; // simulates a URL that couldn't be fetched/parsed
+        var result = await _controller.ImportUrl(
+            new ImportListUrlRequest { Url = "https://moxfield.com/decks/nope", Game = "Mtg" });
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+    }
+
     private sealed class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
         public OmniCardDbContext CreateDbContext() => new(options);
+    }
+
+    /// <summary>Stub decklist service — the URL-fetch result is set per test; parsing/check members are unused here.</summary>
+    private sealed class StubDecklists : IDecklistService
+    {
+        public (string DeckName, List<DecklistEntry> Entries)? FetchResult { get; set; }
+        public Task<(string DeckName, List<DecklistEntry> Entries)?> FetchDecklistAsync(string url) => Task.FromResult(FetchResult);
+        public (string DeckName, List<DecklistEntry> Entries) ParseDecklistText(string text) => throw new NotImplementedException();
+        public List<DecklistEntry> ParseDecklistPrintings(string text) => throw new NotImplementedException();
+        public DecklistCheckResult CheckAgainstCollection(string deckName, string deckSource, List<DecklistEntry> entries, CardGame game) => throw new NotImplementedException();
     }
 
     private sealed class StubDataPath : IDataPathService

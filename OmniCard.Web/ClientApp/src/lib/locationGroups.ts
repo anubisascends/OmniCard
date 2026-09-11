@@ -1,8 +1,7 @@
 import type { LocationSummaryDto } from '../api/types';
 
-// Order the per-type groups follow, and their (plural) section headings. Keys match the display
-// type string the API returns (LocationSummaryDto.Type), e.g. "Deck Box" / "Display Case".
-export const TYPE_ORDER = ['Binder', 'Box', 'Deck Box', 'Display Case', 'Bulk'];
+// (Plural) section headings per location type. Keys match the display type string the API returns
+// (LocationSummaryDto.Type), e.g. "Deck Box" / "Display Case".
 export const TYPE_HEADINGS: Record<string, string> = {
   Binder: 'Binders',
   Box: 'Boxes',
@@ -20,8 +19,9 @@ export interface LocationGroup {
   items: LocationSummaryDto[];
 }
 
-/** Always-available locations first, then the rest grouped by type; every group sorted A→Z.
- * Shared by the Locations page and the move-to-location picker so grouping stays aligned. */
+/** Always-available locations first, then the rest grouped by type with the type groups ordered
+ * alphabetically by heading; every group's own items sorted A→Z. Shared by the Locations page, the
+ * move-to-location picker, and the inline location dropdowns so grouping stays aligned everywhere. */
 export function groupLocations(locations: LocationSummaryDto[]): LocationGroup[] {
   const groups: LocationGroup[] = [];
 
@@ -34,17 +34,10 @@ export function groupLocations(locations: LocationSummaryDto[]): LocationGroup[]
     (byType.get(loc.type) ?? byType.set(loc.type, []).get(loc.type)!).push(loc);
   }
 
-  const orderedTypes = [...byType.keys()].sort((a, b) => {
-    const ia = TYPE_ORDER.indexOf(a);
-    const ib = TYPE_ORDER.indexOf(b);
-    if (ia !== -1 && ib !== -1) return ia - ib;
-    if (ia !== -1) return -1;
-    if (ib !== -1) return 1;
-    return a.localeCompare(b);
-  });
+  const typeGroups = [...byType.keys()]
+    .map((type) => ({ key: type, heading: TYPE_HEADINGS[type] ?? type, items: byType.get(type)!.sort(byName) }))
+    .sort((a, b) => a.heading.localeCompare(b.heading, undefined, { sensitivity: 'base' }));
 
-  for (const type of orderedTypes) {
-    groups.push({ key: type, heading: TYPE_HEADINGS[type] ?? type, items: byType.get(type)!.sort(byName) });
-  }
+  groups.push(...typeGroups);
   return groups;
 }

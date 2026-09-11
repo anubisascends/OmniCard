@@ -114,7 +114,7 @@ public class ListService(
         ctx.SaveChanges();
     }
 
-    public AddCardsResult AddCardsByName(int listId, IEnumerable<DecklistEntry> entries)
+    public AddCardsResult AddCardsByName(int listId, IEnumerable<DecklistEntry> entries, ListItemSource source = ListItemSource.Paste)
     {
         using var ctx = dbContextFactory.CreateDbContext();
         var list = ctx.CardLists.AsNoTracking().FirstOrDefault(l => l.Id == listId)
@@ -129,9 +129,13 @@ public class ListService(
 
         foreach (var entry in entries)
         {
-            var resolved = ResolveCheapest(gs, entry.CardName);
-            if (resolved is null) { unresolved.Add(entry.CardName); continue; }
-            var (printing, price, unpriced) = resolved.Value;
+            // Honor the exact printing (set + collector number) the entry specifies — e.g. the printing a
+            // Moxfield/Archidekt URL points at — instead of collapsing to the cheapest printing of the name.
+            // Fall back to cheapest-by-name so a card is never dropped just because its printing couldn't be
+            // located (a name-only line, or an exact set/collector that isn't in the catalog).
+            var printing = DecklistPrintingResolver.Resolve(gs, entry) ?? ResolveCheapest(gs, entry.CardName)?.Printing;
+            if (printing is null) { unresolved.Add(entry.CardName); continue; }
+            var price = gs.GetCurrentPrice(printing.GameSpecificId, isFoil: false);
 
             var existing = pendingByGameCardId.TryGetValue(printing.GameSpecificId, out var pending)
                 ? pending
@@ -153,8 +157,8 @@ public class ListService(
                     CollectorNumber = string.IsNullOrEmpty(printing.CollectorNumber) ? null : printing.CollectorNumber,
                     IsFoil = false,
                     AddedMarketPrice = price,
-                    IsUnpriced = unpriced,
-                    Source = ListItemSource.Paste,
+                    IsUnpriced = price is null,
+                    Source = source,
                 };
                 ctx.CardListItems.Add(newItem);
                 pendingByGameCardId[printing.GameSpecificId] = newItem;
@@ -175,7 +179,10 @@ public class ListService(
 
         foreach (var item in ctx.CardListItems.Where(i => i.CardListId == listId).ToList())
         {
-            if (item.Source == ListItemSource.Manual)
+            // Manual and URL-imported items point at a deliberately chosen printing (a URL import freezes the
+            // exact set + collector from the deck), so only reprice them — never swap the printing. Name-only
+            // sources (paste/file/scan) re-track the current cheapest printing of the name.
+            if (item.Source is ListItemSource.Manual or ListItemSource.Url)
             {
                 item.AddedMarketPrice = gs.GetCurrentPrice(item.GameCardId, item.IsFoil);
                 item.IsUnpriced = item.AddedMarketPrice is null;

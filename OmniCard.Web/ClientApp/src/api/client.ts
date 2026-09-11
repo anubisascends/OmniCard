@@ -12,6 +12,7 @@ import type {
   CommitListResultDto,
   CustomerDto,
   DashboardDto,
+  ImportListResultDto,
   EbaySetupResultDto,
   EbayStatusDto,
   InventoryLotDto,
@@ -413,6 +414,12 @@ export const api = {
     request<CommitListResultDto>(`/api/lists/${id}/commit`, {
       method: 'POST',
       body: JSON.stringify({ containerId, condition }),
+    }),
+  /** Import a Moxfield/Archidekt decklist URL. Omit `listId` to create a new list named after the deck. */
+  listImportUrl: (url: string, game: string, listId?: number) =>
+    request<ImportListResultDto>('/api/lists/import-url', {
+      method: 'POST',
+      body: JSON.stringify({ url, game, listId }),
     }),
 
   // Catalog refresh

@@ -29,6 +29,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { api, type LotFields, type ProductFields } from '../api/client';
 import type { InventoryLotDto, ProductDto } from '../api/types';
+import { locationSelectOptions } from '../components/LocationSelectOptions';
 import { useGame } from '../context/GameContext';
 
 const money = (n?: number | null) =>
@@ -283,12 +284,7 @@ function LotDialog({
               setFields((f) => ({ ...f, locationId: e.target.value === '' ? null : Number(e.target.value) }))
             }
           >
-            <MenuItem value="">— none —</MenuItem>
-            {locations.data?.map((l) => (
-              <MenuItem key={l.id} value={l.id}>
-                {l.name}
-              </MenuItem>
-            ))}
+            {locationSelectOptions(locations.data, { label: '— none —' })}
           </TextField>
           <TextField
             label="Source (optional)"

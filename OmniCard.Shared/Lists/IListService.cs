@@ -16,8 +16,12 @@ public interface IListService
     void RemoveItem(int itemId);
     void SetQuantity(int itemId, int quantity);
 
-    // Implemented in Task 3
-    AddCardsResult AddCardsByName(int listId, IEnumerable<DecklistEntry> entries);
+    /// <summary>Adds each decklist entry to the list, resolving to the exact printing named by the entry's
+    /// set + collector number when present (falling back to the cheapest printing by name otherwise). The
+    /// <paramref name="source"/> is stamped on new items and governs how <see cref="RefreshPrices"/> treats
+    /// them: <see cref="ListItemSource.Url"/> (and Manual) items keep their frozen printing on refresh, while
+    /// name-resolved sources re-track the current cheapest printing.</summary>
+    AddCardsResult AddCardsByName(int listId, IEnumerable<DecklistEntry> entries, ListItemSource source = ListItemSource.Paste);
     void RefreshPrices(int listId);
     List<DecklistEntry> ToDecklistEntries(int listId);
 
