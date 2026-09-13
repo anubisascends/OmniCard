@@ -692,10 +692,9 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             .AsNoTracking()
             .Select(c => new { c.SetCode, c.SetName })
             .Distinct()
-            .OrderBy(s => s.SetName)
             .AsEnumerable()
             .Select(s => new SetInfo(s.SetCode, s.SetName))
-            .ToList();
+            .InNaturalOrder();
     }
 
     public Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null)

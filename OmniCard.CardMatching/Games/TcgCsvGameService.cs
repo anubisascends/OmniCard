@@ -741,8 +741,8 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
     public IReadOnlyList<SetInfo> GetAvailableSets()
         => _readContext.Cards.AsNoTracking()
             .Select(c => new { c.SetCode, c.SetName }).Distinct()
-            .OrderBy(s => s.SetName).AsEnumerable()
-            .Select(s => new SetInfo(s.SetCode, s.SetName)).ToList();
+            .AsEnumerable()
+            .Select(s => new SetInfo(s.SetCode, s.SetName)).InNaturalOrder();
 
     public Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null)
     {
