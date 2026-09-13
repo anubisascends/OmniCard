@@ -22,11 +22,34 @@ namespace OmniCard.CardMatching.Games;
 
 public sealed class ScryfallService : IScryfallService, ICardGameService, IGameFieldResolver, IDisposable
 {
-    // MTG's search vocabulary is exactly the shared/Scryfall core (name/set/cn/type/color/rarity/…),
-    // which SearchCards already handles as columns — so it has no extra game-specific fields, and
-    // owned-card search never needs the cross-catalog id-resolution path.
-    public SearchSchema SearchSchema => SharedSearchSchema.Default;
-    public IReadOnlySet<string>? ResolveFieldCardIds(string field, ComparisonOp op, string value) => null;
+    // MTG exposes the full Scryfall vocabulary (see MtgSearchSchema). The catalog search
+    // (SearchCards) understands every field; owned-collection search additionally resolves the
+    // catalog-backed text/mana-value fields to card ids via ResolveFieldCardIds below.
+    public SearchSchema SearchSchema => MtgSearchSchema.Public;
+
+    // Fields that ResolveFieldCardIds can answer efficiently with a pure-SQL query (the sound
+    // prefilter is exact for these single-field/op combinations). Other catalog fields
+    // (power/toughness/keyword/colour-identity/price/…) would require a full in-memory catalog scan
+    // per keystroke, so owned-collection search leaves them to the name fallback; they remain fully
+    // supported in catalog search (SearchCards).
+    private static readonly HashSet<string> CollectionResolvableFields =
+        new(StringComparer.OrdinalIgnoreCase) { "oracle", "fulloracle", "flavor", "artist", "watermark", "cmc" };
+
+    public IReadOnlySet<string>? ResolveFieldCardIds(string field, ComparisonOp op, string value)
+    {
+        if (!CollectionResolvableFields.Contains(field))
+            return null;
+
+        var node = new FieldFilter(field, op, value, Negated: false);
+        var prefilter = ScryfallCardFilter.BuildSqlPrefilter(node);
+        if (prefilter is null)
+            return null; // e.g. cmc!= — not exactly SQL-translatable; skip rather than scan the catalog
+
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking().Where(prefilter)
+            .Select(c => c.Id).ToList()
+            .Select(id => id.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
 
     private static readonly JsonSerializerOptions ScryfallJsonOptions = new()
     {
@@ -958,16 +981,19 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
     }
 
     /// <summary>
-    /// Searches cards using Scryfall-style syntax. Supported prefixes:
-    ///   name: or n:    — card name
-    ///   set: s: or e:  — set code or set name
-    ///   cn: or number: — collector number
-    ///   t: or type:    — type line
-    ///   o: or oracle:  — oracle text
-    ///   r: or rarity:  — rarity (common, uncommon, rare, mythic)
-    ///   c: or color:   — color identity (w, u, b, r, g)
-    /// Plain text (no prefix) searches by name. Multiple terms are ANDed.
-    /// Quoted values are supported: name:"lightning bolt"
+    /// Searches the Scryfall catalog using the full
+    /// <see href="https://scryfall.com/docs/syntax">Scryfall search syntax</see>: colours (<c>c:</c>)
+    /// and identity (<c>id:</c>), types (<c>t:</c>), oracle text (<c>o:</c>), mana value (<c>cmc>=7</c>),
+    /// power/toughness/loyalty (<c>pow>=5</c>), mana cost (<c>m:</c>), keywords (<c>kw:</c>), rarity
+    /// (<c>r>=rare</c>), sets (<c>s:</c>, <c>st:</c>), artist/flavor/watermark, borders/frames,
+    /// prices (<c>usd&lt;1</c>), format legality (<c>f:modern</c>, <c>banned:</c>), <c>is:</c>/<c>has:</c>
+    /// flags, dates (<c>year>=2020</c>), plus boolean logic — <c>-</c> negation, <c>or</c>, parentheses,
+    /// <c>!</c> exact name — and result directives (<c>order:</c>, <c>direction:</c>, <c>unique:</c>).
+    /// See <see cref="MtgSearchSchema"/> for the full field list.
+    ///
+    /// Query evaluation runs a sound SQL prefilter (safe column predicates) to narrow the catalog, then
+    /// an exact in-memory pass (<see cref="ScryfallCardFilter"/>) that implements the full semantics for
+    /// list/JSON/numeric-text fields SQL can't compare portably.
     /// </summary>
     public List<CardMatch> SearchCards(string query, int maxResults = 20)
     {
@@ -975,28 +1001,23 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             return [];
 
         _logger.LogDebug("Searching cards with query: {Query} (max: {MaxResults})", query, maxResults);
-        var filters = ScryfallQueryParser.Parse(query);
+        var parsed = ScryfallQueryParser.ParseFilter(query, MtgSearchSchema.Catalog);
+        var (filter, directives) = ScryfallCardFilter.ExtractDirectives(parsed);
+
         IQueryable<Card> cards = _readContext.Cards.AsNoTracking();
+        var prefilter = filter is null ? null : ScryfallCardFilter.BuildSqlPrefilter(filter);
+        if (prefilter is not null)
+            cards = cards.Where(prefilter);
 
-        foreach (var (field, value) in filters)
-        {
-            var v = value; // capture for closure
-            cards = field switch
-            {
-                "name" => cards.Where(c => EF.Functions.Like(c.Name, $"%{v}%")),
-                "set" => cards.Where(c => EF.Functions.Like(c.SetCode, $"%{v}%")
-                                       || EF.Functions.Like(c.SetName, $"%{v}%")),
-                "cn" => cards.Where(c => c.CollectorNumber == v),
-                "type" => cards.Where(c => EF.Functions.Like(c.TypeLine, $"%{v}%")),
-                "oracle" => cards.Where(c => c.OracleText != null
-                                          && EF.Functions.Like(c.OracleText, $"%{v}%")),
-                "rarity" => cards.Where(c => EF.Functions.Like(c.Rarity, $"%{v}%")),
-                "color" => cards.Where(c => c.ColorIdentity.Contains(ScryfallQueryParser.ExpandColor(v))),
-                _ => cards.Where(c => EF.Functions.Like(c.Name, $"%{v}%")),
-            };
-        }
+        // Stream in name order (indexed) so simple queries short-circuit without buffering the catalog.
+        IEnumerable<Card> stream = cards.OrderBy(c => c.Name).AsEnumerable();
+        if (filter is not null)
+            stream = stream.Where(c => ScryfallCardFilter.Matches(c, filter));
+        stream = ScryfallCardFilter.ApplyUnique(stream, directives.Unique);
+        if (directives.Order is not null || directives.Descending)
+            stream = ScryfallCardFilter.ApplyOrder(stream, directives);
 
-        var results = cards.OrderBy(c => c.Name).Take(maxResults).ToList();
+        var results = stream.Take(maxResults).ToList();
         _logger.LogDebug("Search returned {Count} results for query: {Query}", results.Count, query);
         return results.Select(c => new CardMatch
         {
