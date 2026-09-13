@@ -24,6 +24,8 @@ import {
   Typography,
 } from '@mui/material';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
@@ -112,6 +114,103 @@ function identityOf(item: ScanItem) {
     };
   }
   return null;
+}
+
+/** Sortable/filterable name for an item, falling back to the file name for unmatched scans. */
+function itemName(item: ScanItem): string {
+  return identityOf(item)?.name ?? item.fileName;
+}
+
+/** Match confidence as a number, or null when there's no auto-match confidence (unmatched, still
+ * matching, errored, or hand-corrected — corrections carry no confidence score). */
+function itemConfidence(item: ScanItem): number | null {
+  if (item.override) return null;
+  const m = item.match;
+  if (!m?.matched) return null;
+  return m.confidence ?? 0;
+}
+
+/** Matched-card market value, or null when unknown (unmatched, corrected, or no price). */
+function itemPrice(item: ScanItem): number | null {
+  if (item.override) return null;
+  return item.match?.marketPrice ?? null;
+}
+
+type SortKey = 'none' | 'name' | 'confidence' | 'value';
+type SortDir = 'asc' | 'desc';
+type CheckedFilter = 'all' | 'checked' | 'unchecked';
+
+interface ScanListControls {
+  checked: CheckedFilter;
+  name: string;
+  /** Minimum confidence % to show; '' means no confidence floor. */
+  minConfidence: string;
+  /** Minimum market value to show; '' means no price floor. */
+  minPrice: string;
+  sortKey: SortKey;
+  sortDir: SortDir;
+}
+
+const DEFAULT_CONTROLS: ScanListControls = {
+  checked: 'all',
+  name: '',
+  minConfidence: '',
+  minPrice: '',
+  sortKey: 'none',
+  sortDir: 'asc',
+};
+
+/** Apply the filter half of the list controls to a single item. */
+function passesFilter(item: ScanItem, c: ScanListControls): boolean {
+  if (c.checked === 'checked' && !item.include) return false;
+  if (c.checked === 'unchecked' && item.include) return false;
+  if (c.name.trim()) {
+    if (!itemName(item).toLowerCase().includes(c.name.trim().toLowerCase())) return false;
+  }
+  if (c.minConfidence.trim() !== '') {
+    const floor = Number(c.minConfidence);
+    const conf = itemConfidence(item);
+    if (conf === null || conf < floor) return false;
+  }
+  if (c.minPrice.trim() !== '') {
+    const floor = Number(c.minPrice);
+    const price = itemPrice(item);
+    if (price === null || price < floor) return false;
+  }
+  return true;
+}
+
+/** Filter then sort `items` per the list controls. Sort is stable and leaves the original scan order
+ * (newest-first) intact when the sort key is 'none'; items missing a sort value sort last. */
+function applyControls(items: ScanItem[], c: ScanListControls): ScanItem[] {
+  const filtered = items.filter((it) => passesFilter(it, c));
+  if (c.sortKey === 'none') return filtered;
+  const dir = c.sortDir === 'asc' ? 1 : -1;
+  const valueOf = (it: ScanItem): number | string | null => {
+    switch (c.sortKey) {
+      case 'name':
+        return itemName(it).toLowerCase();
+      case 'confidence':
+        return itemConfidence(it);
+      case 'value':
+        return itemPrice(it);
+      default:
+        return null;
+    }
+  };
+  return filtered
+    .map((it, i) => ({ it, i }))
+    .sort((a, b) => {
+      const av = valueOf(a.it);
+      const bv = valueOf(b.it);
+      // Missing values always sink to the bottom regardless of sort direction.
+      if (av === null && bv === null) return a.i - b.i;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      const cmp = typeof av === 'string' ? av.localeCompare(bv as string) : av - (bv as number);
+      return cmp !== 0 ? cmp * dir : a.i - b.i; // Stable tiebreak by original index.
+    })
+    .map((x) => x.it);
 }
 
 function ConfidenceChip({ item }: { item: ScanItem }) {
@@ -866,10 +965,22 @@ export function ScanPage() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [items, setItems] = useState<ScanItem[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [controls, setControls] = useState<ScanListControls>(DEFAULT_CONTROLS);
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
 
   const selectedItem = items.find((it) => it.key === selectedKey) ?? null;
+
+  // The filtered + sorted view of the scans. Everything the toolbar acts on (Confirm / Add, the
+  // select-all header, bulk edit, and the batch counts) is scoped to these visible items, so a
+  // filtered list only ever confirms/commits what the user can actually see.
+  const visibleItems = useMemo(() => applyControls(items, controls), [items, controls]);
+  const visibleKeys = useMemo(() => new Set(visibleItems.map((it) => it.key)), [visibleItems]);
+  const controlsActive =
+    controls.checked !== 'all' ||
+    controls.name.trim() !== '' ||
+    controls.minConfidence.trim() !== '' ||
+    controls.minPrice.trim() !== '';
 
   // Keep a valid selection: default to the first item, and re-point if the selected one is removed.
   useEffect(() => {
@@ -889,16 +1000,18 @@ export function ScanPage() {
   // from the same origin (standard file-explorer / Gmail behaviour).
   const anchorKeyRef = useRef<string | null>(null);
   const toggleInclude = (key: string, checked: boolean, shiftKey: boolean) => {
-    const idx = items.findIndex((it) => it.key === key);
+    // Range selection walks the VISIBLE order so a Shift-click never toggles rows hidden by a filter.
+    const idx = visibleItems.findIndex((it) => it.key === key);
     const anchorIdx = anchorKeyRef.current
-      ? items.findIndex((it) => it.key === anchorKeyRef.current)
+      ? visibleItems.findIndex((it) => it.key === anchorKeyRef.current)
       : -1;
     if (shiftKey && anchorIdx !== -1 && idx !== -1) {
       const [lo, hi] = anchorIdx <= idx ? [anchorIdx, idx] : [idx, anchorIdx];
+      const rangeKeys = new Set(visibleItems.slice(lo, hi + 1).map((it) => it.key));
       // Only rows with a resolved identity are checkable, mirroring the single-toggle guard.
       setItems((prev) =>
-        prev.map((it, i) =>
-          i >= lo && i <= hi && identityOf(it) ? { ...it, include: checked } : it,
+        prev.map((it) =>
+          rangeKeys.has(it.key) && identityOf(it) ? { ...it, include: checked } : it,
         ),
       );
       return; // Keep the anchor where it is so the range can be adjusted with another Shift-click.
@@ -951,9 +1064,12 @@ export function ScanPage() {
   // A scan is committable only when it is BOTH confirmed (verified) AND checked (include).
   const isCommittable = (it: ScanItem) => it.include && it.verified && !!identityOf(it);
 
+  // Only ever act on visible items — a filtered list confirms/commits exactly what's on screen.
+  const isVisibleCommittable = (it: ScanItem) => visibleKeys.has(it.key) && isCommittable(it);
+
   const commit = useMutation({
     mutationFn: () => {
-      const payload = items.filter(isCommittable).map((it) => {
+      const payload = items.filter(isVisibleCommittable).map((it) => {
         const id = identityOf(it)!;
         return {
           ...id,
@@ -971,7 +1087,7 @@ export function ScanPage() {
     },
     onSuccess: (res) => {
       // Drop the cards that were just committed; keep everything else (unchecked or unconfirmed).
-      dropItems(isCommittable);
+      dropItems(isVisibleCommittable);
       qc.invalidateQueries({ queryKey: ['collection'] });
       qc.invalidateQueries({ queryKey: ['locations'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
@@ -979,21 +1095,35 @@ export function ScanPage() {
     },
   });
 
-  /** Confirm every checked-and-matched item at once (batch verify). */
+  /** Confirm every visible checked-and-matched item at once (batch verify). */
   const confirmChecked = () =>
     setItems((prev) =>
-      prev.map((it) => (it.include && identityOf(it) ? { ...it, verified: true } : it)),
+      prev.map((it) =>
+        visibleKeys.has(it.key) && it.include && identityOf(it) ? { ...it, verified: true } : it,
+      ),
     );
 
-  // --- Master-list selection helpers (only cards with a resolved identity can be checked). ---
+  // --- Master-list selection helpers (visible cards only; only those with a resolved identity are
+  // checkable). ---
   const selectAll = () =>
-    setItems((prev) => prev.map((it) => (identityOf(it) ? { ...it, include: true } : it)));
-  const selectNone = () => setItems((prev) => prev.map((it) => ({ ...it, include: false })));
+    setItems((prev) =>
+      prev.map((it) => (visibleKeys.has(it.key) && identityOf(it) ? { ...it, include: true } : it)),
+    );
+  const selectNone = () =>
+    setItems((prev) => prev.map((it) => (visibleKeys.has(it.key) ? { ...it, include: false } : it)));
   const invertSelection = () =>
-    setItems((prev) => prev.map((it) => (identityOf(it) ? { ...it, include: !it.include } : it)));
+    setItems((prev) =>
+      prev.map((it) =>
+        visibleKeys.has(it.key) && identityOf(it) ? { ...it, include: !it.include } : it,
+      ),
+    );
 
   const applyBulkEdit = (state: BulkEditState) => {
-    setItems((prev) => prev.map((it) => (it.include ? { ...it, ...applyBulk(state, it) } : it)));
+    setItems((prev) =>
+      prev.map((it) =>
+        visibleKeys.has(it.key) && it.include ? { ...it, ...applyBulk(state, it) } : it,
+      ),
+    );
     setBulkOpen(false);
   };
 
@@ -1051,14 +1181,19 @@ export function ScanPage() {
     await Promise.all(Array.from({ length: Math.min(MAX_IN_FLIGHT, staged.length) }, worker));
   }
 
-  const committableCount = useMemo(() => items.filter(isCommittable).length, [items]);
+  // All batch counts are scoped to the visible (filtered) list so the buttons' numbers match what
+  // they'll act on.
+  const committableCount = useMemo(() => visibleItems.filter(isCommittable).length, [visibleItems]);
   // Checked + matched but not yet confirmed — the batch "Confirm checked" button targets these.
   const confirmableCount = useMemo(
-    () => items.filter((it) => it.include && !it.verified && identityOf(it)).length,
-    [items],
+    () => visibleItems.filter((it) => it.include && !it.verified && identityOf(it)).length,
+    [visibleItems],
   );
-  const checkedCount = useMemo(() => items.filter((it) => it.include).length, [items]);
-  const selectableCount = useMemo(() => items.filter((it) => identityOf(it)).length, [items]);
+  const checkedCount = useMemo(() => visibleItems.filter((it) => it.include).length, [visibleItems]);
+  const selectableCount = useMemo(
+    () => visibleItems.filter((it) => identityOf(it)).length,
+    [visibleItems],
+  );
   const stillMatching = items.some((it) => it.status === 'matching');
   const selectedLocationName = useMemo(
     () => (containerId === '' ? null : locations.data?.find((l) => l.id === containerId)?.name ?? null),
@@ -1204,11 +1339,95 @@ export function ScanPage() {
                 : `Add ${committableCount} confirmed card${committableCount === 1 ? '' : 's'}`}
             </Button>
             <Typography variant="caption" color="text.secondary">
-              Only confirmed &amp; checked scans are added.
+              Only confirmed &amp; checked scans are added
+              {controlsActive ? ', and only those shown by the current filter' : ''}.
             </Typography>
             {commit.error && <Alert severity="error">{(commit.error as Error).message}</Alert>}
             {commit.data && (
               <Alert severity="success">Added {commit.data.imported} card(s) to your collection.</Alert>
+            )}
+          </Stack>
+        </Paper>
+      )}
+
+      {items.length > 0 && (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+            <TextField
+              size="small"
+              label="Filter by name"
+              value={controls.name}
+              onChange={(e) => setControls((c) => ({ ...c, name: e.target.value }))}
+              InputProps={{ startAdornment: <SearchIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} /> }}
+              sx={{ flex: '1 1 200px', minWidth: 180 }}
+            />
+            <TextField
+              select
+              size="small"
+              label="Show"
+              value={controls.checked}
+              onChange={(e) => setControls((c) => ({ ...c, checked: e.target.value as CheckedFilter }))}
+              sx={{ minWidth: 150 }}
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="checked">Checked only</MenuItem>
+              <MenuItem value="unchecked">Unchecked only</MenuItem>
+            </TextField>
+            <TextField
+              size="small"
+              type="number"
+              label="Min confidence %"
+              value={controls.minConfidence}
+              onChange={(e) => setControls((c) => ({ ...c, minConfidence: e.target.value }))}
+              inputProps={{ min: 0, max: 100 }}
+              sx={{ width: 150 }}
+            />
+            <TextField
+              size="small"
+              type="number"
+              label="Min value"
+              value={controls.minPrice}
+              onChange={(e) => setControls((c) => ({ ...c, minPrice: e.target.value }))}
+              inputProps={{ step: '0.01', min: 0 }}
+              sx={{ width: 130 }}
+            />
+            <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
+            <TextField
+              select
+              size="small"
+              label="Sort by"
+              value={controls.sortKey}
+              onChange={(e) => setControls((c) => ({ ...c, sortKey: e.target.value as SortKey }))}
+              sx={{ minWidth: 160 }}
+            >
+              <MenuItem value="none">None</MenuItem>
+              <MenuItem value="name">Name</MenuItem>
+              <MenuItem value="confidence">Confidence</MenuItem>
+              <MenuItem value="value">Market value</MenuItem>
+            </TextField>
+            <Tooltip title={controls.sortDir === 'asc' ? 'Ascending' : 'Descending'}>
+              <span>
+                <IconButton
+                  size="small"
+                  disabled={controls.sortKey === 'none'}
+                  onClick={() =>
+                    setControls((c) => ({ ...c, sortDir: c.sortDir === 'asc' ? 'desc' : 'asc' }))
+                  }
+                >
+                  {controls.sortDir === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />}
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Box sx={{ flexGrow: 1 }} />
+            {(controlsActive || controls.sortKey !== 'none') && (
+              <>
+                <Typography variant="caption" color="text.secondary">
+                  Showing {visibleItems.length} of {items.length}
+                </Typography>
+                <Button size="small" onClick={() => setControls(DEFAULT_CONTROLS)}>
+                  Clear
+                </Button>
+              </>
             )}
           </Stack>
         </Paper>
@@ -1276,7 +1495,7 @@ export function ScanPage() {
               </Button>
             </Box>
             <Stack divider={<Divider />}>
-              {items.map((item) => (
+              {visibleItems.map((item) => (
                 <MasterRow
                   key={item.key}
                   item={item}
@@ -1286,6 +1505,16 @@ export function ScanPage() {
                   onToggle={(v, shiftKey) => toggleInclude(item.key, v, shiftKey)}
                 />
               ))}
+              {visibleItems.length === 0 && (
+                <Box sx={{ p: 3, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No scans match the current filter.
+                  </Typography>
+                  <Button size="small" sx={{ mt: 1 }} onClick={() => setControls(DEFAULT_CONTROLS)}>
+                    Clear filter
+                  </Button>
+                </Box>
+              )}
             </Stack>
           </Paper>
 
