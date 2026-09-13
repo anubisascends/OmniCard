@@ -382,6 +382,36 @@ export const api = {
   // Import / Export
   exportUrl: (format: string, game?: string, q?: string) =>
     `/api/export/collection${qs({ format, game, q })}`,
+  exportSelection: async (ids: number[], format: string) => {
+    const res = await fetch('/api/export/selection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, format }),
+      credentials: 'same-origin',
+    });
+    if (!res.ok) {
+      let message = res.statusText;
+      try {
+        const b = await res.json();
+        if (b?.error) message = b.error;
+      } catch {
+        /* non-JSON error body */
+      }
+      throw new ApiError(res.status, message);
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') ?? '';
+    const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+    const filename = match ? decodeURIComponent(match[1]) : `selection-${format}.csv`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
   importCsv: async (file: File, skipDuplicates: boolean, targetContainerId?: number) => {
     const form = new FormData();
     form.append('file', file);
