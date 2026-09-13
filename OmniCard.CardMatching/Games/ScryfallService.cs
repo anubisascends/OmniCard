@@ -711,7 +711,8 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
 
     public IReadOnlyList<SetInfo> GetAvailableSets()
     {
-        return _readContext.Cards
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards
             .AsNoTracking()
             .Select(c => new { c.SetCode, c.SetName })
             .Distinct()
@@ -727,7 +728,8 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
         // Total cards per set (distinct collector numbers). Grouped by SetCode alone — Scryfall's
         // bulk data occasionally has the same SetCode under slightly different SetName strings
         // (e.g. localized/promo variants), which would otherwise collide as duplicate dictionary keys.
-        var setTotals = _readContext.Cards
+        using var ctx = _dbContextFactory.CreateDbContext();
+        var setTotals = ctx.Cards
             .AsNoTracking()
             .GroupBy(c => c.SetCode)
             .Select(g => new
@@ -772,7 +774,8 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
     {
         var ownedSet = ownedCollectorNumbers.ToHashSet();
 
-        return _readContext.Cards
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards
             .AsNoTracking()
             .Where(c => c.SetCode == setCode)
             .AsEnumerable()
@@ -798,7 +801,9 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
     }
 
     public List<SetCatalogCard> GetSetCards(string setCode)
-        => _readContext.Cards.AsNoTracking()
+    {
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking()
             .Where(c => c.SetCode == setCode).AsEnumerable()
             .GroupBy(c => c.CollectorNumber).Select(g => g.First())
             .Select(c => new SetCatalogCard
@@ -817,6 +822,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             })
             .OrderBy(c => c.CollectorNumber, CollectorNumberComparer.Instance)
             .ToList();
+    }
 
     private static decimal? ParseUsd(string? value)
         => decimal.TryParse(value, System.Globalization.NumberStyles.Number,
@@ -1003,7 +1009,10 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
         var parsed = ScryfallQueryParser.ParseFilter(query, MtgSearchSchema.Catalog);
         var (filter, directives) = ScryfallCardFilter.ExtractDirectives(parsed);
 
-        IQueryable<Card> cards = _readContext.Cards.AsNoTracking();
+        // Per-call context: this runs on request threads and DbContext is not thread-safe, so the
+        // shared _readContext would throw under concurrent searches (fast typing → overlapping requests).
+        using var ctx = _dbContextFactory.CreateDbContext();
+        IQueryable<Card> cards = ctx.Cards.AsNoTracking();
         var prefilter = filter is null ? null : ScryfallCardFilter.BuildSqlPrefilter(filter);
         if (prefilter is not null)
             cards = cards.Where(prefilter);
@@ -1037,7 +1046,8 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
         if (string.IsNullOrWhiteSpace(cardName))
             return [];
 
-        var results = _readContext.Cards
+        using var ctx = _dbContextFactory.CreateDbContext();
+        var results = ctx.Cards
             .AsNoTracking()
             .Where(c => c.Name == cardName)
             .OrderBy(c => c.SetName)

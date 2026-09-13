@@ -770,7 +770,8 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
 
     public IReadOnlyList<SetInfo> GetAvailableSets()
     {
-        return _readContext.Cards
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards
             .AsNoTracking()
             .Select(c => new { c.SetId, c.SetName })
             .Distinct()
@@ -785,7 +786,8 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
 
         // Total cards per set (counted by distinct printed CardNumber, so alt-art
         // variant rows do not inflate totals; SetId is the set code)
-        var setTotals = _readContext.Cards
+        using var ctx = _dbContextFactory.CreateDbContext();
+        var setTotals = ctx.Cards
             .AsNoTracking()
             .Select(c => new { c.SetId, c.SetName, c.CardNumber })
             .Distinct()
@@ -830,7 +832,8 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
     {
         var ownedSet = ownedCollectorNumbers.ToHashSet();
 
-        return _readContext.Cards
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards
             .AsNoTracking()
             .Where(c => c.SetId == setCode)
             .AsEnumerable()
@@ -855,7 +858,9 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
     }
 
     public List<SetCatalogCard> GetSetCards(string setCode)
-        => _readContext.Cards.AsNoTracking()
+    {
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking()
             .Where(c => c.SetId == setCode).AsEnumerable()
             .GroupBy(c => c.CardNumber)
             .Select(g => g.OrderBy(c => c.VariantIndex).First())
@@ -875,6 +880,7 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
             })
             .OrderBy(c => c.CollectorNumber, CollectorNumberComparer.Instance)
             .ToList();
+    }
 
     private CardMatch? LookupOptcgCard(string cardSetId, double? confidence = null)
     {
@@ -949,7 +955,10 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
 
         _logger.LogDebug("Searching OPTCG cards with query: {Query} (max: {MaxResults})", query, maxResults);
         var node = ScryfallQueryParser.ParseFilter(query, SearchSchema);
-        IQueryable<OptcgCard> cards = _readContext.Cards.AsNoTracking();
+        // Per-call context: DbContext is not thread-safe; the shared _readContext throws under
+        // concurrent searches (fast typing fans out overlapping /api/scan/search requests).
+        using var ctx = _dbContextFactory.CreateDbContext();
+        IQueryable<OptcgCard> cards = ctx.Cards.AsNoTracking();
         var lambda = CatalogSearchExpressionBuilder.Build(node, SearchSchema, FieldMap);
         if (lambda is not null) cards = cards.Where(lambda);
 
@@ -974,7 +983,8 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
         if (!SearchSchema.IsGameSpecific(field)) return null;
         var resolved = SearchSchema.ResolveValue(field, value);
         var lambda = CatalogSearchExpressionBuilder.SingleField(field, op, resolved, FieldMap);
-        return _readContext.Cards.AsNoTracking().Where(lambda).Select(c => c.CardSetId).ToHashSet();
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking().Where(lambda).Select(c => c.CardSetId).ToHashSet();
     }
 
     public List<CardMatch> GetPrintings(string cardName)
@@ -982,7 +992,8 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
         if (string.IsNullOrWhiteSpace(cardName))
             return [];
 
-        var results = _readContext.Cards
+        using var ctx = _dbContextFactory.CreateDbContext();
+        var results = ctx.Cards
             .AsNoTracking()
             .Where(c => c.CardName == cardName)
             .OrderBy(c => c.SetName)
@@ -1005,7 +1016,8 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
 
     public decimal? GetCurrentPrice(string gameCardId, bool isFoil)
     {
-        return _readContext.Cards.AsNoTracking()
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking()
             .Where(c => c.CardSetId == gameCardId)
             .Select(c => c.MarketPrice)
             .FirstOrDefault();
@@ -1019,9 +1031,10 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
 
         var result = new Dictionary<string, decimal>(ids.Count);
 
+        using var ctx = _dbContextFactory.CreateDbContext();
         foreach (var chunk in ids.Chunk(500))
         {
-            var rows = _readContext.Cards.AsNoTracking()
+            var rows = ctx.Cards.AsNoTracking()
                 .Where(c => chunk.Contains(c.CardSetId))
                 .Select(c => new { c.CardSetId, c.MarketPrice })
                 .ToList();
