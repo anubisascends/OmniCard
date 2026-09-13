@@ -30,10 +30,12 @@ import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
 import PlaceIcon from '@mui/icons-material/Place';
 import SearchIcon from '@mui/icons-material/Search';
+import VideocamIcon from '@mui/icons-material/Videocam';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import { api } from '../api/client';
 import { useGame } from '../context/GameContext';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
+import { WebcamScanDialog } from '../components/dialogs/WebcamScanDialog';
 import { ScanValueBadges } from '../lib/scanBadges';
 import type { ScanBadgeSettingsDto, ScanMatchDto, ScanSearchResultDto } from '../api/types';
 
@@ -860,6 +862,7 @@ export function ScanPage() {
   const [condition, setCondition] = useState('NM');
   const [containerId, setContainerId] = useState<number | ''>('');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [webcamOpen, setWebcamOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [items, setItems] = useState<ScanItem[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -994,9 +997,14 @@ export function ScanPage() {
     setBulkOpen(false);
   };
 
-  async function handleFiles(files: FileList | null) {
-    if (!files) return;
-    const chosen = Array.from(files);
+  function handleFiles(files: FileList | null) {
+    return stageFiles(Array.from(files ?? []));
+  }
+
+  // Stage a set of images and match them with bounded concurrency. Shared by the file-input paths and
+  // the webcam capture dialog (each captured card arrives here as a one-element File[]).
+  async function stageFiles(chosen: File[]) {
+    if (chosen.length === 0) return;
     // Seed each new scan's per-copy properties from the current batch defaults. A TIFF gets no local
     // blob preview (browsers can't render it) — the server preview arrives with the match.
     const staged: ScanItem[] = chosen.map((file) => ({
@@ -1118,6 +1126,13 @@ export function ScanPage() {
             onClick={() => cameraInput.current?.click()}
           >
             Take photo
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<VideocamIcon />}
+            onClick={() => setWebcamOpen(true)}
+          >
+            Use webcam
           </Button>
           <Button
             variant="outlined"
@@ -1320,6 +1335,11 @@ export function ScanPage() {
           setPickerOpen(false);
         }}
         onClose={() => setPickerOpen(false)}
+      />
+      <WebcamScanDialog
+        open={webcamOpen}
+        onCapture={(file) => void stageFiles([file])}
+        onClose={() => setWebcamOpen(false)}
       />
     </Stack>
   );
