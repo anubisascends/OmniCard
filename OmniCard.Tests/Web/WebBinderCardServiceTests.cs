@@ -205,6 +205,51 @@ public class WebBinderCardServiceTests : IDisposable
     }
 
     [Fact]
+    public void GetCollectionCards_ReturnsSelectedLotsAsCollectionCards()
+    {
+        var a = AddLot("Alpha");
+        var b = AddLot("Bravo");
+        AddLot("Charlie"); // not selected
+
+        var result = _service.GetCollectionCards([a, b]);
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, c => c.Id == a && c.Name == "Alpha");
+        Assert.Contains(result, c => c.Id == b && c.Name == "Bravo");
+        Assert.DoesNotContain(result, c => c.Name == "Charlie");
+    }
+
+    [Fact]
+    public void GetCollectionCards_ExcludesNonSingleProductLots()
+    {
+        var single = AddLot("A Single");
+        int sealedLotId;
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            var sealedProduct = new Product
+            {
+                Game = CardGame.Pokemon,
+                Category = ProductCategory.Box, // sealed booster box, not a single card
+                GameCardId = "booster-box",
+                Name = "Booster Box",
+                SetCode = "SET",
+                SetName = "Set Name",
+            };
+            ctx.Products.Add(sealedProduct);
+            ctx.SaveChanges();
+            var lot = new InventoryLot { ProductId = sealedProduct.Id, LocationId = _binderId, Condition = "NM" };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            sealedLotId = lot.Id;
+        }
+
+        var result = _service.GetCollectionCards([single, sealedLotId]);
+
+        Assert.Single(result);
+        Assert.Equal(single, result[0].Id);
+    }
+
+    [Fact]
     public void DeleteCollectionCard_RemovesLot()
     {
         var lotId = AddLot("Doomed");

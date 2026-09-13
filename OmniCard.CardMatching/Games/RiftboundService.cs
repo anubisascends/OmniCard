@@ -716,8 +716,8 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
     public IReadOnlyList<SetInfo> GetAvailableSets()
         => _readContext.Cards.AsNoTracking()
             .Select(c => new { c.SetId, c.SetName }).Distinct()
-            .OrderBy(s => s.SetName).AsEnumerable()
-            .Select(s => new SetInfo(s.SetId, s.SetName)).ToList();
+            .AsEnumerable()
+            .Select(s => new SetInfo(s.SetId, s.SetName)).InNaturalOrder();
 
     public Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null)
     {

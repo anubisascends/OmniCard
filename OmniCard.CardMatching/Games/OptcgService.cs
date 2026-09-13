@@ -283,8 +283,16 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
                     return;
                 }
 
+                // The poneglyph per-card `set_name` is a placeholder ("One Piece 17");
+                // the real set name lives at the set level (detail.Data.Name /
+                // "The World's Strongest Warriors"). Prefer it, falling back to the
+                // set summary name and finally the per-card placeholder.
+                var setName = !string.IsNullOrWhiteSpace(detail.Data.Name) ? detail.Data.Name
+                    : !string.IsNullOrWhiteSpace(set.Name) ? set.Name
+                    : null;
+
                 var rows = detail.Data.Cards
-                    .SelectMany(card => card.Variants.Select(v => MapVariant(card, v)))
+                    .SelectMany(card => card.Variants.Select(v => MapVariant(card, v, setName)))
                     .ToList();
 
                 lock (cardsLock)
@@ -365,7 +373,7 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
             $"One Piece prices updated ({updated} cards)"));
     }
 
-    private static OptcgCard MapVariant(OptcgApiCard card, OptcgApiVariant variant)
+    private static OptcgCard MapVariant(OptcgApiCard card, OptcgApiVariant variant, string? setName = null)
     {
         var uid = variant.Index == 0 ? card.CardNumber : $"{card.CardNumber}_p{variant.Index}";
 
@@ -383,7 +391,7 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
             Artist = variant.Artist,
             CardName = card.Name,
             SetId = card.Set,
-            SetName = card.SetName,
+            SetName = !string.IsNullOrWhiteSpace(setName) ? setName : card.SetName,
             Rarity = card.Rarity ?? "",
             CardColor = string.Join("/", card.Color),
             CardType = card.CardType,
@@ -766,10 +774,9 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
             .AsNoTracking()
             .Select(c => new { c.SetId, c.SetName })
             .Distinct()
-            .OrderBy(s => s.SetName)
             .AsEnumerable()
             .Select(s => new SetInfo(s.SetId, s.SetName))
-            .ToList();
+            .InNaturalOrder();
     }
 
     public Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null)

@@ -219,11 +219,12 @@ public class OptcgSetFilterTests : IDisposable
         var svc = CreateService();
         var sets = svc.GetAvailableSets();
         Assert.Equal(2, sets.Count);
-        // Ordered by SetName: "Paramount War" before "Romance Dawn"
-        Assert.Equal("Paramount War", sets[0].SetName);
-        Assert.Equal("OP02", sets[0].SetCode);
-        Assert.Equal("Romance Dawn", sets[1].SetName);
-        Assert.Equal("OP01", sets[1].SetCode);
+        // Ordered by set code in natural order: OP01 ("Romance Dawn") before OP02 ("Paramount War"),
+        // so numbered sets sort by release/number rather than alphabetically by display name.
+        Assert.Equal("Romance Dawn", sets[0].SetName);
+        Assert.Equal("OP01", sets[0].SetCode);
+        Assert.Equal("Paramount War", sets[1].SetName);
+        Assert.Equal("OP02", sets[1].SetCode);
     }
 
     private class TestOptcgDbFactory(DbContextOptions<OptcgDbContext> options) : IDbContextFactory<OptcgDbContext>

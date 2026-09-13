@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
+  Menu,
   MenuItem,
   Popover,
   Stack,
@@ -27,6 +28,7 @@ import ChecklistIcon from '@mui/icons-material/Checklist';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
 import EditIcon from '@mui/icons-material/Edit';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import SellIcon from '@mui/icons-material/Sell';
 import { api } from '../api/client';
 import type { CardDto } from '../api/types';
@@ -42,6 +44,14 @@ import {
 
 const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 const STACK_KEY = 'omnicard.stackDuplicates';
+
+// CSV export formats offered for a selection, mirroring the whole-collection export options.
+const EXPORT_FORMATS: { value: string; label: string }[] = [
+  { value: 'appnative', label: 'OmniCard (full detail)' },
+  { value: 'tcgplayer', label: 'TCGplayer' },
+  { value: 'moxfield', label: 'Moxfield' },
+  { value: 'manabox', label: 'ManaBox' },
+];
 
 /**
  * Shared collection card list used by both the Collection page and Location detail. Server-paginated;
@@ -118,6 +128,11 @@ export function CardTable({
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkChannel, setBulkChannel] = useState('Manual');
   const [bulkNote, setBulkNote] = useState('');
+  const [exportAnchor, setExportAnchor] = useState<HTMLElement | null>(null);
+  const exportCsv = useMutation({
+    mutationFn: (format: string) => api.exportSelection(selectedLotIds, format),
+    onSettled: () => setExportAnchor(null),
+  });
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['collection'] });
@@ -244,6 +259,21 @@ export function CardTable({
             <Button size="small" startIcon={<SellIcon />} onClick={() => setBulkListOpen(true)}>
               List for sale
             </Button>
+            <Button
+              size="small"
+              startIcon={<FileDownloadIcon />}
+              disabled={exportCsv.isPending}
+              onClick={(e) => setExportAnchor(e.currentTarget)}
+            >
+              Export CSV
+            </Button>
+            <Menu anchorEl={exportAnchor} open={!!exportAnchor} onClose={() => setExportAnchor(null)}>
+              {EXPORT_FORMATS.map((f) => (
+                <MenuItem key={f.value} onClick={() => exportCsv.mutate(f.value)}>
+                  {f.label}
+                </MenuItem>
+              ))}
+            </Menu>
             <Button
               size="small"
               color="error"
