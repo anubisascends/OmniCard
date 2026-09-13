@@ -373,6 +373,108 @@ public class ScryfallServiceTests : IDisposable
         Assert.NotNull(svc);
     }
 
+    // --- SearchCards: full Scryfall syntax (parse → SQL prefilter → in-memory matcher) ---
+
+    private void SeedSearchCatalog()
+    {
+        using var ctx = new ScryfallDbContext(_dbOptions);
+        ctx.Cards.AddRange(
+            new Card
+            {
+                Id = Guid.NewGuid(), Name = "Lightning Bolt", Lang = "en", SetCode = "lea", SetName = "Alpha",
+                SetType = "core", CollectorNumber = "161", TypeLine = "Instant", Cmc = 1, ManaCost = "{R}",
+                OracleText = "Lightning Bolt deals 3 damage to any target.", Colors = ["R"], ColorIdentity = ["R"],
+                Rarity = "common", Keywords = [], Games = ["paper"], ReleasedAt = "1993-08-05",
+                Legalities = new() { ["legacy"] = "legal" }, Prices = new Prices { Usd = "3.50" },
+            },
+            new Card
+            {
+                Id = Guid.NewGuid(), Name = "Shivan Dragon", Lang = "en", SetCode = "m19", SetName = "Core 2019",
+                SetType = "core", CollectorNumber = "217", TypeLine = "Creature — Dragon", Cmc = 6, ManaCost = "{4}{R}{R}",
+                OracleText = "Flying", Power = "5", Toughness = "5", Colors = ["R"], ColorIdentity = ["R"],
+                Rarity = "rare", Keywords = ["Flying"], Games = ["paper", "arena"], ReleasedAt = "2018-07-13",
+                Legalities = new() { ["modern"] = "legal" }, Prices = new Prices { Usd = "0.35" },
+            },
+            new Card
+            {
+                Id = Guid.NewGuid(), Name = "Teferi, Hero of Dominaria", Lang = "en", SetCode = "dom", SetName = "Dominaria",
+                SetType = "expansion", CollectorNumber = "207", TypeLine = "Legendary Planeswalker — Teferi", Cmc = 5,
+                ManaCost = "{3}{W}{U}", OracleText = "+1: Draw a card.", Loyalty = "4", Colors = ["W", "U"],
+                ColorIdentity = ["W", "U"], Rarity = "mythic", Keywords = [], Games = ["paper", "mtgo", "arena"],
+                ReleasedAt = "2018-04-27", Legalities = new() { ["modern"] = "legal" }, Prices = new Prices { Usd = "12.00" },
+            });
+        ctx.SaveChanges();
+    }
+
+    private static List<string> Names(IEnumerable<OmniCard.Shared.Matching.CardMatch> matches) =>
+        matches.Select(m => m.Name).OrderBy(n => n).ToList();
+
+    [Fact]
+    public void SearchCards_TypeAndManaValue_UsesPrefilterAndMatcher()
+    {
+        SeedSearchCatalog();
+        var svc = CreateServiceWithLanguages();
+        var results = svc.SearchCards("t:creature cmc>=6");
+        Assert.Equal(["Shivan Dragon"], Names(results));
+    }
+
+    [Fact]
+    public void SearchCards_ColorIdentity_InMemory()
+    {
+        SeedSearchCatalog();
+        var svc = CreateServiceWithLanguages();
+        Assert.Equal(["Teferi, Hero of Dominaria"], Names(svc.SearchCards("c:wu")));
+    }
+
+    [Fact]
+    public void SearchCards_PowerComparison_InMemory()
+    {
+        SeedSearchCatalog();
+        var svc = CreateServiceWithLanguages();
+        Assert.Equal(["Shivan Dragon"], Names(svc.SearchCards("pow>=5")));
+    }
+
+    [Fact]
+    public void SearchCards_OrExpression()
+    {
+        SeedSearchCatalog();
+        var svc = CreateServiceWithLanguages();
+        Assert.Equal(["Lightning Bolt", "Teferi, Hero of Dominaria"], Names(svc.SearchCards("t:instant or t:planeswalker")));
+    }
+
+    [Fact]
+    public void SearchCards_Negation()
+    {
+        SeedSearchCatalog();
+        var svc = CreateServiceWithLanguages();
+        Assert.Equal(["Teferi, Hero of Dominaria"], Names(svc.SearchCards("-c:r")));
+    }
+
+    [Fact]
+    public void SearchCards_FormatLegalityAndPrice()
+    {
+        SeedSearchCatalog();
+        var svc = CreateServiceWithLanguages();
+        Assert.Equal(["Shivan Dragon"], Names(svc.SearchCards("f:modern usd<1")));
+    }
+
+    [Fact]
+    public void SearchCards_OrderDirective_Descending()
+    {
+        SeedSearchCatalog();
+        var svc = CreateServiceWithLanguages();
+        var results = svc.SearchCards("order:cmc direction:desc");
+        Assert.Equal(["Shivan Dragon", "Teferi, Hero of Dominaria", "Lightning Bolt"], results.Select(m => m.Name).ToList());
+    }
+
+    [Fact]
+    public void SearchCards_ExactName()
+    {
+        SeedSearchCatalog();
+        var svc = CreateServiceWithLanguages();
+        Assert.Equal(["Lightning Bolt"], Names(svc.SearchCards("!\"Lightning Bolt\"")));
+    }
+
     // --- Test helpers ---
 
     private class MockHttpMessageHandler : HttpMessageHandler
