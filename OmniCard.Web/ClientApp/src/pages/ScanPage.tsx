@@ -241,10 +241,21 @@ function CorrectionSearch({
 }) {
   const [q, setQ] = useState('');
   const [cn, setCn] = useState('');
-  const active = q.trim().length >= 2 || cn.trim() !== '';
+  // Debounce so fast typing doesn't fan out overlapping requests (which previously raced on the
+  // server's shared DbContext and returned spurious "No matches").
+  const [dq, setDq] = useState('');
+  const [dcn, setDcn] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDq(q);
+      setDcn(cn);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q, cn]);
+  const active = dq.trim().length >= 2 || dcn.trim() !== '';
   const search = useQuery({
-    queryKey: ['scan-search', game, q, cn, setCodes],
-    queryFn: () => api.scanSearch(game, q, setCodes, cn.trim() || undefined),
+    queryKey: ['scan-search', game, dq, dcn, setCodes],
+    queryFn: () => api.scanSearch(game, dq, setCodes, dcn.trim() || undefined),
     enabled: active,
   });
   return (

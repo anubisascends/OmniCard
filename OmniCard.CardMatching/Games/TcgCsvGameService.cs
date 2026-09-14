@@ -739,14 +739,18 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
     }
 
     public IReadOnlyList<SetInfo> GetAvailableSets()
-        => _readContext.Cards.AsNoTracking()
+    {
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking()
             .Select(c => new { c.SetCode, c.SetName }).Distinct()
             .AsEnumerable()
             .Select(s => new SetInfo(s.SetCode, s.SetName)).InNaturalOrder();
+    }
 
     public Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null)
     {
-        var setTotals = _readContext.Cards.AsNoTracking()
+        using var ctx = _dbContextFactory.CreateDbContext();
+        var setTotals = ctx.Cards.AsNoTracking()
             .Select(c => new { c.SetCode, c.SetName, c.CollectorNumber }).Distinct()
             .AsEnumerable()
             .GroupBy(c => new { c.SetCode, c.SetName })
@@ -776,7 +780,8 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
     public List<MissingCard> GetMissingCards(string setCode, IEnumerable<string> ownedCollectorNumbers)
     {
         var ownedSet = ownedCollectorNumbers.ToHashSet();
-        return _readContext.Cards.AsNoTracking()
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking()
             .Where(c => c.SetCode == setCode).AsEnumerable()
             .Where(c => !ownedSet.Contains(c.CollectorNumber))
             .GroupBy(c => c.CollectorNumber)
@@ -794,7 +799,9 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
     }
 
     public List<SetCatalogCard> GetSetCards(string setCode)
-        => _readContext.Cards.AsNoTracking()
+    {
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking()
             .Where(c => c.SetCode == setCode).AsEnumerable()
             .GroupBy(c => c.CollectorNumber)
             .Select(g => g.First())
@@ -814,6 +821,7 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
             })
             .OrderBy(c => c.CollectorNumber, CollectorNumberComparer.Instance)
             .ToList();
+    }
 
     public List<CardMatch> SearchCards(string query, int maxResults = 20)
     {
@@ -823,7 +831,10 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
         var node = ScryfallQueryParser.ParseFilter(query, schema);
         if (node is null) return [];
 
-        IQueryable<TcgCsvCard> cards = _readContext.Cards.AsNoTracking();
+        // Per-call context: DbContext is not thread-safe; the shared _readContext throws under
+        // concurrent searches (fast typing fans out overlapping /api/scan/search requests).
+        using var ctx = _dbContextFactory.CreateDbContext();
+        IQueryable<TcgCsvCard> cards = ctx.Cards.AsNoTracking();
 
         // Core-only queries (name/set/cn/type/rarity) translate fully to SQL. Queries that touch a
         // game-specific field must fall back to an in-memory pass over the blob — pre-filtered by the
@@ -945,8 +956,9 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
         var key = SearchSchema.Find(field)?.SourceKey ?? field;
 
         var ids = new HashSet<string>();
+        using var ctx = _dbContextFactory.CreateDbContext();
         // Project only the id + blob (avoids loading images/hashes); parse each in memory.
-        foreach (var row in _readContext.Cards.AsNoTracking()
+        foreach (var row in ctx.Cards.AsNoTracking()
                      .Select(c => new { c.ProductId, c.ExtendedDataJson }))
         {
             var dict = ExtendedDataParser.ParseToLookup(row.ExtendedDataJson);
@@ -959,7 +971,8 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
     public List<CardMatch> GetPrintings(string cardName)
     {
         if (string.IsNullOrWhiteSpace(cardName)) return [];
-        return _readContext.Cards.AsNoTracking()
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking()
             .Where(c => c.Name == cardName)
             .OrderBy(c => c.SetName).ThenBy(c => c.CollectorNumber)
             .AsEnumerable().Select(c => ToMatch(c)).ToList();
@@ -968,7 +981,8 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
     public decimal? GetCurrentPrice(string gameCardId, bool isFoil)
     {
         if (!int.TryParse(gameCardId, out var id)) return null;
-        var row = _readContext.Cards.AsNoTracking().Where(c => c.ProductId == id)
+        using var ctx = _dbContextFactory.CreateDbContext();
+        var row = ctx.Cards.AsNoTracking().Where(c => c.ProductId == id)
             .Select(c => new { c.MarketPrice, c.FoilMarketPrice }).FirstOrDefault();
         if (row is null) return null;
         return isFoil ? row.FoilMarketPrice ?? row.MarketPrice : row.MarketPrice ?? row.FoilMarketPrice;
@@ -979,9 +993,10 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
         var ids = gameCardIds.Select(s => int.TryParse(s, out var i) ? i : (int?)null).OfType<int>().Distinct().ToList();
         if (ids.Count == 0) return [];
         var result = new Dictionary<string, decimal>(ids.Count);
+        using var ctx = _dbContextFactory.CreateDbContext();
         foreach (var chunk in ids.Chunk(500))
         {
-            var rows = _readContext.Cards.AsNoTracking().Where(c => chunk.Contains(c.ProductId))
+            var rows = ctx.Cards.AsNoTracking().Where(c => chunk.Contains(c.ProductId))
                 .Select(c => new { c.ProductId, c.MarketPrice, c.FoilMarketPrice }).ToList();
             foreach (var row in rows)
             {

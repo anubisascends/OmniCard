@@ -714,14 +714,18 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
 
     // === Query surface ===
     public IReadOnlyList<SetInfo> GetAvailableSets()
-        => _readContext.Cards.AsNoTracking()
+    {
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking()
             .Select(c => new { c.SetId, c.SetName }).Distinct()
             .AsEnumerable()
             .Select(s => new SetInfo(s.SetId, s.SetName)).InNaturalOrder();
+    }
 
     public Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null)
     {
-        var setTotals = _readContext.Cards.AsNoTracking()
+        using var ctx = _dbContextFactory.CreateDbContext();
+        var setTotals = ctx.Cards.AsNoTracking()
             .Select(c => new { c.SetId, c.SetName, c.CollectorNumber }).Distinct()
             .AsEnumerable()
             .GroupBy(c => new { c.SetId, c.SetName })
@@ -752,7 +756,8 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
     public List<MissingCard> GetMissingCards(string setCode, IEnumerable<string> ownedCollectorNumbers)
     {
         var ownedSet = ownedCollectorNumbers.ToHashSet();
-        return _readContext.Cards.AsNoTracking()
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking()
             .Where(c => c.SetId == setCode).AsEnumerable()
             .Where(c => !ownedSet.Contains(c.CollectorNumber.ToString()))
             .GroupBy(c => c.CollectorNumber)
@@ -774,7 +779,9 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
     }
 
     public List<SetCatalogCard> GetSetCards(string setCode)
-        => _readContext.Cards.AsNoTracking()
+    {
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking()
             .Where(c => c.SetId == setCode).AsEnumerable()
             .GroupBy(c => c.CollectorNumber)
             .Select(g => g.OrderBy(c => c.AlternateArt).First())
@@ -794,6 +801,7 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
             })
             .OrderBy(c => c.CollectorNumber, CollectorNumberComparer.Instance)
             .ToList();
+    }
 
     // Riftbound searchable fields. Core name/set/cn/type/rarity map to columns; domain/energy/might/
     // power/supertype are game-specific (also resolvable for owned-card search).
@@ -845,7 +853,10 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
     {
         if (string.IsNullOrWhiteSpace(query)) return [];
         var node = ScryfallQueryParser.ParseFilter(query, SearchSchema);
-        IQueryable<RiftboundCard> cards = _readContext.Cards.AsNoTracking();
+        // Per-call context: DbContext is not thread-safe; the shared _readContext throws under
+        // concurrent searches (fast typing fans out overlapping /api/scan/search requests).
+        using var ctx = _dbContextFactory.CreateDbContext();
+        IQueryable<RiftboundCard> cards = ctx.Cards.AsNoTracking();
         var lambda = CatalogSearchExpressionBuilder.Build(node, SearchSchema, FieldMap);
         if (lambda is not null) cards = cards.Where(lambda);
         return cards.OrderBy(c => c.Name).Take(maxResults).AsEnumerable().Select(c => ToMatch(c)).ToList();
@@ -856,13 +867,15 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
         if (!SearchSchema.IsGameSpecific(field)) return null;
         var resolved = SearchSchema.ResolveValue(field, value);
         var lambda = CatalogSearchExpressionBuilder.SingleField(field, op, resolved, FieldMap);
-        return _readContext.Cards.AsNoTracking().Where(lambda).Select(c => c.Id).ToHashSet();
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking().Where(lambda).Select(c => c.Id).ToHashSet();
     }
 
     public List<CardMatch> GetPrintings(string cardName)
     {
         if (string.IsNullOrWhiteSpace(cardName)) return [];
-        return _readContext.Cards.AsNoTracking()
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking()
             .Where(c => c.Name == cardName)
             .OrderBy(c => c.SetName).ThenBy(c => c.CollectorNumber)
             .AsEnumerable().Select(c => ToMatch(c)).ToList();
@@ -872,7 +885,8 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
     // other subtype so a card resolves a price whenever any subtype has one.
     public decimal? GetCurrentPrice(string gameCardId, bool isFoil)
     {
-        var row = _readContext.Cards.AsNoTracking()
+        using var ctx = _dbContextFactory.CreateDbContext();
+        var row = ctx.Cards.AsNoTracking()
             .Where(c => c.Id == gameCardId)
             .Select(c => new { c.MarketPrice, c.FoilMarketPrice })
             .FirstOrDefault();
@@ -890,9 +904,10 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
 
         var result = new Dictionary<string, decimal>(ids.Count);
 
+        using var ctx = _dbContextFactory.CreateDbContext();
         foreach (var chunk in ids.Chunk(500))
         {
-            var rows = _readContext.Cards.AsNoTracking()
+            var rows = ctx.Cards.AsNoTracking()
                 .Where(c => chunk.Contains(c.Id))
                 .Select(c => new { c.Id, c.MarketPrice, c.FoilMarketPrice })
                 .ToList();
