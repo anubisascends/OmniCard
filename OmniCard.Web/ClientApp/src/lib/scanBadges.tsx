@@ -1,6 +1,32 @@
-import { Box, Stack, Tooltip } from '@mui/material';
+import { Box, Chip, Stack, Tooltip } from '@mui/material';
 import StarIcon from '@mui/icons-material/Star';
 import type { ScanBadgeSettingsDto } from '../api/types';
+
+/**
+ * "The List" badge for MTG scans where the Planeswalker glyph was detected (a plst reprint — a distinct,
+ * cheaper printing). Renders nothing for non-List cards. When the plst printing couldn't be resolved the
+ * badge turns into a warning so the reviewer knows the shown printing/price may be the pricier original.
+ */
+export function ListReprintChip({
+  isListReprint,
+  unresolved,
+  size = 'small',
+}: {
+  isListReprint?: boolean;
+  unresolved?: boolean;
+  size?: 'small' | 'medium';
+}) {
+  if (!isListReprint) return null;
+  return unresolved ? (
+    <Tooltip title="Detected as a The List reprint, but its plst printing wasn't found in the catalog — the printing and price shown may be the more expensive original. Check before adding.">
+      <Chip size={size} color="warning" variant="outlined" label="The List?" />
+    </Tooltip>
+  ) : (
+    <Tooltip title="The List (plst) reprint — an official, cheaper printing. Matched to the plst printing.">
+      <Chip size={size} color="secondary" variant="outlined" label="The List" />
+    </Tooltip>
+  );
+}
 
 /** The localized currency symbol (e.g. "$", "€", "£") for an ISO code, rendered per the browser's
  * locale — falls back to the raw code if the runtime can't resolve a narrow symbol. */

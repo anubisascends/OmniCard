@@ -125,9 +125,16 @@ public sealed class WebScanMatchingService
             return best;
         });
 
+        // 5b. The List (plst) reprints print the MTG Planeswalker glyph in the bottom-left. They carry
+        //     the *original* set's code + collector, so without this they match (and price as) the pricier
+        //     original. Detect it once here; RefineWithOcrAsync remaps the lookup to the plst printing.
+        bool isListReprint = false;
+        if (game == CardGame.Mtg)
+            (isListReprint, _) = await _ocrService.DetectMtgListSymbolAsync(imageBytes);
+
         // 6. OCR refinement — for MTG the printed (set, collector) is ground truth and overrides even
         //    a confident pHash guess; the other games use the collector number to pin the printing.
-        match = await RefineWithOcrAsync(imageBytes, game, gameService, hash, artHashes, edgeHash, detectedSets, setFilter, match);
+        match = await RefineWithOcrAsync(imageBytes, game, gameService, hash, artHashes, edgeHash, detectedSets, setFilter, match, isListReprint);
 
         // 7. If still nothing, retry rotated 180° (cards are often fed upside down).
         if (match is null)
@@ -153,6 +160,16 @@ public sealed class WebScanMatchingService
             if (edition is not null && edConf >= 0.5)
                 dto = dto with { Edition = edition };
         }
+
+        // The List (plst) flag. When the remap resolved, the match's set code is "plst" and pricing/identity
+        // are already correct; when it couldn't (glyph seen but no plst printing found), the match is the
+        // original-set printing — surface that so the reviewer can sanity-check the (higher) price.
+        if (isListReprint)
+            dto = dto with
+            {
+                IsListReprint = true,
+                ListReprintUnresolved = !string.Equals(match?.SetCode, "plst", StringComparison.OrdinalIgnoreCase),
+            };
         return dto;
     }
 
@@ -185,7 +202,7 @@ public sealed class WebScanMatchingService
     private async Task<CardMatch?> RefineWithOcrAsync(
         byte[] imageBytes, CardGame game, ICardGameService gameService, ulong hash,
         ulong[]? artHashes, ulong? edgeHash, IReadOnlySet<string>? detectedSets,
-        IReadOnlySet<string>? setFilter, CardMatch? current)
+        IReadOnlySet<string>? setFilter, CardMatch? current, bool isListReprint = false)
     {
         try
         {
@@ -213,6 +230,27 @@ public sealed class WebScanMatchingService
                     {
                         // Ground truth: bottom-left (set, collector) uniquely identifies a Scryfall printing.
                         var (ocrSet, ocrNumber, conf) = await _ocrService.DetectMtgSetAndNumberAsync(imageBytes);
+
+                        // The List (plst) reprint: the glyph tells us this is really a plst printing (a
+                        // distinct, cheaper card) even though it prints the *original* set's code/collector.
+                        // Identify it hard-constrained to plst: pass the OCR-derived plst key
+                        // ("{ORIGINALSET}-{collector}") so an exact (set, collector) hit wins when the
+                        // collector line read cleanly, and fall through to pHash/art matching within plst
+                        // (which shares the original's art) when it didn't — the List frame makes the
+                        // collector-line OCR unreliable, so the image is the sturdier signal. Only when
+                        // nothing in plst matches do we fall back to the original printing (flagged upstream).
+                        if (isListReprint)
+                        {
+                            OcrMatchResult? plstOcr = ocrSet is not null && ocrNumber is not null && conf >= 0.5
+                                ? new OcrMatchResult { SetCode = "plst", CollectorNumber = $"{ocrSet.ToUpperInvariant()}-{ocrNumber.TrimStart('0')}", CollectorNumberConfidence = conf }
+                                : null;
+                            var plstFilter = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "plst" };
+                            var plstMatch = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, plstOcr, plstFilter, detectedSets, scanEdgeHash: edgeHash));
+                            if (plstMatch is not null)
+                                return plstMatch;
+                            _logger.LogInformation("List glyph detected but no plst match found — falling back to the original printing");
+                        }
+
                         if (ocrSet is not null && ocrNumber is not null && conf >= 0.5)
                         {
                             var gt = new OcrMatchResult { SetCode = ocrSet, CollectorNumber = ocrNumber, CollectorNumberConfidence = conf };

@@ -410,6 +410,13 @@ export interface ScanMatchDto {
   /** Printed edition read from the scan (Yu-Gi-Oh! only): "1st Edition" / "Limited Edition", or null
    * when no edition text is printed (Unlimited) or not applicable. Informational at review time. */
   edition?: string | null;
+  /** True when the MTG Planeswalker glyph was detected, marking this as a The List (plst) reprint —
+   * a distinct, cheaper printing. When set, the match is remapped to the plst printing. Drives the
+   * "The List" badge. MTG only. */
+  isListReprint?: boolean;
+  /** True when the List glyph was detected but the plst printing wasn't found in the catalog, so the
+   * match fell back to the original (pricier) printing — the price should be sanity-checked. */
+  listReprintUnresolved?: boolean;
 }
 
 export interface ScanSearchResultDto {

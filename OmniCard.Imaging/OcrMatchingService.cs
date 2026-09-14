@@ -109,10 +109,34 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
 
     public Dictionary<string, ulong> SymbolHashes { get; set; } = [];
 
+    // The List (plst) reprints print the MTG Planeswalker "hand" logo immediately left of the collector
+    // number. We locate it with normalized cross-correlation (NCC) of a search window around that spot
+    // against a template built from real reference crops. NCC normalizes out local brightness/contrast,
+    // so the glyph is found the same on a blank dark border, a busy filigree border, or a bright foil —
+    // where a plain pHash of the crop was swamped by border texture. Tuned on real scans: cards with the
+    // glyph score ~0.69–0.88, cards without (regular printings, MB2, playtest) score ≤0.54. See
+    // MtgListSymbolDetectionTests. The reference crops in Assets/ were extracted at TemplateRegion.
+    internal static readonly (double X, double Y, double W, double H) MtgListSymbolTemplateRegion =
+        (0.021, 0.905, 0.062, 0.070);
+    // Wider window the template slides within, absorbing card-to-card drift of the collector line.
+    internal static readonly (double X, double Y, double W, double H) MtgListSymbolSearchRegion =
+        (0.005, 0.885, 0.110, 0.110);
+    private const int ListTemplateW = 40, ListTemplateH = 48;   // template raster size
+    private const int ListWindowW = 80, ListWindowH = 90;       // search-window raster size
+    // Peak NCC at/above which the glyph counts as present. 0.60 sits in the wide gap between the two
+    // clusters (~0.15 margin either side), so scanner/lighting variation doesn't flip the decision.
+    private const double MtgListSymbolMinCorrelation = 0.60;
+
+    // Zero-mean template built once from the embedded reference glyph crops, plus its L2 norm for NCC.
+    private float[]? _listTemplate;
+    private double _listTemplateNorm;
+
     public OcrMatchingService(IPerceptualHashService hashService, ILogger<OcrMatchingService> logger)
     {
         _hashService = hashService;
         _logger = logger;
+
+        LoadListSymbolReferences();
 
         _tessdataPath = Path.Combine(AppContext.BaseDirectory, "tessdata");
 
@@ -689,6 +713,156 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         {
             _logger.LogWarning(ex, "MTG set/number detection failed");
             return (null, null, 0);
+        }
+    }
+
+    public Task<(bool Present, double Confidence)> DetectMtgListSymbolAsync(byte[] imageData)
+        => Task.Run(() => DetectMtgListSymbol(imageData));
+
+    // Detects the Planeswalker "hand" glyph The List (plst) prints left of the collector number. We
+    // pHash a small bottom-left box and compare against embedded reference crops of the glyph. Cards
+    // drift a few pixels scan-to-scan, so we sample a small grid of offsets around the nominal box and
+    // keep the closest match — the glyph only has to line up on one of them. Blank borders (any color)
+    // stay far from every reference because the glyph's bright shape dominates the low-frequency DCT.
+    internal (bool Present, double Confidence) DetectMtgListSymbol(byte[] imageData)
+    {
+        var peak = PeakListSymbolCorrelation(imageData);
+        var present = peak >= MtgListSymbolMinCorrelation;
+        if (present)
+            _logger.LogInformation("MTG List (plst) Planeswalker glyph detected (NCC {Peak:F3})", peak);
+        else
+            _logger.LogDebug("MTG List glyph not detected (peak NCC {Peak:F3})", peak);
+        // Report the peak correlation itself as the confidence — it already lives in [0,1].
+        return (present, Math.Max(0, peak));
+    }
+
+    // Peak normalized cross-correlation between the glyph template and the bottom-left search window.
+    // Exposed internal so the validation test can inspect the raw separation. Returns -1 when the
+    // template is missing or the image isn't a usable portrait crop.
+    internal double PeakListSymbolCorrelation(byte[] imageData)
+    {
+        if (_listTemplate is null) return -1;
+        try
+        {
+            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            // Portrait card scans only — the glyph position is defined for upright cards.
+            if (bitmap.Width > bitmap.Height) return -1;
+
+            var rect = ToPixelRect(MtgListSymbolSearchRegion, bitmap.Width, bitmap.Height);
+            // The crop is resized up to the window raster regardless, so only reject degenerate crops.
+            if (rect.Width < 8 || rect.Height < 8) return -1;
+
+            var window = GrayResize(bitmap, rect, ListWindowW, ListWindowH);
+            return MaxNcc(window, ListWindowW, ListWindowH, _listTemplate, _listTemplateNorm, ListTemplateW, ListTemplateH);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "MTG List symbol detection failed");
+            return -1;
+        }
+    }
+
+    // Crop `rect`, resize to w×h, return row-major luminance in [0,255].
+    private static float[] GrayResize(Bitmap source, Rectangle rect, int w, int h)
+    {
+        using var cropped = source.Clone(rect, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using var resized = new Bitmap(w, h);
+        using (var g = Graphics.FromImage(resized))
+        {
+            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            g.DrawImage(cropped, 0, 0, w, h);
+        }
+        var px = new float[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                var c = resized.GetPixel(x, y);
+                px[y * w + x] = 0.299f * c.R + 0.587f * c.G + 0.114f * c.B;
+            }
+        return px;
+    }
+
+    // Slide a zero-mean template over the window and return the highest Pearson correlation (ZNCC) over
+    // all offsets. Template is pre-zero-meaned with L2 norm `tNorm`; each candidate patch is zero-meaned
+    // per position (so the score is invariant to the local border's brightness and contrast).
+    private static double MaxNcc(float[] win, int ww, int wh, float[] tmpl, double tNorm, int tw, int th)
+    {
+        if (tNorm <= 0) return -1;
+        double best = -1;
+        int n = tw * th;
+        for (int oy = 0; oy <= wh - th; oy++)
+        {
+            for (int ox = 0; ox <= ww - tw; ox++)
+            {
+                double sum = 0;
+                for (int y = 0; y < th; y++)
+                {
+                    int wrow = (oy + y) * ww + ox;
+                    for (int x = 0; x < tw; x++)
+                        sum += win[wrow + x];
+                }
+                double mean = sum / n;
+                double num = 0, energy = 0;
+                for (int y = 0; y < th; y++)
+                {
+                    int wrow = (oy + y) * ww + ox;
+                    int trow = y * tw;
+                    for (int x = 0; x < tw; x++)
+                    {
+                        double d = win[wrow + x] - mean;
+                        num += d * tmpl[trow + x];
+                        energy += d * d;
+                    }
+                }
+                if (energy <= 0) continue;
+                double ncc = num / (Math.Sqrt(energy) * tNorm);
+                if (ncc > best) best = ncc;
+            }
+        }
+        return best;
+    }
+
+    // Builds the zero-mean glyph template from the embedded reference crops. Each crop is grayscaled,
+    // resized to the template raster, and per-crop contrast-normalized before averaging so all references
+    // contribute equally regardless of their border brightness. Runs once at construction.
+    private void LoadListSymbolReferences()
+    {
+        try
+        {
+            var asm = System.Reflection.Assembly.GetExecutingAssembly();
+            var accum = new double[ListTemplateW * ListTemplateH];
+            int count = 0;
+            foreach (var name in asm.GetManifestResourceNames())
+            {
+                if (!name.Contains("mtg-list-glyph", StringComparison.OrdinalIgnoreCase)) continue;
+                using var stream = asm.GetManifestResourceStream(name);
+                if (stream is null) continue;
+                using var bmp = new Bitmap(stream);
+                var g = GrayResize(bmp, new Rectangle(0, 0, bmp.Width, bmp.Height), ListTemplateW, ListTemplateH);
+                // Per-crop z-normalize.
+                double mean = g.Average(v => (double)v);
+                double var = g.Average(v => (v - mean) * (v - mean));
+                double std = Math.Sqrt(var) + 1e-3;
+                for (int i = 0; i < accum.Length; i++) accum[i] += (g[i] - mean) / std;
+                count++;
+            }
+            if (count == 0)
+            {
+                _logger.LogWarning("No MTG List glyph reference templates found — List (plst) detection disabled");
+                return;
+            }
+            // Average, then zero-mean the template and record its L2 norm for the NCC denominator.
+            var tmpl = new float[accum.Length];
+            for (int i = 0; i < accum.Length; i++) tmpl[i] = (float)(accum[i] / count);
+            double tmean = tmpl.Average(v => (double)v);
+            double norm = 0;
+            for (int i = 0; i < tmpl.Length; i++) { tmpl[i] = (float)(tmpl[i] - tmean); norm += tmpl[i] * (double)tmpl[i]; }
+            _listTemplate = tmpl;
+            _listTemplateNorm = Math.Sqrt(norm);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load MTG List glyph references — detection disabled");
         }
     }
 
