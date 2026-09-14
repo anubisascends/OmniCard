@@ -75,8 +75,11 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     // primary MTG match signal — see CardService's MTG scan branch and ScryfallService Phase 0. The
     // crop starts at the far left and is kept narrow so most of the artist credit on line 2 falls
     // outside it; the multi-line block read is robust to the two lines drifting vertically card-to-card.
+    // Two-line bottom-left block: line 1 is rarity + collector number ("R 0172"), line 2 is
+    // set code + language + artist ("SOC • EN · Artist"). The region must span BOTH lines because
+    // TryExtractMtgSetAndNumber needs the collector number from line 1 and the set code from line 2.
     internal static readonly (double X, double Y, double W, double H) MtgCollectorRegion =
-        (0.02, 0.945, 0.34, 0.05);
+        (0.02, 0.912, 0.34, 0.066);
 
     // Whitelist: the codes are upper-case letters + digits; the bullet/separator and slash vary
     // (the • often OCRs as ., *, or nothing), so allow the common separators through for the regex.
@@ -92,8 +95,10 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     // Group 1 is the set code (3-5 alphanumerics); the separator and language anchor it. At least one
     // separator (space and/or bullet/punctuation) is required between the set code and the language so
     // the language can't be matched as a substring of an ordinary word (e.g. "ES" inside "RULES").
+    // A single stray letter may sit between the separator and the language code: the promo/special
+    // "★" printed between set code and language OCRs as a whitelisted letter (e.g. "SOC ★ EN" → "SOC XEN").
     private static readonly System.Text.RegularExpressions.Regex MtgSetCodePattern =
-        new(@"\b([A-Z0-9]{3,5})[\s•·.*\-]+(EN|DE|FR|IT|ES|PT|JA|JP|KO|RU|ZH|CT|CS|PH)\b",
+        new(@"\b([A-Z0-9]{3,5})[\s•·.*\-]+[A-Z]?(EN|DE|FR|IT|ES|PT|JA|JP|KO|RU|ZH|CT|CS|PH)\b",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
 
     // Matches the collector number: a run of 1-4 digits, optionally "{collector}/{total}".
