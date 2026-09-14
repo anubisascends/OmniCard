@@ -928,9 +928,8 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
     public void RecordCorrection(ulong scanHash, string correctCardId, ulong? artScanHash = null)
     {
         using var ctx = _dbContextFactory.CreateDbContext();
-        ctx.Database.ExecuteSqlRaw(
-            "INSERT OR REPLACE INTO HashCorrections (ScanHash, CorrectCardId, CreatedAt) VALUES ({0}, {1}, {2})",
-            (long)scanHash, correctCardId, DateTime.UtcNow.ToString("o"));
+        // Provider-agnostic upsert (was SQLite-only INSERT OR REPLACE; failed on SQL Server catalogs).
+        OmniCard.Data.Catalogs.HashCorrectionUpsert.Upsert(ctx, scanHash, correctCardId, artScanHash);
         _correctionsCache = null;
     }
 

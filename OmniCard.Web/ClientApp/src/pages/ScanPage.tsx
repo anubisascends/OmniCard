@@ -648,6 +648,9 @@ function DetailPanel({
             />
           )}
           {item.verified && <Chip size="small" color="success" label="Verified" />}
+          {item.match?.edition && (
+            <Chip size="small" variant="outlined" color="info" label={item.match.edition} />
+          )}
           <Box sx={{ flexGrow: 1 }} />
           <Button variant="outlined" startIcon={<ZoomInIcon />} onClick={() => setScanOpen(true)}>
             View scan
@@ -1092,6 +1095,10 @@ export function ScanPage() {
           purchasePrice: it.purchasePrice.trim() === '' ? null : Number(it.purchasePrice),
           note: it.note.trim() === '' ? null : it.note.trim(),
           tags: it.tags,
+          // Carry the scan's hash so the server records this confirmed identity for future auto-matching.
+          // Present on both auto-matches and manual corrections (it.match holds the original scan result
+          // even when the identity was overridden).
+          scanHash: it.match?.scanHash ?? null,
         };
       });
       return api.scanCommit(containerId as number, payload);

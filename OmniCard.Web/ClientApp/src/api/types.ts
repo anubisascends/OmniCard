@@ -407,6 +407,9 @@ export interface ScanMatchDto {
    * in a browser <img>. Null for JPEG/PNG. */
   scanPreviewDataUri?: string | null;
   error?: string | null;
+  /** Printed edition read from the scan (Yu-Gi-Oh! only): "1st Edition" / "Limited Edition", or null
+   * when no edition text is printed (Unlimited) or not applicable. Informational at review time. */
+  edition?: string | null;
 }
 
 export interface ScanSearchResultDto {
@@ -435,6 +438,9 @@ export interface ScanCommitItem {
   purchasePrice?: number | null;
   note?: string | null;
   tags?: string[];
+  /** The scan's perceptual hash (from ScanMatchDto.scanHash); lets the server record a
+   * scan-hash → this-card mapping so future scans of the same card auto-match. */
+  scanHash?: string | null;
 }
 
 export interface ScanCommitResultDto {

@@ -634,6 +634,10 @@ public sealed record ScanMatchDto
     /// <summary>Set when matching could not run at all (e.g. game catalog unavailable); distinct
     /// from a clean "no match" (<see cref="Matched"/> false, no error).</summary>
     public string? Error { get; init; }
+    /// <summary>The card's printed edition read from the scan (Yu-Gi-Oh! only): "1st Edition" or
+    /// "Limited Edition" when that text is present, else null (Unlimited — no edition text printed,
+    /// or edition not applicable to this game). Informational at review time.</summary>
+    public string? Edition { get; init; }
 }
 
 /// <summary>One catalog card returned by the correction search (<c>GET /api/scan/search</c>).</summary>
@@ -659,6 +663,12 @@ public sealed record ScanCommitItem
     public decimal? PurchasePrice { get; init; }
     public string? Note { get; init; }
     public IReadOnlyList<string> Tags { get; init; } = [];
+    /// <summary>The scan's 64-bit perceptual hash (decimal string, from <see cref="ScanMatchDto.ScanHash"/>),
+    /// or null when the item wasn't produced by a scan. Present ⇒ the commit records a scan-hash → this-card
+    /// mapping so future scans of the same card auto-match (restores the desktop's correction learning; the
+    /// web flow had dropped it). A confirmed identity is user-endorsed ground truth whether it was the
+    /// auto-match or a manual correction.</summary>
+    public string? ScanHash { get; init; }
 }
 
 /// <summary>Commit a batch of confirmed scans into a storage location.</summary>

@@ -238,7 +238,33 @@ public sealed class CardScanController(
                 tags.SetTagsForLot(lotIds[i], cardTags);
         }
 
+        // Teach the matcher from confirmed identities: record each scanned item's (scan pHash → card)
+        // so future scans of the same card auto-match. The desktop did this; the web flow had dropped
+        // it entirely, so the matcher never learned from bulk entry. Best-effort — a failure to record
+        // must never fail the commit (the lots are already written).
+        RecordScanCorrections(request.Items);
+
         logger.LogInformation("Committed {Count} scanned card(s) to location {LocationId}", lotIds.Count, request.ContainerId);
         return Ok(new ScanCommitResultDto(lotIds.Count));
+    }
+
+    /// <summary>Record a scan-hash → confirmed-card mapping for each committed item that carries a scan
+    /// hash, so the matcher recognizes the same card next time (see <see cref="ScanCommitItem.ScanHash"/>).</summary>
+    private void RecordScanCorrections(IReadOnlyList<ScanCommitItem> items)
+    {
+        foreach (var item in items)
+        {
+            if (string.IsNullOrWhiteSpace(item.ScanHash) || string.IsNullOrWhiteSpace(item.GameCardId)) continue;
+            if (!ulong.TryParse(item.ScanHash, out var hash)) continue;
+            if (LocationsController.ParseGame(item.Game) is not { } game) continue;
+            try
+            {
+                cardService.GetGameService(game).RecordCorrection(hash, item.GameCardId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to record scan correction for {Game} card {CardId}", item.Game, item.GameCardId);
+            }
+        }
     }
 }

@@ -59,23 +59,29 @@ public sealed class YugiohService : TcgCsvGameService<YugiohDbContext>
     {
         PortraitRegions =
         [
-            // The code prints just below the artwork; its exact height drifts a little card-to-card,
-            // so two thin overlapping bands cover the range without a tall crop swallowing the art
-            // frame's edge (which wrecks single-line OCR). Validated on Spell/Trap and Collector's
-            // Rare Monster scans. (A band down by the bottom edge is avoided: on Monsters it reads
-            // the ATK/DEF line, which mimics a code — "DEF/ 800" → "…DEF800".)
-            (0.70, 0.723, 0.28, 0.028),
-            (0.70, 0.751, 0.28, 0.028),
+            // The code prints just below the artwork on the lower-right; its exact height drifts a
+            // little card-to-card (Spell/Trap sit a touch higher than Monsters). ONE tall band frames
+            // the whole line with padding so glyph tops aren't clipped — the earlier pair of 2.8%-tall
+            // bands at y=0.723/0.751 cut the tops on many Monsters (measured ~0/294 usable on a real
+            // batch). The wider X (0.60) keeps the leading character; PSM SparseText (below) is robust
+            // to the small amount of art-frame/border noise a taller crop catches. Re-validated on the
+            // 2026091401 batch of 294 real scans.
+            (0.60, 0.706, 0.32, 0.044),
         ],
         LandscapeRegions =
         [
-            (0.70, 0.723, 0.28, 0.028),
-            (0.70, 0.751, 0.28, 0.028),
+            (0.60, 0.706, 0.32, 0.044),
         ],
         Whitelist = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-",
         RegexPattern = @"([A-Z0-9]+-[A-Z]{0,2}\d+)",
         Binarize = true,
         LooseExtraction = true,
+        // SingleLine reads these short-wide strips as garbage ("DAMA-EN012" → "OLSIWANLEOY"); sparse
+        // text mode reads them correctly. This is the single biggest lever on Yu-Gi-Oh! OCR accuracy.
+        PageSegMode = OcrPageSegMode.SparseText,
+        // Holofoil reads often turn the collector digits into letters (…EN012 → …ENULZ); let those
+        // through — FuzzyOcrMatch canonicalizes letters back to digits against the catalog.
+        AllowLetterOnlyToken = true,
     };
 
     // OCR of small holofoil set codes is noisy; resolve reads to the catalog fuzzily + by pHash.
