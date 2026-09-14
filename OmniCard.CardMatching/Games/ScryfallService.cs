@@ -916,19 +916,16 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             .Select(c => new { c.Name, c.SetCode, c.CollectorNumber })
             .FirstOrDefault();
 
-        // Build SQL with explicit NULLs to avoid EF Core DBNull type-mapping issues
-        var artSql = artScanHash.HasValue ? $"{(long)artScanHash.Value}" : "NULL";
-        var nameSql = card?.Name is not null ? $"'{card.Name.Replace("'", "''")}'" : "NULL";
-        var setSql = card?.SetCode is not null ? $"'{card.SetCode.Replace("'", "''")}'" : "NULL";
-        var numSql = card?.CollectorNumber is not null ? $"'{card.CollectorNumber.Replace("'", "''")}'" : "NULL";
-
-        // The artSql/nameSql/etc. fragments are pre-sanitized above (escaped literal or NULL) to work
-        // around EF Core's DBNull type-mapping on nullable columns; the user-supplied values still go
-        // through {0}/{1}/{2} parameters. Built as a plain string (not passed as an interpolated
-        // literal) so the EF1002 raw-SQL analyzer isn't tripped by the intentional inlining.
-        var sql =
-            $"INSERT OR REPLACE INTO HashCorrections (ScanHash, CorrectCardId, ArtScanHash, CardName, SetCode, CollectorNumber, CreatedAt) VALUES ({{0}}, {{1}}, {artSql}, {nameSql}, {setSql}, {numSql}, {{2}})";
-        ctx.Database.ExecuteSqlRaw(sql, (long)scanHash, correctCardId, DateTime.UtcNow.ToString("o"));
+        // Provider-agnostic upsert — the old INSERT OR REPLACE was SQLite-only (and needed hand-built
+        // NULL literals to dodge EF's DBNull mapping); it threw on the web app's SQL Server catalog, so
+        // MTG corrections stopped persisting once matching moved server-side. The identifying columns
+        // (name/set/number) let the correction survive a catalog refresh (card ids change).
+        OmniCard.Data.Catalogs.HashCorrectionUpsert.Upsert(ctx, scanHash, correctCardId, artScanHash, row =>
+        {
+            row.CardName = card?.Name;
+            row.SetCode = card?.SetCode;
+            row.CollectorNumber = card?.CollectorNumber;
+        });
 
         // Invalidate cache
         _correctionsCache = null;

@@ -1010,9 +1010,10 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
     public void RecordCorrection(ulong scanHash, string correctCardId, ulong? artScanHash = null)
     {
         using var ctx = _dbContextFactory.CreateDbContext();
-        ctx.Database.ExecuteSqlRaw(
-            "INSERT OR REPLACE INTO HashCorrections (ScanHash, CorrectCardId, CreatedAt) VALUES ({0}, {1}, {2})",
-            (long)scanHash, correctCardId, DateTime.UtcNow.ToString("o"));
+        // Provider-agnostic upsert — the old INSERT OR REPLACE was SQLite-only and threw on the web
+        // app's SQL Server catalogs, which is why corrections stopped persisting once matching moved
+        // server-side.
+        HashCorrectionUpsert.Upsert(ctx, scanHash, correctCardId, artScanHash);
         _correctionsCache = null;
     }
 

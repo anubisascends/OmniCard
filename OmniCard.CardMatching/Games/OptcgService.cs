@@ -1053,11 +1053,8 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
     {
         _logger.LogInformation("Recording OPTCG correction: hash {Hash:X16} → card {CardId}", scanHash, correctCardId);
         using var ctx = _dbContextFactory.CreateDbContext();
-
-        ctx.Database.ExecuteSqlRaw(
-            "INSERT OR REPLACE INTO HashCorrections (ScanHash, CorrectCardId, CreatedAt) VALUES ({0}, {1}, {2})",
-            (long)scanHash, correctCardId, DateTime.UtcNow.ToString("o"));
-
+        // Provider-agnostic upsert (was SQLite-only INSERT OR REPLACE; failed on SQL Server catalogs).
+        OmniCard.Data.Catalogs.HashCorrectionUpsert.Upsert(ctx, scanHash, correctCardId, artScanHash);
         _correctionsCache = null;
     }
 

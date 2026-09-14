@@ -15,5 +15,10 @@ public interface IOcrMatchingService
     /// number (e.g. "66"). Both are needed to identify a printing; either being null means the read
     /// isn't usable for a ground-truth lookup (e.g. pre-2015 cards that print neither).</summary>
     Task<(string? SetCode, string? CollectorNumber, double Confidence)> DetectMtgSetAndNumberAsync(byte[] imageData);
+    /// <summary>OCR the Yu-Gi-Oh! lower-left edition line, returning "1st Edition"/"Limited Edition"
+    /// when present, or null when no edition text is printed (Unlimited). Default no-op so test doubles
+    /// and non-OCR implementations needn't implement it; the real service overrides it.</summary>
+    Task<(string? Edition, double Confidence)> DetectYugiohEditionAsync(byte[] imageData)
+        => Task.FromResult<(string?, double)>((null, 0));
     Dictionary<string, ulong> SymbolHashes { get; set; }
 }

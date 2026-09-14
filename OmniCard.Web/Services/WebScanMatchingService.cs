@@ -74,10 +74,18 @@ public sealed class WebScanMatchingService
             ? null
             : new HashSet<string>(chosenSets, StringComparer.OrdinalIgnoreCase);
 
-        // 1. pHash from the full image.
-        ulong hash = _hashService.ComputeHash(new MemoryStream(imageBytes));
+        // 1. Candidate pHashes: the full image plus a couple of small centre crops. Flatbed/phone
+        //    scans include a mat/border around the card that the catalog art (full-bleed) doesn't, which
+        //    scales the card down within the frame and inflates the whole-image pHash distance — enough
+        //    to push the correct printing past maxDistance so a similar-looking wrong card wins.
+        //    Measured on a real 294-scan Yu-Gi-Oh! batch: a ~2% edge trim dropped distance-to-correct
+        //    from ~12 (right at the cliff) to ~3. Trying the trims and keeping the best match fixes this
+        //    without hurting borderless sources — the 0% variant stays a candidate and wins there.
+        var hashCandidates = ComputeHashCandidates(imageBytes);
+        ulong hash = hashCandidates[0].Hash; // starts at the full-image hash; set to the winning candidate below
 
         // 2. Art-region hashes (MTG only — its art crop is stable enough to disambiguate reprints).
+        //    Computed from the full image (the art crop regions are relative to the whole card).
         ulong[]? artHashes = game == CardGame.Mtg
             ? _hashService.ComputeArtHash(new MemoryStream(imageBytes), ScryfallService.ArtCropRegions)
             : null;
@@ -97,8 +105,25 @@ public sealed class WebScanMatchingService
                 detectedSets = new HashSet<string>(symbolSets, StringComparer.OrdinalIgnoreCase);
         }
 
-        // 5. Initial pHash/art/edge match.
-        var match = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, null, setFilter, detectedSets, scanEdgeHash: edgeHash));
+        // 5. Initial pHash/art/edge match: run each hash candidate and keep the highest-confidence
+        //    (nearest) match. The winning candidate's hash is then used for OCR tie-breaking below, so
+        //    the whole pipeline benefits from the border-corrected framing.
+        var match = await FindMatchAsync(() =>
+        {
+            CardMatch? best = null;
+            foreach (var (frac, h) in hashCandidates)
+            {
+                // art/edge hashes only make sense for the untrimmed image.
+                var m = gameService.FindClosestMatch(h, frac == 0 ? artHashes : null, null, setFilter,
+                    detectedSets, scanEdgeHash: frac == 0 ? edgeHash : null);
+                if (m is not null && (best is null || (m.Confidence ?? 0) > (best.Confidence ?? 0)))
+                {
+                    best = m;
+                    hash = h;
+                }
+            }
+            return best;
+        });
 
         // 6. OCR refinement — for MTG the printed (set, collector) is ground truth and overrides even
         //    a confident pHash guess; the other games use the collector number to pin the printing.
@@ -118,6 +143,16 @@ public sealed class WebScanMatchingService
         // hits the game service's shared read context, so it goes through the same gate as matching.
         if (match is not null)
             dto = dto with { MarketPrice = await LookupPriceAsync(gameService, match, isFoil) };
+
+        // Yu-Gi-Oh! edition (1st Edition / Limited / Unlimited) is printed on the card, not in the
+        // catalog, so read it from the scan. Informational at review time. Pure OCR — no shared context,
+        // so it needs no gate. Only for a matched Yu-Gi-Oh! card (skip the cost otherwise).
+        if (match is not null && game == CardGame.YuGiOh)
+        {
+            var (edition, edConf) = await _ocrService.DetectYugiohEditionAsync(imageBytes);
+            if (edition is not null && edConf >= 0.5)
+                dto = dto with { Edition = edition };
+        }
         return dto;
     }
 
@@ -399,6 +434,35 @@ public sealed class WebScanMatchingService
             _logger.LogWarning(ex, "Rotated-retry match failed for {Game}", game);
             return (null, originalHash);
         }
+    }
+
+    // Centre-crop fractions (per edge) tried when hashing a scan. 0 = the untrimmed image. The small
+    // trims correct for the mat/border a flatbed/phone scan puts around the card; ~2% was optimal on a
+    // real batch, with 4% covering thicker borders. Keeping 0 means borderless sources never regress.
+    private static readonly double[] CropFractions = [0.0, 0.02, 0.04];
+
+    /// <summary>Perceptual hashes of the scan at each <see cref="CropFractions"/> border trim. The
+    /// image is decoded once; each trim is cropped in memory. The first entry is always the full image.</summary>
+    private List<(double Frac, ulong Hash)> ComputeHashCandidates(byte[] imageBytes)
+    {
+        var result = new List<(double, ulong)>();
+        using var src = new System.Drawing.Bitmap(new MemoryStream(imageBytes));
+        foreach (var f in CropFractions)
+        {
+            if (f == 0)
+            {
+                result.Add((0, _hashService.ComputeHash(new MemoryStream(imageBytes))));
+                continue;
+            }
+            int x = (int)(src.Width * f), y = (int)(src.Height * f);
+            int w = src.Width - 2 * x, h = src.Height - 2 * y;
+            if (w < 10 || h < 10) continue;
+            using var crop = src.Clone(new System.Drawing.Rectangle(x, y, w, h), src.PixelFormat);
+            using var ms = new MemoryStream();
+            crop.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+            result.Add((f, _hashService.ComputeHash(new MemoryStream(ms.ToArray()))));
+        }
+        return result;
     }
 
     private static bool IsEdgeHashGame(CardGame game) =>

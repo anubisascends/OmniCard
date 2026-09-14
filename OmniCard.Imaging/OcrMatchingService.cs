@@ -491,7 +491,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
                     if (string.IsNullOrWhiteSpace(text)) continue;
 
                     string? token = spec.LooseExtraction
-                        ? ExtractLooseToken(text)
+                        ? ExtractLooseToken(text, spec.AllowLetterOnlyToken)
                         : (TryExtractCollectorNumber(text, spec.RegexPattern, out var f) ? f : null);
                     if (token is null) continue;
 
@@ -525,11 +525,89 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         }
     }
 
+    // Yu-Gi-Oh! edition text location varies by frame era:
+    //  • Modern (2020+): bottom line next to the password — "{8-digit password} 1st Edition".
+    //  • Older reprints (e.g. Legendary Collection): just ABOVE the effect box on the LEFT.
+    // Unlimited prints carry NO edition text in either spot, so ANY "Edition" word read here means the
+    // card is 1st (or, rarely, Limited) Edition. Both bands are tried; the adjacent password/copyright
+    // are harmless (we scan for the word "Edition", not a code). Validated on the 2026091401 batch.
+    internal static readonly (double X, double Y, double W, double H)[] YugiohEditionRegions =
+    [
+        (0.12, 0.934, 0.34, 0.030), // modern: bottom line, right of the password
+        (0.05, 0.703, 0.30, 0.034), // older: above the effect box, left side
+    ];
+    // Back-compat alias for the modern region (used by tests).
+    internal static (double X, double Y, double W, double H) YugiohEditionRegion => YugiohEditionRegions[0];
+
+    // The edition text is mixed-case ("1st Edition"), so the whitelist must include lowercase too —
+    // an uppercase-only whitelist makes Tesseract misread the lowercase glyphs. ClassifyEdition
+    // uppercases before matching.
+    private const string EditionWhitelist = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ";
+
+    public Task<(string? Edition, double Confidence)> DetectYugiohEditionAsync(byte[] imageData)
+        => Task.Run(() => DetectYugiohEdition(imageData));
+
+    // Reads the lower-left edition line and classifies it. Returns "1st Edition" / "Limited Edition"
+    // when the edition text is present, else null (Unlimited — no edition text is printed).
+    private (string? Edition, double Confidence) DetectYugiohEdition(byte[] imageData)
+    {
+        if (!_ocrAvailable) return (null, 0);
+        try
+        {
+            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            foreach (var region in YugiohEditionRegions)
+            {
+                var rect = ToPixelRect(region, bitmap.Width, bitmap.Height);
+                if (rect.Width < 10 || rect.Height < 5) continue;
+
+                using var crop = bitmap.Clone(rect, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                // Same cheap-to-aggressive passes as the collector-code path; the text is the same size/finish.
+                IEnumerable<(string Text, double Confidence)> Passes()
+                {
+                    yield return OcrCroppedRegion(bitmap, rect, PageSegMode.SparseText, EditionWhitelist);
+                    using var otsu = BinarizeOtsu(crop, CollectorBinarizeTargetWidth);
+                    yield return RunOcr(otsu, PageSegMode.SparseText, EditionWhitelist);
+                    using var gray = UpscaleGray(crop, CollectorBinarizeTargetWidth, 1.7f);
+                    yield return RunOcr(gray, PageSegMode.SparseText, EditionWhitelist);
+                }
+
+                foreach (var (text, confidence) in Passes())
+                {
+                    var edition = ClassifyEdition(text);
+                    if (edition is not null)
+                    {
+                        _logger.LogInformation("Yu-Gi-Oh! edition detected: {Edition} (raw: {Raw}, ocrConf: {Conf:F2})",
+                            edition, text.Replace("\n", " ").Trim(), confidence);
+                        return (edition, Math.Max(0.9, confidence));
+                    }
+                }
+            }
+            return (null, 0);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Yu-Gi-Oh! edition detection failed");
+            return (null, 0);
+        }
+    }
+
+    // Classifies an OCR'd edition line. Tolerant of the usual small-text confusions: matches the robust
+    // core "EDITI" and "LIMITE" rather than the full words. Null when no edition marker is present.
+    internal static string? ClassifyEdition(string? ocrText)
+    {
+        if (string.IsNullOrWhiteSpace(ocrText)) return null;
+        var upper = System.Text.RegularExpressions.Regex.Replace(ocrText.ToUpperInvariant(), "[^A-Z0-9]", "");
+        bool hasEdition = upper.Contains("EDITI") || upper.Contains("DITION") || upper.Contains("EDITON");
+        if (!hasEdition) return null;
+        if (upper.Contains("LIMITE") || upper.Contains("LIMTE")) return "Limited Edition";
+        return "1st Edition";
+    }
+
     // Yields OCR (text, confidence) for a region: plain when Binarize is off, else both the Otsu
     // binarization and a high-contrast grayscale pass (each wins on different card finishes).
     private IEnumerable<(string Text, double Confidence)> ReadRegion(Bitmap bitmap, Rectangle rect, OcrCollectorSpec spec)
     {
-        var psm = spec.MultiLine ? PageSegMode.SingleBlock : PageSegMode.SingleLine;
+        var psm = ResolvePsm(spec);
         if (!spec.Binarize)
         {
             yield return OcrCroppedRegion(bitmap, rect, psm, spec.Whitelist);
@@ -548,6 +626,16 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         using var gray = UpscaleGray(crop, CollectorBinarizeTargetWidth, 1.7f);
         yield return RunOcr(gray, psm, spec.Whitelist);
     }
+
+    // Maps the spec's provider-neutral page-seg mode to Tesseract's, preserving the legacy default
+    // (SingleBlock for multi-line specs, SingleLine otherwise) when the spec doesn't override it.
+    private static PageSegMode ResolvePsm(OcrCollectorSpec spec) => spec.PageSegMode switch
+    {
+        OcrPageSegMode.SingleLine => PageSegMode.SingleLine,
+        OcrPageSegMode.SingleBlock => PageSegMode.SingleBlock,
+        OcrPageSegMode.SparseText => PageSegMode.SparseText,
+        _ => spec.MultiLine ? PageSegMode.SingleBlock : PageSegMode.SingleLine,
+    };
 
     public Task<(string? SetCode, string? CollectorNumber, double Confidence)> DetectMtgSetAndNumberAsync(byte[] imageData)
         => Task.Run(() => DetectMtgSetAndNumber(imageData));
@@ -653,12 +741,16 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     internal static bool LooksLikeSetCode(string token) =>
         System.Text.RegularExpressions.Regex.IsMatch(token, "^[A-Z0-9]{2,6}-?[A-Z]{1,3}[A-Z0-9]{0,2}[0-9]{2,4}$");
 
-    internal static string? ExtractLooseToken(string text)
+    // When allowLetterOnly is set, tokens with letters but no digits are also eligible — a holofoil
+    // read often turns the collector digits into letters ("DAMA-EN012" → "DAMA-ENULZ"), and the
+    // confusion-aware fuzzy catalog matcher maps them back. Digit-bearing tokens still rank first, so
+    // a clean read always wins; letter-only tokens only surface when nothing better was read.
+    internal static string? ExtractLooseToken(string text, bool allowLetterOnly = false)
     {
         var spaced = System.Text.RegularExpressions.Regex.Replace(text.ToUpperInvariant(), "[^A-Z0-9-]", " ");
         return spaced.Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Select(v => v.Trim('-'))
-            .Where(v => v.Length >= 4 && v.Any(char.IsLetter) && v.Any(char.IsDigit))
+            .Where(v => v.Length >= 4 && v.Any(char.IsLetter) && (allowLetterOnly || v.Any(char.IsDigit)))
             // No set code contains ATK/DEF — guards against a crop that catches a Monster's stat line.
             .Where(v => !v.Contains("ATK") && !v.Contains("DEF"))
             .OrderByDescending(v => v.Count(char.IsDigit))

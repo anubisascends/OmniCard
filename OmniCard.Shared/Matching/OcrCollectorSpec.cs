@@ -1,5 +1,19 @@
 namespace OmniCard.Shared.Matching;
 
+/// <summary>Provider-neutral Tesseract page-segmentation mode for a collector-code crop. Kept out of
+/// OmniCard.Imaging so OmniCard.Shared doesn't take a Tesseract dependency; mapped to the engine's
+/// <c>PageSegMode</c> in <c>OcrMatchingService</c>.</summary>
+public enum OcrPageSegMode
+{
+    /// <summary>Legacy behaviour: SingleBlock when <see cref="OcrCollectorSpec.MultiLine"/>, else SingleLine.</summary>
+    Default,
+    SingleLine,
+    SingleBlock,
+    /// <summary>Sparse text — find as much text as possible in no particular order. Far more robust than
+    /// SingleLine on short, wide code strips that carry a bit of border/frame noise (Yu-Gi-Oh! set codes).</summary>
+    SparseText,
+}
+
 // Per-game configuration for collector-number OCR. Regions are fractions of the card image
 // (X, Y, Width, Height). RegexPattern's first capture group is the normalized collector number.
 public sealed class OcrCollectorSpec
@@ -23,6 +37,17 @@ public sealed class OcrCollectorSpec
     /// when it doesn't strictly match <see cref="RegexPattern"/> — for downstream fuzzy matching
     /// against the catalog, which tolerates OCR character confusions.</summary>
     public bool LooseExtraction { get; init; }
+
+    /// <summary>Page-segmentation mode for the crop. Defaults to legacy single-line/single-block.
+    /// Yu-Gi-Oh! uses <see cref="OcrPageSegMode.SparseText"/> — its set-code strips read as garbage
+    /// under SingleLine.</summary>
+    public OcrPageSegMode PageSegMode { get; init; } = OcrPageSegMode.Default;
+
+    /// <summary>Allow a loose token that has letters but NO digits (e.g. "DAMA-ENULZ", where a
+    /// holofoil read turns "012" into letters). Only meaningful with <see cref="LooseExtraction"/> and
+    /// a confusion-aware fuzzy catalog match downstream, which maps the letters back to digits. Off by
+    /// default so digit-free noise can't win for games that read cleanly.</summary>
+    public bool AllowLetterOnlyToken { get; init; }
 
     /// <summary>OCR the crop as a multi-line text block rather than a single line. Use when the code
     /// shares a tall crop with neighbouring text (FFTCG prints the set code on the bottom credit line,

@@ -188,6 +188,48 @@ public class CardScanControllerTests : IDisposable
         Assert.Contains(lots, l => l.Quantity == 2);
     }
 
+    [Fact]
+    public void Commit_RecordsCorrection_ForItemsWithScanHash()
+    {
+        var loc = _containers.Create("Box", ContainerType.Box).Id;
+        var game = new Mock<ICardGameService>();
+        _cardService.Setup(c => c.GetGameService(CardGame.Mtg)).Returns(game.Object);
+
+        var req = new ScanCommitRequest
+        {
+            ContainerId = loc,
+            Items = [
+                new ScanCommitItem { Game = "Mtg", GameCardId = "id-1", Name = "Bolt", SetCode = "lea",
+                    SetName = "Alpha", CollectorNumber = "161", Rarity = "common", Condition = "NM",
+                    ScanHash = "123" },
+            ],
+        };
+
+        Assert.IsType<OkObjectResult>(CreateController().Commit(req).Result);
+        // The confirmed identity is taught to the matcher so the same card auto-matches next time.
+        game.Verify(g => g.RecordCorrection(123UL, "id-1", null), Times.Once);
+    }
+
+    [Fact]
+    public void Commit_DoesNotRecordCorrection_WhenNoScanHash()
+    {
+        var loc = _containers.Create("Box", ContainerType.Box).Id;
+        var game = new Mock<ICardGameService>();
+        _cardService.Setup(c => c.GetGameService(CardGame.Mtg)).Returns(game.Object);
+
+        var req = new ScanCommitRequest
+        {
+            ContainerId = loc,
+            Items = [
+                new ScanCommitItem { Game = "Mtg", GameCardId = "id-1", Name = "Bolt", SetCode = "lea",
+                    SetName = "Alpha", CollectorNumber = "161", Rarity = "common", Condition = "NM" },
+            ],
+        };
+
+        Assert.IsType<OkObjectResult>(CreateController().Commit(req).Result);
+        game.Verify(g => g.RecordCorrection(It.IsAny<ulong>(), It.IsAny<string>(), It.IsAny<ulong?>()), Times.Never);
+    }
+
     private sealed class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
         public OmniCardDbContext CreateDbContext() => new(options);
