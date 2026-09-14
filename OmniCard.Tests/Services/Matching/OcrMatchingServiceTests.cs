@@ -90,8 +90,9 @@ public class OcrMatchingServiceTests
         var rect = OcrMatchingService.ToPixelRect(OcrMatchingService.MtgCollectorRegion, 717, 1001);
 
         Assert.Equal(14, rect.X);    // 2% of 717
-        Assert.Equal(945, rect.Y);   // 94.5% of 1001
+        Assert.Equal(912, rect.Y);   // 91.2% of 1001 — spans both bottom-left lines (collector + set)
         Assert.True(rect.Width > 200 && rect.Width < 260);   // ~34% of 717
+        Assert.True(rect.Height > 60);                        // tall enough to cover both lines
         Assert.True(rect.Y + rect.Height <= 1001);           // stays on card
     }
 }
