@@ -30,36 +30,125 @@ public sealed class CollectionRepairService(
     IScryfallService scryfall,
     ILogger<CollectionRepairService> logger)
 {
-    /// <summary>Key of the <see cref="MigrationState"/> row that marks this repair complete.</summary>
+    /// <summary>Key of the <see cref="MigrationState"/> row that marks the colour/dedup repair complete.</summary>
     public const string MigrationStateKey = "MtgColorBackfillDedup";
 
+    /// <summary>Key marking the one-time rewrite of collapsed MTG <see cref="Product.CardType"/> buckets
+    /// to the full catalog type line (so <c>t:vampire</c>/<c>t:legendary</c> match owned cards).</summary>
+    public const string FullTypeLineStateKey = "MtgFullTypeLineBackfill";
+
     /// <summary>
-    /// Runs the repair once. No-op (returns 0) if it has already run, or if the Scryfall catalog is
-    /// empty (nothing to backfill against — retried on a later launch once data is downloaded).
-    /// Returns the number of products changed (merged, backfilled, or re-cased).
+    /// Runs the outstanding one-time repairs. Each is guarded by its own <see cref="MigrationState"/>
+    /// marker, so a collection that already ran the original colour/dedup pass still picks up newer
+    /// repairs (e.g. the full-type-line rewrite). No-op (returns 0) while the Scryfall catalog is empty
+    /// (nothing to repair against — retried on a later launch once data is downloaded). Returns the total
+    /// number of products changed.
     /// </summary>
     public int RepairIfNeeded()
     {
         using var ctx = dbFactory.CreateDbContext();
 
-        if (ctx.MigrationState.AsNoTracking().Any(m => m.Key == MigrationStateKey))
+        if (!scryfall.Cards.Any())
+        {
+            logger.LogInformation("Skipping MTG collection repair: Scryfall catalog is empty (will retry after a data download)");
+            return 0;
+        }
+
+        var changed = 0;
+
+        if (!ctx.MigrationState.AsNoTracking().Any(m => m.Key == MigrationStateKey))
+        {
+            var merged = MergeDuplicateProducts(ctx);
+            var backfilled = BackfillColorsAndSetCodes(ctx);
+            ctx.MigrationState.Add(new MigrationState { Key = MigrationStateKey, CompletedAt = DateTime.UtcNow });
+            ctx.SaveChanges();
+            logger.LogInformation("MTG colour repair complete: {Merged} duplicate products merged, {Backfilled} products backfilled/re-cased",
+                merged, backfilled);
+            changed += merged + backfilled;
+        }
+
+        changed += RepairCardTypesIfNeeded();
+
+        return changed;
+    }
+
+    /// <summary>
+    /// Runs only the one-time full-type-line rewrite (guarded by <see cref="FullTypeLineStateKey"/>).
+    /// Split out from <see cref="RepairIfNeeded"/> so the web host can run just this pass without also
+    /// triggering the duplicate-merge/colour backfill — those were desktop-era repairs that group by
+    /// (set, number, foil) and would be unsafe to run for the first time on a live web collection.
+    /// No-op (returns 0) while the Scryfall catalog is empty. Returns the number of products retyped.
+    /// </summary>
+    public int RepairCardTypesIfNeeded()
+    {
+        using var ctx = dbFactory.CreateDbContext();
+
+        if (ctx.MigrationState.AsNoTracking().Any(m => m.Key == FullTypeLineStateKey))
             return 0;
 
         if (!scryfall.Cards.Any())
         {
-            logger.LogInformation("Skipping MTG colour repair: Scryfall catalog is empty (will retry after a data download)");
+            logger.LogInformation("Skipping MTG type-line repair: Scryfall catalog is empty (will retry after a data download)");
             return 0;
         }
 
-        var merged = MergeDuplicateProducts(ctx);
-        var backfilled = BackfillColorsAndSetCodes(ctx);
-
-        ctx.MigrationState.Add(new MigrationState { Key = MigrationStateKey, CompletedAt = DateTime.UtcNow });
+        var retyped = RefreshMtgCardTypes(ctx);
+        ctx.MigrationState.Add(new MigrationState { Key = FullTypeLineStateKey, CompletedAt = DateTime.UtcNow });
         ctx.SaveChanges();
+        logger.LogInformation("MTG type-line repair complete: {Retyped} product CardType(s) rewritten to the full type line", retyped);
+        return retyped;
+    }
 
-        logger.LogInformation("MTG colour repair complete: {Merged} duplicate products merged, {Backfilled} products backfilled/re-cased",
-            merged, backfilled);
-        return merged + backfilled;
+    /// <summary>
+    /// Rewrites the denormalised <see cref="Product.CardType"/> of every MTG single to the catalog's full
+    /// type line (looked up by GameCardId, falling back to set code + collector number). Earlier builds
+    /// stored a collapsed bucket ("Legendary Creature", "Artifact") that dropped subtypes/supertypes, so
+    /// this backfill is what makes <c>t:vampire</c>/<c>t:saga</c>/<c>t:legendary</c> work on pre-existing
+    /// collections. Rows that don't resolve to a catalog card are left untouched.
+    /// </summary>
+    private int RefreshMtgCardTypes(OmniCardDbContext ctx)
+    {
+        var products = ctx.Products
+            .Where(p => p.Game == CardGame.Mtg && p.Category == ProductCategory.Single)
+            .ToList();
+
+        // Look up each distinct (set, number) once; the GameCardId fallback handles odd numbers/promos.
+        var wanted = products
+            .Where(p => !string.IsNullOrEmpty(p.SetCode) && !string.IsNullOrEmpty(p.CollectorNumber))
+            .Select(p => (Set: p.SetCode!.ToLowerInvariant(), Number: p.CollectorNumber!))
+            .Distinct()
+            .ToList();
+
+        var catalog = new Dictionary<(string Set, string Number), string>();
+        foreach (var (set, number) in wanted)
+        {
+            var typeLine = scryfall.Cards.AsNoTracking()
+                .Where(c => c.SetCode == set && c.CollectorNumber == number && c.Lang == "en")
+                .Select(c => c.TypeLine)
+                .FirstOrDefault();
+            if (!string.IsNullOrEmpty(typeLine))
+                catalog[(set, number)] = typeLine;
+        }
+
+        var changed = 0;
+        foreach (var product in products)
+        {
+            string? typeLine = null;
+            if (!string.IsNullOrEmpty(product.SetCode) && !string.IsNullOrEmpty(product.CollectorNumber))
+                catalog.TryGetValue((product.SetCode!.ToLowerInvariant(), product.CollectorNumber!), out typeLine);
+
+            if (string.IsNullOrEmpty(typeLine) && Guid.TryParse(product.GameCardId, out var id))
+                typeLine = scryfall.Cards.AsNoTracking().Where(c => c.Id == id).Select(c => c.TypeLine).FirstOrDefault();
+
+            if (!string.IsNullOrEmpty(typeLine) && product.CardType != typeLine)
+            {
+                product.CardType = typeLine;
+                changed++;
+            }
+        }
+
+        ctx.SaveChanges();
+        return changed;
     }
 
     /// <summary>

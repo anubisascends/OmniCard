@@ -6,18 +6,6 @@ namespace OmniCard.CardMatching;
 
 public static class CardAttributeExtractor
 {
-    private static readonly string[] MtgTypePriority =
-    [
-        "Legendary Creature",
-        "Creature",
-        "Instant",
-        "Sorcery",
-        "Enchantment",
-        "Artifact",
-        "Planeswalker",
-        "Land"
-    ];
-
     public static string? ExtractColor(CardMatch match, CardGame game)
     {
         return game switch
@@ -62,18 +50,8 @@ public static class CardAttributeExtractor
         return string.Join("", colors);
     }
 
-    private static string? ExtractMtgCardType(Card? card)
-    {
-        if (card is null)
-            return null;
-
-        var typeLine = card.TypeLine;
-        foreach (var type in MtgTypePriority)
-        {
-            if (typeLine.Contains(type, StringComparison.OrdinalIgnoreCase))
-                return type;
-        }
-
-        return typeLine;
-    }
+    // Store the FULL type line ("Legendary Creature — Vampire"), not a collapsed bucket. Subtypes and
+    // supertypes live only in the full line, so collapsing to "Creature" would make t:vampire / t:legendary
+    // unmatchable in owned-collection search. Callers that want a coarse primary type derive it on demand.
+    private static string? ExtractMtgCardType(Card? card) => card?.TypeLine;
 }

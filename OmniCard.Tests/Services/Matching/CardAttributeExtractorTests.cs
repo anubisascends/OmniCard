@@ -73,15 +73,16 @@ public class CardAttributeExtractorTests
         Assert.Equal("Green", result);
     }
 
+    // MTG CardType stores the FULL type line so subtype/supertype search (t:vampire, t:legendary) works.
     [Fact]
-    public void ExtractCardType_Mtg_LegendaryCreature()
+    public void ExtractCardType_Mtg_LegendaryCreature_ReturnsFullTypeLine()
     {
         var card = new Card { TypeLine = "Legendary Creature — Human Wizard", Colors = ["U"] };
         var match = new CardMatch { Source = card };
 
         var result = CardAttributeExtractor.ExtractCardType(match, CardGame.Mtg);
 
-        Assert.Equal("Legendary Creature", result);
+        Assert.Equal("Legendary Creature — Human Wizard", result);
     }
 
     [Fact]
@@ -96,27 +97,25 @@ public class CardAttributeExtractorTests
     }
 
     [Fact]
-    public void ExtractCardType_Mtg_LegendaryArtifact()
+    public void ExtractCardType_Mtg_LegendaryArtifact_KeepsSupertype()
     {
         var card = new Card { TypeLine = "Legendary Artifact", Colors = [] };
         var match = new CardMatch { Source = card };
 
         var result = CardAttributeExtractor.ExtractCardType(match, CardGame.Mtg);
 
-        Assert.Equal("Artifact", result);
+        Assert.Equal("Legendary Artifact", result);
     }
 
     [Fact]
-    public void ExtractCardType_Mtg_EnchantmentCreature()
+    public void ExtractCardType_Mtg_EnchantmentCreature_KeepsSubtype()
     {
         var card = new Card { TypeLine = "Enchantment Creature — God", Colors = ["W"] };
         var match = new CardMatch { Source = card };
 
-        // "Creature" appears in the type line — but "Enchantment" has lower priority
-        // than "Creature" in the priority list, so this should match "Creature"
         var result = CardAttributeExtractor.ExtractCardType(match, CardGame.Mtg);
 
-        Assert.Equal("Creature", result);
+        Assert.Equal("Enchantment Creature — God", result);
     }
 
     [Fact]
@@ -127,7 +126,7 @@ public class CardAttributeExtractorTests
 
         var result = CardAttributeExtractor.ExtractCardType(match, CardGame.Mtg);
 
-        Assert.Equal("Planeswalker", result);
+        Assert.Equal("Legendary Planeswalker — Jace", result);
     }
 
     [Fact]

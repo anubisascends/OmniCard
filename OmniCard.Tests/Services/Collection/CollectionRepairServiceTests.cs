@@ -65,7 +65,7 @@ public class CollectionRepairServiceTests : IDisposable
         TypeLine = typeLine,
     };
 
-    private Product SeedProduct(string setCode, string number, bool foil, string? color, string? gameCardId = null)
+    private Product SeedProduct(string setCode, string number, bool foil, string? color, string? gameCardId = null, string? cardType = null)
     {
         using var ctx = new OmniCardDbContext(_omniOptions);
         var p = new Product
@@ -78,6 +78,7 @@ public class CollectionRepairServiceTests : IDisposable
             CollectorNumber = number,
             Foil = foil,
             Color = color,
+            CardType = cardType,
         };
         ctx.Products.Add(p);
         ctx.SaveChanges();
@@ -98,7 +99,7 @@ public class CollectionRepairServiceTests : IDisposable
         using var ctx = new OmniCardDbContext(_omniOptions);
         var repaired = ctx.Products.Single(p => p.Id == product.Id);
         Assert.Equal("W", repaired.Color);
-        Assert.Equal("Artifact", repaired.CardType);
+        Assert.Equal("Artifact — Equipment", repaired.CardType); // full type line, not a collapsed bucket
         Assert.Equal("hob", repaired.SetCode); // authoritative lowercase
         Assert.Equal("The Hobbit", repaired.SetName);
     }
@@ -146,6 +147,37 @@ public class CollectionRepairServiceTests : IDisposable
         var canonical = ctx.Products.Single(p => p.Id == withColor.Id);
         Assert.Equal(2, ctx.Lots.Count(l => l.ProductId == canonical.Id)); // both lots repointed
         Assert.True(changed >= 1);
+    }
+
+    [Fact]
+    public void RepairIfNeeded_RewritesCollapsedCardType_ToFullTypeLine()
+    {
+        SeedScryfall(HobCard("55", ["B"], "Legendary Creature — Vampire", "Sorin"));
+        // Pre-existing row with the old collapsed bucket (colour already set so the colour pass skips it).
+        var product = SeedProduct("hob", "55", foil: false, color: "B", cardType: "Legendary Creature");
+
+        CreateService().RepairIfNeeded();
+
+        using var ctx = new OmniCardDbContext(_omniOptions);
+        Assert.Equal("Legendary Creature — Vampire", ctx.Products.Single(p => p.Id == product.Id).CardType);
+    }
+
+    [Fact]
+    public void RepairCardTypesIfNeeded_RewritesOnly_TypeLine_WithoutMerging()
+    {
+        SeedScryfall(HobCard("55", ["B"], "Legendary Creature — Vampire", "Sorin"));
+        var product = SeedProduct("hob", "55", foil: false, color: "B", cardType: "Legendary Creature");
+
+        // Standalone pass: retypes, sets its own marker, leaves the colour/dedup marker unset.
+        var changed = CreateService().RepairCardTypesIfNeeded();
+
+        Assert.True(changed >= 1);
+        using var ctx = new OmniCardDbContext(_omniOptions);
+        Assert.Equal("Legendary Creature — Vampire", ctx.Products.Single(p => p.Id == product.Id).CardType);
+        Assert.True(ctx.MigrationState.Any(m => m.Key == CollectionRepairService.FullTypeLineStateKey));
+        Assert.False(ctx.MigrationState.Any(m => m.Key == CollectionRepairService.MigrationStateKey));
+        // Second run is a no-op.
+        Assert.Equal(0, CreateService().RepairCardTypesIfNeeded());
     }
 
     [Fact]

@@ -51,6 +51,7 @@ const EXPORT_FORMATS: { value: string; label: string }[] = [
   { value: 'tcgplayer', label: 'TCGplayer' },
   { value: 'moxfield', label: 'Moxfield' },
   { value: 'manabox', label: 'ManaBox' },
+  { value: 'ticker', label: 'Card Price Ticker' },
 ];
 
 /**

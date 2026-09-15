@@ -90,6 +90,27 @@ public class CsvExportImportService(
         logger.LogInformation("Exported {Count} cards in app-native format to {Path}", cards.Count(), filePath);
     }
 
+    // ── Card Price Ticker Export (Premiere Pro plug-in: Card Name + Market Price only) ──
+
+    public void ExportPriceTicker(string filePath, IEnumerable<CollectionCard> cards)
+    {
+        using var writer = new StreamWriter(filePath);
+        using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+
+        csv.WriteField("Card Name");
+        csv.WriteField("Market Price");
+        csv.NextRecord();
+
+        foreach (var card in cards)
+        {
+            csv.WriteField(card.Name);
+            csv.WriteField(card.MarketPrice.ToString(CultureInfo.InvariantCulture));
+            csv.NextRecord();
+        }
+
+        logger.LogInformation("Exported {Count} cards in Card Price Ticker format to {Path}", cards.Count(), filePath);
+    }
+
     // ── TCGPlayer Export ──
 
     public void ExportTcgPlayer(string filePath, IEnumerable<CollectionCard> cards)

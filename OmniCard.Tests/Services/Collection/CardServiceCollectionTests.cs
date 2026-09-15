@@ -102,7 +102,7 @@ public class CardServiceCollectionTests : IDisposable
         using var ctx = new OmniCardDbContext(_omniOptions);
         var product = ctx.Products.Single();
         Assert.Equal("R", product.Color);
-        Assert.Equal("Creature", product.CardType);
+        Assert.Equal("Creature — Goblin", product.CardType); // full type line, not a collapsed bucket
     }
 
     [Fact]

@@ -37,7 +37,7 @@ public class CollectionGameFieldSearchTests : IDisposable
 
     public void Dispose() => _connection.Dispose();
 
-    private void SeedCard(string gameCardId, string name, CardGame game = CardGame.FinalFantasy)
+    private void SeedCard(string gameCardId, string name, CardGame game = CardGame.FinalFantasy, string? cardType = null)
     {
         using var ctx = _factory.CreateDbContext();
         var product = new Product
@@ -50,6 +50,7 @@ public class CollectionGameFieldSearchTests : IDisposable
             SetCode = "OP1",
             CollectorNumber = "1",
             Rarity = "hero",
+            CardType = cardType,
         };
         ctx.Products.Add(product);
         ctx.SaveChanges();
@@ -59,6 +60,56 @@ public class CollectionGameFieldSearchTests : IDisposable
 
     private IReadOnlyDictionary<CardGame, ICardGameService> Services() =>
         new Dictionary<CardGame, ICardGameService> { [CardGame.FinalFantasy] = new FakeFfService() };
+
+    // MTG stores the full type line in CardType, so subtype/supertype search matches directly (fast, no
+    // cross-DB id resolution). This is the query behind the user's (t:creature t:legendary t:vampire).
+    [Fact]
+    public void Type_MatchesSubtypeAndSupertype_FromFullTypeLine()
+    {
+        SeedCard("v1", "Sorin", CardGame.Mtg, cardType: "Legendary Creature — Vampire");
+        SeedCard("c1", "Grizzly Bears", CardGame.Mtg, cardType: "Creature — Bear");
+        SeedCard("l1", "Island", CardGame.Mtg, cardType: "Basic Land — Island");
+
+        using var ctx = _factory.CreateDbContext();
+        var results = CollectionQueryBuilder
+            .BuildFilteredQuery(ctx, "(t:creature t:legendary t:vampire)", CardGame.Mtg, null, null)
+            .ToList();
+
+        Assert.Equal(["v1"], results.Select(c => c.GameCardId).ToList());
+    }
+
+    [Fact]
+    public void Type_BroadType_MatchesAllPrintings()
+    {
+        SeedCard("v1", "Sorin", CardGame.Mtg, cardType: "Legendary Creature — Vampire");
+        SeedCard("c1", "Grizzly Bears", CardGame.Mtg, cardType: "Creature — Bear");
+        SeedCard("l1", "Island", CardGame.Mtg, cardType: "Basic Land — Island");
+
+        using var ctx = _factory.CreateDbContext();
+        var results = CollectionQueryBuilder
+            .BuildFilteredQuery(ctx, "t:creature", CardGame.Mtg, null, null)
+            .ToList();
+
+        Assert.Equal(new[] { "c1", "v1" }, results.Select(c => c.GameCardId).OrderBy(x => x));
+    }
+
+    [Fact]
+    public void Type_Subtype_QueryBuilderAndMatcherAgree()
+    {
+        SeedCard("v1", "Sorin", CardGame.Mtg, cardType: "Legendary Creature — Vampire");
+        SeedCard("c1", "Grizzly Bears", CardGame.Mtg, cardType: "Creature — Bear");
+
+        using var ctx = _factory.CreateDbContext();
+        var all = CollectionQueryBuilder.BuildFilteredQuery(ctx, "", CardGame.Mtg, null, null).ToList();
+        var sql = CollectionQueryBuilder
+            .BuildFilteredQuery(ctx, "t:vampire", CardGame.Mtg, null, null)
+            .Select(c => c.GameCardId).OrderBy(x => x).ToList();
+        var inMemory = CollectionCardMatcher.Filter(all, "t:vampire")
+            .Select(c => c.GameCardId).OrderBy(x => x).ToList();
+
+        Assert.Equal(sql, inMemory);
+        Assert.Equal(["v1"], inMemory);
+    }
 
     [Theory]
     [InlineData("element:fire")]
