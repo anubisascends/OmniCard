@@ -38,7 +38,7 @@ import { api } from '../api/client';
 import { useGame } from '../context/GameContext';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import { WebcamScanDialog } from '../components/dialogs/WebcamScanDialog';
-import { ScanValueBadges } from '../lib/scanBadges';
+import { ScanValueBadges, ListReprintChip } from '../lib/scanBadges';
 import type { ScanBadgeSettingsDto, ScanMatchDto, ScanSearchResultDto } from '../api/types';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
@@ -494,6 +494,10 @@ function MasterRow({
             price={badgeMatch?.marketPrice}
             settings={badgeSettings}
           />
+          <ListReprintChip
+            isListReprint={badgeMatch?.isListReprint}
+            unresolved={badgeMatch?.listReprintUnresolved}
+          />
         </Stack>
       </Box>
     </Box>
@@ -651,6 +655,10 @@ function DetailPanel({
           {item.match?.edition && (
             <Chip size="small" variant="outlined" color="info" label={item.match.edition} />
           )}
+          <ListReprintChip
+            isListReprint={item.match?.isListReprint}
+            unresolved={item.match?.listReprintUnresolved}
+          />
           <Box sx={{ flexGrow: 1 }} />
           <Button variant="outlined" startIcon={<ZoomInIcon />} onClick={() => setScanOpen(true)}>
             View scan

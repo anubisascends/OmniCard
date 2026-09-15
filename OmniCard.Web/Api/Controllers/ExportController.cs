@@ -75,6 +75,7 @@ public sealed class ExportController(
             "tcgplayer" => p => csv.ExportTcgPlayer(p, cards),
             "moxfield" => p => csv.ExportMoxfield(p, cards),
             "manabox" => p => csv.ExportManabox(p, cards),
+            "ticker" => p => csv.ExportPriceTicker(p, cards),
             _ => p => csv.ExportAppNative(p, cards),
         };
 

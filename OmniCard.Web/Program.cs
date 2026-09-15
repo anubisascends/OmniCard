@@ -96,6 +96,7 @@ builder.Services.Configure<ScryfallSettings>(builder.Configuration.GetSection("S
 // Game services
 builder.Services.AddSingleton<ScryfallService>();
 builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<ScryfallService>());
+builder.Services.AddSingleton<IScryfallService>(sp => sp.GetRequiredService<ScryfallService>());
 builder.Services.AddSingleton<OptcgService>();
 builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<OptcgService>());
 builder.Services.AddSingleton<RiftboundService>();
@@ -109,6 +110,7 @@ builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<Fina
 
 // Card & decklist services
 builder.Services.AddSingleton<ICardService, WebCardService>();
+builder.Services.AddSingleton<CollectionRepairService>();
 builder.Services.AddSingleton<WebScanMatchingService>();
 builder.Services.AddSingleton<CardImageCacheService>();
 builder.Services.AddSingleton<CatalogRefreshService>();
@@ -262,6 +264,24 @@ using (var scope = app.Services.CreateScope())
     EnsureCatalog<PokemonDbContext>();
     EnsureCatalog<YugiohDbContext>();
     EnsureCatalog<FinalFantasyDbContext>();
+}
+
+// One-time rewrite of MTG Product.CardType to the full catalog type line, so t:vampire/t:legendary
+// (which need the subtypes/supertypes the old collapsed bucket dropped) match owned cards. Guarded by a
+// MigrationState marker and no-ops until the Scryfall catalog has data — so it runs after the catalog
+// EnsureCreated above and safely retries on a later launch if the catalog hasn't been downloaded yet.
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var changed = scope.ServiceProvider.GetRequiredService<CollectionRepairService>().RepairCardTypesIfNeeded();
+        if (changed > 0)
+            app.Logger.LogInformation("MTG type-line repair updated {Count} product(s) at startup.", changed);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "MTG type-line repair failed at startup.");
+    }
 }
 
 // Apply any finalized-but-unapplied trade drafts left in the shared trades folder (e.g. a session

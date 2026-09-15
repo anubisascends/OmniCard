@@ -26,4 +26,10 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+  <!-- Reference crops of the MTG Planeswalker "hand" glyph that The List (plst) reprints
+       print in the bottom-left collector block. Embedded so the detector can pHash-match
+       them at runtime with no external asset dir. See OcrMatchingService.DetectMtgListSymbol. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\mtg-list-glyph-*.png" />
+  </ItemGroup>
 </Project>

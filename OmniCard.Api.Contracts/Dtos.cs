@@ -638,6 +638,15 @@ public sealed record ScanMatchDto
     /// "Limited Edition" when that text is present, else null (Unlimited — no edition text printed,
     /// or edition not applicable to this game). Informational at review time.</summary>
     public string? Edition { get; init; }
+    /// <summary>True when the MTG Planeswalker glyph was detected in the bottom-left, marking this as a
+    /// The List (plst) reprint. List cards print the original set's code/collector but are a distinct,
+    /// cheaper printing; when detected the match is remapped to the plst printing so identity + price are
+    /// correct. Drives a "The List" badge at review time. MTG only.</summary>
+    public bool IsListReprint { get; init; }
+    /// <summary>True when the List glyph was detected but the plst printing could not be found in the
+    /// catalog (e.g. a very new List card), so the match fell back to the original-set printing. Signals
+    /// that the identity/price may be the more expensive original and should be checked manually.</summary>
+    public bool ListReprintUnresolved { get; init; }
 }
 
 /// <summary>One catalog card returned by the correction search (<c>GET /api/scan/search</c>).</summary>
