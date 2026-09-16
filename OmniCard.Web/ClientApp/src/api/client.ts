@@ -344,7 +344,7 @@ export const api = {
     request<void>(`/api/listings/lot/${lotId}`, { method: 'DELETE' }),
   pickListPdfUrl: (game?: string) => `/api/listings/picklist.pdf${qs({ game })}`,
   settings: () => request<SalesSettingsDto>('/api/settings'),
-  settingsUpdate: (body: { forSaleLocationId: number | null }) =>
+  settingsUpdate: (body: { forSaleLocationId: number | null; movePickedToForSaleLocation: boolean }) =>
     request<void>('/api/settings', { method: 'PUT', body: JSON.stringify(body) }),
   scanBadgeSettings: () => request<ScanBadgeSettingsDto>('/api/settings/scan-badges'),
   scanBadgeSettingsUpdate: (body: ScanBadgeSettingsDto) =>

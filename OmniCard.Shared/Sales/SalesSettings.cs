@@ -3,6 +3,11 @@ namespace OmniCard.Shared.Sales;
 public class SalesSettings
 {
     public int? ForSaleLocationId { get; set; }
+
+    /// <summary>Whether marking a listing as picked physically moves the card to
+    /// <see cref="ForSaleLocationId"/>. When false, picking only flips the listing's status and
+    /// leaves the card in its current location. Defaults to true (the historical behavior).</summary>
+    public bool MovePickedToForSaleLocation { get; set; } = true;
     public CompanyProfile Company { get; set; } = new();
     public ReceiptSettings Receipt { get; set; } = new();
 

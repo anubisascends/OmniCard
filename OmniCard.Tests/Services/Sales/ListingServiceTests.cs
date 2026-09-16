@@ -118,6 +118,8 @@ public class ListingServiceTests : IDisposable
     {
         public int? ForSaleLocationId { get; private set; } = 99;
         public void SetForSaleLocationId(int? id) => ForSaleLocationId = id;
+        public bool MovePickedToForSaleLocation { get; private set; } = true;
+        public void SetMovePickedToForSaleLocation(bool move) => MovePickedToForSaleLocation = move;
         public CompanyProfile GetCompany() => new();
         public void SaveCompany(CompanyProfile company) { }
         public ReceiptSettings GetReceipt() => new();
@@ -246,6 +248,43 @@ public class ListingServiceTests : IDisposable
         Assert.NotNull(listing.PickedAt);
         Assert.Equal(99, ctx2.Lots.Single(l => l.Id == lotId).LocationId);
         Assert.Contains(ctx2.Movements.ToList(), m => m.Type == MovementType.Move && m.LotId == lotId);
+    }
+
+    [Fact]
+    public void MarkPicked_WhenMoveDisabled_FlipsStatusButLeavesLotInPlace()
+    {
+        var (lotId, originalLocationId) = SeedLot(_opts, locationId: 7);
+        var settings = new StubSalesSettings();
+        settings.SetMovePickedToForSaleLocation(false);
+        // No For-Sale location container is seeded and none is required when moving is off.
+        var svc = new ListingService(new MockFactory(_opts), settings);
+        svc.ListForSale([lotId], SalesChannel.Manual, 1m, 1);
+
+        var count = svc.MarkPicked([lotId]);
+
+        Assert.Equal(1, count);
+        using var ctx = new OmniCardDbContext(_opts);
+        var listing = Assert.Single(ctx.Listings.ToList());
+        Assert.Equal(ListingStatus.Picked, listing.Status);
+        Assert.NotNull(listing.PickedAt);
+        // Card stays put; no relocation movement recorded.
+        Assert.Equal(originalLocationId, ctx.Lots.Single(l => l.Id == lotId).LocationId);
+        Assert.DoesNotContain(ctx.Movements.ToList(), m => m.Type == MovementType.Move && m.LotId == lotId);
+    }
+
+    [Fact]
+    public void MarkPicked_WhenMoveDisabled_DoesNotRequireForSaleLocation()
+    {
+        var (lotId, _) = SeedLot(_opts, locationId: 7);
+        var settings = new StubSalesSettings();
+        settings.SetForSaleLocationId(null);
+        settings.SetMovePickedToForSaleLocation(false);
+        var svc = new ListingService(new MockFactory(_opts), settings);
+        svc.ListForSale([lotId], SalesChannel.Manual, 1m, 1);
+
+        var count = svc.MarkPicked([lotId]); // must not throw despite no location configured
+
+        Assert.Equal(1, count);
     }
 
     [Fact]

@@ -25,6 +25,15 @@ public class SalesSettingsService : ISalesSettingsService
         Save(settings);
     }
 
+    public bool MovePickedToForSaleLocation => Load().MovePickedToForSaleLocation;
+
+    public void SetMovePickedToForSaleLocation(bool move)
+    {
+        var settings = Load();
+        settings.MovePickedToForSaleLocation = move;
+        Save(settings);
+    }
+
     public CompanyProfile GetCompany() => Load().Company;
 
     public void SaveCompany(CompanyProfile company)

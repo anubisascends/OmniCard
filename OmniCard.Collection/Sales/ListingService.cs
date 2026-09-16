@@ -148,13 +148,21 @@ public class ListingService(
 
     public int MarkPicked(IEnumerable<int> lotIds)
     {
-        var forSaleLocationId = salesSettings.ForSaleLocationId
-            ?? throw new InvalidOperationException("No 'For Sale' location is configured. Set one in Sales settings before picking.");
+        // When the "move picked cards" setting is off, picking is purely a status change — the card
+        // stays put — so we neither require nor validate a for-sale location.
+        var move = salesSettings.MovePickedToForSaleLocation;
+        int? forSaleLocationId = null;
 
         using var ctx = dbContextFactory.CreateDbContext();
 
-        if (!ctx.StorageContainers.Any(c => c.Id == forSaleLocationId))
-            throw new InvalidOperationException("The configured For-Sale location no longer exists. Pick a new one in the Sales tab.");
+        if (move)
+        {
+            forSaleLocationId = salesSettings.ForSaleLocationId
+                ?? throw new InvalidOperationException("No 'For Sale' location is configured. Set one in Sales settings before picking.");
+
+            if (!ctx.StorageContainers.Any(c => c.Id == forSaleLocationId))
+                throw new InvalidOperationException("The configured For-Sale location no longer exists. Pick a new one in the Sales tab.");
+        }
 
         var ids = lotIds.Distinct().ToList();
 
@@ -170,16 +178,20 @@ public class ListingService(
 
             listing.Status = ListingStatus.Picked;
             listing.PickedAt = DateTime.UtcNow;
-            lot.LocationId = forSaleLocationId;
-            ctx.Movements.Add(new InventoryMovement
+
+            if (move && lot.LocationId != forSaleLocationId)
             {
-                ProductId = lot.ProductId,
-                LotId = lot.Id,
-                Type = MovementType.Move,
-                Quantity = lot.Quantity,
-                Timestamp = DateTime.UtcNow,
-                Note = "Picked for sale",
-            });
+                lot.LocationId = forSaleLocationId;
+                ctx.Movements.Add(new InventoryMovement
+                {
+                    ProductId = lot.ProductId,
+                    LotId = lot.Id,
+                    Type = MovementType.Move,
+                    Quantity = lot.Quantity,
+                    Timestamp = DateTime.UtcNow,
+                    Note = "Picked for sale",
+                });
+            }
             picked++;
         }
 
