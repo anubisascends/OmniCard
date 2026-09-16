@@ -19,6 +19,7 @@ import {
   Paper,
   Slider,
   Stack,
+  Switch,
   Tab,
   Table,
   TableBody,
@@ -258,12 +259,14 @@ function SalesCard() {
   const [pickOpen, setPickOpen] = useState(false);
 
   const save = useMutation({
-    mutationFn: (forSaleLocationId: number | null) => api.settingsUpdate({ forSaleLocationId }),
+    mutationFn: (body: { forSaleLocationId: number | null; movePickedToForSaleLocation: boolean }) =>
+      api.settingsUpdate(body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
   });
 
   const currentId = settings.data?.forSaleLocationId ?? null;
   const currentName = locations.data?.find((l) => l.id === currentId)?.name;
+  const moveEnabled = settings.data?.movePickedToForSaleLocation ?? true;
 
   return (
     <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
@@ -288,15 +291,37 @@ function SalesCard() {
                 {currentName ?? (currentId != null ? `#${currentId}` : '— none —')}
               </Typography>
             </Box>
-            <Button size="small" onClick={() => setPickOpen(true)}>
+            <Button size="small" disabled={!moveEnabled} onClick={() => setPickOpen(true)}>
               Change
             </Button>
             {currentId != null && (
-              <Button size="small" color="error" disabled={save.isPending} onClick={() => save.mutate(null)}>
+              <Button
+                size="small"
+                color="error"
+                disabled={save.isPending || !moveEnabled}
+                onClick={() => save.mutate({ forSaleLocationId: null, movePickedToForSaleLocation: moveEnabled })}
+              >
                 Clear
               </Button>
             )}
           </Stack>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={moveEnabled}
+                disabled={save.isPending}
+                onChange={(e) =>
+                  save.mutate({ forSaleLocationId: currentId, movePickedToForSaleLocation: e.target.checked })
+                }
+              />
+            }
+            label="Move picked cards to the for-sale location"
+          />
+          <Typography variant="caption" color="text.secondary">
+            {moveEnabled
+              ? 'Marking a listing as picked physically relocates the card to the for-sale location above.'
+              : 'Marking a listing as picked only changes its status — the card stays in its current location.'}
+          </Typography>
           {save.error && <Alert severity="error">{(save.error as Error).message}</Alert>}
         </Stack>
       )}
@@ -306,7 +331,7 @@ function SalesCard() {
         title="For-sale location"
         onPick={(id) => {
           setPickOpen(false);
-          save.mutate(id);
+          save.mutate({ forSaleLocationId: id, movePickedToForSaleLocation: moveEnabled });
         }}
         onClose={() => setPickOpen(false)}
       />

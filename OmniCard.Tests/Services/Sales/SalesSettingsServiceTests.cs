@@ -21,6 +21,34 @@ public class SalesSettingsServiceTests
     }
 
     [Fact]
+    public void MovePickedToForSaleLocation_Persists_AcrossInstances()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "omnicard-sales-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var dps = new DataPathServiceStub(dir);
+            new SalesSettingsService(dps).SetMovePickedToForSaleLocation(false);
+            Assert.False(new SalesSettingsService(dps).MovePickedToForSaleLocation);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
+    public void MovePickedToForSaleLocation_DefaultsTrue_ForOldFileWithoutIt()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "omnicard-sales-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            // A pre-existing file lacking the new flag must keep the historical move-on-pick behavior.
+            File.WriteAllText(Path.Combine(dir, "sales-settings.json"), "{\"ForSaleLocationId\":7}");
+            Assert.True(new SalesSettingsService(new DataPathServiceStub(dir)).MovePickedToForSaleLocation);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
     public void OrdersEditorWidthAndCollapsed_Persist_AcrossInstances()
     {
         var dir = Path.Combine(Path.GetTempPath(), "omnicard-sales-" + Guid.NewGuid().ToString("N"));

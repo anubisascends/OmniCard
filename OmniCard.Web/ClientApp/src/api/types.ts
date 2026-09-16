@@ -231,6 +231,7 @@ export interface ListingDetailDto {
 
 export interface SalesSettingsDto {
   forSaleLocationId?: number | null;
+  movePickedToForSaleLocation: boolean;
 }
 
 /** Value-tier badge config for the scan page. `thresholds` is an ascending list of price ceilings

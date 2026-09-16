@@ -5,6 +5,11 @@ public interface ISalesSettingsService
     int? ForSaleLocationId { get; }
     void SetForSaleLocationId(int? id);
 
+    /// <summary>Whether marking a listing as picked physically moves the card to the for-sale location
+    /// (true, the default) or leaves it where it is (false).</summary>
+    bool MovePickedToForSaleLocation { get; }
+    void SetMovePickedToForSaleLocation(bool move);
+
     CompanyProfile GetCompany();
     void SaveCompany(CompanyProfile company);
     ReceiptSettings GetReceipt();

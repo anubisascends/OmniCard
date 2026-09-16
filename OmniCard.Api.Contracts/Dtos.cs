@@ -404,11 +404,12 @@ public sealed record LotIdsRequest
 }
 
 /// <summary>App/sales settings surfaced to the SPA.</summary>
-public sealed record SalesSettingsDto(int? ForSaleLocationId);
+public sealed record SalesSettingsDto(int? ForSaleLocationId, bool MovePickedToForSaleLocation);
 
 public sealed record UpdateSalesSettingsRequest
 {
     public int? ForSaleLocationId { get; init; }
+    public bool MovePickedToForSaleLocation { get; init; } = true;
 }
 
 /// <summary>Value-tier badge configuration for the scan page: the ISO currency code the thresholds are

@@ -51,6 +51,8 @@ public class OrderServiceTests : IDisposable
     {
         public int? ForSaleLocationId => 99;
         public void SetForSaleLocationId(int? id) { }
+        public bool MovePickedToForSaleLocation => true;
+        public void SetMovePickedToForSaleLocation(bool move) { }
         public CompanyProfile GetCompany() => new();
         public void SaveCompany(CompanyProfile company) { }
         public ReceiptSettings GetReceipt() => new();

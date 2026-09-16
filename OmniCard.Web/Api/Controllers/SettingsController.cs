@@ -14,12 +14,13 @@ public sealed class SettingsController(
 {
     [HttpGet]
     public ActionResult<SalesSettingsDto> Get() =>
-        new SalesSettingsDto(settings.ForSaleLocationId);
+        new SalesSettingsDto(settings.ForSaleLocationId, settings.MovePickedToForSaleLocation);
 
     [HttpPut]
     public IActionResult Update([FromBody] UpdateSalesSettingsRequest req)
     {
         settings.SetForSaleLocationId(req.ForSaleLocationId);
+        settings.SetMovePickedToForSaleLocation(req.MovePickedToForSaleLocation);
         return NoContent();
     }
 
