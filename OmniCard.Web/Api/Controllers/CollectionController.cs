@@ -56,7 +56,11 @@ public sealed class CollectionController(
     }
 
     /// <summary>Search owned singles. <paramref name="q"/> accepts the Scryfall-style tokens
-    /// (<c>set:</c>, <c>cn:</c>, <c>c:</c>, <c>r:</c>, <c>t:</c>, <c>tag:</c>, <c>is:foil</c>, …).</summary>
+    /// (<c>set:</c>, <c>cn:</c>, <c>c:</c>, <c>r:</c>, <c>t:</c>, <c>tag:</c>, <c>is:foil</c>, …).
+    /// <paramref name="sort"/> is a column key (name/setCode/number/rarity/condition/isFoil/quantity/
+    /// marketPrice/containerName) and <paramref name="dir"/> is asc|desc. Sorting runs server-side over
+    /// the *whole* filtered result set — never just the current page — so ordering by market price (or
+    /// any column) returns the true top-of-collection, not the top of page 1.</summary>
     [HttpGet]
     public ActionResult<PagedResult<CardDto>> Get(
         [FromQuery] string? game,
@@ -64,20 +68,30 @@ public sealed class CollectionController(
         [FromQuery] int? containerId,
         [FromQuery] int skip = 0,
         [FromQuery] int take = 100,
-        [FromQuery] bool stacked = false)
+        [FromQuery] bool stacked = false,
+        [FromQuery] string? sort = null,
+        [FromQuery] string? dir = null)
     {
         take = Math.Clamp(take, 1, 500);
         skip = Math.Max(0, skip);
         var gameFilter = LocationsController.ParseGame(game);
+        var sortKey = NormalizeSort(sort);
+        var desc = string.Equals(dir, "desc", StringComparison.OrdinalIgnoreCase);
 
         using var ctx = dbFactory.CreateDbContext();
         var query = CollectionQueryBuilder.BuildFilteredQuery(ctx, q ?? "", gameFilter, containerId, filterPreset: null, _gameServices);
 
-        var (total, cards) = stacked ? PageStacked(query, skip, take) : PageFlat(query, skip, take);
+        // Market-price sorting needs prices in hand *before* paging, so the paging helpers hydrate the
+        // full set through this delegate. All other sorts page in the DB and only the page is priced below.
+        void HydratePrices(IReadOnlyCollection<CollectionCard> cs) => MarketPriceHydrator.Populate(cardService, cs);
+
+        var (total, cards) = stacked
+            ? PageStacked(query, skip, take, sortKey, desc, HydratePrices)
+            : PageFlat(query, skip, take, sortKey, desc, HydratePrices);
 
         CardArtHydrator.HydrateMissingImageUris(cardService, cards);
         imageCache.PreferCached(cards);
-        MarketPriceHydrator.Populate(cardService, cards);
+        MarketPriceHydrator.Populate(cardService, cards); // idempotent; prices the page for non-price sorts
         AnnotateListingStatus(cards);
         PopulateTags(cards);
 
@@ -85,10 +99,78 @@ public sealed class CollectionController(
         return new PagedResult<CardDto>(total, skip, take, items);
     }
 
-    /// <summary>One row per lot (unstacked).</summary>
-    private static (int Total, List<CollectionCard> Cards) PageFlat(IQueryable<CollectionCard> query, int skip, int take)
+    /// <summary>Sortable column keys, lower-cased to match the client's DataGrid field names. Anything
+    /// unknown (or null) falls back to name.</summary>
+    private static string NormalizeSort(string? sort) => (sort ?? "").Trim().ToLowerInvariant() switch
     {
-        var ordered = query.OrderBy(c => c.Name).ThenBy(c => c.SetCode).ThenBy(c => c.Number).ThenBy(c => c.Id);
+        "setcode" => "setcode",
+        "number" => "number",
+        "rarity" => "rarity",
+        "condition" => "condition",
+        "isfoil" => "isfoil",
+        "quantity" => "quantity",
+        "marketprice" => "marketprice",
+        "containername" => "containername",
+        _ => "name",
+    };
+
+    private static IOrderedQueryable<T> Dir<T, TKey>(IQueryable<T> q, System.Linq.Expressions.Expression<Func<T, TKey>> key, bool desc)
+        => desc ? q.OrderByDescending(key) : q.OrderBy(key);
+
+    /// <summary>Global secondary ordering (in memory) so equal primary keys page deterministically.</summary>
+    private static List<CollectionCard> SortRows(IEnumerable<CollectionCard> rows, string sort, bool desc)
+    {
+        Func<CollectionCard, IComparable?> key = sort switch
+        {
+            "marketprice" => c => c.MarketPrice,
+            "quantity" => c => c.Quantity,
+            "setcode" => c => c.SetCode,
+            "number" => c => c.Number,
+            "rarity" => c => c.Rarity,
+            "condition" => c => c.Condition,
+            "isfoil" => c => c.IsFoil,
+            "containername" => c => c.Container?.Name,
+            _ => c => c.Name,
+        };
+        var primary = desc ? rows.OrderByDescending(key) : rows.OrderBy(key);
+        return primary
+            .ThenBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(c => c.SetCode, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(c => c.Number, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(c => c.Id)
+            .ToList();
+    }
+
+    /// <summary>One row per lot (unstacked).</summary>
+    internal static (int Total, List<CollectionCard> Cards) PageFlat(
+        IQueryable<CollectionCard> query, int skip, int take,
+        string sort = "name", bool desc = false, Action<IReadOnlyCollection<CollectionCard>>? hydratePrices = null)
+    {
+        // Market price isn't a DB column (looked up live per game catalog), so it can't be ordered in
+        // SQL. Materialize the whole filtered set, price it, then sort + page in memory.
+        if (sort == "marketprice")
+        {
+            var all = query.ToList();
+            foreach (var c in all)
+                c.StackedIds = [c.Id];
+            hydratePrices?.Invoke(all);
+            var sorted = SortRows(all, sort, desc);
+            return (all.Count, sorted.Skip(skip).Take(take).ToList());
+        }
+
+        // Everything else is a real projected column — order and page in the DB.
+        IOrderedQueryable<CollectionCard> keyed = sort switch
+        {
+            "setcode" => Dir(query, c => c.SetCode, desc),
+            "number" => Dir(query, c => c.Number, desc),
+            "rarity" => Dir(query, c => c.Rarity, desc),
+            "condition" => Dir(query, c => c.Condition, desc),
+            "isfoil" => Dir(query, c => c.IsFoil, desc),
+            "quantity" => Dir(query, c => c.Quantity, desc),
+            "containername" => Dir(query, c => c.Container != null ? c.Container.Name : null, desc),
+            _ => Dir(query, c => c.Name, desc),
+        };
+        var ordered = keyed.ThenBy(c => c.Name).ThenBy(c => c.SetCode).ThenBy(c => c.Number).ThenBy(c => c.Id);
         var total = ordered.Count();
         var cards = ordered.Skip(skip).Take(take).ToList();
         foreach (var c in cards)
@@ -101,15 +183,33 @@ public sealed class CollectionController(
     /// stack (different sets/printings/foils stay separate). Paginates the distinct printing keys first
     /// (cheap), then loads just that page's lots to build the representative rows — so it scales to the
     /// whole collection without materializing everything.</summary>
-    internal static (int Total, List<CollectionCard> Cards) PageStacked(IQueryable<CollectionCard> query, int skip, int take)
+    internal static (int Total, List<CollectionCard> Cards) PageStacked(
+        IQueryable<CollectionCard> query, int skip, int take,
+        string sort = "name", bool desc = false, Action<IReadOnlyCollection<CollectionCard>>? hydratePrices = null)
     {
+        // Sorts on a field that is part of the printing identity can page cheaply off the distinct keys
+        // (below). Sorts on a *computed* field — market price, summed quantity, or the representative's
+        // rarity/condition/location — must see every stack, so materialize the whole set, build the
+        // stacks, then sort + page in memory.
+        if (sort is not ("name" or "setcode" or "number" or "isfoil"))
+            return PageStackedComputed(query, skip, take, sort, desc, hydratePrices);
+
         // Distinct printing identity. Ordered so pagination is stable across requests.
         var keys = query
             .Select(c => new { c.Name, c.SetCode, c.Number, c.IsFoil })
             .Distinct();
         var total = keys.Count();
-        var pageKeys = keys
-            .OrderBy(k => k.Name).ThenBy(k => k.SetCode).ThenBy(k => k.Number).ThenBy(k => k.IsFoil)
+        IOrderedQueryable<T> KeyDir<T, TKey>(IQueryable<T> q, System.Linq.Expressions.Expression<Func<T, TKey>> k)
+            => desc ? q.OrderByDescending(k) : q.OrderBy(k);
+        var orderedKeys = sort switch
+        {
+            "setcode" => KeyDir(keys, k => k.SetCode),
+            "number" => KeyDir(keys, k => k.Number),
+            "isfoil" => KeyDir(keys, k => k.IsFoil),
+            _ => KeyDir(keys, k => k.Name),
+        };
+        var pageKeys = orderedKeys
+            .ThenBy(k => k.Name).ThenBy(k => k.SetCode).ThenBy(k => k.Number).ThenBy(k => k.IsFoil)
             .Skip(skip).Take(take)
             .ToList();
         if (pageKeys.Count == 0)
@@ -135,6 +235,31 @@ public sealed class CollectionController(
             .ThenBy(c => c.Number, StringComparer.OrdinalIgnoreCase)
             .ToList();
         return (total, rows);
+    }
+
+    /// <summary>Stacked paging for a sort that isn't part of the printing identity (market price, summed
+    /// quantity, or the representative's rarity/condition/location). These can't be resolved from the
+    /// distinct keys alone, so the whole filtered set is materialized, collapsed into stacks, priced
+    /// (for a price sort), then globally sorted and paged.</summary>
+    private static (int Total, List<CollectionCard> Cards) PageStackedComputed(
+        IQueryable<CollectionCard> query, int skip, int take,
+        string sort, bool desc, Action<IReadOnlyCollection<CollectionCard>>? hydratePrices)
+    {
+        var rows = query.ToList()
+            .GroupBy(c => (c.Name, c.SetCode, c.Number, c.IsFoil))
+            .Select(g =>
+            {
+                var rep = g.OrderBy(c => c.Id).First();
+                rep.Quantity = g.Sum(c => c.Quantity);
+                rep.StackedIds = g.Select(c => c.Id).ToList();
+                return rep;
+            })
+            .ToList();
+        var total = rows.Count;
+        if (sort == "marketprice")
+            hydratePrices?.Invoke(rows);
+        var sorted = SortRows(rows, sort, desc);
+        return (total, sorted.Skip(skip).Take(take).ToList());
     }
 
     /// <summary>Fills each row's tags in one batch query (union of tags across a stacked row's lots),

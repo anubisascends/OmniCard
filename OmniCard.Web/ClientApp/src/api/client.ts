@@ -214,6 +214,8 @@ export const api = {
     skip?: number;
     take?: number;
     stacked?: boolean;
+    sort?: string;
+    dir?: 'asc' | 'desc';
   }) => request<PagedResult<CardDto>>(`/api/collection${qs(opts)}`),
 
   // Location writes

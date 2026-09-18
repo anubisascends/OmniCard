@@ -23,6 +23,7 @@ import {
   type GridColDef,
   type GridPaginationModel,
   type GridRowSelectionModel,
+  type GridSortModel,
 } from '@mui/x-data-grid';
 import ChecklistIcon from '@mui/icons-material/Checklist';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -74,6 +75,7 @@ export function CardTable({
   const qc = useQueryClient();
   const [stacked, setStacked] = useState<boolean>(() => localStorage.getItem(STACK_KEY) !== 'false');
   const [pagination, setPagination] = useState<GridPaginationModel>({ page: 0, pageSize: 100 });
+  const [sortModel, setSortModel] = useState<GridSortModel>([{ field: 'name', sort: 'asc' }]);
   const [selectMode, setSelectMode] = useState(false);
   const [selection, setSelection] = useState<GridRowSelectionModel>([]);
   const [detailCardId, setDetailCardId] = useState<number | null>(null);
@@ -87,8 +89,14 @@ export function CardTable({
     setSelection([]);
   }, [game, q, containerId, stacked]);
 
+  const sortField = sortModel[0]?.field ?? 'name';
+  const sortDir = sortModel[0]?.sort ?? 'asc';
+
   const query = useQuery({
-    queryKey: ['collection', containerId ?? null, game ?? null, q ?? '', stacked, pagination.page, pagination.pageSize],
+    queryKey: [
+      'collection', containerId ?? null, game ?? null, q ?? '', stacked,
+      pagination.page, pagination.pageSize, sortField, sortDir,
+    ],
     queryFn: () =>
       api.collection({
         game,
@@ -97,6 +105,8 @@ export function CardTable({
         stacked,
         skip: pagination.page * pagination.pageSize,
         take: pagination.pageSize,
+        sort: sortField,
+        dir: sortDir,
       }),
     placeholderData: keepPreviousData,
   });
@@ -300,6 +310,13 @@ export function CardTable({
           paginationModel={pagination}
           onPaginationModelChange={setPagination}
           pageSizeOptions={[25, 50, 100]}
+          sortingMode="server"
+          sortModel={sortModel}
+          onSortModelChange={(model) => {
+            // Server sorts the whole result set, so jump back to page 1 for the new order.
+            setSortModel(model.length ? model : [{ field: 'name', sort: 'asc' }]);
+            setPagination((p) => ({ ...p, page: 0 }));
+          }}
           density="compact"
           checkboxSelection={selectMode}
           disableRowSelectionOnClick
