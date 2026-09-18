@@ -19,6 +19,16 @@
       "unfiled": "Unfiled",
       "addToPocket": "Add to pocket"
     },
+    "addToList": {
+      "title": "Add card to list",
+      "addedSoFar": "Added {{count}} so far",
+      "inCollection": "In your collection",
+      "inCatalog": "In the catalog",
+      "noOwnedCopies": "No copies in your collection.",
+      "noCatalogMatches": "No matches in the {{game}} catalog.",
+      "unfiled": "Unfiled",
+      "addToList": "Add to list"
+    },
     "bulkEdit": {
       "title_one": "Edit {{count}} selected card",
       "title_other": "Edit {{count}} selected cards",

@@ -12,7 +12,12 @@ public interface IListService
     void DeleteList(int listId);
 
     IReadOnlyList<CardListItem> GetItems(int listId);
-    CardListItem AddPrinting(int listId, CardMatch printing, bool isFoil, string? foilType, int quantity, ListItemSource source);
+    CardListItem AddPrinting(int listId, CardMatch printing, bool isFoil, string? foilType, int quantity, ListItemSource source, int? sourceLotId = null);
+
+    /// <summary>Adds a card the user already owns to the list by referencing an existing <c>InventoryLot</c>.
+    /// The printing is frozen from the lot's product; the lot itself is <em>not</em> moved or mutated — the
+    /// reference is only acted on at commit time (where the copies are relocated instead of duplicated).</summary>
+    CardListItem AddOwnedLot(int listId, int lotId, int quantity);
     void RemoveItem(int itemId);
     void SetQuantity(int itemId, int quantity);
 
