@@ -4,7 +4,26 @@
     <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Keep the publish output lean. Native runtime packages (SkiaSharp + HarfBuzz, pulled in by
+         QuestPDF) ship large debug-symbol files — libSkiaSharp.pdb alone is ~89 MB, ~110 MB per RID —
+         plus XML docs, none of which are used at runtime. Excluding them here trims hundreds of MB
+         from a publish. Always publish with an explicit RID (see OmniCard.Web/README.md ▸ Publish);
+         a RID-less framework-dependent publish otherwise copies every platform's native assets. -->
+    <CopyDebugSymbolFilesFromPackages>false</CopyDebugSymbolFilesFromPackages>
+    <CopyDocumentationFilesFromPackages>false</CopyDocumentationFilesFromPackages>
   </PropertyGroup>
+
+  <!-- Strip native debug symbols from the publish output. The property above doesn't catch these
+       (libSkiaSharp.pdb ~89 MB, libHarfBuzzSharp.pdb ~23 MB): with an explicit RID they land at the
+       publish root, and with a RID-less publish they sit under runtimes/**. We match native symbols
+       (lib*.pdb) plus everything under runtimes/, and deliberately keep the small OmniCard.*.pdb
+       managed symbols for readable stack traces. -->
+  <Target Name="StripNativePdbsFromPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <_PublishedNativePdb Include="$(PublishDir)**\lib*.pdb;$(PublishDir)runtimes\**\*.pdb" />
+    </ItemGroup>
+    <Delete Files="@(_PublishedNativePdb)" ContinueOnError="true" />
+  </Target>
 
   <ItemGroup>
     <InternalsVisibleTo Include="OmniCard.Tests" />

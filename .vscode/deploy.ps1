@@ -119,12 +119,48 @@ npm run build
 if ($LASTEXITCODE -ne 0) { Pop-Location; Write-Host 'SPA build FAILED' -ForegroundColor Red; Pause-Exit 1 }
 Pop-Location
 
+# ---- 2b. Clean the deploy folder so stale files don't accumulate ----
+# The publish profile sets SkipExtraFilesOnServer, so Web Deploy never removes files that a previous
+# build left behind - content-hashed SPA chunks (each build drops a fresh ~10 MB opencv asset) pile up
+# and the folder balloons over time. Wipe it before publishing. The app's runtime data lives in
+# $DataDirectory, not here, so the site folder only holds regenerated build output + logs.
+# Safety guard: never let a mis-edited setting turn this into a drive-root wipe.
+if ([string]::IsNullOrWhiteSpace($PhysicalPath) -or $PhysicalPath -match '^[A-Za-z]:\\?$') {
+    Write-Host "Refusing to clean unsafe PhysicalPath '$PhysicalPath'" -ForegroundColor Red; Pause-Exit 1
+}
+if (Test-Path $PhysicalPath) {
+    # Stop the app pool first so the running worker releases its lock on the DLLs, then wait for it to
+    # actually exit before deleting (a 'Stopped' state can briefly precede w3wp unloading).
+    if (Test-Path "IIS:\AppPools\$AppPool") {
+        Write-Host "Stopping app pool '$AppPool' to release file locks" -ForegroundColor Cyan
+        if ((Get-WebAppPoolState -Name $AppPool).Value -ne 'Stopped') { Stop-WebAppPool -Name $AppPool }
+        for ($i = 0; $i -lt 40 -and (Get-WebAppPoolState -Name $AppPool).Value -ne 'Stopped'; $i++) { Start-Sleep -Milliseconds 250 }
+    }
+    Write-Host "Cleaning deploy folder $PhysicalPath" -ForegroundColor Cyan
+    # Remove folder *contents* (keep the folder so its IIS physical path + ACL grant survive). Retry a
+    # couple of times in case a handle is slow to release.
+    for ($try = 1; $try -le 3; $try++) {
+        try {
+            Get-ChildItem -LiteralPath $PhysicalPath -Force | Remove-Item -Recurse -Force -ErrorAction Stop
+            break
+        } catch {
+            if ($try -eq 3) { Write-Host "Could not fully clean '$PhysicalPath': $_" -ForegroundColor Red; Pause-Exit 1 }
+            Start-Sleep -Milliseconds 500
+        }
+    }
+}
+
 # ---- 3. Publish to IIS via the Web Deploy profile (AppOffline handles the DLL lock) ----
 Write-Host 'Publishing to IIS...' -ForegroundColor Cyan
 Push-Location $Repo
 dotnet publish OmniCard.Web/OmniCard.Web.csproj -c Release "/p:PublishProfile=$PublishProfile"
 $code = $LASTEXITCODE
 Pop-Location
+
+# Bring the pool back up (we stopped it above; a manually stopped pool stays stopped otherwise).
+if (Test-Path "IIS:\AppPools\$AppPool") {
+    if ((Get-WebAppPoolState -Name $AppPool).Value -ne 'Started') { Start-WebAppPool -Name $AppPool }
+}
 
 if ($code -ne 0) { Write-Host 'PUBLISH FAILED' -ForegroundColor Red; Pause-Exit $code }
 Write-Host "DONE - https://localhost:$Port" -ForegroundColor Green
