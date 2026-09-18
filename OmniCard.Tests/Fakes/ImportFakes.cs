@@ -135,7 +135,7 @@ public sealed class RecordingTagService : ITagService
 /// <summary>IListService that records AddPrinting/CreateList calls.</summary>
 public sealed class RecordingListService : IListService
 {
-    public sealed record AddPrintingCall(int ListId, CardMatch Printing, bool IsFoil, string? FoilType, int Quantity, ListItemSource Source);
+    public sealed record AddPrintingCall(int ListId, CardMatch Printing, bool IsFoil, string? FoilType, int Quantity, ListItemSource Source, int? SourceLotId);
     public List<AddPrintingCall> Printings { get; } = [];
     public List<CardList> Lists { get; } = [];
     private int _nextId = 500;
@@ -147,13 +147,14 @@ public sealed class RecordingListService : IListService
         Lists.Add(l);
         return l;
     }
-    public CardListItem AddPrinting(int listId, CardMatch printing, bool isFoil, string? foilType, int quantity, ListItemSource source)
+    public CardListItem AddPrinting(int listId, CardMatch printing, bool isFoil, string? foilType, int quantity, ListItemSource source, int? sourceLotId = null)
     {
-        Printings.Add(new AddPrintingCall(listId, printing, isFoil, foilType, quantity, source));
-        return new CardListItem { CardListId = listId, GameCardId = printing.GameSpecificId, Quantity = quantity, Source = source, IsFoil = isFoil, FoilType = foilType };
+        Printings.Add(new AddPrintingCall(listId, printing, isFoil, foilType, quantity, source, sourceLotId));
+        return new CardListItem { CardListId = listId, GameCardId = printing.GameSpecificId, Quantity = quantity, Source = source, IsFoil = isFoil, FoilType = foilType, SourceLotId = sourceLotId };
     }
 
     // Unused members
+    public CardListItem AddOwnedLot(int listId, int lotId, int quantity) => throw new NotImplementedException();
     public void RenameList(int listId, string name) => throw new NotImplementedException();
     public void DeleteList(int listId) => throw new NotImplementedException();
     public IReadOnlyList<CardListItem> GetItems(int listId) => throw new NotImplementedException();

@@ -77,6 +77,22 @@ public sealed class WebBinderCardService
             .Any(l => l.Product.Game == game && l.Product.GameCardId == gameCardId);
     }
 
+    /// <summary>Of the given catalog ids, the subset the collection already owns at least one lot of
+    /// (by game + card id, regardless of finish/condition). Bulk companion to <see cref="IsNewCard"/> —
+    /// one query for a whole list rather than a probe per card.</summary>
+    public HashSet<string> GetOwnedGameCardIds(CardGame game, IEnumerable<string> gameCardIds)
+    {
+        var ids = gameCardIds.Where(id => !string.IsNullOrEmpty(id)).Distinct().ToList();
+        if (ids.Count == 0)
+            return [];
+        using var context = _dbFactory.CreateDbContext();
+        return context.Lots.AsNoTracking()
+            .Where(l => l.Product.Game == game && l.Product.GameCardId != null && ids.Contains(l.Product.GameCardId))
+            .Select(l => l.Product.GameCardId!)
+            .Distinct()
+            .ToHashSet();
+    }
+
     public void MoveCardsToContainer(IEnumerable<int> cardIds, int containerId, string? section = null)
     {
         using var context = _dbFactory.CreateDbContext();
@@ -398,6 +414,68 @@ public sealed class WebBinderCardService
             Quantity = 1,
         });
         context.SaveChanges();
+    }
+
+    /// <summary>Relocates up to <paramref name="quantity"/> owned copies of <paramref name="lotId"/> into a
+    /// location (no page/slot), splitting a larger stack so the remainder stays where it was. Returns the
+    /// number of copies actually moved (0 if the lot no longer exists). Drives list-commit's "cards already
+    /// in the collection are just moved to the chosen location" path — no new lot is created for these.</summary>
+    public int MoveOwnedCopiesToContainer(int lotId, int quantity, int containerId)
+    {
+        using var context = _dbFactory.CreateDbContext();
+        var lot = context.Lots.Include(l => l.Product)
+            .FirstOrDefault(l => l.Id == lotId && l.Product.Category == ProductCategory.Single);
+        if (lot is null)
+            return 0;
+
+        // Hard block: a game-locked deck box rejects cards from other games (shared with the desktop path).
+        DeckBoxGameGuard.ValidateIncoming(context, containerId, [lot.Product.Game]);
+
+        var move = Math.Clamp(quantity, 1, lot.Quantity);
+
+        if (move >= lot.Quantity)
+        {
+            // Whole-lot relocation.
+            lot.LocationId = containerId;
+            lot.Page = null;
+            lot.Slot = null;
+            lot.Section = null;
+            context.SaveChanges();
+            context.Movements.Add(new InventoryMovement
+            {
+                ProductId = lot.ProductId,
+                LotId = lot.Id,
+                Type = MovementType.Move,
+                Quantity = move,
+            });
+            context.SaveChanges();
+            return move;
+        }
+
+        // Split the moved copies off the stack into a new lot at the destination; the remainder stays put.
+        lot.Quantity -= move;
+        var moved = new InventoryLot
+        {
+            ProductId = lot.ProductId,
+            Quantity = move,
+            UnitCost = lot.UnitCost,
+            AcquisitionDate = lot.AcquisitionDate,
+            Source = lot.Source,
+            Condition = lot.Condition,
+            LocationId = containerId,
+        };
+        context.Lots.Add(moved);
+        context.SaveChanges();
+
+        context.Movements.Add(new InventoryMovement
+        {
+            ProductId = moved.ProductId,
+            LotId = moved.Id,
+            Type = MovementType.Move,
+            Quantity = move,
+        });
+        context.SaveChanges();
+        return move;
     }
 
     // --- Ported find-or-create-Product + identity/copy helpers (canonical copy: CardService.cs) ---

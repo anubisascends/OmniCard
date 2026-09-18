@@ -6,6 +6,7 @@ import type {
   CardDto,
   ComponentDto,
   CsvImportResultDto,
+  AddListItemRequest,
   CardListDto,
   CardListItemDto,
   CatalogStatusDto,
@@ -505,6 +506,17 @@ export const api = {
     request<void>(`/api/lists/${id}`, { method: 'PUT', body: JSON.stringify({ name }) }),
   listDelete: (id: number) => request<void>(`/api/lists/${id}`, { method: 'DELETE' }),
   listItems: (id: number) => request<CardListItemDto[]>(`/api/lists/${id}/items`),
+  /** Add a single "wholly new" card (chosen from the catalog) to a list. Records a printing reference
+   * only — no lot is created and the collection is untouched. */
+  listAddItem: (id: number, body: AddListItemRequest) =>
+    request<CardListItemDto>(`/api/lists/${id}/items`, { method: 'POST', body: JSON.stringify(body) }),
+  /** Add a card the user already owns to a list by referencing an existing lot. The lot is not moved or
+   * mutated; on commit the referenced copies are relocated to the target location instead of duplicated. */
+  listAddFromCollection: (id: number, lotId: number, quantity: number) =>
+    request<CardListItemDto>(`/api/lists/${id}/items/from-collection`, {
+      method: 'POST',
+      body: JSON.stringify({ lotId, quantity }),
+    }),
   listRemoveItem: (itemId: number) =>
     request<void>(`/api/lists/items/${itemId}`, { method: 'DELETE' }),
   listSetItemQuantity: (itemId: number, quantity: number) =>

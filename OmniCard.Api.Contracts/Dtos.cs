@@ -512,9 +512,13 @@ public sealed record TradeSummaryDto(
 
 public sealed record CardListDto(int Id, string Name, string Game, string? Notes, int ItemCount);
 
+/// <summary>A card on a saved list. <see cref="InCollection"/> is true when the collection already owns
+/// at least one copy of this printing (by game + card id); <see cref="ImageUri"/> is the best display art
+/// (local cache when downloaded, else catalog CDN) for hover previews.</summary>
 public sealed record CardListItemDto(
     int Id, string GameCardId, string CardName, string? SetCode, string? CollectorNumber,
-    bool IsFoil, string? FoilType, int Quantity, decimal? MarketPrice, bool IsUnpriced);
+    bool IsFoil, string? FoilType, int Quantity, decimal? MarketPrice, bool IsUnpriced,
+    bool InCollection, string? ImageUri);
 
 public sealed record CreateListRequest
 {
@@ -532,6 +536,31 @@ public sealed record CommitListResultDto(int Imported, bool ListDeleted);
 
 public sealed record SetQuantityRequest
 {
+    public int Quantity { get; init; } = 1;
+}
+
+/// <summary>Add a single catalog card ("a wholly new card") to a list. This only records a frozen
+/// printing reference on the list — it never creates a lot or touches the collection.</summary>
+public sealed record AddListItemRequest
+{
+    public string GameCardId { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string? SetCode { get; init; }
+    public string? SetName { get; init; }
+    public string? CollectorNumber { get; init; }
+    public string? Rarity { get; init; }
+    public string? ImageUri { get; init; }
+    public bool IsFoil { get; init; }
+    public string? FoilType { get; init; }
+    public int Quantity { get; init; } = 1;
+}
+
+/// <summary>Add a card the user already owns to a list by referencing an existing inventory lot. Adding
+/// does not move or mutate the lot; on commit the referenced copies are relocated to the target location
+/// (rather than duplicated).</summary>
+public sealed record AddListItemFromCollectionRequest
+{
+    public int LotId { get; init; }
     public int Quantity { get; init; } = 1;
 }
 

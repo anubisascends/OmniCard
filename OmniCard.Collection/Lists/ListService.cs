@@ -59,7 +59,7 @@ public class ListService(
             .ToList();
     }
 
-    public CardListItem AddPrinting(int listId, CardMatch printing, bool isFoil, string? foilType, int quantity, ListItemSource source)
+    public CardListItem AddPrinting(int listId, CardMatch printing, bool isFoil, string? foilType, int quantity, ListItemSource source, int? sourceLotId = null)
     {
         using var ctx = dbContextFactory.CreateDbContext();
         var list = ctx.CardLists.AsNoTracking().FirstOrDefault(l => l.Id == listId)
@@ -71,6 +71,10 @@ public class ListService(
         if (existing is not null)
         {
             existing.Quantity += quantity;
+            // Adopt the owned-copy reference if this item didn't already carry one, so a later commit
+            // relocates the physical copy rather than minting a duplicate.
+            if (existing.SourceLotId is null && sourceLotId is not null)
+                existing.SourceLotId = sourceLotId;
             ctx.SaveChanges();
             return existing;
         }
@@ -88,11 +92,41 @@ public class ListService(
             FoilType = foilType,
             AddedMarketPrice = price,
             IsUnpriced = price is null,
+            SourceLotId = sourceLotId,
             Source = source,
         };
         ctx.CardListItems.Add(item);
         ctx.SaveChanges();
         return item;
+    }
+
+    public CardListItem AddOwnedLot(int listId, int lotId, int quantity)
+    {
+        CardMatch match;
+        bool isFoil;
+        string? foilType;
+        using (var ctx = dbContextFactory.CreateDbContext())
+        {
+            var lot = ctx.Lots.AsNoTracking().Include(l => l.Product)
+                          .FirstOrDefault(l => l.Id == lotId)
+                      ?? throw new InvalidOperationException($"Card {lotId} was not found in your collection.");
+            var p = lot.Product;
+            isFoil = p.Foil;
+            foilType = p.FoilType;
+            match = new CardMatch
+            {
+                GameSpecificId = p.GameCardId ?? "",
+                Name = p.Name,
+                SetCode = p.SetCode ?? "",
+                SetName = p.SetName ?? "",
+                CollectorNumber = p.CollectorNumber ?? "",
+                Rarity = p.Rarity ?? "",
+                ImageUri = p.ImageUri,
+            };
+        }
+        // Adding to a list is a pure reference — the source lot is untouched here. Stamp Manual so
+        // RefreshPrices keeps this exact printing rather than re-tracking the cheapest one.
+        return AddPrinting(listId, match, isFoil, foilType, Math.Max(1, quantity), ListItemSource.Manual, lotId);
     }
 
     public void RemoveItem(int itemId)

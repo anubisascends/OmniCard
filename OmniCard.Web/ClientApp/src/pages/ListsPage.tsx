@@ -18,14 +18,17 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { api } from '../api/client';
+import { AddCardToListDialog } from '../components/dialogs/AddCardToListDialog';
 import { locationSelectOptions } from '../components/LocationSelectOptions';
 import { useGame } from '../context/GameContext';
 import { useFormatters } from '../i18n/format';
@@ -42,6 +45,7 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
   const [containerId, setContainerId] = useState<number | ''>('');
   const [condition, setCondition] = useState('NM');
   const [addUrl, setAddUrl] = useState('');
+  const [addCardOpen, setAddCardOpen] = useState(false);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['list-items', list.id] });
@@ -76,6 +80,12 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
 
   if (items.isLoading || !items.data) return <CircularProgress />;
 
+  // Market-value roll-ups: the whole list, and the subset not already in the collection ("missing").
+  // Unpriced items contribute nothing (matching the "—" shown per row).
+  const lineValue = (it: (typeof items.data)[number]) => (it.isUnpriced ? 0 : (it.marketPrice ?? 0) * it.quantity);
+  const totalValue = items.data.reduce((sum, it) => sum + lineValue(it), 0);
+  const missingValue = items.data.reduce((sum, it) => sum + (it.inCollection ? 0 : lineValue(it)), 0);
+
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Typography variant="h6" gutterBottom>
@@ -83,6 +93,9 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
       </Typography>
 
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }} flexWrap="wrap" useFlexGap>
+        <Button size="small" variant="outlined" startIcon={<AddIcon />} onClick={() => setAddCardOpen(true)}>
+          {t('lists.detail.addCard')}
+        </Button>
         <Button
           size="small"
           startIcon={<RefreshIcon />}
@@ -155,7 +168,34 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
         </Alert>
       )}
 
+      {items.data.length > 0 && (
+        <Stack
+          direction="row"
+          spacing={2}
+          flexWrap="wrap"
+          useFlexGap
+          sx={{ mb: 1, px: 1, py: 0.75, borderRadius: 1, bgcolor: 'action.hover' }}
+        >
+          <Typography variant="body2">
+            {t('lists.detail.totalValue')}{' '}
+            <Box component="span" sx={{ fontWeight: 600 }}>{fmt.money(totalValue)}</Box>
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {t('lists.detail.missingValue')}{' '}
+            <Box component="span" sx={{ fontWeight: 600 }}>{fmt.money(missingValue)}</Box>
+          </Typography>
+        </Stack>
+      )}
+
       <Divider sx={{ mb: 1 }} />
+
+      <AddCardToListDialog
+        open={addCardOpen}
+        listId={list.id}
+        defaultGame={list.game}
+        onClose={() => setAddCardOpen(false)}
+        onDone={invalidate}
+      />
 
       {items.data.length === 0 ? (
         <Typography color="text.secondary" variant="body2">
@@ -165,6 +205,7 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
         <Table size="small">
           <TableHead>
             <TableRow>
+              <TableCell padding="checkbox"></TableCell>
               <TableCell>{t('lists.detail.columns.card')}</TableCell>
               <TableCell>{t('common.labels.set')}</TableCell>
               <TableCell align="right">{t('lists.detail.columns.qty')}</TableCell>
@@ -175,9 +216,35 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
           <TableBody>
             {items.data.map((it) => (
               <TableRow key={it.id} hover>
+                <TableCell padding="checkbox">
+                  {it.inCollection && (
+                    <Tooltip title={t('lists.detail.inCollectionTooltip')}>
+                      <CollectionsBookmarkIcon fontSize="small" color="success" sx={{ display: 'block' }} />
+                    </Tooltip>
+                  )}
+                </TableCell>
                 <TableCell>
-                  {it.cardName}
-                  {it.isFoil ? ' ✦' : ''}
+                  <Tooltip
+                    disableInteractive
+                    slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, maxWidth: 'none' } } }}
+                    title={
+                      it.imageUri ? (
+                        <Box
+                          component="img"
+                          src={it.imageUri}
+                          alt=""
+                          sx={{ width: 240, borderRadius: 2, display: 'block', boxShadow: 6 }}
+                        />
+                      ) : (
+                        ''
+                      )
+                    }
+                  >
+                    <Box component="span" sx={{ cursor: it.imageUri ? 'help' : 'default' }}>
+                      {it.cardName}
+                      {it.isFoil ? ' ✦' : ''}
+                    </Box>
+                  </Tooltip>
                 </TableCell>
                 <TableCell>
                   {it.setCode?.toUpperCase()}

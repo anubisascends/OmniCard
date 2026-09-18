@@ -572,11 +572,30 @@ export interface CardListItemDto {
   quantity: number;
   marketPrice?: number | null;
   isUnpriced: boolean;
+  /** True when the collection already owns at least one copy of this printing (by game + card id). */
+  inCollection: boolean;
+  /** Best display art (local cache when downloaded, else catalog CDN) for hover previews. */
+  imageUri?: string | null;
 }
 
 export interface CommitListResultDto {
   imported: number;
   listDeleted: boolean;
+}
+
+/** Add a single catalog card ("a wholly new card") to a list. Records a frozen printing only — it never
+ * creates a lot or touches the collection. */
+export interface AddListItemRequest {
+  gameCardId: string;
+  name: string;
+  setCode?: string | null;
+  setName?: string | null;
+  collectorNumber?: string | null;
+  rarity?: string | null;
+  imageUri?: string | null;
+  isFoil: boolean;
+  foilType?: string | null;
+  quantity: number;
 }
 
 export interface ImportListResultDto {

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Api.Contracts;
 using OmniCard.Data;
 using OmniCard.Web.Services;
@@ -32,9 +33,11 @@ public class ListsControllerTests : IDisposable
         using (var ctx = new OmniCardDbContext(_opts)) ctx.Database.EnsureCreated();
 
         var factory = new MockFactory(_opts);
-        var listService = new ListService(factory, new WebCardService([]));
+        var cardService = new WebCardService([]);
+        var listService = new ListService(factory, cardService);
         var binderCards = new WebBinderCardService(factory, new StubDataPath());
-        _controller = new ListsController(listService, _decklists, binderCards);
+        var imageCache = new CardImageCacheService(new StubDataPath(), new StubHttpClientFactory(), NullLogger<CardImageCacheService>.Instance);
+        _controller = new ListsController(listService, _decklists, binderCards, cardService, imageCache);
         _containers = new StorageContainerService(factory);
     }
 
@@ -168,5 +171,12 @@ public class ListsControllerTests : IDisposable
         public void SetPendingDataDirectory(string path) { }
         public void CommitMigration() { }
         public void CancelPendingMigration() { }
+    }
+
+    // Image caching only touches the filesystem for the read paths the controller uses (DisplayUrl/
+    // PreferCached), so this never actually gets called — it just satisfies the constructor.
+    private sealed class StubHttpClientFactory : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => new();
     }
 }

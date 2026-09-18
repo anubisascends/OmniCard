@@ -15,15 +15,19 @@
     "confirmDelete": "Delete list \"{{name}}\"?",
     "renamePrompt": "Rename list",
     "detail": {
+      "addCard": "Add card",
       "refreshPrices": "Refresh prices",
       "chooseLocation": "— choose —",
       "conditionLabel": "Cond",
       "commit": "Commit to location",
       "committing": "Committing…",
       "addFromUrlLabel": "Add from URL (Moxfield / Archidekt)",
+      "totalValue": "Total market value:",
+      "missingValue": "Not in collection:",
+      "inCollectionTooltip": "Already in your collection",
       "added": "Added {{count}} card.",
       "added_other": "Added {{count}} cards.",
-      "empty": "This list is empty. Add cards from a Moxfield/Archidekt URL above, or from the scan/import flow.",
+      "empty": "This list is empty. Add a card with the “Add card” button above, import a Moxfield/Archidekt URL, or add from the scan/import flow.",
       "columns": {
         "card": "Card",
         "qty": "Qty"

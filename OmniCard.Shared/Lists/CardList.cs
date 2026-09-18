@@ -32,6 +32,13 @@ public class CardListItem
     /// <summary>True when no printing had a price and a fallback printing was chosen.</summary>
     public bool IsUnpriced { get; set; }
 
+    /// <summary>When this item was added by picking an owned copy from the collection, the id of the
+    /// source <c>InventoryLot</c>. Adding to a list never moves or mutates that lot; the reference is
+    /// only consumed at commit time, where the referenced copies are <em>relocated</em> to the target
+    /// location instead of creating brand-new lots. Null for catalog / URL / name-resolved items, which
+    /// commit as newly-created lots.</summary>
+    public int? SourceLotId { get; set; }
+
     public ListItemSource Source { get; set; }
 }
 
