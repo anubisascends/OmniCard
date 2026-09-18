@@ -287,6 +287,103 @@ public class WebBinderCardServiceTests : IDisposable
         Assert.Equal("New Card", placed.Product.Name);
     }
 
+    private int AddLotIn(int containerId, string name, int quantity = 1, string condition = "NM")
+    {
+        using var ctx = new OmniCardDbContext(_opts);
+        var product = new Product
+        {
+            Game = CardGame.Pokemon,
+            Category = ProductCategory.Single,
+            GameCardId = name.Replace(" ", "").ToLowerInvariant(),
+            Name = name,
+            SetCode = "SET",
+            SetName = "Set Name",
+        };
+        ctx.Products.Add(product);
+        ctx.SaveChanges();
+        var lot = new InventoryLot
+        {
+            ProductId = product.Id,
+            LocationId = containerId,
+            Quantity = quantity,
+            Condition = condition,
+        };
+        ctx.Lots.Add(lot);
+        ctx.SaveChanges();
+        return lot.Id;
+    }
+
+    [Fact]
+    public void PlaceOwnedCardInSlot_SingleCopy_MovesWholeLotIntoPocket()
+    {
+        var boxId = _containers.Create("Box B", ContainerType.Box).Id;
+        var lotId = AddLotIn(boxId, "Solo", quantity: 1);
+
+        _service.PlaceOwnedCardInSlot(lotId, _binderId, 2, 3);
+
+        using var ctx = new OmniCardDbContext(_opts);
+        var lot = ctx.Lots.Single(l => l.Id == lotId);
+        Assert.Equal(_binderId, lot.LocationId);
+        Assert.Equal(2, lot.Page);
+        Assert.Equal(3, lot.Slot);
+        // No extra lot was created for a whole-lot move.
+        Assert.Equal(1, ctx.Lots.Count(l => l.Product.Name == "Solo"));
+    }
+
+    [Fact]
+    public void PlaceOwnedCardInSlot_MultiCopy_SplitsOneCopyLeavingRemainder()
+    {
+        var boxId = _containers.Create("Box B", ContainerType.Box).Id;
+        var lotId = AddLotIn(boxId, "Stack", quantity: 3);
+
+        _service.PlaceOwnedCardInSlot(lotId, _binderId, 1, 0);
+
+        using var ctx = new OmniCardDbContext(_opts);
+        // Original lot keeps the remainder where it was.
+        var source = ctx.Lots.Single(l => l.Id == lotId);
+        Assert.Equal(2, source.Quantity);
+        Assert.Equal(boxId, source.LocationId);
+        Assert.Null(source.Page);
+        // A new single-copy lot sits in the pocket.
+        var placed = ctx.Lots.Include(l => l.Product)
+            .Single(l => l.LocationId == _binderId && l.Page == 1 && l.Slot == 0);
+        Assert.Equal("Stack", placed.Product.Name);
+        Assert.Equal(1, placed.Quantity);
+        Assert.NotEqual(lotId, placed.Id);
+    }
+
+    [Fact]
+    public void PlaceOwnedCardInSlot_DisplacesExistingOccupant()
+    {
+        var occupantId = AddLot("Occupant", page: 1, slot: 0);
+        var boxId = _containers.Create("Box B", ContainerType.Box).Id;
+        var incomingId = AddLotIn(boxId, "Incoming", quantity: 1);
+
+        _service.PlaceOwnedCardInSlot(incomingId, _binderId, 1, 0);
+
+        using var ctx = new OmniCardDbContext(_opts);
+        var occupant = ctx.Lots.Single(l => l.Id == occupantId);
+        Assert.Null(occupant.Page);
+        Assert.Null(occupant.Slot);
+        var incoming = ctx.Lots.Single(l => l.Id == incomingId);
+        Assert.Equal(1, incoming.Page);
+        Assert.Equal(0, incoming.Slot);
+    }
+
+    [Fact]
+    public void PlaceOwnedCardInSlot_IntoMismatchedGameDeckBox_Throws()
+    {
+        var boxId = _containers.Create("Box B", ContainerType.Box).Id;
+        var lotId = AddLotIn(boxId, "Pikachu"); // Pokémon
+        var deckBox = _containers.Create("MTG Deck", ContainerType.DeckBox, game: CardGame.Mtg);
+
+        Assert.Throws<DeckBoxGameMismatchException>(() =>
+            _service.PlaceOwnedCardInSlot(lotId, deckBox.Id, 1, 0));
+
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.Equal(boxId, ctx.Lots.Single(l => l.Id == lotId).LocationId);
+    }
+
     private sealed class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
         public OmniCardDbContext CreateDbContext() => new(options);

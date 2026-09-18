@@ -328,6 +328,78 @@ public sealed class WebBinderCardService
         context.SaveChanges();
     }
 
+    /// <summary>Moves one owned copy of <paramref name="lotId"/> into the binder pocket at
+    /// (<paramref name="containerId"/>, <paramref name="page"/>, <paramref name="slot"/>). A single copy
+    /// is split off a multi-copy lot so the remainder stays where it was; any card already in that pocket
+    /// is displaced back to the Unplaced pool. Drives the binder editor's "Add card ▸ from your
+    /// collection" flow (relocating a card from another location straight into a pocket). Mirrors the
+    /// displace-then-place rules of <see cref="AddMissingCardToSlot"/> and the split rules of
+    /// <c>CardService.MoveQuantityToContainer</c>.</summary>
+    public void PlaceOwnedCardInSlot(int lotId, int containerId, int page, int slot)
+    {
+        using var context = _dbFactory.CreateDbContext();
+        var lot = context.Lots.Include(l => l.Product)
+            .FirstOrDefault(l => l.Id == lotId && l.Product.Category == ProductCategory.Single)
+            ?? throw new InvalidOperationException($"Card {lotId} was not found in your collection.");
+
+        // Hard block: a game-locked deck box rejects cards from other games (shared with the desktop path).
+        DeckBoxGameGuard.ValidateIncoming(context, containerId, [lot.Product.Game]);
+
+        // Displace any current occupant of the target pocket back to the Unplaced pool.
+        var occupant = context.Lots.FirstOrDefault(l =>
+            l.LocationId == containerId && l.Page == page && l.Slot == slot && l.Id != lotId);
+        if (occupant is not null)
+        {
+            occupant.Page = null;
+            occupant.Slot = null;
+        }
+
+        if (lot.Quantity <= 1)
+        {
+            // Whole-lot move into the pocket.
+            lot.LocationId = containerId;
+            lot.Page = page;
+            lot.Slot = slot;
+            lot.Section = null;
+            context.SaveChanges();
+            context.Movements.Add(new InventoryMovement
+            {
+                ProductId = lot.ProductId,
+                LotId = lot.Id,
+                Type = MovementType.Move,
+                Quantity = 1,
+            });
+            context.SaveChanges();
+            return;
+        }
+
+        // Split one copy off the stack into a new single-copy lot placed in the pocket.
+        lot.Quantity -= 1;
+        var placed = new InventoryLot
+        {
+            ProductId = lot.ProductId,
+            Quantity = 1,
+            UnitCost = lot.UnitCost,
+            AcquisitionDate = lot.AcquisitionDate,
+            Source = lot.Source,
+            Condition = lot.Condition,
+            LocationId = containerId,
+            Page = page,
+            Slot = slot,
+        };
+        context.Lots.Add(placed);
+        context.SaveChanges();
+
+        context.Movements.Add(new InventoryMovement
+        {
+            ProductId = placed.ProductId,
+            LotId = placed.Id,
+            Type = MovementType.Move,
+            Quantity = 1,
+        });
+        context.SaveChanges();
+    }
+
     // --- Ported find-or-create-Product + identity/copy helpers (canonical copy: CardService.cs) ---
 
     private static Product FindOrCreateProduct(

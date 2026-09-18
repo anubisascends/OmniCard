@@ -205,6 +205,30 @@ export const api = {
     request<void>('/api/binder/page/remove', { method: 'POST', body: JSON.stringify({ containerId, page }) }),
   binderLayout: (containerId: number, slotsPerPage: number, columns: number) =>
     request<void>('/api/binder/layout', { method: 'POST', body: JSON.stringify({ containerId, slotsPerPage, columns }) }),
+  /** Relocate one owned copy of a lot from wherever it lives into a binder pocket (splits a stack). */
+  binderPlaceOwned: (lotId: number, containerId: number, page: number, slot: number) =>
+    request<void>('/api/binder/card/place-owned', {
+      method: 'POST',
+      body: JSON.stringify({ lotId, containerId, page, slot }),
+    }),
+  /** Create a new loose lot from a catalog card and drop it straight into a binder pocket. */
+  binderAddMissing: (body: {
+    containerId: number;
+    page: number;
+    slot: number;
+    game: string;
+    gameSpecificId: string;
+    name: string;
+    setCode: string;
+    setName: string;
+    collectorNumber: string;
+    rarity: string;
+    imageUri?: string | null;
+    condition: string;
+    isFoil: boolean;
+    foilType?: string | null;
+    purchasePrice?: number | null;
+  }) => request<void>('/api/binder/card/add-missing', { method: 'POST', body: JSON.stringify(body) }),
 
   // Collection
   collection: (opts: {

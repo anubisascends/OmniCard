@@ -21,10 +21,13 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import SellIcon from '@mui/icons-material/Sell';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { api } from '../api/client';
 import type { BinderCardDto, BinderSlotDto } from '../api/types';
 import { CardImage } from '../components/CardImage';
 import { ListForSaleDialog } from '../components/dialogs/ListForSaleDialog';
+import { CardEditDrawer } from '../components/dialogs/CardEditDrawer';
+import { AddCardToSlotDialog } from '../components/dialogs/AddCardToSlotDialog';
 import { SearchBox } from '../components/SearchBox';
 
 const CARD_BACK_SLUGS = ['mtg', 'optcg', 'riftbound', 'pokemon', 'yugioh', 'fftcg'];
@@ -32,6 +35,70 @@ const cardBackSrc = (game: number): string | undefined => {
   const slug = CARD_BACK_SLUGS[game];
   return slug ? `/img/card-back-${slug}.png` : undefined;
 };
+
+// CardGame enum names by ordinal (matches OmniCard.Shared.Cards.CardGame) — used to seed the
+// Add-card dialog's game selector from a card already in the binder.
+const GAME_NAMES = ['Mtg', 'OnePiece', 'Riftbound', 'Pokemon', 'YuGiOh', 'FinalFantasy'];
+const gameName = (game?: number | null): string =>
+  (game != null && GAME_NAMES[game]) || 'Mtg';
+
+// Friendly labels for the SalesChannel enum names sent by the API.
+const CHANNEL_LABELS: Record<string, string> = { Manual: 'Manual', TcgPlayer: 'TCGplayer', Ebay: 'eBay' };
+const channelLabel = (c?: string | null): string => (c ? CHANNEL_LABELS[c] ?? c : '');
+// Picked cards are further along the sale pipeline than merely Listed — warn vs. info.
+const statusColor = (status?: string | null): string => (status === 'Picked' ? 'warning.main' : 'info.main');
+
+// Shared look for the overlay price/status pills: a solid, high-contrast chip that stays legible on
+// top of any card art (light or dark), rather than plain text over a gradient.
+const PILL_SX = {
+  px: 0.6,
+  py: '2px',
+  borderRadius: 0.75,
+  fontSize: 11,
+  fontWeight: 700,
+  lineHeight: 1.35,
+  letterSpacing: 0.2,
+  color: '#fff',
+  boxShadow: 2,
+  pointerEvents: 'none',
+  whiteSpace: 'nowrap',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 0.25,
+} as const;
+
+/** Overlay badges drawn on top of a placed card: a sale-status pill (top-left), the market price
+ * (bottom-left) and, when listed, the channel + listed price (bottom-right). Each is a solid pill so
+ * it reads clearly over any art. `pointer-events: none` so drag / click still reach the card. */
+function CardOverlayBadges({ card }: { card: BinderCardDto }) {
+  const listed = card.listingStatus;
+  return (
+    <>
+      {listed && (
+        <Box sx={{ ...PILL_SX, position: 'absolute', top: 3, left: 3, bgcolor: statusColor(listed) }}>
+          <SellIcon sx={{ fontSize: 12 }} />
+          {listed === 'Picked' ? 'Picked' : 'Listed'}
+        </Box>
+      )}
+      {card.price && (
+        <Box
+          title="Market price"
+          sx={{ ...PILL_SX, position: 'absolute', bottom: 3, left: 3, bgcolor: 'rgba(17,17,17,0.82)' }}
+        >
+          {card.price}
+        </Box>
+      )}
+      {listed && card.listedPrice && (
+        <Box
+          title="Listed price"
+          sx={{ ...PILL_SX, position: 'absolute', bottom: 3, right: 3, bgcolor: statusColor(listed) }}
+        >
+          {channelLabel(card.listingChannel)} {card.listedPrice}
+        </Box>
+      )}
+    </>
+  );
+}
 
 // Layout presets (slots-per-page → columns) offered in edit mode.
 const LAYOUTS = [
@@ -75,7 +142,8 @@ function SlotGrid({
   editMode,
   onDragCard,
   onDropSlot,
-  onCardContextMenu,
+  onSlotContextMenu,
+  onCardClick,
 }: {
   slots: BinderSlotDto[];
   columns: number;
@@ -83,7 +151,8 @@ function SlotGrid({
   editMode: boolean;
   onDragCard: (lotId: number) => void;
   onDropSlot: (page: number, slot: number) => void;
-  onCardContextMenu: (e: React.MouseEvent, card: BinderCardDto) => void;
+  onSlotContextMenu: (e: React.MouseEvent, page: number, slot: number, card: BinderCardDto | null) => void;
+  onCardClick: (card: BinderCardDto) => void;
 }) {
   return (
     <Paper variant="outlined" sx={{ p: 1, flex: 1 }}>
@@ -96,7 +165,9 @@ function SlotGrid({
             key={s.slotIndex}
             onDragOver={editMode ? (e) => e.preventDefault() : undefined}
             onDrop={editMode ? () => onDropSlot(pageNumber, s.slotIndex) : undefined}
+            onContextMenu={(e) => onSlotContextMenu(e, pageNumber, s.slotIndex, s.card ?? null)}
             sx={{
+              position: 'relative',
               aspectRatio: '0.72',
               border: '1px dashed',
               borderColor: editMode ? 'primary.light' : 'divider',
@@ -105,26 +176,30 @@ function SlotGrid({
               bgcolor: 'action.hover',
               display: 'grid',
               placeItems: 'center',
+              cursor: s.card ? 'default' : 'context-menu',
             }}
           >
             {s.card?.imageUrl ? (
-              <Tooltip title={`${s.card.name} · ${s.card.condition}${s.card.foil ? ' · Foil' : ''} — right-click to list for sale`}>
-                <CardImage
-                  src={s.card.imageUrl}
-                  alt={s.card.name}
-                  foil={s.card.foil}
-                  draggable={editMode}
-                  onDragStart={editMode ? () => onDragCard(s.card!.id) : undefined}
-                  onContextMenu={(e) => onCardContextMenu(e, s.card!)}
-                  wrapperSx={{ width: '100%', height: '100%' }}
-                  sx={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'contain',
-                    cursor: editMode ? 'grab' : 'default',
-                  }}
-                />
-              </Tooltip>
+              <>
+                <Tooltip title={`${s.card.name} · ${s.card.condition}${s.card.foil ? ' · Foil' : ''} — click for details, right-click for actions`}>
+                  <CardImage
+                    src={s.card.imageUrl}
+                    alt={s.card.name}
+                    foil={s.card.foil}
+                    draggable={editMode}
+                    onDragStart={editMode ? () => onDragCard(s.card!.id) : undefined}
+                    onClick={() => onCardClick(s.card!)}
+                    wrapperSx={{ width: '100%', height: '100%' }}
+                    sx={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      cursor: editMode ? 'grab' : 'pointer',
+                    }}
+                  />
+                </Tooltip>
+                <CardOverlayBadges card={s.card} />
+              </>
             ) : s.reverseGame != null ? (
               <ReverseCardBack game={s.reverseGame} />
             ) : null}
@@ -146,6 +221,7 @@ function UnplacedSidebar({
   onDragCard,
   onDropUnassign,
   onCardContextMenu,
+  onCardClick,
 }: {
   cards: BinderCardDto[];
   loading: boolean;
@@ -154,6 +230,7 @@ function UnplacedSidebar({
   onDragCard: (lotId: number) => void;
   onDropUnassign: () => void;
   onCardContextMenu: (e: React.MouseEvent, card: BinderCardDto) => void;
+  onCardClick: (card: BinderCardDto) => void;
 }) {
   return (
     <Paper
@@ -200,6 +277,7 @@ function UnplacedSidebar({
                 alignItems="center"
                 draggable
                 onDragStart={() => onDragCard(c.id)}
+                onClick={() => onCardClick(c)}
                 onContextMenu={(e) => onCardContextMenu(e, c)}
                 sx={{
                   p: 0.5,
@@ -223,6 +301,23 @@ function UnplacedSidebar({
                     {c.setCode} · #{c.number} · {c.condition}
                     {c.foil ? ' · Foil' : ''}
                   </Typography>
+                  <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25 }}>
+                    {c.price && (
+                      <Typography variant="caption" color="text.secondary" noWrap>
+                        {c.price}
+                      </Typography>
+                    )}
+                    {c.listingStatus && (
+                      <Typography
+                        variant="caption"
+                        noWrap
+                        sx={{ fontWeight: 700, color: statusColor(c.listingStatus) }}
+                      >
+                        {c.listingStatus === 'Picked' ? 'Picked' : 'Listed'}
+                        {c.listedPrice ? ` · ${channelLabel(c.listingChannel)} ${c.listedPrice}` : ''}
+                      </Typography>
+                    )}
+                  </Stack>
                 </Box>
               </Stack>
             ))}
@@ -244,12 +339,21 @@ export function BinderPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [debouncedFilter, setDebouncedFilter] = useState('');
+  // Context menu for a card in the Unplaced sidebar (details / list for sale).
   const [cardMenu, setCardMenu] = useState<{ x: number; y: number; card: BinderCardDto } | null>(null);
+  // Context menu for a binder pocket (add card + occupant actions).
+  const [slotMenu, setSlotMenu] = useState<{ x: number; y: number; page: number; slot: number; card: BinderCardDto | null } | null>(null);
   const [listCard, setListCard] = useState<BinderCardDto | null>(null);
+  const [detailCardId, setDetailCardId] = useState<number | null>(null);
+  const [addSlot, setAddSlot] = useState<{ page: number; slot: number; card: BinderCardDto | null } | null>(null);
 
   const openCardMenu = (e: React.MouseEvent, card: BinderCardDto) => {
     e.preventDefault();
     setCardMenu({ x: e.clientX, y: e.clientY, card });
+  };
+  const openSlotMenu = (e: React.MouseEvent, page: number, slot: number, card: BinderCardDto | null) => {
+    e.preventDefault();
+    setSlotMenu({ x: e.clientX, y: e.clientY, page, slot, card });
   };
 
   // Debounce the search box so each keystroke doesn't hit the server; keeps type-ahead snappy.
@@ -395,6 +499,7 @@ export function BinderPage() {
             onDragCard={setDragLotId}
             onDropUnassign={dropUnassign}
             onCardContextMenu={openCardMenu}
+            onCardClick={(c) => setDetailCardId(c.id)}
           />
         )}
         <Stack direction="row" spacing={2} sx={{ flexGrow: 1, minWidth: 0 }}>
@@ -406,12 +511,13 @@ export function BinderPage() {
               editMode={editMode}
               onDragCard={setDragLotId}
               onDropSlot={dropOnSlot}
-              onCardContextMenu={openCardMenu}
+              onSlotContextMenu={openSlotMenu}
+              onCardClick={(c) => setDetailCardId(c.id)}
             />
           ) : (
             <Box sx={{ flex: 1 }} />
           )}
-          {data.rightPageNumber != null && (
+          {data.rightPageNumber != null ? (
             <SlotGrid
               slots={data.rightSlots}
               columns={data.columns}
@@ -419,18 +525,33 @@ export function BinderPage() {
               editMode={editMode}
               onDragCard={setDragLotId}
               onDropSlot={dropOnSlot}
-              onCardContextMenu={openCardMenu}
+              onSlotContextMenu={openSlotMenu}
+              onCardClick={(c) => setDetailCardId(c.id)}
             />
+          ) : (
+            // Keep the empty half reserved so a lone left page (e.g. an odd last page / a single
+            // backside) fills only its half of the spread, mirroring page 1 alone on the right.
+            <Box sx={{ flex: 1 }} />
           )}
         </Stack>
       </Stack>
 
+      {/* Unplaced-sidebar card menu */}
       <Menu
         open={cardMenu != null}
         onClose={() => setCardMenu(null)}
         anchorReference="anchorPosition"
         anchorPosition={cardMenu ? { top: cardMenu.y, left: cardMenu.x } : undefined}
       >
+        <MenuItem
+          onClick={() => {
+            setDetailCardId(cardMenu!.card.id);
+            setCardMenu(null);
+          }}
+        >
+          <InfoOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
+          Card details
+        </MenuItem>
         <MenuItem
           onClick={() => {
             setListCard(cardMenu!.card);
@@ -441,6 +562,70 @@ export function BinderPage() {
           List for sale
         </MenuItem>
       </Menu>
+
+      {/* Binder-pocket menu */}
+      <Menu
+        open={slotMenu != null}
+        onClose={() => setSlotMenu(null)}
+        anchorReference="anchorPosition"
+        anchorPosition={slotMenu ? { top: slotMenu.y, left: slotMenu.x } : undefined}
+      >
+        <MenuItem
+          onClick={() => {
+            setAddSlot({ page: slotMenu!.page, slot: slotMenu!.slot, card: slotMenu!.card });
+            setSlotMenu(null);
+          }}
+        >
+          <AddIcon fontSize="small" sx={{ mr: 1 }} />
+          {slotMenu?.card ? 'Replace card in this pocket…' : 'Add card to this pocket…'}
+        </MenuItem>
+        {slotMenu?.card && (
+          <MenuItem
+            onClick={() => {
+              setDetailCardId(slotMenu!.card!.id);
+              setSlotMenu(null);
+            }}
+          >
+            <InfoOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
+            Card details
+          </MenuItem>
+        )}
+        {slotMenu?.card && (
+          <MenuItem
+            onClick={() => {
+              setListCard(slotMenu!.card);
+              setSlotMenu(null);
+            }}
+          >
+            <SellIcon fontSize="small" sx={{ mr: 1 }} />
+            List for sale
+          </MenuItem>
+        )}
+      </Menu>
+
+      {addSlot && (
+        <AddCardToSlotDialog
+          open
+          containerId={binderId}
+          page={addSlot.page}
+          slot={addSlot.slot}
+          occupantName={addSlot.card?.name}
+          defaultGame={gameName(
+            addSlot.card?.game ??
+              data.leftSlots.concat(data.rightSlots).find((s) => s.card)?.card?.game,
+          )}
+          onClose={() => setAddSlot(null)}
+          onDone={refresh}
+        />
+      )}
+
+      <CardEditDrawer
+        cardId={detailCardId}
+        onClose={() => {
+          setDetailCardId(null);
+          refresh();
+        }}
+      />
 
       <ListForSaleDialog
         target={

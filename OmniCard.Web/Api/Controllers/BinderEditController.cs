@@ -264,16 +264,32 @@ public sealed class BinderEditController : ControllerBase
         return Ok(new { status = "ok" });
     }
 
+    public sealed record PlaceOwnedRequest(int LotId, int ContainerId, int Page, int Slot);
+
+    /// <summary>Relocate an owned card straight into a binder pocket (the "Add card ▸ from your
+    /// collection" flow). One copy is split off a stack; a displaced occupant returns to the pool.</summary>
+    [HttpPost("card/place-owned")]
+    public IActionResult PlaceOwned([FromBody] PlaceOwnedRequest r)
+    {
+        try { _binderCards.PlaceOwnedCardInSlot(r.LotId, r.ContainerId, r.Page, r.Slot); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+        return Ok(new { status = "ok" });
+    }
+
+    // Game is the CardGame enum *name* ("Mtg", "OnePiece", …) to match the rest of the SPA API.
     public sealed record AddMissingRequest(
         int ContainerId, int Page, int Slot,
-        int Game, string GameSpecificId, string Name, string SetCode, string SetName,
+        string Game, string GameSpecificId, string Name, string SetCode, string SetName,
         string CollectorNumber, string Rarity, string? ImageUri,
         string Condition, bool IsFoil, string? FoilType, decimal? PurchasePrice);
 
+    /// <summary>Place a card chosen from the game catalog straight into a binder pocket (the "Add card
+    /// ▸ from the catalog" flow), creating a new loose lot. Displaces any current occupant to the pool.</summary>
     [HttpPost("card/add-missing")]
     public IActionResult AddMissing([FromBody] AddMissingRequest r)
     {
-        var game = (CardGame)r.Game;
+        if (!Enum.TryParse<CardGame>(r.Game, ignoreCase: true, out var game))
+            return BadRequest(new { error = $"Unknown game '{r.Game}'." });
         var match = new CardMatch
         {
             GameSpecificId = r.GameSpecificId,
