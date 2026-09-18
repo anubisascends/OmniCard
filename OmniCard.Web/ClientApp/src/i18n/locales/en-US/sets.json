@@ -1,0 +1,13 @@
+{
+  "sets": {
+    "title": "Sets",
+    "pickGame": "Pick a game in the top bar to browse its sets.",
+    "summary": "{{setName}} — {{owned}}/{{total}} owned ({{percent}}%)",
+    "columns": {
+      "no": "No.",
+      "owned": "Owned",
+      "normal": "Normal"
+    },
+    "ownedCount": "×{{count}}"
+  }
+}

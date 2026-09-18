@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Autocomplete,
@@ -22,14 +23,16 @@ import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import SellIcon from '@mui/icons-material/Sell';
 import { Snackbar } from '@mui/material';
 import { api } from '../../api/client';
+import { useFormatters } from '../../i18n/format';
 import { CardImage } from '../CardImage';
 import { LocationPickerDialog } from './LocationPickerDialog';
 import { ListForSaleDialog } from './ListForSaleDialog';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
-const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 
 export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onClose: () => void }) {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   const qc = useQueryClient();
   const open = cardId != null;
 
@@ -133,13 +136,17 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
               />
             )}
             <Stack direction="row" spacing={1} sx={{ alignSelf: 'flex-start' }}>
-              <Chip label={`Market ${card.marketPrice ? money(card.marketPrice) : 'n/a'}`} />
+              <Chip
+                label={t('dialogs.cardEdit.market', {
+                  price: card.marketPrice ? fmt.money(card.marketPrice, 'USD') : t('dialogs.cardEdit.notAvailable'),
+                })}
+              />
               {card.listingStatus && (
                 <Chip
                   color="warning"
                   variant="outlined"
                   icon={<SellIcon />}
-                  label={card.listingStatus === 'Picked' ? 'Picked for sale' : 'Listed for sale'}
+                  label={card.listingStatus === 'Picked' ? t('dialogs.cardEdit.pickedForSale') : t('dialogs.cardEdit.listedForSale')}
                 />
               )}
             </Stack>
@@ -147,25 +154,25 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
 
             <TextField
               select
-              label="Condition"
+              label={t('common.labels.condition')}
               size="small"
               value={condition}
               onChange={(e) => setCondition(e.target.value)}
             >
               {CONDITIONS.map((c) => (
                 <MenuItem key={c} value={c}>
-                  {c}
+                  {t(`common.conditions.${c}`)}
                 </MenuItem>
               ))}
             </TextField>
 
             <FormControlLabel
               control={<Switch checked={isFoil} onChange={(e) => setIsFoil(e.target.checked)} />}
-              label="Foil"
+              label={t('common.labels.foil')}
             />
 
             <TextField
-              label="Quantity"
+              label={t('common.labels.quantity')}
               type="number"
               size="small"
               value={quantity}
@@ -174,7 +181,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
             />
 
             <TextField
-              label="Purchase price"
+              label={t('common.labels.purchasePrice')}
               type="number"
               size="small"
               value={purchasePrice}
@@ -183,28 +190,28 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
             />
 
             <TextField
-              label="Note"
+              label={t('common.labels.note')}
               size="small"
               multiline
               minRows={2}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="e.g. signed, played, misprint…"
+              placeholder={t('dialogs.cardEdit.notePlaceholder')}
             />
 
             <Stack direction="row" spacing={1} alignItems="center">
               <Box sx={{ flexGrow: 1 }}>
                 <Typography variant="caption" color="text.secondary">
-                  Location
+                  {t('common.labels.location')}
                 </Typography>
                 <Typography variant="body2">
                   {locationsQuery.data?.find((l) => l.id === containerId)?.name ??
                     card.containerName ??
-                    '— none —'}
+                    t('dialogs.cardEdit.noLocation')}
                 </Typography>
               </Box>
               <Button size="small" startIcon={<DriveFileMoveIcon />} onClick={() => setMoveOpen(true)}>
-                Change
+                {t('common.actions.change')}
               </Button>
             </Stack>
 
@@ -215,15 +222,11 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
               options={(tagsQuery.data ?? []).map((t) => t.name)}
               value={tags}
               onChange={(_, v) => setTags(v)}
-              renderInput={(params) => <TextField {...params} label="Tags" />}
+              renderInput={(params) => <TextField {...params} label={t('common.labels.tags')} />}
             />
 
             <Tooltip
-              title={
-                card.listingStatus
-                  ? 'This card is already listed for sale. Unlist it from Sales ▸ Listings first.'
-                  : ''
-              }
+              title={card.listingStatus ? t('dialogs.cardEdit.alreadyListedTooltip') : ''}
             >
               {/* span keeps the tooltip working while the button is disabled */}
               <span>
@@ -234,7 +237,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
                   disabled={!!card.listingStatus}
                   fullWidth
                 >
-                  {card.listingStatus ? 'Already listed for sale' : 'List for sale'}
+                  {card.listingStatus ? t('dialogs.cardEdit.alreadyListed') : t('dialogs.cardEdit.listForSale')}
                 </Button>
               </span>
             </Tooltip>
@@ -245,7 +248,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
               onClick={() => addToTrade.mutate()}
               disabled={addToTrade.isPending}
             >
-              Add to trade
+              {t('dialogs.cardEdit.addToTrade')}
             </Button>
 
             <Stack direction="row" spacing={1} justifyContent="space-between">
@@ -253,17 +256,17 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
                 color="error"
                 startIcon={<DeleteOutlineIcon />}
                 onClick={() => {
-                  if (confirm(`Delete "${card.name}"? This removes the card from your collection.`))
+                  if (confirm(t('dialogs.cardEdit.deleteConfirm', { name: card.name })))
                     del.mutate();
                 }}
                 disabled={del.isPending}
               >
-                Delete
+                {t('common.actions.delete')}
               </Button>
               <Stack direction="row" spacing={1}>
-                <Button onClick={onClose}>Cancel</Button>
+                <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
                 <Button variant="contained" onClick={() => save.mutate()} disabled={save.isPending}>
-                  {save.isPending ? 'Saving…' : 'Save'}
+                  {save.isPending ? t('common.states.saving') : t('common.actions.save')}
                 </Button>
               </Stack>
             </Stack>
@@ -275,7 +278,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
         open={tradeToast}
         autoHideDuration={3000}
         onClose={() => setTradeToast(false)}
-        message="Added to your trade — finalize it on the Trades page."
+        message={t('dialogs.cardEdit.tradeToast')}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       />
 
@@ -283,7 +286,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
         open={listToast}
         autoHideDuration={3000}
         onClose={() => setListToast(false)}
-        message="Listed for sale — pull it from Sales ▸ Listings."
+        message={t('dialogs.cardEdit.listToast')}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       />
 
@@ -299,7 +302,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
 
       <LocationPickerDialog
         open={moveOpen}
-        title="Move card to…"
+        title={t('dialogs.cardEdit.moveTitle')}
         cardGames={card ? [card.game] : undefined}
         onPick={(id) => {
           setContainerId(id);

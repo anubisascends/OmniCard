@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
@@ -36,6 +37,7 @@ export function ListForSaleDialog({
   onClose: () => void;
   onListed?: () => void;
 }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const open = target != null;
 
@@ -74,12 +76,12 @@ export function ListForSaleDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>List for sale{target ? ` — ${target.name}` : ''}</DialogTitle>
+      <DialogTitle>{target ? t('sales.listForSale.titleNamed', { name: target.name }) : t('sales.listForSale.title')}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           {target && target.quantity > 1 && (
             <TextField
-              label={`Quantity (you have ${target.quantity})`}
+              label={t('sales.listForSale.quantityYouHave', { qty: target.quantity })}
               type="number"
               required
               value={quantity}
@@ -89,14 +91,14 @@ export function ListForSaleDialog({
               slotProps={{ htmlInput: { min: 1, max: target.quantity, step: 1 } }}
               helperText={
                 quantity < target.quantity
-                  ? `Splits ${quantity} off your stack of ${target.quantity}.`
-                  : 'Lists the whole stack.'
+                  ? t('sales.listForSale.splitsHelper', { quantity, total: target.quantity })
+                  : t('sales.listForSale.listsWholeStack')
               }
               autoFocus
             />
           )}
           <TextField
-            label="Price"
+            label={t('common.labels.price')}
             required
             value={priceText}
             onChange={(e) => {
@@ -117,19 +119,19 @@ export function ListForSaleDialog({
             }}
             autoFocus={!target || target.quantity <= 1}
           />
-          <TextField select label="Channel" value={channel} onChange={(e) => setChannel(e.target.value)}>
+          <TextField select label={t('common.labels.channel')} value={channel} onChange={(e) => setChannel(e.target.value)}>
             {CHANNELS.map((c) => (
-              <MenuItem key={c} value={c}>{c}</MenuItem>
+              <MenuItem key={c} value={c}>{t(`common.channels.${c}`)}</MenuItem>
             ))}
           </TextField>
-          <TextField label="Note" value={note} onChange={(e) => setNote(e.target.value)} multiline minRows={2} />
+          <TextField label={t('common.labels.note')} value={note} onChange={(e) => setNote(e.target.value)} multiline minRows={2} />
           {list.error && <Typography color="error" variant="body2">{(list.error as Error).message}</Typography>}
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
         <Button variant="contained" disabled={price < 0 || list.isPending} onClick={() => list.mutate()}>
-          {list.isPending ? 'Listing…' : 'List for sale'}
+          {list.isPending ? t('sales.listForSale.listing') : t('sales.listForSale.title')}
         </Button>
       </DialogActions>
     </Dialog>

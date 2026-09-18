@@ -1,7 +1,16 @@
 import { ListSubheader, MenuItem } from '@mui/material';
 import type { ReactNode } from 'react';
+import i18n from '../i18n';
 import type { LocationSummaryDto } from '../api/types';
 import { groupLocations } from '../lib/locationGroups';
+
+// Localized group heading. `groupLocations` returns a stable `key` per group (`__always__`, or the
+// type display string), which we resolve to a translated heading here. This module is a plain
+// function (no React hooks), so it reads the shared i18n singleton rather than `useTranslation`.
+function headingFor(key: string, fallback: string): string {
+  if (key === '__always__') return i18n.t('locations.groups.alwaysAvailable');
+  return i18n.t(`locations.groups.headings.${key}`, { defaultValue: fallback });
+}
 
 /**
  * Options for a MUI `<TextField select>` / `<Select>` location picker: the locations grouped by type
@@ -25,7 +34,7 @@ export function locationSelectOptions(
   for (const g of groupLocations(locations ?? [])) {
     nodes.push(
       <ListSubheader key={g.key} disableSticky>
-        {g.heading}
+        {headingFor(g.key, g.heading)}
       </ListSubheader>,
     );
     for (const l of g.items)

@@ -1,0 +1,56 @@
+{
+  "inventory": {
+    "title": "Sealed Inventory",
+    "newProduct": "New product",
+    "categories": {
+      "Case": "Case",
+      "Box": "Box",
+      "Pack": "Pack",
+      "Deck": "Deck",
+      "Bundle": "Bundle",
+      "Other": "Other"
+    },
+    "columns": {
+      "product": "Product",
+      "type": "Type",
+      "set": "Set",
+      "qty": "Qty",
+      "market": "Market",
+      "upc": "UPC"
+    },
+    "stats": {
+      "totalUnits": "Total Units",
+      "cost": "Cost",
+      "market": "Market"
+    },
+    "productDialog": {
+      "editTitle": "Edit product",
+      "newTitle": "New sealed product",
+      "setName": "Set name",
+      "setCode": "Set code",
+      "upc": "UPC"
+    },
+    "lotDialog": {
+      "editTitle": "Edit lot",
+      "addTitle": "Add lot",
+      "unitCost": "Unit cost",
+      "locationOptional": "Location (optional)",
+      "sourceOptional": "Source (optional)",
+      "none": "— none —"
+    },
+    "drawer": {
+      "editProduct": "Edit product",
+      "deleteProduct": "Delete product",
+      "confirmDeleteProduct": "Delete \"{{name}}\" and all its lots?",
+      "confirmDeleteLot": "Delete this lot?",
+      "lots": "Lots",
+      "addLot": "Add lot",
+      "noLots": "No lots yet.",
+      "lotColumns": {
+        "qty": "Qty",
+        "cost": "Cost",
+        "source": "Source"
+      }
+    }
+  }
+}

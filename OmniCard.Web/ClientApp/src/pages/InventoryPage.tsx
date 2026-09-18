@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
@@ -31,28 +32,38 @@ import { api, type LotFields, type ProductFields } from '../api/client';
 import type { InventoryLotDto, ProductDto } from '../api/types';
 import { locationSelectOptions } from '../components/LocationSelectOptions';
 import { useGame } from '../context/GameContext';
+import { useFormatters } from '../i18n/format';
+import type { TFunction } from 'i18next';
 
-const money = (n?: number | null) =>
-  n == null ? '' : n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
-
-// Sealed categories (Single is managed in the Collection).
+// Sealed categories (Single is managed in the Collection). Server identifiers — not translated.
 const CATEGORIES = ['Case', 'Box', 'Pack', 'Deck', 'Bundle', 'Other'];
 
-const columns: GridColDef<ProductDto>[] = [
-  { field: 'name', headerName: 'Product', flex: 2, minWidth: 240 },
-  { field: 'category', headerName: 'Type', width: 110 },
-  { field: 'setCode', headerName: 'Set', width: 90 },
-  { field: 'totalQuantity', headerName: 'Qty', width: 80, type: 'number' },
-  {
-    field: 'lastMarketPrice',
-    headerName: 'Market',
-    width: 120,
-    align: 'right',
-    headerAlign: 'right',
-    valueFormatter: (v: number | null) => money(v),
-  },
-  { field: 'upc', headerName: 'UPC', width: 140 },
-];
+function buildColumns(
+  t: TFunction,
+  fmt: ReturnType<typeof useFormatters>,
+): GridColDef<ProductDto>[] {
+  return [
+    { field: 'name', headerName: t('inventory.columns.product'), flex: 2, minWidth: 240 },
+    {
+      field: 'category',
+      headerName: t('inventory.columns.type'),
+      width: 110,
+      valueFormatter: (v: string) =>
+        v && CATEGORIES.includes(v) ? t(`inventory.categories.${v}`) : v,
+    },
+    { field: 'setCode', headerName: t('inventory.columns.set'), width: 90 },
+    { field: 'totalQuantity', headerName: t('inventory.columns.qty'), width: 80, type: 'number' },
+    {
+      field: 'lastMarketPrice',
+      headerName: t('inventory.columns.market'),
+      width: 120,
+      align: 'right',
+      headerAlign: 'right',
+      valueFormatter: (v: number | null) => fmt.money(v),
+    },
+    { field: 'upc', headerName: t('inventory.columns.upc'), width: 140 },
+  ];
+}
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -78,6 +89,7 @@ function ProductDialog({
   defaultGame: string;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const games = useQuery({ queryKey: ['games'], queryFn: api.games });
   const [fields, setFields] = useState<ProductFields>({
@@ -119,11 +131,13 @@ function ProductDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>{initial ? 'Edit product' : 'New sealed product'}</DialogTitle>
+      <DialogTitle>
+        {initial ? t('inventory.productDialog.editTitle') : t('inventory.productDialog.newTitle')}
+      </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <TextField
-            label="Name"
+            label={t('common.labels.name')}
             required
             value={fields.name}
             onChange={(e) => setFields((f) => ({ ...f, name: e.target.value }))}
@@ -132,7 +146,7 @@ function ProductDialog({
           <Stack direction="row" spacing={2}>
             <TextField
               select
-              label="Game"
+              label={t('common.labels.game')}
               value={fields.game}
               onChange={(e) => setFields((f) => ({ ...f, game: e.target.value }))}
               fullWidth
@@ -145,27 +159,27 @@ function ProductDialog({
             </TextField>
             <TextField
               select
-              label="Type"
+              label={t('common.labels.type')}
               value={fields.category}
               onChange={(e) => setFields((f) => ({ ...f, category: e.target.value }))}
               sx={{ minWidth: 120 }}
             >
               {CATEGORIES.map((c) => (
                 <MenuItem key={c} value={c}>
-                  {c}
+                  {t(`inventory.categories.${c}`)}
                 </MenuItem>
               ))}
             </TextField>
           </Stack>
           <Stack direction="row" spacing={2}>
             <TextField
-              label="Set name"
+              label={t('inventory.productDialog.setName')}
               value={fields.setName ?? ''}
               onChange={(e) => setFields((f) => ({ ...f, setName: e.target.value }))}
               fullWidth
             />
             <TextField
-              label="Set code"
+              label={t('inventory.productDialog.setCode')}
               value={fields.setCode ?? ''}
               onChange={(e) => setFields((f) => ({ ...f, setCode: e.target.value }))}
               sx={{ width: 120 }}
@@ -173,13 +187,13 @@ function ProductDialog({
           </Stack>
           <Stack direction="row" spacing={2}>
             <TextField
-              label="UPC"
+              label={t('inventory.productDialog.upc')}
               value={fields.upc ?? ''}
               onChange={(e) => setFields((f) => ({ ...f, upc: e.target.value }))}
               fullWidth
             />
             <TextField
-              label="Market price"
+              label={t('common.labels.marketPrice')}
               type="number"
               value={fields.lastMarketPrice ?? ''}
               onChange={(e) =>
@@ -199,13 +213,13 @@ function ProductDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
         <Button
           variant="contained"
           disabled={!fields.name.trim() || save.isPending}
           onClick={() => save.mutate()}
         >
-          {save.isPending ? 'Saving…' : 'Save'}
+          {save.isPending ? t('common.states.saving') : t('common.actions.save')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -223,6 +237,7 @@ function LotDialog({
   initial: InventoryLotDto | null;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const locations = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations() });
   const [fields, setFields] = useState<LotFields>({ quantity: 1 });
@@ -258,18 +273,20 @@ function LotDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>{initial ? 'Edit lot' : 'Add lot'}</DialogTitle>
+      <DialogTitle>
+        {initial ? t('inventory.lotDialog.editTitle') : t('inventory.lotDialog.addTitle')}
+      </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <TextField
-            label="Quantity"
+            label={t('common.labels.quantity')}
             type="number"
             value={fields.quantity}
             onChange={(e) => setFields((f) => ({ ...f, quantity: Number(e.target.value) }))}
             autoFocus
           />
           <TextField
-            label="Unit cost"
+            label={t('inventory.lotDialog.unitCost')}
             type="number"
             value={fields.unitCost ?? ''}
             onChange={(e) =>
@@ -278,16 +295,16 @@ function LotDialog({
           />
           <TextField
             select
-            label="Location (optional)"
+            label={t('inventory.lotDialog.locationOptional')}
             value={fields.locationId ?? ''}
             onChange={(e) =>
               setFields((f) => ({ ...f, locationId: e.target.value === '' ? null : Number(e.target.value) }))
             }
           >
-            {locationSelectOptions(locations.data, { label: '— none —' })}
+            {locationSelectOptions(locations.data, { label: t('inventory.lotDialog.none') })}
           </TextField>
           <TextField
-            label="Source (optional)"
+            label={t('inventory.lotDialog.sourceOptional')}
             value={fields.source ?? ''}
             onChange={(e) => setFields((f) => ({ ...f, source: e.target.value }))}
           />
@@ -299,13 +316,13 @@ function LotDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
         <Button
           variant="contained"
           disabled={fields.quantity < 1 || save.isPending}
           onClick={() => save.mutate()}
         >
-          {save.isPending ? 'Saving…' : 'Save'}
+          {save.isPending ? t('common.states.saving') : t('common.actions.save')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -313,6 +330,8 @@ function LotDialog({
 }
 
 function ProductDrawer({ product, onClose }: { product: ProductDto; onClose: () => void }) {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   const qc = useQueryClient();
   const { game } = useGame();
   const lots = useQuery({
@@ -349,31 +368,32 @@ function ProductDrawer({ product, onClose }: { product: ProductDto; onClose: () 
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             {product.name}
           </Typography>
-          <IconButton onClick={() => setEditingProduct(true)} title="Edit product">
+          <IconButton onClick={() => setEditingProduct(true)} title={t('inventory.drawer.editProduct')}>
             <EditIcon />
           </IconButton>
           <IconButton
             onClick={() => {
-              if (confirm(`Delete "${product.name}" and all its lots?`)) delProduct.mutate();
+              if (confirm(t('inventory.drawer.confirmDeleteProduct', { name: product.name })))
+                delProduct.mutate();
             }}
-            title="Delete product"
+            title={t('inventory.drawer.deleteProduct')}
           >
             <DeleteIcon />
           </IconButton>
         </Stack>
         <Typography variant="body2" color="text.secondary">
           {product.game} · {product.category}
-          {product.setCode ? ` · ${product.setCode}` : ''} · {money(product.lastMarketPrice)}
+          {product.setCode ? ` · ${product.setCode}` : ''} · {fmt.money(product.lastMarketPrice)}
         </Typography>
 
         <Divider sx={{ my: 2 }} />
 
         <Stack direction="row" alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
-            Lots
+            {t('inventory.drawer.lots')}
           </Typography>
           <Button size="small" startIcon={<AddIcon />} onClick={() => setLotDialog({ open: true, lot: null })}>
-            Add lot
+            {t('inventory.drawer.addLot')}
           </Button>
         </Stack>
 
@@ -381,15 +401,15 @@ function ProductDrawer({ product, onClose }: { product: ProductDto; onClose: () 
           <CircularProgress size={24} />
         ) : lots.data.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
-            No lots yet.
+            {t('inventory.drawer.noLots')}
           </Typography>
         ) : (
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell align="right">Qty</TableCell>
-                <TableCell align="right">Cost</TableCell>
-                <TableCell>Source</TableCell>
+                <TableCell align="right">{t('inventory.drawer.lotColumns.qty')}</TableCell>
+                <TableCell align="right">{t('inventory.drawer.lotColumns.cost')}</TableCell>
+                <TableCell>{t('inventory.drawer.lotColumns.source')}</TableCell>
                 <TableCell align="right"></TableCell>
               </TableRow>
             </TableHead>
@@ -397,7 +417,7 @@ function ProductDrawer({ product, onClose }: { product: ProductDto; onClose: () 
               {lots.data.map((lot) => (
                 <TableRow key={lot.id} hover>
                   <TableCell align="right">{lot.quantity}</TableCell>
-                  <TableCell align="right">{money(lot.unitCost)}</TableCell>
+                  <TableCell align="right">{fmt.money(lot.unitCost)}</TableCell>
                   <TableCell>{lot.source}</TableCell>
                   <TableCell align="right">
                     <IconButton size="small" onClick={() => setLotDialog({ open: true, lot })}>
@@ -406,7 +426,7 @@ function ProductDrawer({ product, onClose }: { product: ProductDto; onClose: () 
                     <IconButton
                       size="small"
                       onClick={() => {
-                        if (confirm('Delete this lot?')) delLot.mutate(lot.id);
+                        if (confirm(t('inventory.drawer.confirmDeleteLot'))) delLot.mutate(lot.id);
                       }}
                     >
                       <DeleteIcon fontSize="small" />
@@ -436,6 +456,8 @@ function ProductDrawer({ product, onClose }: { product: ProductDto; onClose: () 
 }
 
 export function InventoryPage() {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   const { game } = useGame();
   const products = useQuery({
     queryKey: ['inventory-products', game],
@@ -449,16 +471,25 @@ export function InventoryPage() {
     <Stack spacing={2} sx={{ height: 'calc(100vh - 120px)' }}>
       <Stack direction="row" alignItems="center">
         <Typography variant="h4" sx={{ flexGrow: 1 }}>
-          Sealed Inventory
+          {t('inventory.title')}
         </Typography>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)}>
-          New product
+          {t('inventory.newProduct')}
         </Button>
       </Stack>
       <Stack direction="row" spacing={2}>
-        <Stat label="Total Units" value={valuation.data?.totalUnits.toLocaleString() ?? '…'} />
-        <Stat label="Cost" value={valuation.data ? money(valuation.data.totalCost) : '…'} />
-        <Stat label="Market" value={valuation.data ? money(valuation.data.totalMarket) : '…'} />
+        <Stat
+          label={t('inventory.stats.totalUnits')}
+          value={valuation.data ? fmt.number(valuation.data.totalUnits) : '…'}
+        />
+        <Stat
+          label={t('inventory.stats.cost')}
+          value={valuation.data ? fmt.money(valuation.data.totalCost) : '…'}
+        />
+        <Stat
+          label={t('inventory.stats.market')}
+          value={valuation.data ? fmt.money(valuation.data.totalMarket) : '…'}
+        />
       </Stack>
       <Box sx={{ flexGrow: 1 }}>
         {products.isLoading || !products.data ? (
@@ -466,7 +497,7 @@ export function InventoryPage() {
         ) : (
           <DataGrid
             rows={products.data}
-            columns={columns}
+            columns={buildColumns(t, fmt)}
             density="compact"
             disableRowSelectionOnClick
             onRowClick={(p: GridRowParams<ProductDto>) => setSelected(p.row)}

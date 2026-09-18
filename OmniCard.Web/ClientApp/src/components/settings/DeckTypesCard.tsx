@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
@@ -57,6 +58,7 @@ function DeckTypeDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<DeckTypeUpsertRequest>(emptyRules(game));
 
   // Seed the form when the dialog opens (edit → prefill; add → blank for the current game).
@@ -96,11 +98,11 @@ function DeckTypeDialog({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>{existing ? 'Edit deck type' : 'New deck type'}</DialogTitle>
+      <DialogTitle>{existing ? t('settings.deckTypes.editTitle') : t('settings.deckTypes.newTitle')}</DialogTitle>
       <DialogContent>
         <Stack spacing={1.5} sx={{ mt: 1 }}>
           <TextField
-            label="Name"
+            label={t('common.labels.name')}
             size="small"
             value={form.name}
             onChange={(e) => set({ name: e.target.value })}
@@ -108,14 +110,14 @@ function DeckTypeDialog({
           />
           <Stack direction="row" spacing={1}>
             <TextField
-              label="Deck size min"
+              label={t('settings.deckTypes.deckSizeMin')}
               size="small"
               type="number"
               value={form.deckSizeMin ?? ''}
               onChange={(e) => set({ deckSizeMin: numOrNull(e.target.value) })}
             />
             <TextField
-              label="Deck size max"
+              label={t('settings.deckTypes.deckSizeMax')}
               size="small"
               type="number"
               value={form.deckSizeMax ?? ''}
@@ -124,16 +126,16 @@ function DeckTypeDialog({
           </Stack>
           <Stack direction="row" spacing={1}>
             <TextField
-              label="Max copies / card"
+              label={t('settings.deckTypes.maxCopies')}
               size="small"
               type="number"
               value={form.maxCopiesPerCard ?? ''}
               onChange={(e) => set({ maxCopiesPerCard: numOrNull(e.target.value) })}
               disabled={form.singleton}
-              helperText={form.singleton ? 'Singleton = 1' : ' '}
+              helperText={form.singleton ? t('settings.deckTypes.singletonHelper') : ' '}
             />
             <TextField
-              label="Commander/leader slots"
+              label={t('settings.deckTypes.commanderSlots')}
               size="small"
               type="number"
               value={form.commanderSlots}
@@ -142,7 +144,7 @@ function DeckTypeDialog({
           </Stack>
           <FormControlLabel
             control={<Switch checked={form.singleton} onChange={(e) => set({ singleton: e.target.checked })} />}
-            label="Singleton (max 1 of each card)"
+            label={t('settings.deckTypes.singletonSwitch')}
           />
           <FormControlLabel
             control={
@@ -151,7 +153,7 @@ function DeckTypeDialog({
                 onChange={(e) => set({ basicLandsExempt: e.target.checked })}
               />
             }
-            label="Basic lands exempt from copy limit"
+            label={t('settings.deckTypes.basicLandsExempt')}
           />
           {save.isError && (
             <Typography variant="caption" color="error">
@@ -161,13 +163,13 @@ function DeckTypeDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
         <Button
           variant="contained"
           disabled={form.name.trim().length === 0 || save.isPending}
           onClick={() => save.mutate()}
         >
-          Save
+          {t('common.actions.save')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -176,6 +178,7 @@ function DeckTypeDialog({
 
 /** Settings tab: per-game deck formats (built-in + custom) with editable build rules. */
 export function DeckTypesCard() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const games = useQuery({ queryKey: ['games'], queryFn: api.games });
   const [game, setGame] = useState('Mtg');
@@ -196,18 +199,17 @@ export function DeckTypesCard() {
   return (
     <Paper variant="outlined" sx={{ p: 2, maxWidth: 720 }}>
       <Typography variant="h6" gutterBottom>
-        Deck types
+        {t('settings.deckTypes.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" gutterBottom>
-        The deck formats a deck box can be assigned, per game. Built-ins can be edited; add your own for
-        formats we didn't include. Rules drive advisory legality warnings only — they never block.
+        {t('settings.deckTypes.description')}
       </Typography>
 
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1, mb: 1 }}>
         <TextField
           select
           size="small"
-          label="Game"
+          label={t('common.labels.game')}
           value={game}
           onChange={(e) => setGame(e.target.value)}
           sx={{ minWidth: 200 }}
@@ -223,18 +225,18 @@ export function DeckTypesCard() {
           startIcon={<AddIcon />}
           onClick={() => setDialog({ open: true, existing: null })}
         >
-          Add deck type
+          {t('settings.deckTypes.addDeckType')}
         </Button>
       </Stack>
 
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Name</TableCell>
-            <TableCell>Size</TableCell>
-            <TableCell>Copies</TableCell>
-            <TableCell>Commander</TableCell>
-            <TableCell align="right">Actions</TableCell>
+            <TableCell>{t('settings.deckTypes.colName')}</TableCell>
+            <TableCell>{t('settings.deckTypes.colSize')}</TableCell>
+            <TableCell>{t('settings.deckTypes.colCopies')}</TableCell>
+            <TableCell>{t('settings.deckTypes.colCommander')}</TableCell>
+            <TableCell align="right">{t('settings.deckTypes.colActions')}</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -242,13 +244,13 @@ export function DeckTypesCard() {
             <TableRow key={d.id}>
               <TableCell>
                 {d.name}
-                {d.isBuiltIn && <Chip label="built-in" size="small" variant="outlined" sx={{ ml: 1 }} />}
+                {d.isBuiltIn && <Chip label={t('settings.deckTypes.builtInChip')} size="small" variant="outlined" sx={{ ml: 1 }} />}
               </TableCell>
               <TableCell>
                 {d.deckSizeMin ?? '—'}
                 {d.deckSizeMax != null && d.deckSizeMax !== d.deckSizeMin ? `–${d.deckSizeMax}` : ''}
               </TableCell>
-              <TableCell>{d.singleton ? '1 (singleton)' : d.maxCopiesPerCard ?? '—'}</TableCell>
+              <TableCell>{d.singleton ? t('settings.deckTypes.singletonValue') : d.maxCopiesPerCard ?? '—'}</TableCell>
               <TableCell>{d.commanderSlots > 0 ? d.commanderSlots : '—'}</TableCell>
               <TableCell align="right">
                 <IconButton size="small" onClick={() => setDialog({ open: true, existing: d })}>
@@ -257,7 +259,7 @@ export function DeckTypesCard() {
                 <IconButton
                   size="small"
                   onClick={() => {
-                    if (confirm(`Delete deck type "${d.name}"? Deck boxes using it will be unset.`))
+                    if (confirm(t('settings.deckTypes.confirmDelete', { name: d.name })))
                       remove.mutate(d.id);
                   }}
                 >
@@ -270,7 +272,7 @@ export function DeckTypesCard() {
             <TableRow>
               <TableCell colSpan={5}>
                 <Typography variant="body2" color="text.secondary">
-                  No deck types for this game yet.
+                  {t('settings.deckTypes.emptyState')}
                 </Typography>
               </TableCell>
             </TableRow>

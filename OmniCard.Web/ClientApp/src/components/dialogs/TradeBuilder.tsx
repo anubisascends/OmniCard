@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
@@ -20,9 +21,7 @@ import ImageNotSupportedIcon from '@mui/icons-material/ImageNotSupported';
 import { api } from '../../api/client';
 import type { TradeSearchResult, TradeSessionState } from '../../api/types';
 import { CardImage } from '../CardImage';
-
-const money = (n?: number | null) =>
-  n == null ? '—' : n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+import { useFormatters } from '../../i18n/format';
 
 /**
  * Build up a multi-card trade (cards you're giving away), then finalize with a note, the value you
@@ -31,6 +30,9 @@ const money = (n?: number | null) =>
  * off-catalog card-show pickups are captured by name/value/photo.
  */
 export function TradeBuilder() {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
+  const money = (n?: number | null) => (n == null ? '—' : fmt.money(n));
   const qc = useQueryClient();
   const sessionQuery = useQuery({ queryKey: ['trade-session'], queryFn: api.tradeSession });
   const session = sessionQuery.data ?? null;
@@ -108,9 +110,9 @@ export function TradeBuilder() {
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
           <Box sx={{ flexGrow: 1 }}>
-            <Typography variant="h6">Start a trade</Typography>
+            <Typography variant="h6">{t('trades.builder.start.title')}</Typography>
             <Typography variant="body2" color="text.secondary">
-              Add the cards you're giving away, then finalize with what you received.
+              {t('trades.builder.start.subtitle')}
             </Typography>
           </Box>
           <Button
@@ -119,7 +121,7 @@ export function TradeBuilder() {
             onClick={() => run(start.mutateAsync())}
             disabled={start.isPending}
           >
-            New trade
+            {t('trades.builder.start.newTrade')}
           </Button>
         </Stack>
         {error && <Alert severity="error" sx={{ mt: 2 }} onClose={() => setError(null)}>{error}</Alert>}
@@ -134,20 +136,23 @@ export function TradeBuilder() {
       <Stack spacing={2}>
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            Trade in progress
+            {t('trades.builder.inProgress')}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Giving {session.items.length} card(s) · {money(session.outgoingTotal)}
+            {t('trades.builder.giving', {
+              count: session.items.length,
+              total: money(session.outgoingTotal),
+            })}
           </Typography>
           <Button
             size="small"
             color="error"
             onClick={() => {
-              if (confirm('Cancel this trade? Nothing has been applied yet.')) run(cancel.mutateAsync());
+              if (confirm(t('trades.builder.confirmCancel'))) run(cancel.mutateAsync());
             }}
             disabled={cancel.isPending}
           >
-            Cancel trade
+            {t('trades.builder.cancelTrade')}
           </Button>
         </Stack>
 
@@ -156,7 +161,7 @@ export function TradeBuilder() {
         {/* Outgoing cards */}
         {session.items.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
-            No cards added yet — search below to add cards you own.
+            {t('trades.builder.noCardsYet')}
           </Typography>
         ) : (
           <Stack spacing={0.5}>
@@ -188,24 +193,24 @@ export function TradeBuilder() {
                 <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                   <Typography variant="body2" noWrap>
                     {it.cardName}
-                    {it.foil ? ' · Foil' : ''}
-                    {it.isOffDatabase ? ' · (off-catalog)' : ''}
+                    {it.foil ? t('trades.foilSuffix') : ''}
+                    {it.isOffDatabase ? t('trades.offCatalogSuffix') : ''}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
                     {it.setCode ? it.setCode.toUpperCase() : ''}
                     {it.collectorNumber ? ` #${it.collectorNumber}` : ''}
-                    {it.estimatedValue != null ? ` · ${money(it.estimatedValue)}` : ''}
+                    {it.estimatedValue != null ? ` · ${fmt.money(it.estimatedValue)}` : ''}
                     {it.tcgPlayerUrl ? ' · ' : ''}
                     {it.tcgPlayerUrl && (
                       <Link href={it.tcgPlayerUrl} target="_blank" rel="noopener" variant="caption">
-                        TCGplayer
+                        {t('common.channels.TcgPlayer')}
                       </Link>
                     )}
                   </Typography>
                 </Box>
                 <IconButton
                   size="small"
-                  aria-label="Remove"
+                  aria-label={t('common.actions.remove')}
                   onClick={() => run(removeItem.mutateAsync(it.index))}
                 >
                   <DeleteOutlineIcon fontSize="small" />
@@ -222,8 +227,8 @@ export function TradeBuilder() {
           <TextField
             fullWidth
             size="small"
-            label="Add a card you own"
-            placeholder="Search — name, set:dom, cn:123"
+            label={t('trades.builder.addOwnedLabel')}
+            placeholder={t('trades.builder.addOwnedPlaceholder')}
             value={term}
             onChange={(e) => setTerm(e.target.value)}
           />
@@ -231,12 +236,12 @@ export function TradeBuilder() {
             <Paper variant="outlined" sx={{ mt: 0.5, maxHeight: 240, overflowY: 'auto' }}>
               {searchQuery.isFetching && (
                 <Typography variant="caption" color="text.secondary" sx={{ p: 1, display: 'block' }}>
-                  Searching…
+                  {t('common.states.searching')}
                 </Typography>
               )}
               {searchQuery.data?.length === 0 && !searchQuery.isFetching && (
                 <Typography variant="caption" color="text.secondary" sx={{ p: 1, display: 'block' }}>
-                  No owned cards match.
+                  {t('trades.builder.noOwnedMatch')}
                 </Typography>
               )}
               {searchQuery.data?.map((r: TradeSearchResult) => (
@@ -258,10 +263,10 @@ export function TradeBuilder() {
                   <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                     <Typography variant="body2" noWrap>
                       {r.name}
-                      {r.isFoil ? ' · Foil' : ''}
+                      {r.isFoil ? t('trades.foilSuffix') : ''}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-                      {r.setCode?.toUpperCase()} · #{r.number} · {r.condition} · {money(r.marketPrice)}
+                      {r.setCode?.toUpperCase()} · #{r.number} · {r.condition} · {fmt.money(r.marketPrice)}
                     </Typography>
                   </Box>
                   <AddIcon fontSize="small" color="action" />
@@ -274,21 +279,21 @@ export function TradeBuilder() {
         {/* Add an off-catalog card */}
         <Box>
           <Button size="small" onClick={() => setOffOpen((v) => !v)}>
-            {offOpen ? 'Hide off-catalog card' : 'Add off-catalog card (card-show pickup)'}
+            {offOpen ? t('trades.builder.hideOffCatalog') : t('trades.builder.showOffCatalog')}
           </Button>
           <Collapse in={offOpen}>
             <Stack spacing={1} sx={{ mt: 1 }}>
-              <TextField size="small" label="Card name (optional)" value={offName} onChange={(e) => setOffName(e.target.value)} />
+              <TextField size="small" label={t('trades.builder.cardNameOptional')} value={offName} onChange={(e) => setOffName(e.target.value)} />
               <TextField
                 size="small"
-                label="Estimated value (optional)"
+                label={t('trades.builder.estimatedValueOptional')}
                 type="number"
                 value={offValue}
                 onChange={(e) => setOffValue(e.target.value)}
                 inputProps={{ step: '0.01', min: 0 }}
               />
               <Button component="label" size="small" variant="outlined">
-                {offPhoto ? offPhoto.name : 'Photo (optional)'}
+                {offPhoto ? offPhoto.name : t('trades.builder.photoOptional')}
                 <input
                   hidden
                   type="file"
@@ -305,7 +310,7 @@ export function TradeBuilder() {
                 disabled={addOffDb.isPending}
                 sx={{ alignSelf: 'flex-start' }}
               >
-                Add card
+                {t('trades.builder.addCard')}
               </Button>
             </Stack>
           </Collapse>
@@ -315,10 +320,10 @@ export function TradeBuilder() {
 
         {/* Finalize */}
         <Stack spacing={1}>
-          <Typography variant="subtitle2">Finalize</Typography>
+          <Typography variant="subtitle2">{t('trades.builder.finalize')}</Typography>
           <TextField
             size="small"
-            label="Note — what did you get?"
+            label={t('trades.builder.noteLabel')}
             multiline
             minRows={2}
             value={note}
@@ -326,14 +331,14 @@ export function TradeBuilder() {
           />
           <TextField
             size="small"
-            label="Value received (optional)"
+            label={t('trades.builder.valueReceivedOptional')}
             type="number"
             value={receivedValue}
             onChange={(e) => setReceivedValue(e.target.value)}
             inputProps={{ step: '0.01', min: 0 }}
           />
           <Button component="label" size="small" variant="outlined" sx={{ alignSelf: 'flex-start' }}>
-            {receivedPhoto ? receivedPhoto.name : 'Photo of received cards (optional)'}
+            {receivedPhoto ? receivedPhoto.name : t('trades.builder.receivedPhotoOptional')}
             <input
               hidden
               type="file"
@@ -347,13 +352,13 @@ export function TradeBuilder() {
             color="success"
             startIcon={<SwapHorizIcon />}
             onClick={() => {
-              if (confirm(`Finalize this trade? ${session.items.length} card(s) will be marked traded.`))
+              if (confirm(t('trades.builder.confirmFinalize', { count: session.items.length })))
                 run(finalize.mutateAsync());
             }}
             disabled={!canFinalize}
             sx={{ alignSelf: 'flex-start' }}
           >
-            {finalize.isPending ? 'Finalizing…' : 'Finalize trade'}
+            {finalize.isPending ? t('trades.builder.finalizing') : t('trades.builder.finalizeTrade')}
           </Button>
         </Stack>
       </Stack>

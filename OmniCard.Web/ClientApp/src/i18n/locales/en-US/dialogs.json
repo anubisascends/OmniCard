@@ -1,0 +1,83 @@
+{
+  "dialogs": {
+    "addCard": {
+      "title": "Add card to {{location}}",
+      "lockedHelper": "Locked to this deck box’s game",
+      "noCatalogMatches": "No matches in the {{game}} catalog.",
+      "added_one": "Added {{count}} card to {{location}}.",
+      "added_other": "Added {{count}} cards to {{location}}.",
+      "addCard": "Add card"
+    },
+    "addToSlot": {
+      "title": "Add card to pocket",
+      "pageSlot": "Page {{page}} · slot {{slot}}",
+      "replaces": " — replaces “{{name}}”",
+      "inCollection": "In your collection",
+      "inCatalog": "In the catalog",
+      "noCopiesElsewhere": "No copies in other locations.",
+      "noCatalogMatches": "No matches in the {{game}} catalog.",
+      "unfiled": "Unfiled",
+      "addToPocket": "Add to pocket"
+    },
+    "bulkEdit": {
+      "title_one": "Edit {{count}} selected card",
+      "title_other": "Edit {{count}} selected cards",
+      "instructions": "Tick a property to apply it to every selected card. Unticked properties are left unchanged.",
+      "nonFoil": "Non-foil",
+      "pricePlaceholder": "0.00",
+      "tagsAdd": "Add to existing",
+      "tagsReplace": "Replace all",
+      "replaceWarning": "Replace with no tags will clear every selected card's tags.",
+      "applyTo": "Apply to {{count}}"
+    },
+    "cardEdit": {
+      "market": "Market {{price}}",
+      "notAvailable": "n/a",
+      "pickedForSale": "Picked for sale",
+      "listedForSale": "Listed for sale",
+      "notePlaceholder": "e.g. signed, played, misprint…",
+      "noLocation": "— none —",
+      "alreadyListedTooltip": "This card is already listed for sale. Unlist it from Sales ▸ Listings first.",
+      "alreadyListed": "Already listed for sale",
+      "listForSale": "List for sale",
+      "addToTrade": "Add to trade",
+      "deleteConfirm": "Delete \"{{name}}\"? This removes the card from your collection.",
+      "tradeToast": "Added to your trade — finalize it on the Trades page.",
+      "listToast": "Listed for sale — pull it from Sales ▸ Listings.",
+      "moveTitle": "Move card to…"
+    },
+    "locationPicker": {
+      "defaultTitle": "Move to location",
+      "searchPlaceholder": "Search locations…",
+      "noMatches": "No matching locations.",
+      "gameBlocked": "This deck box only holds {{game}} cards",
+      "newLocationName": "New location name",
+      "nameTaken": "This name is already in use",
+      "createAndSelect": "Create & select",
+      "newLocation": "New location"
+    },
+    "webcam": {
+      "title": "Scan with webcam",
+      "camera": "Camera",
+      "cameraN": "Camera {{number}}",
+      "loadingEngine": "Loading engine…",
+      "capturedCount": "Captured: {{count}}",
+      "captureAlt": "Capture {{number}}",
+      "captureNow": "Capture now",
+      "status": {
+        "starting": "Starting camera…",
+        "searching": "Point a card at the camera",
+        "stabilizing": "Hold steady…",
+        "captured": "Captured ✓  —  present the next card",
+        "error": "Camera unavailable"
+      },
+      "errors": {
+        "permissionDenied": "Camera permission was denied. Allow camera access in your browser and try again.",
+        "notFound": "No camera was found. Connect a webcam and try again.",
+        "startFailed": "Could not start the camera: {{message}}",
+        "engineLoadFailed": "Failed to load the image-processing engine (opencv.js).",
+        "canvasUnavailable": "Canvas 2D context unavailable"
+      }
+    }
+  }
+}

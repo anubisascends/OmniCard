@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
@@ -27,14 +28,14 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { api } from '../api/client';
 import { locationSelectOptions } from '../components/LocationSelectOptions';
 import { useGame } from '../context/GameContext';
+import { useFormatters } from '../i18n/format';
 import type { CardListDto } from '../api/types';
-
-const money = (n?: number | null) =>
-  n == null ? '—' : n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
 function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => void }) {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   const qc = useQueryClient();
   const items = useQuery({ queryKey: ['list-items', list.id], queryFn: () => api.listItems(list.id) });
   const locations = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations() });
@@ -88,30 +89,30 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
           disabled={refreshPrices.isPending || items.data.length === 0}
           onClick={() => refreshPrices.mutate()}
         >
-          Refresh prices
+          {t('lists.detail.refreshPrices')}
         </Button>
         <Box sx={{ flexGrow: 1 }} />
         <TextField
           select
           size="small"
-          label="Location"
+          label={t('common.labels.location')}
           value={containerId}
           onChange={(e) => setContainerId(e.target.value === '' ? '' : Number(e.target.value))}
           sx={{ minWidth: 180 }}
         >
-          {locationSelectOptions(locations.data, { label: '— choose —' })}
+          {locationSelectOptions(locations.data, { label: t('lists.detail.chooseLocation') })}
         </TextField>
         <TextField
           select
           size="small"
-          label="Cond"
+          label={t('lists.detail.conditionLabel')}
           value={condition}
           onChange={(e) => setCondition(e.target.value)}
           sx={{ width: 90 }}
         >
           {CONDITIONS.map((c) => (
             <MenuItem key={c} value={c}>
-              {c}
+              {t(`common.conditions.${c}`)}
             </MenuItem>
           ))}
         </TextField>
@@ -120,7 +121,7 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
           disabled={containerId === '' || items.data.length === 0 || commit.isPending}
           onClick={() => commit.mutate()}
         >
-          {commit.isPending ? 'Committing…' : 'Commit to location'}
+          {commit.isPending ? t('lists.detail.committing') : t('lists.detail.commit')}
         </Button>
       </Stack>
       {commit.error && <Alert severity="error">{(commit.error as Error).message}</Alert>}
@@ -128,7 +129,7 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }} flexWrap="wrap" useFlexGap>
         <TextField
           size="small"
-          label="Add from URL (Moxfield / Archidekt)"
+          label={t('lists.detail.addFromUrlLabel')}
           placeholder="https://moxfield.com/decks/…"
           value={addUrl}
           onChange={(e) => setAddUrl(e.target.value)}
@@ -142,15 +143,15 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
           disabled={!addUrl.trim() || importUrl.isPending}
           onClick={() => importUrl.mutate()}
         >
-          {importUrl.isPending ? 'Importing…' : 'Add'}
+          {importUrl.isPending ? t('lists.importing') : t('common.actions.add')}
         </Button>
       </Stack>
       {importUrl.error && <Alert severity="error">{(importUrl.error as Error).message}</Alert>}
       {importUrl.data && (
         <Alert severity={importUrl.data.unresolvedNames.length ? 'warning' : 'success'} sx={{ mb: 1 }}>
-          Added {importUrl.data.addedCount} card{importUrl.data.addedCount === 1 ? '' : 's'}.
+          {t('lists.detail.added', { count: importUrl.data.addedCount })}
           {importUrl.data.unresolvedNames.length > 0 &&
-            ` Couldn't match: ${importUrl.data.unresolvedNames.join(', ')}.`}
+            t('lists.couldNotMatch', { names: importUrl.data.unresolvedNames.join(', ') })}
         </Alert>
       )}
 
@@ -158,16 +159,16 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
 
       {items.data.length === 0 ? (
         <Typography color="text.secondary" variant="body2">
-          This list is empty. Add cards from a Moxfield/Archidekt URL above, or from the scan/import flow.
+          {t('lists.detail.empty')}
         </Typography>
       ) : (
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Card</TableCell>
-              <TableCell>Set</TableCell>
-              <TableCell align="right">Qty</TableCell>
-              <TableCell align="right">Price</TableCell>
+              <TableCell>{t('lists.detail.columns.card')}</TableCell>
+              <TableCell>{t('common.labels.set')}</TableCell>
+              <TableCell align="right">{t('lists.detail.columns.qty')}</TableCell>
+              <TableCell align="right">{t('common.labels.price')}</TableCell>
               <TableCell align="right"></TableCell>
             </TableRow>
           </TableHead>
@@ -194,7 +195,7 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
                     sx={{ width: 70 }}
                   />
                 </TableCell>
-                <TableCell align="right">{it.isUnpriced ? '—' : money(it.marketPrice)}</TableCell>
+                <TableCell align="right">{it.isUnpriced ? '—' : fmt.money(it.marketPrice)}</TableCell>
                 <TableCell align="right">
                   <IconButton size="small" onClick={() => removeItem.mutate(it.id)}>
                     <DeleteIcon fontSize="small" />
@@ -210,6 +211,7 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
 }
 
 export function ListsPage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { game: contextGame } = useGame();
   const [game, setGame] = useState(contextGame ?? 'Mtg');
@@ -252,14 +254,14 @@ export function ListsPage() {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="h4">Lists</Typography>
+      <Typography variant="h4">{t('lists.title')}</Typography>
 
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
           <TextField
             select
             size="small"
-            label="Game"
+            label={t('common.labels.game')}
             value={game}
             onChange={(e) => {
               setGame(e.target.value);
@@ -276,7 +278,7 @@ export function ListsPage() {
           <Box sx={{ flexGrow: 1 }} />
           <TextField
             size="small"
-            label="New list name"
+            label={t('lists.newListName')}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
           />
@@ -286,16 +288,16 @@ export function ListsPage() {
             disabled={!newName.trim() || create.isPending}
             onClick={() => create.mutate()}
           >
-            Create
+            {t('common.actions.create')}
           </Button>
         </Stack>
 
-        <Divider sx={{ my: 2 }}>or import from a URL</Divider>
+        <Divider sx={{ my: 2 }}>{t('lists.orImportFromUrl')}</Divider>
 
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
           <TextField
             size="small"
-            label="Moxfield / Archidekt deck URL"
+            label={t('lists.deckUrlLabel')}
             placeholder="https://moxfield.com/decks/…"
             value={importUrl}
             onChange={(e) => setImportUrl(e.target.value)}
@@ -310,7 +312,7 @@ export function ListsPage() {
             disabled={!importUrl.trim() || importNew.isPending}
             onClick={() => importNew.mutate()}
           >
-            {importNew.isPending ? 'Importing…' : 'Import as new list'}
+            {importNew.isPending ? t('lists.importing') : t('lists.importAsNewList')}
           </Button>
         </Stack>
         {importNew.error && (
@@ -323,10 +325,12 @@ export function ListsPage() {
             severity={importNew.data.unresolvedNames.length ? 'warning' : 'success'}
             sx={{ mt: 1 }}
           >
-            Imported “{importNew.data.listName}” — added {importNew.data.addedCount} card
-            {importNew.data.addedCount === 1 ? '' : 's'}.
+            {t('lists.imported', {
+              name: importNew.data.listName,
+              count: importNew.data.addedCount,
+            })}
             {importNew.data.unresolvedNames.length > 0 &&
-              ` Couldn't match: ${importNew.data.unresolvedNames.join(', ')}.`}
+              t('lists.couldNotMatch', { names: importNew.data.unresolvedNames.join(', ') })}
           </Alert>
         )}
       </Paper>
@@ -334,17 +338,17 @@ export function ListsPage() {
       {lists.isLoading || !lists.data ? (
         <CircularProgress />
       ) : lists.data.length === 0 ? (
-        <Typography color="text.secondary">No lists for this game yet.</Typography>
+        <Typography color="text.secondary">{t('lists.noListsYet')}</Typography>
       ) : (
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           {lists.data.map((l) => (
             <Chip
               key={l.id}
-              label={`${l.name} (${l.itemCount})`}
+              label={t('lists.chipLabel', { name: l.name, count: l.itemCount })}
               color={l.id === selectedId ? 'primary' : 'default'}
               onClick={() => setSelectedId(l.id)}
               onDelete={() => {
-                if (confirm(`Delete list "${l.name}"?`)) del.mutate(l.id);
+                if (confirm(t('lists.confirmDelete', { name: l.name }))) del.mutate(l.id);
               }}
               deleteIcon={<DeleteIcon />}
             />
@@ -359,11 +363,11 @@ export function ListsPage() {
               size="small"
               startIcon={<EditIcon />}
               onClick={() => {
-                const name = prompt('Rename list', selected.name);
+                const name = prompt(t('lists.renamePrompt'), selected.name);
                 if (name?.trim()) rename.mutate({ id: selected.id, name: name.trim() });
               }}
             >
-              Rename
+              {t('common.actions.rename')}
             </Button>
           </Stack>
           <ListDetail list={selected} onDeleted={() => setSelectedId(null)} />

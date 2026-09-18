@@ -1,0 +1,112 @@
+{
+  "scan": {
+    "title": "Scan cards",
+    "intro": "Upload photos or scans of cards. Each image is matched against the selected game's catalog on the server; review the matches, correct any that are wrong, then add them to a location.",
+    "status": {
+      "corrected": "Corrected",
+      "error": "Error",
+      "noMatch": "No match",
+      "matching": "Matching…",
+      "verified": "Verified"
+    },
+    "alt": {
+      "uploadedScan": "uploaded scan",
+      "matchedArt": "matched art"
+    },
+    "props": {
+      "foilWithType": "Foil ({{type}})",
+      "foilType": "Foil type",
+      "notePlaceholder": "e.g. signed, played, misprint…"
+    },
+    "controls": {
+      "artSets": "Sets (art fallback)",
+      "allSets": "All sets",
+      "takePhoto": "Take photo",
+      "useWebcam": "Use webcam",
+      "addImages": "Add images",
+      "seedHint": "Game / sets / condition / foil above seed each new scan; edit any card (or several at once) below before committing."
+    },
+    "commit": {
+      "addToLocation": "Add to location…",
+      "confirmChecked": "Confirm {{count}} checked",
+      "addConfirmed_one": "Add {{count}} confirmed card",
+      "addConfirmed_other": "Add {{count}} confirmed cards",
+      "addedNote": "Only confirmed & checked scans are added.",
+      "addedNoteFiltered": "Only confirmed & checked scans are added, and only those shown by the current filter.",
+      "success": "Added {{count}} card(s) to your collection."
+    },
+    "filter": {
+      "filterByName": "Filter by name",
+      "show": "Show",
+      "all": "All",
+      "checkedOnly": "Checked only",
+      "uncheckedOnly": "Unchecked only",
+      "minConfidence": "Min confidence %",
+      "minValue": "Min value",
+      "sortBy": "Sort by",
+      "sortNone": "None",
+      "sortConfidence": "Confidence",
+      "sortValue": "Market value",
+      "ascending": "Ascending",
+      "descending": "Descending",
+      "showingOf": "Showing {{visible}} of {{total}}"
+    },
+    "master": {
+      "checkAll": "Check all",
+      "uncheckAll": "Uncheck all",
+      "all": "All",
+      "none": "None",
+      "invert": "Invert",
+      "checkedCount": "{{count}} checked",
+      "noMatchFilter": "No scans match the current filter.",
+      "clearFilter": "Clear filter"
+    },
+    "detail": {
+      "uploadedScan": "Uploaded scan",
+      "matchedArt": "Matched art",
+      "viewScan": "View scan",
+      "noConfidentMatch": "No confident match. Use “Search catalog” to pick the correct card, or “View scan” to read it.",
+      "confirmMatch": "Confirm match",
+      "looksCorrect": "Looks correct",
+      "searchCatalog": "Search catalog",
+      "excludeFromCommit": "Exclude from commit",
+      "includeInCommit": "Include in commit",
+      "cardProperties": "Card properties",
+      "selectPrompt": "Select a scanned card to review it."
+    },
+    "correction": {
+      "searchByNamePlaceholder": "Search {{game}} by name…",
+      "searchingWithin": "Searching within: {{sets}}",
+      "searchingAllSets": "Searching all sets — pick “Sets (art fallback)” above to narrow.",
+      "noMatches": "No matches.",
+      "matchCount_one": "{{count}} match",
+      "matchCount_other": "{{count}} matches"
+    },
+    "bulk": {
+      "title_one": "Edit {{count}} selected card",
+      "title_other": "Edit {{count}} selected cards",
+      "help": "Tick a property to apply it to every checked card. Unticked properties are left unchanged.",
+      "mode": "Mode",
+      "modeAdd": "Add",
+      "modeReplace": "Replace",
+      "applyTo": "Apply to {{count}}"
+    },
+    "locationPicker": {
+      "title": "Add scanned cards to location"
+    },
+    "badges": {
+      "value": {
+        "newTooltip": "New — not in your collection yet",
+        "newAria": "new card",
+        "valueTooltip": "Value: {{value}} · {{range}}",
+        "tierAria": "value tier {{tier}} of {{total}}"
+      },
+      "listReprint": {
+        "label": "The List",
+        "tooltip": "The List (plst) reprint — an official, cheaper printing. Matched to the plst printing.",
+        "unresolvedLabel": "The List?",
+        "unresolvedTooltip": "Detected as a The List reprint, but its plst printing wasn't found in the catalog — the printing and price shown may be the more expensive original. Check before adding."
+      }
+    }
+  }
+}

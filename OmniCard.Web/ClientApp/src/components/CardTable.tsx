@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
@@ -42,18 +43,13 @@ import {
   PREVIEW_BASE_WIDTH,
   PREVIEW_BASE_MAX_HEIGHT,
 } from '../lib/previewScale';
+import { useFormatters } from '../i18n/format';
 
-const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 const STACK_KEY = 'omnicard.stackDuplicates';
 
 // CSV export formats offered for a selection, mirroring the whole-collection export options.
-const EXPORT_FORMATS: { value: string; label: string }[] = [
-  { value: 'appnative', label: 'OmniCard (full detail)' },
-  { value: 'tcgplayer', label: 'TCGplayer' },
-  { value: 'moxfield', label: 'Moxfield' },
-  { value: 'manabox', label: 'ManaBox' },
-  { value: 'ticker', label: 'Card Price Ticker' },
-];
+// Labels are resolved from `collection.exportFormats.<value>` at render time.
+const EXPORT_FORMATS: string[] = ['appnative', 'tcgplayer', 'moxfield', 'manabox', 'ticker'];
 
 /**
  * Shared collection card list used by both the Collection page and Location detail. Server-paginated;
@@ -72,6 +68,8 @@ export function CardTable({
   containerId?: number;
   showLocation?: boolean;
 }) {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   const qc = useQueryClient();
   const [stacked, setStacked] = useState<boolean>(() => localStorage.getItem(STACK_KEY) !== 'false');
   const [pagination, setPagination] = useState<GridPaginationModel>({ page: 0, pageSize: 100 });
@@ -179,7 +177,7 @@ export function CardTable({
   const columns: GridColDef<CardDto>[] = [
     {
       field: 'name',
-      headerName: 'Name',
+      headerName: t('common.labels.name'),
       flex: 2,
       minWidth: 200,
       renderCell: (p) => {
@@ -194,30 +192,30 @@ export function CardTable({
             {count > 1 && (
               <Typography component="span" variant="caption" color="text.secondary">
                 {' · '}
-                {count} printings
+                {t('collection.printings', { count })}
               </Typography>
             )}
           </Box>
         );
       },
     },
-    { field: 'setCode', headerName: 'Set', width: 90 },
-    { field: 'number', headerName: 'No.', width: 80 },
-    { field: 'rarity', headerName: 'Rarity', width: 90 },
-    { field: 'condition', headerName: 'Cond', width: 80 },
-    { field: 'isFoil', headerName: 'Foil', width: 70, type: 'boolean' },
-    { field: 'quantity', headerName: 'Qty', width: 70, type: 'number', align: 'right', headerAlign: 'right' },
+    { field: 'setCode', headerName: t('common.labels.set'), width: 90 },
+    { field: 'number', headerName: t('collection.columns.number'), width: 80 },
+    { field: 'rarity', headerName: t('common.labels.rarity'), width: 90 },
+    { field: 'condition', headerName: t('collection.columns.condition'), width: 80 },
+    { field: 'isFoil', headerName: t('common.labels.foil'), width: 70, type: 'boolean' },
+    { field: 'quantity', headerName: t('collection.columns.quantity'), width: 70, type: 'number', align: 'right', headerAlign: 'right' },
     {
       field: 'marketPrice',
-      headerName: 'Market',
+      headerName: t('collection.columns.market'),
       width: 110,
       align: 'right',
       headerAlign: 'right',
-      valueFormatter: (v: number) => (v ? money(v) : ''),
+      valueFormatter: (v: number) => (v ? fmt.money(v) : ''),
     },
     {
       field: 'listingStatus',
-      headerName: 'Status',
+      headerName: t('common.labels.status'),
       width: 100,
       sortable: false,
       renderCell: (p) =>
@@ -225,16 +223,21 @@ export function CardTable({
           <Tooltip
             title={
               p.row.listingStatus === 'Picked'
-                ? 'Listed for sale and picked into the for-sale location. Unlist it from Sales ▸ Listings to change.'
-                : 'Already listed for sale. Unlist it from Sales ▸ Listings to change.'
+                ? t('collection.status.pickedTooltip')
+                : t('collection.status.listedTooltip')
             }
           >
-            <Chip size="small" color="warning" variant="outlined" label={p.row.listingStatus} />
+            <Chip
+              size="small"
+              color="warning"
+              variant="outlined"
+              label={t(`common.listingStatus.${p.row.listingStatus}`, { defaultValue: p.row.listingStatus })}
+            />
           </Tooltip>
         ) : null,
     },
     ...(showLocation
-      ? [{ field: 'containerName', headerName: 'Location', flex: 1, minWidth: 120 } as GridColDef<CardDto>]
+      ? [{ field: 'containerName', headerName: t('common.labels.location'), flex: 1, minWidth: 120 } as GridColDef<CardDto>]
       : []),
   ];
 
@@ -243,7 +246,7 @@ export function CardTable({
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
         <FormControlLabel
           control={<Switch checked={stacked} onChange={(e) => toggleStack(e.target.checked)} />}
-          label="Stack duplicates"
+          label={t('collection.stackDuplicates')}
         />
         <Button
           size="small"
@@ -254,21 +257,21 @@ export function CardTable({
             setSelection([]);
           }}
         >
-          {selectMode ? 'Done' : 'Select'}
+          {selectMode ? t('common.actions.done') : t('common.actions.select')}
         </Button>
         {selectMode && selectedLotIds.length > 0 && (
           <>
             <Typography variant="body2" color="text.secondary">
-              {selectedLotIds.length} card(s) selected
+              {t('collection.selectedCount', { count: selectedLotIds.length })}
             </Typography>
             <Button size="small" startIcon={<DriveFileMoveIcon />} onClick={() => setMoveOpen(true)}>
-              Move to…
+              {t('collection.moveTo')}
             </Button>
             <Button size="small" startIcon={<EditIcon />} onClick={() => setBulkEditOpen(true)}>
-              Bulk edit
+              {t('collection.bulkEdit')}
             </Button>
             <Button size="small" startIcon={<SellIcon />} onClick={() => setBulkListOpen(true)}>
-              List for sale
+              {t('collection.listForSale')}
             </Button>
             <Button
               size="small"
@@ -276,12 +279,12 @@ export function CardTable({
               disabled={exportCsv.isPending}
               onClick={(e) => setExportAnchor(e.currentTarget)}
             >
-              Export CSV
+              {t('collection.exportCsv')}
             </Button>
             <Menu anchorEl={exportAnchor} open={!!exportAnchor} onClose={() => setExportAnchor(null)}>
               {EXPORT_FORMATS.map((f) => (
-                <MenuItem key={f.value} onClick={() => exportCsv.mutate(f.value)}>
-                  {f.label}
+                <MenuItem key={f} onClick={() => exportCsv.mutate(f)}>
+                  {t(`collection.exportFormats.${f}`)}
                 </MenuItem>
               ))}
             </Menu>
@@ -291,10 +294,10 @@ export function CardTable({
               startIcon={<DeleteIcon />}
               disabled={del.isPending}
               onClick={() => {
-                if (confirm(`Delete ${selectedLotIds.length} card(s)? This cannot be undone.`)) del.mutate();
+                if (confirm(t('collection.confirmDelete', { count: selectedLotIds.length }))) del.mutate();
               }}
             >
-              Delete
+              {t('common.actions.delete')}
             </Button>
           </>
         )}
@@ -370,7 +373,7 @@ export function CardTable({
 
       <LocationPickerDialog
         open={moveOpen}
-        title={`Move ${selectedLotIds.length} card(s) to…`}
+        title={t('collection.moveDialogTitle', { count: selectedLotIds.length })}
         excludeId={containerId}
         cardGames={[...new Set(selectedRows.map((r) => r.game))]}
         onPick={(id) => {
@@ -381,31 +384,30 @@ export function CardTable({
       />
 
       <Dialog open={bulkListOpen} onClose={() => setBulkListOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>List {selectedListItems.length} card(s) for sale</DialogTitle>
+        <DialogTitle>{t('collection.bulkList.title', { count: selectedListItems.length })}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <Typography variant="body2" color="text.secondary">
-              Each card is listed as a whole lot at its current market price. Adjust individual prices
-              afterwards on Sales ▸ Listings.
+              {t('collection.bulkList.description')}
             </Typography>
             {alreadyListedCount > 0 && (
               <Typography variant="body2" color="warning.main">
-                {alreadyListedCount} selected card(s) are already listed for sale and will be skipped.
+                {t('collection.bulkList.alreadyListed', { count: alreadyListedCount })}
               </Typography>
             )}
-            <TextField select label="Channel" value={bulkChannel} onChange={(e) => setBulkChannel(e.target.value)}>
-              {['Manual', 'TcgPlayer', 'Ebay'].map((c) => (
-                <MenuItem key={c} value={c}>{c}</MenuItem>
+            <TextField select label={t('common.labels.channel')} value={bulkChannel} onChange={(e) => setBulkChannel(e.target.value)}>
+              {(['Manual', 'TcgPlayer', 'Ebay'] as const).map((c) => (
+                <MenuItem key={c} value={c}>{t(`common.channels.${c}`)}</MenuItem>
               ))}
             </TextField>
-            <TextField label="Note" value={bulkNote} onChange={(e) => setBulkNote(e.target.value)} multiline minRows={2} />
+            <TextField label={t('common.labels.note')} value={bulkNote} onChange={(e) => setBulkNote(e.target.value)} multiline minRows={2} />
             {bulkList.error && <Typography color="error" variant="body2">{(bulkList.error as Error).message}</Typography>}
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setBulkListOpen(false)}>Cancel</Button>
+          <Button onClick={() => setBulkListOpen(false)}>{t('common.actions.cancel')}</Button>
           <Button variant="contained" disabled={bulkList.isPending || !selectedListItems.length} onClick={() => bulkList.mutate()}>
-            {bulkList.isPending ? 'Listing…' : 'List for sale'}
+            {bulkList.isPending ? t('collection.bulkList.listing') : t('collection.listForSale')}
           </Button>
         </DialogActions>
       </Dialog>

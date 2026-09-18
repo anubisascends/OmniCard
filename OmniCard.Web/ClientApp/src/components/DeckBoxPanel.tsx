@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, AlertTitle, Button, Chip, Paper, Stack, Typography } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
@@ -13,6 +14,7 @@ import { DeckBoxGameDialog } from './dialogs/DeckBoxGameDialog';
  * rules. Editing the game/type opens the assign dialog.
  */
 export function DeckBoxPanel({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: () => void }) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const games = useQuery({ queryKey: ['games'], queryFn: () => api.games() });
   const legality = useQuery({
@@ -32,32 +34,34 @@ export function DeckBoxPanel({ loc, onChanged }: { loc: LocationSummaryDto; onCh
           {gameName ? (
             <Chip size="small" color="primary" variant="outlined" label={gameName} />
           ) : (
-            <Chip size="small" color="warning" label="No game assigned" />
+            <Chip size="small" color="warning" label={t('deckbox.panel.noGameAssigned')} />
           )}
           {loc.deckTypeName && <Chip size="small" icon={<CasinoIcon />} label={loc.deckTypeName} />}
           {legality.data != null && legality.data.commanderCount > 0 && (
             <Chip
               size="small"
               variant="outlined"
-              label={`${legality.data.commanderCount} commander${legality.data.commanderCount === 1 ? '' : 's'}`}
+              label={t('deckbox.panel.commander', { count: legality.data.commanderCount })}
             />
           )}
           {legality.data != null && legality.data.totalDeckCount > 0 && (
             <Typography variant="caption" color="text.secondary">
-              {legality.data.totalDeckCount} cards
               {legality.data.commanderCount > 0
-                ? ` (${legality.data.mainDeckCount} + commander)`
-                : ''}
+                ? t('deckbox.panel.cardsCountWithCommander', {
+                    count: legality.data.totalDeckCount,
+                    main: legality.data.mainDeckCount,
+                  })
+                : t('deckbox.panel.cardsCount', { count: legality.data.totalDeckCount })}
             </Typography>
           )}
           <Button size="small" startIcon={<EditIcon />} onClick={() => setEditing(true)} sx={{ ml: 'auto' }}>
-            Game &amp; deck type
+            {t('deckbox.panel.gameAndDeckType')}
           </Button>
         </Stack>
 
         {warnings.length > 0 && (
           <Alert severity="info" variant="outlined">
-            <AlertTitle>Deck legality ({loc.deckTypeName})</AlertTitle>
+            <AlertTitle>{t('deckbox.panel.legalityTitle', { deckType: loc.deckTypeName })}</AlertTitle>
             <Stack component="ul" spacing={0.25} sx={{ m: 0, pl: 2 }}>
               {warnings.map((w) => (
                 <Typography key={w.code + w.message} component="li" variant="body2">

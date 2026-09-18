@@ -1,0 +1,22 @@
+{
+  "dashboard": {
+    "title": "Dashboard",
+    "stats": {
+      "totalUnits": "Total Units",
+      "cost": "Cost",
+      "market": "Market",
+      "unrealized": "Unrealized",
+      "realizedProfit": "Realized Profit"
+    },
+    "tables": {
+      "byGame": "By Game",
+      "byCategory": "By Category"
+    },
+    "columns": {
+      "group": "Group",
+      "units": "Units",
+      "cost": "Cost",
+      "market": "Market"
+    }
+  }
+}

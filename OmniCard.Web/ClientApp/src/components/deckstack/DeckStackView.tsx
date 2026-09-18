@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
   Box,
@@ -32,6 +33,7 @@ export function DeckStackView({
   game?: string;
   q?: string;
 }) {
+  const { t } = useTranslation();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
   const [groupMode, setGroupMode] = useState<DeckGroupMode>(
@@ -68,7 +70,7 @@ export function DeckStackView({
   if (cards.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-        No cards to show.
+        {t('deckbox.stackView.noCards')}
       </Typography>
     );
   }
@@ -77,19 +79,22 @@ export function DeckStackView({
     <Stack spacing={1} sx={{ minHeight: 0, flex: 1 }}>
       <Stack direction="row" spacing={1.5} alignItems="center">
         <Typography variant="body2" color="text.secondary">
-          {total} card{total === 1 ? '' : 's'} · {groups.length} group{groups.length === 1 ? '' : 's'}
+          {t('deckbox.stackView.summary', {
+            count: total,
+            groups: t('deckbox.stackView.groups', { count: groups.length }),
+          })}
         </Typography>
         <Box sx={{ flexGrow: 1 }} />
         <TextField
           select
           size="small"
-          label="Group by"
+          label={t('deckbox.stackView.groupBy')}
           value={groupMode}
           onChange={(e) => setMode(e.target.value as DeckGroupMode)}
           sx={{ minWidth: 130 }}
         >
-          <MenuItem value="type">Type</MenuItem>
-          <MenuItem value="tag">Tags</MenuItem>
+          <MenuItem value="type">{t('deckbox.stackView.groupType')}</MenuItem>
+          <MenuItem value="tag">{t('deckbox.stackView.groupTags')}</MenuItem>
         </TextField>
       </Stack>
       <Box

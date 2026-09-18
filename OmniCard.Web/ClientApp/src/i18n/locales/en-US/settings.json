@@ -1,0 +1,140 @@
+{
+  "settings": {
+    "title": "Administration",
+    "tabs": {
+      "sales": "Sales",
+      "scan": "Scan Badges",
+      "deckTypes": "Deck Types",
+      "appearance": "Appearance",
+      "catalog": "Catalog Data",
+      "ebay": "eBay",
+      "users": "Users",
+      "components": "Components"
+    },
+    "catalog": {
+      "title": "Catalog data",
+      "description": "Refresh the per-game card catalogs, prices, and image hashes on the server (no desktop app needed). One job runs at a time.",
+      "operations": {
+        "prices": "Update prices",
+        "bulk": "Download catalog",
+        "hashes": "Recompute hashes",
+        "images": "Download artwork"
+      },
+      "running": "{{game}} · {{operation}} — running",
+      "recentHeading": "Recent",
+      "recentItem": "{{icon}} {{game}} · {{operation}} — {{message}}"
+    },
+    "ebay": {
+      "title": "eBay",
+      "connected": "Connected to eBay.",
+      "failed": "eBay connection failed. Please try again.",
+      "misconfigured": "eBay isn't configured on the server yet (AppId/CertId/RuName/AcceptUrl).",
+      "statusLabel": "Status:",
+      "connectedChip": "Connected",
+      "notConnectedChip": "Not connected",
+      "notConfiguredChip": "Not configured",
+      "missingCredentialsBefore": "The server is missing eBay app credentials: {{missing}}. Set the ",
+      "missingCredentialsAfter": " section in the server's appsettings, then reload.",
+      "runSellerSetup": "Run seller setup",
+      "runningSetup": "Running setup…",
+      "disconnect": "Disconnect",
+      "connect": "Connect to eBay",
+      "setupComplete": "Seller setup complete.",
+      "setupFailed": "Seller setup failed."
+    },
+    "sales": {
+      "title": "Sales",
+      "description": "When you mark a listing as picked, its card is automatically moved to this location. Leave it unset to disable picking.",
+      "forSaleLocation": "For-sale location",
+      "none": "— none —",
+      "moveSwitch": "Move picked cards to the for-sale location",
+      "moveOn": "Marking a listing as picked physically relocates the card to the for-sale location above.",
+      "moveOff": "Marking a listing as picked only changes its status — the card stays in its current location."
+    },
+    "appearance": {
+      "title": "Appearance",
+      "description": "Card preview size — how large the artwork popup grows when you hover a card in a list. 100% is the default; drag up to {{max}}%.",
+      "popup": "Popup: {{width}} × {{height}} px"
+    },
+    "password": {
+      "title": "Your password",
+      "description": "Change the password for your own account. You must enter your current password.",
+      "current": "Current password",
+      "new": "New password",
+      "confirm": "Confirm new password",
+      "mismatch": "Passwords don't match.",
+      "changed": "Password changed.",
+      "changeButton": "Change password"
+    },
+    "users": {
+      "addUser": "Add user",
+      "manageDescription": "Accounts that can sign in. The built-in Admin account can't be deleted.",
+      "colUsername": "Username",
+      "colRole": "Role",
+      "colActions": "Actions",
+      "systemChip": "system",
+      "roleAdmin": "Administrator",
+      "roleUser": "User",
+      "resetPasswordTooltip": "Reset password",
+      "deleteTooltip": "Delete user",
+      "systemDeleteTooltip": "The system account can't be deleted",
+      "confirmDelete": "Delete user \"{{username}}\"?",
+      "resetTitle": "Reset password",
+      "resetTitleFor": "Reset password — {{username}}",
+      "username": "Username",
+      "password": "Password",
+      "confirmPassword": "Confirm password",
+      "passwordMismatch": "Passwords don't match.",
+      "administratorFullAccess": "Administrator (full access)"
+    },
+    "components": {
+      "title": "Components",
+      "description": "Software and third-party components that OmniCard ships or runs on, with their versions and links to each project's website and license.",
+      "colComponent": "Component",
+      "colVersion": "Version",
+      "colLicense": "License",
+      "colLinks": "Links",
+      "website": "Website",
+      "license": "License"
+    },
+    "scanBadges": {
+      "title": "Scan badges",
+      "descriptionBefore": "On the Scan page, matched cards show a gold ",
+      "descriptionAfter": " when the card isn't in your collection yet, and one to five currency signs indicating its value. Set the currency and the price ceiling for each tier below — a card at or below the first ceiling shows one sign; anything above the last ceiling shows five.",
+      "currencyCode": "Currency code (ISO 4217)",
+      "currencyHelper": "Displayed as \"{{symbol}}\", localized to your browser.",
+      "tierMax": "Tier {{tier}} max ({{signs}})",
+      "ascendingWarning": "Thresholds should increase from tier 1 to tier 4. They'll be sorted automatically when saved.",
+      "preview": "Preview",
+      "rangeAtMost": "≤ {{max}}",
+      "rangeAbove": "> {{min}}",
+      "rangeBetween": "{{min}} – {{max}}",
+      "rangeUnknown": "—",
+      "saved": "Saved.",
+      "adminOnly": "Only administrators can change these thresholds."
+    },
+    "deckTypes": {
+      "title": "Deck types",
+      "description": "The deck formats a deck box can be assigned, per game. Built-ins can be edited; add your own for formats we didn't include. Rules drive advisory legality warnings only — they never block.",
+      "addDeckType": "Add deck type",
+      "editTitle": "Edit deck type",
+      "newTitle": "New deck type",
+      "deckSizeMin": "Deck size min",
+      "deckSizeMax": "Deck size max",
+      "maxCopies": "Max copies / card",
+      "singletonHelper": "Singleton = 1",
+      "commanderSlots": "Commander/leader slots",
+      "singletonSwitch": "Singleton (max 1 of each card)",
+      "basicLandsExempt": "Basic lands exempt from copy limit",
+      "colName": "Name",
+      "colSize": "Size",
+      "colCopies": "Copies",
+      "colCommander": "Commander",
+      "colActions": "Actions",
+      "builtInChip": "built-in",
+      "singletonValue": "1 (singleton)",
+      "emptyState": "No deck types for this game yet.",
+      "confirmDelete": "Delete deck type \"{{name}}\"? Deck boxes using it will be unset."
+    }
+  }
+}

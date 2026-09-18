@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Autocomplete,
@@ -37,6 +38,7 @@ export function BulkEditCardsDialog({
   onClose: () => void;
   onApplied: () => void;
 }) {
+  const { t } = useTranslation();
   const count = lotIds.length;
   const tagsQuery = useQuery({ queryKey: ['tags'], queryFn: api.tags, enabled: open });
 
@@ -113,16 +115,16 @@ export function BulkEditCardsDialog({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Edit {count} selected card{count === 1 ? '' : 's'}</DialogTitle>
+      <DialogTitle>{t('dialogs.bulkEdit.title', { count })}</DialogTitle>
       <DialogContent>
         <DialogContentText sx={{ mb: 2 }}>
-          Tick a property to apply it to every selected card. Unticked properties are left unchanged.
+          {t('dialogs.bulkEdit.instructions')}
         </DialogContentText>
         <Stack spacing={1.5}>
           {row(
             setCondition,
             setSetCondition,
-            'Condition',
+            t('common.labels.condition'),
             <TextField
               select
               size="small"
@@ -132,7 +134,7 @@ export function BulkEditCardsDialog({
             >
               {CONDITIONS.map((c) => (
                 <MenuItem key={c} value={c}>
-                  {c}
+                  {t(`common.conditions.${c}`)}
                 </MenuItem>
               ))}
             </TextField>,
@@ -140,16 +142,16 @@ export function BulkEditCardsDialog({
           {row(
             setFoil,
             setSetFoil,
-            'Foil',
+            t('common.labels.foil'),
             <FormControlLabel
               control={<Switch checked={isFoil} onChange={(e) => setIsFoil(e.target.checked)} />}
-              label={isFoil ? 'Foil' : 'Non-foil'}
+              label={isFoil ? t('common.labels.foil') : t('dialogs.bulkEdit.nonFoil')}
             />,
           )}
           {row(
             setQuantity,
             setSetQuantity,
-            'Quantity',
+            t('common.labels.quantity'),
             <TextField
               type="number"
               size="small"
@@ -162,11 +164,11 @@ export function BulkEditCardsDialog({
           {row(
             setPrice,
             setSetPrice,
-            'Purchase price',
+            t('common.labels.purchasePrice'),
             <TextField
               type="number"
               size="small"
-              placeholder="0.00"
+              placeholder={t('dialogs.bulkEdit.pricePlaceholder')}
               value={price}
               onChange={(e) => setPrice_(e.target.value)}
               slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
@@ -176,7 +178,7 @@ export function BulkEditCardsDialog({
           {row(
             setNote,
             setSetNote,
-            'Note',
+            t('common.labels.note'),
             <TextField
               size="small"
               fullWidth
@@ -189,7 +191,7 @@ export function BulkEditCardsDialog({
           {row(
             setTags,
             setSetTags,
-            'Tags',
+            t('common.labels.tags'),
             <Stack spacing={1}>
               <TextField
                 select
@@ -198,8 +200,8 @@ export function BulkEditCardsDialog({
                 onChange={(e) => setTagsMode(e.target.value as 'add' | 'replace')}
                 sx={{ width: 160 }}
               >
-                <MenuItem value="add">Add to existing</MenuItem>
-                <MenuItem value="replace">Replace all</MenuItem>
+                <MenuItem value="add">{t('dialogs.bulkEdit.tagsAdd')}</MenuItem>
+                <MenuItem value="replace">{t('dialogs.bulkEdit.tagsReplace')}</MenuItem>
               </TextField>
               <Autocomplete
                 multiple
@@ -208,11 +210,11 @@ export function BulkEditCardsDialog({
                 options={tagOptions}
                 value={tags}
                 onChange={(_, v) => setTags_(v as string[])}
-                renderInput={(params) => <TextField {...params} placeholder="Tags" />}
+                renderInput={(params) => <TextField {...params} placeholder={t('common.labels.tags')} />}
               />
               {tagsMode === 'replace' && tags.length === 0 && (
                 <Typography variant="caption" color="warning.main">
-                  Replace with no tags will clear every selected card's tags.
+                  {t('dialogs.bulkEdit.replaceWarning')}
                 </Typography>
               )}
             </Stack>,
@@ -225,9 +227,9 @@ export function BulkEditCardsDialog({
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
         <Button variant="contained" disabled={!anyField || apply.isPending} onClick={() => apply.mutate()}>
-          Apply to {count}
+          {t('dialogs.bulkEdit.applyTo', { count })}
         </Button>
       </DialogActions>
     </Dialog>

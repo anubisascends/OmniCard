@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Link as RouterLink } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -24,16 +26,16 @@ const COLLAPSED_KEY = 'omnicard.locations.collapsed';
 import { api } from '../api/client';
 import type { LocationSummaryDto } from '../api/types';
 import { useGame } from '../context/GameContext';
+import { useFormatters } from '../i18n/format';
 
-const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
-
-import { groupLocations } from '../lib/locationGroups';
+import { groupLocations, type LocationGroup } from '../lib/locationGroups';
 import { LOCATION_TYPES, isDeckBoxType } from '../lib/locationTypes';
 import { DeckBoxGamePicker } from '../components/DeckBoxGamePicker';
 import { DeckBoxGameBanner } from '../components/DeckBoxGameBanner';
 import { DeckBoxGameDialog } from '../components/dialogs/DeckBoxGameDialog';
 
 function AddLocationBar({ onAdded }: { onAdded: () => void }) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [type, setType] = useState('Box');
   const [game, setGame] = useState('');
@@ -69,24 +71,24 @@ function AddLocationBar({ onAdded }: { onAdded: () => void }) {
     <Stack direction="row" spacing={1} alignItems="flex-start" flexWrap="wrap" useFlexGap>
       <TextField
         size="small"
-        label="New location name"
+        label={t('locations.addBar.nameLabel')}
         value={name}
         onChange={(e) => setName(e.target.value)}
         error={taken}
-        helperText={taken ? 'This name is already in use' : ' '}
+        helperText={taken ? t('locations.addBar.nameTaken') : ' '}
         sx={{ width: 260 }}
       />
       <TextField
         select
         size="small"
-        label="Type"
+        label={t('common.labels.type')}
         value={type}
         onChange={(e) => setType(e.target.value)}
         sx={{ width: 150 }}
       >
-        {LOCATION_TYPES.map((t) => (
-          <MenuItem key={t.value} value={t.value}>
-            {t.label}
+        {LOCATION_TYPES.map((lt) => (
+          <MenuItem key={lt.value} value={lt.value}>
+            {t(`locations.types.${lt.value}`)}
           </MenuItem>
         ))}
       </TextField>
@@ -105,13 +107,14 @@ function AddLocationBar({ onAdded }: { onAdded: () => void }) {
         onClick={() => create.mutate()}
         sx={{ mt: 0.5 }}
       >
-        Add
+        {t('common.actions.add')}
       </Button>
     </Stack>
   );
 }
 
 function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: () => void }) {
+  const { t } = useTranslation();
   const [anchor, setAnchor] = useState<null | HTMLElement>(null);
   const [editingDeckBox, setEditingDeckBox] = useState(false);
   const close = () => setAnchor(null);
@@ -139,11 +142,11 @@ function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: 
         <MenuItem
           onClick={() => {
             close();
-            const name = prompt('Rename location', loc.name);
+            const name = prompt(t('locations.menu.renamePrompt'), loc.name);
             if (name && name.trim() && name.trim() !== loc.name) rename.mutate(name.trim());
           }}
         >
-          Rename…
+          {t('locations.menu.rename')}
         </MenuItem>
         {isDeckBox && (
           <MenuItem
@@ -152,7 +155,7 @@ function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: 
               setEditingDeckBox(true);
             }}
           >
-            Game &amp; deck type…
+            {t('locations.menu.gameDeckType')}
           </MenuItem>
         )}
         <MenuItem
@@ -162,18 +165,20 @@ function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: 
             toggleAlways.mutate();
           }}
         >
-          {loc.isAlwaysAvailable ? 'Unset always-available' : 'Set always-available'}
+          {loc.isAlwaysAvailable
+            ? t('locations.menu.unsetAlwaysAvailable')
+            : t('locations.menu.setAlwaysAvailable')}
         </MenuItem>
         <MenuItem
           disabled={loc.isSystem}
           onClick={() => {
             close();
-            if (!confirm(`Delete "${loc.name}"?`)) return;
-            const moveToBulk = confirm('Move its cards to Bulk?  (Cancel = delete the cards)');
+            if (!confirm(t('locations.menu.deleteConfirm', { name: loc.name }))) return;
+            const moveToBulk = confirm(t('locations.menu.moveToBulkConfirm'));
             remove.mutate(moveToBulk);
           }}
         >
-          Delete…
+          {t('locations.menu.delete')}
         </MenuItem>
       </Menu>
       {isDeckBox && (
@@ -194,16 +199,18 @@ function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: 
 const locationHref = (loc: LocationSummaryDto) =>
   loc.type === 'Binder' ? `/binder/${loc.id}` : `/location/${loc.id}`;
 
-const num = (n: number) => n.toLocaleString();
-
 function buildColumns(
   onChanged: () => void,
   gameLabel: (id: string) => string,
+  t: TFunction,
+  fmt: ReturnType<typeof useFormatters>,
 ): GridColDef<LocationSummaryDto>[] {
+  const num = (n: number) => fmt.number(n);
+  const money = (n: number) => fmt.money(n);
   return [
     {
       field: 'name',
-      headerName: 'Name',
+      headerName: t('common.labels.name'),
       flex: 2,
       minWidth: 200,
       renderCell: (p) => (
@@ -214,12 +221,12 @@ function buildColumns(
     },
     {
       field: 'type',
-      headerName: 'Type',
+      headerName: t('common.labels.type'),
       width: 200,
       renderCell: (p) => {
         // Deck boxes show their game + deck type inline; other types show just the type name.
         if (p.row.type === 'Deck Box' && (p.row.game || p.row.deckTypeName)) {
-          const bits = [p.row.deckTypeName, 'Deck Box'].filter(Boolean).join(' · ');
+          const bits = [p.row.deckTypeName, t('locations.deckBoxLabel')].filter(Boolean).join(' · ');
           return (
             <Stack spacing={0} sx={{ lineHeight: 1.2 }}>
               <Typography variant="body2" noWrap>
@@ -238,7 +245,7 @@ function buildColumns(
     },
     {
       field: 'cardCount',
-      headerName: 'Cards',
+      headerName: t('locations.columns.cards'),
       width: 100,
       align: 'right',
       headerAlign: 'right',
@@ -246,7 +253,7 @@ function buildColumns(
     },
     {
       field: 'uniquePrintCount',
-      headerName: 'Unique',
+      headerName: t('locations.columns.unique'),
       width: 100,
       align: 'right',
       headerAlign: 'right',
@@ -254,7 +261,7 @@ function buildColumns(
     },
     {
       field: 'totalMarketValue',
-      headerName: 'Market',
+      headerName: t('locations.columns.market'),
       width: 120,
       align: 'right',
       headerAlign: 'right',
@@ -262,7 +269,7 @@ function buildColumns(
     },
     {
       field: 'totalPurchaseCost',
-      headerName: 'Cost',
+      headerName: t('locations.columns.cost'),
       width: 120,
       align: 'right',
       headerAlign: 'right',
@@ -282,7 +289,7 @@ function buildColumns(
           <Typography variant="body2" sx={{ color }}>
             {sign}
             {money(d)} ({sign}
-            {p.row.priceDeltaPercent.toFixed(0)}%)
+            {fmt.number(p.row.priceDeltaPercent, { maximumFractionDigits: 0 })}%)
           </Typography>
         );
       },
@@ -300,6 +307,8 @@ function buildColumns(
 }
 
 export function LocationsPage() {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   const { game } = useGame();
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
@@ -314,7 +323,12 @@ export function LocationsPage() {
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['locations'] });
   const groups = useMemo(() => (data ? groupLocations(data) : []), [data]);
-  const columns = useMemo(() => buildColumns(refresh, gameLabel), [gameLabel]);
+  const columns = useMemo(() => buildColumns(refresh, gameLabel, t, fmt), [gameLabel, t, fmt]);
+
+  const headingFor = (g: LocationGroup) =>
+    g.key === '__always__'
+      ? t('locations.groups.alwaysAvailable')
+      : t(`locations.groups.headings.${g.key}`, { defaultValue: g.heading });
 
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
     try {
@@ -334,7 +348,7 @@ export function LocationsPage() {
 
   return (
     <Stack spacing={3}>
-      <Typography variant="h4">Locations</Typography>
+      <Typography variant="h4">{t('locations.title')}</Typography>
       <DeckBoxGameBanner onResolved={refresh} />
       <AddLocationBar onAdded={refresh} />
       {isLoading || !data ? (
@@ -354,7 +368,7 @@ export function LocationsPage() {
                   <ExpandMoreIcon fontSize="small" sx={{ color: 'text.secondary' }} />
                 )}
                 <Typography variant="overline" color="text.secondary">
-                  {group.heading} · {group.items.length}
+                  {headingFor(group)} · {fmt.number(group.items.length)}
                 </Typography>
               </ButtonBase>
               <Collapse in={!isCollapsed} unmountOnExit>

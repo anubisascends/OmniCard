@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { AppShell } from './components/AppShell';
 import { DashboardPage } from './pages/DashboardPage';
 import { CollectionPage } from './pages/CollectionPage';
@@ -16,6 +17,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 
 export function App() {
+  const { t } = useTranslation();
   return (
     <AppShell>
       <Routes>
@@ -32,7 +34,7 @@ export function App() {
         <Route path="/trades" element={<TradesPage />} />
         <Route path="/sales" element={<SalesPage />} />
         <Route path="/settings" element={<SettingsPage />} />
-        <Route path="*" element={<PlaceholderPage title="Not Found" />} />
+        <Route path="*" element={<PlaceholderPage title={t('common.notFound')} />} />
       </Routes>
     </AppShell>
   );

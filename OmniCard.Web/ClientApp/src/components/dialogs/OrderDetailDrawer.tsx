@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
@@ -23,9 +24,8 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { api } from '../../api/client';
 import { useGame } from '../../context/GameContext';
+import { useFormatters } from '../../i18n/format';
 
-const money = (n?: number | null) =>
-  n == null ? '—' : n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 const CHANNELS = ['Manual', 'TcgPlayer', 'Ebay'];
 
 interface HeaderForm {
@@ -41,6 +41,7 @@ interface HeaderForm {
 
 /** Add-line search: find an owned single by name, set a sale price, add it to the order. */
 function AddLineSearch({ orderId, onAdded }: { orderId: number; onAdded: () => void }) {
+  const { t } = useTranslation();
   const { game } = useGame();
   const [q, setQ] = useState('');
   const search = useQuery({
@@ -58,7 +59,7 @@ function AddLineSearch({ orderId, onAdded }: { orderId: number; onAdded: () => v
       <TextField
         size="small"
         fullWidth
-        label="Add a card (search your collection)"
+        label={t('sales.orderDetail.addCard')}
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
@@ -101,6 +102,8 @@ function AddLineRow({
 }
 
 export function OrderDetailDrawer({ orderId, onClose }: { orderId: number | null; onClose: () => void }) {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   const qc = useQueryClient();
   const open = orderId != null;
   const detail = useQuery({
@@ -165,42 +168,41 @@ export function OrderDetailDrawer({ orderId, onClose }: { orderId: number | null
           <Stack spacing={2}>
             <Stack direction="row" alignItems="center" spacing={1}>
               <Typography variant="h6" sx={{ flexGrow: 1 }}>
-                Order #{detail.data.order.id}
+                {t('sales.orderDetail.orderTitle', { id: detail.data.order.id })}
               </Typography>
               <Chip size="small" label={status} />
             </Stack>
             <Typography variant="body2" color="text.secondary">
-              {detail.data.order.customerName ?? `Customer #${detail.data.order.customerId}`}
+              {detail.data.order.customerName ?? t('sales.orders.customerFallback', { id: detail.data.order.customerId })}
             </Typography>
 
             {!editable && (
               <Alert severity="info">
-                This order is {status?.toLowerCase()} — header and line edits are locked (change the
-                lane back to Created/Packed to edit).
+                {t('sales.orderDetail.locked', { status: status?.toLowerCase() })}
               </Alert>
             )}
 
             {/* Header */}
             <Stack direction="row" spacing={2}>
-              <TextField select size="small" label="Channel" value={form.channel} onChange={set('channel')} disabled={!editable} sx={{ minWidth: 130 }}>
+              <TextField select size="small" label={t('common.labels.channel')} value={form.channel} onChange={set('channel')} disabled={!editable} sx={{ minWidth: 130 }}>
                 {CHANNELS.map((c) => (
-                  <MenuItem key={c} value={c}>{c}</MenuItem>
+                  <MenuItem key={c} value={c}>{t(`common.channels.${c}`)}</MenuItem>
                 ))}
               </TextField>
-              <TextField size="small" label="Order #" value={form.orderNumber} onChange={set('orderNumber')} disabled={!editable} fullWidth />
+              <TextField size="small" label={t('sales.orderDetail.orderNumberShort')} value={form.orderNumber} onChange={set('orderNumber')} disabled={!editable} fullWidth />
             </Stack>
             <Stack direction="row" spacing={2}>
-              <TextField size="small" label="Tracking" value={form.trackingNumber} onChange={set('trackingNumber')} disabled={!editable} fullWidth />
+              <TextField size="small" label={t('sales.orderDetail.tracking')} value={form.trackingNumber} onChange={set('trackingNumber')} disabled={!editable} fullWidth />
             </Stack>
             <Stack direction="row" spacing={2}>
-              <TextField size="small" type="number" label="Ship charged" value={form.shippingChargedToBuyer} onChange={setNum('shippingChargedToBuyer')} disabled={!editable} />
-              <TextField size="small" type="number" label="Ship cost" value={form.shippingCost} onChange={setNum('shippingCost')} disabled={!editable} />
-              <TextField size="small" type="number" label="Fees" value={form.marketplaceFees} onChange={setNum('marketplaceFees')} disabled={!editable} />
+              <TextField size="small" type="number" label={t('sales.orderDetail.shipCharged')} value={form.shippingChargedToBuyer} onChange={setNum('shippingChargedToBuyer')} disabled={!editable} />
+              <TextField size="small" type="number" label={t('sales.orderDetail.shipCost')} value={form.shippingCost} onChange={setNum('shippingCost')} disabled={!editable} />
+              <TextField size="small" type="number" label={t('sales.orderDetail.fees')} value={form.marketplaceFees} onChange={setNum('marketplaceFees')} disabled={!editable} />
             </Stack>
-            <TextField size="small" label="Notes" value={form.notes} onChange={set('notes')} disabled={!editable} multiline minRows={2} />
+            <TextField size="small" label={t('common.labels.notes')} value={form.notes} onChange={set('notes')} disabled={!editable} multiline minRows={2} />
             {editable && (
               <Button variant="contained" disabled={save.isPending} onClick={() => save.mutate()}>
-                {save.isPending ? 'Saving…' : 'Save header'}
+                {save.isPending ? t('common.states.saving') : t('sales.orderDetail.saveHeader')}
               </Button>
             )}
             {save.error && <Alert severity="error">{(save.error as Error).message}</Alert>}
@@ -209,16 +211,18 @@ export function OrderDetailDrawer({ orderId, onClose }: { orderId: number | null
 
             {/* Lines */}
             <Typography variant="subtitle1">
-              Items ({detail.data.lines.reduce((s, l) => s + l.quantity, 0)}) —{' '}
-              {money(detail.data.lines.reduce((s, l) => s + l.unitSalePrice * l.quantity, 0))}
+              {t('sales.orderDetail.items', {
+                n: detail.data.lines.reduce((s, l) => s + l.quantity, 0),
+                total: fmt.money(detail.data.lines.reduce((s, l) => s + l.unitSalePrice * l.quantity, 0)),
+              })}
             </Typography>
             {detail.data.lines.length > 0 && (
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Card</TableCell>
-                    <TableCell align="right">Qty</TableCell>
-                    <TableCell align="right">Price</TableCell>
+                    <TableCell>{t('sales.orderDetail.card')}</TableCell>
+                    <TableCell align="right">{t('sales.listings.qty')}</TableCell>
+                    <TableCell align="right">{t('common.labels.price')}</TableCell>
                     {editable && <TableCell />}
                   </TableRow>
                 </TableHead>
@@ -232,7 +236,7 @@ export function OrderDetailDrawer({ orderId, onClose }: { orderId: number | null
                         {l.condition ? ` · ${l.condition}` : ''}
                       </TableCell>
                       <TableCell align="right">{l.quantity}</TableCell>
-                      <TableCell align="right">{money(l.unitSalePrice)}</TableCell>
+                      <TableCell align="right">{fmt.money(l.unitSalePrice)}</TableCell>
                       {editable && (
                         <TableCell align="right">
                           <IconButton size="small" onClick={() => removeLine.mutate(l.id)}>
@@ -249,17 +253,17 @@ export function OrderDetailDrawer({ orderId, onClose }: { orderId: number | null
 
             <Divider />
             <Stack direction="row" justifyContent="space-between">
-              <Button onClick={onClose}>Close</Button>
+              <Button onClick={onClose}>{t('common.actions.close')}</Button>
               {editable && (
                 <Button
                   color="error"
                   startIcon={<DeleteIcon />}
                   disabled={del.isPending}
                   onClick={() => {
-                    if (confirm(`Delete order #${orderId}?`)) del.mutate();
+                    if (confirm(t('sales.orderDetail.deleteConfirm', { id: orderId }))) del.mutate();
                   }}
                 >
-                  Delete order
+                  {t('sales.orderDetail.deleteOrder')}
                 </Button>
               )}
             </Stack>

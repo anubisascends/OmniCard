@@ -1,0 +1,44 @@
+{
+  "trades": {
+    "title": "Trades",
+    "history": "History",
+    "historyCaption": "Cards you've traded away, newest first.",
+    "noneYet": "No trades recorded yet.",
+    "replaced": "{{count}} replaced",
+    "out": "Out:",
+    "received": "Received:",
+    "tradedAway": "Traded away",
+    "foilSuffix": " · Foil",
+    "offCatalogSuffix": " · (off-catalog)",
+    "builder": {
+      "start": {
+        "title": "Start a trade",
+        "subtitle": "Add the cards you're giving away, then finalize with what you received.",
+        "newTrade": "New trade"
+      },
+      "inProgress": "Trade in progress",
+      "giving_one": "Giving {{count}} card · {{total}}",
+      "giving_other": "Giving {{count}} cards · {{total}}",
+      "cancelTrade": "Cancel trade",
+      "confirmCancel": "Cancel this trade? Nothing has been applied yet.",
+      "noCardsYet": "No cards added yet — search below to add cards you own.",
+      "addOwnedLabel": "Add a card you own",
+      "addOwnedPlaceholder": "Search — name, set:dom, cn:123",
+      "noOwnedMatch": "No owned cards match.",
+      "hideOffCatalog": "Hide off-catalog card",
+      "showOffCatalog": "Add off-catalog card (card-show pickup)",
+      "cardNameOptional": "Card name (optional)",
+      "estimatedValueOptional": "Estimated value (optional)",
+      "photoOptional": "Photo (optional)",
+      "addCard": "Add card",
+      "finalize": "Finalize",
+      "noteLabel": "Note — what did you get?",
+      "valueReceivedOptional": "Value received (optional)",
+      "receivedPhotoOptional": "Photo of received cards (optional)",
+      "finalizeTrade": "Finalize trade",
+      "finalizing": "Finalizing…",
+      "confirmFinalize_one": "Finalize this trade? {{count}} card will be marked traded.",
+      "confirmFinalize_other": "Finalize this trade? {{count}} cards will be marked traded."
+    }
+  }
+}

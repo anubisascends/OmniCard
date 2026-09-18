@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Button } from '@mui/material';
 import { api } from '../api/client';
@@ -10,6 +11,7 @@ import { DeckBoxGameDialog } from './dialogs/DeckBoxGameDialog';
  * Hidden when there's nothing to resolve.
  */
 export function DeckBoxGameBanner({ onResolved }: { onResolved: () => void }) {
+  const { t } = useTranslation();
   const pending = useQuery({
     queryKey: ['deck-boxes-needs-game'],
     queryFn: () => api.deckBoxesNeedingGame(),
@@ -29,13 +31,13 @@ export function DeckBoxGameBanner({ onResolved }: { onResolved: () => void }) {
         severity="warning"
         action={
           <Button color="inherit" size="small" onClick={() => setActive(next)}>
-            Assign game
+            {t('deckbox.banner.assignGame')}
           </Button>
         }
       >
         {boxes.length === 1
-          ? `Deck box "${next.name}" has no game assigned.`
-          : `${boxes.length} deck boxes have no game assigned (starting with "${next.name}").`}
+          ? t('deckbox.banner.oneBoxNoGame', { name: next.name })
+          : t('deckbox.banner.manyBoxesNoGame', { count: boxes.length, name: next.name })}
       </Alert>
       {active && (
         <DeckBoxGameDialog

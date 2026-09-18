@@ -1,5 +1,7 @@
 import { Box, Chip, Stack, Tooltip } from '@mui/material';
 import StarIcon from '@mui/icons-material/Star';
+import { useTranslation } from 'react-i18next';
+import { useFormatters } from '../i18n/format';
 import type { ScanBadgeSettingsDto } from '../api/types';
 
 /**
@@ -16,14 +18,15 @@ export function ListReprintChip({
   unresolved?: boolean;
   size?: 'small' | 'medium';
 }) {
+  const { t } = useTranslation();
   if (!isListReprint) return null;
   return unresolved ? (
-    <Tooltip title="Detected as a The List reprint, but its plst printing wasn't found in the catalog — the printing and price shown may be the more expensive original. Check before adding.">
-      <Chip size={size} color="warning" variant="outlined" label="The List?" />
+    <Tooltip title={t('scan.badges.listReprint.unresolvedTooltip')}>
+      <Chip size={size} color="warning" variant="outlined" label={t('scan.badges.listReprint.unresolvedLabel')} />
     </Tooltip>
   ) : (
-    <Tooltip title="The List (plst) reprint — an official, cheaper printing. Matched to the plst printing.">
-      <Chip size={size} color="secondary" variant="outlined" label="The List" />
+    <Tooltip title={t('scan.badges.listReprint.tooltip')}>
+      <Chip size={size} color="secondary" variant="outlined" label={t('scan.badges.listReprint.label')} />
     </Tooltip>
   );
 }
@@ -43,15 +46,6 @@ export function currencySymbol(currencyCode: string): string {
   }
 }
 
-/** Format an amount as localized currency (browser locale + the configured ISO code). */
-function money(amount: number, currencyCode: string): string {
-  try {
-    return amount.toLocaleString(undefined, { style: 'currency', currency: currencyCode });
-  } catch {
-    return amount.toFixed(2);
-  }
-}
-
 /** The 1-based value tier for a price given the ascending threshold ladder: tier N ⇒ N currency
  * signs. A price at or below `thresholds[i]` is tier `i+1`; above the last threshold is the top tier
  * (`thresholds.length + 1`). */
@@ -62,9 +56,9 @@ export function priceTier(price: number, thresholds: number[]): number {
   return thresholds.length + 1;
 }
 
-/** A human-readable description of a tier's price range, for the badge tooltip. */
-function tierRange(tier: number, thresholds: number[], currencyCode: string): string {
-  const m = (n: number) => money(n, currencyCode);
+/** A human-readable description of a tier's price range, for the badge tooltip. `m` formats a raw
+ * amount as localized currency. */
+function tierRange(tier: number, thresholds: number[], m: (n: number) => string): string {
   if (tier === 1) return `≤ ${m(thresholds[0])}`;
   if (tier > thresholds.length) return `> ${m(thresholds[thresholds.length - 1])}`;
   return `${m(thresholds[tier - 2])} – ${m(thresholds[tier - 1])}`;
@@ -90,6 +84,8 @@ export function ScanValueBadges({
   /** 'small' for the compact master row, 'medium' for the detail panel. */
   size?: 'small' | 'medium';
 }) {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   const fontSize = size === 'medium' ? '1rem' : '0.8rem';
   const starSize = size === 'medium' ? 22 : 18;
 
@@ -103,21 +99,23 @@ export function ScanValueBadges({
   return (
     <Stack direction="row" spacing={0.5} alignItems="center" component="span">
       {isNew && (
-        <Tooltip title="New — not in your collection yet">
-          <StarIcon sx={{ color: '#f5b301', fontSize: starSize }} aria-label="new card" />
+        <Tooltip title={t('scan.badges.value.newTooltip')}>
+          <StarIcon sx={{ color: '#f5b301', fontSize: starSize }} aria-label={t('scan.badges.value.newAria')} />
         </Tooltip>
       )}
       {showTier && (
         <Tooltip
-          title={`Value: ${money(price as number, settings!.currencyCode)} · ${tierRange(
-            tier,
-            settings!.thresholds,
-            settings!.currencyCode,
-          )}`}
+          title={t('scan.badges.value.valueTooltip', {
+            value: fmt.money(price as number, settings!.currencyCode),
+            range: tierRange(tier, settings!.thresholds, (n) => fmt.money(n, settings!.currencyCode)),
+          })}
         >
           <Box
             component="span"
-            aria-label={`value tier ${tier} of ${settings!.thresholds.length + 1}`}
+            aria-label={t('scan.badges.value.tierAria', {
+              tier,
+              total: settings!.thresholds.length + 1,
+            })}
             sx={{
               fontWeight: 700,
               fontSize,

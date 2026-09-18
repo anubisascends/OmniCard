@@ -7,6 +7,7 @@ import { App } from './App';
 import { AuthGate } from './context/AuthGate';
 import { GameProvider } from './context/GameContext';
 import { buildTheme } from './theme';
+import './i18n';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },

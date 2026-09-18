@@ -1,0 +1,33 @@
+{
+  "lists": {
+    "title": "Lists",
+    "newListName": "New list name",
+    "orImportFromUrl": "or import from a URL",
+    "deckUrlLabel": "Moxfield / Archidekt deck URL",
+    "deckUrlPlaceholder": "https://moxfield.com/decks/…",
+    "importAsNewList": "Import as new list",
+    "importing": "Importing…",
+    "imported": "Imported “{{name}}” — added {{count}} card.",
+    "imported_other": "Imported “{{name}}” — added {{count}} cards.",
+    "couldNotMatch": " Couldn't match: {{names}}.",
+    "noListsYet": "No lists for this game yet.",
+    "chipLabel": "{{name}} ({{count}})",
+    "confirmDelete": "Delete list \"{{name}}\"?",
+    "renamePrompt": "Rename list",
+    "detail": {
+      "refreshPrices": "Refresh prices",
+      "chooseLocation": "— choose —",
+      "conditionLabel": "Cond",
+      "commit": "Commit to location",
+      "committing": "Committing…",
+      "addFromUrlLabel": "Add from URL (Moxfield / Archidekt)",
+      "added": "Added {{count}} card.",
+      "added_other": "Added {{count}} cards.",
+      "empty": "This list is empty. Add cards from a Moxfield/Archidekt URL above, or from the scan/import flow.",
+      "columns": {
+        "card": "Card",
+        "qty": "Qty"
+      }
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
@@ -57,6 +58,7 @@ export function AddCardToSlotDialog({
   /** Called after a card is successfully placed so the caller can refresh the binder. */
   onDone: () => void;
 }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const games = useQuery({ queryKey: ['games'], queryFn: api.games, enabled: open });
 
@@ -165,10 +167,10 @@ export function AddCardToSlotDialog({
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>
-        Add card to pocket
+        {t('dialogs.addToSlot.title')}
         <Typography variant="body2" color="text.secondary">
-          Page {page} · slot {slot + 1}
-          {occupantName ? ` — replaces “${occupantName}”` : ''}
+          {t('dialogs.addToSlot.pageSlot', { page, slot: slot + 1 })}
+          {occupantName ? t('dialogs.addToSlot.replaces', { name: occupantName }) : ''}
         </Typography>
       </DialogTitle>
       <DialogContent>
@@ -176,7 +178,7 @@ export function AddCardToSlotDialog({
           <TextField
             select
             size="small"
-            label="Game"
+            label={t('common.labels.game')}
             value={game}
             onChange={(e) => {
               setGame(e.target.value);
@@ -194,7 +196,7 @@ export function AddCardToSlotDialog({
           <Stack direction="row" spacing={1}>
             <TextField
               size="small"
-              label="Name"
+              label={t('common.labels.name')}
               value={name}
               onChange={(e) => setName(e.target.value)}
               fullWidth
@@ -209,8 +211,8 @@ export function AddCardToSlotDialog({
                 },
               }}
             />
-            <TextField size="small" label="Set" value={set} onChange={(e) => setSet(e.target.value)} sx={{ width: 110 }} />
-            <TextField size="small" label="Collector #" value={cn} onChange={(e) => setCn(e.target.value)} sx={{ width: 110 }} />
+            <TextField size="small" label={t('common.labels.set')} value={set} onChange={(e) => setSet(e.target.value)} sx={{ width: 110 }} />
+            <TextField size="small" label={t('common.labels.collectorNumber')} value={cn} onChange={(e) => setCn(e.target.value)} sx={{ width: 110 }} />
           </Stack>
 
           {/* Search results — collection first, then catalog. */}
@@ -220,11 +222,11 @@ export function AddCardToSlotDialog({
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                   <CollectionsBookmarkIcon fontSize="small" color="action" />
                   <Typography variant="subtitle2">
-                    In your collection {owned.data ? `(${ownedElsewhere.length})` : ''}
+                    {t('dialogs.addToSlot.inCollection')} {owned.data ? `(${ownedElsewhere.length})` : ''}
                   </Typography>
                 </Stack>
                 {owned.isFetching ? (
-                  <Typography variant="body2" color="text.secondary">Searching…</Typography>
+                  <Typography variant="body2" color="text.secondary">{t('common.states.searching')}</Typography>
                 ) : ownedElsewhere.length > 0 ? (
                   <List dense disablePadding sx={{ maxHeight: 200, overflowY: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}>
                     {ownedElsewhere.map((c) => (
@@ -237,13 +239,13 @@ export function AddCardToSlotDialog({
                             <Typography variant="body2" noWrap>{c.name}</Typography>
                             <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
                               {c.setCode.toUpperCase()} · #{c.number} · {c.condition}
-                              {c.isFoil ? ' · Foil' : ''}
+                              {c.isFoil ? ` · ${t('common.labels.foil')}` : ''}
                             </Typography>
                           </Box>
                           <Chip
                             size="small"
                             variant="outlined"
-                            label={c.containerName ?? 'Unfiled'}
+                            label={c.containerName ?? t('dialogs.addToSlot.unfiled')}
                             sx={{ flexShrink: 0, maxWidth: 130 }}
                           />
                         </Stack>
@@ -252,7 +254,7 @@ export function AddCardToSlotDialog({
                   </List>
                 ) : (
                   <Typography variant="body2" color="text.secondary">
-                    No copies in other locations.
+                    {t('dialogs.addToSlot.noCopiesElsewhere')}
                   </Typography>
                 )}
               </Box>
@@ -261,11 +263,11 @@ export function AddCardToSlotDialog({
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                   <TravelExploreIcon fontSize="small" color="action" />
                   <Typography variant="subtitle2">
-                    In the catalog {catalog.data ? `(${catalog.data.length})` : ''}
+                    {t('dialogs.addToSlot.inCatalog')} {catalog.data ? `(${catalog.data.length})` : ''}
                   </Typography>
                 </Stack>
                 {catalog.isFetching ? (
-                  <Typography variant="body2" color="text.secondary">Searching…</Typography>
+                  <Typography variant="body2" color="text.secondary">{t('common.states.searching')}</Typography>
                 ) : catalog.data && catalog.data.length > 0 ? (
                   <List dense disablePadding sx={{ maxHeight: 200, overflowY: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}>
                     {catalog.data.map((r) => (
@@ -285,7 +287,7 @@ export function AddCardToSlotDialog({
                     ))}
                   </List>
                 ) : (
-                  <Typography variant="body2" color="text.secondary">No matches in the {game} catalog.</Typography>
+                  <Typography variant="body2" color="text.secondary">{t('dialogs.addToSlot.noCatalogMatches', { game })}</Typography>
                 )}
               </Box>
             </Stack>
@@ -305,18 +307,18 @@ export function AddCardToSlotDialog({
                     {selected.setName} · #{selected.collectorNumber} · {selected.rarity}
                   </Typography>
                 </Box>
-                <Button size="small" onClick={() => setSelected(null)}>Change</Button>
+                <Button size="small" onClick={() => setSelected(null)}>{t('common.actions.change')}</Button>
               </Stack>
 
               <Stack direction="row" spacing={1}>
-                <TextField select size="small" label="Condition" value={condition} onChange={(e) => setCondition(e.target.value)} sx={{ width: 120 }}>
+                <TextField select size="small" label={t('common.labels.condition')} value={condition} onChange={(e) => setCondition(e.target.value)} sx={{ width: 120 }}>
                   {CONDITIONS.map((c) => (
-                    <MenuItem key={c} value={c}>{c}</MenuItem>
+                    <MenuItem key={c} value={c}>{t(`common.conditions.${c}`)}</MenuItem>
                   ))}
                 </TextField>
                 <TextField
                   size="small"
-                  label="Purchase price"
+                  label={t('common.labels.purchasePrice')}
                   type="number"
                   value={purchasePrice}
                   onChange={(e) => setPurchasePrice(e.target.value)}
@@ -325,7 +327,7 @@ export function AddCardToSlotDialog({
                 />
                 <FormControlLabel
                   control={<Switch checked={isFoil} onChange={(e) => setIsFoil(e.target.checked)} />}
-                  label="Foil"
+                  label={t('common.labels.foil')}
                 />
               </Stack>
             </>
@@ -335,9 +337,9 @@ export function AddCardToSlotDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
         <Button variant="contained" disabled={!selected || busy} onClick={() => addCatalog.mutate()}>
-          {addCatalog.isPending ? 'Adding…' : 'Add to pocket'}
+          {addCatalog.isPending ? t('common.states.adding') : t('dialogs.addToSlot.addToPocket')}
         </Button>
       </DialogActions>
     </Dialog>

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Card,
@@ -15,9 +16,7 @@ import {
 } from '@mui/material';
 import { api } from '../api/client';
 import type { ValuationLineDto } from '../api/types';
-
-const money = (n: number) =>
-  n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+import { useFormatters } from '../i18n/format';
 
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
@@ -35,6 +34,8 @@ function Stat({ label, value, color }: { label: string; value: string; color?: s
 }
 
 function ValuationTable({ title, rows }: { title: string; rows: ValuationLineDto[] }) {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   return (
     <Paper sx={{ p: 2, flex: 1, minWidth: 320 }}>
       <Typography variant="h6" gutterBottom>
@@ -43,19 +44,19 @@ function ValuationTable({ title, rows }: { title: string; rows: ValuationLineDto
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Group</TableCell>
-            <TableCell align="right">Units</TableCell>
-            <TableCell align="right">Cost</TableCell>
-            <TableCell align="right">Market</TableCell>
+            <TableCell>{t('dashboard.columns.group')}</TableCell>
+            <TableCell align="right">{t('dashboard.columns.units')}</TableCell>
+            <TableCell align="right">{t('dashboard.columns.cost')}</TableCell>
+            <TableCell align="right">{t('dashboard.columns.market')}</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {rows.map((r) => (
             <TableRow key={r.key}>
               <TableCell>{r.key}</TableCell>
-              <TableCell align="right">{r.units.toLocaleString()}</TableCell>
-              <TableCell align="right">{money(r.cost)}</TableCell>
-              <TableCell align="right">{money(r.market)}</TableCell>
+              <TableCell align="right">{fmt.number(r.units)}</TableCell>
+              <TableCell align="right">{fmt.money(r.cost)}</TableCell>
+              <TableCell align="right">{fmt.money(r.market)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -65,31 +66,33 @@ function ValuationTable({ title, rows }: { title: string; rows: ValuationLineDto
 }
 
 export function DashboardPage() {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   const { data, isLoading } = useQuery({ queryKey: ['dashboard'], queryFn: api.dashboard });
 
   if (isLoading || !data) return <CircularProgress />;
 
   return (
     <Stack spacing={3}>
-      <Typography variant="h4">Dashboard</Typography>
+      <Typography variant="h4">{t('dashboard.title')}</Typography>
       <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-        <Stat label="Total Units" value={data.totalUnits.toLocaleString()} />
-        <Stat label="Cost" value={money(data.totalCost)} />
-        <Stat label="Market" value={money(data.totalMarket)} />
+        <Stat label={t('dashboard.stats.totalUnits')} value={fmt.number(data.totalUnits)} />
+        <Stat label={t('dashboard.stats.cost')} value={fmt.money(data.totalCost)} />
+        <Stat label={t('dashboard.stats.market')} value={fmt.money(data.totalMarket)} />
         <Stat
-          label="Unrealized"
-          value={money(data.unrealizedDelta)}
+          label={t('dashboard.stats.unrealized')}
+          value={fmt.money(data.unrealizedDelta)}
           color={data.unrealizedDelta >= 0 ? 'success.main' : 'error.main'}
         />
         <Stat
-          label="Realized Profit"
-          value={money(data.realized.profit)}
+          label={t('dashboard.stats.realizedProfit')}
+          value={fmt.money(data.realized.profit)}
           color={data.realized.profit >= 0 ? 'success.main' : 'error.main'}
         />
       </Stack>
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-        <ValuationTable title="By Game" rows={data.byGame} />
-        <ValuationTable title="By Category" rows={data.byCategory} />
+        <ValuationTable title={t('dashboard.tables.byGame')} rows={data.byGame} />
+        <ValuationTable title={t('dashboard.tables.byCategory')} rows={data.byCategory} />
       </Box>
     </Stack>
   );

@@ -1,0 +1,43 @@
+{
+  "importing": {
+    "pageTitle": "Import / Export",
+    "export": {
+      "title": "Export collection (CSV)",
+      "descriptionGame": "Downloads the current game filter ({{game}}).",
+      "descriptionAll": "Downloads the current game filter (all games).",
+      "formats": {
+        "appnative": "App-native",
+        "tcgplayer": "TCGplayer",
+        "moxfield": "Moxfield",
+        "manabox": "Manabox"
+      }
+    },
+    "import": {
+      "title": "Import collection (CSV)",
+      "description": "Auto-detects app-native, TCGplayer, Moxfield, and Manabox formats.",
+      "chooseFile": "Choose CSV file",
+      "skipDuplicates": "Skip duplicates already in collection",
+      "targetLocationOptional": "Target location (optional)",
+      "none": "— none —",
+      "importing": "Importing…",
+      "result_one": "Imported {{imported}} of {{count}} row ({{format}}).",
+      "result_other": "Imported {{imported}} of {{count}} rows ({{format}}).",
+      "warnings_one": " {{count}} warning.",
+      "warnings_other": " {{count}} warnings."
+    },
+    "decklist": {
+      "title": "Check a decklist",
+      "descriptionPrefix": "Paste a Moxfield/Archidekt URL, or a decklist, to see owned vs. missing against ",
+      "urlLabel": "Decklist URL (Moxfield / Archidekt)",
+      "orPaste": "or paste",
+      "textLabel": "Decklist text",
+      "textPlaceholder": "4 Lightning Bolt\n2 Counterspell",
+      "checking": "Checking…",
+      "check": "Check",
+      "owned": "{{count}} owned",
+      "missing": "{{count}} missing",
+      "toComplete": "{{cost}} to complete",
+      "missingHeading": "Missing"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "search": {
+    "placeholder": "Search…",
+    "placeholderWithExamples": "Search — try {{examples}}",
+    "syntaxHelp": "Search syntax help",
+    "syntaxTitle": "Search syntax",
+    "syntaxHelpBody": "Combine tokens with spaces (AND), <1>or</1>, <3>-</3> to negate, and parentheses. Plain words match the card name.",
+    "values": "Values: {{values}}"
+  }
+}

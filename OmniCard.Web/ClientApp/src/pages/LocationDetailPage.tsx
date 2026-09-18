@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -22,11 +23,13 @@ import { AddCardDialog } from '../components/dialogs/AddCardDialog';
 import { DeckBoxPanel } from '../components/DeckBoxPanel';
 import { DeckStackView } from '../components/deckstack/DeckStackView';
 import { SearchBox } from '../components/SearchBox';
+import { useFormatters } from '../i18n/format';
 
-const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 const VIEW_KEY = 'omnicard.location.view';
 
 export function LocationDetailPage() {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   const { id } = useParams();
   const locationId = Number(id);
   const { game } = useGame();
@@ -56,26 +59,30 @@ export function LocationDetailPage() {
     <Stack spacing={2} sx={{ height: 'calc(100vh - 120px)' }}>
       <Breadcrumbs>
         <Link component={RouterLink} to="/locations">
-          Locations
+          {t('locations.title')}
         </Link>
         <Typography color="text.primary">{locQuery.data?.name ?? '…'}</Typography>
       </Breadcrumbs>
       <Stack direction="row" spacing={2} alignItems="center">
-        <Typography variant="h4">{locQuery.data?.name ?? 'Location'}</Typography>
+        <Typography variant="h4">{locQuery.data?.name ?? t('locations.detail.fallbackName')}</Typography>
         {locQuery.data && <Chip label={locQuery.data.type} />}
         {locQuery.data?.type === 'Binder' && (
           <Link component={RouterLink} to={`/binder/${locationId}`}>
-            Open binder view
+            {t('locations.detail.openBinderView')}
           </Link>
         )}
         <Box sx={{ flexGrow: 1 }} />
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>
-          Add card
+          {t('locations.detail.addCard')}
         </Button>
       </Stack>
       {locQuery.data && (
         <Typography variant="body2" color="text.secondary">
-          {locQuery.data.cardCount.toLocaleString()} cards · {money(locQuery.data.totalMarketValue)} market
+          {t('locations.detail.summary', {
+            count: locQuery.data.cardCount,
+            countText: fmt.number(locQuery.data.cardCount),
+            value: fmt.money(locQuery.data.totalMarketValue),
+          })}
         </Typography>
       )}
       {isDeckBox && locQuery.data && <DeckBoxPanel loc={locQuery.data} onChanged={refresh} />}
@@ -88,12 +95,12 @@ export function LocationDetailPage() {
           exclusive
           value={view}
           onChange={(_, v) => v && setViewMode(v)}
-          aria-label="View mode"
+          aria-label={t('locations.detail.viewModeLabel')}
         >
-          <ToggleButton value="table" aria-label="Table view">
+          <ToggleButton value="table" aria-label={t('locations.detail.tableView')}>
             <ViewListIcon fontSize="small" />
           </ToggleButton>
-          <ToggleButton value="stacks" aria-label="Stacked view">
+          <ToggleButton value="stacks" aria-label={t('locations.detail.stackedView')}>
             <ViewColumnIcon fontSize="small" />
           </ToggleButton>
         </ToggleButtonGroup>
@@ -107,7 +114,7 @@ export function LocationDetailPage() {
       <AddCardDialog
         open={addOpen}
         locationId={locationId}
-        locationName={locQuery.data?.name ?? 'this location'}
+        locationName={locQuery.data?.name ?? t('locations.detail.thisLocation')}
         defaultGame={deckBoxGame ?? game}
         lockGame={isDeckBox && !!deckBoxGame}
         onClose={() => setAddOpen(false)}

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
@@ -35,6 +37,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import { api } from '../api/client';
+import { useFormatters } from '../i18n/format';
 import { useGame } from '../context/GameContext';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import { WebcamScanDialog } from '../components/dialogs/WebcamScanDialog';
@@ -214,14 +217,16 @@ function applyControls(items: ScanItem[], c: ScanListControls): ScanItem[] {
 }
 
 function ConfidenceChip({ item }: { item: ScanItem }) {
-  if (item.override) return <Chip size="small" color="info" label="Corrected" />;
+  const { t } = useTranslation();
+  const fmt = useFormatters();
+  if (item.override) return <Chip size="small" color="info" label={t('scan.status.corrected')} />;
   if (item.status === 'matching') return <CircularProgress size={18} />;
-  if (item.status === 'error') return <Chip size="small" color="error" label="Error" />;
+  if (item.status === 'error') return <Chip size="small" color="error" label={t('scan.status.error')} />;
   const m = item.match;
-  if (!m?.matched) return <Chip size="small" color="error" label="No match" />;
+  if (!m?.matched) return <Chip size="small" color="error" label={t('scan.status.noMatch')} />;
   const c = m.confidence ?? 0;
   const color = c >= 50 ? 'success' : c >= 15 ? 'warning' : 'error';
-  return <Chip size="small" color={color} label={`${Math.round(c)}%`} />;
+  return <Chip size="small" color={color} label={`${fmt.number(Math.round(c))}%`} />;
 }
 
 /** Inline catalog search used to correct a bad/absent match. Searches by name and/or collector
@@ -239,6 +244,7 @@ function CorrectionSearch({
   setNames: string;
   onPick: (r: ScanSearchResultDto) => void;
 }) {
+  const { t } = useTranslation();
   const [q, setQ] = useState('');
   const [cn, setCn] = useState('');
   // Debounce so fast typing doesn't fan out overlapping requests (which previously raced on the
@@ -264,14 +270,14 @@ function CorrectionSearch({
         <TextField
           size="small"
           autoFocus
-          placeholder={`Search ${game} by name…`}
+          placeholder={t('scan.correction.searchByNamePlaceholder', { game })}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           sx={{ flex: '1 1 200px' }}
         />
         <TextField
           size="small"
-          label="Collector #"
+          label={t('common.labels.collectorNumber')}
           value={cn}
           onChange={(e) => setCn(e.target.value)}
           sx={{ width: 120 }}
@@ -279,20 +285,20 @@ function CorrectionSearch({
       </Stack>
       <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
         {setCodes.length
-          ? `Searching within: ${setNames}`
-          : 'Searching all sets — pick “Sets (art fallback)” above to narrow.'}
+          ? t('scan.correction.searchingWithin', { sets: setNames })
+          : t('scan.correction.searchingAllSets')}
       </Typography>
       {search.isFetching && (
         <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-          Searching…
+          {t('common.states.searching')}
         </Typography>
       )}
       {search.data && (
         <>
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
             {search.data.length === 0
-              ? 'No matches.'
-              : `${search.data.length} match${search.data.length === 1 ? '' : 'es'}`}
+              ? t('scan.correction.noMatches')
+              : t('scan.correction.matchCount', { count: search.data.length })}
           </Typography>
           {search.data.length > 0 && (
             <Stack sx={{ mt: 0.5, maxHeight: 320, overflowY: 'auto' }} spacing={0.5}>
@@ -405,9 +411,10 @@ function Thumb({ src, alt }: { src?: string | null; alt: string }) {
 }
 
 /** A one-line summary of an item's per-copy properties, shown on the master row. */
-function propsSummary(item: ScanItem): string {
-  const parts = [item.condition];
-  if (item.isFoil) parts.push(item.foilType ? `Foil (${item.foilType})` : 'Foil');
+function propsSummary(item: ScanItem, t: TFunction): string {
+  const parts = [t(`common.conditions.${item.condition}`)];
+  if (item.isFoil)
+    parts.push(item.foilType ? t('scan.props.foilWithType', { type: item.foilType }) : t('common.labels.foil'));
   if (item.quantity > 1) parts.push(`×${item.quantity}`);
   if (item.tags.length) parts.push(item.tags.join(', '));
   if (item.note.trim()) parts.push('📝');
@@ -428,6 +435,7 @@ function MasterRow({
   onSelect: () => void;
   onToggle: (v: boolean, shiftKey: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const id = identityOf(item);
   // Badges reflect the auto-match; once the user hand-corrects a card we no longer have its price /
   // ownership status, so they're suppressed for overrides.
@@ -469,8 +477,8 @@ function MasterRow({
         sx={{ p: 0 }}
       />
       <Stack direction="row" spacing={0.75}>
-        <Thumb src={item.previewUrl} alt="uploaded scan" />
-        <Thumb src={id?.imageUri ?? null} alt="matched art" />
+        <Thumb src={item.previewUrl} alt={t('scan.alt.uploadedScan')} />
+        <Thumb src={id?.imageUri ?? null} alt={t('scan.alt.matchedArt')} />
       </Stack>
       <Box sx={{ minWidth: 0, flex: 1 }}>
         <Stack direction="row" spacing={0.5} alignItems="center">
@@ -482,10 +490,10 @@ function MasterRow({
         <Typography variant="body2" color="text.secondary" noWrap display="block">
           {id
             ? `${id.setName} · ${id.setCode.toUpperCase()} #${id.collectorNumber}`
-            : (item.error ?? 'No match')}
+            : (item.error ?? t('scan.status.noMatch'))}
         </Typography>
         <Typography variant="caption" color="text.secondary" noWrap display="block">
-          {propsSummary(item)}
+          {propsSummary(item, t)}
         </Typography>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
           <ConfidenceChip item={item} />
@@ -516,13 +524,14 @@ function PropertyFields({
   foilTypeOptions: string[];
   tagOptions: string[];
 }) {
+  const { t } = useTranslation();
   return (
     <Stack spacing={2}>
       <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
         <TextField
           select
           size="small"
-          label="Condition"
+          label={t('common.labels.condition')}
           value={props.condition}
           onChange={(e) => onChange({ condition: e.target.value })}
           sx={{ minWidth: 120 }}
@@ -536,7 +545,7 @@ function PropertyFields({
         <TextField
           size="small"
           type="number"
-          label="Quantity"
+          label={t('common.labels.quantity')}
           value={props.quantity}
           onChange={(e) => onChange({ quantity: Math.max(1, Number(e.target.value) || 1) })}
           inputProps={{ min: 1 }}
@@ -545,7 +554,7 @@ function PropertyFields({
         <TextField
           size="small"
           type="number"
-          label="Purchase price"
+          label={t('common.labels.purchasePrice')}
           value={props.purchasePrice}
           onChange={(e) => onChange({ purchasePrice: e.target.value })}
           inputProps={{ step: '0.01', min: 0 }}
@@ -560,7 +569,7 @@ function PropertyFields({
               onChange={(e) => onChange({ isFoil: e.target.checked })}
             />
           }
-          label="Foil"
+          label={t('common.labels.foil')}
         />
         {props.isFoil && (
           <Autocomplete
@@ -571,7 +580,7 @@ function PropertyFields({
             onChange={(_, v) => onChange({ foilType: v || null })}
             onInputChange={(_, v) => onChange({ foilType: v || null })}
             sx={{ minWidth: 200 }}
-            renderInput={(p) => <TextField {...p} label="Foil type" />}
+            renderInput={(p) => <TextField {...p} label={t('scan.props.foilType')} />}
           />
         )}
       </Stack>
@@ -582,16 +591,16 @@ function PropertyFields({
         options={tagOptions}
         value={props.tags}
         onChange={(_, v) => onChange({ tags: v })}
-        renderInput={(p) => <TextField {...p} label="Tags" />}
+        renderInput={(p) => <TextField {...p} label={t('common.labels.tags')} />}
       />
       <TextField
         size="small"
-        label="Note"
+        label={t('common.labels.note')}
         multiline
         minRows={2}
         value={props.note}
         onChange={(e) => onChange({ note: e.target.value })}
-        placeholder="e.g. signed, played, misprint…"
+        placeholder={t('scan.props.notePlaceholder')}
       />
     </Stack>
   );
@@ -623,6 +632,7 @@ function DetailPanel({
   onRemove: () => void;
   onProps: (patch: Partial<ItemProps>) => void;
 }) {
+  const { t } = useTranslation();
   const [correcting, setCorrecting] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const id = identityOf(item);
@@ -632,12 +642,12 @@ function DetailPanel({
       <Stack spacing={2}>
         {/* Side-by-side compare at the top: uploaded scan vs. matched art, each half width. */}
         <Stack direction="row" spacing={2}>
-          <ImagePane label="Uploaded scan" src={item.previewUrl} alt={item.fileName} />
+          <ImagePane label={t('scan.detail.uploadedScan')} src={item.previewUrl} alt={item.fileName} />
           <ImagePane
-            label="Matched art"
+            label={t('scan.detail.matchedArt')}
             src={id?.imageUri ?? null}
-            alt={id?.name ?? 'No match'}
-            placeholder={item.status === 'matching' ? 'Matching…' : 'No match'}
+            alt={id?.name ?? t('scan.status.noMatch')}
+            placeholder={item.status === 'matching' ? t('scan.status.matching') : t('scan.status.noMatch')}
           />
         </Stack>
 
@@ -651,7 +661,7 @@ function DetailPanel({
               size="medium"
             />
           )}
-          {item.verified && <Chip size="small" color="success" label="Verified" />}
+          {item.verified && <Chip size="small" color="success" label={t('scan.status.verified')} />}
           {item.match?.edition && (
             <Chip size="small" variant="outlined" color="info" label={item.match.edition} />
           )}
@@ -661,7 +671,7 @@ function DetailPanel({
           />
           <Box sx={{ flexGrow: 1 }} />
           <Button variant="outlined" startIcon={<ZoomInIcon />} onClick={() => setScanOpen(true)}>
-            View scan
+            {t('scan.detail.viewScan')}
           </Button>
         </Stack>
 
@@ -674,10 +684,7 @@ function DetailPanel({
             </Typography>
           </Box>
         ) : (
-          <Alert severity="warning">
-            No confident match. Use “Search catalog” to pick the correct card, or “View scan” to read
-            it.
-          </Alert>
+          <Alert severity="warning">{t('scan.detail.noConfidentMatch')}</Alert>
         )}
 
         {correcting ? (
@@ -692,7 +699,7 @@ function DetailPanel({
               }}
             />
             <Button size="small" onClick={() => setCorrecting(false)} sx={{ mt: 1 }}>
-              Cancel
+              {t('common.actions.cancel')}
             </Button>
           </Box>
         ) : (
@@ -704,30 +711,30 @@ function DetailPanel({
               disabled={!id}
               onClick={onVerify}
             >
-              {item.verified ? 'Looks correct' : 'Confirm match'}
+              {item.verified ? t('scan.detail.looksCorrect') : t('scan.detail.confirmMatch')}
             </Button>
             <Button variant="outlined" startIcon={<SearchIcon />} onClick={() => setCorrecting(true)}>
-              Search catalog
+              {t('scan.detail.searchCatalog')}
             </Button>
             {item.include ? (
               <Button variant="text" onClick={() => onToggle(false)}>
-                Exclude from commit
+                {t('scan.detail.excludeFromCommit')}
               </Button>
             ) : (
               <Button variant="text" disabled={!id} onClick={() => onToggle(true)}>
-                Include in commit
+                {t('scan.detail.includeInCommit')}
               </Button>
             )}
             <Box sx={{ flexGrow: 1 }} />
             <Button variant="text" color="error" startIcon={<CloseIcon />} onClick={onRemove}>
-              Remove
+              {t('common.actions.remove')}
             </Button>
           </Stack>
         )}
 
         <Divider textAlign="left">
           <Typography variant="caption" color="text.secondary">
-            Card properties
+            {t('scan.detail.cardProperties')}
           </Typography>
         </Divider>
         <PropertyFields
@@ -823,6 +830,7 @@ function BulkEditDialog({
   onApply: (state: BulkEditState) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [state, setState] = useState<BulkEditState>(newBulkState);
   // Reset the form each time the dialog opens so it never carries a stale selection.
   useEffect(() => {
@@ -845,10 +853,10 @@ function BulkEditDialog({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Edit {count} selected card{count === 1 ? '' : 's'}</DialogTitle>
+      <DialogTitle>{t('scan.bulk.title', { count })}</DialogTitle>
       <DialogContent dividers>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Tick a property to apply it to every checked card. Unticked properties are left unchanged.
+          {t('scan.bulk.help')}
         </Typography>
         <Stack spacing={2}>
           {row(
@@ -858,7 +866,7 @@ function BulkEditDialog({
               select
               size="small"
               fullWidth
-              label="Condition"
+              label={t('common.labels.condition')}
               value={state.props.condition}
               onChange={(e) => patchProps({ condition: e.target.value })}
             >
@@ -880,7 +888,7 @@ function BulkEditDialog({
                     onChange={(e) => patchProps({ isFoil: e.target.checked })}
                   />
                 }
-                label="Foil"
+                label={t('common.labels.foil')}
               />
               {state.props.isFoil && (
                 <Autocomplete
@@ -891,7 +899,7 @@ function BulkEditDialog({
                   onChange={(_, v) => patchProps({ foilType: v || null })}
                   onInputChange={(_, v) => patchProps({ foilType: v || null })}
                   sx={{ minWidth: 200 }}
-                  renderInput={(p) => <TextField {...p} label="Foil type" />}
+                  renderInput={(p) => <TextField {...p} label={t('scan.props.foilType')} />}
                 />
               )}
             </Stack>,
@@ -902,7 +910,7 @@ function BulkEditDialog({
             <TextField
               size="small"
               type="number"
-              label="Quantity"
+              label={t('common.labels.quantity')}
               value={state.props.quantity}
               onChange={(e) => patchProps({ quantity: Math.max(1, Number(e.target.value) || 1) })}
               inputProps={{ min: 1 }}
@@ -915,7 +923,7 @@ function BulkEditDialog({
               size="small"
               type="number"
               fullWidth
-              label="Purchase price"
+              label={t('common.labels.purchasePrice')}
               value={state.props.purchasePrice}
               onChange={(e) => patchProps({ purchasePrice: e.target.value })}
               inputProps={{ step: '0.01', min: 0 }}
@@ -928,13 +936,13 @@ function BulkEditDialog({
               <TextField
                 select
                 size="small"
-                label="Mode"
+                label={t('scan.bulk.mode')}
                 value={state.tagsMode}
                 onChange={(e) => setState((s) => ({ ...s, tagsMode: e.target.value as 'add' | 'replace' }))}
                 sx={{ width: 120 }}
               >
-                <MenuItem value="add">Add</MenuItem>
-                <MenuItem value="replace">Replace</MenuItem>
+                <MenuItem value="add">{t('scan.bulk.modeAdd')}</MenuItem>
+                <MenuItem value="replace">{t('scan.bulk.modeReplace')}</MenuItem>
               </TextField>
               <Autocomplete
                 multiple
@@ -944,7 +952,7 @@ function BulkEditDialog({
                 options={tagOptions}
                 value={state.props.tags}
                 onChange={(_, v) => patchProps({ tags: v })}
-                renderInput={(p) => <TextField {...p} label="Tags" />}
+                renderInput={(p) => <TextField {...p} label={t('common.labels.tags')} />}
               />
             </Stack>,
           )}
@@ -954,7 +962,7 @@ function BulkEditDialog({
             <TextField
               size="small"
               fullWidth
-              label="Note"
+              label={t('common.labels.note')}
               multiline
               minRows={2}
               value={state.props.note}
@@ -964,9 +972,9 @@ function BulkEditDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
         <Button variant="contained" disabled={!anyEnabled} onClick={() => onApply(state)}>
-          Apply to {count}
+          {t('scan.bulk.applyTo', { count })}
         </Button>
       </DialogActions>
     </Dialog>
@@ -974,6 +982,7 @@ function BulkEditDialog({
 }
 
 export function ScanPage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { game: contextGame } = useGame();
   const [game, setGame] = useState(contextGame ?? 'Mtg');
@@ -1228,10 +1237,9 @@ export function ScanPage() {
 
   return (
     <Stack spacing={3}>
-      <Typography variant="h4">Scan cards</Typography>
+      <Typography variant="h4">{t('scan.title')}</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mt: -1 }}>
-        Upload photos or scans of cards. Each image is matched against the selected game's catalog on
-        the server; review the matches, correct any that are wrong, then add them to a location.
+        {t('scan.intro')}
       </Typography>
 
       <Paper variant="outlined" sx={{ p: 2 }}>
@@ -1239,7 +1247,7 @@ export function ScanPage() {
           <TextField
             select
             size="small"
-            label="Game"
+            label={t('common.labels.game')}
             value={game}
             onChange={(e) => setGame(e.target.value)}
             sx={{ minWidth: 200 }}
@@ -1260,13 +1268,17 @@ export function ScanPage() {
             onChange={(_, v) => setArtSets(v)}
             sx={{ minWidth: 260, flex: '1 1 260px' }}
             renderInput={(p) => (
-              <TextField {...p} label="Sets (art fallback)" placeholder={artSets.length ? '' : 'All sets'} />
+              <TextField
+                {...p}
+                label={t('scan.controls.artSets')}
+                placeholder={artSets.length ? '' : t('scan.controls.allSets')}
+              />
             )}
           />
           <TextField
             select
             size="small"
-            label="Condition"
+            label={t('common.labels.condition')}
             value={condition}
             onChange={(e) => setCondition(e.target.value)}
             sx={{ minWidth: 120 }}
@@ -1279,28 +1291,28 @@ export function ScanPage() {
           </TextField>
           <FormControlLabel
             control={<Checkbox checked={isFoil} onChange={(e) => setIsFoil(e.target.checked)} />}
-            label="Foil"
+            label={t('common.labels.foil')}
           />
           <Button
             variant="contained"
             startIcon={<CameraAltIcon />}
             onClick={() => cameraInput.current?.click()}
           >
-            Take photo
+            {t('scan.controls.takePhoto')}
           </Button>
           <Button
             variant="outlined"
             startIcon={<VideocamIcon />}
             onClick={() => setWebcamOpen(true)}
           >
-            Use webcam
+            {t('scan.controls.useWebcam')}
           </Button>
           <Button
             variant="outlined"
             startIcon={<AddPhotoAlternateIcon />}
             onClick={() => fileInput.current?.click()}
           >
-            Add images
+            {t('scan.controls.addImages')}
           </Button>
           {/* Camera capture: on a phone this opens the rear camera directly; on desktop the
               `capture` hint is ignored and it falls back to a normal file picker. */}
@@ -1328,8 +1340,7 @@ export function ScanPage() {
           />
         </Stack>
         <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-          Game / sets / condition / foil above seed each new scan; edit any card (or several at once)
-          below before committing.
+          {t('scan.controls.seedHint')}
         </Typography>
       </Paper>
 
@@ -1342,7 +1353,7 @@ export function ScanPage() {
               onClick={() => setPickerOpen(true)}
               sx={{ minWidth: 220, justifyContent: 'flex-start', textTransform: 'none' }}
             >
-              {selectedLocationName ?? 'Add to location…'}
+              {selectedLocationName ?? t('scan.commit.addToLocation')}
             </Button>
             <Button
               variant="outlined"
@@ -1351,7 +1362,7 @@ export function ScanPage() {
               disabled={confirmableCount === 0}
               onClick={confirmChecked}
             >
-              Confirm {confirmableCount} checked
+              {t('scan.commit.confirmChecked', { count: confirmableCount })}
             </Button>
             <Button
               variant="contained"
@@ -1361,16 +1372,15 @@ export function ScanPage() {
               onClick={() => commit.mutate()}
             >
               {commit.isPending
-                ? 'Adding…'
-                : `Add ${committableCount} confirmed card${committableCount === 1 ? '' : 's'}`}
+                ? t('common.states.adding')
+                : t('scan.commit.addConfirmed', { count: committableCount })}
             </Button>
             <Typography variant="caption" color="text.secondary">
-              Only confirmed &amp; checked scans are added
-              {controlsActive ? ', and only those shown by the current filter' : ''}.
+              {controlsActive ? t('scan.commit.addedNoteFiltered') : t('scan.commit.addedNote')}
             </Typography>
             {commit.error && <Alert severity="error">{(commit.error as Error).message}</Alert>}
             {commit.data && (
-              <Alert severity="success">Added {commit.data.imported} card(s) to your collection.</Alert>
+              <Alert severity="success">{t('scan.commit.success', { count: commit.data.imported })}</Alert>
             )}
           </Stack>
         </Paper>
@@ -1381,7 +1391,7 @@ export function ScanPage() {
           <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
             <TextField
               size="small"
-              label="Filter by name"
+              label={t('scan.filter.filterByName')}
               value={controls.name}
               onChange={(e) => setControls((c) => ({ ...c, name: e.target.value }))}
               InputProps={{ startAdornment: <SearchIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} /> }}
@@ -1390,19 +1400,19 @@ export function ScanPage() {
             <TextField
               select
               size="small"
-              label="Show"
+              label={t('scan.filter.show')}
               value={controls.checked}
               onChange={(e) => setControls((c) => ({ ...c, checked: e.target.value as CheckedFilter }))}
               sx={{ minWidth: 150 }}
             >
-              <MenuItem value="all">All</MenuItem>
-              <MenuItem value="checked">Checked only</MenuItem>
-              <MenuItem value="unchecked">Unchecked only</MenuItem>
+              <MenuItem value="all">{t('scan.filter.all')}</MenuItem>
+              <MenuItem value="checked">{t('scan.filter.checkedOnly')}</MenuItem>
+              <MenuItem value="unchecked">{t('scan.filter.uncheckedOnly')}</MenuItem>
             </TextField>
             <TextField
               size="small"
               type="number"
-              label="Min confidence %"
+              label={t('scan.filter.minConfidence')}
               value={controls.minConfidence}
               onChange={(e) => setControls((c) => ({ ...c, minConfidence: e.target.value }))}
               inputProps={{ min: 0, max: 100 }}
@@ -1411,7 +1421,7 @@ export function ScanPage() {
             <TextField
               size="small"
               type="number"
-              label="Min value"
+              label={t('scan.filter.minValue')}
               value={controls.minPrice}
               onChange={(e) => setControls((c) => ({ ...c, minPrice: e.target.value }))}
               inputProps={{ step: '0.01', min: 0 }}
@@ -1421,17 +1431,17 @@ export function ScanPage() {
             <TextField
               select
               size="small"
-              label="Sort by"
+              label={t('scan.filter.sortBy')}
               value={controls.sortKey}
               onChange={(e) => setControls((c) => ({ ...c, sortKey: e.target.value as SortKey }))}
               sx={{ minWidth: 160 }}
             >
-              <MenuItem value="none">None</MenuItem>
-              <MenuItem value="name">Name</MenuItem>
-              <MenuItem value="confidence">Confidence</MenuItem>
-              <MenuItem value="value">Market value</MenuItem>
+              <MenuItem value="none">{t('scan.filter.sortNone')}</MenuItem>
+              <MenuItem value="name">{t('common.labels.name')}</MenuItem>
+              <MenuItem value="confidence">{t('scan.filter.sortConfidence')}</MenuItem>
+              <MenuItem value="value">{t('scan.filter.sortValue')}</MenuItem>
             </TextField>
-            <Tooltip title={controls.sortDir === 'asc' ? 'Ascending' : 'Descending'}>
+            <Tooltip title={controls.sortDir === 'asc' ? t('scan.filter.ascending') : t('scan.filter.descending')}>
               <span>
                 <IconButton
                   size="small"
@@ -1448,10 +1458,10 @@ export function ScanPage() {
             {(controlsActive || controls.sortKey !== 'none') && (
               <>
                 <Typography variant="caption" color="text.secondary">
-                  Showing {visibleItems.length} of {items.length}
+                  {t('scan.filter.showingOf', { visible: visibleItems.length, total: items.length })}
                 </Typography>
                 <Button size="small" onClick={() => setControls(DEFAULT_CONTROLS)}>
-                  Clear
+                  {t('common.actions.clear')}
                 </Button>
               </>
             )}
@@ -1486,7 +1496,7 @@ export function ScanPage() {
                 zIndex: 1,
               }}
             >
-              <Tooltip title={checkedCount === selectableCount ? 'Uncheck all' : 'Check all'}>
+              <Tooltip title={checkedCount === selectableCount ? t('scan.master.uncheckAll') : t('scan.master.checkAll')}>
                 <span>
                   <Checkbox
                     size="small"
@@ -1498,17 +1508,17 @@ export function ScanPage() {
                 </span>
               </Tooltip>
               <Button size="small" onClick={selectAll} disabled={selectableCount === 0}>
-                All
+                {t('scan.master.all')}
               </Button>
               <Button size="small" onClick={selectNone} disabled={checkedCount === 0}>
-                None
+                {t('scan.master.none')}
               </Button>
               <Button size="small" onClick={invertSelection} disabled={selectableCount === 0}>
-                Invert
+                {t('scan.master.invert')}
               </Button>
               <Box sx={{ flexGrow: 1 }} />
               <Typography variant="caption" color="text.secondary">
-                {checkedCount} checked
+                {t('scan.master.checkedCount', { count: checkedCount })}
               </Typography>
               <Button
                 size="small"
@@ -1517,7 +1527,7 @@ export function ScanPage() {
                 disabled={checkedCount === 0}
                 onClick={() => setBulkOpen(true)}
               >
-                Edit
+                {t('common.actions.edit')}
               </Button>
             </Box>
             <Stack divider={<Divider />}>
@@ -1534,10 +1544,10 @@ export function ScanPage() {
               {visibleItems.length === 0 && (
                 <Box sx={{ p: 3, textAlign: 'center' }}>
                   <Typography variant="body2" color="text.secondary">
-                    No scans match the current filter.
+                    {t('scan.master.noMatchFilter')}
                   </Typography>
                   <Button size="small" sx={{ mt: 1 }} onClick={() => setControls(DEFAULT_CONTROLS)}>
-                    Clear filter
+                    {t('scan.master.clearFilter')}
                   </Button>
                 </Box>
               )}
@@ -1567,7 +1577,7 @@ export function ScanPage() {
               variant="outlined"
               sx={{ p: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              <Typography color="text.secondary">Select a scanned card to review it.</Typography>
+              <Typography color="text.secondary">{t('scan.detail.selectPrompt')}</Typography>
             </Paper>
           )}
         </Box>
@@ -1584,7 +1594,7 @@ export function ScanPage() {
 
       <LocationPickerDialog
         open={pickerOpen}
-        title="Add scanned cards to location"
+        title={t('scan.locationPicker.title')}
         onPick={(id) => {
           setContainerId(id);
           setPickerOpen(false);

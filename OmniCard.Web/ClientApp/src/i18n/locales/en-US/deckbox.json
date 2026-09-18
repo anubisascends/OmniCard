@@ -1,0 +1,37 @@
+{
+  "deckbox": {
+    "banner": {
+      "assignGame": "Assign game",
+      "oneBoxNoGame": "Deck box \"{{name}}\" has no game assigned.",
+      "manyBoxesNoGame": "{{count}} deck boxes have no game assigned (starting with \"{{name}}\")."
+    },
+    "picker": {
+      "deckType": "Deck type",
+      "gameRequired": "Required for a deck box",
+      "none": "None"
+    },
+    "panel": {
+      "noGameAssigned": "No game assigned",
+      "commander_one": "{{count}} commander",
+      "commander_other": "{{count}} commanders",
+      "cardsCount": "{{count}} cards",
+      "cardsCountWithCommander": "{{count}} cards ({{main}} + commander)",
+      "gameAndDeckType": "Game & deck type",
+      "legalityTitle": "Deck legality ({{deckType}})"
+    },
+    "dialog": {
+      "title": "Deck box game — {{name}}",
+      "oneGameHelp": "A deck box holds one game system. Cards from other games can't be added once a game is set."
+    },
+    "stackView": {
+      "summary_one": "{{count}} card · {{groups}}",
+      "summary_other": "{{count}} cards · {{groups}}",
+      "groups_one": "{{count}} group",
+      "groups_other": "{{count}} groups",
+      "groupBy": "Group by",
+      "groupType": "Type",
+      "groupTags": "Tags",
+      "noCards": "No cards to show."
+    }
+  }
+}

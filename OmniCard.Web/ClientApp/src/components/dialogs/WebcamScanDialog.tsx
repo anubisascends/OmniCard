@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Box,
@@ -48,6 +49,7 @@ export function WebcamScanDialog({
   onCapture: (file: File) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const overlayRef = useRef<HTMLCanvasElement | null>(null);
   const workRef = useRef<HTMLCanvasElement | null>(null);
@@ -111,7 +113,7 @@ export function WebcamScanDialog({
         cap.width = vw;
         cap.height = vh;
         const cctx = cap.getContext('2d');
-        if (!cctx) throw new Error('Canvas 2D context unavailable');
+        if (!cctx) throw new Error(t('dialogs.webcam.errors.canvasUnavailable'));
         cctx.drawImage(video, 0, 0, vw, vh);
         const full = cctx.getImageData(0, 0, vw, vh);
         const scaledQuad = quad.map((p) => ({ x: p.x * scale, y: p.y * scale }));
@@ -139,7 +141,7 @@ export function WebcamScanDialog({
         busyRef.current = false;
       }
     },
-    [onCapture],
+    [onCapture, t],
   );
 
   // The self-scheduling detection loop. Uses setTimeout-after-completion so detections never overlap
@@ -263,14 +265,14 @@ export function WebcamScanDialog({
       const err = e as DOMException;
       const msg =
         err.name === 'NotAllowedError'
-          ? 'Camera permission was denied. Allow camera access in your browser and try again.'
+          ? t('dialogs.webcam.errors.permissionDenied')
           : err.name === 'NotFoundError'
-            ? 'No camera was found. Connect a webcam and try again.'
-            : `Could not start the camera: ${err.message}`;
+            ? t('dialogs.webcam.errors.notFound')
+            : t('dialogs.webcam.errors.startFailed', { message: err.message });
       setError(msg);
       setStatus('error');
     }
-  }, []);
+  }, [t]);
 
   // Lifecycle: on open, warm up opencv and start the camera + loop; on close, tear everything down.
   useEffect(() => {
@@ -292,7 +294,7 @@ export function WebcamScanDialog({
         if (!cancelled) setCvReady(true);
       })
       .catch(() => {
-        if (!cancelled) setError('Failed to load the image-processing engine (opencv.js).');
+        if (!cancelled) setError(t('dialogs.webcam.errors.engineLoadFailed'));
       });
 
     void startStream();
@@ -318,16 +320,16 @@ export function WebcamScanDialog({
   }, [open]);
 
   const statusText: Record<Status, string> = {
-    starting: 'Starting camera…',
-    searching: 'Point a card at the camera',
-    stabilizing: 'Hold steady…',
-    captured: 'Captured ✓  —  present the next card',
-    error: 'Camera unavailable',
+    starting: t('dialogs.webcam.status.starting'),
+    searching: t('dialogs.webcam.status.searching'),
+    stabilizing: t('dialogs.webcam.status.stabilizing'),
+    captured: t('dialogs.webcam.status.captured'),
+    error: t('dialogs.webcam.status.error'),
   };
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Scan with webcam</DialogTitle>
+      <DialogTitle>{t('dialogs.webcam.title')}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
           {error && <Alert severity="error">{error}</Alert>}
@@ -336,7 +338,7 @@ export function WebcamScanDialog({
             <TextField
               select
               size="small"
-              label="Camera"
+              label={t('dialogs.webcam.camera')}
               value={deviceId}
               onChange={(e) => {
                 setDeviceId(e.target.value);
@@ -345,7 +347,7 @@ export function WebcamScanDialog({
             >
               {devices.map((d, i) => (
                 <MenuItem key={d.deviceId} value={d.deviceId}>
-                  {d.label || `Camera ${i + 1}`}
+                  {d.label || t('dialogs.webcam.cameraN', { number: i + 1 })}
                 </MenuItem>
               ))}
             </TextField>
@@ -393,7 +395,7 @@ export function WebcamScanDialog({
                 }}
               >
                 <CircularProgress size={20} color="inherit" />
-                <Typography variant="body2">{cvReady ? 'Starting camera…' : 'Loading engine…'}</Typography>
+                <Typography variant="body2">{cvReady ? t('dialogs.webcam.status.starting') : t('dialogs.webcam.loadingEngine')}</Typography>
               </Box>
             )}
           </Box>
@@ -410,7 +412,7 @@ export function WebcamScanDialog({
               {statusText[status]}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Captured: {capturedCount}
+              {t('dialogs.webcam.capturedCount', { count: capturedCount })}
             </Typography>
           </Stack>
 
@@ -421,7 +423,7 @@ export function WebcamScanDialog({
                   key={src}
                   component="img"
                   src={src}
-                  alt={`Capture ${capturedCount - i}`}
+                  alt={t('dialogs.webcam.captureAlt', { number: capturedCount - i })}
                   sx={{ height: 72, borderRadius: 1, border: '1px solid', borderColor: 'divider' }}
                 />
               ))}
@@ -435,11 +437,11 @@ export function WebcamScanDialog({
           startIcon={<CameraAltIcon />}
           disabled={!hasCard || !cvReady || !!error}
         >
-          Capture now
+          {t('dialogs.webcam.captureNow')}
         </Button>
         <Box sx={{ flex: 1 }} />
         <Button onClick={onClose} variant="contained">
-          Done
+          {t('common.actions.done')}
         </Button>
       </DialogActions>
     </Dialog>

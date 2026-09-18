@@ -26,6 +26,9 @@ whole app — the original WPF desktop app has been retired.
   `ICardGameService` pipeline; no TWAIN, no desktop agent.
 - **Server-hosted artwork** — card images cached under `{dataDir}/card-images`, served at
   `/card-images` (see [Catalog data](#catalog-data)).
+- **Localized UI** — every SPA string runs through `react-i18next`; the display language follows the
+  visitor's browser culture with **en-US** as the fallback, and numbers/currency/dates are formatted
+  per that culture (see [Localization](#localization)).
 
 ## Prerequisites
 
@@ -163,6 +166,47 @@ The full desktop eBay stack runs server-side; the OAuth flow is a normal web red
 Until configured, `GET /api/ebay/status` reports what's missing and all listing operations no-op
 (so order status changes keep working without a live connection). Tokens are stored encrypted in
 `<DataDirectory>/web-credentials.dat`.
+
+## Localization
+
+The SPA is internationalized with **react-i18next** + **i18next-browser-languagedetector**. It picks
+the visitor's browser culture automatically and falls back to **en-US** (the only language bundle that
+ships today, and the source of truth). A `?lng=<culture>` query-string override is available for
+testing (e.g. `http://localhost:5173/?lng=de-DE`).
+
+Value formatting is locale-aware even when the text falls back to en-US: numbers, dates, and currency
+are formatted for the visitor's actual culture via the `Intl` APIs (`ClientApp/src/i18n/format.ts`,
+`useFormatters()`). Currency amounts stay denominated in **USD** — only their *presentation* (decimal
+/ grouping separators, symbol placement) is localized, so a value is never reinterpreted as a
+different currency.
+
+- **Init & detection:** `ClientApp/src/i18n/index.ts` (single `translation` bundle, `fallbackLng:
+  'en-US'`, detection order query-string → `navigator` → `<html lang>`). Imported once from
+  `src/main.tsx`.
+- **Strings:** `ClientApp/src/i18n/locales/en-US/*.json`, one file per feature area (namespace):
+  `common` (shared actions/labels/conditions/channels/statuses), `nav`, `auth`, `dashboard`,
+  `collection`, `locations`, `binder`, `sets`, `scan`, `sales`, `inventory`, `importing`, `lists`,
+  `trades`, `settings`, `deckbox`, `dialogs`, `search`. Each file is keyed by its namespace object and
+  spread into the bundle in `index.ts`.
+
+### Adding a language
+
+1. Copy `ClientApp/src/i18n/locales/en-US/` to `ClientApp/src/i18n/locales/<culture>/` (e.g. `de-DE`)
+   and translate the string values (keep the keys and `{{placeholders}}` unchanged).
+2. Import the new files in `ClientApp/src/i18n/index.ts` and add them under
+   `resources['<culture>'].translation`.
+3. Rebuild the SPA. No component changes are needed — browsers set to that culture pick it up
+   automatically, and any key you leave untranslated falls back to en-US.
+
+### Conventions (when adding or changing UI)
+
+- Never hard-code user-facing text. Use `const { t } = useTranslation();` and `t('<namespace>.<key>')`,
+  reusing `common.*` for generic terms rather than duplicating them.
+- Format every number/currency/date through `useFormatters()` (`fmt.money` / `fmt.number` /
+  `fmt.percent` / `fmt.date` / `fmt.dateTime`) — do not call `toLocaleString`/`toFixed`/`new Date().toLocale*`
+  directly for display. Prefer a DTO's numeric field over a server-preformatted string.
+- Do **not** translate data returned by the server (card/set/customer names, error messages) or
+  identifiers/enum values sent back to the API.
 
 ## Tests
 

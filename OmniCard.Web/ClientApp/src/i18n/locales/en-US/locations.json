@@ -1,0 +1,53 @@
+{
+  "locations": {
+    "title": "Locations",
+    "addBar": {
+      "nameLabel": "New location name",
+      "nameTaken": "This name is already in use"
+    },
+    "types": {
+      "Binder": "Binder",
+      "Box": "Box",
+      "DeckBox": "Deck Box",
+      "DisplayCase": "Display Case"
+    },
+    "deckBoxLabel": "Deck Box",
+    "groups": {
+      "alwaysAvailable": "Always Available",
+      "headings": {
+        "Binder": "Binders",
+        "Box": "Boxes",
+        "Deck Box": "Deck Boxes",
+        "Display Case": "Display Cases",
+        "Bulk": "Bulk"
+      }
+    },
+    "menu": {
+      "rename": "Rename…",
+      "renamePrompt": "Rename location",
+      "gameDeckType": "Game & deck type…",
+      "setAlwaysAvailable": "Set always-available",
+      "unsetAlwaysAvailable": "Unset always-available",
+      "delete": "Delete…",
+      "deleteConfirm": "Delete \"{{name}}\"?",
+      "moveToBulkConfirm": "Move its cards to Bulk?  (Cancel = delete the cards)"
+    },
+    "columns": {
+      "cards": "Cards",
+      "unique": "Unique",
+      "market": "Market",
+      "cost": "Cost"
+    },
+    "detail": {
+      "fallbackName": "Location",
+      "thisLocation": "this location",
+      "openBinderView": "Open binder view",
+      "addCard": "Add card",
+      "summary_one": "{{countText}} card · {{value}} market",
+      "summary_other": "{{countText}} cards · {{value}} market",
+      "viewModeLabel": "View mode",
+      "tableView": "Table view",
+      "stackedView": "Stacked view"
+    }
+  }
+}

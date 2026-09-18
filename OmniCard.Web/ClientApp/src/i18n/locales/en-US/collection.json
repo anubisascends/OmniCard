@@ -1,0 +1,43 @@
+{
+  "collection": {
+    "title": "Collection",
+    "columns": {
+      "number": "No.",
+      "condition": "Cond",
+      "quantity": "Qty",
+      "market": "Market"
+    },
+    "printings_one": "{{count}} printing",
+    "printings_other": "{{count}} printings",
+    "exportFormats": {
+      "appnative": "OmniCard (full detail)",
+      "tcgplayer": "TCGplayer",
+      "moxfield": "Moxfield",
+      "manabox": "ManaBox",
+      "ticker": "Card Price Ticker"
+    },
+    "stackDuplicates": "Stack duplicates",
+    "selectedCount_one": "{{count}} card selected",
+    "selectedCount_other": "{{count}} cards selected",
+    "moveTo": "Move to…",
+    "bulkEdit": "Bulk edit",
+    "listForSale": "List for sale",
+    "exportCsv": "Export CSV",
+    "confirmDelete_one": "Delete {{count}} card? This cannot be undone.",
+    "confirmDelete_other": "Delete {{count}} cards? This cannot be undone.",
+    "status": {
+      "pickedTooltip": "Listed for sale and picked into the for-sale location. Unlist it from Sales ▸ Listings to change.",
+      "listedTooltip": "Already listed for sale. Unlist it from Sales ▸ Listings to change."
+    },
+    "moveDialogTitle_one": "Move {{count}} card to…",
+    "moveDialogTitle_other": "Move {{count}} cards to…",
+    "bulkList": {
+      "title_one": "List {{count}} card for sale",
+      "title_other": "List {{count}} cards for sale",
+      "description": "Each card is listed as a whole lot at its current market price. Adjust individual prices afterwards on Sales ▸ Listings.",
+      "alreadyListed_one": "{{count}} selected card is already listed for sale and will be skipped.",
+      "alreadyListed_other": "{{count}} selected cards are already listed for sale and will be skipped.",
+      "listing": "Listing…"
+    }
+  }
+}

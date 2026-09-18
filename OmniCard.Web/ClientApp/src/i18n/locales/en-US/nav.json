@@ -1,0 +1,21 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "scan": "Scan",
+    "collection": "Collection",
+    "locations": "Locations",
+    "sets": "Sets",
+    "inventory": "Inventory",
+    "lists": "Lists",
+    "trades": "Trades",
+    "import": "Import",
+    "sales": "Sales",
+    "administration": "Administration",
+    "allGames": "All Games",
+    "openNavigation": "Open navigation",
+    "account": "Account",
+    "signedInAs": "Signed in as",
+    "accountAndUsers": "Account & users",
+    "signOut": "Sign out"
+  }
+}

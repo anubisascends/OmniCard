@@ -11,6 +11,7 @@ import {
   Typography,
 } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import { Trans, useTranslation } from 'react-i18next';
 import { api } from '../api/client';
 import { useGame } from '../context/GameContext';
 
@@ -41,6 +42,7 @@ export function SearchBox({
   game,
   autoFocus,
 }: SearchBoxProps) {
+  const { t } = useTranslation();
   const { game: activeGame } = useGame();
   const effectiveGame = game ?? activeGame;
   const [helpAnchor, setHelpAnchor] = useState<HTMLElement | null>(null);
@@ -52,13 +54,15 @@ export function SearchBox({
   });
 
   const placeholder = useMemo(() => {
-    if (!schema) return 'Search…';
+    if (!schema) return t('search.placeholder');
     const examples = schema.fields
       .filter((f) => f.example)
       .slice(0, 5)
       .map((f) => f.example);
-    return examples.length ? `Search — try ${examples.join(', ')}` : 'Search…';
-  }, [schema]);
+    return examples.length
+      ? t('search.placeholderWithExamples', { examples: examples.join(', ') })
+      : t('search.placeholder');
+  }, [schema, t]);
 
   return (
     <Box
@@ -78,11 +82,11 @@ export function SearchBox({
         InputProps={{
           endAdornment: (
             <InputAdornment position="end">
-              <Tooltip title="Search syntax help">
+              <Tooltip title={t('search.syntaxHelp')}>
                 <IconButton
                   edge="end"
                   size="small"
-                  aria-label="Search syntax help"
+                  aria-label={t('search.syntaxHelp')}
                   onClick={(e) => setHelpAnchor(e.currentTarget)}
                 >
                   <HelpOutlineIcon fontSize="small" />
@@ -102,11 +106,13 @@ export function SearchBox({
       >
         <Box sx={{ p: 2, maxWidth: 420 }}>
           <Typography variant="subtitle2" gutterBottom>
-            Search syntax
+            {t('search.syntaxTitle')}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            Combine tokens with spaces (AND), <code>or</code>, <code>-</code> to negate, and parentheses.
-            Plain words match the card name.
+            <Trans i18nKey="search.syntaxHelpBody">
+              Combine tokens with spaces (AND), <code>or</code>, <code>-</code> to negate, and parentheses.
+              Plain words match the card name.
+            </Trans>
           </Typography>
           <Stack spacing={1}>
             {schema?.fields.map((f) => (
@@ -126,7 +132,7 @@ export function SearchBox({
                 ) : null}
                 {f.valueAliases.length ? (
                   <Typography variant="caption" color="text.secondary" display="block">
-                    Values: {f.valueAliases.join(', ')}
+                    {t('search.values', { values: f.valueAliases.join(', ') })}
                   </Typography>
                 ) : null}
               </Box>

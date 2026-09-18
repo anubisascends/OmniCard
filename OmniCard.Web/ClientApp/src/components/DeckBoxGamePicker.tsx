@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { MenuItem, Stack, TextField } from '@mui/material';
 import { api } from '../api/client';
@@ -22,6 +23,7 @@ export function DeckBoxGamePicker({
   onDeckTypeChange: (deckTypeId: number | null) => void;
   direction?: 'row' | 'column';
 }) {
+  const { t } = useTranslation();
   const games = useQuery({ queryKey: ['games'], queryFn: () => api.games() });
   const deckTypes = useQuery({
     queryKey: ['deck-types', game],
@@ -40,12 +42,12 @@ export function DeckBoxGamePicker({
       <TextField
         select
         size="small"
-        label="Game"
+        label={t('common.labels.game')}
         required
         value={game}
         onChange={(e) => onGameChange(e.target.value)}
         error={game.length === 0}
-        helperText={game.length === 0 ? 'Required for a deck box' : ' '}
+        helperText={game.length === 0 ? t('deckbox.picker.gameRequired') : ' '}
         sx={{ minWidth: 200 }}
       >
         {(games.data ?? []).map((g) => (
@@ -57,7 +59,7 @@ export function DeckBoxGamePicker({
       <TextField
         select
         size="small"
-        label="Deck type"
+        label={t('deckbox.picker.deckType')}
         value={deckTypeId ?? ''}
         onChange={(e) => onDeckTypeChange(e.target.value === '' ? null : Number(e.target.value))}
         disabled={!game}
@@ -65,7 +67,7 @@ export function DeckBoxGamePicker({
         sx={{ minWidth: 180 }}
       >
         <MenuItem value="">
-          <em>None</em>
+          <em>{t('deckbox.picker.none')}</em>
         </MenuItem>
         {(deckTypes.data ?? []).map((d) => (
           <MenuItem key={d.id} value={d.id}>

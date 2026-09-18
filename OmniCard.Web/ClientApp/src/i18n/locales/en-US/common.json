@@ -1,0 +1,93 @@
+{
+  "common": {
+    "app": {
+      "name": "OmniCard"
+    },
+    "actions": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "edit": "Edit",
+      "add": "Add",
+      "remove": "Remove",
+      "close": "Close",
+      "done": "Done",
+      "create": "Create",
+      "confirm": "Confirm",
+      "search": "Search",
+      "apply": "Apply",
+      "change": "Change",
+      "refresh": "Refresh",
+      "export": "Export",
+      "import": "Import",
+      "next": "Next",
+      "previous": "Previous",
+      "back": "Back",
+      "open": "Open",
+      "rename": "Rename",
+      "move": "Move",
+      "clear": "Clear",
+      "reset": "Reset",
+      "select": "Select",
+      "view": "View",
+      "update": "Update",
+      "retry": "Retry",
+      "yes": "Yes",
+      "no": "No",
+      "ok": "OK"
+    },
+    "labels": {
+      "name": "Name",
+      "game": "Game",
+      "set": "Set",
+      "quantity": "Quantity",
+      "condition": "Condition",
+      "foil": "Foil",
+      "price": "Price",
+      "note": "Note",
+      "notes": "Notes",
+      "tags": "Tags",
+      "location": "Location",
+      "status": "Status",
+      "collectorNumber": "Collector #",
+      "rarity": "Rarity",
+      "purchasePrice": "Purchase price",
+      "marketPrice": "Market price",
+      "channel": "Channel",
+      "date": "Date",
+      "type": "Type",
+      "email": "Email",
+      "phone": "Phone",
+      "city": "City",
+      "state": "State"
+    },
+    "conditions": {
+      "NM": "NM",
+      "LP": "LP",
+      "MP": "MP",
+      "HP": "HP",
+      "DMG": "DMG"
+    },
+    "channels": {
+      "Manual": "Manual",
+      "TcgPlayer": "TCGplayer",
+      "Ebay": "eBay"
+    },
+    "listingStatus": {
+      "Listed": "Listed",
+      "Picked": "Picked",
+      "Sold": "Sold",
+      "Cancelled": "Cancelled"
+    },
+    "notFound": "Not Found",
+    "comingSoon": "This screen is coming in a later phase of the web migration.",
+    "states": {
+      "loading": "Loading…",
+      "saving": "Saving…",
+      "searching": "Searching…",
+      "adding": "Adding…",
+      "noResults": "No results.",
+      "error": "Something went wrong."
+    }
+  }
+}

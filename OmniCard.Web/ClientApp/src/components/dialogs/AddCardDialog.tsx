@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
@@ -47,6 +48,7 @@ export function AddCardDialog({
   lockGame?: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const games = useQuery({ queryKey: ['games'], queryFn: api.games, enabled: open });
 
@@ -129,16 +131,16 @@ export function AddCardDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Add card to {locationName}</DialogTitle>
+      <DialogTitle>{t('dialogs.addCard.title', { location: locationName })}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <TextField
             select
             size="small"
-            label="Game"
+            label={t('common.labels.game')}
             value={game}
             disabled={lockGame}
-            helperText={lockGame ? 'Locked to this deck box’s game' : undefined}
+            helperText={lockGame ? t('dialogs.addCard.lockedHelper') : undefined}
             onChange={(e) => {
               setGame(e.target.value);
               setSelected(null);
@@ -155,7 +157,7 @@ export function AddCardDialog({
           <Stack direction="row" spacing={1}>
             <TextField
               size="small"
-              label="Name"
+              label={t('common.labels.name')}
               value={name}
               onChange={(e) => setName(e.target.value)}
               fullWidth
@@ -170,15 +172,15 @@ export function AddCardDialog({
                 },
               }}
             />
-            <TextField size="small" label="Set" value={set} onChange={(e) => setSet(e.target.value)} sx={{ width: 120 }} />
-            <TextField size="small" label="Collector #" value={cn} onChange={(e) => setCn(e.target.value)} sx={{ width: 120 }} />
+            <TextField size="small" label={t('common.labels.set')} value={set} onChange={(e) => setSet(e.target.value)} sx={{ width: 120 }} />
+            <TextField size="small" label={t('common.labels.collectorNumber')} value={cn} onChange={(e) => setCn(e.target.value)} sx={{ width: 120 }} />
           </Stack>
 
           {/* Results */}
           {debounced.trim().length >= 2 && !selected && (
             <Box>
               {results.isFetching ? (
-                <Typography variant="body2" color="text.secondary">Searching…</Typography>
+                <Typography variant="body2" color="text.secondary">{t('common.states.searching')}</Typography>
               ) : results.data && results.data.length > 0 ? (
                 <List dense disablePadding sx={{ maxHeight: 260, overflowY: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}>
                   {results.data.map((r) => (
@@ -198,7 +200,7 @@ export function AddCardDialog({
                   ))}
                 </List>
               ) : (
-                <Typography variant="body2" color="text.secondary">No matches in the {game} catalog.</Typography>
+                <Typography variant="body2" color="text.secondary">{t('dialogs.addCard.noCatalogMatches', { game })}</Typography>
               )}
             </Box>
           )}
@@ -217,18 +219,18 @@ export function AddCardDialog({
                     {selected.setName} · #{selected.collectorNumber} · {selected.rarity}
                   </Typography>
                 </Box>
-                <Button size="small" onClick={() => setSelected(null)}>Change</Button>
+                <Button size="small" onClick={() => setSelected(null)}>{t('common.actions.change')}</Button>
               </Stack>
 
               <Stack direction="row" spacing={1}>
-                <TextField select size="small" label="Condition" value={condition} onChange={(e) => setCondition(e.target.value)} sx={{ width: 120 }}>
+                <TextField select size="small" label={t('common.labels.condition')} value={condition} onChange={(e) => setCondition(e.target.value)} sx={{ width: 120 }}>
                   {CONDITIONS.map((c) => (
-                    <MenuItem key={c} value={c}>{c}</MenuItem>
+                    <MenuItem key={c} value={c}>{t(`common.conditions.${c}`)}</MenuItem>
                   ))}
                 </TextField>
                 <TextField
                   size="small"
-                  label="Quantity"
+                  label={t('common.labels.quantity')}
                   type="number"
                   value={quantity}
                   onChange={(e) => setQuantity(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
@@ -237,7 +239,7 @@ export function AddCardDialog({
                 />
                 <TextField
                   size="small"
-                  label="Purchase price"
+                  label={t('common.labels.purchasePrice')}
                   type="number"
                   value={purchasePrice}
                   onChange={(e) => setPurchasePrice(e.target.value)}
@@ -246,7 +248,7 @@ export function AddCardDialog({
                 />
                 <FormControlLabel
                   control={<Switch checked={isFoil} onChange={(e) => setIsFoil(e.target.checked)} />}
-                  label="Foil"
+                  label={t('common.labels.foil')}
                 />
               </Stack>
               {add.error && <Typography color="error" variant="body2">{(add.error as Error).message}</Typography>}
@@ -255,15 +257,15 @@ export function AddCardDialog({
 
           {addedCount > 0 && (
             <Typography variant="body2" color="success.main">
-              Added {addedCount} card{addedCount === 1 ? '' : 's'} to {locationName}.
+              {t('dialogs.addCard.added', { count: addedCount, location: locationName })}
             </Typography>
           )}
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Done</Button>
+        <Button onClick={onClose}>{t('common.actions.done')}</Button>
         <Button variant="contained" disabled={!selected || add.isPending} onClick={() => add.mutate()}>
-          {add.isPending ? 'Adding…' : 'Add card'}
+          {add.isPending ? t('common.states.adding') : t('dialogs.addCard.addCard')}
         </Button>
       </DialogActions>
     </Dialog>

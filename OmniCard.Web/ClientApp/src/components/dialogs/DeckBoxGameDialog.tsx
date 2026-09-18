@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation } from '@tanstack/react-query';
 import {
   Alert,
@@ -35,6 +36,7 @@ export function DeckBoxGameDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const [game, setGame] = useState(initialGame ?? '');
   const [deckTypeId, setDeckTypeId] = useState<number | null>(initialDeckTypeId ?? null);
 
@@ -56,11 +58,11 @@ export function DeckBoxGameDialog({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>Deck box game — {deckBoxName}</DialogTitle>
+      <DialogTitle>{t('deckbox.dialog.title', { name: deckBoxName })}</DialogTitle>
       <DialogContent>
         <Stack spacing={1} sx={{ mt: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            A deck box holds one game system. Cards from other games can't be added once a game is set.
+            {t('deckbox.dialog.oneGameHelp')}
           </Typography>
           <DeckBoxGamePicker
             game={game}
@@ -75,13 +77,13 @@ export function DeckBoxGameDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
         <Button
           variant="contained"
           disabled={game.length === 0 || save.isPending}
           onClick={() => save.mutate()}
         >
-          Save
+          {t('common.actions.save')}
         </Button>
       </DialogActions>
     </Dialog>

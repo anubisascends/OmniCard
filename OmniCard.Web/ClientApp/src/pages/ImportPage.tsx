@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
@@ -18,36 +19,34 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { api } from '../api/client';
 import { locationSelectOptions } from '../components/LocationSelectOptions';
 import { useGame } from '../context/GameContext';
+import { useFormatters } from '../i18n/format';
 
-const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
-
-const EXPORT_FORMATS = [
-  { key: 'appnative', label: 'App-native' },
-  { key: 'tcgplayer', label: 'TCGplayer' },
-  { key: 'moxfield', label: 'Moxfield' },
-  { key: 'manabox', label: 'Manabox' },
-];
+// Server format identifiers — not translated. Display labels resolve via importing.export.formats.
+const EXPORT_FORMATS = ['appnative', 'tcgplayer', 'moxfield', 'manabox'];
 
 function ExportSection() {
+  const { t } = useTranslation();
   const { game } = useGame();
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Typography variant="h6" gutterBottom>
-        Export collection (CSV)
+        {t('importing.export.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" gutterBottom>
-        Downloads the current game filter{game ? ` (${game})` : ' (all games)'}.
+        {game
+          ? t('importing.export.descriptionGame', { game })
+          : t('importing.export.descriptionAll')}
       </Typography>
       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-        {EXPORT_FORMATS.map((f) => (
+        {EXPORT_FORMATS.map((key) => (
           <Button
-            key={f.key}
+            key={key}
             variant="outlined"
             startIcon={<DownloadIcon />}
             component="a"
-            href={api.exportUrl(f.key, game)}
+            href={api.exportUrl(key, game)}
           >
-            {f.label}
+            {t(`importing.export.formats.${key}`)}
           </Button>
         ))}
       </Stack>
@@ -56,6 +55,7 @@ function ExportSection() {
 }
 
 function ImportSection() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [skipDuplicates, setSkipDuplicates] = useState(true);
@@ -74,14 +74,14 @@ function ImportSection() {
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Typography variant="h6" gutterBottom>
-        Import collection (CSV)
+        {t('importing.import.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" gutterBottom>
-        Auto-detects app-native, TCGplayer, Moxfield, and Manabox formats.
+        {t('importing.import.description')}
       </Typography>
       <Stack spacing={2} sx={{ maxWidth: 480 }}>
         <Button variant="outlined" component="label" startIcon={<UploadFileIcon />}>
-          {file ? file.name : 'Choose CSV file'}
+          {file ? file.name : t('importing.import.chooseFile')}
           <input
             type="file"
             accept=".csv,text/csv"
@@ -91,30 +91,34 @@ function ImportSection() {
         </Button>
         <FormControlLabel
           control={<Checkbox checked={skipDuplicates} onChange={(e) => setSkipDuplicates(e.target.checked)} />}
-          label="Skip duplicates already in collection"
+          label={t('importing.import.skipDuplicates')}
         />
         <TextField
           select
           size="small"
-          label="Target location (optional)"
+          label={t('importing.import.targetLocationOptional')}
           value={targetContainerId}
           onChange={(e) => setTargetContainerId(e.target.value === '' ? '' : Number(e.target.value))}
         >
-          {locationSelectOptions(locations.data, { label: '— none —' })}
+          {locationSelectOptions(locations.data, { label: t('importing.import.none') })}
         </TextField>
         <Button
           variant="contained"
           disabled={!file || importMut.isPending}
           onClick={() => importMut.mutate()}
         >
-          {importMut.isPending ? 'Importing…' : 'Import'}
+          {importMut.isPending ? t('importing.import.importing') : t('common.actions.import')}
         </Button>
         {importMut.error && <Alert severity="error">{(importMut.error as Error).message}</Alert>}
         {importMut.data && (
           <Alert severity="success">
-            Imported {importMut.data.imported} of {importMut.data.totalRows} rows (
-            {importMut.data.detectedFormat}).
-            {importMut.data.warnings.length > 0 && ` ${importMut.data.warnings.length} warning(s).`}
+            {t('importing.import.result', {
+              imported: importMut.data.imported,
+              count: importMut.data.totalRows,
+              format: importMut.data.detectedFormat,
+            })}
+            {importMut.data.warnings.length > 0 &&
+              t('importing.import.warnings', { count: importMut.data.warnings.length })}
           </Alert>
         )}
       </Stack>
@@ -123,6 +127,8 @@ function ImportSection() {
 }
 
 function DecklistSection() {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   const { game } = useGame();
   const [text, setText] = useState('');
   const [url, setUrl] = useState('');
@@ -134,27 +140,27 @@ function DecklistSection() {
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Typography variant="h6" gutterBottom>
-        Check a decklist
+        {t('importing.decklist.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" gutterBottom>
-        Paste a Moxfield/Archidekt URL, or a decklist, to see owned vs. missing against{' '}
+        {t('importing.decklist.descriptionPrefix')}
         {game ?? 'MTG'}.
       </Typography>
       <Stack spacing={2} sx={{ maxWidth: 560 }}>
         <TextField
           size="small"
-          label="Decklist URL (Moxfield / Archidekt)"
+          label={t('importing.decklist.urlLabel')}
           value={url}
           onChange={(e) => setUrl(e.target.value)}
         />
-        <Divider>or paste</Divider>
+        <Divider>{t('importing.decklist.orPaste')}</Divider>
         <TextField
-          label="Decklist text"
+          label={t('importing.decklist.textLabel')}
           multiline
           minRows={4}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder={'4 Lightning Bolt\n2 Counterspell'}
+          placeholder={t('importing.decklist.textPlaceholder')}
           disabled={!!url}
         />
         <Button
@@ -162,23 +168,23 @@ function DecklistSection() {
           disabled={(!text && !url) || check.isPending}
           onClick={() => check.mutate()}
         >
-          {check.isPending ? 'Checking…' : 'Check'}
+          {check.isPending ? t('importing.decklist.checking') : t('importing.decklist.check')}
         </Button>
         {check.error && <Alert severity="error">{(check.error as Error).message}</Alert>}
         {check.data && (
           <Box>
             <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
-              <Chip color="success" label={`${check.data.totalOwned} owned`} />
-              <Chip color="warning" label={`${check.data.totalMissing} missing`} />
-              <Chip label={`${money(check.data.estimatedCost)} to complete`} />
+              <Chip color="success" label={t('importing.decklist.owned', { count: check.data.totalOwned })} />
+              <Chip color="warning" label={t('importing.decklist.missing', { count: check.data.totalMissing })} />
+              <Chip label={t('importing.decklist.toComplete', { cost: fmt.money(check.data.estimatedCost) })} />
             </Stack>
             {check.data.missing.length > 0 && (
               <>
-                <Typography variant="subtitle2">Missing</Typography>
+                <Typography variant="subtitle2">{t('importing.decklist.missingHeading')}</Typography>
                 {check.data.missing.map((m, i) => (
                   <Typography key={i} variant="body2" color="text.secondary">
                     {m.quantityNeeded}× {m.cardName}
-                    {m.marketPrice != null ? ` — ${money(m.marketPrice)}` : ''}
+                    {m.marketPrice != null ? ` — ${fmt.money(m.marketPrice)}` : ''}
                   </Typography>
                 ))}
               </>
@@ -191,9 +197,10 @@ function DecklistSection() {
 }
 
 export function ImportPage() {
+  const { t } = useTranslation();
   return (
     <Stack spacing={3}>
-      <Typography variant="h4">Import / Export</Typography>
+      <Typography variant="h4">{t('importing.pageTitle')}</Typography>
       <ImportSection />
       <ExportSection />
       <DecklistSection />

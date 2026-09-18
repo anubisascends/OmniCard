@@ -13,6 +13,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { api, ApiError } from '../api/client';
 
 /**
@@ -21,6 +22,7 @@ import { api, ApiError } from '../api/client';
  * through.
  */
 export function AuthGate({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const statusQuery = useQuery({ queryKey: ['auth-status'], queryFn: api.authStatus });
   const [username, setUsername] = useState('');
@@ -55,12 +57,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
             login.mutate();
           }}
         >
-          <Typography variant="h5">OmniCard</Typography>
+          <Typography variant="h5">{t('common.app.name')}</Typography>
           <Typography variant="body2" color="text.secondary">
-            Sign in to continue.
+            {t('auth.signInToContinue')}
           </Typography>
           <TextField
-            label="Username"
+            label={t('auth.username')}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoFocus
@@ -69,7 +71,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
           />
           <TextField
             type="password"
-            label="Password"
+            label={t('auth.password')}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
@@ -79,7 +81,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
             control={
               <Checkbox checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
             }
-            label="Remember me"
+            label={t('auth.rememberMe')}
           />
           {login.error instanceof ApiError && <Alert severity="error">{login.error.message}</Alert>}
           <Button
@@ -87,7 +89,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
             variant="contained"
             disabled={login.isPending || !username || !password}
           >
-            {login.isPending ? 'Signing in…' : 'Sign in'}
+            {login.isPending ? t('auth.signingIn') : t('auth.signIn')}
           </Button>
         </Stack>
       </Paper>

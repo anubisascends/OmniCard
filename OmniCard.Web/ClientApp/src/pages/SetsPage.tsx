@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   Alert,
   Autocomplete,
@@ -16,24 +18,24 @@ import { api } from '../api/client';
 import type { SetChecklistCardDto, SetInfoDto } from '../api/types';
 import { useGame } from '../context/GameContext';
 import { CardImage } from '../components/CardImage';
+import { useFormatters } from '../i18n/format';
 import {
   usePreviewScale,
   PREVIEW_BASE_WIDTH,
   PREVIEW_BASE_MAX_HEIGHT,
 } from '../lib/previewScale';
 
-const money = (n?: number | null) =>
-  n == null ? '' : n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
-
 type HoverState = { el: HTMLElement; url: string; foil: boolean };
 
 const buildColumns = (
+  t: TFunction,
+  money: (n?: number | null) => string,
   setHover: (h: HoverState | null) => void,
 ): GridColDef<SetChecklistCardDto>[] => [
-  { field: 'collectorNumber', headerName: 'No.', width: 80 },
+  { field: 'collectorNumber', headerName: t('sets.columns.no'), width: 80 },
   {
     field: 'name',
-    headerName: 'Name',
+    headerName: t('common.labels.name'),
     flex: 2,
     minWidth: 200,
     renderCell: (p) => (
@@ -48,17 +50,21 @@ const buildColumns = (
       </Box>
     ),
   },
-  { field: 'rarity', headerName: 'Rarity', width: 110 },
+  { field: 'rarity', headerName: t('common.labels.rarity'), width: 110 },
   {
     field: 'ownedQuantity',
-    headerName: 'Owned',
+    headerName: t('sets.columns.owned'),
     width: 100,
     renderCell: (p) =>
-      p.value > 0 ? <Chip size="small" color="success" label={`×${p.value}`} /> : '—',
+      p.value > 0 ? (
+        <Chip size="small" color="success" label={t('sets.ownedCount', { count: p.value })} />
+      ) : (
+        '—'
+      ),
   },
   {
     field: 'normalPrice',
-    headerName: 'Normal',
+    headerName: t('sets.columns.normal'),
     width: 100,
     align: 'right',
     headerAlign: 'right',
@@ -66,7 +72,7 @@ const buildColumns = (
   },
   {
     field: 'foilPrice',
-    headerName: 'Foil',
+    headerName: t('common.labels.foil'),
     width: 100,
     align: 'right',
     headerAlign: 'right',
@@ -75,11 +81,13 @@ const buildColumns = (
 ];
 
 export function SetsPage() {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   const { game } = useGame();
   const [set, setSet] = useState<SetInfoDto | null>(null);
   const [hover, setHover] = useState<HoverState | null>(null);
   const previewScale = usePreviewScale();
-  const columns = buildColumns(setHover);
+  const columns = buildColumns(t, (n) => (n == null ? '' : fmt.money(n)), setHover);
 
   const setsQuery = useQuery({
     queryKey: ['sets', game],
@@ -96,8 +104,8 @@ export function SetsPage() {
   if (!game) {
     return (
       <Stack spacing={2}>
-        <Typography variant="h4">Sets</Typography>
-        <Alert severity="info">Pick a game in the top bar to browse its sets.</Alert>
+        <Typography variant="h4">{t('sets.title')}</Typography>
+        <Alert severity="info">{t('sets.pickGame')}</Alert>
       </Stack>
     );
   }
@@ -106,7 +114,7 @@ export function SetsPage() {
 
   return (
     <Stack spacing={2} sx={{ height: 'calc(100vh - 120px)' }}>
-      <Typography variant="h4">Sets</Typography>
+      <Typography variant="h4">{t('sets.title')}</Typography>
       <Autocomplete
         options={setsQuery.data ?? []}
         loading={setsQuery.isLoading}
@@ -114,14 +122,21 @@ export function SetsPage() {
         value={set}
         onChange={(_, v) => setSet(v)}
         sx={{ maxWidth: 480 }}
-        renderInput={(params) => <TextField {...params} label="Set" size="small" />}
+        renderInput={(params) => <TextField {...params} label={t('common.labels.set')} size="small" />}
       />
 
       {checklist && (
         <Box>
           <Typography variant="subtitle1">
-            {checklist.setName} — {checklist.ownedCount}/{checklist.totalCount} owned (
-            {checklist.completionPercent.toFixed(1)}%)
+            {t('sets.summary', {
+              setName: checklist.setName,
+              owned: fmt.number(checklist.ownedCount),
+              total: fmt.number(checklist.totalCount),
+              percent: fmt.number(checklist.completionPercent, {
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1,
+              }),
+            })}
           </Typography>
           <LinearProgress
             variant="determinate"

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
@@ -20,12 +21,14 @@ import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import { InputAdornment } from '@mui/material';
 import { api } from '../../api/client';
+import { useFormatters } from '../../i18n/format';
 import { groupLocations } from '../../lib/locationGroups';
 import { LOCATION_TYPES, isDeckBoxType } from '../../lib/locationTypes';
 import { DeckBoxGamePicker } from '../DeckBoxGamePicker';
 
 /** Inline "create a new location" section, revealed from the picker so callers never have to leave. */
 function CreateLocationSection({ onCreated }: { onCreated: (id: number) => void }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -69,17 +72,17 @@ function CreateLocationSection({ onCreated }: { onCreated: (id: number) => void 
           <TextField
             size="small"
             autoFocus
-            label="New location name"
+            label={t('dialogs.locationPicker.newLocationName')}
             value={name}
             onChange={(e) => setName(e.target.value)}
             error={taken}
-            helperText={taken ? 'This name is already in use' : ' '}
+            helperText={taken ? t('dialogs.locationPicker.nameTaken') : ' '}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && trimmed.length > 0 && !taken && !needsGame && !create.isPending)
                 create.mutate();
             }}
           />
-          <TextField select size="small" label="Type" value={type} onChange={(e) => setType(e.target.value)}>
+          <TextField select size="small" label={t('common.labels.type')} value={type} onChange={(e) => setType(e.target.value)}>
             {LOCATION_TYPES.map((t) => (
               <MenuItem key={t.value} value={t.value}>
                 {t.label}
@@ -102,7 +105,7 @@ function CreateLocationSection({ onCreated }: { onCreated: (id: number) => void 
           )}
           <Stack direction="row" spacing={1} justifyContent="flex-end">
             <Button size="small" onClick={() => setOpen(false)}>
-              Cancel
+              {t('common.actions.cancel')}
             </Button>
             <Button
               size="small"
@@ -111,13 +114,13 @@ function CreateLocationSection({ onCreated }: { onCreated: (id: number) => void 
               disabled={trimmed.length === 0 || taken || needsGame || create.isPending}
               onClick={() => create.mutate()}
             >
-              Create &amp; select
+              {t('dialogs.locationPicker.createAndSelect')}
             </Button>
           </Stack>
         </Stack>
       ) : (
         <Button size="small" startIcon={<AddIcon />} onClick={() => setOpen(true)} sx={{ alignSelf: 'flex-start' }}>
-          New location
+          {t('dialogs.locationPicker.newLocation')}
         </Button>
       )}
     </>
@@ -132,7 +135,7 @@ function CreateLocationSection({ onCreated }: { onCreated: (id: number) => void 
  */
 export function LocationPickerDialog({
   open,
-  title = 'Move to location',
+  title,
   excludeId,
   allowCreate = true,
   cardGames,
@@ -149,6 +152,8 @@ export function LocationPickerDialog({
   onPick: (id: number) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   // A deck box locked to a game that none of the moving cards share can't receive them.
   const gameBlocked = (locGame?: string | null) =>
     !!locGame && cardGames != null && cardGames.length > 0 && !cardGames.includes(locGame);
@@ -165,13 +170,13 @@ export function LocationPickerDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle sx={{ pb: 1 }}>{title}</DialogTitle>
+      <DialogTitle sx={{ pb: 1 }}>{title ?? t('dialogs.locationPicker.defaultTitle')}</DialogTitle>
       <DialogContent>
         <TextField
           fullWidth
           size="small"
           autoFocus
-          placeholder="Search locations…"
+          placeholder={t('dialogs.locationPicker.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           slotProps={{
@@ -191,7 +196,7 @@ export function LocationPickerDialog({
           </Stack>
         ) : groups.length === 0 ? (
           <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-            No matching locations.
+            {t('dialogs.locationPicker.noMatches')}
           </Typography>
         ) : (
           <List dense disablePadding sx={{ maxHeight: '55vh', overflowY: 'auto' }}>
@@ -209,14 +214,14 @@ export function LocationPickerDialog({
                         disabled={blocked}
                         onClick={() => onPick(l.id)}
                         sx={{ borderRadius: 1 }}
-                        title={blocked ? `This deck box only holds ${l.game} cards` : undefined}
+                        title={blocked ? t('dialogs.locationPicker.gameBlocked', { game: l.game }) : undefined}
                       >
                         <Stack direction="row" spacing={1} alignItems="center" sx={{ width: '100%' }}>
                           <Typography variant="body2" sx={{ flexGrow: 1 }} noWrap>
                             {l.name}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {l.cardCount.toLocaleString()}
+                            {fmt.number(l.cardCount)}
                           </Typography>
                           <Chip size="small" variant="outlined" label={l.type} />
                         </Stack>

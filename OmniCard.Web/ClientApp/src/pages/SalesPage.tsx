@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -40,8 +41,7 @@ import { api, type CustomerFields, type ListingFields } from '../api/client';
 import { useGame } from '../context/GameContext';
 import type { CustomerDto, ListingDetailDto, OrderDto, WorkflowLaneDto } from '../api/types';
 import { OrderDetailDrawer } from '../components/dialogs/OrderDetailDrawer';
-
-const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+import { useFormatters } from '../i18n/format';
 
 function laneOf(order: OrderDto, lanes: WorkflowLaneDto[]): string {
   const byKey = lanes.find((l) => l.key === order.stageKey);
@@ -51,6 +51,7 @@ function laneOf(order: OrderDto, lanes: WorkflowLaneDto[]): string {
 }
 
 function CreateOrderDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: number) => void }) {
+  const { t } = useTranslation();
   const customers = useQuery({ queryKey: ['customers'], queryFn: api.customers, enabled: open });
   const [customerId, setCustomerId] = useState<number | ''>('');
   const [channel, setChannel] = useState('Manual');
@@ -68,12 +69,12 @@ function CreateOrderDialog({ open, onClose, onCreated }: { open: boolean; onClos
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>New order</DialogTitle>
+      <DialogTitle>{t('sales.createOrder.title')}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <TextField
             select
-            label="Customer"
+            label={t('sales.createOrder.customer')}
             required
             value={customerId}
             onChange={(e) => setCustomerId(e.target.value === '' ? '' : Number(e.target.value))}
@@ -82,19 +83,19 @@ function CreateOrderDialog({ open, onClose, onCreated }: { open: boolean; onClos
               <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
             ))}
           </TextField>
-          <TextField select label="Channel" value={channel} onChange={(e) => setChannel(e.target.value)}>
+          <TextField select label={t('common.labels.channel')} value={channel} onChange={(e) => setChannel(e.target.value)}>
             {['Manual', 'TcgPlayer', 'Ebay'].map((c) => (
-              <MenuItem key={c} value={c}>{c}</MenuItem>
+              <MenuItem key={c} value={c}>{t(`common.channels.${c}`)}</MenuItem>
             ))}
           </TextField>
-          <TextField label="Order # (optional)" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} />
+          <TextField label={t('sales.createOrder.orderNumberOptional')} value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} />
           {create.error && <Typography color="error" variant="body2">{(create.error as Error).message}</Typography>}
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
         <Button variant="contained" disabled={customerId === '' || create.isPending} onClick={() => create.mutate()}>
-          {create.isPending ? 'Creating…' : 'Create'}
+          {create.isPending ? t('sales.createOrder.creating') : t('common.actions.create')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -102,6 +103,8 @@ function CreateOrderDialog({ open, onClose, onCreated }: { open: boolean; onClos
 }
 
 function OrdersBoard() {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   const qc = useQueryClient();
   const lanesQuery = useQuery({ queryKey: ['order-lanes'], queryFn: api.orderLanes });
   const ordersQuery = useQuery({ queryKey: ['orders'], queryFn: api.orders });
@@ -126,7 +129,7 @@ function OrdersBoard() {
   return (
     <Stack spacing={1.5} alignItems="flex-start">
       <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}>
-        New order
+        {t('sales.orders.newOrder')}
       </Button>
       <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1, alignSelf: 'stretch' }}>
       {lanes.map((lane) => {
@@ -160,16 +163,16 @@ function OrdersBoard() {
                 >
                   <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
                     <Typography variant="body2" fontWeight={600} noWrap>
-                      {o.customerName ?? `Customer #${o.customerId}`}
+                      {o.customerName ?? t('sales.orders.customerFallback', { id: o.customerId })}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" display="block" noWrap>
-                      {o.channel}
+                      {t(`common.channels.${o.channel}`, o.channel)}
                       {o.orderNumber ? ` · ${o.orderNumber}` : ''}
                     </Typography>
                     <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                      <Typography variant="caption">{o.lineItemCount} item(s)</Typography>
+                      <Typography variant="caption">{t('sales.orders.itemCount', { count: o.lineItemCount })}</Typography>
                       <Typography variant="caption" fontWeight={600}>
-                        {money(o.lineTotal)}
+                        {fmt.money(o.lineTotal)}
                       </Typography>
                     </Stack>
                   </CardContent>
@@ -205,6 +208,7 @@ function ListingDialog({
   initial: ListingDetailDto | null;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [fields, setFields] = useState<ListingFields>({ listedPrice: 0, channel: 'Manual', quantity: 1, note: '' });
   // The price field keeps its own text so the user can type freely; it reformats to two decimals on blur.
@@ -235,11 +239,11 @@ function ListingDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Edit listing{initial ? ` — ${initial.name}` : ''}</DialogTitle>
+      <DialogTitle>{initial ? t('sales.listingDialog.titleNamed', { name: initial.name }) : t('sales.listingDialog.title')}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <TextField
-            label="Price"
+            label={t('common.labels.price')}
             required
             value={priceText}
             onChange={(e) => {
@@ -262,16 +266,16 @@ function ListingDialog({
           />
           <TextField
             select
-            label="Channel"
+            label={t('common.labels.channel')}
             value={fields.channel}
             onChange={(e) => setFields((f) => ({ ...f, channel: e.target.value }))}
           >
             {LISTING_CHANNELS.map((c) => (
-              <MenuItem key={c} value={c}>{c}</MenuItem>
+              <MenuItem key={c} value={c}>{t(`common.channels.${c}`)}</MenuItem>
             ))}
           </TextField>
           <TextField
-            label="Quantity"
+            label={t('common.labels.quantity')}
             type="number"
             required
             value={fields.quantity}
@@ -279,7 +283,7 @@ function ListingDialog({
             slotProps={{ htmlInput: { min: 1, step: 1 } }}
           />
           <TextField
-            label="Note"
+            label={t('common.labels.note')}
             value={fields.note ?? ''}
             onChange={(e) => setFields((f) => ({ ...f, note: e.target.value }))}
             multiline
@@ -289,13 +293,13 @@ function ListingDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
         <Button
           variant="contained"
           disabled={fields.listedPrice < 0 || fields.quantity < 1 || save.isPending}
           onClick={() => save.mutate()}
         >
-          {save.isPending ? 'Saving…' : 'Save'}
+          {save.isPending ? t('common.states.saving') : t('common.actions.save')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -303,6 +307,8 @@ function ListingDialog({
 }
 
 function ListingsTable() {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   const qc = useQueryClient();
   const { game } = useGame();
   const { data, isLoading } = useQuery({ queryKey: ['listings'], queryFn: () => api.listingDetails() });
@@ -341,7 +347,7 @@ function ListingsTable() {
           component="a"
           href={api.pickListPdfUrl(game)}
         >
-          Pick list (PDF)
+          {t('sales.listings.pickListPdf')}
         </Button>
         <Button
           variant="outlined"
@@ -349,26 +355,26 @@ function ListingsTable() {
           disabled={listedLotIds.length === 0 || pick.isPending}
           onClick={() => pick.mutate(listedLotIds)}
         >
-          Mark all picked ({listedLotIds.length})
+          {t('sales.listings.markAllPicked', { count: listedLotIds.length })}
         </Button>
       </Stack>
       {pickError && (
         <Alert severity="error" onClose={() => setPickError(null)} sx={{ alignSelf: 'stretch' }}>
-          {pickError} — set a sales location in{' '}
-          <Link component={RouterLink} to="/settings">Settings</Link>.
+          {pickError} — {t('sales.listings.setSalesLocationIn')}{' '}
+          <Link component={RouterLink} to="/settings">{t('sales.listings.settings')}</Link>.
         </Alert>
       )}
       <Paper variant="outlined" sx={{ alignSelf: 'stretch' }}>
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Name</TableCell>
-            <TableCell>Set</TableCell>
-            <TableCell>Cond</TableCell>
-            <TableCell>Channel</TableCell>
-            <TableCell align="right">Qty</TableCell>
-            <TableCell align="right">Price</TableCell>
-            <TableCell>Status</TableCell>
+            <TableCell>{t('common.labels.name')}</TableCell>
+            <TableCell>{t('common.labels.set')}</TableCell>
+            <TableCell>{t('sales.listings.cond')}</TableCell>
+            <TableCell>{t('common.labels.channel')}</TableCell>
+            <TableCell align="right">{t('sales.listings.qty')}</TableCell>
+            <TableCell align="right">{t('common.labels.price')}</TableCell>
+            <TableCell>{t('common.labels.status')}</TableCell>
             <TableCell align="right"></TableCell>
           </TableRow>
         </TableHead>
@@ -380,22 +386,22 @@ function ListingsTable() {
                 {l.isFoil ? ' ✦' : ''}
               </TableCell>
               <TableCell>{l.setCode}</TableCell>
-              <TableCell>{l.condition}</TableCell>
-              <TableCell>{l.channel}</TableCell>
+              <TableCell>{l.condition ? t(`common.conditions.${l.condition}`, l.condition) : ''}</TableCell>
+              <TableCell>{t(`common.channels.${l.channel}`, l.channel)}</TableCell>
               <TableCell align="right">{l.quantity}</TableCell>
-              <TableCell align="right">{money(l.listedPrice)}</TableCell>
+              <TableCell align="right">{fmt.money(l.listedPrice)}</TableCell>
               <TableCell>
                 <Chip size="small" label={l.status} />
               </TableCell>
               <TableCell align="right">
                 {l.status === 'Listed' && (
-                  <Tooltip title="Mark picked (move to sales location)">
+                  <Tooltip title={t('sales.listings.markPicked')}>
                     <IconButton size="small" disabled={pick.isPending} onClick={() => pick.mutate([l.lotId])}>
                       <CheckIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
                 )}
-                <Tooltip title="Edit">
+                <Tooltip title={t('common.actions.edit')}>
                   <IconButton
                     size="small"
                     onClick={() => {
@@ -406,7 +412,7 @@ function ListingsTable() {
                     <EditIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title="Unlist">
+                <Tooltip title={t('sales.listings.unlist')}>
                   <IconButton size="small" onClick={() => unlist.mutate(l.lotId)}>
                     <LinkOffIcon fontSize="small" />
                   </IconButton>
@@ -433,6 +439,7 @@ function CustomerDialog({
   initial: CustomerDto | null;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [fields, setFields] = useState<CustomerFields>(EMPTY_CUSTOMER);
 
@@ -470,27 +477,27 @@ function CustomerDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>{initial ? 'Edit customer' : 'New customer'}</DialogTitle>
+      <DialogTitle>{initial ? t('sales.customers.editCustomer') : t('sales.customers.newCustomer')}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <TextField label="Name" required value={fields.name} onChange={set('name')} autoFocus />
-          <TextField label="Email" value={fields.email ?? ''} onChange={set('email')} />
-          <TextField label="Phone" value={fields.phone ?? ''} onChange={set('phone')} />
+          <TextField label={t('common.labels.name')} required value={fields.name} onChange={set('name')} autoFocus />
+          <TextField label={t('common.labels.email')} value={fields.email ?? ''} onChange={set('email')} />
+          <TextField label={t('common.labels.phone')} value={fields.phone ?? ''} onChange={set('phone')} />
           <Stack direction="row" spacing={2}>
-            <TextField label="City" value={fields.city ?? ''} onChange={set('city')} fullWidth />
-            <TextField label="State" value={fields.state ?? ''} onChange={set('state')} sx={{ width: 100 }} />
+            <TextField label={t('common.labels.city')} value={fields.city ?? ''} onChange={set('city')} fullWidth />
+            <TextField label={t('common.labels.state')} value={fields.state ?? ''} onChange={set('state')} sx={{ width: 100 }} />
           </Stack>
           {save.error && <Typography color="error" variant="body2">{(save.error as Error).message}</Typography>}
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
         <Button
           variant="contained"
           disabled={!fields.name.trim() || save.isPending}
           onClick={() => save.mutate()}
         >
-          {save.isPending ? 'Saving…' : 'Save'}
+          {save.isPending ? t('common.states.saving') : t('common.actions.save')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -498,6 +505,7 @@ function CustomerDialog({
 }
 
 function CustomersTable() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ['customers'], queryFn: api.customers });
   const [editing, setEditing] = useState<CustomerDto | null>(null);
@@ -519,16 +527,16 @@ function CustomersTable() {
           setDialogOpen(true);
         }}
       >
-        New customer
+        {t('sales.customers.newCustomer')}
       </Button>
       <Paper variant="outlined" sx={{ alignSelf: 'stretch' }}>
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Phone</TableCell>
-              <TableCell>Location</TableCell>
+              <TableCell>{t('common.labels.name')}</TableCell>
+              <TableCell>{t('common.labels.email')}</TableCell>
+              <TableCell>{t('common.labels.phone')}</TableCell>
+              <TableCell>{t('common.labels.location')}</TableCell>
               <TableCell align="right"></TableCell>
             </TableRow>
           </TableHead>
@@ -552,7 +560,7 @@ function CustomersTable() {
                   <IconButton
                     size="small"
                     onClick={() => {
-                      if (confirm(`Delete customer "${c.name}"?`)) del.mutate(c.id);
+                      if (confirm(t('sales.customers.deleteConfirm', { name: c.name }))) del.mutate(c.id);
                     }}
                   >
                     <DeleteIcon fontSize="small" />
@@ -569,14 +577,15 @@ function CustomersTable() {
 }
 
 export function SalesPage() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState(0);
   return (
     <Stack spacing={2}>
-      <Typography variant="h4">Sales</Typography>
+      <Typography variant="h4">{t('sales.title')}</Typography>
       <Tabs value={tab} onChange={(_, v) => setTab(v)}>
-        <Tab label="Orders" />
-        <Tab label="Listings" />
-        <Tab label="Customers" />
+        <Tab label={t('sales.tabs.orders')} />
+        <Tab label={t('sales.tabs.listings')} />
+        <Tab label={t('sales.tabs.customers')} />
       </Tabs>
       {tab === 0 && <OrdersBoard />}
       {tab === 1 && <ListingsTable />}

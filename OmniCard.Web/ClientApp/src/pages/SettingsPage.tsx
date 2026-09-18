@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -40,6 +41,7 @@ import type { ComponentDto, UserDto } from '../api/types';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import { DeckTypesCard } from '../components/settings/DeckTypesCard';
 import { currencySymbol } from '../lib/scanBadges';
+import { useFormatters } from '../i18n/format';
 import {
   usePreviewScale,
   setPreviewScale,
@@ -49,14 +51,15 @@ import {
   PREVIEW_BASE_MAX_HEIGHT,
 } from '../lib/previewScale';
 
-const OPERATIONS: { key: 'prices' | 'bulk' | 'hashes' | 'images'; label: string }[] = [
-  { key: 'prices', label: 'Update prices' },
-  { key: 'bulk', label: 'Download catalog' },
-  { key: 'hashes', label: 'Recompute hashes' },
-  { key: 'images', label: 'Download artwork' },
+const OPERATIONS: { key: 'prices' | 'bulk' | 'hashes' | 'images' }[] = [
+  { key: 'prices' },
+  { key: 'bulk' },
+  { key: 'hashes' },
+  { key: 'images' },
 ];
 
 function CatalogCard() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const games = useQuery({ queryKey: ['games'], queryFn: api.games });
   const [game, setGame] = useState('Mtg');
@@ -79,11 +82,10 @@ function CatalogCard() {
   return (
     <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
       <Typography variant="h6" gutterBottom>
-        Catalog data
+        {t('settings.catalog.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" gutterBottom>
-        Refresh the per-game card catalogs, prices, and image hashes on the server (no desktop app
-        needed). One job runs at a time.
+        {t('settings.catalog.description')}
       </Typography>
 
       <Stack spacing={2} sx={{ mt: 1 }}>
@@ -91,7 +93,7 @@ function CatalogCard() {
           <TextField
             select
             size="small"
-            label="Game"
+            label={t('common.labels.game')}
             value={game}
             onChange={(e) => setGame(e.target.value)}
             sx={{ minWidth: 180 }}
@@ -110,7 +112,7 @@ function CatalogCard() {
               disabled={!!running || refresh.isPending}
               onClick={() => refresh.mutate({ op: o.key })}
             >
-              {o.label}
+              {t(`settings.catalog.operations.${o.key}`)}
             </Button>
           ))}
         </Stack>
@@ -120,7 +122,7 @@ function CatalogCard() {
         {running && (
           <Alert severity="info" icon={false}>
             <Typography variant="body2" fontWeight={600}>
-              {running.game} · {running.operation} — running
+              {t('settings.catalog.running', { game: running.game, operation: running.operation })}
             </Typography>
             <Typography variant="caption" color="text.secondary">
               {running.message}
@@ -131,10 +133,15 @@ function CatalogCard() {
 
         {recent.length > 0 && (
           <Stack spacing={0.5}>
-            <Typography variant="subtitle2">Recent</Typography>
+            <Typography variant="subtitle2">{t('settings.catalog.recentHeading')}</Typography>
             {recent.map((j, i) => (
               <Typography key={i} variant="caption" color="text.secondary">
-                {j.state === 'succeeded' ? '✓' : '✗'} {j.game} · {j.operation} — {j.message}
+                {t('settings.catalog.recentItem', {
+                  icon: j.state === 'succeeded' ? '✓' : '✗',
+                  game: j.game,
+                  operation: j.operation,
+                  message: j.message,
+                })}
               </Typography>
             ))}
           </Stack>
@@ -145,6 +152,7 @@ function CatalogCard() {
 }
 
 function EbayCard() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
   const status = useQuery({ queryKey: ['ebay-status'], queryFn: api.ebayStatus });
@@ -165,22 +173,22 @@ function EbayCard() {
   return (
     <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
       <Typography variant="h6" gutterBottom>
-        eBay
+        {t('settings.ebay.title')}
       </Typography>
 
       {ebayParam === 'connected' && (
         <Alert severity="success" onClose={clearParam} sx={{ mb: 2 }}>
-          Connected to eBay.
+          {t('settings.ebay.connected')}
         </Alert>
       )}
       {ebayParam === 'failed' && (
         <Alert severity="error" onClose={clearParam} sx={{ mb: 2 }}>
-          eBay connection failed. Please try again.
+          {t('settings.ebay.failed')}
         </Alert>
       )}
       {ebayParam === 'misconfigured' && (
         <Alert severity="warning" onClose={clearParam} sx={{ mb: 2 }}>
-          eBay isn't configured on the server yet (AppId/CertId/RuName/AcceptUrl).
+          {t('settings.ebay.misconfigured')}
         </Alert>
       )}
 
@@ -189,21 +197,23 @@ function EbayCard() {
       ) : (
         <Stack spacing={2}>
           <Stack direction="row" spacing={1} alignItems="center">
-            <Typography variant="body2">Status:</Typography>
+            <Typography variant="body2">{t('settings.ebay.statusLabel')}</Typography>
             {status.data.connected ? (
-              <Chip color="success" size="small" label="Connected" />
+              <Chip color="success" size="small" label={t('settings.ebay.connectedChip')} />
             ) : status.data.configured ? (
-              <Chip color="default" size="small" label="Not connected" />
+              <Chip color="default" size="small" label={t('settings.ebay.notConnectedChip')} />
             ) : (
-              <Chip color="warning" size="small" label="Not configured" />
+              <Chip color="warning" size="small" label={t('settings.ebay.notConfiguredChip')} />
             )}
           </Stack>
 
           {!status.data.configured && (
             <Alert severity="info">
-              The server is missing eBay app credentials:{' '}
-              {status.data.missingConfig.join(', ')}. Set the <code>eBay</code> section in the
-              server's appsettings, then reload.
+              {t('settings.ebay.missingCredentialsBefore', {
+                missing: status.data.missingConfig.join(', '),
+              })}
+              <code>eBay</code>
+              {t('settings.ebay.missingCredentialsAfter')}
             </Alert>
           )}
 
@@ -215,7 +225,7 @@ function EbayCard() {
                   disabled={setup.isPending}
                   onClick={() => setup.mutate()}
                 >
-                  {setup.isPending ? 'Running setup…' : 'Run seller setup'}
+                  {setup.isPending ? t('settings.ebay.runningSetup') : t('settings.ebay.runSellerSetup')}
                 </Button>
                 <Button
                   color="error"
@@ -223,7 +233,7 @@ function EbayCard() {
                   disabled={disconnect.isPending}
                   onClick={() => disconnect.mutate()}
                 >
-                  Disconnect
+                  {t('settings.ebay.disconnect')}
                 </Button>
               </>
             ) : (
@@ -234,14 +244,14 @@ function EbayCard() {
                   window.location.href = api.ebayConnectUrl;
                 }}
               >
-                Connect to eBay
+                {t('settings.ebay.connect')}
               </Button>
             )}
           </Stack>
 
           {setup.data && (
             <Alert severity={setup.data.success ? 'success' : 'error'}>
-              {setup.data.success ? 'Seller setup complete.' : 'Seller setup failed.'}
+              {setup.data.success ? t('settings.ebay.setupComplete') : t('settings.ebay.setupFailed')}
               {setup.data.message ? ` ${setup.data.message}` : ''}
             </Alert>
           )}
@@ -253,6 +263,7 @@ function EbayCard() {
 }
 
 function SalesCard() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const settings = useQuery({ queryKey: ['settings'], queryFn: api.settings });
   const locations = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations() });
@@ -271,11 +282,10 @@ function SalesCard() {
   return (
     <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
       <Typography variant="h6" gutterBottom>
-        Sales
+        {t('settings.sales.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" gutterBottom>
-        When you mark a listing as picked, its card is automatically moved to this location. Leave it
-        unset to disable picking.
+        {t('settings.sales.description')}
       </Typography>
 
       {settings.isLoading ? (
@@ -285,14 +295,14 @@ function SalesCard() {
           <Stack direction="row" spacing={1} alignItems="center">
             <Box sx={{ flexGrow: 1 }}>
               <Typography variant="caption" color="text.secondary">
-                For-sale location
+                {t('settings.sales.forSaleLocation')}
               </Typography>
               <Typography variant="body2">
-                {currentName ?? (currentId != null ? `#${currentId}` : '— none —')}
+                {currentName ?? (currentId != null ? `#${currentId}` : t('settings.sales.none'))}
               </Typography>
             </Box>
             <Button size="small" disabled={!moveEnabled} onClick={() => setPickOpen(true)}>
-              Change
+              {t('common.actions.change')}
             </Button>
             {currentId != null && (
               <Button
@@ -301,7 +311,7 @@ function SalesCard() {
                 disabled={save.isPending || !moveEnabled}
                 onClick={() => save.mutate({ forSaleLocationId: null, movePickedToForSaleLocation: moveEnabled })}
               >
-                Clear
+                {t('common.actions.clear')}
               </Button>
             )}
           </Stack>
@@ -315,12 +325,10 @@ function SalesCard() {
                 }
               />
             }
-            label="Move picked cards to the for-sale location"
+            label={t('settings.sales.moveSwitch')}
           />
           <Typography variant="caption" color="text.secondary">
-            {moveEnabled
-              ? 'Marking a listing as picked physically relocates the card to the for-sale location above.'
-              : 'Marking a listing as picked only changes its status — the card stays in its current location.'}
+            {moveEnabled ? t('settings.sales.moveOn') : t('settings.sales.moveOff')}
           </Typography>
           {save.error && <Alert severity="error">{(save.error as Error).message}</Alert>}
         </Stack>
@@ -328,7 +336,7 @@ function SalesCard() {
 
       <LocationPickerDialog
         open={pickOpen}
-        title="For-sale location"
+        title={t('settings.sales.forSaleLocation')}
         onPick={(id) => {
           setPickOpen(false);
           save.mutate({ forSaleLocationId: id, movePickedToForSaleLocation: moveEnabled });
@@ -340,16 +348,17 @@ function SalesCard() {
 }
 
 function AppearanceCard() {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   const scale = usePreviewScale();
 
   return (
     <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
       <Typography variant="h6" gutterBottom>
-        Appearance
+        {t('settings.appearance.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" gutterBottom>
-        Card preview size — how large the artwork popup grows when you hover a card in a list. 100% is
-        the default; drag up to {PREVIEW_SCALE_MAX}%.
+        {t('settings.appearance.description', { max: PREVIEW_SCALE_MAX })}
       </Typography>
 
       <Stack direction="row" spacing={3} alignItems="center" sx={{ mt: 1 }}>
@@ -360,17 +369,19 @@ function AppearanceCard() {
             max={PREVIEW_SCALE_MAX}
             step={10}
             marks={[
-              { value: 100, label: '100%' },
-              { value: 200, label: '200%' },
-              { value: 300, label: '300%' },
+              { value: 100, label: fmt.percent(1, 0) },
+              { value: 200, label: fmt.percent(2, 0) },
+              { value: 300, label: fmt.percent(3, 0) },
             ]}
             valueLabelDisplay="auto"
-            valueLabelFormat={(v) => `${v}%`}
+            valueLabelFormat={(v) => fmt.percent(v / 100, 0)}
             onChange={(_, v) => setPreviewScale(v as number)}
           />
           <Typography variant="caption" color="text.secondary">
-            Popup: {Math.round((PREVIEW_BASE_WIDTH * scale) / 100)} ×{' '}
-            {Math.round((PREVIEW_BASE_MAX_HEIGHT * scale) / 100)} px
+            {t('settings.appearance.popup', {
+              width: fmt.number(Math.round((PREVIEW_BASE_WIDTH * scale) / 100)),
+              height: fmt.number(Math.round((PREVIEW_BASE_MAX_HEIGHT * scale) / 100)),
+            })}
           </Typography>
         </Box>
         {/* Compact proportional swatch — capped to a display size so the panel never blows out. */}
@@ -390,7 +401,7 @@ function AppearanceCard() {
           }}
         >
           <Typography variant="caption" color="text.secondary">
-            {scale}%
+            {fmt.percent(scale / 100, 0)}
           </Typography>
         </Box>
       </Stack>
@@ -400,6 +411,7 @@ function AppearanceCard() {
 
 /** Self-service password change for the signed-in user — requires the current password + confirm. */
 function ChangePasswordCard() {
+  const { t } = useTranslation();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -419,10 +431,10 @@ function ChangePasswordCard() {
   return (
     <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
       <Typography variant="h6" gutterBottom>
-        Your password
+        {t('settings.password.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" gutterBottom>
-        Change the password for your own account. You must enter your current password.
+        {t('settings.password.description')}
       </Typography>
 
       <Stack
@@ -436,7 +448,7 @@ function ChangePasswordCard() {
       >
         <TextField
           type="password"
-          label="Current password"
+          label={t('settings.password.current')}
           size="small"
           value={current}
           autoComplete="current-password"
@@ -444,7 +456,7 @@ function ChangePasswordCard() {
         />
         <TextField
           type="password"
-          label="New password"
+          label={t('settings.password.new')}
           size="small"
           value={next}
           autoComplete="new-password"
@@ -452,21 +464,21 @@ function ChangePasswordCard() {
         />
         <TextField
           type="password"
-          label="Confirm new password"
+          label={t('settings.password.confirm')}
           size="small"
           value={confirm}
           autoComplete="new-password"
           error={mismatch}
-          helperText={mismatch ? "Passwords don't match." : ' '}
+          helperText={mismatch ? t('settings.password.mismatch') : ' '}
           onChange={(e) => setConfirm(e.target.value)}
         />
         {change.error instanceof ApiError && (
           <Alert severity="error">{change.error.message}</Alert>
         )}
-        {change.isSuccess && <Alert severity="success">Password changed.</Alert>}
+        {change.isSuccess && <Alert severity="success">{t('settings.password.changed')}</Alert>}
         <Box>
           <Button type="submit" variant="contained" disabled={!canSubmit}>
-            {change.isPending ? 'Saving…' : 'Change password'}
+            {change.isPending ? t('common.states.saving') : t('settings.password.changeButton')}
           </Button>
         </Box>
       </Stack>
@@ -494,6 +506,7 @@ function PasswordDialog({
   pending: boolean;
   error?: string | null;
 }) {
+  const { t } = useTranslation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -532,7 +545,7 @@ function PasswordDialog({
         >
           {withUsername && (
             <TextField
-              label="Username"
+              label={t('settings.users.username')}
               size="small"
               value={username}
               autoFocus
@@ -541,7 +554,7 @@ function PasswordDialog({
           )}
           <TextField
             type="password"
-            label="Password"
+            label={t('settings.users.password')}
             size="small"
             value={password}
             autoComplete="new-password"
@@ -550,12 +563,12 @@ function PasswordDialog({
           />
           <TextField
             type="password"
-            label="Confirm password"
+            label={t('settings.users.confirmPassword')}
             size="small"
             value={confirm}
             autoComplete="new-password"
             error={mismatch}
-            helperText={mismatch ? "Passwords don't match." : ' '}
+            helperText={mismatch ? t('settings.users.passwordMismatch') : ' '}
             onChange={(e) => setConfirm(e.target.value)}
           />
           {withUsername && (
@@ -563,7 +576,7 @@ function PasswordDialog({
               control={
                 <Checkbox checked={isAdmin} onChange={(e) => setIsAdmin(e.target.checked)} />
               }
-              label="Administrator (full access)"
+              label={t('settings.users.administratorFullAccess')}
             />
           )}
           {error && <Alert severity="error">{error}</Alert>}
@@ -572,13 +585,13 @@ function PasswordDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
         <Button
           variant="contained"
           disabled={!canSubmit}
           onClick={() => onSubmit({ username: username.trim(), password, isAdmin })}
         >
-          {pending ? 'Saving…' : submitLabel}
+          {pending ? t('common.states.saving') : submitLabel}
         </Button>
       </DialogActions>
     </Dialog>
@@ -587,6 +600,7 @@ function PasswordDialog({
 
 /** Admin-only management of all accounts (create / delete / reset password). */
 function ManageUsersCard() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const usersQuery = useQuery({ queryKey: ['users'], queryFn: api.users });
   const [createOpen, setCreateOpen] = useState(false);
@@ -614,13 +628,13 @@ function ManageUsersCard() {
   return (
     <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between">
-        <Typography variant="h6">Users</Typography>
+        <Typography variant="h6">{t('settings.tabs.users')}</Typography>
         <Button variant="contained" size="small" onClick={() => setCreateOpen(true)}>
-          Add user
+          {t('settings.users.addUser')}
         </Button>
       </Stack>
       <Typography variant="body2" color="text.secondary" gutterBottom>
-        Accounts that can sign in. The built-in Admin account can't be deleted.
+        {t('settings.users.manageDescription')}
       </Typography>
 
       {del.error instanceof ApiError && (
@@ -635,9 +649,9 @@ function ManageUsersCard() {
         <Table size="small" sx={{ mt: 1 }}>
           <TableHead>
             <TableRow>
-              <TableCell>Username</TableCell>
-              <TableCell>Role</TableCell>
-              <TableCell align="right">Actions</TableCell>
+              <TableCell>{t('settings.users.colUsername')}</TableCell>
+              <TableCell>{t('settings.users.colRole')}</TableCell>
+              <TableCell align="right">{t('settings.users.colActions')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -646,24 +660,24 @@ function ManageUsersCard() {
                 <TableCell>
                   {u.username}
                   {u.isSystem && (
-                    <Chip label="system" size="small" sx={{ ml: 1 }} variant="outlined" />
+                    <Chip label={t('settings.users.systemChip')} size="small" sx={{ ml: 1 }} variant="outlined" />
                   )}
                 </TableCell>
-                <TableCell>{u.isAdmin ? 'Administrator' : 'User'}</TableCell>
+                <TableCell>{u.isAdmin ? t('settings.users.roleAdmin') : t('settings.users.roleUser')}</TableCell>
                 <TableCell align="right">
-                  <Tooltip title="Reset password">
+                  <Tooltip title={t('settings.users.resetPasswordTooltip')}>
                     <IconButton size="small" onClick={() => setResetFor(u)}>
                       <KeyIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title={u.isSystem ? "The system account can't be deleted" : 'Delete user'}>
+                  <Tooltip title={u.isSystem ? t('settings.users.systemDeleteTooltip') : t('settings.users.deleteTooltip')}>
                     <span>
                       <IconButton
                         size="small"
                         color="error"
                         disabled={u.isSystem || del.isPending}
                         onClick={() => {
-                          if (confirm(`Delete user "${u.username}"?`)) del.mutate(u.id);
+                          if (confirm(t('settings.users.confirmDelete', { username: u.username }))) del.mutate(u.id);
                         }}
                       >
                         <DeleteIcon fontSize="small" />
@@ -679,9 +693,9 @@ function ManageUsersCard() {
 
       <PasswordDialog
         open={createOpen}
-        title="Add user"
+        title={t('settings.users.addUser')}
         withUsername
-        submitLabel="Create"
+        submitLabel={t('common.actions.create')}
         pending={create.isPending}
         error={create.error instanceof ApiError ? create.error.message : null}
         onClose={() => setCreateOpen(false)}
@@ -689,9 +703,9 @@ function ManageUsersCard() {
       />
       <PasswordDialog
         open={!!resetFor}
-        title={resetFor ? `Reset password — ${resetFor.username}` : 'Reset password'}
+        title={resetFor ? t('settings.users.resetTitleFor', { username: resetFor.username }) : t('settings.users.resetTitle')}
         withUsername={false}
-        submitLabel="Reset"
+        submitLabel={t('common.actions.reset')}
         pending={reset.isPending}
         error={reset.error instanceof ApiError ? reset.error.message : null}
         onClose={() => setResetFor(null)}
@@ -713,6 +727,7 @@ function UsersTab() {
 
 /** Read-only inventory of the software/components OmniCard ships or runs on, with versions + links. */
 function ComponentsCard() {
+  const { t } = useTranslation();
   const components = useQuery({ queryKey: ['components'], queryFn: api.components });
 
   // Preserve server order but split into visual groups by category.
@@ -729,11 +744,10 @@ function ComponentsCard() {
   return (
     <Paper variant="outlined" sx={{ p: 2, maxWidth: 880 }}>
       <Typography variant="h6" gutterBottom>
-        Components
+        {t('settings.components.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" gutterBottom>
-        Software and third-party components that OmniCard ships or runs on, with their versions and
-        links to each project's website and license.
+        {t('settings.components.description')}
       </Typography>
 
       {components.isLoading ? (
@@ -752,10 +766,10 @@ function ComponentsCard() {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Component</TableCell>
-                    <TableCell>Version</TableCell>
-                    <TableCell>License</TableCell>
-                    <TableCell align="right">Links</TableCell>
+                    <TableCell>{t('settings.components.colComponent')}</TableCell>
+                    <TableCell>{t('settings.components.colVersion')}</TableCell>
+                    <TableCell>{t('settings.components.colLicense')}</TableCell>
+                    <TableCell align="right">{t('settings.components.colLinks')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -768,12 +782,12 @@ function ComponentsCard() {
                         <Stack direction="row" spacing={1.5} justifyContent="flex-end">
                           {c.homepageUrl && (
                             <Link href={c.homepageUrl} target="_blank" rel="noopener noreferrer">
-                              Website
+                              {t('settings.components.website')}
                             </Link>
                           )}
                           {c.licenseUrl && (
                             <Link href={c.licenseUrl} target="_blank" rel="noopener noreferrer">
-                              License
+                              {t('settings.components.license')}
                             </Link>
                           )}
                         </Stack>
@@ -793,6 +807,8 @@ function ComponentsCard() {
 /** Admin config for the scan page's value-tier badges: the currency code and the four ascending price
  * ceilings that split cards into five tiers (one to five currency signs). Editing is admin-only. */
 function ScanBadgesCard() {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
   const qc = useQueryClient();
   const authQuery = useQuery({ queryKey: ['auth-status'], queryFn: api.authStatus });
   const settings = useQuery({ queryKey: ['scan-badge-settings'], queryFn: api.scanBadgeSettings });
@@ -822,34 +838,31 @@ function ScanBadgesCard() {
   const validNumbers = nums.every((n) => Number.isFinite(n) && n > 0);
   const ascending = nums.every((n, i) => i === 0 || n > nums[i - 1]);
   const symbol = currencySymbol(currency || 'USD');
-  const money = (n: number) => {
-    try {
-      return n.toLocaleString(undefined, { style: 'currency', currency: currency || 'USD' });
-    } catch {
-      return n.toFixed(2);
-    }
-  };
+  const money = (n: number) => fmt.money(n, currency || 'USD');
 
   // The five tiers, described for the live preview (tier 5 is open-ended above the last threshold).
   const tierRows = [1, 2, 3, 4, 5].map((tier) => {
     let range: string;
-    if (!validNumbers) range = '—';
-    else if (tier === 1) range = `≤ ${money(nums[0])}`;
-    else if (tier === 5) range = `> ${money(nums[3])}`;
-    else range = `${money(nums[tier - 2])} – ${money(nums[tier - 1])}`;
+    if (!validNumbers) range = t('settings.scanBadges.rangeUnknown');
+    else if (tier === 1) range = t('settings.scanBadges.rangeAtMost', { max: money(nums[0]) });
+    else if (tier === 5) range = t('settings.scanBadges.rangeAbove', { min: money(nums[3]) });
+    else
+      range = t('settings.scanBadges.rangeBetween', {
+        min: money(nums[tier - 2]),
+        max: money(nums[tier - 1]),
+      });
     return { tier, range };
   });
 
   return (
     <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
       <Typography variant="h6" gutterBottom>
-        Scan badges
+        {t('settings.scanBadges.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" gutterBottom>
-        On the Scan page, matched cards show a gold <StarIcon sx={{ fontSize: 16, color: '#f5b301', verticalAlign: 'text-bottom' }} /> when the card
-        isn't in your collection yet, and one to five currency signs indicating its value. Set the
-        currency and the price ceiling for each tier below — a card at or below the first ceiling shows
-        one sign; anything above the last ceiling shows five.
+        {t('settings.scanBadges.descriptionBefore')}
+        <StarIcon sx={{ fontSize: 16, color: '#f5b301', verticalAlign: 'text-bottom' }} />
+        {t('settings.scanBadges.descriptionAfter')}
       </Typography>
 
       {settings.isLoading ? (
@@ -858,22 +871,22 @@ function ScanBadgesCard() {
         <Stack spacing={2} sx={{ mt: 1 }}>
           <TextField
             size="small"
-            label="Currency code (ISO 4217)"
+            label={t('settings.scanBadges.currencyCode')}
             value={currency}
             disabled={!isAdmin}
             onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))}
-            helperText={`Displayed as "${symbol}", localized to your browser.`}
+            helperText={t('settings.scanBadges.currencyHelper', { symbol })}
             sx={{ maxWidth: 260 }}
           />
 
           <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-            {thresholds.map((t, i) => (
+            {thresholds.map((threshold, i) => (
               <TextField
                 key={i}
                 size="small"
                 type="number"
-                label={`Tier ${i + 1} max (${symbol.repeat(i + 1)})`}
-                value={t}
+                label={t('settings.scanBadges.tierMax', { tier: i + 1, signs: symbol.repeat(i + 1) })}
+                value={threshold}
                 disabled={!isAdmin}
                 onChange={(e) =>
                   setThresholds((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))
@@ -885,16 +898,13 @@ function ScanBadgesCard() {
           </Stack>
 
           {!ascending && validNumbers && (
-            <Alert severity="warning">
-              Thresholds should increase from tier 1 to tier 4. They'll be sorted automatically when
-              saved.
-            </Alert>
+            <Alert severity="warning">{t('settings.scanBadges.ascendingWarning')}</Alert>
           )}
 
           {/* Live preview of the five tiers. */}
           <Box>
             <Typography variant="subtitle2" gutterBottom>
-              Preview
+              {t('settings.scanBadges.preview')}
             </Typography>
             <Stack spacing={0.5}>
               {tierRows.map(({ tier, range }) => (
@@ -914,7 +924,7 @@ function ScanBadgesCard() {
           </Box>
 
           {save.error && <Alert severity="error">{(save.error as Error).message}</Alert>}
-          {save.isSuccess && <Alert severity="success">Saved.</Alert>}
+          {save.isSuccess && <Alert severity="success">{t('settings.scanBadges.saved')}</Alert>}
 
           {isAdmin ? (
             <Box>
@@ -923,11 +933,11 @@ function ScanBadgesCard() {
                 disabled={!validNumbers || save.isPending}
                 onClick={() => save.mutate()}
               >
-                {save.isPending ? 'Saving…' : 'Save'}
+                {save.isPending ? t('common.states.saving') : t('common.actions.save')}
               </Button>
             </Box>
           ) : (
-            <Alert severity="info">Only administrators can change these thresholds.</Alert>
+            <Alert severity="info">{t('settings.scanBadges.adminOnly')}</Alert>
           )}
         </Stack>
       )}
@@ -936,27 +946,28 @@ function ScanBadgesCard() {
 }
 
 const TABS = [
-  { key: 'sales', label: 'Sales', render: () => <SalesCard /> },
-  { key: 'scan', label: 'Scan Badges', render: () => <ScanBadgesCard /> },
-  { key: 'deck-types', label: 'Deck Types', render: () => <DeckTypesCard /> },
-  { key: 'appearance', label: 'Appearance', render: () => <AppearanceCard /> },
-  { key: 'catalog', label: 'Catalog Data', render: () => <CatalogCard /> },
-  { key: 'ebay', label: 'eBay', render: () => <EbayCard /> },
-  { key: 'users', label: 'Users', render: () => <UsersTab /> },
-  { key: 'components', label: 'Components', render: () => <ComponentsCard /> },
+  { key: 'sales', labelKey: 'settings.tabs.sales', render: () => <SalesCard /> },
+  { key: 'scan', labelKey: 'settings.tabs.scan', render: () => <ScanBadgesCard /> },
+  { key: 'deck-types', labelKey: 'settings.tabs.deckTypes', render: () => <DeckTypesCard /> },
+  { key: 'appearance', labelKey: 'settings.tabs.appearance', render: () => <AppearanceCard /> },
+  { key: 'catalog', labelKey: 'settings.tabs.catalog', render: () => <CatalogCard /> },
+  { key: 'ebay', labelKey: 'settings.tabs.ebay', render: () => <EbayCard /> },
+  { key: 'users', labelKey: 'settings.tabs.users', render: () => <UsersTab /> },
+  { key: 'components', labelKey: 'settings.tabs.components', render: () => <ComponentsCard /> },
 ] as const;
 
 export function SettingsPage() {
+  const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
   const requested = params.get('tab');
   const active = Math.max(
     0,
-    TABS.findIndex((t) => t.key === requested),
+    TABS.findIndex((tab) => tab.key === requested),
   );
 
   return (
     <Stack spacing={3}>
-      <Typography variant="h4">Administration</Typography>
+      <Typography variant="h4">{t('settings.title')}</Typography>
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs
           value={active}
@@ -968,8 +979,8 @@ export function SettingsPage() {
           variant="scrollable"
           scrollButtons="auto"
         >
-          {TABS.map((t) => (
-            <Tab key={t.key} label={t.label} />
+          {TABS.map((tab) => (
+            <Tab key={tab.key} label={t(tab.labelKey)} />
           ))}
         </Tabs>
       </Box>

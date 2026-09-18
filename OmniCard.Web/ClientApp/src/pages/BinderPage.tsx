@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useParams, Link as RouterLink } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -29,6 +31,7 @@ import { ListForSaleDialog } from '../components/dialogs/ListForSaleDialog';
 import { CardEditDrawer } from '../components/dialogs/CardEditDrawer';
 import { AddCardToSlotDialog } from '../components/dialogs/AddCardToSlotDialog';
 import { SearchBox } from '../components/SearchBox';
+import { useFormatters } from '../i18n/format';
 
 const CARD_BACK_SLUGS = ['mtg', 'optcg', 'riftbound', 'pokemon', 'yugioh', 'fftcg'];
 const cardBackSrc = (game: number): string | undefined => {
@@ -42,9 +45,9 @@ const GAME_NAMES = ['Mtg', 'OnePiece', 'Riftbound', 'Pokemon', 'YuGiOh', 'FinalF
 const gameName = (game?: number | null): string =>
   (game != null && GAME_NAMES[game]) || 'Mtg';
 
-// Friendly labels for the SalesChannel enum names sent by the API.
-const CHANNEL_LABELS: Record<string, string> = { Manual: 'Manual', TcgPlayer: 'TCGplayer', Ebay: 'eBay' };
-const channelLabel = (c?: string | null): string => (c ? CHANNEL_LABELS[c] ?? c : '');
+// Friendly labels for the SalesChannel enum names sent by the API, via the shared common.channels.* keys.
+const channelLabel = (c: string | null | undefined, t: TFunction): string =>
+  c ? t(`common.channels.${c}`, { defaultValue: c }) : '';
 // Picked cards are further along the sale pipeline than merely Listed — warn vs. info.
 const statusColor = (status?: string | null): string => (status === 'Picked' ? 'warning.main' : 'info.main');
 
@@ -71,29 +74,31 @@ const PILL_SX = {
  * (bottom-left) and, when listed, the channel + listed price (bottom-right). Each is a solid pill so
  * it reads clearly over any art. `pointer-events: none` so drag / click still reach the card. */
 function CardOverlayBadges({ card }: { card: BinderCardDto }) {
+  const { t } = useTranslation();
+  const { money } = useFormatters();
   const listed = card.listingStatus;
   return (
     <>
       {listed && (
         <Box sx={{ ...PILL_SX, position: 'absolute', top: 3, left: 3, bgcolor: statusColor(listed) }}>
           <SellIcon sx={{ fontSize: 12 }} />
-          {listed === 'Picked' ? 'Picked' : 'Listed'}
+          {listed === 'Picked' ? t('binder.statusPicked') : t('binder.statusListed')}
         </Box>
       )}
-      {card.price && (
+      {card.marketPriceRaw > 0 && (
         <Box
-          title="Market price"
+          title={t('binder.marketPriceTitle')}
           sx={{ ...PILL_SX, position: 'absolute', bottom: 3, left: 3, bgcolor: 'rgba(17,17,17,0.82)' }}
         >
-          {card.price}
+          {money(card.marketPriceRaw)}
         </Box>
       )}
-      {listed && card.listedPrice && (
+      {listed && card.listedPriceRaw != null && card.listedPriceRaw > 0 && (
         <Box
-          title="Listed price"
+          title={t('binder.listedPriceTitle')}
           sx={{ ...PILL_SX, position: 'absolute', bottom: 3, right: 3, bgcolor: statusColor(listed) }}
         >
-          {channelLabel(card.listingChannel)} {card.listedPrice}
+          {channelLabel(card.listingChannel, t)} {money(card.listedPriceRaw)}
         </Box>
       )}
     </>
@@ -102,16 +107,17 @@ function CardOverlayBadges({ card }: { card: BinderCardDto }) {
 
 // Layout presets (slots-per-page → columns) offered in edit mode.
 const LAYOUTS = [
-  { label: '2 × 2 (4)', slots: 4, cols: 2 },
-  { label: '3 × 3 (9)', slots: 9, cols: 3 },
-  { label: '3 × 4 (12)', slots: 12, cols: 3 },
-  { label: '4 × 4 (16)', slots: 16, cols: 4 },
+  { slots: 4, cols: 2 },
+  { slots: 9, cols: 3 },
+  { slots: 12, cols: 3 },
+  { slots: 16, cols: 4 },
 ];
 
 function ReverseCardBack({ game }: { game: number }) {
+  const { t } = useTranslation();
   const src = cardBackSrc(game);
   return (
-    <Tooltip title="Card on the reverse side of this sheet">
+    <Tooltip title={t('binder.reverseSideTooltip')}>
       <Box
         sx={{
           width: '100%',
@@ -154,10 +160,11 @@ function SlotGrid({
   onSlotContextMenu: (e: React.MouseEvent, page: number, slot: number, card: BinderCardDto | null) => void;
   onCardClick: (card: BinderCardDto) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Paper variant="outlined" sx={{ p: 1, flex: 1 }}>
       <Typography variant="caption" color="text.secondary">
-        Page {pageNumber}
+        {t('binder.page', { page: pageNumber })}
       </Typography>
       <Box sx={{ display: 'grid', gap: 0.5, gridTemplateColumns: `repeat(${columns}, 1fr)`, mt: 0.5 }}>
         {slots.map((s) => (
@@ -181,7 +188,7 @@ function SlotGrid({
           >
             {s.card?.imageUrl ? (
               <>
-                <Tooltip title={`${s.card.name} · ${s.card.condition}${s.card.foil ? ' · Foil' : ''} — click for details, right-click for actions`}>
+                <Tooltip title={t('binder.slotTooltip', { name: s.card.name, condition: s.card.condition, foilSuffix: s.card.foil ? t('binder.foilSuffix') : '' })}>
                   <CardImage
                     src={s.card.imageUrl}
                     alt={s.card.name}
@@ -232,6 +239,8 @@ function UnplacedSidebar({
   onCardContextMenu: (e: React.MouseEvent, card: BinderCardDto) => void;
   onCardClick: (card: BinderCardDto) => void;
 }) {
+  const { t } = useTranslation();
+  const { money } = useFormatters();
   return (
     <Paper
       variant="outlined"
@@ -252,7 +261,7 @@ function UnplacedSidebar({
     >
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
         <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
-          Unplaced cards ({cards.length})
+          {t('binder.unplacedCards', { count: cards.length })}
         </Typography>
         {loading && <CircularProgress size={14} />}
       </Stack>
@@ -260,12 +269,12 @@ function UnplacedSidebar({
         <SearchBox value={filter} onChange={onFilter} autoFocus />
       </Box>
       <Typography variant="caption" color="text.secondary" sx={{ mb: 1 }}>
-        Drag onto a slot to place · drop a placed card here to remove it
+        {t('binder.dragHint')}
       </Typography>
       <Box sx={{ overflowY: 'auto', flexGrow: 1 }}>
         {cards.length === 0 ? (
           <Typography variant="body2" color="text.secondary" sx={{ px: 0.5, py: 1 }}>
-            {filter.trim() ? 'No cards match your search.' : 'Everything in this binder is placed.'}
+            {filter.trim() ? t('binder.noCardsMatch') : t('binder.allPlaced')}
           </Typography>
         ) : (
           <Stack spacing={0.5}>
@@ -298,13 +307,17 @@ function UnplacedSidebar({
                     {c.name}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-                    {c.setCode} · #{c.number} · {c.condition}
-                    {c.foil ? ' · Foil' : ''}
+                    {t('binder.sidebarCardMeta', {
+                      setCode: c.setCode,
+                      number: c.number,
+                      condition: c.condition,
+                      foilSuffix: c.foil ? t('binder.foilSuffix') : '',
+                    })}
                   </Typography>
                   <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25 }}>
-                    {c.price && (
+                    {c.marketPriceRaw > 0 && (
                       <Typography variant="caption" color="text.secondary" noWrap>
-                        {c.price}
+                        {money(c.marketPriceRaw)}
                       </Typography>
                     )}
                     {c.listingStatus && (
@@ -313,8 +326,10 @@ function UnplacedSidebar({
                         noWrap
                         sx={{ fontWeight: 700, color: statusColor(c.listingStatus) }}
                       >
-                        {c.listingStatus === 'Picked' ? 'Picked' : 'Listed'}
-                        {c.listedPrice ? ` · ${channelLabel(c.listingChannel)} ${c.listedPrice}` : ''}
+                        {c.listingStatus === 'Picked' ? t('binder.statusPicked') : t('binder.statusListed')}
+                        {c.listedPriceRaw != null && c.listedPriceRaw > 0
+                          ? ` · ${channelLabel(c.listingChannel, t)} ${money(c.listedPriceRaw)}`
+                          : ''}
                       </Typography>
                     )}
                   </Stack>
@@ -329,6 +344,7 @@ function UnplacedSidebar({
 }
 
 export function BinderPage() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const binderId = Number(id);
   const qc = useQueryClient();
@@ -403,18 +419,18 @@ export function BinderPage() {
     <Stack spacing={2}>
       <Breadcrumbs>
         <Link component={RouterLink} to="/locations">
-          Locations
+          {t('binder.locations')}
         </Link>
         <Link component={RouterLink} to={`/location/${binderId}`}>
           {data.containerName}
         </Link>
-        <Typography color="text.primary">Binder</Typography>
+        <Typography color="text.primary">{t('binder.breadcrumb')}</Typography>
       </Breadcrumbs>
 
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
         <Typography variant="h4">{data.containerName}</Typography>
         <Typography variant="body2" color="text.secondary">
-          {data.pageRangeLabel} · {data.totalPages} pages
+          {data.pageRangeLabel} · {t('binder.pages', { count: data.totalPages })}
         </Typography>
         {isFetching && <CircularProgress size={16} />}
         <Box sx={{ flexGrow: 1 }} />
@@ -424,7 +440,7 @@ export function BinderPage() {
           startIcon={<EditIcon />}
           onClick={() => setEditMode((v) => !v)}
         >
-          {editMode ? 'Done editing' : 'Edit'}
+          {editMode ? t('binder.doneEditing') : t('common.actions.edit')}
         </Button>
       </Stack>
 
@@ -433,20 +449,20 @@ export function BinderPage() {
         <Paper variant="outlined" sx={{ p: 1 }}>
           <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
             <Button size="small" startIcon={<AddIcon />} onClick={(e) => setAddAnchor(e.currentTarget)}>
-              Add page
+              {t('binder.addPage')}
             </Button>
             <Menu anchorEl={addAnchor} open={!!addAnchor} onClose={() => setAddAnchor(null)}>
               <MenuItem onClick={() => { setAddAnchor(null); run(addPage.mutateAsync('double')); }}>
-                Double-sided sheet
+                {t('binder.doubleSidedSheet')}
               </MenuItem>
               <MenuItem onClick={() => { setAddAnchor(null); run(addPage.mutateAsync('single')); }}>
-                Single-sided page
+                {t('binder.singleSidedPage')}
               </MenuItem>
             </Menu>
             <TextField
               select
               size="small"
-              label="Layout"
+              label={t('binder.layout')}
               value={data.slotsPerPage}
               onChange={(e) => {
                 const l = LAYOUTS.find((x) => x.slots === Number(e.target.value));
@@ -455,17 +471,19 @@ export function BinderPage() {
               sx={{ minWidth: 140 }}
             >
               {LAYOUTS.map((l) => (
-                <MenuItem key={l.slots} value={l.slots}>{l.label}</MenuItem>
+                <MenuItem key={l.slots} value={l.slots}>
+                  {t('binder.layoutGrid', { cols: l.cols, rows: l.slots / l.cols, count: l.slots })}
+                </MenuItem>
               ))}
             </TextField>
             {data.leftPageNumber != null && (
               <Button size="small" color="error" onClick={() => run(removePage.mutateAsync(data.leftPageNumber!))}>
-                Remove page {data.leftPageNumber}
+                {t('binder.removePage', { page: data.leftPageNumber })}
               </Button>
             )}
             {data.rightPageNumber != null && (
               <Button size="small" color="error" onClick={() => run(removePage.mutateAsync(data.rightPageNumber!))}>
-                Remove page {data.rightPageNumber}
+                {t('binder.removePage', { page: data.rightPageNumber })}
               </Button>
             )}
           </Stack>
@@ -476,7 +494,7 @@ export function BinderPage() {
       {/* Spread navigation */}
       <Stack direction="row" spacing={1} alignItems="center">
         <Button size="small" disabled={spread <= 0} onClick={() => setSpread((s) => Math.max(0, s - 1))}>
-          ‹ Prev
+          {t('binder.prev')}
         </Button>
         <Tabs value={data.spreadIndex} onChange={(_, v) => setSpread(v)} variant="scrollable" scrollButtons="auto" sx={{ flexGrow: 1, minHeight: 36 }}>
           {data.spreadTabs.map((t) => (
@@ -484,7 +502,7 @@ export function BinderPage() {
           ))}
         </Tabs>
         <Button size="small" disabled={spread >= data.totalSpreads - 1} onClick={() => setSpread((s) => Math.min(data.totalSpreads - 1, s + 1))}>
-          Next ›
+          {t('binder.next')}
         </Button>
       </Stack>
 
@@ -550,7 +568,7 @@ export function BinderPage() {
           }}
         >
           <InfoOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
-          Card details
+          {t('binder.cardDetails')}
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -559,7 +577,7 @@ export function BinderPage() {
           }}
         >
           <SellIcon fontSize="small" sx={{ mr: 1 }} />
-          List for sale
+          {t('binder.listForSale')}
         </MenuItem>
       </Menu>
 
@@ -577,7 +595,7 @@ export function BinderPage() {
           }}
         >
           <AddIcon fontSize="small" sx={{ mr: 1 }} />
-          {slotMenu?.card ? 'Replace card in this pocket…' : 'Add card to this pocket…'}
+          {slotMenu?.card ? t('binder.replaceCardInPocket') : t('binder.addCardToPocket')}
         </MenuItem>
         {slotMenu?.card && (
           <MenuItem
@@ -587,7 +605,7 @@ export function BinderPage() {
             }}
           >
             <InfoOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
-            Card details
+            {t('binder.cardDetails')}
           </MenuItem>
         )}
         {slotMenu?.card && (
@@ -598,7 +616,7 @@ export function BinderPage() {
             }}
           >
             <SellIcon fontSize="small" sx={{ mr: 1 }} />
-            List for sale
+            {t('binder.listForSale')}
           </MenuItem>
         )}
       </Menu>

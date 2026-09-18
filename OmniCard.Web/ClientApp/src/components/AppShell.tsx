@@ -34,26 +34,29 @@ import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
 import { useGame } from '../context/GameContext';
 
 const DRAWER_WIDTH = 200;
 
-const NAV: { to: string; label: string; icon: ReactNode }[] = [
-  { to: '/', label: 'Dashboard', icon: <DashboardIcon /> },
-  { to: '/scan', label: 'Scan', icon: <PhotoCameraIcon /> },
-  { to: '/collection', label: 'Collection', icon: <CollectionsBookmarkIcon /> },
-  { to: '/locations', label: 'Locations', icon: <GridViewIcon /> },
-  { to: '/sets', label: 'Sets', icon: <ChecklistIcon /> },
-  { to: '/inventory', label: 'Inventory', icon: <Inventory2Icon /> },
-  { to: '/lists', label: 'Lists', icon: <FormatListBulletedIcon /> },
-  { to: '/trades', label: 'Trades', icon: <SwapHorizIcon /> },
-  { to: '/import', label: 'Import', icon: <UploadFileIcon /> },
-  { to: '/sales', label: 'Sales', icon: <PointOfSaleIcon /> },
-  { to: '/settings', label: 'Administration', icon: <AdminPanelSettingsIcon /> },
+// `labelKey` resolves against the `nav` namespace at render time.
+const NAV: { to: string; labelKey: string; icon: ReactNode }[] = [
+  { to: '/', labelKey: 'dashboard', icon: <DashboardIcon /> },
+  { to: '/scan', labelKey: 'scan', icon: <PhotoCameraIcon /> },
+  { to: '/collection', labelKey: 'collection', icon: <CollectionsBookmarkIcon /> },
+  { to: '/locations', labelKey: 'locations', icon: <GridViewIcon /> },
+  { to: '/sets', labelKey: 'sets', icon: <ChecklistIcon /> },
+  { to: '/inventory', labelKey: 'inventory', icon: <Inventory2Icon /> },
+  { to: '/lists', labelKey: 'lists', icon: <FormatListBulletedIcon /> },
+  { to: '/trades', labelKey: 'trades', icon: <SwapHorizIcon /> },
+  { to: '/import', labelKey: 'import', icon: <UploadFileIcon /> },
+  { to: '/sales', labelKey: 'sales', icon: <PointOfSaleIcon /> },
+  { to: '/settings', labelKey: 'administration', icon: <AdminPanelSettingsIcon /> },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const location = useLocation();
   const { game, setGame } = useGame();
   const qc = useQueryClient();
@@ -88,7 +91,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             onClick={() => setMobileOpen(false)}
           >
             <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
-            <ListItemText primary={item.label} />
+            <ListItemText primary={t(`nav.${item.labelKey}`)} />
           </ListItemButton>
         );
       })}
@@ -103,7 +106,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <IconButton
               color="inherit"
               edge="start"
-              aria-label="Open navigation"
+              aria-label={t('nav.openNavigation')}
               onClick={() => setMobileOpen((v) => !v)}
               sx={{ mr: 1 }}
             >
@@ -111,7 +114,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </IconButton>
           )}
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            OmniCard
+            {t('common.app.name')}
           </Typography>
           <FormControl size="small" sx={{ minWidth: { xs: 130, sm: 200 } }}>
             <Select
@@ -119,7 +122,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               onChange={(e) => setGame(e.target.value === '__all__' ? undefined : e.target.value)}
               sx={{ color: 'inherit', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' } }}
             >
-              <MenuItem value="__all__">All Games</MenuItem>
+              <MenuItem value="__all__">{t('nav.allGames')}</MenuItem>
               {gamesQuery.data?.map((g) => (
                 <MenuItem key={g.id} value={g.id}>
                   {g.displayName}
@@ -130,7 +133,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <IconButton
             color="inherit"
-            aria-label="Account"
+            aria-label={t('nav.account')}
             onClick={(e) => setAccountAnchor(e.currentTarget)}
             sx={{ ml: 0.5 }}
           >
@@ -144,7 +147,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {username && (
               <MenuItem disabled sx={{ opacity: '1 !important' }}>
                 <Typography variant="body2" color="text.secondary">
-                  Signed in as <strong>{username}</strong>
+                  {t('nav.signedInAs')} <strong>{username}</strong>
                 </Typography>
               </MenuItem>
             )}
@@ -157,13 +160,13 @@ export function AppShell({ children }: { children: ReactNode }) {
               <ListItemIcon>
                 <AdminPanelSettingsIcon fontSize="small" />
               </ListItemIcon>
-              <ListItemText>Account &amp; users</ListItemText>
+              <ListItemText>{t('nav.accountAndUsers')}</ListItemText>
             </MenuItem>
             <MenuItem disabled={logout.isPending} onClick={() => logout.mutate()}>
               <ListItemIcon>
                 <LogoutIcon fontSize="small" />
               </ListItemIcon>
-              <ListItemText>Sign out</ListItemText>
+              <ListItemText>{t('nav.signOut')}</ListItemText>
             </MenuItem>
           </Menu>
         </Toolbar>
