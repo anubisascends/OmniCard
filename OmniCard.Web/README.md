@@ -117,9 +117,17 @@ http://localhost:5000/app/.
 ## Publish & IIS
 
 ```bash
-# Build the SPA first (populates wwwroot/app), then:
-dotnet publish OmniCard.Web/OmniCard.Web.csproj -c Release
+# Build the SPA first (populates wwwroot/app), then publish with an explicit RID:
+dotnet publish OmniCard.Web/OmniCard.Web.csproj -c Release -r win-x64 --self-contained false
 ```
+
+> **Always pass `-r win-x64 --self-contained false`.** A RID-less framework-dependent publish copies
+> the native assets for *every* platform (win-x64/x86/arm64 + a dozen linux/osx/… RIDs) into a
+> `runtimes/` folder — ~500 MB of dead weight for a single-target IIS box. Pinning the RID emits only
+> win-x64. The project also strips the large native debug-symbol files (`libSkiaSharp.pdb` ~89 MB,
+> `libHarfBuzzSharp.pdb` ~23 MB) that the SkiaSharp/HarfBuzz packages ship — see
+> `CopyDebugSymbolFilesFromPackages` and the `StripNativePdbsFromPublish` target in
+> `OmniCard.Web.csproj`. Together these keep a publish around **~125 MB** instead of ~700 MB.
 
 Deploy the published output to IIS:
 
@@ -131,6 +139,18 @@ Deploy the published output to IIS:
 5. Grant the app-pool identity (`IIS AppPool\<name>`):
    - **read/write** on the data directory (`scans/`, `card-images/`, `dataprotection-keys/`),
    - access to SQL Server (or use a SQL login in the connection string instead of Windows auth).
+
+> **Wipe the target folder before copying a new build over it.** Neither `dotnet publish`/xcopy nor
+> Web Deploy with `SkipExtraFilesOnServer` (this project's publish profiles) delete files that no
+> longer exist in the source, so republishing into the same site folder accumulates stale,
+> content-hashed SPA chunks (each build adds a fresh ~10 MB `opencv` asset the old `index.html` no
+> longer references). The `.vscode/deploy.ps1` script (VS Code **Publish** task) automates this: it
+> stops the app pool to release the DLL locks, clears the site folder, publishes, then restarts the
+> pool. If you deploy by hand, do the same. The source `wwwroot/app` stays clean on its own — Vite's
+> `emptyOutDir` rebuilds it from scratch each time.
+>
+> The publish profiles under `OmniCard.Web/Properties/PublishProfiles/` pin `RuntimeIdentifier` to
+> `win-x64`, so the Web Deploy path produces the same slim, single-RID output as the command above.
 
 ## Catalog data
 
