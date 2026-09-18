@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using OmniCard.Shared.Binder;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
+using OmniCard.Shared.Sales;
 using OmniCard.Shared.Settings;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
@@ -23,6 +24,7 @@ public sealed class BinderStateBuilder
     private readonly IStorageContainerService _containers;
     private readonly WebBinderCardService _binderCards;
     private readonly ITagService _tags;
+    private readonly IListingService _listings;
     private readonly ICardService _cardService;
     private readonly IDataPathService _dataPath;
     private readonly IDbContextFactory<ScryfallDbContext>? _scryfallFactory;
@@ -31,6 +33,7 @@ public sealed class BinderStateBuilder
         IStorageContainerService containers,
         WebBinderCardService binderCards,
         ITagService tags,
+        IListingService listings,
         ICardService cardService,
         IDataPathService dataPath,
         IDbContextFactory<ScryfallDbContext>? scryfallFactory = null)
@@ -38,6 +41,7 @@ public sealed class BinderStateBuilder
         _containers = containers;
         _binderCards = binderCards;
         _tags = tags;
+        _listings = listings;
         _cardService = cardService;
         _dataPath = dataPath;
         _scryfallFactory = scryfallFactory;
@@ -72,6 +76,7 @@ public sealed class BinderStateBuilder
         var all = leftCards.Concat(rightCards).ToList();
         Hydrate(all);
         var tcg = ResolveTcgIds(all);
+        var listings = ResolveListings(all);
 
         // Cards on the reverse side of each visible page's physical sheet, so an empty pocket can
         // show the back of the card behind it. These pages live on adjacent spreads, so they aren't
@@ -80,8 +85,8 @@ public sealed class BinderStateBuilder
         var leftReverse = ReverseCards(containerId, sheetLayout, leftPage);
         var rightReverse = ReverseCards(containerId, sheetLayout, rightPage);
 
-        var leftSlots = BuildSlots(leftCards, leftReverse, slotsPerPage, columns, tcg);
-        var rightSlots = BuildSlots(rightCards, rightReverse, slotsPerPage, columns, tcg);
+        var leftSlots = BuildSlots(leftCards, leftReverse, slotsPerPage, columns, tcg, listings);
+        var rightSlots = BuildSlots(rightCards, rightReverse, slotsPerPage, columns, tcg, listings);
 
         return new BinderStateDto(
             name, slotsPerPage, columns, totalPages,
@@ -96,7 +101,8 @@ public sealed class BinderStateBuilder
         var cards = _binderCards.GetUnplacedBinderCards(containerId, preset);
         Hydrate(cards);
         var tcg = ResolveTcgIds(cards);
-        return cards.Select(c => Map(c, tcg)).ToList();
+        var listings = ResolveListings(cards);
+        return cards.Select(c => Map(c, tcg, listings)).ToList();
     }
 
     /// <summary>Full card DTOs for the given lot ids (for the card editor and post-action refresh).</summary>
@@ -105,7 +111,8 @@ public sealed class BinderStateBuilder
         var cards = _binderCards.GetCollectionCards(lotIds);
         Hydrate(cards);
         var tcg = ResolveTcgIds(cards);
-        return cards.Select(c => Map(c, tcg)).ToList();
+        var listings = ResolveListings(cards);
+        return cards.Select(c => Map(c, tcg, listings)).ToList();
     }
 
     private List<CollectionCard> ReverseCards(int containerId, BinderSheetLayout sheetLayout, int? page)
@@ -115,7 +122,8 @@ public sealed class BinderStateBuilder
 
     private List<BinderSlotDto> BuildSlots(
         List<CollectionCard> pageCards, List<CollectionCard> reverseCards,
-        int slotsPerPage, int columns, IReadOnlyDictionary<string, ScryfallTcgIdResolver.Ids> tcg)
+        int slotsPerPage, int columns, IReadOnlyDictionary<string, ScryfallTcgIdResolver.Ids> tcg,
+        IReadOnlyDictionary<int, ListingDetail> listings)
     {
         var slots = new List<BinderSlotDto>(slotsPerPage);
         for (var i = 0; i < slotsPerPage; i++)
@@ -130,7 +138,7 @@ public sealed class BinderStateBuilder
                 reverseGame = (int)behind.Game;
             }
 
-            slots.Add(new BinderSlotDto(i, card is null ? null : Map(card, tcg), reverseGame));
+            slots.Add(new BinderSlotDto(i, card is null ? null : Map(card, tcg, listings), reverseGame));
         }
         return slots;
     }
@@ -173,7 +181,24 @@ public sealed class BinderStateBuilder
             _scryfallFactory,
             cards.Where(c => c.Game == CardGame.Mtg).Select(c => c.GameCardId));
 
-    private BinderCardDto Map(CollectionCard c, IReadOnlyDictionary<string, ScryfallTcgIdResolver.Ids> tcg)
+    /// <summary>Active (Listed/Picked) listing per lot for the given cards, so the editor can badge a
+    /// card's sale status, channel, and listed price. Loads all active listings once and filters in
+    /// memory (they're a small fraction of the collection, same reasoning as
+    /// <c>ListingService.GetActiveListingStatusByLot</c>).</summary>
+    private Dictionary<int, ListingDetail> ResolveListings(IReadOnlyList<CollectionCard> cards)
+    {
+        if (cards.Count == 0) return [];
+        var ids = cards.Select(c => c.Id).ToHashSet();
+        return _listings.GetListingDetails()
+            .Where(d => ids.Contains(d.LotId))
+            .GroupBy(d => d.LotId)
+            .ToDictionary(g => g.Key, g => g.First());
+    }
+
+    private BinderCardDto Map(
+        CollectionCard c,
+        IReadOnlyDictionary<string, ScryfallTcgIdResolver.Ids> tcg,
+        IReadOnlyDictionary<int, ListingDetail> listings)
     {
         int? resolved = null;
         if (c.Game == CardGame.Mtg && tcg.TryGetValue(c.GameCardId, out var ids))
@@ -182,6 +207,8 @@ public sealed class BinderStateBuilder
             resolved = ids.Pick(etched);
         }
 
+        listings.TryGetValue(c.Id, out var listing);
+
         return new BinderCardDto(
             c.Id, (int)c.Game, c.Name, c.SetName, c.SetCode, c.Number, c.Rarity, c.Color, c.CardType,
             c.IsFoil, c.FoilType, c.Condition, c.PurchasePrice,
@@ -189,7 +216,11 @@ public sealed class BinderStateBuilder
             c.MarketPrice,
             CardImageUrl.Resolve(c.ScanImagePath, c.ImageUri, _dataPath.ScansDirectory),
             c.IsTraded, c.Tags, c.Page, c.Slot, c.ContainerId,
-            TcgPlayerLink.Build(c.Game, c.GameCardId, c.Name, c.SetName, resolved));
+            TcgPlayerLink.Build(c.Game, c.GameCardId, c.Name, c.SetName, resolved),
+            listing?.Status.ToString(),
+            listing?.Channel.ToString(),
+            listing?.ListedPrice,
+            listing is not null ? listing.ListedPrice.ToString("C") : null);
     }
 }
 
@@ -197,7 +228,11 @@ public sealed record BinderCardDto(
     int Id, int Game, string Name, string SetName, string SetCode, string Number, string Rarity,
     string? Color, string? CardType, bool Foil, string? FoilType, string Condition,
     decimal? PurchasePrice, string? Price, decimal MarketPriceRaw, string? ImageUrl,
-    bool IsTraded, List<string> Tags, int? Page, int? Slot, int? ContainerId, string TcgPlayerUrl);
+    bool IsTraded, List<string> Tags, int? Page, int? Slot, int? ContainerId, string TcgPlayerUrl,
+    // Active-listing badges: null when the card isn't listed. Status is "Listed"/"Picked"; Channel is
+    // the SalesChannel name ("Manual"/"TcgPlayer"/"Ebay"); ListedPrice is the pre-formatted amount.
+    string? ListingStatus = null, string? ListingChannel = null,
+    decimal? ListedPriceRaw = null, string? ListedPrice = null);
 
 /// <summary>One pocket in the editor spread. <see cref="ReverseGame"/> is set only for an empty
 /// pocket whose mirrored pocket on the reverse side of the sheet is filled — the client shows that

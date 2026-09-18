@@ -356,6 +356,11 @@ export interface BinderCardDto {
   slot?: number | null;
   containerId?: number | null;
   tcgPlayerUrl: string;
+  /** Active-listing badges — null unless the card is on the market. */
+  listingStatus?: string | null; // "Listed" | "Picked"
+  listingChannel?: string | null; // "Manual" | "TcgPlayer" | "Ebay"
+  listedPriceRaw?: number | null;
+  listedPrice?: string | null; // pre-formatted currency
 }
 
 export interface BinderSlotDto {

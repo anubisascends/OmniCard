@@ -20,6 +20,7 @@ export function CardImage({
   draggable,
   onDragStart,
   onContextMenu,
+  onClick,
   onError,
   onMouseEnter,
   onMouseLeave,
@@ -32,6 +33,7 @@ export function CardImage({
   draggable?: boolean;
   onDragStart?: React.DragEventHandler<HTMLImageElement>;
   onContextMenu?: React.MouseEventHandler<HTMLImageElement>;
+  onClick?: React.MouseEventHandler<HTMLImageElement>;
   onError?: React.ReactEventHandler<HTMLImageElement>;
   onMouseEnter?: React.MouseEventHandler<HTMLElement>;
   onMouseLeave?: React.MouseEventHandler<HTMLElement>;
@@ -49,6 +51,7 @@ export function CardImage({
         draggable={draggable}
         onDragStart={onDragStart}
         onContextMenu={onContextMenu}
+        onClick={onClick}
         onError={onError}
         sx={sx}
       />
