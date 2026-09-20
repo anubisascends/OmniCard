@@ -241,6 +241,41 @@ export interface ScanBadgeSettingsDto {
   thresholds: number[];
 }
 
+/** Store/company identity printed on receipts. `logoPath` is the stored relative path (managed via the
+ * logo upload/delete endpoints); `logoUrl` is a ready-to-render URL (with cache-busting) or null. */
+export interface CompanyProfileDto {
+  name?: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  logoPath?: string | null;
+  logoUrl?: string | null;
+}
+
+/** Physical layout of a printed receipt. `widthMm` is the roll/paper width — the PDF is generated at
+ * exactly this width so it prints on a thermal printer without scaling. */
+export interface ReceiptLayoutDto {
+  widthMm: number;
+  marginMm: number;
+  fontPointSize: number;
+  showPrices: boolean;
+  footerText?: string | null;
+}
+
+export interface ReceiptConfigDto {
+  company: CompanyProfileDto;
+  receipt: ReceiptLayoutDto;
+}
+
+export interface LogoUploadResultDto {
+  company: CompanyProfileDto;
+}
+
 export interface CustomerDto {
   id: number;
   name: string;

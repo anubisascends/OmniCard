@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import { api } from '../../api/client';
 import { useGame } from '../../context/GameContext';
 import { useFormatters } from '../../i18n/format';
@@ -252,20 +253,32 @@ export function OrderDetailDrawer({ orderId, onClose }: { orderId: number | null
             {editable && <AddLineSearch orderId={orderId!} onAdded={invalidate} />}
 
             <Divider />
-            <Stack direction="row" justifyContent="space-between">
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
               <Button onClick={onClose}>{t('common.actions.close')}</Button>
-              {editable && (
+              <Stack direction="row" spacing={1}>
                 <Button
-                  color="error"
-                  startIcon={<DeleteIcon />}
-                  disabled={del.isPending}
-                  onClick={() => {
-                    if (confirm(t('sales.orderDetail.deleteConfirm', { id: orderId }))) del.mutate();
-                  }}
+                  variant="outlined"
+                  startIcon={<ReceiptLongIcon />}
+                  component="a"
+                  href={api.receiptPdfUrl(orderId!)}
+                  target="_blank"
+                  rel="noopener"
                 >
-                  {t('sales.orderDetail.deleteOrder')}
+                  {t('sales.orderDetail.printReceipt')}
                 </Button>
-              )}
+                {editable && (
+                  <Button
+                    color="error"
+                    startIcon={<DeleteIcon />}
+                    disabled={del.isPending}
+                    onClick={() => {
+                      if (confirm(t('sales.orderDetail.deleteConfirm', { id: orderId }))) del.mutate();
+                    }}
+                  >
+                    {t('sales.orderDetail.deleteOrder')}
+                  </Button>
+                )}
+              </Stack>
             </Stack>
             {del.error && <Alert severity="error">{(del.error as Error).message}</Alert>}
           </Stack>

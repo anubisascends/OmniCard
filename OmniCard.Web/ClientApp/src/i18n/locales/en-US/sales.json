@@ -38,6 +38,7 @@
       "deleteConfirm": "Delete customer \"{{name}}\"?"
     },
     "orderDetail": {
+      "printReceipt": "Print receipt",
       "addCard": "Add a card (search your collection)",
       "orderTitle": "Order #{{id}}",
       "locked": "This order is {{status}} — header and line edits are locked (change the lane back to Created/Packed to edit).",
