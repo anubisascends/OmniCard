@@ -327,6 +327,18 @@ if (Directory.Exists(scansDir))
     });
 }
 
+// Serve branding assets (the receipt logo uploaded in Settings ▸ Receipts) so the SPA can preview it.
+// A dedicated subdir keeps the served surface off the data-dir root (which holds settings + keys).
+{
+    var brandingDir = Path.Combine(dataDir, "branding");
+    Directory.CreateDirectory(brandingDir);
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(brandingDir),
+        RequestPath = "/branding",
+    });
+}
+
 app.MapControllers();
 app.MapHub<OmniCard.Web.Hubs.ScanHub>("/hubs/scan");
 

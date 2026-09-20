@@ -33,6 +33,10 @@ import type {
   ProductDto,
   SalesSettingsDto,
   ScanBadgeSettingsDto,
+  CompanyProfileDto,
+  ReceiptConfigDto,
+  ReceiptLayoutDto,
+  LogoUploadResultDto,
   ScanCommitItem,
   ScanCommitResultDto,
   ScanMatchDto,
@@ -52,8 +56,12 @@ export interface CustomerFields {
   name: string;
   email?: string | null;
   phone?: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
   city?: string | null;
   state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
 }
 export interface ListingFields {
   listedPrice: number;
@@ -376,6 +384,22 @@ export const api = {
   scanBadgeSettings: () => request<ScanBadgeSettingsDto>('/api/settings/scan-badges'),
   scanBadgeSettingsUpdate: (body: ScanBadgeSettingsDto) =>
     request<void>('/api/settings/scan-badges', { method: 'PUT', body: JSON.stringify(body) }),
+  /** A printable, thermal-width receipt PDF for an order (open in a new tab, then print). */
+  receiptPdfUrl: (orderId: number) => `/api/orders/${orderId}/receipt.pdf`,
+  /** Print-ready HTML receipt sized to the configured roll width (auto-opens the print dialog). Preferred
+   * for thermal printers — avoids the PDF padding the job out to a full sheet. */
+  receiptHtmlUrl: (orderId: number) => `/api/orders/${orderId}/receipt.html`,
+  receiptConfig: () => request<ReceiptConfigDto>('/api/settings/receipt'),
+  receiptConfigUpdate: (body: {
+    company: CompanyProfileDto;
+    receipt: ReceiptLayoutDto;
+  }) => request<void>('/api/settings/receipt', { method: 'PUT', body: JSON.stringify(body) }),
+  receiptLogoUpload: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return postForm<LogoUploadResultDto>('/api/settings/receipt/logo', form);
+  },
+  receiptLogoDelete: () => request<void>('/api/settings/receipt/logo', { method: 'DELETE' }),
   customers: () => request<CustomerDto[]>('/api/customers'),
   customerCreate: (body: CustomerFields) =>
     request<CustomerDto>('/api/customers', { method: 'POST', body: JSON.stringify(body) }),

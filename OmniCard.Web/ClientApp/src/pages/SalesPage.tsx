@@ -428,7 +428,10 @@ function ListingsTable() {
   );
 }
 
-const EMPTY_CUSTOMER: CustomerFields = { name: '', email: '', phone: '', city: '', state: '' };
+const EMPTY_CUSTOMER: CustomerFields = {
+  name: '', email: '', phone: '',
+  addressLine1: '', addressLine2: '', city: '', state: '', postalCode: '', country: '',
+};
 
 function CustomerDialog({
   open,
@@ -454,8 +457,12 @@ function CustomerDialog({
             name: initial.name,
             email: initial.email ?? '',
             phone: initial.phone ?? '',
+            addressLine1: initial.addressLine1 ?? '',
+            addressLine2: initial.addressLine2 ?? '',
             city: initial.city ?? '',
             state: initial.state ?? '',
+            postalCode: initial.postalCode ?? '',
+            country: initial.country ?? '',
           }
         : EMPTY_CUSTOMER,
     );
@@ -483,9 +490,15 @@ function CustomerDialog({
           <TextField label={t('common.labels.name')} required value={fields.name} onChange={set('name')} autoFocus />
           <TextField label={t('common.labels.email')} value={fields.email ?? ''} onChange={set('email')} />
           <TextField label={t('common.labels.phone')} value={fields.phone ?? ''} onChange={set('phone')} />
+          <TextField label={t('sales.customers.addressLine1')} value={fields.addressLine1 ?? ''} onChange={set('addressLine1')} fullWidth />
+          <TextField label={t('sales.customers.addressLine2')} value={fields.addressLine2 ?? ''} onChange={set('addressLine2')} fullWidth />
           <Stack direction="row" spacing={2}>
             <TextField label={t('common.labels.city')} value={fields.city ?? ''} onChange={set('city')} fullWidth />
             <TextField label={t('common.labels.state')} value={fields.state ?? ''} onChange={set('state')} sx={{ width: 100 }} />
+          </Stack>
+          <Stack direction="row" spacing={2}>
+            <TextField label={t('sales.customers.postalCode')} value={fields.postalCode ?? ''} onChange={set('postalCode')} sx={{ width: 140 }} />
+            <TextField label={t('sales.customers.country')} value={fields.country ?? ''} onChange={set('country')} fullWidth />
           </Stack>
           {save.error && <Typography color="error" variant="body2">{(save.error as Error).message}</Typography>}
         </Stack>

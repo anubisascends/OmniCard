@@ -424,14 +424,60 @@ public sealed record UpdateScanBadgeSettingsRequest
     public IReadOnlyList<decimal> Thresholds { get; init; } = [];
 }
 
+/// <summary>The store/company identity printed on sales receipts. <see cref="LogoPath"/> is the stored
+/// relative path (managed via the logo upload/delete endpoints, not writable through the config PUT);
+/// <see cref="LogoUrl"/> is a ready-to-render URL (with a cache-busting version) or null when no logo is set.</summary>
+public sealed record CompanyProfileDto
+{
+    public string? Name { get; init; }
+    public string? AddressLine1 { get; init; }
+    public string? AddressLine2 { get; init; }
+    public string? City { get; init; }
+    public string? State { get; init; }
+    public string? PostalCode { get; init; }
+    public string? Country { get; init; }
+    public string? Email { get; init; }
+    public string? Phone { get; init; }
+    public string? LogoPath { get; init; }
+    public string? LogoUrl { get; init; }
+}
+
+/// <summary>Physical layout of a printed receipt for a thermal/roll printer. <see cref="WidthMm"/> is the
+/// paper (roll) width — the receipt PDF is generated at exactly this width so it prints without scaling.</summary>
+public sealed record ReceiptLayoutDto
+{
+    public double WidthMm { get; init; } = 80;
+    public double MarginMm { get; init; } = 4;
+    public double FontPointSize { get; init; } = 9;
+    public bool ShowPrices { get; init; } = true;
+    public string? FooterText { get; init; }
+}
+
+/// <summary>Everything the admin can configure for receipt printing: the company identity + logo and the
+/// printer layout.</summary>
+public sealed record ReceiptConfigDto(CompanyProfileDto Company, ReceiptLayoutDto Receipt);
+
+public sealed record UpdateReceiptConfigRequest
+{
+    public CompanyProfileDto Company { get; init; } = new();
+    public ReceiptLayoutDto Receipt { get; init; } = new();
+}
+
+/// <summary>Result of a logo upload: the refreshed company profile (carrying the new <c>LogoUrl</c>).</summary>
+public sealed record LogoUploadResultDto(CompanyProfileDto Company);
+
 public sealed record CustomerDto
 {
     public int Id { get; init; }
     public string Name { get; init; } = "";
     public string? Email { get; init; }
     public string? Phone { get; init; }
+    public string? AddressLine1 { get; init; }
+    public string? AddressLine2 { get; init; }
     public string? City { get; init; }
     public string? State { get; init; }
+    public string? PostalCode { get; init; }
+    public string? Country { get; init; }
 }
 
 public sealed record ProductDto
@@ -469,8 +515,12 @@ public sealed record CustomerUpsertRequest
     public string Name { get; init; } = "";
     public string? Email { get; init; }
     public string? Phone { get; init; }
+    public string? AddressLine1 { get; init; }
+    public string? AddressLine2 { get; init; }
     public string? City { get; init; }
     public string? State { get; init; }
+    public string? PostalCode { get; init; }
+    public string? Country { get; init; }
 }
 
 /// <summary>Create or edit a sealed-product catalog entry.</summary>

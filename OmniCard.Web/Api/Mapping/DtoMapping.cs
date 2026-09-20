@@ -203,8 +203,12 @@ public static class DtoMapping
         Name = c.Name,
         Email = c.Email,
         Phone = c.Phone,
+        AddressLine1 = c.AddressLine1,
+        AddressLine2 = c.AddressLine2,
         City = c.City,
         State = c.State,
+        PostalCode = c.PostalCode,
+        Country = c.Country,
     };
 
     public static ProductDto ToDto(Product p, int totalQuantity) => new()

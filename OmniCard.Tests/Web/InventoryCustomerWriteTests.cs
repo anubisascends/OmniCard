@@ -73,7 +73,7 @@ public class InventoryCustomerWriteTests : IDisposable
     [Fact]
     public void Customer_Update_Patches_And_PreservesUnexposedFields()
     {
-        // Seed a customer with an address + notes the request DTO does not expose.
+        // Seed a customer with an address + notes; Notes is not exposed by the request DTO.
         int id;
         using (var ctx = new OmniCardDbContext(_opts))
         {
@@ -83,15 +83,21 @@ public class InventoryCustomerWriteTests : IDisposable
             id = c.Id;
         }
 
-        var result = _customersController.Update(id, new CustomerUpsertRequest { Name = "Grace Hopper", Phone = "555" });
+        // The address fields ARE exposed now (needed for the receipt's Ship-to), so they patch;
+        // Notes remains an unexposed field that must be preserved across the update.
+        var result = _customersController.Update(id, new CustomerUpsertRequest
+        {
+            Name = "Grace Hopper", Phone = "555", AddressLine1 = "2 Navy Way", PostalCode = "20390",
+        });
         Assert.IsType<NoContentResult>(result);
 
         using var verify = new OmniCardDbContext(_opts);
         var updated = verify.Customers.Single(c => c.Id == id);
         Assert.Equal("Grace Hopper", updated.Name);
         Assert.Equal("555", updated.Phone);
-        Assert.Equal("1 Navy Way", updated.AddressLine1); // untouched
-        Assert.Equal("VIP", updated.Notes); // untouched
+        Assert.Equal("2 Navy Way", updated.AddressLine1); // patched
+        Assert.Equal("20390", updated.PostalCode); // patched
+        Assert.Equal("VIP", updated.Notes); // untouched (not exposed by the request)
     }
 
     [Fact]

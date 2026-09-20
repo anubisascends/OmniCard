@@ -945,8 +945,290 @@ function ScanBadgesCard() {
   );
 }
 
+/** Admin config for printed sales receipts: the store/company identity + logo shown at the top, and the
+ * thermal-printer layout (roll width, margins, font size, whether prices show, footer text). The receipt
+ * PDF (printed from an order's detail drawer) is generated at exactly the configured width. Editing is
+ * admin-only; the width drives a live to-scale preview strip. */
+function ReceiptSettingsCard() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const authQuery = useQuery({ queryKey: ['auth-status'], queryFn: api.authStatus });
+  const config = useQuery({ queryKey: ['receipt-config'], queryFn: api.receiptConfig });
+  const isAdmin = !!authQuery.data?.isAdmin;
+
+  const [company, setCompany] = useState({
+    name: '', addressLine1: '', addressLine2: '', city: '', state: '', postalCode: '', country: '',
+    email: '', phone: '',
+  });
+  const [widthMm, setWidthMm] = useState('80');
+  const [marginMm, setMarginMm] = useState('4');
+  const [fontPointSize, setFontPointSize] = useState('9');
+  const [showPrices, setShowPrices] = useState(true);
+  const [footerText, setFooterText] = useState('');
+
+  // Seed the form from the server once it loads (and after a save re-fetches the canonical values).
+  useEffect(() => {
+    if (!config.data) return;
+    const c = config.data.company;
+    setCompany({
+      name: c.name ?? '', addressLine1: c.addressLine1 ?? '', addressLine2: c.addressLine2 ?? '',
+      city: c.city ?? '', state: c.state ?? '', postalCode: c.postalCode ?? '', country: c.country ?? '',
+      email: c.email ?? '', phone: c.phone ?? '',
+    });
+    const r = config.data.receipt;
+    setWidthMm(String(r.widthMm));
+    setMarginMm(String(r.marginMm));
+    setFontPointSize(String(r.fontPointSize));
+    setShowPrices(r.showPrices);
+    setFooterText(r.footerText ?? '');
+  }, [config.data]);
+
+  const save = useMutation({
+    mutationFn: () =>
+      api.receiptConfigUpdate({
+        company,
+        receipt: {
+          widthMm: Number(widthMm) || 80,
+          marginMm: Number(marginMm) || 0,
+          fontPointSize: Number(fontPointSize) || 9,
+          showPrices,
+          footerText,
+        },
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['receipt-config'] }),
+  });
+
+  const uploadLogo = useMutation({
+    mutationFn: (file: File) => api.receiptLogoUpload(file),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['receipt-config'] }),
+  });
+  const removeLogo = useMutation({
+    mutationFn: () => api.receiptLogoDelete(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['receipt-config'] }),
+  });
+
+  const logoUrl = config.data?.company.logoUrl ?? null;
+  const widthNum = Number(widthMm) || 80;
+  const field = (label: string, key: keyof typeof company, width = 260) => (
+    <TextField
+      size="small"
+      label={label}
+      value={company[key]}
+      disabled={!isAdmin}
+      onChange={(e) => setCompany((prev) => ({ ...prev, [key]: e.target.value }))}
+      sx={{ width }}
+    />
+  );
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2, maxWidth: 720 }}>
+      <Typography variant="h6" gutterBottom>
+        {t('settings.receipt.title')}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" gutterBottom>
+        {t('settings.receipt.description')}
+      </Typography>
+
+      {config.isLoading ? (
+        <CircularProgress size={24} sx={{ mt: 1 }} />
+      ) : (
+        <Stack spacing={3} sx={{ mt: 1 }}>
+          {/* Company identity */}
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              {t('settings.receipt.companySection')}
+            </Typography>
+            <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+              {field(t('settings.receipt.companyName'), 'name', 320)}
+              {field(t('settings.receipt.email'), 'email')}
+              {field(t('settings.receipt.phone'), 'phone', 180)}
+              {field(t('settings.receipt.addressLine1'), 'addressLine1', 320)}
+              {field(t('settings.receipt.addressLine2'), 'addressLine2', 320)}
+              {field(t('settings.receipt.city'), 'city', 200)}
+              {field(t('settings.receipt.state'), 'state', 120)}
+              {field(t('settings.receipt.postalCode'), 'postalCode', 140)}
+              {field(t('settings.receipt.country'), 'country', 160)}
+            </Stack>
+          </Box>
+
+          {/* Logo */}
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              {t('settings.receipt.logoSection')}
+            </Typography>
+            <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Box
+                sx={{
+                  width: 160, height: 80, border: 1, borderColor: 'divider', borderRadius: 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default',
+                  overflow: 'hidden',
+                }}
+              >
+                {logoUrl ? (
+                  <Box component="img" src={logoUrl} alt="" sx={{ maxWidth: '100%', maxHeight: '100%' }} />
+                ) : (
+                  <Typography variant="caption" color="text.secondary">
+                    {t('settings.receipt.noLogo')}
+                  </Typography>
+                )}
+              </Box>
+              {isAdmin && (
+                <Stack spacing={1}>
+                  <Button variant="outlined" component="label" disabled={uploadLogo.isPending}>
+                    {uploadLogo.isPending ? t('common.states.saving') : t('settings.receipt.uploadLogo')}
+                    <input
+                      type="file"
+                      hidden
+                      accept="image/png,image/jpeg,image/gif,image/webp,image/bmp"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) uploadLogo.mutate(f);
+                        e.target.value = '';
+                      }}
+                    />
+                  </Button>
+                  {logoUrl && (
+                    <Button
+                      color="error"
+                      size="small"
+                      startIcon={<DeleteIcon />}
+                      disabled={removeLogo.isPending}
+                      onClick={() => removeLogo.mutate()}
+                    >
+                      {t('settings.receipt.removeLogo')}
+                    </Button>
+                  )}
+                </Stack>
+              )}
+            </Stack>
+            {uploadLogo.error && <Alert severity="error" sx={{ mt: 1 }}>{(uploadLogo.error as Error).message}</Alert>}
+          </Box>
+
+          {/* Printer layout */}
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              {t('settings.receipt.layoutSection')}
+            </Typography>
+            <Stack direction="row" spacing={2} alignItems="flex-start" flexWrap="wrap" useFlexGap>
+              <Box>
+                <TextField
+                  size="small"
+                  type="number"
+                  label={t('settings.receipt.widthMm')}
+                  value={widthMm}
+                  disabled={!isAdmin}
+                  onChange={(e) => setWidthMm(e.target.value)}
+                  inputProps={{ min: 20, max: 210, step: 1 }}
+                  sx={{ width: 150 }}
+                />
+                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                  {['58', '80'].map((w) => (
+                    <Chip
+                      key={w}
+                      label={t('settings.receipt.widthPreset', { mm: w })}
+                      size="small"
+                      variant={widthMm === w ? 'filled' : 'outlined'}
+                      color={widthMm === w ? 'primary' : 'default'}
+                      onClick={isAdmin ? () => setWidthMm(w) : undefined}
+                    />
+                  ))}
+                </Stack>
+              </Box>
+              <TextField
+                size="small"
+                type="number"
+                label={t('settings.receipt.marginMm')}
+                value={marginMm}
+                disabled={!isAdmin}
+                onChange={(e) => setMarginMm(e.target.value)}
+                inputProps={{ min: 0, max: 25, step: 0.5 }}
+                sx={{ width: 130 }}
+              />
+              <TextField
+                size="small"
+                type="number"
+                label={t('settings.receipt.fontPointSize')}
+                value={fontPointSize}
+                disabled={!isAdmin}
+                onChange={(e) => setFontPointSize(e.target.value)}
+                inputProps={{ min: 5, max: 24, step: 0.5 }}
+                sx={{ width: 130 }}
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={showPrices}
+                    disabled={!isAdmin}
+                    onChange={(e) => setShowPrices(e.target.checked)}
+                  />
+                }
+                label={t('settings.receipt.showPrices')}
+              />
+            </Stack>
+            <TextField
+              size="small"
+              label={t('settings.receipt.footerText')}
+              value={footerText}
+              disabled={!isAdmin}
+              onChange={(e) => setFooterText(e.target.value)}
+              fullWidth
+              multiline
+              minRows={2}
+              sx={{ mt: 2, maxWidth: 480 }}
+              placeholder={t('settings.receipt.footerPlaceholder')}
+            />
+
+            {/* To-scale width preview so the admin can gauge the roll width. */}
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="caption" color="text.secondary">
+                {t('settings.receipt.previewWidth', { mm: widthNum })}
+              </Typography>
+              <Box
+                sx={{
+                  mt: 0.5,
+                  width: `${widthNum}mm`,
+                  maxWidth: '100%',
+                  border: '1px dashed',
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  p: 1,
+                  bgcolor: 'background.default',
+                }}
+              >
+                {logoUrl && (
+                  <Box component="img" src={logoUrl} alt="" sx={{ display: 'block', mx: 'auto', maxHeight: 48, maxWidth: '80%', mb: 0.5 }} />
+                )}
+                <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', fontWeight: 600 }}>
+                  {company.name || t('settings.receipt.companyNamePlaceholder')}
+                </Typography>
+                <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', color: 'text.secondary' }}>
+                  {t('settings.receipt.previewSampleLine')}
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+
+          {save.error && <Alert severity="error">{(save.error as Error).message}</Alert>}
+          {save.isSuccess && <Alert severity="success">{t('settings.receipt.saved')}</Alert>}
+
+          {isAdmin ? (
+            <Box>
+              <Button variant="contained" disabled={save.isPending} onClick={() => save.mutate()}>
+                {save.isPending ? t('common.states.saving') : t('common.actions.save')}
+              </Button>
+            </Box>
+          ) : (
+            <Alert severity="info">{t('settings.receipt.adminOnly')}</Alert>
+          )}
+        </Stack>
+      )}
+    </Paper>
+  );
+}
+
 const TABS = [
   { key: 'sales', labelKey: 'settings.tabs.sales', render: () => <SalesCard /> },
+  { key: 'receipt', labelKey: 'settings.tabs.receipt', render: () => <ReceiptSettingsCard /> },
   { key: 'scan', labelKey: 'settings.tabs.scan', render: () => <ScanBadgesCard /> },
   { key: 'deck-types', labelKey: 'settings.tabs.deckTypes', render: () => <DeckTypesCard /> },
   { key: 'appearance', labelKey: 'settings.tabs.appearance', render: () => <AppearanceCard /> },

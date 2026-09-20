@@ -35,9 +35,15 @@
     "customers": {
       "newCustomer": "New customer",
       "editCustomer": "Edit customer",
-      "deleteConfirm": "Delete customer \"{{name}}\"?"
+      "deleteConfirm": "Delete customer \"{{name}}\"?",
+      "addressLine1": "Address line 1",
+      "addressLine2": "Address line 2",
+      "postalCode": "Postal code",
+      "country": "Country"
     },
     "orderDetail": {
+      "printReceipt": "Print receipt",
+      "receiptPdf": "PDF",
       "addCard": "Add a card (search your collection)",
       "orderTitle": "Order #{{id}}",
       "locked": "This order is {{status}} — header and line edits are locked (change the lane back to Created/Packed to edit).",

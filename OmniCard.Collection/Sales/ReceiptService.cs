@@ -54,10 +54,14 @@ public class ReceiptService(
                 company.AddressLine1, company.AddressLine2,
                 JoinInline(company.City, company.State, company.PostalCode), company.Country),
             CompanyLogoAbsolutePath = logoAbs,
+            CompanyLogoUrl = string.IsNullOrWhiteSpace(company.LogoPath)
+                ? null
+                : "/" + company.LogoPath.Replace('\\', '/'),
             CompanyEmail = company.Email,
             CompanyPhone = company.Phone,
 
             OrderNumber = order.OrderNumber,
+            Channel = ChannelDisplay(order.Channel),
             OrderDate = order.OrderDate,
             TrackingNumber = order.TrackingNumber,
             Carrier = order.Carrier,
@@ -79,6 +83,15 @@ public class ReceiptService(
             FontPointSize = receipt.FontPointSize,
         };
     }
+
+    /// <summary>Human-friendly marketplace name for the receipt (the enum names aren't presentation-ready).</summary>
+    private static string ChannelDisplay(SalesChannel channel) => channel switch
+    {
+        SalesChannel.TcgPlayer => "TCGplayer",
+        SalesChannel.Ebay => "eBay",
+        SalesChannel.Manual => "Manual",
+        _ => channel.ToString(),
+    };
 
     /// <summary>Joins non-empty parts with newlines (multi-line address block).</summary>
     private static string? JoinBlock(params string?[] parts)
