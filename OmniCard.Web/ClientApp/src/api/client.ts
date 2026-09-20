@@ -28,6 +28,9 @@ import type {
   LocationSummaryDto,
   OrderDetailDto,
   OrderDto,
+  OrderImportPreviewDto,
+  OrderImportRowDto,
+  OrderImportTemplateDto,
   OrderLineDto,
   PagedResult,
   ProductDto,
@@ -364,6 +367,39 @@ export const api = {
     }),
   orderRemoveLine: (lineId: number) =>
     request<void>(`/api/orders/lines/${lineId}`, { method: 'DELETE' }),
+
+  // Order CSV import
+  orderImportFields: () => request<string[]>('/api/orders/import/fields'),
+  orderImportTemplates: () => request<OrderImportTemplateDto[]>('/api/orders/import/templates'),
+  orderImportTemplateSave: (body: {
+    id?: string;
+    name: string;
+    channel: string;
+    columnMappings: Record<string, string>;
+  }) =>
+    request<OrderImportTemplateDto>('/api/orders/import/templates', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  orderImportTemplateDelete: (id: string) =>
+    request<void>(`/api/orders/import/templates/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  orderImportHeaders: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return postForm<{ headers: string[] }>('/api/orders/import/headers', form);
+  },
+  orderImportPreview: (file: File, mappings: Record<string, string>, channel: string) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('mappingsJson', JSON.stringify(mappings));
+    form.append('channel', channel);
+    return postForm<OrderImportPreviewDto>('/api/orders/import/preview', form);
+  },
+  orderImportCommit: (channel: string, rows: OrderImportRowDto[]) =>
+    request<{ created: number }>('/api/orders/import/commit', {
+      method: 'POST',
+      body: JSON.stringify({ channel, rows }),
+    }),
   listings: (game?: string) => request<ActiveListingDto[]>(`/api/listings${qs({ game })}`),
   listingDetails: (game?: string) =>
     request<ListingDetailDto[]>(`/api/listings/details${qs({ game })}`),

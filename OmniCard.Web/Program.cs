@@ -154,6 +154,8 @@ builder.Services.AddSingleton<IOrderService, OrderService>();
 
 // Import/export + PDF generation (QuestPDF exporters set their own Community license internally).
 builder.Services.AddSingleton<ICsvExportImportService, CsvExportImportService>();
+builder.Services.AddSingleton<IOrderCsvImportService, OrderCsvImportService>();
+builder.Services.AddSingleton<IOrderImportTemplateService, OrderImportTemplateService>();
 builder.Services.AddSingleton<IReceiptService, ReceiptService>();
 builder.Services.AddSingleton<IReceiptPdfExporter, ReceiptPdfExporter>();
 builder.Services.AddSingleton<ISetChecklistPdfExporter, SetChecklistPdfExporter>();

@@ -8,9 +8,63 @@
     },
     "orders": {
       "newOrder": "New order",
+      "importCsv": "Import CSV",
+      "importResult_one": "Imported {{count}} order",
+      "importResult_other": "Imported {{count}} orders",
       "customerFallback": "Customer #{{id}}",
       "itemCount_one": "{{count}} item",
       "itemCount_other": "{{count}} items"
+    },
+    "orderImport": {
+      "title": "Import orders from CSV",
+      "steps": {
+        "file": "Choose file",
+        "map": "Map columns",
+        "review": "Review & import"
+      },
+      "fileHelp": "Upload a CSV of orders (e.g. a TCGPlayer shipping export). You'll map its columns next.",
+      "chooseFile": "Choose CSV file…",
+      "template": "Template",
+      "builtIn": "built-in",
+      "mapHelp": "Map each order field to a column from your file. Order Number is required; leave others unmapped if your file doesn't have them.",
+      "notMapped": "— not mapped —",
+      "orderNumberRequired": "Map a column to Order Number to continue — it's used to identify and de-duplicate orders.",
+      "saveAsName": "New template name",
+      "saveAsTemplate": "Save as template",
+      "deleteTemplate": "Delete this template",
+      "preview": "Preview",
+      "previewing": "Previewing…",
+      "noRows": "No importable rows were found in this file.",
+      "selectedCount": "{{count}} of {{total}} rows selected to import.",
+      "importCount_one": "Import {{count}} order",
+      "importCount_other": "Import {{count}} orders",
+      "importing": "Importing…",
+      "col": {
+        "order": "Order #",
+        "customer": "Customer",
+        "date": "Date",
+        "items": "Items",
+        "value": "Value",
+        "status": "Status"
+      },
+      "fields": {
+        "FullName": "Full name",
+        "FirstName": "First name",
+        "LastName": "Last name",
+        "OrderNumber": "Order number",
+        "OrderDate": "Order date",
+        "Address1": "Address line 1",
+        "Address2": "Address line 2",
+        "City": "City",
+        "State": "State / province",
+        "PostalCode": "Postal code",
+        "Country": "Country",
+        "ShippingFeePaid": "Shipping fee paid",
+        "ItemCount": "Item count",
+        "ValueOfProducts": "Value of products",
+        "TrackingNumber": "Tracking number",
+        "Carrier": "Carrier"
+      }
     },
     "createOrder": {
       "title": "New order",
