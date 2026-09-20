@@ -6,11 +6,16 @@ public class ReceiptDocument
     public string? CompanyName { get; set; }
     public string? CompanyAddressBlock { get; set; }
     public string? CompanyLogoAbsolutePath { get; set; }
+    /// <summary>Web-servable URL for the logo (e.g. "/branding/company-logo.png"); used by the HTML
+    /// receipt view. The PDF exporter uses <see cref="CompanyLogoAbsolutePath"/> instead.</summary>
+    public string? CompanyLogoUrl { get; set; }
     public string? CompanyEmail { get; set; }
     public string? CompanyPhone { get; set; }
 
     // Order info
     public string? OrderNumber { get; set; }
+    /// <summary>Human-friendly sales channel the order came through (e.g. "TCGplayer", "eBay").</summary>
+    public string? Channel { get; set; }
     public DateTime OrderDate { get; set; }
     public string? TrackingNumber { get; set; }
     public string? Carrier { get; set; }

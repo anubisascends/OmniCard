@@ -41,9 +41,12 @@ public sealed class ReceiptPdfExporter : IReceiptPdfExporter
                     // Order info
                     if (!string.IsNullOrWhiteSpace(doc.OrderNumber))
                         col.Item().Text($"Order: {doc.OrderNumber}").Bold();
+                    if (!string.IsNullOrWhiteSpace(doc.Channel))
+                        col.Item().Text($"Channel: {doc.Channel}");
                     col.Item().Text($"Date: {doc.OrderDate:yyyy-MM-dd}");
-                    if (!string.IsNullOrWhiteSpace(doc.Carrier) || !string.IsNullOrWhiteSpace(doc.TrackingNumber))
-                        col.Item().Text($"Ship: {doc.Carrier} {doc.TrackingNumber}".Trim());
+                    if (!string.IsNullOrWhiteSpace(doc.TrackingNumber))
+                        col.Item().Text($"Tracking No.: {doc.TrackingNumber}"
+                            + (string.IsNullOrWhiteSpace(doc.Carrier) ? "" : $" ({doc.Carrier})"));
 
                     // Customer
                     col.Item().PaddingTop(4).Text("Ship to:").Bold();

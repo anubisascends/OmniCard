@@ -37,8 +37,12 @@ public sealed class CustomersController(
             Name = request.Name.Trim(),
             Email = request.Email,
             Phone = request.Phone,
+            AddressLine1 = request.AddressLine1,
+            AddressLine2 = request.AddressLine2,
             City = request.City,
             State = request.State,
+            PostalCode = request.PostalCode,
+            Country = request.Country,
         });
         return CreatedAtAction(nameof(GetOne), new { id = created.Id }, DtoMapping.ToDto(created));
     }
@@ -57,8 +61,12 @@ public sealed class CustomersController(
         existing.Name = request.Name.Trim();
         existing.Email = request.Email;
         existing.Phone = request.Phone;
+        existing.AddressLine1 = request.AddressLine1;
+        existing.AddressLine2 = request.AddressLine2;
         existing.City = request.City;
         existing.State = request.State;
+        existing.PostalCode = request.PostalCode;
+        existing.Country = request.Country;
         ctx.SaveChanges();
         return NoContent();
     }

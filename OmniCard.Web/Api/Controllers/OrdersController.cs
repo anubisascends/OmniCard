@@ -6,6 +6,7 @@ using OmniCard.Shared.Audit;
 using OmniCard.Shared.Sales;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Api.Mapping;
+using OmniCard.Web.Services;
 
 namespace OmniCard.Web.Api.Controllers;
 
@@ -28,6 +29,16 @@ public sealed class OrdersController(
         var doc = receipts.BuildReceipt(id);
         var bytes = TempFile.Produce(".pdf", p => receiptPdf.Export(doc, p));
         return File(bytes, "application/pdf", $"receipt-{id}.pdf");
+    }
+
+    /// <summary>Print-ready HTML receipt sized to the configured roll width (<c>@page size: {width}mm
+    /// auto</c>) and auto-opening the browser print dialog. Preferred for thermal printers — it avoids the
+    /// PDF path's tendency to pad the job out to a full Letter/A4 sheet.</summary>
+    [HttpGet("{id:int}/receipt.html")]
+    public ContentResult ReceiptHtml(int id)
+    {
+        var doc = receipts.BuildReceipt(id);
+        return Content(ReceiptHtmlRenderer.Render(doc), "text/html");
     }
 
     /// <summary>The kanban lanes in board order (customizable; falls back to built-in defaults).</summary>

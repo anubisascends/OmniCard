@@ -260,11 +260,21 @@ export function OrderDetailDrawer({ orderId, onClose }: { orderId: number | null
                   variant="outlined"
                   startIcon={<ReceiptLongIcon />}
                   component="a"
-                  href={api.receiptPdfUrl(orderId!)}
+                  href={api.receiptHtmlUrl(orderId!)}
                   target="_blank"
                   rel="noopener"
                 >
                   {t('sales.orderDetail.printReceipt')}
+                </Button>
+                <Button
+                  variant="text"
+                  size="small"
+                  component="a"
+                  href={api.receiptPdfUrl(orderId!)}
+                  target="_blank"
+                  rel="noopener"
+                >
+                  {t('sales.orderDetail.receiptPdf')}
                 </Button>
                 {editable && (
                   <Button

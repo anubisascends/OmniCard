@@ -472,8 +472,12 @@ public sealed record CustomerDto
     public string Name { get; init; } = "";
     public string? Email { get; init; }
     public string? Phone { get; init; }
+    public string? AddressLine1 { get; init; }
+    public string? AddressLine2 { get; init; }
     public string? City { get; init; }
     public string? State { get; init; }
+    public string? PostalCode { get; init; }
+    public string? Country { get; init; }
 }
 
 public sealed record ProductDto
@@ -511,8 +515,12 @@ public sealed record CustomerUpsertRequest
     public string Name { get; init; } = "";
     public string? Email { get; init; }
     public string? Phone { get; init; }
+    public string? AddressLine1 { get; init; }
+    public string? AddressLine2 { get; init; }
     public string? City { get; init; }
     public string? State { get; init; }
+    public string? PostalCode { get; init; }
+    public string? Country { get; init; }
 }
 
 /// <summary>Create or edit a sealed-product catalog entry.</summary>
