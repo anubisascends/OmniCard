@@ -356,6 +356,64 @@ public sealed record AddOrderLineRequest
     public decimal UnitSalePrice { get; init; }
 }
 
+// --- Order CSV import ---
+
+/// <summary>A reusable column-mapping template for importing orders from a CSV.
+/// <see cref="ColumnMappings"/> maps a logical field name (see the field list from
+/// <c>GET /api/orders/import/fields</c>) to a CSV header name.</summary>
+public sealed record OrderImportTemplateDto
+{
+    public string Id { get; init; } = "";
+    public string Name { get; init; } = "";
+    public bool IsBuiltIn { get; init; }
+    public string Channel { get; init; } = "Manual";
+    public Dictionary<string, string> ColumnMappings { get; init; } = new();
+}
+
+/// <summary>Create (blank/absent <see cref="Id"/>) or update (existing custom id) a mapping template.</summary>
+public sealed record SaveOrderImportTemplateRequest
+{
+    public string? Id { get; init; }
+    public string Name { get; init; } = "";
+    public string Channel { get; init; } = "Manual";
+    public Dictionary<string, string> ColumnMappings { get; init; } = new();
+}
+
+/// <summary>One parsed CSV row plus how it maps onto existing data (mirrors the domain import row).</summary>
+public sealed record OrderImportRowDto
+{
+    public string OrderNumber { get; init; } = "";
+    public string CustomerName { get; init; } = "";
+    public string? AddressLine1 { get; init; }
+    public string? AddressLine2 { get; init; }
+    public string? City { get; init; }
+    public string? State { get; init; }
+    public string? PostalCode { get; init; }
+    public string? Country { get; init; }
+    public DateTime OrderDate { get; init; }
+    public decimal ShippingFeePaid { get; init; }
+    public int ItemCount { get; init; }
+    public decimal ValueOfProducts { get; init; }
+    public string? TrackingNumber { get; init; }
+    public string? Carrier { get; init; }
+    public int? MatchedCustomerId { get; init; }
+    public bool IsNewCustomer { get; init; }
+    public bool IsDuplicateOrder { get; init; }
+    public bool Include { get; init; }
+    public bool CanInclude { get; init; }
+    public string StatusText { get; init; } = "";
+}
+
+public sealed record OrderImportPreviewDto(
+    IReadOnlyList<OrderImportRowDto> Rows, IReadOnlyList<string> Warnings);
+
+/// <summary>Commit the (possibly re-selected) preview rows as orders under <see cref="Channel"/>.</summary>
+public sealed record CommitOrderImportRequest
+{
+    public string Channel { get; init; } = "Manual";
+    public List<OrderImportRowDto> Rows { get; init; } = [];
+}
+
 public sealed record ActiveListingDto(
     int LotId, string Name, string SetName, string SetCode,
     string? Condition, bool IsFoil, decimal ListedPrice, string Status);

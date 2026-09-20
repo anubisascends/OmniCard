@@ -187,6 +187,27 @@ Until configured, `GET /api/ebay/status` reports what's missing and all listing 
 (so order status changes keep working without a live connection). Tokens are stored encrypted in
 `<DataDirectory>/web-credentials.dat`.
 
+## Order CSV import
+
+**Sales → Orders → Import CSV** creates orders from a CSV using a reusable column-mapping **template**.
+The built-in **TCGPlayer Shipping Export** template ships pre-mapped to that file's columns and is the
+default. You can adjust the mapping per import and **Save as template** to store a custom layout for a
+different marketplace's export.
+
+Flow: upload the CSV → the dialog reads its headers → map each order field to a column (Order Number is
+required; it's the dedup key) → preview the resolved rows (new vs. matched customer, duplicate orders
+already imported) → import the selected rows. Import is **idempotent**: rows whose order number already
+exists are skipped, and customers are matched/reused by name + postal code.
+
+Imported orders are **header-only**: they capture the customer, channel, order number/date, shipping fee,
+tracking/carrier, and the aggregate item count + product value (`ImportedItemCount` / `ImportedProductValue`).
+They are **not** backed by inventory lots, so importing does not decrement stock.
+
+- API: `POST /api/orders/import/{headers,preview,commit}`, template CRUD under
+  `/api/orders/import/templates`, field list at `GET /api/orders/import/fields`.
+- Custom templates persist to `<DataDirectory>/order-import-templates.json`; built-ins are merged in at
+  read time and can't be edited or deleted.
+
 ## Localization
 
 The SPA is internationalized with **react-i18next** + **i18next-browser-languagedetector**. It picks

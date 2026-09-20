@@ -1,7 +1,7 @@
 namespace OmniCard.Shared.ImportExport;
 
-public class TcgOrderImportPreview
+public class OrderImportPreview
 {
-    public List<TcgOrderImportRow> Rows { get; set; } = [];
+    public List<OrderImportRow> Rows { get; set; } = [];
     public List<string> Warnings { get; set; } = [];
 }

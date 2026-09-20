@@ -1,7 +1,7 @@
 namespace OmniCard.Shared.ImportExport;
 
-/// <summary>One row of a parsed TCGPlayer Shipping Export, plus how it maps onto existing data.</summary>
-public class TcgOrderImportRow
+/// <summary>One row of a parsed order-import CSV, plus how it maps onto existing data.</summary>
+public class OrderImportRow
 {
     public string OrderNumber { get; set; } = "";
     public string CustomerName { get; set; } = "";

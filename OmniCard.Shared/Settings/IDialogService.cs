@@ -108,7 +108,7 @@ public interface IDialogService
 
     /// <summary>Opens the read-only Trades history window (all trade sessions).</summary>
     void OpenTrades();
-    int ShowTcgOrderImportPreview(TcgOrderImportPreview preview);
+    int ShowTcgOrderImportPreview(OrderImportPreview preview);
     bool Confirm(string message, string title);
     BatchDecklistImportSummary? ShowBatchDecklistImport();
 

@@ -37,10 +37,13 @@ import CheckIcon from '@mui/icons-material/Check';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
+import Snackbar from '@mui/material/Snackbar';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { api, type CustomerFields, type ListingFields } from '../api/client';
 import { useGame } from '../context/GameContext';
 import type { CustomerDto, ListingDetailDto, OrderDto, WorkflowLaneDto } from '../api/types';
 import { OrderDetailDrawer } from '../components/dialogs/OrderDetailDrawer';
+import { ImportOrdersDialog } from '../components/dialogs/ImportOrdersDialog';
 import { useFormatters } from '../i18n/format';
 
 function laneOf(order: OrderDto, lanes: WorkflowLaneDto[]): string {
@@ -121,6 +124,8 @@ function OrdersBoard() {
   const [dragId, setDragId] = useState<number | null>(null);
   const [detailOrderId, setDetailOrderId] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importResult, setImportResult] = useState<number | null>(null);
 
   if (lanesQuery.isLoading || ordersQuery.isLoading) return <CircularProgress />;
   const lanes = lanesQuery.data ?? [];
@@ -128,9 +133,14 @@ function OrdersBoard() {
 
   return (
     <Stack spacing={1.5} alignItems="flex-start">
-      <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}>
-        {t('sales.orders.newOrder')}
-      </Button>
+      <Stack direction="row" spacing={1}>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}>
+          {t('sales.orders.newOrder')}
+        </Button>
+        <Button variant="outlined" startIcon={<UploadFileIcon />} onClick={() => setImportOpen(true)}>
+          {t('sales.orders.importCsv')}
+        </Button>
+      </Stack>
       <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1, alignSelf: 'stretch' }}>
       {lanes.map((lane) => {
         const laneOrders = orders.filter((o) => laneOf(o, lanes) === lane.key);
@@ -191,6 +201,17 @@ function OrdersBoard() {
           qc.invalidateQueries({ queryKey: ['orders'] });
           setDetailOrderId(id);
         }}
+      />
+      <ImportOrdersDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={(created) => setImportResult(created)}
+      />
+      <Snackbar
+        open={importResult !== null}
+        autoHideDuration={5000}
+        onClose={() => setImportResult(null)}
+        message={t('sales.orders.importResult', { count: importResult ?? 0 })}
       />
       <OrderDetailDrawer orderId={detailOrderId} onClose={() => setDetailOrderId(null)} />
     </Stack>

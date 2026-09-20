@@ -203,6 +203,44 @@ export interface OrderDto {
   notes?: string | null;
 }
 
+// --- Order CSV import ---
+
+export interface OrderImportTemplateDto {
+  id: string;
+  name: string;
+  isBuiltIn: boolean;
+  channel: string;
+  columnMappings: Record<string, string>;
+}
+
+export interface OrderImportRowDto {
+  orderNumber: string;
+  customerName: string;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+  orderDate: string;
+  shippingFeePaid: number;
+  itemCount: number;
+  valueOfProducts: number;
+  trackingNumber?: string | null;
+  carrier?: string | null;
+  matchedCustomerId?: number | null;
+  isNewCustomer: boolean;
+  isDuplicateOrder: boolean;
+  include: boolean;
+  canInclude: boolean;
+  statusText: string;
+}
+
+export interface OrderImportPreviewDto {
+  rows: OrderImportRowDto[];
+  warnings: string[];
+}
+
 export interface ActiveListingDto {
   lotId: number;
   name: string;
