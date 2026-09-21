@@ -194,6 +194,120 @@ public class DeckLegalityServiceTests : IDisposable
         Assert.Contains(result.Warnings, w => w.Code == "commander-count");
     }
 
+    /// <summary>Like <see cref="SeedDeckBox"/> but also stamps each card's collector number (card
+    /// number / set code), which One Piece uses as the copy-identity for its 4-copy limit.</summary>
+    private int SeedDeckBoxWithNumbers(string builtInName, CardGame game,
+        IReadOnlyList<(string Name, string Number, int Qty, string? Tag)> cards)
+    {
+        var deckTypeId = DeckTypes().GetForGame(game).Single(d => d.Name == builtInName).Id;
+        using var ctx = new OmniCardDbContext(_options);
+        var box = new StorageContainer
+        {
+            Name = $"Deck {Guid.NewGuid():N}",
+            ContainerType = ContainerType.DeckBox,
+            Game = game,
+            DeckTypeId = deckTypeId,
+        };
+        ctx.StorageContainers.Add(box);
+        ctx.SaveChanges();
+
+        foreach (var (name, number, qty, tag) in cards)
+        {
+            var product = new Product { Game = game, Category = ProductCategory.Single, Name = name, CollectorNumber = number };
+            ctx.Products.Add(product);
+            ctx.SaveChanges();
+            var lot = new InventoryLot { ProductId = product.Id, Quantity = qty, LocationId = box.Id };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+
+            if (tag != null)
+            {
+                var t = new Tag { Name = tag };
+                ctx.Tags.Add(t);
+                ctx.SaveChanges();
+                ctx.LotTags.Add(new LotTag { LotId = lot.Id, TagId = t.Id });
+                ctx.SaveChanges();
+            }
+        }
+        return box.Id;
+    }
+
+    [Fact]
+    public void OnePiece_CountsCopiesBySetCode_AltArtsStack_Warns()
+    {
+        // Two different arts of OP01-001 (2 + 3 copies) share a card number → 5 of one card → warn,
+        // even though the printed names differ. Grouping must be by set code, not name.
+        var deckTypes = DeckTypes();
+        var boxId = SeedDeckBoxWithNumbers("Constructed", CardGame.OnePiece, new (string, string, int, string?)[]
+        {
+            ("Monkey.D.Luffy", "OP01-001", 2, null),
+            ("Monkey.D.Luffy (Alt Art)", "OP01-001", 3, null),
+            ("Leader", "OP01-060", 1, "commander"),
+        });
+
+        var result = CreateService(deckTypes).Check(boxId);
+
+        Assert.Contains(result.Warnings, w => w.Code == "copy-limit" && w.Message.Contains("OP01-001"));
+    }
+
+    [Fact]
+    public void OnePiece_DistinctSetCodes_DoNotStack_NoWarning()
+    {
+        // Four copies each of two distinct card numbers → each is at the 4-copy limit → no warning,
+        // even if a name happened to repeat. Distinct set codes must be counted separately.
+        var deckTypes = DeckTypes();
+        var boxId = SeedDeckBoxWithNumbers("Constructed", CardGame.OnePiece, new (string, string, int, string?)[]
+        {
+            ("Card", "OP01-010", 4, null),
+            ("Card", "OP01-011", 4, null),
+            ("Leader", "OP01-060", 1, "commander"),
+        });
+
+        var result = CreateService(deckTypes).Check(boxId);
+
+        Assert.DoesNotContain(result.Warnings, w => w.Code == "copy-limit");
+    }
+
+    [Fact]
+    public void OnePiece_FiveOfOneSetCode_Warns()
+    {
+        var deckTypes = DeckTypes();
+        var boxId = SeedDeckBoxWithNumbers("Constructed", CardGame.OnePiece, new (string, string, int, string?)[]
+        {
+            ("Some Character", "OP01-025", 5, null),
+            ("Leader", "OP01-060", 1, "commander"),
+        });
+
+        var result = CreateService(deckTypes).Check(boxId);
+
+        Assert.Contains(result.Warnings, w => w.Code == "copy-limit" && w.Message.Contains("OP01-025"));
+    }
+
+    [Fact]
+    public void CopyIdentity_IsFlagDriven_NotGameDriven()
+    {
+        // A custom One Piece deck type with the flag OFF must count by NAME: two copies of the same
+        // name across different card numbers stack and warn (max 1 here), proving the collector-number
+        // grouping is controlled by CopiesCountByCollectorNumber, not hardcoded to the game.
+        var deckTypes = DeckTypes();
+        deckTypes.Create(new DeckType
+        {
+            Game = CardGame.OnePiece,
+            Name = "By Name",
+            MaxCopiesPerCard = 1,
+            CopiesCountByCollectorNumber = false,
+        });
+        var boxId = SeedDeckBoxWithNumbers("By Name", CardGame.OnePiece, new (string, string, int, string?)[]
+        {
+            ("Same Name", "OP01-001", 1, null),
+            ("Same Name", "OP01-002", 1, null),
+        });
+
+        var result = CreateService(deckTypes).Check(boxId);
+
+        Assert.Contains(result.Warnings, w => w.Code == "copy-limit" && w.Message.Contains("Same Name"));
+    }
+
     [Fact]
     public void NoDeckType_ReturnsOk()
     {

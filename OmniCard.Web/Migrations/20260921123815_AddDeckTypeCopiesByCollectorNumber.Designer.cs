@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OmniCard.Data;
 
@@ -11,9 +12,11 @@ using OmniCard.Data;
 namespace OmniCard.Web.Migrations
 {
     [DbContext(typeof(OmniCardDbContext))]
-    partial class OmniCardDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260921123815_AddDeckTypeCopiesByCollectorNumber")]
+    partial class AddDeckTypeCopiesByCollectorNumber
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

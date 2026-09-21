@@ -192,6 +192,9 @@ public sealed record DeckTypeDto
     public int? MaxCopiesPerCard { get; init; }
     public bool Singleton { get; init; }
     public bool BasicLandsExempt { get; init; }
+    /// <summary>Count copies by printed card number (set code) instead of name — every art of a number
+    /// counts together toward the copy limit (One Piece TCG rule).</summary>
+    public bool CopiesCountByCollectorNumber { get; init; }
     public int CommanderSlots { get; init; }
 }
 
@@ -205,6 +208,8 @@ public sealed record DeckTypeUpsertRequest
     public int? MaxCopiesPerCard { get; init; }
     public bool Singleton { get; init; }
     public bool BasicLandsExempt { get; init; }
+    /// <summary>Count copies by printed card number (set code) instead of name (One Piece TCG rule).</summary>
+    public bool CopiesCountByCollectorNumber { get; init; }
     public int CommanderSlots { get; init; }
 }
 

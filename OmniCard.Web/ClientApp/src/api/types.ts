@@ -100,6 +100,7 @@ export interface DeckTypeDto {
   maxCopiesPerCard?: number | null;
   singleton: boolean;
   basicLandsExempt: boolean;
+  copiesCountByCollectorNumber: boolean;
   commanderSlots: number;
 }
 
@@ -111,6 +112,7 @@ export interface DeckTypeUpsertRequest {
   maxCopiesPerCard?: number | null;
   singleton: boolean;
   basicLandsExempt: boolean;
+  copiesCountByCollectorNumber: boolean;
   commanderSlots: number;
 }
 

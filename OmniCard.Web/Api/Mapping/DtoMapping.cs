@@ -119,6 +119,7 @@ public static class DtoMapping
         MaxCopiesPerCard = d.MaxCopiesPerCard,
         Singleton = d.Singleton,
         BasicLandsExempt = d.BasicLandsExempt,
+        CopiesCountByCollectorNumber = d.CopiesCountByCollectorNumber,
         CommanderSlots = d.CommanderSlots,
     };
 

@@ -36,6 +36,7 @@ const emptyRules = (game: string): DeckTypeUpsertRequest => ({
   maxCopiesPerCard: null,
   singleton: false,
   basicLandsExempt: false,
+  copiesCountByCollectorNumber: false,
   commanderSlots: 0,
 });
 
@@ -76,6 +77,7 @@ function DeckTypeDialog({
             maxCopiesPerCard: existing.maxCopiesPerCard ?? null,
             singleton: existing.singleton,
             basicLandsExempt: existing.basicLandsExempt,
+            copiesCountByCollectorNumber: existing.copiesCountByCollectorNumber,
             commanderSlots: existing.commanderSlots,
           }
         : emptyRules(game),
@@ -154,6 +156,15 @@ function DeckTypeDialog({
               />
             }
             label={t('settings.deckTypes.basicLandsExempt')}
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={form.copiesCountByCollectorNumber}
+                onChange={(e) => set({ copiesCountByCollectorNumber: e.target.checked })}
+              />
+            }
+            label={t('settings.deckTypes.copiesByCollectorNumber')}
           />
           {save.isError && (
             <Typography variant="caption" color="error">

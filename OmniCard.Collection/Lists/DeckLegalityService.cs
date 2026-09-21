@@ -34,7 +34,7 @@ public sealed class DeckLegalityService(
         // Owned singles in the box, with the data the rules need. Tags come from the join tables.
         var lots = context.Lots.AsNoTracking()
             .Where(l => l.LocationId == deckBoxId && l.Product.Category == ProductCategory.Single)
-            .Select(l => new { l.Id, l.Quantity, l.Product.Name, l.Product.CardType })
+            .Select(l => new { l.Id, l.Quantity, l.Product.Name, l.Product.CardType, l.Product.CollectorNumber })
             .ToList();
 
         var lotIds = lots.Select(l => l.Id).ToList();
@@ -49,7 +49,12 @@ public sealed class DeckLegalityService(
         var warnings = new List<DeckLegalityWarning>();
         var commanderCount = 0;
         var mainDeckCount = 0;
-        var mainCopiesByName = new Dictionary<string, (int Count, bool IsBasicLand)>(StringComparer.OrdinalIgnoreCase);
+        // Copies are aggregated by a "copy identity". Most deck types count by card name, but some
+        // (e.g. One Piece) treat a card as unique by its printed number (e.g. OP01-001): alternate
+        // arts of the same number are the same card for the copy limit. That behavior is opt-in per
+        // deck type via CopiesCountByCollectorNumber, so we group by CollectorNumber when it's set.
+        var byNumber = deckType.CopiesCountByCollectorNumber;
+        var mainCopies = new Dictionary<string, (int Count, bool IsBasicLand, string Label)>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var lot in lots)
         {
@@ -62,9 +67,15 @@ public sealed class DeckLegalityService(
 
             mainDeckCount += qty;
             var name = (lot.Name ?? "").Trim();
+            var number = (lot.CollectorNumber ?? "").Trim();
+            // Group by set code when the game demands it (fall back to name when the number is missing).
+            var key = byNumber && number.Length > 0 ? number : name;
+            var label = byNumber && number.Length > 0
+                ? (name.Length > 0 ? $"{name} ({number})" : number)
+                : name;
             var isBasic = IsBasicLand(name, lot.CardType);
-            var prev = mainCopiesByName.GetValueOrDefault(name);
-            mainCopiesByName[name] = (prev.Count + qty, isBasic);
+            var prev = mainCopies.GetValueOrDefault(key);
+            mainCopies[key] = (prev.Count + qty, isBasic, prev.Label ?? label);
         }
 
         // --- Deck size ---
@@ -83,14 +94,14 @@ public sealed class DeckLegalityService(
         var copyLimit = deckType.Singleton ? 1 : deckType.MaxCopiesPerCard;
         if (copyLimit is int limit)
         {
-            foreach (var (name, info) in mainCopiesByName)
+            foreach (var (_, info) in mainCopies)
             {
                 if (deckType.BasicLandsExempt && info.IsBasicLand) continue;
                 if (info.Count > limit)
                     warnings.Add(new("copy-limit",
                         deckType.Singleton
-                            ? $"\"{name}\" appears {info.Count}× — {deckType.Name} is singleton (max 1)."
-                            : $"\"{name}\" appears {info.Count}× — {deckType.Name} allows at most {limit}."));
+                            ? $"\"{info.Label}\" appears {info.Count}× — {deckType.Name} is singleton (max 1)."
+                            : $"\"{info.Label}\" appears {info.Count}× — {deckType.Name} allows at most {limit}."));
             }
         }
 
