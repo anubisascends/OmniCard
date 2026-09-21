@@ -59,6 +59,19 @@ License:     MIT License
 Copyright (c) .NET Foundation and Contributors / Microsoft Corporation.
 
 --------------------------------------------------------------------------------
+Microsoft.OpenApi 2.12.2 / Microsoft.AspNetCore.OpenApi 10.0.0 — MIT License
+--------------------------------------------------------------------------------
+Components:  Microsoft.AspNetCore.OpenApi (10.0.0),
+             Microsoft.OpenApi (2.12.2 — referenced directly to pin a patched
+             version above the 2.0.0 that Microsoft.AspNetCore.OpenApi 10.0.0
+             pulls in transitively — CVE-2026-49451 / GHSA-v5pm-xwqc-g5wc, a
+             high-severity stack-overflow DoS on circular schema references,
+             fixed in 2.7.5).
+Homepage:    https://github.com/microsoft/OpenAPI.NET
+License:     MIT License
+Copyright (c) .NET Foundation and Contributors / Microsoft Corporation.
+
+--------------------------------------------------------------------------------
 SQLitePCLRaw 2.1.13 — Apache License 2.0
 --------------------------------------------------------------------------------
 Components:  SQLitePCLRaw.bundle_e_sqlite3, SQLitePCLRaw.core,
