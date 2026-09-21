@@ -31,6 +31,10 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
+    <!-- Pin Microsoft.OpenApi above the transitive 2.0.0 pulled in by Microsoft.AspNetCore.OpenApi:
+         2.0.0 has a known high-severity DoS (CVE-2026-49451 / GHSA-v5pm-xwqc-g5wc — stack overflow
+         on circular schema refs), fixed in 2.7.5. -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.12.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
