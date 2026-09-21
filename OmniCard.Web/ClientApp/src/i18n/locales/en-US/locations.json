@@ -5,6 +5,7 @@
       "nameLabel": "New location name",
       "nameTaken": "This name is already in use"
     },
+    "hideEmpty": "Hide empty locations",
     "types": {
       "Binder": "Binder",
       "Box": "Box",
