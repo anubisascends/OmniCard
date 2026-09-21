@@ -8,11 +8,13 @@ import {
   ButtonBase,
   CircularProgress,
   Collapse,
+  FormControlLabel,
   IconButton,
   Link,
   Menu,
   MenuItem,
   Stack,
+  Switch,
   TextField,
   Typography,
 } from '@mui/material';
@@ -23,6 +25,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
 const COLLAPSED_KEY = 'omnicard.locations.collapsed';
+const HIDE_EMPTY_KEY = 'omnicard.locations.hideEmpty';
 import { api } from '../api/client';
 import type { LocationSummaryDto } from '../api/types';
 import { useGame } from '../context/GameContext';
@@ -322,7 +325,24 @@ export function LocationsPage() {
   }, [games.data]);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['locations'] });
-  const groups = useMemo(() => (data ? groupLocations(data) : []), [data]);
+
+  const [hideEmpty, setHideEmpty] = useState<boolean>(
+    () => localStorage.getItem(HIDE_EMPTY_KEY) === '1',
+  );
+  const toggleHideEmpty = (value: boolean) => {
+    setHideEmpty(value);
+    localStorage.setItem(HIDE_EMPTY_KEY, value ? '1' : '0');
+  };
+
+  const groups = useMemo(() => {
+    if (!data) return [];
+    const all = groupLocations(data);
+    if (!hideEmpty) return all;
+    // Drop locations with no cards from the selected game, then drop groups left empty.
+    return all
+      .map((g) => ({ ...g, items: g.items.filter((loc) => loc.cardCount > 0) }))
+      .filter((g) => g.items.length > 0);
+  }, [data, hideEmpty]);
   const columns = useMemo(() => buildColumns(refresh, gameLabel, t, fmt), [gameLabel, t, fmt]);
 
   const headingFor = (g: LocationGroup) =>
@@ -351,6 +371,17 @@ export function LocationsPage() {
       <Typography variant="h4">{t('locations.title')}</Typography>
       <DeckBoxGameBanner onResolved={refresh} />
       <AddLocationBar onAdded={refresh} />
+      <FormControlLabel
+        control={
+          <Switch
+            checked={hideEmpty}
+            onChange={(e) => toggleHideEmpty(e.target.checked)}
+            size="small"
+          />
+        }
+        label={t('locations.hideEmpty')}
+        sx={{ alignSelf: 'flex-start' }}
+      />
       {isLoading || !data ? (
         <CircularProgress />
       ) : (
