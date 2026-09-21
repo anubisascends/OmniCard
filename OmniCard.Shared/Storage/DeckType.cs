@@ -42,6 +42,12 @@ public class DeckType
     /// <summary>Basic lands (and other unlimited-copy staples) are exempt from the singleton/copy limit.</summary>
     public bool BasicLandsExempt { get; set; }
 
+    /// <summary>When true, a card's copy identity for the singleton/copy-limit rule is its printed card
+    /// number (<see cref="Product.CollectorNumber"/>) rather than its name — so every art of the same
+    /// number counts together toward the limit. One Piece TCG works this way (max 4 per card number,
+    /// e.g. OP01-001). Cards with no collector number fall back to name-based counting.</summary>
+    public bool CopiesCountByCollectorNumber { get; set; }
+
     /// <summary>How many commander/leader cards the deck expects (Commander = 1; leader-based games = 1;
     /// most 60-card formats = 0).</summary>
     public int CommanderSlots { get; set; }

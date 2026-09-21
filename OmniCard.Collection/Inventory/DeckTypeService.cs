@@ -91,6 +91,7 @@ public sealed class DeckTypeService(IDbContextFactory<OmniCardDbContext> dbConte
         existing.MaxCopiesPerCard = changes.MaxCopiesPerCard;
         existing.Singleton = changes.Singleton;
         existing.BasicLandsExempt = changes.BasicLandsExempt;
+        existing.CopiesCountByCollectorNumber = changes.CopiesCountByCollectorNumber;
         existing.CommanderSlots = changes.CommanderSlots;
         context.SaveChanges();
     }
@@ -123,6 +124,7 @@ public sealed class DeckTypeService(IDbContextFactory<OmniCardDbContext> dbConte
         MaxCopiesPerCard = d.MaxCopiesPerCard,
         Singleton = d.Singleton,
         BasicLandsExempt = d.BasicLandsExempt,
+        CopiesCountByCollectorNumber = d.CopiesCountByCollectorNumber,
         CommanderSlots = d.CommanderSlots,
     };
 
@@ -138,11 +140,13 @@ public sealed class DeckTypeService(IDbContextFactory<OmniCardDbContext> dbConte
 
         DeckType Def(CardGame game, string key, string name, int s,
             int? sizeMin = null, int? sizeMax = null, int? maxCopies = null,
-            bool singleton = false, bool basicsExempt = false, int commanderSlots = 0) => new()
+            bool singleton = false, bool basicsExempt = false, int commanderSlots = 0,
+            bool copiesByNumber = false) => new()
         {
             Game = game, BuiltInKey = key, Name = name, IsBuiltIn = true, SortOrder = s,
             DeckSizeMin = sizeMin, DeckSizeMax = sizeMax, MaxCopiesPerCard = maxCopies,
             Singleton = singleton, BasicLandsExempt = basicsExempt, CommanderSlots = commanderSlots,
+            CopiesCountByCollectorNumber = copiesByNumber,
         };
 
         // --- Magic: The Gathering ---
@@ -159,9 +163,10 @@ public sealed class DeckTypeService(IDbContextFactory<OmniCardDbContext> dbConte
         list.Add(Def(CardGame.Mtg, "mtg.limited", "Limited / Draft", sort++, 40, null, null));
         list.Add(Def(CardGame.Mtg, "mtg.cube", "Cube", sort++));
 
-        // --- One Piece TCG (Leader + 50-card deck, max 4) ---
+        // --- One Piece TCG (Leader + 50-card deck, max 4 per card number) ---
+        // Copies count by card number (set code), so alternate arts of the same card don't stack.
         sort = 0;
-        list.Add(Def(CardGame.OnePiece, "optcg.constructed", "Constructed", sort++, 50, 50, 4, commanderSlots: 1));
+        list.Add(Def(CardGame.OnePiece, "optcg.constructed", "Constructed", sort++, 50, 50, 4, commanderSlots: 1, copiesByNumber: true));
 
         // --- Riftbound (Legend/Champion-based) ---
         sort = 0;

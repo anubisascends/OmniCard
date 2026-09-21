@@ -158,6 +158,7 @@
       "commanderSlots": "Commander/leader slots",
       "singletonSwitch": "Singleton (max 1 of each card)",
       "basicLandsExempt": "Basic lands exempt from copy limit",
+      "copiesByCollectorNumber": "Count copies by card number (all arts of a number count as one card)",
       "colName": "Name",
       "colSize": "Size",
       "colCopies": "Copies",

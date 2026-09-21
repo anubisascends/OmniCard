@@ -78,6 +78,7 @@ public sealed class DeckTypesController(IDeckTypeService deckTypes) : ApiControl
         MaxCopiesPerCard = req.MaxCopiesPerCard,
         Singleton = req.Singleton,
         BasicLandsExempt = req.BasicLandsExempt,
+        CopiesCountByCollectorNumber = req.CopiesCountByCollectorNumber,
         CommanderSlots = req.CommanderSlots,
     };
 }
