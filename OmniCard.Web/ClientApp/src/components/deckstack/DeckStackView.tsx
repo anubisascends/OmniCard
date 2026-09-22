@@ -34,7 +34,8 @@ export function DeckStackView({
   q?: string;
 }) {
   const { t } = useTranslation();
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Selection is tied to the detail drawer: a card is "selected" (and stays expanded) exactly while
+  // its drawer is open. Closing the drawer deselects it. Only ever one card at a time — no multi-select.
   const [detailId, setDetailId] = useState<number | null>(null);
   const [groupMode, setGroupMode] = useState<DeckGroupMode>(
     () => (localStorage.getItem(GROUP_MODE_KEY) === 'tag' ? 'tag' : 'type'),
@@ -55,7 +56,6 @@ export function DeckStackView({
   const total = useMemo(() => totalDeckCards(cards), [cards]);
 
   const select = (id: number) => {
-    setSelectedId(id);
     setDetailId(id);
   };
 
@@ -114,7 +114,7 @@ export function DeckStackView({
             key={g.key}
             group={g}
             width={CARD_WIDTH}
-            selectedId={selectedId}
+            selectedId={detailId}
             onSelect={select}
           />
         ))}
