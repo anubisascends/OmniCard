@@ -232,26 +232,200 @@ public sealed class WebBinderCardService
 
         foreach (var card in cards)
         {
-            var product = FindOrCreateProduct(context, productCache, card.Game, card.GameCardId, card.IsFoil,
-                card.IsFoil ? card.FoilType : null, card.Name, card.SetCode, card.SetName, card.Number, card.Rarity,
-                card.ImageUri, card.Color, card.CardType);
-
-            var lot = new InventoryLot
-            {
-                Product = product,
-                Condition = card.Condition,
-                Note = card.Note,
-                Quantity = Math.Max(1, card.Quantity),
-                UnitCost = card.PurchasePrice,
-                AcquisitionDate = card.DateAdded,
-                LocationId = card.ContainerId,
-            };
+            var lot = BuildLot(context, productCache, card);
             context.Lots.Add(lot);
             lots.Add(lot);
         }
 
         context.SaveChanges();
         return lots.Select(l => l.Id).ToList();
+    }
+
+    /// <summary>Constructs a new (untracked) <see cref="InventoryLot"/> for a scanned card, resolving
+    /// or creating its <see cref="Product"/>. Shared by the scan-commit and audit-commit paths.</summary>
+    private static InventoryLot BuildLot(
+        OmniCardDbContext context,
+        Dictionary<(CardGame Game, string GameCardId, bool Foil, string? FoilType), Product> productCache,
+        CollectionCard card)
+    {
+        var product = FindOrCreateProduct(context, productCache, card.Game, card.GameCardId, card.IsFoil,
+            card.IsFoil ? card.FoilType : null, card.Name, card.SetCode, card.SetName, card.Number, card.Rarity,
+            card.ImageUri, card.Color, card.CardType);
+
+        return new InventoryLot
+        {
+            Product = product,
+            Condition = card.Condition,
+            Note = card.Note,
+            Quantity = Math.Max(1, card.Quantity),
+            UnitCost = card.PurchasePrice,
+            AcquisitionDate = card.DateAdded,
+            LocationId = card.ContainerId,
+        };
+    }
+
+    /// <summary>Identity key for audit matching: a card's game id (foil-agnostic — foil and non-foil
+    /// printings of the same card share a <c>GameCardId</c> and should reconcile together), falling
+    /// back to set code + collector number when no game id is present. Shared with the controller so
+    /// scanned items and stored lots key identically.</summary>
+    public static string AuditIdentityKey(string? gameCardId, string? setCode, string? collectorNumber)
+    {
+        var id = gameCardId?.Trim();
+        if (!string.IsNullOrEmpty(id)) return "id:" + id.ToLowerInvariant();
+        return "sc:" + (setCode ?? "").Trim().ToLowerInvariant() + "|" + (collectorNumber ?? "").Trim().ToLowerInvariant();
+    }
+
+    /// <summary>One card line in an audit outcome bucket.</summary>
+    public sealed record AuditLine(string Name, string SetCode, string CollectorNumber, string? Condition, bool IsFoil, int Quantity);
+
+    /// <summary>Result of reconciling a location against a confirmed scan. <see cref="AddedLots"/>
+    /// pairs each newly-created lot's id with its identity key so the caller can attach tags.</summary>
+    public sealed record AuditReconcileResult(
+        IReadOnlyList<AuditLine> Matched,
+        IReadOnlyList<AuditLine> NotFound,
+        IReadOnlyList<AuditLine> Added,
+        int UpdatedCount,
+        IReadOnlyList<(string IdentityKey, int LotId)> AddedLots);
+
+    /// <summary>Makes the confirmed scan the source of truth for a location: cards present in both are
+    /// <b>matched</b> (their stored lots are kept, but condition/foil is overwritten from the scan);
+    /// cards scanned but not previously present are <b>added</b> as new lots; cards expected at the
+    /// location but not scanned are <b>not found</b> and their lots are deleted. Quantities are
+    /// reconciled per identity. Only single-card lots participate (sealed product is untouched).</summary>
+    public AuditReconcileResult ReconcileLocationAudit(int containerId, IReadOnlyList<CollectionCard> scanned)
+    {
+        using var context = _dbFactory.CreateDbContext();
+
+        // Same hard block as scanning: a game-locked deck box rejects cards from other games.
+        DeckBoxGameGuard.ValidateIncoming(context, containerId, scanned.Select(c => c.Game).Distinct());
+
+        var expectedLots = context.Lots
+            .Include(l => l.Product)
+            .Where(l => l.LocationId == containerId && l.Product.Category == ProductCategory.Single)
+            .ToList();
+
+        var expectedByKey = new Dictionary<string, List<InventoryLot>>();
+        foreach (var lot in expectedLots)
+        {
+            var key = AuditIdentityKey(lot.Product.GameCardId, lot.Product.SetCode, lot.Product.CollectorNumber);
+            if (!expectedByKey.TryGetValue(key, out var list)) expectedByKey[key] = list = new List<InventoryLot>();
+            list.Add(lot);
+        }
+
+        // Keep the individual scanned items per identity (not just a total): added copies are
+        // materialized as separate lots — one per scanned item, preserving its own condition/foil/
+        // price/note — exactly like the normal scan commit (AddScannedLots). Collapsing them into a
+        // single quantity>1 lot would undercount the location, since a lot counts as one card
+        // regardless of quantity (StorageContainerService.GetCardCount).
+        var scannedByKey = new Dictionary<string, List<CollectionCard>>();
+        foreach (var card in scanned)
+        {
+            var key = AuditIdentityKey(card.GameCardId, card.SetCode, card.Number);
+            if (!scannedByKey.TryGetValue(key, out var list)) scannedByKey[key] = list = new List<CollectionCard>();
+            list.Add(card);
+        }
+
+        var cache = new Dictionary<(CardGame Game, string GameCardId, bool Foil, string? FoilType), Product>();
+        var matched = new List<AuditLine>();
+        var added = new List<AuditLine>();
+        var notFound = new List<AuditLine>();
+        var addedLots = new List<(string Key, InventoryLot Lot)>();
+        var updated = 0;
+
+        foreach (var (key, items) in scannedByKey)
+        {
+            expectedByKey.TryGetValue(key, out var expLots);
+            expLots ??= new List<InventoryLot>();
+
+            var rep = items[0];
+            var expectedCount = expLots.Sum(l => Math.Max(1, l.Quantity));
+            var scannedCount = items.Sum(c => Math.Max(1, c.Quantity));
+            var matchedCount = Math.Min(expectedCount, scannedCount);
+
+            // Delete/trim the expected copies beyond what was scanned ("not found").
+            var toRemove = expectedCount - matchedCount;
+            foreach (var lot in expLots.OrderBy(l => Math.Max(1, l.Quantity)))
+            {
+                if (toRemove <= 0) break;
+                var q = Math.Max(1, lot.Quantity);
+                if (q <= toRemove) { context.Lots.Remove(lot); lot.Quantity = 0; toRemove -= q; }
+                else { lot.Quantity = q - toRemove; toRemove = 0; }
+            }
+
+            // Overwrite condition/foil on the surviving (matched) lots from the scan.
+            foreach (var lot in expLots.Where(l => l.Quantity > 0))
+                if (OverwriteFromScan(context, cache, lot, rep)) updated++;
+
+            if (matchedCount > 0) matched.Add(Line(rep, matchedCount));
+            var notFoundCount = expectedCount - matchedCount;
+            if (notFoundCount > 0) notFound.Add(LineFromLot(expLots[0], notFoundCount));
+
+            // The first `expectedCount` scanned copies are considered matched to the kept lots; the
+            // remainder are genuinely new. Walk the scanned items copy-by-copy, adding one lot per
+            // item (splitting an item only if the matched/added boundary falls inside it).
+            var surplus = scannedCount - expectedCount;
+            if (surplus > 0)
+            {
+                var skip = expectedCount; // copies already represented by the kept expected lots
+                var addedForKey = 0;
+                foreach (var item in items)
+                {
+                    var q = Math.Max(1, item.Quantity);
+                    if (skip >= q) { skip -= q; continue; } // this whole item matched an existing copy
+                    var addQ = q - skip;
+                    skip = 0;
+                    var lot = BuildLot(context, cache, item);
+                    lot.Quantity = addQ;
+                    context.Lots.Add(lot);
+                    addedLots.Add((key, lot));
+                    addedForKey += addQ;
+                }
+                if (addedForKey > 0) added.Add(Line(rep, addedForKey));
+            }
+        }
+
+        // Expected identities the scan never saw → delete every copy ("not found").
+        foreach (var (key, expLots) in expectedByKey)
+        {
+            if (scannedByKey.ContainsKey(key)) continue;
+            var cnt = expLots.Sum(l => Math.Max(1, l.Quantity));
+            foreach (var lot in expLots) context.Lots.Remove(lot);
+            notFound.Add(LineFromLot(expLots[0], cnt));
+        }
+
+        context.SaveChanges();
+
+        return new AuditReconcileResult(matched, notFound, added, updated,
+            addedLots.Select(a => (a.Key, a.Lot.Id)).ToList());
+
+        static AuditLine Line(CollectionCard c, int qty) =>
+            new(c.Name, c.SetCode ?? "", c.Number ?? "", c.Condition, c.IsFoil, qty);
+        static AuditLine LineFromLot(InventoryLot l, int qty) =>
+            new(l.Product.Name, l.Product.SetCode ?? "", l.Product.CollectorNumber ?? "", l.Condition, l.Product.Foil, qty);
+    }
+
+    /// <summary>Overwrites a matched lot's condition and foil from the scanned copy (the audit is the
+    /// source of truth for those fields). Reassigns the lot to the correct foil-variant product when
+    /// the foil state changed, preserving the product's identity fields. Returns whether anything
+    /// changed. Purchase price, notes, tags and binder position on matched lots are left intact.</summary>
+    private static bool OverwriteFromScan(
+        OmniCardDbContext context,
+        Dictionary<(CardGame Game, string GameCardId, bool Foil, string? FoilType), Product> cache,
+        InventoryLot lot, CollectionCard scanned)
+    {
+        var changed = false;
+        if ((lot.Condition ?? "") != (scanned.Condition ?? "")) { lot.Condition = scanned.Condition; changed = true; }
+
+        var foilType = scanned.IsFoil ? scanned.FoilType : null;
+        var product = lot.Product;
+        if (product.Foil != scanned.IsFoil || product.FoilType != foilType)
+        {
+            lot.Product = FindOrCreateProduct(context, cache, product.Game, product.GameCardId ?? "", scanned.IsFoil, foilType,
+                product.Name, product.SetCode, product.SetName, product.CollectorNumber, product.Rarity,
+                product.ImageUri, product.Color, product.CardType);
+            changed = true;
+        }
+        return changed;
     }
 
     /// <summary>Sets the owned copy count on a lot. Kept separate from

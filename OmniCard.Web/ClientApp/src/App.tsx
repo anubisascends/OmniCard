@@ -12,6 +12,7 @@ import { SalesPage } from './pages/SalesPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { ImportPage } from './pages/ImportPage';
 import { ScanPage } from './pages/ScanPage';
+import { AuditPage } from './pages/AuditPage';
 import { ListsPage } from './pages/ListsPage';
 import { TradesPage } from './pages/TradesPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -27,6 +28,7 @@ export function App() {
         <Route path="/collection" element={<RequirePermission anyOf={['collection.view']}><CollectionPage /></RequirePermission>} />
         <Route path="/locations" element={<RequirePermission anyOf={['locations.view']}><LocationsPage /></RequirePermission>} />
         <Route path="/location/:id" element={<RequirePermission anyOf={['locations.view']}><LocationDetailPage /></RequirePermission>} />
+        <Route path="/audit/:locationId" element={<RequirePermission anyOf={['collection.delete']}><AuditPage /></RequirePermission>} />
         <Route path="/binder/:id" element={<RequirePermission anyOf={['binder.view', 'binder.edit']}><BinderPage /></RequirePermission>} />
         <Route path="/sets" element={<RequirePermission anyOf={['sets.view']}><SetsPage /></RequirePermission>} />
         <Route path="/inventory" element={<RequirePermission anyOf={['inventory.view']}><InventoryPage /></RequirePermission>} />

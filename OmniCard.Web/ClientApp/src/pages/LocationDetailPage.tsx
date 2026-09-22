@@ -14,10 +14,12 @@ import {
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import { api } from '../api/client';
 import { useGame } from '../context/GameContext';
+import { usePermissions } from '../context/usePermissions';
 import { CardTable } from '../components/CardTable';
 import { AddCardDialog } from '../components/dialogs/AddCardDialog';
 import { DeckBoxPanel } from '../components/DeckBoxPanel';
@@ -33,6 +35,7 @@ export function LocationDetailPage() {
   const { id } = useParams();
   const locationId = Number(id);
   const { game } = useGame();
+  const { can } = usePermissions();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
@@ -72,6 +75,16 @@ export function LocationDetailPage() {
           </Link>
         )}
         <Box sx={{ flexGrow: 1 }} />
+        {can('collection.delete') && (
+          <Button
+            variant="outlined"
+            startIcon={<FactCheckIcon />}
+            component={RouterLink}
+            to={`/audit/${locationId}`}
+          >
+            {t('locations.detail.audit')}
+          </Button>
+        )}
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>
           {t('locations.detail.addCard')}
         </Button>

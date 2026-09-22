@@ -35,6 +35,26 @@
       "addedNoteFiltered": "Only confirmed & checked scans are added, and only those shown by the current filter.",
       "success": "Added {{count}} card(s) to your collection."
     },
+    "audit": {
+      "breadcrumb": "Audit",
+      "title": "Audit: {{location}}",
+      "banner": "Scan every card physically in this location, confirm the matches, then commit. Committing makes this scan the source of truth for the location: matched cards are kept, cards not scanned are removed, and new cards are added.",
+      "commit_one": "Commit audit ({{count}} card)",
+      "commit_other": "Commit audit ({{count}} cards)",
+      "committing": "Committing audit…",
+      "commitHint": "Only confirmed & checked scans count toward the audit.",
+      "summary": {
+        "title": "Audit complete: {{location}}",
+        "intro": "{{matched}} matched, {{added}} added, {{notFound}} not found (removed).",
+        "updated": "Overwrote condition/foil on {{count}} matched card(s) from the scan.",
+        "matched": "Matched ({{count}})",
+        "matchedEmpty": "No cards matched what was already here.",
+        "notFound": "Not found — removed ({{count}})",
+        "notFoundEmpty": "Every card previously here was found.",
+        "added": "Added ({{count}})",
+        "addedEmpty": "No new cards were added."
+      }
+    },
     "filter": {
       "filterByName": "Filter by name",
       "show": "Show",

@@ -42,6 +42,7 @@ import type {
   LogoUploadResultDto,
   ScanCommitItem,
   ScanCommitResultDto,
+  AuditCommitResultDto,
   ScanMatchDto,
   ScanSearchResultDto,
   SearchSchemaDto,
@@ -668,6 +669,13 @@ export const api = {
   scanFoilTypes: (game: string) => request<string[]>(`/api/scan/foil-types${qs({ game })}`),
   scanCommit: (containerId: number, items: ScanCommitItem[]) =>
     request<ScanCommitResultDto>('/api/scan/commit', {
+      method: 'POST',
+      body: JSON.stringify({ containerId, items }),
+    }),
+  // Location audit: the confirmed scans become the source of truth for the location (matched cards
+  // kept, absent cards deleted, new cards added). Returns the per-bucket summary.
+  auditCommit: (containerId: number, items: ScanCommitItem[]) =>
+    request<AuditCommitResultDto>('/api/scan/audit-commit', {
       method: 'POST',
       body: JSON.stringify({ containerId, items }),
     }),

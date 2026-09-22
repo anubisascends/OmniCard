@@ -44,6 +44,7 @@
       "thisLocation": "this location",
       "openBinderView": "Open binder view",
       "addCard": "Add card",
+      "audit": "Audit",
       "summary_one": "{{countText}} card · {{value}} market",
       "summary_other": "{{countText}} cards · {{value}} market",
       "viewModeLabel": "View mode",

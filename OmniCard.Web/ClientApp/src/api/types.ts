@@ -567,6 +567,25 @@ export interface ScanCommitResultDto {
   imported: number;
 }
 
+/** One card line in an audit summary bucket. */
+export interface AuditLineDto {
+  name: string;
+  setCode: string;
+  collectorNumber: string;
+  condition?: string | null;
+  isFoil: boolean;
+  quantity: number;
+}
+
+/** Outcome of committing a location audit. `notFound` lots were deleted; `added` lots were created;
+ * `updatedCount` counts matched copies whose condition/foil was overwritten from the scan. */
+export interface AuditCommitResultDto {
+  matched: AuditLineDto[];
+  notFound: AuditLineDto[];
+  added: AuditLineDto[];
+  updatedCount: number;
+}
+
 // --- eBay ---
 
 export interface EbayStatusDto {

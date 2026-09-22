@@ -32,6 +32,7 @@ import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
+import LockIcon from '@mui/icons-material/Lock';
 import PlaceIcon from '@mui/icons-material/Place';
 import SearchIcon from '@mui/icons-material/Search';
 import VideocamIcon from '@mui/icons-material/Videocam';
@@ -42,7 +43,13 @@ import { useGame } from '../context/GameContext';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import { WebcamScanDialog } from '../components/dialogs/WebcamScanDialog';
 import { ScanValueBadges, ListReprintChip } from '../lib/scanBadges';
-import type { ScanBadgeSettingsDto, ScanMatchDto, ScanSearchResultDto } from '../api/types';
+import type {
+  AuditCommitResultDto,
+  ScanBadgeSettingsDto,
+  ScanCommitResultDto,
+  ScanMatchDto,
+  ScanSearchResultDto,
+} from '../api/types';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
@@ -981,7 +988,18 @@ function BulkEditDialog({
   );
 }
 
-export function ScanPage() {
+/** When run as an audit ({@link ScanPageProps.auditMode}), the Scan view is locked to one location
+ * and its commit reconciles that location against the scan instead of appending lots. */
+export interface ScanPageProps {
+  /** Pre-selected, non-changeable target location. Hides the location picker. */
+  lockedContainerId?: number;
+  /** Switches the commit to an audit reconcile (delete-not-found / add-new / overwrite-matched). */
+  auditMode?: boolean;
+  /** Called with the audit summary after a successful audit commit. */
+  onAuditCommitted?: (result: AuditCommitResultDto) => void;
+}
+
+export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitted }: ScanPageProps = {}) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const { game: contextGame } = useGame();
@@ -990,7 +1008,8 @@ export function ScanPage() {
   const [artSets, setArtSets] = useState<{ setCode: string; setName: string }[]>([]);
   const [isFoil, setIsFoil] = useState(false);
   const [condition, setCondition] = useState('NM');
-  const [containerId, setContainerId] = useState<number | ''>('');
+  // In audit mode the target location is fixed to the audited container and cannot be changed.
+  const [containerId, setContainerId] = useState<number | ''>(lockedContainerId ?? '');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [webcamOpen, setWebcamOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -1098,7 +1117,7 @@ export function ScanPage() {
   // Only ever act on visible items — a filtered list confirms/commits exactly what's on screen.
   const isVisibleCommittable = (it: ScanItem) => visibleKeys.has(it.key) && isCommittable(it);
 
-  const commit = useMutation({
+  const commit = useMutation<ScanCommitResultDto | AuditCommitResultDto>({
     mutationFn: () => {
       const payload = items.filter(isVisibleCommittable).map((it) => {
         const id = identityOf(it)!;
@@ -1118,7 +1137,10 @@ export function ScanPage() {
           scanHash: it.match?.scanHash ?? null,
         };
       });
-      return api.scanCommit(containerId as number, payload);
+      // Audit mode reconciles the location against the scan; normal mode appends lots.
+      return auditMode
+        ? api.auditCommit(containerId as number, payload)
+        : api.scanCommit(containerId as number, payload);
     },
     onSuccess: (res) => {
       // Drop the cards that were just committed; keep everything else (unchecked or unconfirmed).
@@ -1126,6 +1148,11 @@ export function ScanPage() {
       qc.invalidateQueries({ queryKey: ['collection'] });
       qc.invalidateQueries({ queryKey: ['locations'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
+      if (auditMode) {
+        // The audited location's card lists change wholesale — refresh its detail view too.
+        qc.invalidateQueries({ queryKey: ['location'] });
+        onAuditCommitted?.(res as AuditCommitResultDto);
+      }
       return res;
     },
   });
@@ -1237,10 +1264,15 @@ export function ScanPage() {
 
   return (
     <Stack spacing={3}>
-      <Typography variant="h4">{t('scan.title')}</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mt: -1 }}>
-        {t('scan.intro')}
-      </Typography>
+      {/* In audit mode the wrapping AuditPage supplies its own header/banner. */}
+      {!auditMode && (
+        <>
+          <Typography variant="h4">{t('scan.title')}</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: -1 }}>
+            {t('scan.intro')}
+          </Typography>
+        </>
+      )}
 
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap alignItems="center">
@@ -1347,14 +1379,24 @@ export function ScanPage() {
       {items.length > 0 && (
         <Paper variant="outlined" sx={{ p: 2, position: 'sticky', top: 56, zIndex: 1 }}>
           <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
-            <Button
-              variant="outlined"
-              startIcon={<PlaceIcon />}
-              onClick={() => setPickerOpen(true)}
-              sx={{ minWidth: 220, justifyContent: 'flex-start', textTransform: 'none' }}
-            >
-              {selectedLocationName ?? t('scan.commit.addToLocation')}
-            </Button>
+            {/* Audit is locked to one location: show it read-only instead of the picker. */}
+            {lockedContainerId != null ? (
+              <Chip
+                icon={<LockIcon />}
+                variant="outlined"
+                label={selectedLocationName ?? t('scan.commit.addToLocation')}
+                sx={{ minWidth: 220, justifyContent: 'flex-start' }}
+              />
+            ) : (
+              <Button
+                variant="outlined"
+                startIcon={<PlaceIcon />}
+                onClick={() => setPickerOpen(true)}
+                sx={{ minWidth: 220, justifyContent: 'flex-start', textTransform: 'none' }}
+              >
+                {selectedLocationName ?? t('scan.commit.addToLocation')}
+              </Button>
+            )}
             <Button
               variant="outlined"
               color="success"
@@ -1366,21 +1408,32 @@ export function ScanPage() {
             </Button>
             <Button
               variant="contained"
+              color={auditMode ? 'warning' : 'primary'}
               disabled={
                 committableCount === 0 || containerId === '' || commit.isPending || stillMatching
               }
               onClick={() => commit.mutate()}
             >
               {commit.isPending
-                ? t('common.states.adding')
-                : t('scan.commit.addConfirmed', { count: committableCount })}
+                ? auditMode
+                  ? t('scan.audit.committing')
+                  : t('common.states.adding')
+                : auditMode
+                  ? t('scan.audit.commit', { count: committableCount })
+                  : t('scan.commit.addConfirmed', { count: committableCount })}
             </Button>
             <Typography variant="caption" color="text.secondary">
-              {controlsActive ? t('scan.commit.addedNoteFiltered') : t('scan.commit.addedNote')}
+              {auditMode
+                ? t('scan.audit.commitHint')
+                : controlsActive
+                  ? t('scan.commit.addedNoteFiltered')
+                  : t('scan.commit.addedNote')}
             </Typography>
             {commit.error && <Alert severity="error">{(commit.error as Error).message}</Alert>}
-            {commit.data && (
-              <Alert severity="success">{t('scan.commit.success', { count: commit.data.imported })}</Alert>
+            {!auditMode && commit.data && (
+              <Alert severity="success">
+                {t('scan.commit.success', { count: (commit.data as { imported: number }).imported })}
+              </Alert>
             )}
           </Stack>
         </Paper>
@@ -1592,15 +1645,17 @@ export function ScanPage() {
         onClose={() => setBulkOpen(false)}
       />
 
-      <LocationPickerDialog
-        open={pickerOpen}
-        title={t('scan.locationPicker.title')}
-        onPick={(id) => {
-          setContainerId(id);
-          setPickerOpen(false);
-        }}
-        onClose={() => setPickerOpen(false)}
-      />
+      {lockedContainerId == null && (
+        <LocationPickerDialog
+          open={pickerOpen}
+          title={t('scan.locationPicker.title')}
+          onPick={(id) => {
+            setContainerId(id);
+            setPickerOpen(false);
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
       <WebcamScanDialog
         open={webcamOpen}
         onCapture={(file) => void stageFiles([file])}

@@ -194,34 +194,9 @@ public sealed class CardScanController(
         var tagsPerCard = new List<IReadOnlyList<string>>(request.Items.Count);
         foreach (var item in request.Items)
         {
-            if (LocationsController.ParseGame(item.Game) is not { } game)
+            if (MapScanItem(item, request.ContainerId) is not { } card)
                 return BadRequest(new { error = $"Unknown game '{item.Game}'" });
-
-            // Honor an explicit per-item foil finish; fall back to the game's basic foil when foil but
-            // no finish was chosen. Non-foil ⇒ no finish.
-            var foilType = item.IsFoil
-                ? (string.IsNullOrWhiteSpace(item.FoilType) ? FoilTypes.BasicFoilType(game) : item.FoilType.Trim())
-                : null;
-
-            cards.Add(new CollectionCard
-            {
-                Game = game,
-                GameCardId = item.GameCardId,
-                Name = item.Name,
-                SetCode = item.SetCode,
-                SetName = item.SetName,
-                Number = item.CollectorNumber,
-                Rarity = item.Rarity,
-                ImageUri = item.ImageUri,
-                Condition = string.IsNullOrWhiteSpace(item.Condition) ? "NM" : item.Condition,
-                IsFoil = item.IsFoil,
-                FoilType = foilType,
-                Quantity = Math.Max(1, item.Quantity),
-                PurchasePrice = item.PurchasePrice,
-                Note = string.IsNullOrWhiteSpace(item.Note) ? null : item.Note.Trim(),
-                DateAdded = DateTime.UtcNow,
-                ContainerId = request.ContainerId,
-            });
+            cards.Add(card);
             tagsPerCard.Add(item.Tags);
         }
 
@@ -251,6 +226,102 @@ public sealed class CardScanController(
 
         logger.LogInformation("Committed {Count} scanned card(s) to location {LocationId}", lotIds.Count, request.ContainerId);
         return Ok(new ScanCommitResultDto(lotIds.Count));
+    }
+
+    /// <summary>Maps a confirmed scan item to a <see cref="CollectionCard"/> destined for
+    /// <paramref name="containerId"/>. Returns <c>null</c> when the item's game is unknown. Shared by
+    /// the scan-commit and audit-commit paths.</summary>
+    private static CollectionCard? MapScanItem(ScanCommitItem item, int containerId)
+    {
+        if (LocationsController.ParseGame(item.Game) is not { } game)
+            return null;
+
+        // Honor an explicit per-item foil finish; fall back to the game's basic foil when foil but
+        // no finish was chosen. Non-foil ⇒ no finish.
+        var foilType = item.IsFoil
+            ? (string.IsNullOrWhiteSpace(item.FoilType) ? FoilTypes.BasicFoilType(game) : item.FoilType.Trim())
+            : null;
+
+        return new CollectionCard
+        {
+            Game = game,
+            GameCardId = item.GameCardId,
+            Name = item.Name,
+            SetCode = item.SetCode,
+            SetName = item.SetName,
+            Number = item.CollectorNumber,
+            Rarity = item.Rarity,
+            ImageUri = item.ImageUri,
+            Condition = string.IsNullOrWhiteSpace(item.Condition) ? "NM" : item.Condition,
+            IsFoil = item.IsFoil,
+            FoilType = foilType,
+            Quantity = Math.Max(1, item.Quantity),
+            PurchasePrice = item.PurchasePrice,
+            Note = string.IsNullOrWhiteSpace(item.Note) ? null : item.Note.Trim(),
+            DateAdded = DateTime.UtcNow,
+            ContainerId = containerId,
+        };
+    }
+
+    /// <summary>Commit a location audit: the confirmed scans become the source of truth for the
+    /// location. Matched cards are kept (condition/foil overwritten from the scan), scanned-but-absent
+    /// cards are added, and expected-but-unscanned cards are deleted. Returns a summary of each bucket.
+    /// Destructive (deletes lots), so it requires the collection-delete grant rather than scan-commit.</summary>
+    [HttpPost("audit-commit")]
+    [RequirePermission(Permissions.CollectionDelete)]
+    public ActionResult<AuditCommitResultDto> AuditCommit([FromBody] AuditCommitRequest request)
+    {
+        if (request.ContainerId <= 0)
+            return BadRequest(new { error = "A target location is required" });
+        if (request.Items.Count == 0)
+            return BadRequest(new { error = "An audit must include at least one scanned card" });
+
+        var cards = new List<CollectionCard>(request.Items.Count);
+        // Union of tags per identity key, so newly-added lots inherit the tags the user set on the scan.
+        var tagsByKey = new Dictionary<string, HashSet<string>>();
+        foreach (var item in request.Items)
+        {
+            if (MapScanItem(item, request.ContainerId) is not { } card)
+                return BadRequest(new { error = $"Unknown game '{item.Game}'" });
+            cards.Add(card);
+
+            var key = WebBinderCardService.AuditIdentityKey(card.GameCardId, card.SetCode, card.Number);
+            if (!tagsByKey.TryGetValue(key, out var set)) tagsByKey[key] = set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var tag in item.Tags.Where(t => !string.IsNullOrWhiteSpace(t))) set.Add(tag.Trim());
+        }
+
+        WebBinderCardService.AuditReconcileResult result;
+        try
+        {
+            result = binderCards.ReconcileLocationAudit(request.ContainerId, cards);
+        }
+        catch (DeckBoxGameMismatchException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+
+        // Attach tags to the lots the audit created (one added lot per identity key).
+        foreach (var (key, lotId) in result.AddedLots)
+        {
+            if (tagsByKey.TryGetValue(key, out var set) && set.Count > 0)
+                tags.SetTagsForLot(lotId, set.ToList());
+        }
+
+        // Teach the matcher from every confirmed identity, matched or added (same as scan commit).
+        RecordScanCorrections(request.Items);
+
+        logger.LogInformation(
+            "Audited location {LocationId}: {Matched} matched, {Added} added, {NotFound} not found ({Updated} updated)",
+            request.ContainerId, result.Matched.Count, result.Added.Count, result.NotFound.Count, result.UpdatedCount);
+
+        static AuditLineDto ToDto(WebBinderCardService.AuditLine l) =>
+            new(l.Name, l.SetCode, l.CollectorNumber, l.Condition, l.IsFoil, l.Quantity);
+
+        return Ok(new AuditCommitResultDto(
+            result.Matched.Select(ToDto).ToList(),
+            result.NotFound.Select(ToDto).ToList(),
+            result.Added.Select(ToDto).ToList(),
+            result.UpdatedCount));
     }
 
     /// <summary>Record a scan-hash → confirmed-card mapping for each committed item that carries a scan
