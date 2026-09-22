@@ -488,6 +488,24 @@ public class WebBinderCardServiceTests : IDisposable
     }
 
     [Fact]
+    public void ReconcileLocationAudit_DuplicateScans_CreateSeparateLotsNotOneStack()
+    {
+        // Regression: a location counts lots, not summed quantity (GetCardCount), and the normal scan
+        // commit creates one lot per scanned card. Auditing N single-copy scans into an empty location
+        // must therefore leave N lots — not collapse duplicates into fewer quantity>1 stacks.
+        var scans = new List<CollectionCard>();
+        for (var i = 0; i < 5; i++) scans.Add(ScanCard("Island")); // 5 copies of one card
+        scans.Add(ScanCard("Forest")); // + 1 distinct
+
+        var result = _service.ReconcileLocationAudit(_binderId, scans);
+
+        Assert.Equal(6, result.Added.Sum(l => l.Quantity)); // 6 physical copies added
+        using var ctx = new OmniCardDbContext(_opts);
+        // 6 separate lots (5 Island + 1 Forest), so GetCardCount-style lot counting reports 6.
+        Assert.Equal(6, ctx.Lots.Count(l => l.LocationId == _binderId && l.Product.Category == ProductCategory.Single));
+    }
+
+    [Fact]
     public void ReconcileLocationAudit_OnlyTouchesTargetLocation()
     {
         var otherBox = _containers.Create("Other Box", ContainerType.Box).Id;

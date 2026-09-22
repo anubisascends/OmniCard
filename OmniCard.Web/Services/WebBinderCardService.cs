@@ -312,14 +312,17 @@ public sealed class WebBinderCardService
             list.Add(lot);
         }
 
-        var scannedByKey = new Dictionary<string, (CollectionCard Rep, int Quantity)>();
+        // Keep the individual scanned items per identity (not just a total): added copies are
+        // materialized as separate lots — one per scanned item, preserving its own condition/foil/
+        // price/note — exactly like the normal scan commit (AddScannedLots). Collapsing them into a
+        // single quantity>1 lot would undercount the location, since a lot counts as one card
+        // regardless of quantity (StorageContainerService.GetCardCount).
+        var scannedByKey = new Dictionary<string, List<CollectionCard>>();
         foreach (var card in scanned)
         {
             var key = AuditIdentityKey(card.GameCardId, card.SetCode, card.Number);
-            var qty = Math.Max(1, card.Quantity);
-            scannedByKey[key] = scannedByKey.TryGetValue(key, out var g)
-                ? (g.Rep, g.Quantity + qty)
-                : (card, qty);
+            if (!scannedByKey.TryGetValue(key, out var list)) scannedByKey[key] = list = new List<CollectionCard>();
+            list.Add(card);
         }
 
         var cache = new Dictionary<(CardGame Game, string GameCardId, bool Foil, string? FoilType), Product>();
@@ -329,13 +332,14 @@ public sealed class WebBinderCardService
         var addedLots = new List<(string Key, InventoryLot Lot)>();
         var updated = 0;
 
-        foreach (var (key, group) in scannedByKey)
+        foreach (var (key, items) in scannedByKey)
         {
             expectedByKey.TryGetValue(key, out var expLots);
             expLots ??= new List<InventoryLot>();
 
+            var rep = items[0];
             var expectedCount = expLots.Sum(l => Math.Max(1, l.Quantity));
-            var scannedCount = group.Quantity;
+            var scannedCount = items.Sum(c => Math.Max(1, c.Quantity));
             var matchedCount = Math.Min(expectedCount, scannedCount);
 
             // Delete/trim the expected copies beyond what was scanned ("not found").
@@ -350,20 +354,33 @@ public sealed class WebBinderCardService
 
             // Overwrite condition/foil on the surviving (matched) lots from the scan.
             foreach (var lot in expLots.Where(l => l.Quantity > 0))
-                if (OverwriteFromScan(context, cache, lot, group.Rep)) updated++;
+                if (OverwriteFromScan(context, cache, lot, rep)) updated++;
 
-            if (matchedCount > 0) matched.Add(Line(group.Rep, matchedCount));
+            if (matchedCount > 0) matched.Add(Line(rep, matchedCount));
             var notFoundCount = expectedCount - matchedCount;
             if (notFoundCount > 0) notFound.Add(LineFromLot(expLots[0], notFoundCount));
 
+            // The first `expectedCount` scanned copies are considered matched to the kept lots; the
+            // remainder are genuinely new. Walk the scanned items copy-by-copy, adding one lot per
+            // item (splitting an item only if the matched/added boundary falls inside it).
             var surplus = scannedCount - expectedCount;
             if (surplus > 0)
             {
-                var lot = BuildLot(context, cache, group.Rep);
-                lot.Quantity = surplus;
-                context.Lots.Add(lot);
-                addedLots.Add((key, lot));
-                added.Add(Line(group.Rep, surplus));
+                var skip = expectedCount; // copies already represented by the kept expected lots
+                var addedForKey = 0;
+                foreach (var item in items)
+                {
+                    var q = Math.Max(1, item.Quantity);
+                    if (skip >= q) { skip -= q; continue; } // this whole item matched an existing copy
+                    var addQ = q - skip;
+                    skip = 0;
+                    var lot = BuildLot(context, cache, item);
+                    lot.Quantity = addQ;
+                    context.Lots.Add(lot);
+                    addedLots.Add((key, lot));
+                    addedForKey += addQ;
+                }
+                if (addedForKey > 0) added.Add(Line(rep, addedForKey));
             }
         }
 
