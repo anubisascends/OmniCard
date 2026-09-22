@@ -832,6 +832,28 @@ public sealed record ScanCommitRequest
 
 public sealed record ScanCommitResultDto(int Imported);
 
+/// <summary>Commit a location audit: the confirmed scans become the source of truth for the
+/// location. Reuses <see cref="ScanCommitItem"/> — each item is one confirmed physical copy.</summary>
+public sealed record AuditCommitRequest
+{
+    public int ContainerId { get; init; }
+    public IReadOnlyList<ScanCommitItem> Items { get; init; } = [];
+}
+
+/// <summary>One card line in an audit summary (matched / not-found / added bucket).</summary>
+public sealed record AuditLineDto(
+    string Name, string SetCode, string CollectorNumber, string? Condition, bool IsFoil, int Quantity);
+
+/// <summary>Outcome of an audit commit. <paramref name="NotFound"/> lots were deleted (expected at
+/// the location but not scanned); <paramref name="Added"/> lots were created (scanned but not
+/// previously present); <paramref name="UpdatedCount"/> counts matched copies whose condition/foil
+/// was overwritten from the scan.</summary>
+public sealed record AuditCommitResultDto(
+    IReadOnlyList<AuditLineDto> Matched,
+    IReadOnlyList<AuditLineDto> NotFound,
+    IReadOnlyList<AuditLineDto> Added,
+    int UpdatedCount);
+
 // --- Auth ---
 
 /// <summary>

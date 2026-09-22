@@ -384,6 +384,131 @@ public class WebBinderCardServiceTests : IDisposable
         Assert.Equal(boxId, ctx.Lots.Single(l => l.Id == lotId).LocationId);
     }
 
+    // --- Location audit reconcile -------------------------------------------------------------
+
+    private CollectionCard ScanCard(string name, int quantity = 1, string condition = "NM", bool foil = false) =>
+        new()
+        {
+            Game = CardGame.Pokemon,
+            GameCardId = name.Replace(" ", "").ToLowerInvariant(),
+            Name = name,
+            SetCode = "SET",
+            SetName = "Set Name",
+            Number = "1",
+            Condition = condition,
+            IsFoil = foil,
+            Quantity = quantity,
+            ContainerId = _binderId,
+        };
+
+    [Fact]
+    public void ReconcileLocationAudit_MatchesExistingCard_KeepsLot()
+    {
+        var lotId = AddLot("Pikachu");
+
+        var result = _service.ReconcileLocationAudit(_binderId, [ScanCard("Pikachu")]);
+
+        Assert.Single(result.Matched);
+        Assert.Empty(result.NotFound);
+        Assert.Empty(result.Added);
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.True(ctx.Lots.Any(l => l.Id == lotId)); // matched lot preserved
+    }
+
+    [Fact]
+    public void ReconcileLocationAudit_ExpectedButNotScanned_DeletesLot()
+    {
+        var goneId = AddLot("Snorlax"); // present but won't be scanned
+
+        var result = _service.ReconcileLocationAudit(_binderId, [ScanCard("Pikachu")]);
+
+        Assert.Single(result.NotFound);
+        Assert.Equal("Snorlax", result.NotFound[0].Name);
+        Assert.Single(result.Added);
+        Assert.Equal("Pikachu", result.Added[0].Name);
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.False(ctx.Lots.Any(l => l.Id == goneId)); // not-found lot deleted
+    }
+
+    [Fact]
+    public void ReconcileLocationAudit_ScannedButAbsent_AddsLot()
+    {
+        var result = _service.ReconcileLocationAudit(_binderId, [ScanCard("Charizard")]);
+
+        Assert.Single(result.Added);
+        Assert.Equal("Charizard", result.Added[0].Name);
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.True(ctx.Lots.Include(l => l.Product).Any(l => l.LocationId == _binderId && l.Product.Name == "Charizard"));
+    }
+
+    [Fact]
+    public void ReconcileLocationAudit_ConditionAndFoilDiffer_OverwritesFromScan()
+    {
+        var lotId = AddLot("Mewtwo", foil: false, condition: "NM");
+
+        var result = _service.ReconcileLocationAudit(_binderId, [ScanCard("Mewtwo", condition: "LP", foil: true)]);
+
+        Assert.Single(result.Matched);
+        Assert.Equal(1, result.UpdatedCount);
+        using var ctx = new OmniCardDbContext(_opts);
+        var lot = ctx.Lots.Include(l => l.Product).Single(l => l.Id == lotId);
+        Assert.Equal("LP", lot.Condition);
+        Assert.True(lot.Product.Foil); // reassigned to the foil-variant product
+    }
+
+    [Fact]
+    public void ReconcileLocationAudit_FewerScannedThanExpected_TrimsQuantity()
+    {
+        var lotId = AddLotIn(_binderId, "Bulk Common", quantity: 3);
+
+        var result = _service.ReconcileLocationAudit(_binderId, [ScanCard("Bulk Common", quantity: 1)]);
+
+        Assert.Single(result.Matched);
+        Assert.Equal(1, result.Matched[0].Quantity);
+        Assert.Single(result.NotFound);
+        Assert.Equal(2, result.NotFound[0].Quantity);
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.Equal(1, ctx.Lots.Single(l => l.Id == lotId).Quantity);
+    }
+
+    [Fact]
+    public void ReconcileLocationAudit_MoreScannedThanExpected_AddsSurplus()
+    {
+        AddLotIn(_binderId, "Rare Hit", quantity: 1);
+
+        var result = _service.ReconcileLocationAudit(_binderId, [ScanCard("Rare Hit", quantity: 3)]);
+
+        Assert.Single(result.Matched);
+        Assert.Equal(1, result.Matched[0].Quantity);
+        Assert.Single(result.Added);
+        Assert.Equal(2, result.Added[0].Quantity); // surplus copies added
+        using var ctx = new OmniCardDbContext(_opts);
+        // Location now holds exactly what was scanned: 1 kept + 2 added = 3.
+        Assert.Equal(3, ctx.Lots.Where(l => l.LocationId == _binderId && l.Product.Name == "Rare Hit").Sum(l => l.Quantity));
+    }
+
+    [Fact]
+    public void ReconcileLocationAudit_OnlyTouchesTargetLocation()
+    {
+        var otherBox = _containers.Create("Other Box", ContainerType.Box).Id;
+        var otherLotId = AddLotIn(otherBox, "Elsewhere", quantity: 1);
+
+        _service.ReconcileLocationAudit(_binderId, [ScanCard("Pikachu")]);
+
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.True(ctx.Lots.Any(l => l.Id == otherLotId)); // a different location is untouched
+    }
+
+    [Fact]
+    public void ReconcileLocationAudit_IntoMismatchedGameDeckBox_Throws()
+    {
+        var deckBox = _containers.Create("MTG Deck", ContainerType.DeckBox, game: CardGame.Mtg);
+
+        // ScanCard builds Pokémon cards; the Magic-locked deck box must reject them.
+        Assert.Throws<DeckBoxGameMismatchException>(() =>
+            _service.ReconcileLocationAudit(deckBox.Id, [ScanCard("Pikachu")]));
+    }
+
     private sealed class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {
         public OmniCardDbContext CreateDbContext() => new(options);
