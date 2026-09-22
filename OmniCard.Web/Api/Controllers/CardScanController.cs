@@ -4,6 +4,7 @@ using OmniCard.Web.Services;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Matching;
 using OmniCard.Shared.Collection;
+using OmniCard.Shared.Security;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Web.Api.Infrastructure;
@@ -67,6 +68,7 @@ public sealed class CardScanController(
     /// <summary>Match one uploaded card image against <paramref name="game"/>'s catalog.</summary>
     [HttpPost("match")]
     [RequestSizeLimit(MaxFileSize)]
+    [RequirePermission(Permissions.ScanView)]
     public async Task<ActionResult<ScanMatchDto>> Match(
         IFormFile image, [FromForm] string game, [FromForm] bool isFoil, [FromForm] string[]? set, CancellationToken ct)
     {
@@ -111,6 +113,7 @@ public sealed class CardScanController(
     /// look through). Empty ⇒ all sets. Each term folds into the same <c>set:</c>/<c>cn:</c> query
     /// grammar every game's <c>SearchCards</c> already understands.</summary>
     [HttpGet("search")]
+    [RequirePermission(Permissions.ScanView)]
     public ActionResult<IReadOnlyList<ScanSearchResultDto>> Search(
         [FromQuery] string game, [FromQuery] string? q = null, [FromQuery] string[]? set = null, [FromQuery] string? cn = null)
     {
@@ -169,6 +172,7 @@ public sealed class CardScanController(
 
     /// <summary>Curated foil-finish presets for a game, for the scan bulk/per-item foil-type picker.</summary>
     [HttpGet("foil-types")]
+    [RequirePermission(Permissions.ScanView)]
     public ActionResult<IReadOnlyList<string>> FoilTypesFor([FromQuery] string game)
     {
         if (LocationsController.ParseGame(game) is not { } parsedGame)
@@ -178,6 +182,7 @@ public sealed class CardScanController(
 
     /// <summary>Write a batch of confirmed scans into a storage location as owned lots.</summary>
     [HttpPost("commit")]
+    [RequirePermission(Permissions.ScanCommit)]
     public ActionResult<ScanCommitResultDto> Commit([FromBody] ScanCommitRequest request)
     {
         if (request.ContainerId <= 0)

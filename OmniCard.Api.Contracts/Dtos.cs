@@ -839,7 +839,7 @@ public sealed record ScanCommitResultDto(int Imported);
 /// uses per-user accounts) but is kept so older clients that branch on it keep working. When
 /// <see cref="Authenticated"/>, <see cref="Username"/>/<see cref="IsAdmin"/> describe the signed-in user.
 /// </summary>
-public sealed record AuthStatusDto(bool AuthRequired, bool Authenticated, string? Username = null, bool IsAdmin = false);
+public sealed record AuthStatusDto(bool AuthRequired, bool Authenticated, string? Username = null, bool IsAdmin = false, IReadOnlyList<string>? Permissions = null);
 
 public sealed record LoginRequest
 {
@@ -848,15 +848,45 @@ public sealed record LoginRequest
     public bool RememberMe { get; init; }
 }
 
-/// <summary>A user account as exposed to the Administration UI (never carries the password hash).</summary>
-public sealed record UserDto(int Id, string Username, bool IsSystem, bool IsAdmin, DateTime CreatedAt);
+/// <summary>A user account as exposed to the Administration UI (never carries the password hash).
+/// <paramref name="RoleId"/> is the assigned role; <paramref name="Grant"/>/<paramref name="Deny"/>
+/// are the per-user overrides layered on top.</summary>
+public sealed record UserDto(int Id, string Username, bool IsSystem, bool IsAdmin, DateTime CreatedAt,
+    int? RoleId = null, IReadOnlyList<string>? Grant = null, IReadOnlyList<string>? Deny = null);
 
 public sealed record CreateUserRequest
 {
     public string Username { get; init; } = "";
     public string Password { get; init; } = "";
     public bool IsAdmin { get; init; }
+    public int? RoleId { get; init; }
+    public IReadOnlyList<string>? Grant { get; init; }
+    public IReadOnlyList<string>? Deny { get; init; }
 }
+
+/// <summary>Admin edit of a user's access: role, per-user overrides, and the admin flag.</summary>
+public sealed record UpdateUserRequest
+{
+    public int? RoleId { get; init; }
+    public IReadOnlyList<string>? Grant { get; init; }
+    public IReadOnlyList<string>? Deny { get; init; }
+    public bool IsAdmin { get; init; }
+}
+
+/// <summary>A role (reusable permission bundle). System roles can't be deleted.</summary>
+public sealed record RoleDto(int Id, string Name, bool IsSystem, IReadOnlyList<string> Permissions);
+
+/// <summary>Create/update a role. On a system role, the name is ignored (only permissions are tunable).</summary>
+public sealed record SaveRoleRequest
+{
+    public string Name { get; init; } = "";
+    public IReadOnlyList<string> Permissions { get; init; } = [];
+}
+
+/// <summary>The permission catalog for the admin checklist UI: sections, each with their permissions.</summary>
+public sealed record PermissionCatalogDto(IReadOnlyList<PermissionGroupDto> Groups);
+public sealed record PermissionGroupDto(string Key, string Label, IReadOnlyList<PermissionItemDto> Permissions);
+public sealed record PermissionItemDto(string Key, string Action, string Label);
 
 /// <summary>Self-service password change — the current password is required to set a new one.</summary>
 public sealed record ChangePasswordRequest

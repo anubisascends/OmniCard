@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
+using OmniCard.Shared.Security;
 using OmniCard.Shared.Settings;
 
 namespace OmniCard.Web.Services;
@@ -19,22 +20,58 @@ public sealed class UserService(IDbContextFactory<OmniCardDbContext> factory)
     public const string SystemUsername = "Admin";
     public const string SystemDefaultPassword = "admin";
 
-    /// <summary>Create the built-in Admin account when the users table is empty. Idempotent.</summary>
+    // Built-in role names (seeded, IsSystem, not deletable).
+    public const string AdministratorRole = "Administrator";
+    public const string ViewerRole = "Viewer";
+    public const string StaffRole = "Staff";
+
+    /// <summary>Seed built-in roles and the built-in Admin account. Idempotent — safe on every startup,
+    /// including upgrades of an existing DB that predates roles.</summary>
     public void EnsureSeeded()
     {
         using var db = factory.CreateDbContext();
-        if (db.Users.Any())
-            return;
 
-        db.Users.Add(new User
+        // Roles are seeded independently of users so an existing (pre-roles) DB still gets them.
+        var existingRoles = db.Roles.Select(r => r.Name).ToHashSet();
+        void SeedRole(string name, IEnumerable<string> perms)
         {
-            Username = SystemUsername,
-            PasswordHash = PasswordHasher.Hash(SystemDefaultPassword),
-            IsSystem = true,
-            IsAdmin = true,
-        });
+            if (existingRoles.Contains(name)) return;
+            db.Roles.Add(new Role { Name = name, IsSystem = true, Permissions = perms.OrderBy(p => p).ToList() });
+        }
+        SeedRole(AdministratorRole, Permissions.All);
+        SeedRole(ViewerRole, Permissions.ViewOnly);
+        SeedRole(StaffRole, StaffPermissions);
         db.SaveChanges();
+
+        if (!db.Users.Any())
+        {
+            db.Users.Add(new User
+            {
+                Username = SystemUsername,
+                PasswordHash = PasswordHasher.Hash(SystemDefaultPassword),
+                IsSystem = true,
+                IsAdmin = true,
+            });
+            db.SaveChanges();
+        }
     }
+
+    /// <summary>The "Staff" preset: all views plus everyday edit actions (no delete, no admin/config areas).</summary>
+    private static readonly IReadOnlyList<string> StaffPermissions =
+    [
+        .. Permissions.ViewOnly,
+        Permissions.ScanCommit,
+        Permissions.CollectionEdit, Permissions.CollectionExport,
+        Permissions.LocationsCreate, Permissions.LocationsEdit,
+        Permissions.BinderEdit,
+        Permissions.InventoryCreate, Permissions.InventoryEdit,
+        Permissions.ListsCreate, Permissions.ListsEdit, Permissions.ListsCommit,
+        Permissions.TradesCreate, Permissions.TradesFinalize,
+        Permissions.ImportRun, Permissions.ExportRun,
+        Permissions.SalesOrdersCreate, Permissions.SalesOrdersEdit, Permissions.SalesOrdersImport,
+        Permissions.SalesCustomersCreate, Permissions.SalesCustomersEdit,
+        Permissions.SalesListingsCreate, Permissions.SalesListingsEdit, Permissions.SalesListingsPick,
+    ];
 
     public async Task<List<User>> ListAsync()
     {
@@ -60,8 +97,10 @@ public sealed class UserService(IDbContextFactory<OmniCardDbContext> factory)
         return user;
     }
 
-    /// <summary>Create a new (non-system) user. Throws <see cref="InvalidOperationException"/> on a duplicate/invalid name.</summary>
-    public async Task<User> CreateAsync(string username, string password, bool isAdmin = false)
+    /// <summary>Create a new (non-system) user. Non-admins with no explicit role default to the "Viewer"
+    /// role (view-only baseline). Throws <see cref="InvalidOperationException"/> on a duplicate/invalid name.</summary>
+    public async Task<User> CreateAsync(string username, string password, bool isAdmin = false,
+        int? roleId = null, PermissionOverrides? overrides = null)
     {
         username = (username ?? "").Trim();
         if (string.IsNullOrWhiteSpace(username))
@@ -73,17 +112,111 @@ public sealed class UserService(IDbContextFactory<OmniCardDbContext> factory)
         if (await db.Users.AnyAsync(u => u.Username == username))
             throw new InvalidOperationException($"A user named \"{username}\" already exists.");
 
+        // Non-admins default to the Viewer role when none is specified (view-only baseline).
+        if (!isAdmin && roleId is null)
+            roleId = await db.Roles.Where(r => r.Name == ViewerRole).Select(r => (int?)r.Id).FirstOrDefaultAsync();
+
         var user = new User
         {
             Username = username,
             PasswordHash = PasswordHasher.Hash(password),
             IsSystem = false,
             IsAdmin = isAdmin,
+            RoleId = roleId,
+            Overrides = Sanitize(overrides),
         };
         db.Users.Add(user);
         await db.SaveChangesAsync();
         return user;
     }
+
+    /// <summary>Update a user's role, per-user overrides, and admin flag. The system account stays admin
+    /// (its flag can't be cleared). Returns the updated user, or null if not found.</summary>
+    public async Task<User?> UpdateUserAsync(int id, int? roleId, PermissionOverrides? overrides, bool isAdmin)
+    {
+        using var db = factory.CreateDbContext();
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id);
+        if (user is null)
+            return null;
+
+        user.RoleId = roleId;
+        user.Overrides = Sanitize(overrides);
+        // The built-in system account is always an admin and can't be demoted.
+        user.IsAdmin = user.IsSystem || isAdmin;
+        await db.SaveChangesAsync();
+        return user;
+    }
+
+    // --- Roles ---
+
+    public async Task<List<Role>> ListRolesAsync()
+    {
+        using var db = factory.CreateDbContext();
+        return await db.Roles.AsNoTracking().OrderBy(r => r.Name).ToListAsync();
+    }
+
+    /// <summary>Create a custom role. Throws on a blank/duplicate name.</summary>
+    public async Task<Role> CreateRoleAsync(string name, IEnumerable<string>? permissions)
+    {
+        name = (name ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(name))
+            throw new InvalidOperationException("Role name is required.");
+
+        using var db = factory.CreateDbContext();
+        if (await db.Roles.AnyAsync(r => r.Name == name))
+            throw new InvalidOperationException($"A role named \"{name}\" already exists.");
+
+        var role = new Role { Name = name, IsSystem = false, Permissions = SanitizePermissions(permissions) };
+        db.Roles.Add(role);
+        await db.SaveChangesAsync();
+        return role;
+    }
+
+    /// <summary>Rename / re-permission a role. System roles keep their name but permissions can be tuned.
+    /// Returns the updated role, or null if not found.</summary>
+    public async Task<Role?> UpdateRoleAsync(int id, string? name, IEnumerable<string>? permissions)
+    {
+        using var db = factory.CreateDbContext();
+        var role = await db.Roles.FirstOrDefaultAsync(r => r.Id == id);
+        if (role is null)
+            return null;
+
+        if (!role.IsSystem && !string.IsNullOrWhiteSpace(name))
+        {
+            var trimmed = name.Trim();
+            if (await db.Roles.AnyAsync(r => r.Id != id && r.Name == trimmed))
+                throw new InvalidOperationException($"A role named \"{trimmed}\" already exists.");
+            role.Name = trimmed;
+        }
+        role.Permissions = SanitizePermissions(permissions);
+        await db.SaveChangesAsync();
+        return role;
+    }
+
+    /// <summary>Delete a custom role and detach it from any users. System roles can't be deleted;
+    /// returns false if not found or blocked.</summary>
+    public async Task<bool> DeleteRoleAsync(int id)
+    {
+        using var db = factory.CreateDbContext();
+        var role = await db.Roles.FirstOrDefaultAsync(r => r.Id == id);
+        if (role is null || role.IsSystem)
+            return false;
+
+        await db.Users.Where(u => u.RoleId == id).ExecuteUpdateAsync(s => s.SetProperty(u => u.RoleId, (int?)null));
+        db.Roles.Remove(role);
+        await db.SaveChangesAsync();
+        return true;
+    }
+
+    // Keep only known permission keys so stray/renamed keys can't accumulate in storage.
+    private static List<string> SanitizePermissions(IEnumerable<string>? keys) =>
+        (keys ?? []).Where(Permissions.IsValid).Distinct().OrderBy(k => k).ToList();
+
+    private static PermissionOverrides Sanitize(PermissionOverrides? o) => new()
+    {
+        Grant = SanitizePermissions(o?.Grant),
+        Deny = SanitizePermissions(o?.Deny),
+    };
 
     /// <summary>Delete a user. The system account can't be deleted; returns false if not found or blocked.</summary>
     public async Task<bool> DeleteAsync(int id)

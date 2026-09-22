@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
 using OmniCard.Shared.Ebay;
+using OmniCard.Shared.Security;
 using OmniCard.Web.Api.Infrastructure;
 
 namespace OmniCard.Web.Api.Controllers;
@@ -24,6 +25,7 @@ public sealed class EbayController(
     ILogger<EbayController> logger) : ControllerBase
 {
     [HttpGet("status")]
+    [RequirePermission(Permissions.EbayView)]
     public ActionResult<EbayStatusDto> Status()
     {
         var missing = auth.GetMissingConfiguration();
@@ -33,6 +35,7 @@ public sealed class EbayController(
     /// <summary>Redirects the browser to eBay's OAuth consent page. If the app isn't configured,
     /// bounces back to the settings screen with an error marker instead.</summary>
     [HttpGet("connect")]
+    [RequirePermission(Permissions.EbayManage)]
     public IActionResult Connect()
     {
         if (auth.GetMissingConfiguration().Count > 0)
@@ -43,6 +46,7 @@ public sealed class EbayController(
     /// <summary>eBay redirects here after consent with an authorization <paramref name="code"/>.
     /// Exchanges it for tokens (stored server-side) and returns the user to the settings screen.</summary>
     [HttpGet("callback")]
+    [RequirePermission(Permissions.EbayManage)]
     public async Task<IActionResult> Callback([FromQuery] string? code, [FromQuery] string? error)
     {
         if (!string.IsNullOrEmpty(error) || string.IsNullOrEmpty(code))
@@ -56,6 +60,7 @@ public sealed class EbayController(
     }
 
     [HttpPost("disconnect")]
+    [RequirePermission(Permissions.EbayManage)]
     public IActionResult Disconnect()
     {
         auth.Disconnect();
@@ -65,6 +70,7 @@ public sealed class EbayController(
     /// <summary>Runs the idempotent eBay seller setup (opt-in, inventory location, business policies).
     /// Requires an active connection.</summary>
     [HttpPost("setup")]
+    [RequirePermission(Permissions.EbayManage)]
     public async Task<ActionResult<EbaySetupResultDto>> Setup()
     {
         if (!auth.IsConnected)

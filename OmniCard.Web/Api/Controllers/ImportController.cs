@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using OmniCard.Web.Services;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.ImportExport;
+using OmniCard.Shared.Security;
 using OmniCard.Web.Api.Infrastructure;
 
 namespace OmniCard.Web.Api.Controllers;
@@ -14,6 +15,7 @@ public sealed class ImportController(
     WebBinderCardService binderCards) : ApiControllerBase
 {
     [HttpPost("csv")]
+    [RequirePermission(Permissions.ImportRun)]
     public IActionResult Csv(
         IFormFile file,
         [FromQuery] bool skipDuplicates = true,

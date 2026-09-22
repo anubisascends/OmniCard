@@ -7,6 +7,7 @@ using OmniCard.Web.Services;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Security;
 using OmniCard.Shared.Settings;
 using OmniCard.Shared.Trades;
 using OmniCard.Data.Catalogs;
@@ -53,6 +54,7 @@ public sealed class TradeSessionController : ControllerBase
     // ---- Read: the current draft (null when none is open) --------------------------------------
 
     [HttpGet]
+    [RequirePermission(Permissions.TradesView)]
     public IActionResult Current()
     {
         var id = TradeSessionCookie.GetActive(HttpContext, _paths);
@@ -62,6 +64,7 @@ public sealed class TradeSessionController : ControllerBase
     }
 
     [HttpPost("start")]
+    [RequirePermission(Permissions.TradesCreate)]
     public IActionResult Start()
     {
         var id = TradeSessionCookie.GetActive(HttpContext, _paths) ?? CreateDraft();
@@ -74,6 +77,7 @@ public sealed class TradeSessionController : ControllerBase
     public sealed record AddOwnedRequest(int LotId);
 
     [HttpPost("add-owned")]
+    [RequirePermission(Permissions.TradesCreate)]
     public IActionResult AddOwned([FromBody] AddOwnedRequest r)
     {
         var id = TradeSessionCookie.GetActive(HttpContext, _paths) ?? CreateDraft();
@@ -83,6 +87,7 @@ public sealed class TradeSessionController : ControllerBase
     }
 
     [HttpPost("add-offdb")]
+    [RequirePermission(Permissions.TradesCreate)]
     public async Task<IActionResult> AddOffDb([FromForm] string? name, [FromForm] decimal? value, IFormFile? photo)
     {
         var id = TradeSessionCookie.GetActive(HttpContext, _paths) ?? CreateDraft();
@@ -105,6 +110,7 @@ public sealed class TradeSessionController : ControllerBase
     public sealed record RemoveItemRequest(int Index);
 
     [HttpPost("remove-item")]
+    [RequirePermission(Permissions.TradesCreate)]
     public IActionResult RemoveItem([FromBody] RemoveItemRequest r)
     {
         var id = TradeSessionCookie.GetActive(HttpContext, _paths);
@@ -125,6 +131,7 @@ public sealed class TradeSessionController : ControllerBase
     // ---- Finalize / cancel ----------------------------------------------------------------------
 
     [HttpPost("finalize")]
+    [RequirePermission(Permissions.TradesFinalize)]
     public async Task<IActionResult> Finalize([FromForm] string? note, [FromForm] decimal? receivedValue, IFormFile? receivedPhoto)
     {
         var id = TradeSessionCookie.GetActive(HttpContext, _paths);
@@ -147,6 +154,7 @@ public sealed class TradeSessionController : ControllerBase
     }
 
     [HttpPost("cancel")]
+    [RequirePermission(Permissions.TradesCancel)]
     public IActionResult Cancel()
     {
         var id = TradeSessionCookie.GetActive(HttpContext, _paths);
@@ -167,6 +175,7 @@ public sealed class TradeSessionController : ControllerBase
     // ---- Owned-card search (to add outgoing cards) ---------------------------------------------
 
     [HttpGet("search")]
+    [RequirePermission(Permissions.TradesView)]
     public IActionResult Search(string? q)
     {
         if (string.IsNullOrWhiteSpace(q))

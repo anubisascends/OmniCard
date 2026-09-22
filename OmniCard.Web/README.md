@@ -17,11 +17,17 @@ whole app — the original WPF desktop app has been retired.
   `OmniCard_Riftbound`, `OmniCard_Pokemon`, `OmniCard_Yugioh`, `OmniCard_FinalFantasy`). They're
   disposable reference caches (refresh wipes + reloads), so they use `EnsureCreated` at startup, not
   migrations. Refreshed in-place via the catalog "refresh" operations (Settings → Catalog data).
-- **Per-user accounts** — username + password sign-in (passwords stored as salted PBKDF2 hashes).
-  A built-in `Admin` account (default password `admin`) is seeded on first run — change it after
-  signing in. "Remember me" issues a persistent, encrypted auth cookie. Manage accounts under
-  **Administration → Users**; per-user permissions are planned but not yet enforced (any admin has
-  full access today).
+- **Per-user accounts + granular permissions** — username + password sign-in (passwords stored as
+  salted PBKDF2 hashes). A built-in `Admin` account (default password `admin`) is seeded on first
+  run — change it after signing in. "Remember me" issues a persistent, encrypted auth cookie.
+  Manage accounts under **Administration → Users** and permission bundles under
+  **Administration → Roles** (both admin-only). Each app section has granular permissions
+  (view/create/edit/delete plus a few special actions); access is granted via a **role** plus
+  optional per-user **grant/deny overrides**. Admin accounts (and the built-in `Admin`) hold every
+  permission. New non-admin users default to the seeded **Viewer** role (view-only). The API
+  enforces each permission per request (`RequirePermission` filter → `PermissionService`), so an
+  admin's change takes effect on the affected user's **next request — no re-login**. The permission
+  catalog is defined in `OmniCard.Shared/Security/Permissions.cs` (exposed at `GET /api/meta/permissions`).
 - **Server-side scanning** — image upload → perceptual hash + OCR matching via the per-game
   `ICardGameService` pipeline; no TWAIN, no desktop agent.
 - **Server-hosted artwork** — card images cached under `{dataDir}/card-images`, served at

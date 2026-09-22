@@ -170,6 +170,8 @@ export interface AuthStatusDto {
   authenticated: boolean;
   username?: string | null;
   isAdmin?: boolean;
+  /** Effective permission keys for the signed-in user (admins hold every key). */
+  permissions?: string[] | null;
 }
 
 export interface UserDto {
@@ -178,6 +180,32 @@ export interface UserDto {
   isSystem: boolean;
   isAdmin: boolean;
   createdAt: string;
+  roleId?: number | null;
+  grant?: string[] | null;
+  deny?: string[] | null;
+}
+
+/** A reusable permission bundle. System roles can't be deleted. */
+export interface RoleDto {
+  id: number;
+  name: string;
+  isSystem: boolean;
+  permissions: string[];
+}
+
+/** The permission catalog for the admin checklist UI: sections, each with their permissions. */
+export interface PermissionCatalogDto {
+  groups: PermissionGroupDto[];
+}
+export interface PermissionGroupDto {
+  key: string;
+  label: string;
+  permissions: PermissionItemDto[];
+}
+export interface PermissionItemDto {
+  key: string;
+  action: string;
+  label: string;
 }
 
 export interface WorkflowLaneDto {

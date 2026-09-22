@@ -2,6 +2,7 @@ using System.Reflection;
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
 using OmniCard.Shared.Games;
+using OmniCard.Shared.Security;
 using OmniCard.CardMatching.Search;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Api.Mapping;
@@ -27,6 +28,18 @@ public sealed class MetaController(IEnumerable<ICardGameService> gameServices) :
             return DtoMapping.ToDto(resolver.SearchSchema, DtoMapping.GameId(g));
 
         return DtoMapping.ToDto(SharedSearchSchema.Default, "all");
+    }
+
+    /// <summary>The granular permission catalog grouped by feature section — drives the role/user
+    /// permission checklists in Administration. Read-only reference data; any signed-in user may fetch it.</summary>
+    [HttpGet("permissions")]
+    public ActionResult<PermissionCatalogDto> PermissionCatalog()
+    {
+        var groups = Permissions.Catalog
+            .Select(g => new PermissionGroupDto(g.Key, g.Label,
+                g.Permissions.Select(p => new PermissionItemDto(p.Key, p.Action, p.Label)).ToList()))
+            .ToList();
+        return new PermissionCatalogDto(groups);
     }
 
     /// <summary>

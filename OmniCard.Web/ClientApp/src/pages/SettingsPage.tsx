@@ -33,13 +33,17 @@ import {
   Typography,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import KeyIcon from '@mui/icons-material/Key';
 import Link from '@mui/material/Link';
 import StarIcon from '@mui/icons-material/Star';
 import { api, ApiError } from '../api/client';
-import type { ComponentDto, UserDto } from '../api/types';
+import type { ComponentDto, RoleDto, UserDto } from '../api/types';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import { DeckTypesCard } from '../components/settings/DeckTypesCard';
+import { RolesCard } from '../components/settings/RolesCard';
+import { PermissionChecklist } from '../components/settings/PermissionChecklist';
+import { usePermissions } from '../context/usePermissions';
 import { currencySymbol } from '../lib/scanBadges';
 import { useFormatters } from '../i18n/format';
 import {
@@ -496,21 +500,24 @@ function PasswordDialog({
   onSubmit,
   pending,
   error,
+  roles,
 }: {
   open: boolean;
   title: string;
   withUsername: boolean;
   submitLabel: string;
   onClose: () => void;
-  onSubmit: (v: { username: string; password: string; isAdmin: boolean }) => void;
+  onSubmit: (v: { username: string; password: string; isAdmin: boolean; roleId: number | null }) => void;
   pending: boolean;
   error?: string | null;
+  roles?: RoleDto[];
 }) {
   const { t } = useTranslation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [roleId, setRoleId] = useState<number | ''>('');
 
   // Reset fields whenever the dialog is (re)opened.
   const reset = () => {
@@ -518,7 +525,11 @@ function PasswordDialog({
     setPassword('');
     setConfirm('');
     setIsAdmin(false);
+    setRoleId('');
   };
+
+  const submit = () =>
+    onSubmit({ username: username.trim(), password, isAdmin, roleId: roleId === '' ? null : roleId });
 
   const mismatch = confirm.length > 0 && password !== confirm;
   const canSubmit =
@@ -540,7 +551,7 @@ function PasswordDialog({
           sx={{ mt: 1 }}
           onSubmit={(e) => {
             e.preventDefault();
-            if (canSubmit) onSubmit({ username: username.trim(), password, isAdmin });
+            if (canSubmit) submit();
           }}
         >
           {withUsername && (
@@ -571,6 +582,23 @@ function PasswordDialog({
             helperText={mismatch ? t('settings.users.passwordMismatch') : ' '}
             onChange={(e) => setConfirm(e.target.value)}
           />
+          {withUsername && roles && !isAdmin && (
+            <TextField
+              select
+              label={t('settings.users.role')}
+              size="small"
+              value={roleId}
+              onChange={(e) => setRoleId(e.target.value === '' ? '' : Number(e.target.value))}
+              helperText={t('settings.users.roleHelper')}
+            >
+              <MenuItem value="">{t('settings.users.noRole')}</MenuItem>
+              {roles.map((r) => (
+                <MenuItem key={r.id} value={r.id}>
+                  {r.name}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
           {withUsername && (
             <FormControlLabel
               control={
@@ -586,12 +614,107 @@ function PasswordDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
-        <Button
-          variant="contained"
-          disabled={!canSubmit}
-          onClick={() => onSubmit({ username: username.trim(), password, isAdmin })}
-        >
+        <Button variant="contained" disabled={!canSubmit} onClick={submit}>
           {pending ? t('common.states.saving') : submitLabel}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/** Admin edit of a user's access: assigned role, per-user grant/deny overrides, and the admin flag.
+ * Admins bypass roles/overrides, so those controls disable when "Administrator" is ticked. */
+function UserEditDialog({
+  user,
+  roles,
+  onClose,
+  onSaved,
+}: {
+  user: UserDto;
+  roles: RoleDto[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const catalog = useQuery({ queryKey: ['permission-catalog'], queryFn: api.permissionCatalog });
+  const [roleId, setRoleId] = useState<number | ''>(user.roleId ?? '');
+  const [grant, setGrant] = useState<string[]>(user.grant ?? []);
+  const [deny, setDeny] = useState<string[]>(user.deny ?? []);
+  const [isAdmin, setIsAdmin] = useState(user.isAdmin);
+
+  const save = useMutation({
+    mutationFn: () =>
+      api.userUpdate(user.id, {
+        roleId: roleId === '' ? null : roleId,
+        grant,
+        deny,
+        isAdmin,
+      }),
+    onSuccess: () => {
+      // Effective permissions changed — refresh the current session's own status too.
+      qc.invalidateQueries({ queryKey: ['auth-status'] });
+      onSaved();
+    },
+  });
+
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="md">
+      <DialogTitle>{t('settings.users.editAccessTitle', { username: user.username })}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <FormControlLabel
+            control={<Checkbox checked={isAdmin} onChange={(e) => setIsAdmin(e.target.checked)} />}
+            label={t('settings.users.administratorFullAccess')}
+          />
+          {!isAdmin && (
+            <>
+              <TextField
+                select
+                label={t('settings.users.role')}
+                size="small"
+                value={roleId}
+                onChange={(e) => setRoleId(e.target.value === '' ? '' : Number(e.target.value))}
+                sx={{ maxWidth: 320 }}
+              >
+                <MenuItem value="">{t('settings.users.noRole')}</MenuItem>
+                {roles.map((r) => (
+                  <MenuItem key={r.id} value={r.id}>
+                    {r.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>
+                  {t('settings.users.grantHeading')}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {t('settings.users.grantHelper')}
+                </Typography>
+                <Box sx={{ mt: 1 }}>
+                  <PermissionChecklist catalog={catalog.data} selected={grant} onChange={setGrant} />
+                </Box>
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>
+                  {t('settings.users.denyHeading')}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {t('settings.users.denyHelper')}
+                </Typography>
+                <Box sx={{ mt: 1 }}>
+                  <PermissionChecklist catalog={catalog.data} selected={deny} onChange={setDeny} />
+                </Box>
+              </Box>
+            </>
+          )}
+          {save.error instanceof ApiError && <Alert severity="error">{save.error.message}</Alert>}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
+        <Button variant="contained" disabled={save.isPending} onClick={() => save.mutate()}>
+          {save.isPending ? t('common.states.saving') : t('common.actions.save')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -603,14 +726,18 @@ function ManageUsersCard() {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const usersQuery = useQuery({ queryKey: ['users'], queryFn: api.users });
+  const rolesQuery = useQuery({ queryKey: ['roles'], queryFn: api.roles });
   const [createOpen, setCreateOpen] = useState(false);
   const [resetFor, setResetFor] = useState<UserDto | null>(null);
+  const [editFor, setEditFor] = useState<UserDto | null>(null);
 
+  const roleName = (id: number | null | undefined) =>
+    id == null ? null : rolesQuery.data?.find((r) => r.id === id)?.name ?? `#${id}`;
   const invalidate = () => qc.invalidateQueries({ queryKey: ['users'] });
 
   const create = useMutation({
-    mutationFn: (v: { username: string; password: string; isAdmin: boolean }) =>
-      api.userCreate(v),
+    mutationFn: (v: { username: string; password: string; isAdmin: boolean; roleId: number | null }) =>
+      api.userCreate({ username: v.username, password: v.password, isAdmin: v.isAdmin, roleId: v.roleId }),
     onSuccess: () => {
       setCreateOpen(false);
       invalidate();
@@ -663,8 +790,22 @@ function ManageUsersCard() {
                     <Chip label={t('settings.users.systemChip')} size="small" sx={{ ml: 1 }} variant="outlined" />
                   )}
                 </TableCell>
-                <TableCell>{u.isAdmin ? t('settings.users.roleAdmin') : t('settings.users.roleUser')}</TableCell>
+                <TableCell>
+                  {u.isAdmin
+                    ? t('settings.users.roleAdmin')
+                    : roleName(u.roleId) ?? t('settings.users.noRole')}
+                  {!u.isAdmin && ((u.grant?.length ?? 0) > 0 || (u.deny?.length ?? 0) > 0) && (
+                    <Chip label={t('settings.users.overridesChip')} size="small" sx={{ ml: 1 }} variant="outlined" />
+                  )}
+                </TableCell>
                 <TableCell align="right">
+                  <Tooltip title={t('settings.users.editAccessTooltip')}>
+                    <span>
+                      <IconButton size="small" disabled={u.isSystem} onClick={() => setEditFor(u)}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
                   <Tooltip title={t('settings.users.resetPasswordTooltip')}>
                     <IconButton size="small" onClick={() => setResetFor(u)}>
                       <KeyIcon fontSize="small" />
@@ -695,12 +836,24 @@ function ManageUsersCard() {
         open={createOpen}
         title={t('settings.users.addUser')}
         withUsername
+        roles={rolesQuery.data}
         submitLabel={t('common.actions.create')}
         pending={create.isPending}
         error={create.error instanceof ApiError ? create.error.message : null}
         onClose={() => setCreateOpen(false)}
         onSubmit={(v) => create.mutate(v)}
       />
+      {editFor && (
+        <UserEditDialog
+          user={editFor}
+          roles={rolesQuery.data ?? []}
+          onClose={() => setEditFor(null)}
+          onSaved={() => {
+            setEditFor(null);
+            invalidate();
+          }}
+        />
+      )}
       <PasswordDialog
         open={!!resetFor}
         title={resetFor ? t('settings.users.resetTitleFor', { username: resetFor.username }) : t('settings.users.resetTitle')}
@@ -1226,25 +1379,36 @@ function ReceiptSettingsCard() {
   );
 }
 
-const TABS = [
-  { key: 'sales', labelKey: 'settings.tabs.sales', render: () => <SalesCard /> },
-  { key: 'receipt', labelKey: 'settings.tabs.receipt', render: () => <ReceiptSettingsCard /> },
-  { key: 'scan', labelKey: 'settings.tabs.scan', render: () => <ScanBadgesCard /> },
-  { key: 'deck-types', labelKey: 'settings.tabs.deckTypes', render: () => <DeckTypesCard /> },
-  { key: 'appearance', labelKey: 'settings.tabs.appearance', render: () => <AppearanceCard /> },
-  { key: 'catalog', labelKey: 'settings.tabs.catalog', render: () => <CatalogCard /> },
-  { key: 'ebay', labelKey: 'settings.tabs.ebay', render: () => <EbayCard /> },
-  { key: 'users', labelKey: 'settings.tabs.users', render: () => <UsersTab /> },
-  { key: 'components', labelKey: 'settings.tabs.components', render: () => <ComponentsCard /> },
-] as const;
+// `show` decides tab visibility from the signed-in user's access. The Administration hub itself is
+// always reachable so everyone can change their password (Users tab) and read Components.
+type TabGate = { isAdmin: boolean; can: (perm: string) => boolean };
+const TABS: {
+  key: string;
+  labelKey: string;
+  render: () => JSX.Element;
+  show: (g: TabGate) => boolean;
+}[] = [
+  { key: 'sales', labelKey: 'settings.tabs.sales', render: () => <SalesCard />, show: (g) => g.can('settings.view') },
+  { key: 'receipt', labelKey: 'settings.tabs.receipt', render: () => <ReceiptSettingsCard />, show: (g) => g.can('settings.view') },
+  { key: 'scan', labelKey: 'settings.tabs.scan', render: () => <ScanBadgesCard />, show: (g) => g.can('settings.view') },
+  { key: 'deck-types', labelKey: 'settings.tabs.deckTypes', render: () => <DeckTypesCard />, show: (g) => g.can('decktypes.view') },
+  { key: 'appearance', labelKey: 'settings.tabs.appearance', render: () => <AppearanceCard />, show: () => true },
+  { key: 'catalog', labelKey: 'settings.tabs.catalog', render: () => <CatalogCard />, show: (g) => g.can('catalog.view') },
+  { key: 'ebay', labelKey: 'settings.tabs.ebay', render: () => <EbayCard />, show: (g) => g.can('ebay.view') },
+  { key: 'roles', labelKey: 'settings.tabs.roles', render: () => <RolesCard />, show: (g) => g.isAdmin },
+  { key: 'users', labelKey: 'settings.tabs.users', render: () => <UsersTab />, show: () => true },
+  { key: 'components', labelKey: 'settings.tabs.components', render: () => <ComponentsCard />, show: () => true },
+];
 
 export function SettingsPage() {
   const { t } = useTranslation();
+  const { isAdmin, can } = usePermissions();
   const [params, setParams] = useSearchParams();
   const requested = params.get('tab');
+  const tabs = TABS.filter((tab) => tab.show({ isAdmin, can }));
   const active = Math.max(
     0,
-    TABS.findIndex((tab) => tab.key === requested),
+    tabs.findIndex((tab) => tab.key === requested),
   );
 
   return (
@@ -1255,18 +1419,18 @@ export function SettingsPage() {
           value={active}
           onChange={(_, v) => {
             const nextParams = new URLSearchParams(params);
-            nextParams.set('tab', TABS[v].key);
+            nextParams.set('tab', tabs[v].key);
             setParams(nextParams, { replace: true });
           }}
           variant="scrollable"
           scrollButtons="auto"
         >
-          {TABS.map((tab) => (
+          {tabs.map((tab) => (
             <Tab key={tab.key} label={t(tab.labelKey)} />
           ))}
         </Tabs>
       </Box>
-      <Box>{TABS[active].render()}</Box>
+      <Box>{tabs[active]?.render()}</Box>
     </Stack>
   );
 }

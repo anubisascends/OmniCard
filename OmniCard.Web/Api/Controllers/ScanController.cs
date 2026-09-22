@@ -1,6 +1,8 @@
 // OmniCard.Web/Api/ScanController.cs
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using OmniCard.Shared.Security;
+using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Hubs;
 
 namespace OmniCard.Web.Api.Controllers;
@@ -28,6 +30,7 @@ public class ScanController : ControllerBase
 
     [HttpPost]
     [RequestSizeLimit(MaxFileSize)]
+    [RequirePermission(Permissions.ScanView)]
     public async Task<IActionResult> Upload(IFormFile image)
     {
         if (image is null || image.Length == 0)

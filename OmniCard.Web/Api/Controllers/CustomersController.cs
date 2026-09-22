@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using OmniCard.Api.Contracts;
 using OmniCard.Data;
 using OmniCard.Shared.Sales;
+using OmniCard.Shared.Security;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Api.Mapping;
 
@@ -16,10 +17,12 @@ public sealed class CustomersController(
     IDbContextFactory<OmniCardDbContext> dbFactory) : ApiControllerBase
 {
     [HttpGet]
+    [RequirePermission(Permissions.SalesCustomersView)]
     public ActionResult<IReadOnlyList<CustomerDto>> Get() =>
         customers.GetAll().Select(DtoMapping.ToDto).ToList();
 
     [HttpGet("{id:int}")]
+    [RequirePermission(Permissions.SalesCustomersView)]
     public ActionResult<CustomerDto> GetOne(int id)
     {
         var c = customers.Get(id);
@@ -27,6 +30,7 @@ public sealed class CustomersController(
     }
 
     [HttpPost]
+    [RequirePermission(Permissions.SalesCustomersCreate)]
     public ActionResult<CustomerDto> Create([FromBody] CustomerUpsertRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -48,6 +52,7 @@ public sealed class CustomersController(
     }
 
     [HttpPut("{id:int}")]
+    [RequirePermission(Permissions.SalesCustomersEdit)]
     public IActionResult Update(int id, [FromBody] CustomerUpsertRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -72,6 +77,7 @@ public sealed class CustomersController(
     }
 
     [HttpDelete("{id:int}")]
+    [RequirePermission(Permissions.SalesCustomersDelete)]
     public IActionResult Delete(int id)
     {
         customers.Delete(id);

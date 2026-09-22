@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import {
   AppBar,
@@ -37,21 +37,24 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
 import { useGame } from '../context/GameContext';
+import { usePermissions } from '../context/usePermissions';
 
 const DRAWER_WIDTH = 200;
 
-// `labelKey` resolves against the `nav` namespace at render time.
-const NAV: { to: string; labelKey: string; icon: ReactNode }[] = [
-  { to: '/', labelKey: 'dashboard', icon: <DashboardIcon /> },
-  { to: '/scan', labelKey: 'scan', icon: <PhotoCameraIcon /> },
-  { to: '/collection', labelKey: 'collection', icon: <CollectionsBookmarkIcon /> },
-  { to: '/locations', labelKey: 'locations', icon: <GridViewIcon /> },
-  { to: '/sets', labelKey: 'sets', icon: <ChecklistIcon /> },
-  { to: '/inventory', labelKey: 'inventory', icon: <Inventory2Icon /> },
-  { to: '/lists', labelKey: 'lists', icon: <FormatListBulletedIcon /> },
-  { to: '/trades', labelKey: 'trades', icon: <SwapHorizIcon /> },
-  { to: '/import', labelKey: 'import', icon: <UploadFileIcon /> },
-  { to: '/sales', labelKey: 'sales', icon: <PointOfSaleIcon /> },
+// `labelKey` resolves against the `nav` namespace at render time. `perm` lists the view permission(s)
+// that reveal the item — a user needs at least one. Items with no `perm` are always shown
+// (Administration hosts self-service password change + the always-viewable Components tab).
+const NAV: { to: string; labelKey: string; icon: ReactNode; perm?: string[] }[] = [
+  { to: '/', labelKey: 'dashboard', icon: <DashboardIcon />, perm: ['dashboard.view'] },
+  { to: '/scan', labelKey: 'scan', icon: <PhotoCameraIcon />, perm: ['scan.view'] },
+  { to: '/collection', labelKey: 'collection', icon: <CollectionsBookmarkIcon />, perm: ['collection.view'] },
+  { to: '/locations', labelKey: 'locations', icon: <GridViewIcon />, perm: ['locations.view'] },
+  { to: '/sets', labelKey: 'sets', icon: <ChecklistIcon />, perm: ['sets.view'] },
+  { to: '/inventory', labelKey: 'inventory', icon: <Inventory2Icon />, perm: ['inventory.view'] },
+  { to: '/lists', labelKey: 'lists', icon: <FormatListBulletedIcon />, perm: ['lists.view'] },
+  { to: '/trades', labelKey: 'trades', icon: <SwapHorizIcon />, perm: ['trades.view'] },
+  { to: '/import', labelKey: 'import', icon: <UploadFileIcon />, perm: ['import.run'] },
+  { to: '/sales', labelKey: 'sales', icon: <PointOfSaleIcon />, perm: ['sales.orders.view', 'sales.customers.view', 'sales.listings.view'] },
   { to: '/settings', labelKey: 'administration', icon: <AdminPanelSettingsIcon /> },
 ];
 
@@ -62,6 +65,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
   const gamesQuery = useQuery({ queryKey: ['games'], queryFn: api.games });
   const authQuery = useQuery({ queryKey: ['auth-status'], queryFn: api.authStatus });
+  const { canAny, isAdmin } = usePermissions();
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -77,9 +81,17 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const username = authQuery.data?.username;
 
+  // Re-check permissions when navigating so an admin's change to this user (applied server-side
+  // immediately) is reflected in the nav/UI within a click, without a reload.
+  useEffect(() => {
+    qc.invalidateQueries({ queryKey: ['auth-status'] });
+  }, [location.pathname, qc]);
+
+  const visibleNav = NAV.filter((item) => !item.perm || canAny(...item.perm));
+
   const navList = (
     <List>
-      {NAV.map((item) => {
+      {visibleNav.map((item) => {
         const selected =
           item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to);
         return (
@@ -152,16 +164,18 @@ export function AppShell({ children }: { children: ReactNode }) {
               </MenuItem>
             )}
             {username && <Divider />}
-            <MenuItem
-              component={RouterLink}
-              to="/settings?tab=users"
-              onClick={() => setAccountAnchor(null)}
-            >
-              <ListItemIcon>
-                <AdminPanelSettingsIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>{t('nav.accountAndUsers')}</ListItemText>
-            </MenuItem>
+            {isAdmin && (
+              <MenuItem
+                component={RouterLink}
+                to="/settings?tab=users"
+                onClick={() => setAccountAnchor(null)}
+              >
+                <ListItemIcon>
+                  <AdminPanelSettingsIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>{t('nav.accountAndUsers')}</ListItemText>
+              </MenuItem>
+            )}
             <MenuItem disabled={logout.isPending} onClick={() => logout.mutate()}>
               <ListItemIcon>
                 <LogoutIcon fontSize="small" />

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
 using OmniCard.Shared.ImportExport;
 using OmniCard.Shared.Sales;
+using OmniCard.Shared.Security;
 using OmniCard.Web.Api.Infrastructure;
 
 namespace OmniCard.Web.Api.Controllers;
@@ -14,6 +15,7 @@ namespace OmniCard.Web.Api.Controllers;
 /// product value); no inventory lots are touched.</summary>
 [ApiController]
 [ApiAuth]
+[RequirePermission(Permissions.SalesOrdersImport)]
 [Route("api/orders/import")]
 public sealed class OrderImportController(
     IOrderCsvImportService importer,

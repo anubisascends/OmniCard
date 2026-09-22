@@ -4,6 +4,7 @@ using OmniCard.Shared.Audit;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Sales;
+using OmniCard.Shared.Security;
 using OmniCard.Shared.Storage;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Api.Mapping;
@@ -22,6 +23,7 @@ public sealed class LocationsController(
 {
     /// <summary>Printable price-sheet PDF for a location's cards.</summary>
     [HttpGet("{id:int}/pricesheet.pdf")]
+    [RequirePermission(Permissions.LocationsView)]
     public IActionResult PriceSheet(int id)
     {
         var container = containers.GetAll().FirstOrDefault(c => c.Id == id);
@@ -33,6 +35,7 @@ public sealed class LocationsController(
 
     /// <summary>All locations (optionally filtered to one game) with card counts and valuations.</summary>
     [HttpGet]
+    [RequirePermission(Permissions.LocationsView)]
     public async Task<ActionResult<IReadOnlyList<LocationSummaryDto>>> Get([FromQuery] string? game)
     {
         var gameFilter = ParseGame(game);
@@ -43,6 +46,7 @@ public sealed class LocationsController(
     /// <summary>One location's overview tile. Its cards come from
     /// <c>GET /api/collection?containerId={id}</c>.</summary>
     [HttpGet("{id:int}")]
+    [RequirePermission(Permissions.LocationsView)]
     public async Task<ActionResult<LocationSummaryDto>> GetOne(int id)
     {
         var summaries = await queryService.GetLocationOverviewsAsync();
@@ -60,12 +64,14 @@ public sealed class LocationsController(
     /// <summary>Whether a location name is free (case-insensitive, incl. the reserved Bulk name).
     /// Backs the live add/rename validation.</summary>
     [HttpGet("name-available")]
+    [RequirePermission(Permissions.LocationsView)]
     public ActionResult<NameAvailableDto> NameAvailable([FromQuery] string name, [FromQuery] int? excludeId) =>
         new NameAvailableDto(!containers.NameExists(name ?? "", excludeId));
 
     /// <summary>Create a new location. 409 if the name is taken, 400 for an invalid/Bulk type or a
     /// deck box without a valid game.</summary>
     [HttpPost]
+    [RequirePermission(Permissions.LocationsCreate)]
     public ActionResult<LocationSummaryDto> Create([FromBody] CreateLocationRequest req)
     {
         var name = (req.Name ?? "").Trim();
@@ -98,6 +104,7 @@ public sealed class LocationsController(
     /// <summary>Assign/reassign a deck box's game system and deck type. 400 if not a deck box or the
     /// game/deck type is invalid; 409 if the box already holds cards from a different game.</summary>
     [HttpPut("{id:int}/deck-box")]
+    [RequirePermission(Permissions.LocationsEdit)]
     public IActionResult SetDeckBox(int id, [FromBody] SetDeckBoxRequest req)
     {
         var game = ParseGame(req.Game);
@@ -119,11 +126,13 @@ public sealed class LocationsController(
     /// <summary>Deck boxes with no game assigned yet (legacy), each with the game inferred from the
     /// cards inside. Backs the "assign game" prompt on the Locations page.</summary>
     [HttpGet("deck-boxes/needs-game")]
+    [RequirePermission(Permissions.LocationsView)]
     public ActionResult<IReadOnlyList<DeckBoxNeedsGameDto>> DeckBoxesNeedingGame() =>
         containers.GetDeckBoxesMissingGame().Select(DtoMapping.ToDto).ToList();
 
     /// <summary>Advisory deck-legality check for a deck box against its deck type's rules.</summary>
     [HttpGet("{id:int}/deck-legality")]
+    [RequirePermission(Permissions.LocationsView)]
     public ActionResult<DeckLegalityDto> DeckLegality(int id) =>
         DtoMapping.ToDto(deckLegality.Check(id));
 
@@ -132,6 +141,7 @@ public sealed class LocationsController(
 
     /// <summary>Rename a location. 409 if the new name is taken.</summary>
     [HttpPut("{id:int}")]
+    [RequirePermission(Permissions.LocationsEdit)]
     public IActionResult Rename(int id, [FromBody] RenameRequest req)
     {
         var name = (req.Name ?? "").Trim();
@@ -146,6 +156,7 @@ public sealed class LocationsController(
     /// <summary>Delete a location; <paramref name="moveToBulk"/> keeps its cards (moved to Bulk) or
     /// deletes them.</summary>
     [HttpDelete("{id:int}")]
+    [RequirePermission(Permissions.LocationsDelete)]
     public IActionResult Delete(int id, [FromQuery] bool moveToBulk = true)
     {
         containers.Delete(id, moveToBulk);
@@ -153,6 +164,7 @@ public sealed class LocationsController(
     }
 
     [HttpPut("{id:int}/always-available")]
+    [RequirePermission(Permissions.LocationsEdit)]
     public IActionResult SetAlwaysAvailable(int id, [FromBody] BoolValueRequest req)
     {
         containers.SetAlwaysAvailable(id, req.Value);
@@ -160,6 +172,7 @@ public sealed class LocationsController(
     }
 
     [HttpPut("{id:int}/exclude-deck-check")]
+    [RequirePermission(Permissions.LocationsEdit)]
     public IActionResult SetExcludeFromDeckCheck(int id, [FromBody] BoolValueRequest req)
     {
         containers.SetExcludeFromDeckCheck(id, req.Value);

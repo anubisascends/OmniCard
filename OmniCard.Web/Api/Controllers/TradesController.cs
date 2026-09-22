@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
+using OmniCard.Shared.Security;
 using OmniCard.Shared.Trades;
 using OmniCard.Web.Api.Infrastructure;
 
@@ -9,10 +10,12 @@ namespace OmniCard.Web.Api.Controllers;
 public sealed class TradesController(ITradeService trades) : ApiControllerBase
 {
     [HttpGet]
+    [RequirePermission(Permissions.TradesView)]
     public ActionResult<IReadOnlyList<TradeSummaryDto>> Get() =>
         trades.GetTrades().Select(ToDto).ToList();
 
     [HttpGet("{id:int}")]
+    [RequirePermission(Permissions.TradesView)]
     public ActionResult<TradeSummaryDto> GetOne(int id)
     {
         var t = trades.GetTrade(id);

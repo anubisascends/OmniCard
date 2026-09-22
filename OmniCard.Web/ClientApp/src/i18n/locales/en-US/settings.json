@@ -9,8 +9,22 @@
       "appearance": "Appearance",
       "catalog": "Catalog Data",
       "ebay": "eBay",
+      "roles": "Roles",
       "users": "Users",
       "components": "Components"
+    },
+    "roles": {
+      "title": "Roles",
+      "description": "Reusable permission bundles you assign to users. The built-in Administrator, Viewer, and Staff roles can be re-permissioned but not renamed or deleted.",
+      "addRole": "Add role",
+      "editTitle": "Edit role — {{name}}",
+      "colName": "Name",
+      "colPermissions": "Permissions",
+      "permissionCount": "{{count}} permission",
+      "permissionCount_other": "{{count}} permissions",
+      "systemNameLocked": "Built-in roles can't be renamed.",
+      "systemDeleteTooltip": "Built-in roles can't be deleted",
+      "confirmDelete": "Delete role \"{{name}}\"? Users with this role will keep any per-user permissions but lose the role's."
     },
     "receipt": {
       "title": "Receipt printing",
@@ -117,7 +131,17 @@
       "password": "Password",
       "confirmPassword": "Confirm password",
       "passwordMismatch": "Passwords don't match.",
-      "administratorFullAccess": "Administrator (full access)"
+      "administratorFullAccess": "Administrator (full access)",
+      "role": "Role",
+      "roleHelper": "New users default to the Viewer role (view-only) if none is chosen.",
+      "noRole": "No role",
+      "overridesChip": "custom",
+      "editAccessTooltip": "Edit access",
+      "editAccessTitle": "Edit access — {{username}}",
+      "grantHeading": "Also allow (grant)",
+      "grantHelper": "Extra permissions this user gets beyond their role.",
+      "denyHeading": "Never allow (deny)",
+      "denyHelper": "Permissions removed from this user even if their role grants them."
     },
     "components": {
       "title": "Components",

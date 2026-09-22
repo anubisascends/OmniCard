@@ -188,6 +188,10 @@ builder.Services.AddScoped<BinderStateBuilder>();
 // encrypted, HttpOnly cookie (DataProtection keys persisted above), so "remember me" survives
 // app-pool recycles and browser restarts. This replaces the old shared-passphrase gate.
 builder.Services.AddSingleton(new UserService(writableFactory));
+// Resolves + caches each user's effective permission set from live DB state (singleton so the cache
+// is shared). RequirePermissionAttribute reads it per request; user/role edits invalidate it, so
+// permission changes apply immediately without a re-login.
+builder.Services.AddSingleton(new PermissionService(writableFactory));
 builder.Services
     .AddAuthentication(AppAuthGate.Scheme)
     .AddCookie(AppAuthGate.Scheme, options =>

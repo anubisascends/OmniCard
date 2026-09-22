@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
 using OmniCard.Shared.Cards;
+using OmniCard.Shared.Security;
 using OmniCard.Shared.Storage;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Api.Mapping;
@@ -14,6 +15,7 @@ public sealed class DeckTypesController(IDeckTypeService deckTypes) : ApiControl
 {
     /// <summary>Deck types for a game (built-in + custom). Empty when the game is missing/invalid.</summary>
     [HttpGet]
+    [RequirePermission(Permissions.DeckTypesView)]
     public ActionResult<IReadOnlyList<DeckTypeDto>> Get([FromQuery] string game)
     {
         if (!Enum.TryParse<CardGame>(game, ignoreCase: true, out var g))
@@ -23,6 +25,7 @@ public sealed class DeckTypesController(IDeckTypeService deckTypes) : ApiControl
 
     /// <summary>Create a custom deck type. 400 on invalid game/blank name, 409 on a duplicate name.</summary>
     [HttpPost]
+    [RequirePermission(Permissions.DeckTypesEdit)]
     public ActionResult<DeckTypeDto> Create([FromBody] DeckTypeUpsertRequest req)
     {
         if (!Enum.TryParse<CardGame>(req.Game, ignoreCase: true, out var g))
@@ -40,6 +43,7 @@ public sealed class DeckTypesController(IDeckTypeService deckTypes) : ApiControl
 
     /// <summary>Update a deck type's name/rules (built-ins may be edited too). 409 on a duplicate name.</summary>
     [HttpPut("{id:int}")]
+    [RequirePermission(Permissions.DeckTypesEdit)]
     public IActionResult Update(int id, [FromBody] DeckTypeUpsertRequest req)
     {
         try
@@ -56,6 +60,7 @@ public sealed class DeckTypesController(IDeckTypeService deckTypes) : ApiControl
 
     /// <summary>Delete a deck type. Deck boxes referencing it have their reference cleared.</summary>
     [HttpDelete("{id:int}")]
+    [RequirePermission(Permissions.DeckTypesEdit)]
     public IActionResult Delete(int id)
     {
         try

@@ -8,6 +8,7 @@ using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Sales;
+using OmniCard.Shared.Security;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Web.Helpers;
@@ -62,6 +63,7 @@ public sealed class CollectionController(
     /// the *whole* filtered result set — never just the current page — so ordering by market price (or
     /// any column) returns the true top-of-collection, not the top of page 1.</summary>
     [HttpGet]
+    [RequirePermission(Permissions.CollectionView)]
     public ActionResult<PagedResult<CardDto>> Get(
         [FromQuery] string? game,
         [FromQuery] string? q,
@@ -286,6 +288,7 @@ public sealed class CollectionController(
 
     /// <summary>One card with its tags, for the edit drawer.</summary>
     [HttpGet("{id:int}")]
+    [RequirePermission(Permissions.CollectionView)]
     public ActionResult<CardDto> GetOne(int id)
     {
         var card = binderCards.GetCollectionCards([id]).FirstOrDefault();
@@ -304,6 +307,7 @@ public sealed class CollectionController(
 
     /// <summary>Edit a card's condition / foil / quantity / cost.</summary>
     [HttpPut("{id:int}")]
+    [RequirePermission(Permissions.CollectionEdit)]
     public IActionResult Update(int id, [FromBody] UpdateCardRequest req)
     {
         var card = binderCards.GetCollectionCards([id]).FirstOrDefault();
@@ -321,6 +325,7 @@ public sealed class CollectionController(
     }
 
     [HttpDelete("{id:int}")]
+    [RequirePermission(Permissions.CollectionDelete)]
     public IActionResult Delete(int id)
     {
         binderCards.DeleteCollectionCard(id);
@@ -330,6 +335,7 @@ public sealed class CollectionController(
     /// <summary>Move one or more cards to another location. 409 if the target is a game-locked deck
     /// box and any card belongs to a different game.</summary>
     [HttpPost("move")]
+    [RequirePermission(Permissions.CollectionEdit)]
     public IActionResult Move([FromBody] MoveCardsRequest req)
     {
         if (req.CardIds.Count == 0) return BadRequest(new { error = "No cards specified." });
@@ -348,6 +354,7 @@ public sealed class CollectionController(
     /// otherwise keeps its per-card value. Condition/foil/price/note go through one batched write,
     /// quantity through the bulk quantity setter, and tags add-union or replace per TagsMode.</summary>
     [HttpPost("bulk-update")]
+    [RequirePermission(Permissions.CollectionEdit)]
     public IActionResult BulkUpdate([FromBody] BulkUpdateCardsRequest req)
     {
         if (req.CardIds.Count == 0)
@@ -390,9 +397,11 @@ public sealed class CollectionController(
     }
 
     [HttpGet("{id:int}/tags")]
+    [RequirePermission(Permissions.CollectionView)]
     public ActionResult<IReadOnlyList<string>> GetTags(int id) => tags.GetTagsForLot(id);
 
     [HttpPut("{id:int}/tags")]
+    [RequirePermission(Permissions.CollectionEdit)]
     public IActionResult SetTags(int id, [FromBody] SetTagsRequest req)
     {
         tags.SetTagsForLot(id, req.Tags);
