@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
 using OmniCard.Shared.Sales;
+using OmniCard.Shared.Security;
 using OmniCard.Shared.Settings;
 using OmniCard.Web.Api.Infrastructure;
 
@@ -24,10 +25,12 @@ public sealed class SettingsController(
     private string BrandingDir => Path.Combine(dataPath.DataDirectory, BrandingDirName);
 
     [HttpGet]
+    [RequirePermission(Permissions.SettingsView)]
     public ActionResult<SalesSettingsDto> Get() =>
         new SalesSettingsDto(settings.ForSaleLocationId, settings.MovePickedToForSaleLocation);
 
     [HttpPut]
+    [RequirePermission(Permissions.SettingsEdit)]
     public IActionResult Update([FromBody] UpdateSalesSettingsRequest req)
     {
         settings.SetForSaleLocationId(req.ForSaleLocationId);
@@ -38,6 +41,7 @@ public sealed class SettingsController(
     /// <summary>The scan page's value-tier badge config (currency + price thresholds). Readable by any
     /// signed-in user — the scan page needs it to render badges.</summary>
     [HttpGet("scan-badges")]
+    [RequirePermission(Permissions.SettingsView)]
     public ActionResult<ScanBadgeSettingsDto> GetScanBadges()
     {
         var s = scanBadges.Get();
@@ -46,7 +50,7 @@ public sealed class SettingsController(
 
     /// <summary>Update the value-tier badge config. Admin-only — it's an administration setting.</summary>
     [HttpPut("scan-badges")]
-    [ApiAuth(RequireAdmin = true)]
+    [RequirePermission(Permissions.SettingsEdit)]
     public IActionResult UpdateScanBadges([FromBody] UpdateScanBadgeSettingsRequest req)
     {
         scanBadges.Save(req.CurrencyCode, req.Thresholds);
@@ -58,13 +62,14 @@ public sealed class SettingsController(
     /// <summary>The company identity + printer layout used when printing sales receipts. Readable by any
     /// signed-in user (the Sales page needs it to enable the print action); editing is admin-only.</summary>
     [HttpGet("receipt")]
+    [RequirePermission(Permissions.SettingsView)]
     public ActionResult<ReceiptConfigDto> GetReceiptConfig() =>
         new ReceiptConfigDto(ToDto(settings.GetCompany()), ToDto(settings.GetReceipt()));
 
     /// <summary>Update the company identity + receipt layout. The logo is managed via the logo endpoints,
     /// so an incoming <c>LogoPath</c> is ignored (the stored logo is preserved).</summary>
     [HttpPut("receipt")]
-    [ApiAuth(RequireAdmin = true)]
+    [RequirePermission(Permissions.SettingsEdit)]
     public IActionResult UpdateReceiptConfig([FromBody] UpdateReceiptConfigRequest req)
     {
         var c = req.Company;
@@ -99,7 +104,7 @@ public sealed class SettingsController(
     /// <summary>Upload/replace the receipt logo. Stores it under the served <c>branding/</c> dir and points
     /// the company profile at it.</summary>
     [HttpPost("receipt/logo")]
-    [ApiAuth(RequireAdmin = true)]
+    [RequirePermission(Permissions.SettingsEdit)]
     public async Task<ActionResult<LogoUploadResultDto>> UploadLogo(IFormFile? file)
     {
         if (file is not { Length: > 0 })
@@ -125,7 +130,7 @@ public sealed class SettingsController(
 
     /// <summary>Remove the receipt logo.</summary>
     [HttpDelete("receipt/logo")]
-    [ApiAuth(RequireAdmin = true)]
+    [RequirePermission(Permissions.SettingsEdit)]
     public IActionResult DeleteLogo()
     {
         RemoveExistingLogoFiles();

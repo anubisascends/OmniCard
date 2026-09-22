@@ -4,6 +4,7 @@ using OmniCard.Api.Contracts;
 using OmniCard.Data;
 using OmniCard.Shared.Audit;
 using OmniCard.Shared.Sales;
+using OmniCard.Shared.Security;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Api.Mapping;
 
@@ -16,16 +17,19 @@ public sealed class ListingsController(
     IPickListPdfExporter pickListPdf) : ApiControllerBase
 {
     [HttpGet]
+    [RequirePermission(Permissions.SalesListingsView)]
     public ActionResult<IReadOnlyList<ActiveListingDto>> Get([FromQuery] string? game) =>
         listings.GetActiveListings(LocationsController.ParseGame(game)).Select(DtoMapping.ToDto).ToList();
 
     /// <summary>Full detail (including listing id and editable sale properties) for the Manage Listings screen.</summary>
     [HttpGet("details")]
+    [RequirePermission(Permissions.SalesListingsView)]
     public ActionResult<IReadOnlyList<ListingDetailDto>> GetDetails([FromQuery] string? game) =>
         listings.GetListingDetails(LocationsController.ParseGame(game)).Select(DtoMapping.ToDto).ToList();
 
     /// <summary>Edit an active listing's sale properties (price, channel, quantity, note) in place.</summary>
     [HttpPut("{listingId:int}")]
+    [RequirePermission(Permissions.SalesListingsEdit)]
     public IActionResult Update(int listingId, [FromBody] UpdateListingRequest req)
     {
         if (!Enum.TryParse<SalesChannel>(req.Channel, ignoreCase: true, out var channel))
@@ -44,6 +48,7 @@ public sealed class ListingsController(
 
     /// <summary>List a single card lot for sale, splitting the lot when only part of a stack is listed.</summary>
     [HttpPost]
+    [RequirePermission(Permissions.SalesListingsCreate)]
     public IActionResult Create([FromBody] CreateListingRequest req)
     {
         if (!Enum.TryParse<SalesChannel>(req.Channel, ignoreCase: true, out var channel))
@@ -71,6 +76,7 @@ public sealed class ListingsController(
 
     /// <summary>List several whole lots for sale at once, each at its own price.</summary>
     [HttpPost("bulk")]
+    [RequirePermission(Permissions.SalesListingsCreate)]
     public IActionResult CreateBulk([FromBody] BulkListingRequest req)
     {
         if (!Enum.TryParse<SalesChannel>(req.Channel, ignoreCase: true, out var channel))
@@ -93,6 +99,7 @@ public sealed class ListingsController(
     /// <summary>Mark the given lots' active listings as picked — moves each lot to the configured
     /// for-sale location (a 400 is returned if no such location is configured).</summary>
     [HttpPost("pick")]
+    [RequirePermission(Permissions.SalesListingsPick)]
     public IActionResult Pick([FromBody] LotIdsRequest req)
     {
         try
@@ -108,6 +115,7 @@ public sealed class ListingsController(
 
     /// <summary>Cancel the active listing on a lot (returns it to not-listed).</summary>
     [HttpDelete("lot/{lotId:int}")]
+    [RequirePermission(Permissions.SalesListingsDelete)]
     public IActionResult Unlist(int lotId)
     {
         listings.Unlist([lotId]);
@@ -116,6 +124,7 @@ public sealed class ListingsController(
 
     /// <summary>Printable pick list (cards to pull for active listings), optionally game-filtered.</summary>
     [HttpGet("picklist.pdf")]
+    [RequirePermission(Permissions.SalesListingsView)]
     public IActionResult PickListPdf([FromQuery] string? game)
     {
         var entries = listings.GetPickList(LocationsController.ParseGame(game));

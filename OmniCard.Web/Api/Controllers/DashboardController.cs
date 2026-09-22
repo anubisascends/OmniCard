@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
 using OmniCard.Shared.Collection;
+using OmniCard.Shared.Security;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Api.Mapping;
 
 namespace OmniCard.Web.Api.Controllers;
 
 /// <summary>Dashboard metrics: holdings valuation + realized P&amp;L.</summary>
+[RequirePermission(Permissions.DashboardView)]
 public sealed class DashboardController(IAnalyticsService analytics) : ApiControllerBase
 {
     [HttpGet]

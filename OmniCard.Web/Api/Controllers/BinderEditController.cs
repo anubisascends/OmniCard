@@ -5,6 +5,7 @@ using OmniCard.Shared.Cards;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Matching;
 using OmniCard.Shared.Sales;
+using OmniCard.Shared.Security;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Web.Api.Infrastructure;
@@ -21,6 +22,7 @@ namespace OmniCard.Web.Api.Controllers;
 [ApiController]
 [Route("api/binder")]
 [ApiAuth]
+[RequirePermission(Permissions.BinderEdit)]
 public sealed class BinderEditController : ControllerBase
 {
     private readonly IStorageContainerService _containers;

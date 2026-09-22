@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AppShell } from './components/AppShell';
+import { RequirePermission } from './components/RequirePermission';
 import { DashboardPage } from './pages/DashboardPage';
 import { CollectionPage } from './pages/CollectionPage';
 import { LocationsPage } from './pages/LocationsPage';
@@ -21,18 +22,20 @@ export function App() {
   return (
     <AppShell>
       <Routes>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/scan" element={<ScanPage />} />
-        <Route path="/collection" element={<CollectionPage />} />
-        <Route path="/locations" element={<LocationsPage />} />
-        <Route path="/location/:id" element={<LocationDetailPage />} />
-        <Route path="/binder/:id" element={<BinderPage />} />
-        <Route path="/sets" element={<SetsPage />} />
-        <Route path="/inventory" element={<InventoryPage />} />
-        <Route path="/import" element={<ImportPage />} />
-        <Route path="/lists" element={<ListsPage />} />
-        <Route path="/trades" element={<TradesPage />} />
-        <Route path="/sales" element={<SalesPage />} />
+        <Route path="/" element={<RequirePermission anyOf={['dashboard.view']}><DashboardPage /></RequirePermission>} />
+        <Route path="/scan" element={<RequirePermission anyOf={['scan.view']}><ScanPage /></RequirePermission>} />
+        <Route path="/collection" element={<RequirePermission anyOf={['collection.view']}><CollectionPage /></RequirePermission>} />
+        <Route path="/locations" element={<RequirePermission anyOf={['locations.view']}><LocationsPage /></RequirePermission>} />
+        <Route path="/location/:id" element={<RequirePermission anyOf={['locations.view']}><LocationDetailPage /></RequirePermission>} />
+        <Route path="/binder/:id" element={<RequirePermission anyOf={['binder.view', 'binder.edit']}><BinderPage /></RequirePermission>} />
+        <Route path="/sets" element={<RequirePermission anyOf={['sets.view']}><SetsPage /></RequirePermission>} />
+        <Route path="/inventory" element={<RequirePermission anyOf={['inventory.view']}><InventoryPage /></RequirePermission>} />
+        <Route path="/import" element={<RequirePermission anyOf={['import.run']}><ImportPage /></RequirePermission>} />
+        <Route path="/lists" element={<RequirePermission anyOf={['lists.view']}><ListsPage /></RequirePermission>} />
+        <Route path="/trades" element={<RequirePermission anyOf={['trades.view']}><TradesPage /></RequirePermission>} />
+        <Route path="/sales" element={<RequirePermission anyOf={['sales.orders.view', 'sales.customers.view', 'sales.listings.view']}><SalesPage /></RequirePermission>} />
+        {/* Administration is always reachable: it hosts self-service password change + the
+            always-viewable Components tab. Individual tabs gate themselves. */}
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<PlaceholderPage title={t('common.notFound')} />} />
       </Routes>

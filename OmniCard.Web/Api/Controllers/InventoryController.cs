@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using OmniCard.Api.Contracts;
 using OmniCard.Data;
 using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Security;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Api.Mapping;
 
@@ -16,6 +17,7 @@ public sealed class InventoryController(
     /// <summary>Products, optionally filtered by game/category. Singles are excluded by default
     /// (they live in the Collection); pass <c>category=Single</c> to include them.</summary>
     [HttpGet("products")]
+    [RequirePermission(Permissions.InventoryView)]
     public ActionResult<IReadOnlyList<ProductDto>> Products(
         [FromQuery] string? game, [FromQuery] string? category)
     {
@@ -38,10 +40,12 @@ public sealed class InventoryController(
     }
 
     [HttpGet("products/{id:int}/lots")]
+    [RequirePermission(Permissions.InventoryView)]
     public ActionResult<IReadOnlyList<InventoryLotDto>> Lots(int id) =>
         inventory.GetLots(id).Select(DtoMapping.ToDto).ToList();
 
     [HttpGet("valuation")]
+    [RequirePermission(Permissions.InventoryView)]
     public ActionResult<InventoryValuationDto> Valuation(
         [FromQuery] string? game, [FromQuery] string? category) =>
         DtoMapping.ToDto(inventory.GetValuation(LocationsController.ParseGame(game), ParseCategory(category)));
@@ -49,6 +53,7 @@ public sealed class InventoryController(
     // --- writes ---
 
     [HttpPost("products")]
+    [RequirePermission(Permissions.InventoryCreate)]
     public ActionResult<ProductDto> CreateProduct([FromBody] ProductUpsertRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -73,6 +78,7 @@ public sealed class InventoryController(
     }
 
     [HttpPut("products/{id:int}")]
+    [RequirePermission(Permissions.InventoryEdit)]
     public IActionResult UpdateProduct(int id, [FromBody] ProductUpsertRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -101,6 +107,7 @@ public sealed class InventoryController(
     }
 
     [HttpDelete("products/{id:int}")]
+    [RequirePermission(Permissions.InventoryDelete)]
     public IActionResult DeleteProduct(int id)
     {
         inventory.DeleteProduct(id);
@@ -108,6 +115,7 @@ public sealed class InventoryController(
     }
 
     [HttpPost("products/{id:int}/lots")]
+    [RequirePermission(Permissions.InventoryCreate)]
     public ActionResult<InventoryLotDto> AddLot(int id, [FromBody] LotUpsertRequest request)
     {
         if (request.Quantity <= 0)
@@ -124,6 +132,7 @@ public sealed class InventoryController(
     }
 
     [HttpPut("lots/{id:int}")]
+    [RequirePermission(Permissions.InventoryEdit)]
     public IActionResult UpdateLot(int id, [FromBody] LotUpsertRequest request)
     {
         if (request.Quantity <= 0)
@@ -143,6 +152,7 @@ public sealed class InventoryController(
     }
 
     [HttpDelete("lots/{id:int}")]
+    [RequirePermission(Permissions.InventoryDelete)]
     public IActionResult DeleteLot(int id)
     {
         inventory.DeleteLot(id);

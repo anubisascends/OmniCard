@@ -51,6 +51,8 @@ import type {
   TradeSessionState,
   TradeSummaryDto,
   UserDto,
+  RoleDto,
+  PermissionCatalogDto,
   WorkflowLaneDto,
 } from './types';
 
@@ -174,8 +176,18 @@ export const api = {
 
   // Users (Administration ▸ Users — admin only)
   users: () => request<UserDto[]>('/api/users'),
-  userCreate: (body: { username: string; password: string; isAdmin: boolean }) =>
-    request<UserDto>('/api/users', { method: 'POST', body: JSON.stringify(body) }),
+  userCreate: (body: {
+    username: string;
+    password: string;
+    isAdmin: boolean;
+    roleId?: number | null;
+    grant?: string[];
+    deny?: string[];
+  }) => request<UserDto>('/api/users', { method: 'POST', body: JSON.stringify(body) }),
+  userUpdate: (
+    id: number,
+    body: { roleId: number | null; grant: string[]; deny: string[]; isAdmin: boolean },
+  ) => request<UserDto>(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   userDelete: (id: number) => request<void>(`/api/users/${id}`, { method: 'DELETE' }),
   userResetPassword: (id: number, newPassword: string) =>
     request<void>(`/api/users/${id}/reset-password`, {
@@ -183,9 +195,18 @@ export const api = {
       body: JSON.stringify({ newPassword }),
     }),
 
+  // Roles (Administration ▸ Roles — admin only)
+  roles: () => request<RoleDto[]>('/api/roles'),
+  roleCreate: (body: { name: string; permissions: string[] }) =>
+    request<RoleDto>('/api/roles', { method: 'POST', body: JSON.stringify(body) }),
+  roleUpdate: (id: number, body: { name: string; permissions: string[] }) =>
+    request<RoleDto>(`/api/roles/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  roleDelete: (id: number) => request<void>(`/api/roles/${id}`, { method: 'DELETE' }),
+
   // Meta
   games: () => request<GameDto[]>('/api/meta/games'),
   components: () => request<ComponentDto[]>('/api/meta/components'),
+  permissionCatalog: () => request<PermissionCatalogDto>('/api/meta/permissions'),
   searchFields: (game?: string) => request<SearchSchemaDto>(`/api/meta/search-fields${qs({ game })}`),
 
   // Dashboard

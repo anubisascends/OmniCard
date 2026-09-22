@@ -80,6 +80,7 @@
       "Cancelled": "Cancelled"
     },
     "notFound": "Not Found",
+    "noAccess": "You don't have permission to view this section. Ask an administrator if you need access.",
     "comingSoon": "This screen is coming in a later phase of the web migration.",
     "states": {
       "loading": "Loading…",

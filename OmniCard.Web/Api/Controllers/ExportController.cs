@@ -6,6 +6,7 @@ using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.ImportExport;
+using OmniCard.Shared.Security;
 using OmniCard.Web.Helpers;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Services;
@@ -28,6 +29,7 @@ public sealed class ExportController(
     /// <summary>Export the (optionally filtered) collection as CSV. <paramref name="format"/> =
     /// appnative | tcgplayer | moxfield | manabox.</summary>
     [HttpGet("collection")]
+    [RequirePermission(Permissions.ExportRun)]
     public IActionResult Collection(
         [FromQuery] string? game, [FromQuery] string? q, [FromQuery] string format = "appnative")
     {
@@ -49,6 +51,7 @@ public sealed class ExportController(
     /// (appnative | tcgplayer | moxfield | manabox). POST (not GET) so large selections don't overrun
     /// the query-string limit.</summary>
     [HttpPost("selection")]
+    [RequirePermission(Permissions.ExportRun)]
     public IActionResult Selection([FromBody] SelectionRequest request)
     {
         if (request.Ids is null || request.Ids.Count == 0)

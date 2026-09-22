@@ -36,6 +36,7 @@ public class OmniCardDbContext : DbContext
     public DbSet<CardList> CardLists => Set<CardList>();
     public DbSet<CardListItem> CardListItems => Set<CardListItem>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<Role> Roles => Set<Role>();
 
     public OmniCardDbContext(DbContextOptions<OmniCardDbContext> options) : base(options) { }
 
@@ -237,6 +238,39 @@ public class OmniCardDbContext : DbContext
             e.HasKey(m => m.Key);
         });
 
+        // JSON <-> object converters for the permission model. Permissions/overrides are small,
+        // read whole, and never queried relationally, so a JSON string column is the simplest fit
+        // (matches how the app stores other serialized settings). Value comparers let EF change-track
+        // these mutable reference-type properties correctly.
+        var stringListConverter = new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<List<string>, string>(
+            v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+            v => System.Text.Json.JsonSerializer.Deserialize<List<string>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new List<string>());
+        var stringListComparer = new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<string>>(
+            (a, b) => (a ?? new List<string>()).SequenceEqual(b ?? new List<string>()),
+            v => v == null ? 0 : v.Aggregate(0, (h, s) => HashCode.Combine(h, s.GetHashCode())),
+            v => v == null ? new List<string>() : v.ToList());
+        var overridesConverter = new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<PermissionOverrides, string>(
+            v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+            v => System.Text.Json.JsonSerializer.Deserialize<PermissionOverrides>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new PermissionOverrides());
+        var overridesComparer = new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<PermissionOverrides>(
+            (a, b) => System.Text.Json.JsonSerializer.Serialize(a, (System.Text.Json.JsonSerializerOptions?)null)
+                   == System.Text.Json.JsonSerializer.Serialize(b, (System.Text.Json.JsonSerializerOptions?)null),
+            v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null).GetHashCode(),
+            v => System.Text.Json.JsonSerializer.Deserialize<PermissionOverrides>(
+                     System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                     (System.Text.Json.JsonSerializerOptions?)null) ?? new PermissionOverrides());
+
+        modelBuilder.Entity<Role>(e =>
+        {
+            e.HasKey(r => r.Id);
+            e.Property(r => r.Id).ValueGeneratedOnAdd();
+            e.Property(r => r.Name).IsRequired();
+            e.HasIndex(r => r.Name).IsUnique();
+            e.Property(r => r.Permissions)
+                .HasConversion(stringListConverter)
+                .Metadata.SetValueComparer(stringListComparer);
+        });
+
         modelBuilder.Entity<User>(e =>
         {
             e.HasKey(u => u.Id);
@@ -246,6 +280,12 @@ public class OmniCardDbContext : DbContext
             // Usernames are unique (case-insensitive matching is handled in the service; the DB index
             // enforces the hard uniqueness constraint under SQL Server's default case-insensitive collation).
             e.HasIndex(u => u.Username).IsUnique();
+            e.Property(u => u.Overrides)
+                .HasConversion(overridesConverter)
+                .Metadata.SetValueComparer(overridesComparer);
+            // No hard FK to Role: a deleted role simply leaves RoleId dangling (resolver treats an
+            // unresolved role as "no baseline"), which keeps role deletion cheap and safe.
+            e.HasIndex(u => u.RoleId);
         });
 
         // Optimistic-concurrency tokens for the networked (multi-user) web deployment, which runs on

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
+using OmniCard.Shared.Security;
 using OmniCard.Web.Services;
 using OmniCard.Web.Api.Infrastructure;
 
@@ -13,6 +14,7 @@ namespace OmniCard.Web.Api.Controllers;
 public sealed class CatalogController(CatalogRefreshService refresh) : ApiControllerBase
 {
     [HttpGet("status")]
+    [RequirePermission(Permissions.CatalogView)]
     public ActionResult<CatalogStatusDto> Status()
     {
         var s = refresh.Status();
@@ -20,6 +22,7 @@ public sealed class CatalogController(CatalogRefreshService refresh) : ApiContro
     }
 
     [HttpPost("refresh")]
+    [RequirePermission(Permissions.CatalogRefresh)]
     public IActionResult Refresh([FromBody] CatalogRefreshRequest request)
     {
         if (LocationsController.ParseGame(request.Game) is not { } game)

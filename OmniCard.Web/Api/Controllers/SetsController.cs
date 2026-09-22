@@ -3,6 +3,7 @@ using OmniCard.Api.Contracts;
 using OmniCard.Shared.Audit;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Games;
+using OmniCard.Shared.Security;
 using OmniCard.Shared.Sets;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Api.Mapping;
@@ -17,6 +18,7 @@ public sealed class SetsController(
 {
     /// <summary>Printable want-list PDF (unowned cards) for a set.</summary>
     [HttpGet("{game}/{setCode}/wantlist.pdf")]
+    [RequirePermission(Permissions.SetsExport)]
     public async Task<IActionResult> WantList(string game, string setCode)
     {
         if (!Enum.TryParse<CardGame>(game, ignoreCase: true, out var g))
@@ -34,6 +36,7 @@ public sealed class SetsController(
 
     /// <summary>All sets available for a game, newest catalog order.</summary>
     [HttpGet]
+    [RequirePermission(Permissions.SetsView)]
     public ActionResult<IReadOnlyList<SetInfoDto>> Get([FromQuery] string game)
     {
         var svc = Game(game);
@@ -43,6 +46,7 @@ public sealed class SetsController(
 
     /// <summary>The ownership checklist for one set (every printing + owned quantity + prices).</summary>
     [HttpGet("{game}/{setCode}")]
+    [RequirePermission(Permissions.SetsView)]
     public async Task<ActionResult<SetChecklistDto>> Checklist(string game, string setCode)
     {
         if (!Enum.TryParse<CardGame>(game, ignoreCase: true, out var g))

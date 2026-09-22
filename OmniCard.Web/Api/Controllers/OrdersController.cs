@@ -4,6 +4,7 @@ using OmniCard.Api.Contracts;
 using OmniCard.Data;
 using OmniCard.Shared.Audit;
 using OmniCard.Shared.Sales;
+using OmniCard.Shared.Security;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Api.Mapping;
 using OmniCard.Web.Services;
@@ -24,6 +25,7 @@ public sealed class OrdersController(
 {
     /// <summary>Downloadable PDF receipt for an order.</summary>
     [HttpGet("{id:int}/receipt.pdf")]
+    [RequirePermission(Permissions.SalesOrdersView)]
     public IActionResult Receipt(int id)
     {
         var doc = receipts.BuildReceipt(id);
@@ -35,6 +37,7 @@ public sealed class OrdersController(
     /// auto</c>) and auto-opening the browser print dialog. Preferred for thermal printers — it avoids the
     /// PDF path's tendency to pad the job out to a full Letter/A4 sheet.</summary>
     [HttpGet("{id:int}/receipt.html")]
+    [RequirePermission(Permissions.SalesOrdersView)]
     public ContentResult ReceiptHtml(int id)
     {
         var doc = receipts.BuildReceipt(id);
@@ -43,12 +46,14 @@ public sealed class OrdersController(
 
     /// <summary>The kanban lanes in board order (customizable; falls back to built-in defaults).</summary>
     [HttpGet("lanes")]
+    [RequirePermission(Permissions.SalesOrdersView)]
     public ActionResult<IReadOnlyList<WorkflowLaneDto>> Lanes() =>
         settings.GetWorkflowLanes().Select(DtoMapping.ToDto).ToList();
 
     /// <summary>All orders, newest first, each with its customer name + line count/total for the
     /// kanban cards.</summary>
     [HttpGet]
+    [RequirePermission(Permissions.SalesOrdersView)]
     public ActionResult<IReadOnlyList<OrderDto>> Get()
     {
         var summaries = orders.GetOrderLineSummaries().ToDictionary(s => s.OrderId);
@@ -70,6 +75,7 @@ public sealed class OrdersController(
     /// <summary>Move an order to a new status/lane (kanban drag). On a transition to Shipped this
     /// records the sale + marks listings sold (eBay auto-end is stubbed until Phase 5).</summary>
     [HttpPut("{id:int}/status")]
+    [RequirePermission(Permissions.SalesOrdersEdit)]
     public async Task<IActionResult> SetStatus(int id, [FromBody] SetOrderStatusRequest req)
     {
         if (!Enum.TryParse<OrderStatus>(req.Status, ignoreCase: true, out var status))
@@ -82,6 +88,7 @@ public sealed class OrdersController(
 
     /// <summary>An order's header + line items for the detail/edit view.</summary>
     [HttpGet("{id:int}")]
+    [RequirePermission(Permissions.SalesOrdersView)]
     public ActionResult<OrderDetailDto> GetOne(int id)
     {
         var order = orders.GetOrder(id);
@@ -97,6 +104,7 @@ public sealed class OrdersController(
     }
 
     [HttpPost]
+    [RequirePermission(Permissions.SalesOrdersCreate)]
     public ActionResult<OrderDto> Create([FromBody] CreateOrderRequest req)
     {
         if (req.CustomerId <= 0 || customers.Get(req.CustomerId) is null)
@@ -111,6 +119,7 @@ public sealed class OrdersController(
 
     /// <summary>Edit a pre-ship order's header. Load-then-patch for the rowversion token.</summary>
     [HttpPut("{id:int}")]
+    [RequirePermission(Permissions.SalesOrdersEdit)]
     public IActionResult Update(int id, [FromBody] UpdateOrderRequest req)
     {
         if (!Enum.TryParse<SalesChannel>(req.Channel, ignoreCase: true, out var channel))
@@ -134,6 +143,7 @@ public sealed class OrdersController(
     }
 
     [HttpDelete("{id:int}")]
+    [RequirePermission(Permissions.SalesOrdersDelete)]
     public IActionResult Delete(int id)
     {
         try
@@ -149,6 +159,7 @@ public sealed class OrdersController(
     }
 
     [HttpPost("{id:int}/lines")]
+    [RequirePermission(Permissions.SalesOrdersEdit)]
     public ActionResult<OrderLineDto> AddLine(int id, [FromBody] AddOrderLineRequest req)
     {
         if (orders.GetOrder(id) is null)
@@ -161,6 +172,7 @@ public sealed class OrdersController(
     }
 
     [HttpDelete("lines/{lineId:int}")]
+    [RequirePermission(Permissions.SalesOrdersEdit)]
     public IActionResult RemoveLine(int lineId)
     {
         orders.RemoveLine(lineId);

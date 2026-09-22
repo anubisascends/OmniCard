@@ -11,17 +11,24 @@ namespace OmniCard.Web.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-public sealed class AuthController(UserService users) : ControllerBase
+public sealed class AuthController(UserService users, PermissionService permissions) : ControllerBase
 {
     [HttpGet("status")]
-    public ActionResult<AuthStatusDto> Status()
+    public async Task<ActionResult<AuthStatusDto>> Status()
     {
         var authed = AppAuthGate.IsAuthenticated(HttpContext);
+        // Effective permissions are resolved fresh (from PermissionService) so the SPA's nav/buttons
+        // reflect admin changes without a re-login. Admins get the full catalog.
+        var userId = AppAuthGate.CurrentUserId(HttpContext);
+        var perms = authed && userId is int id
+            ? (await permissions.GetEffectiveAsync(id)).OrderBy(p => p).ToList()
+            : [];
         return new AuthStatusDto(
             AuthRequired: true,
             Authenticated: authed,
             Username: AppAuthGate.CurrentUsername(HttpContext),
-            IsAdmin: AppAuthGate.IsAdmin(HttpContext));
+            IsAdmin: AppAuthGate.IsAdmin(HttpContext),
+            Permissions: perms);
     }
 
     [HttpPost("login")]
@@ -32,7 +39,8 @@ public sealed class AuthController(UserService users) : ControllerBase
             return Unauthorized(new { error = "Incorrect username or password." });
 
         await AppAuthGate.SignInAsync(HttpContext, user, request.RememberMe);
-        return new AuthStatusDto(true, true, user.Username, user.IsAdmin || user.IsSystem);
+        var perms = (await permissions.GetEffectiveAsync(user.Id)).OrderBy(p => p).ToList();
+        return new AuthStatusDto(true, true, user.Username, user.IsAdmin || user.IsSystem, perms);
     }
 
     [HttpPost("logout")]

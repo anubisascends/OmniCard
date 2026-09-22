@@ -6,6 +6,7 @@ using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Lists;
 using OmniCard.Shared.Matching;
+using OmniCard.Shared.Security;
 using OmniCard.Web.Api.Infrastructure;
 
 namespace OmniCard.Web.Api.Controllers;
@@ -22,6 +23,7 @@ public sealed class ListsController(
     CardImageCacheService imageCache) : ApiControllerBase
 {
     [HttpGet]
+    [RequirePermission(Permissions.ListsView)]
     public ActionResult<IReadOnlyList<CardListDto>> Get([FromQuery] string? game)
     {
         if (LocationsController.ParseGame(game) is not { } g)
@@ -32,6 +34,7 @@ public sealed class ListsController(
     }
 
     [HttpPost]
+    [RequirePermission(Permissions.ListsCreate)]
     public ActionResult<CardListDto> Create([FromBody] CreateListRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -44,6 +47,7 @@ public sealed class ListsController(
     }
 
     [HttpPut("{id:int}")]
+    [RequirePermission(Permissions.ListsEdit)]
     public IActionResult Rename(int id, [FromBody] RenameRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -53,6 +57,7 @@ public sealed class ListsController(
     }
 
     [HttpDelete("{id:int}")]
+    [RequirePermission(Permissions.ListsDelete)]
     public IActionResult Delete(int id)
     {
         lists.DeleteList(id);
@@ -64,6 +69,7 @@ public sealed class ListsController(
     /// are resolved to printings via <see cref="IListService.AddCardsByName"/>; any that don't resolve come
     /// back in <c>UnresolvedNames</c>.</summary>
     [HttpPost("import-url")]
+    [RequirePermission(Permissions.ListsCreate)]
     public async Task<ActionResult<ImportListResultDto>> ImportUrl([FromBody] ImportListUrlRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Url))
@@ -101,6 +107,7 @@ public sealed class ListsController(
     }
 
     [HttpGet("{id:int}/items")]
+    [RequirePermission(Permissions.ListsView)]
     public ActionResult<IReadOnlyList<CardListItemDto>> Items(int id)
     {
         var list = FindList(id);
@@ -112,6 +119,7 @@ public sealed class ListsController(
     /// <summary>Add a single "wholly new" card (chosen from the catalog) to the list. This only records a
     /// frozen printing on the list — it never creates a lot or otherwise touches the collection.</summary>
     [HttpPost("{id:int}/items")]
+    [RequirePermission(Permissions.ListsEdit)]
     public ActionResult<CardListItemDto> AddItem(int id, [FromBody] AddListItemRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.GameCardId))
@@ -139,6 +147,7 @@ public sealed class ListsController(
     /// Adding does not move or mutate the lot — the reference is only consumed at commit time, where the
     /// copies are relocated to the target location instead of being duplicated.</summary>
     [HttpPost("{id:int}/items/from-collection")]
+    [RequirePermission(Permissions.ListsEdit)]
     public ActionResult<CardListItemDto> AddItemFromCollection(int id, [FromBody] AddListItemFromCollectionRequest request)
     {
         if (request.LotId <= 0)
@@ -152,6 +161,7 @@ public sealed class ListsController(
     }
 
     [HttpDelete("items/{itemId:int}")]
+    [RequirePermission(Permissions.ListsEdit)]
     public IActionResult RemoveItem(int itemId)
     {
         lists.RemoveItem(itemId);
@@ -159,6 +169,7 @@ public sealed class ListsController(
     }
 
     [HttpPut("items/{itemId:int}")]
+    [RequirePermission(Permissions.ListsEdit)]
     public IActionResult SetQuantity(int itemId, [FromBody] SetQuantityRequest request)
     {
         if (request.Quantity < 1)
@@ -168,6 +179,7 @@ public sealed class ListsController(
     }
 
     [HttpPost("{id:int}/refresh-prices")]
+    [RequirePermission(Permissions.ListsEdit)]
     public IActionResult RefreshPrices(int id)
     {
         lists.RefreshPrices(id);
@@ -180,6 +192,7 @@ public sealed class ListsController(
     /// written as brand-new owned lots. An owned reference whose lot has since vanished falls back to being
     /// created new, so nothing on the list is silently dropped.</summary>
     [HttpPost("{id:int}/commit")]
+    [RequirePermission(Permissions.ListsCommit)]
     public ActionResult<CommitListResultDto> Commit(int id, [FromBody] CommitListRequest request)
     {
         if (request.ContainerId <= 0)
