@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
 using OmniCard.Shared.Ebay;
@@ -22,6 +23,7 @@ namespace OmniCard.Web.Api.Controllers;
 public sealed class EbayController(
     IEbayAuthService auth,
     IEbaySellerSetupService sellerSetup,
+    IEbaySellingSettingsService selling,
     ILogger<EbayController> logger) : ControllerBase
 {
     [HttpGet("status")]
@@ -46,7 +48,7 @@ public sealed class EbayController(
     /// <summary>eBay redirects here after consent with an authorization <paramref name="code"/>.
     /// Exchanges it for tokens (stored server-side) and returns the user to the settings screen.</summary>
     [HttpGet("callback")]
-    [RequirePermission(Permissions.EbayManage)]
+    [AllowAnonymous]
     public async Task<IActionResult> Callback([FromQuery] string? code, [FromQuery] string? error)
     {
         if (!string.IsNullOrEmpty(error) || string.IsNullOrEmpty(code))
@@ -58,6 +60,71 @@ public sealed class EbayController(
         var ok = await auth.ExchangeCodeForTokensAsync(code);
         return Redirect(ok ? "/app/settings?ebay=connected" : "/app/settings?ebay=failed");
     }
+
+    /// <summary>The editable eBay seller settings (inventory-location address + shipping/return policy
+    /// inputs) plus read-only setup results, for the Settings ▸ eBay editor.</summary>
+    [HttpGet("selling")]
+    [RequirePermission(Permissions.EbayView)]
+    public ActionResult<EbaySellingSettingsDto> GetSelling() => ToDto(selling.Get());
+
+    /// <summary>Saves the editable seller settings. Load-then-patch: setup-written results (policy ids,
+    /// provisioning state) are preserved, only the user-editable fields are updated.</summary>
+    [HttpPut("selling")]
+    [RequirePermission(Permissions.EbayManage)]
+    public ActionResult<EbaySellingSettingsDto> SaveSelling([FromBody] EbaySellingSettingsDto dto)
+    {
+        var s = selling.Get();
+
+        s.LocationName = Clean(dto.LocationName);
+        s.AddressLine1 = Clean(dto.AddressLine1);
+        s.AddressLine2 = Clean(dto.AddressLine2);
+        s.City = Clean(dto.City);
+        s.State = Clean(dto.State);
+        s.PostalCode = Clean(dto.PostalCode);
+        s.Country = Clean(dto.Country)?.ToUpperInvariant();
+        s.Phone = Clean(dto.Phone);
+
+        s.FreeShipping = dto.FreeShipping;
+        s.ShippingCost = dto.ShippingCost < 0 ? 0 : dto.ShippingCost;
+        s.HandlingTimeDays = dto.HandlingTimeDays < 0 ? 0 : dto.HandlingTimeDays;
+        if (!string.IsNullOrWhiteSpace(dto.ShippingServiceCode))
+            s.ShippingServiceCode = dto.ShippingServiceCode.Trim();
+
+        s.ReturnsAccepted = dto.ReturnsAccepted;
+        s.ReturnWindowDays = dto.ReturnWindowDays <= 0 ? 30 : dto.ReturnWindowDays;
+        s.ReturnShippingPaidBy = string.Equals(dto.ReturnShippingPaidBy, "Seller", StringComparison.OrdinalIgnoreCase)
+            ? ReturnShippingPayer.Seller
+            : ReturnShippingPayer.Buyer;
+
+        selling.Save(s);
+        return ToDto(s);
+    }
+
+    private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static EbaySellingSettingsDto ToDto(EbaySellingSettings s) => new()
+    {
+        LocationName = s.LocationName,
+        AddressLine1 = s.AddressLine1,
+        AddressLine2 = s.AddressLine2,
+        City = s.City,
+        State = s.State,
+        PostalCode = s.PostalCode,
+        Country = s.Country,
+        Phone = s.Phone,
+        FreeShipping = s.FreeShipping,
+        ShippingCost = s.ShippingCost,
+        HandlingTimeDays = s.HandlingTimeDays,
+        ShippingServiceCode = s.ShippingServiceCode,
+        ReturnsAccepted = s.ReturnsAccepted,
+        ReturnWindowDays = s.ReturnWindowDays,
+        ReturnShippingPaidBy = s.ReturnShippingPaidBy == ReturnShippingPayer.Seller ? "Seller" : "Buyer",
+        LocationProvisioned = s.LocationProvisioned,
+        FulfillmentPolicyId = s.FulfillmentPolicyId,
+        PaymentPolicyId = s.PaymentPolicyId,
+        ReturnPolicyId = s.ReturnPolicyId,
+        SetupCompletedAt = s.SetupCompletedAt,
+    };
 
     [HttpPost("disconnect")]
     [RequirePermission(Permissions.EbayManage)]

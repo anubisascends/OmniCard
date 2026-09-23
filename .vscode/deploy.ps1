@@ -128,6 +128,18 @@ Pop-Location
 if ([string]::IsNullOrWhiteSpace($PhysicalPath) -or $PhysicalPath -match '^[A-Za-z]:\\?$') {
     Write-Host "Refusing to clean unsafe PhysicalPath '$PhysicalPath'" -ForegroundColor Red; Pause-Exit 1
 }
+# Preserve the server-specific sections of the live appsettings.json (these are hand-filled on the
+# server and must NOT be reset each deploy). Back up the whole file before the wipe; after publish we
+# merge just these top-level sections back over the repo's placeholder so NEW repo keys still flow
+# through while the hand-filled values survive.
+$PreserveSections = @('DataDirectory', 'ConnectionStrings', 'eBay', 'Mcp')
+$LiveAppSettings = Join-Path $PhysicalPath 'appsettings.json'
+$AppSettingsBackup = $null
+if (Test-Path $LiveAppSettings) {
+    $AppSettingsBackup = Join-Path $env:TEMP 'omnicard-appsettings.backup.json'
+    Copy-Item -LiteralPath $LiveAppSettings -Destination $AppSettingsBackup -Force
+    Write-Host "Preserving server appsettings.json sections: $($PreserveSections -join ', ')" -ForegroundColor Cyan
+}
 if (Test-Path $PhysicalPath) {
     # Stop the app pool first so the running worker releases its lock on the DLLs, then wait for it to
     # actually exit before deleting (a 'Stopped' state can briefly precede w3wp unloading).
@@ -156,6 +168,33 @@ Push-Location $Repo
 dotnet publish OmniCard.Web/OmniCard.Web.csproj -c Release "/p:PublishProfile=$PublishProfile"
 $code = $LASTEXITCODE
 Pop-Location
+
+# Merge the preserved server sections back over the placeholder appsettings.json publish just wrote:
+# the repo file provides any NEW keys, while $PreserveSections keep their hand-filled server values.
+# Only on a successful publish (a failed publish leaves the folder half-written - don't touch config).
+if ($code -eq 0 -and $AppSettingsBackup -and (Test-Path $AppSettingsBackup) -and (Test-Path $LiveAppSettings)) {
+    try {
+        $published = Get-Content -LiteralPath $LiveAppSettings -Raw | ConvertFrom-Json
+        $saved     = Get-Content -LiteralPath $AppSettingsBackup -Raw | ConvertFrom-Json
+        foreach ($key in $PreserveSections) {
+            if ($saved.PSObject.Properties.Name -contains $key) {
+                if ($published.PSObject.Properties.Name -contains $key) {
+                    $published.$key = $saved.$key
+                } else {
+                    $published | Add-Member -NotePropertyName $key -NotePropertyValue $saved.$key -Force
+                }
+            }
+        }
+        ($published | ConvertTo-Json -Depth 32) | Out-File -LiteralPath $LiveAppSettings -Encoding utf8
+        Remove-Item -LiteralPath $AppSettingsBackup -ErrorAction SilentlyContinue
+        Write-Host "Merged preserved sections into appsettings.json: $($PreserveSections -join ', ')" -ForegroundColor Cyan
+    } catch {
+        # Never lose the config: on any merge error, fall back to the full preserved file and keep the
+        # backup around so nothing hand-filled is lost.
+        Copy-Item -LiteralPath $AppSettingsBackup -Destination $LiveAppSettings -Force
+        Write-Host "appsettings.json merge failed ($_); restored full preserved copy. Backup kept at $AppSettingsBackup" -ForegroundColor Yellow
+    }
+}
 
 # Bring the pool back up (we stopped it above; a manually stopped pool stays stopped otherwise).
 if (Test-Path "IIS:\AppPools\$AppPool") {

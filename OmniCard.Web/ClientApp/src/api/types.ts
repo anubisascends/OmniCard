@@ -599,6 +599,33 @@ export interface EbaySetupResultDto {
   message?: string | null;
 }
 
+export interface EbaySellingSettingsDto {
+  // Inventory location (editable)
+  locationName?: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null; // ISO 3166-1 alpha-2, e.g. "US"
+  phone?: string | null;
+  // Shipping policy (editable)
+  freeShipping: boolean;
+  shippingCost: number;
+  handlingTimeDays: number;
+  shippingServiceCode: string;
+  // Return policy (editable)
+  returnsAccepted: boolean;
+  returnWindowDays: number;
+  returnShippingPaidBy: 'Buyer' | 'Seller';
+  // Setup results (read-only)
+  locationProvisioned: boolean;
+  fulfillmentPolicyId?: string | null;
+  paymentPolicyId?: string | null;
+  returnPolicyId?: string | null;
+  setupCompletedAt?: string | null;
+}
+
 // --- Catalog refresh ---
 
 export interface CatalogJobDto {

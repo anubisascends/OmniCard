@@ -30,6 +30,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- MCP server: exposes read-only collection/inventory/sales data to MCP clients (Claude, Gemini)
+         over Streamable HTTP at /mcp. Loopback-only in this phase (see OmniCard.Web/Mcp/). The
+         .AspNetCore package transitively pulls the core ModelContextProtocol package. -->
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
+    <!-- Validates the external IdP's JWT access tokens on the /mcp endpoint (MCP OAuth resource
+         server). Only wired up when Mcp:OAuth:Enabled — see OmniCard.Web/Mcp/McpAuthExtensions.cs. -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
     <!-- Pin Microsoft.OpenApi above the transitive 2.0.0 pulled in by Microsoft.AspNetCore.OpenApi:
          2.0.0 has a known high-severity DoS (CVE-2026-49451 / GHSA-v5pm-xwqc-g5wc — stack overflow

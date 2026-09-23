@@ -72,6 +72,26 @@ License:     MIT License
 Copyright (c) .NET Foundation and Contributors / Microsoft Corporation.
 
 --------------------------------------------------------------------------------
+ModelContextProtocol.AspNetCore 2.2.0 — MIT License
+--------------------------------------------------------------------------------
+Components:  ModelContextProtocol.AspNetCore, ModelContextProtocol (core,
+             pulled in transitively). Hosts the in-process MCP server that exposes
+             read-only collection/inventory/sales data to MCP clients at /mcp.
+Homepage:    https://github.com/modelcontextprotocol/csharp-sdk
+License:     MIT License
+Copyright (c) Anthropic and the Model Context Protocol contributors.
+
+--------------------------------------------------------------------------------
+Microsoft.AspNetCore.Authentication.JwtBearer 10.0.0 — MIT License
+--------------------------------------------------------------------------------
+Component:   Microsoft.AspNetCore.Authentication.JwtBearer. Validates the external
+             IdP's JWT access tokens on the /mcp endpoint when the MCP server is run
+             in OAuth resource-server mode (Mcp:OAuth).
+Homepage:    https://github.com/dotnet/aspnetcore
+License:     MIT License
+Copyright (c) .NET Foundation and Contributors.
+
+--------------------------------------------------------------------------------
 SQLitePCLRaw 2.1.13 — Apache License 2.0
 --------------------------------------------------------------------------------
 Components:  SQLitePCLRaw.bundle_e_sqlite3, SQLitePCLRaw.core,

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using OmniCard.Web.Services;
@@ -19,6 +20,11 @@ public sealed class ApiAuthAttribute : Attribute, IAuthorizationFilter
 
     public void OnAuthorization(AuthorizationFilterContext context)
     {
+        // Honor [AllowAnonymous] so external-redirect endpoints (e.g. the eBay OAuth callback, which the
+        // browser reaches without the app's session cookie) can opt out of the sign-in gate.
+        if (context.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any())
+            return;
+
         if (!AppAuthGate.IsAuthenticated(context.HttpContext))
         {
             context.Result = new UnauthorizedObjectResult(new { error = "Not authenticated. Please sign in." });

@@ -38,7 +38,7 @@ import KeyIcon from '@mui/icons-material/Key';
 import Link from '@mui/material/Link';
 import StarIcon from '@mui/icons-material/Star';
 import { api, ApiError } from '../api/client';
-import type { ComponentDto, RoleDto, UserDto } from '../api/types';
+import type { ComponentDto, EbaySellingSettingsDto, RoleDto, UserDto } from '../api/types';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import { DeckTypesCard } from '../components/settings/DeckTypesCard';
 import { RolesCard } from '../components/settings/RolesCard';
@@ -174,6 +174,12 @@ function EbayCard() {
     setParams(params, { replace: true });
   };
 
+  // Connecting is an external redirect, so the cached ebay-status (fetched before connecting) is now
+  // stale. Refetch it when we land back on ?ebay=connected so the status chip reflects the new state.
+  useEffect(() => {
+    if (ebayParam === 'connected') qc.invalidateQueries({ queryKey: ['ebay-status'] });
+  }, [ebayParam, qc]);
+
   return (
     <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
       <Typography variant="h6" gutterBottom>
@@ -260,6 +266,223 @@ function EbayCard() {
             </Alert>
           )}
           {setup.error && <Alert severity="error">{(setup.error as Error).message}</Alert>}
+        </Stack>
+      )}
+    </Paper>
+  );
+}
+
+/** Editable eBay seller settings: the inventory-location address and the shipping/return policy inputs
+ * that "Run seller setup" consumes. The address is required before setup can create an eBay inventory
+ * location. Editing requires the ebay.manage permission; read-only setup results (policy ids / when
+ * setup last completed) are shown for reference. */
+function EbaySellingCard() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const fmt = useFormatters();
+  const { can } = usePermissions();
+  const canManage = can('ebay.manage');
+  const selling = useQuery({ queryKey: ['ebay-selling'], queryFn: api.ebaySelling });
+
+  const [form, setForm] = useState<EbaySellingSettingsDto>({
+    locationName: '', addressLine1: '', addressLine2: '', city: '', state: '', postalCode: '',
+    country: 'US', phone: '', freeShipping: true, shippingCost: 0, handlingTimeDays: 1,
+    shippingServiceCode: 'USPSPriority', returnsAccepted: true, returnWindowDays: 30,
+    returnShippingPaidBy: 'Buyer', locationProvisioned: false, fulfillmentPolicyId: null,
+    paymentPolicyId: null, returnPolicyId: null, setupCompletedAt: null,
+  });
+
+  // Seed the form once the server data loads (and after a save re-fetches canonical values).
+  useEffect(() => {
+    if (selling.data) setForm(selling.data);
+  }, [selling.data]);
+
+  const save = useMutation({
+    mutationFn: () => api.ebaySellingSave(form),
+    onSuccess: (data) => {
+      qc.setQueryData(['ebay-selling'], data);
+      qc.invalidateQueries({ queryKey: ['ebay-selling'] });
+    },
+  });
+
+  const set = <K extends keyof EbaySellingSettingsDto>(key: K, value: EbaySellingSettingsDto[K]) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
+
+  const text = (label: string, key: keyof EbaySellingSettingsDto, width = 260, required = false) => (
+    <TextField
+      size="small"
+      label={label}
+      required={required}
+      value={(form[key] as string | null) ?? ''}
+      disabled={!canManage}
+      onChange={(e) => set(key, e.target.value as EbaySellingSettingsDto[typeof key])}
+      sx={{ width }}
+    />
+  );
+
+  const addressComplete =
+    !!form.addressLine1?.trim() && !!form.city?.trim() && !!form.postalCode?.trim() && !!form.country?.trim();
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2, maxWidth: 720 }}>
+      <Typography variant="h6" gutterBottom>
+        {t('settings.ebay.selling.title')}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" gutterBottom>
+        {t('settings.ebay.selling.description')}
+      </Typography>
+
+      {selling.isLoading || !selling.data ? (
+        <CircularProgress size={24} sx={{ mt: 1 }} />
+      ) : (
+        <Stack spacing={3} sx={{ mt: 1 }}>
+          {/* Inventory location address */}
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              {t('settings.ebay.selling.addressSection')}
+            </Typography>
+            {!addressComplete && (
+              <Alert severity="warning" sx={{ mb: 1.5 }}>
+                {t('settings.ebay.selling.addressRequired')}
+              </Alert>
+            )}
+            <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+              {text(t('settings.ebay.selling.locationName'), 'locationName', 260)}
+              {text(t('settings.ebay.selling.addressLine1'), 'addressLine1', 340, true)}
+              {text(t('settings.ebay.selling.addressLine2'), 'addressLine2', 340)}
+              {text(t('settings.ebay.selling.city'), 'city', 220, true)}
+              {text(t('settings.ebay.selling.state'), 'state', 120)}
+              {text(t('settings.ebay.selling.postalCode'), 'postalCode', 160, true)}
+              {text(t('settings.ebay.selling.country'), 'country', 140, true)}
+              {text(t('settings.ebay.selling.phone'), 'phone', 200)}
+            </Stack>
+          </Box>
+
+          {/* Shipping policy */}
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              {t('settings.ebay.selling.shippingSection')}
+            </Typography>
+            <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={form.freeShipping}
+                    disabled={!canManage}
+                    onChange={(e) => set('freeShipping', e.target.checked)}
+                  />
+                }
+                label={t('settings.ebay.selling.freeShipping')}
+              />
+              <TextField
+                size="small"
+                type="number"
+                label={t('settings.ebay.selling.shippingCost')}
+                value={String(form.shippingCost)}
+                disabled={!canManage || form.freeShipping}
+                onChange={(e) => set('shippingCost', Number(e.target.value) || 0)}
+                inputProps={{ min: 0, step: 0.5 }}
+                sx={{ width: 160 }}
+              />
+              <TextField
+                size="small"
+                type="number"
+                label={t('settings.ebay.selling.handlingTimeDays')}
+                value={String(form.handlingTimeDays)}
+                disabled={!canManage}
+                onChange={(e) => set('handlingTimeDays', Number(e.target.value) || 0)}
+                inputProps={{ min: 0, max: 30, step: 1 }}
+                sx={{ width: 180 }}
+              />
+              <TextField
+                size="small"
+                select
+                label={t('settings.ebay.selling.shippingService')}
+                value={form.shippingServiceCode}
+                disabled={!canManage}
+                onChange={(e) => set('shippingServiceCode', e.target.value)}
+                sx={{ width: 220 }}
+              >
+                <MenuItem value="USPSPriority">USPS Priority</MenuItem>
+                <MenuItem value="USPSGroundAdvantage">USPS Ground Advantage</MenuItem>
+                <MenuItem value="USPSFirstClass">USPS First Class</MenuItem>
+                <MenuItem value="USPSMediaMail">USPS Media Mail</MenuItem>
+              </TextField>
+            </Stack>
+          </Box>
+
+          {/* Return policy */}
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              {t('settings.ebay.selling.returnsSection')}
+            </Typography>
+            <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={form.returnsAccepted}
+                    disabled={!canManage}
+                    onChange={(e) => set('returnsAccepted', e.target.checked)}
+                  />
+                }
+                label={t('settings.ebay.selling.returnsAccepted')}
+              />
+              <TextField
+                size="small"
+                type="number"
+                label={t('settings.ebay.selling.returnWindowDays')}
+                value={String(form.returnWindowDays)}
+                disabled={!canManage || !form.returnsAccepted}
+                onChange={(e) => set('returnWindowDays', Number(e.target.value) || 0)}
+                inputProps={{ min: 1, max: 90, step: 1 }}
+                sx={{ width: 180 }}
+              />
+              <TextField
+                size="small"
+                select
+                label={t('settings.ebay.selling.returnShippingPaidBy')}
+                value={form.returnShippingPaidBy}
+                disabled={!canManage || !form.returnsAccepted}
+                onChange={(e) => set('returnShippingPaidBy', e.target.value as 'Buyer' | 'Seller')}
+                sx={{ width: 220 }}
+              >
+                <MenuItem value="Buyer">{t('settings.ebay.selling.payerBuyer')}</MenuItem>
+                <MenuItem value="Seller">{t('settings.ebay.selling.payerSeller')}</MenuItem>
+              </TextField>
+            </Stack>
+          </Box>
+
+          {/* Setup status (read-only) */}
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              {t('settings.ebay.selling.statusSection')}
+            </Typography>
+            <Stack spacing={0.5}>
+              <Typography variant="body2" color="text.secondary">
+                {t('settings.ebay.selling.locationProvisioned')}:{' '}
+                {form.locationProvisioned ? t('common.actions.yes') : t('common.actions.no')}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {t('settings.ebay.selling.policiesCreated')}:{' '}
+                {[form.fulfillmentPolicyId, form.paymentPolicyId, form.returnPolicyId].filter(Boolean).length}/3
+              </Typography>
+              {form.setupCompletedAt && (
+                <Typography variant="body2" color="text.secondary">
+                  {t('settings.ebay.selling.setupCompletedAt')}: {fmt.dateTime(form.setupCompletedAt)}
+                </Typography>
+              )}
+            </Stack>
+          </Box>
+
+          {canManage && (
+            <Box>
+              <Button variant="contained" disabled={save.isPending} onClick={() => save.mutate()}>
+                {save.isPending ? t('common.states.saving') : t('settings.ebay.selling.save')}
+              </Button>
+            </Box>
+          )}
+          {save.isSuccess && <Alert severity="success">{t('settings.ebay.selling.saved')}</Alert>}
+          {save.error && <Alert severity="error">{(save.error as Error).message}</Alert>}
         </Stack>
       )}
     </Paper>
@@ -1394,7 +1617,17 @@ const TABS: {
   { key: 'deck-types', labelKey: 'settings.tabs.deckTypes', render: () => <DeckTypesCard />, show: (g) => g.can('decktypes.view') },
   { key: 'appearance', labelKey: 'settings.tabs.appearance', render: () => <AppearanceCard />, show: () => true },
   { key: 'catalog', labelKey: 'settings.tabs.catalog', render: () => <CatalogCard />, show: (g) => g.can('catalog.view') },
-  { key: 'ebay', labelKey: 'settings.tabs.ebay', render: () => <EbayCard />, show: (g) => g.can('ebay.view') },
+  {
+    key: 'ebay',
+    labelKey: 'settings.tabs.ebay',
+    render: () => (
+      <Stack spacing={2}>
+        <EbayCard />
+        <EbaySellingCard />
+      </Stack>
+    ),
+    show: (g) => g.can('ebay.view'),
+  },
   { key: 'roles', labelKey: 'settings.tabs.roles', render: () => <RolesCard />, show: (g) => g.isAdmin },
   { key: 'users', labelKey: 'settings.tabs.users', render: () => <UsersTab />, show: () => true },
   { key: 'components', labelKey: 'settings.tabs.components', render: () => <ComponentsCard />, show: () => true },

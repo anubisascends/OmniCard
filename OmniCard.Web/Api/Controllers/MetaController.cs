@@ -69,6 +69,8 @@ public sealed class MetaController(IEnumerable<ICardGameService> gameServices) :
             new("Platform", ".NET", Environment.Version.ToString(), "MIT", "https://dotnet.microsoft.com", mit),
             new("Platform", "ASP.NET Core", "10.0", "MIT", "https://learn.microsoft.com/aspnet/core", mit),
             new("Platform", "Microsoft.AspNetCore.OpenApi", "10.0.0", "MIT", "https://github.com/dotnet/aspnetcore", mit),
+            new("Platform", "ModelContextProtocol.AspNetCore (MCP server)", "2.2.0", "MIT", "https://github.com/modelcontextprotocol/csharp-sdk", mit),
+            new("Platform", "Microsoft.AspNetCore.Authentication.JwtBearer (MCP OAuth)", "10.0.0", "MIT", "https://github.com/dotnet/aspnetcore", mit),
 
             // ── Backend libraries ───────────────────────────────────────────────
             new("Backend", "Entity Framework Core (SQL Server + SQLite)", "10.0.9", "MIT", "https://github.com/dotnet/efcore", mit),
