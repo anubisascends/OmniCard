@@ -30,6 +30,8 @@ using OmniCard.CardMatching.Games;
 using OmniCard.Data.Catalogs;
 using OmniCard.Audit.Exporters;
 using OmniCard.Web.Api.Infrastructure;
+using OmniCard.Web.Mcp;
+using ModelContextProtocol.AspNetCore.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -192,7 +194,13 @@ builder.Services.AddSingleton(new UserService(writableFactory));
 // is shared). RequirePermissionAttribute reads it per request; user/role edits invalidate it, so
 // permission changes apply immediately without a re-login.
 builder.Services.AddSingleton(new PermissionService(writableFactory));
-builder.Services
+
+// MCP OAuth resource-server mode (Phase 2). When configured (Mcp:OAuth:Enabled + Authority/Audience/
+// PublicBaseUrl), /mcp is exposed to remote MCP clients and gated by JWTs from an external IdP;
+// otherwise /mcp stays loopback-only (Phase 1). Bound once here and reused when mapping the endpoint.
+var mcpOAuth = OmniCard.Web.Mcp.McpOAuthOptions.FromConfiguration(builder.Configuration);
+
+var authBuilder = builder.Services
     .AddAuthentication(AppAuthGate.Scheme)
     .AddCookie(AppAuthGate.Scheme, options =>
     {
@@ -208,10 +216,32 @@ builder.Services
         options.Events.OnRedirectToAccessDenied = ctx => { ctx.Response.StatusCode = 403; return Task.CompletedTask; };
     });
 
+// Cookie stays the app-wide default scheme (above); the JWT + MCP schemes are added only as named
+// schemes scoped to the /mcp endpoint, so the SPA's cookie auth is unaffected.
+if (mcpOAuth.IsValid)
+    authBuilder.AddOmniCardMcpAuth(mcpOAuth);
+
 // Persist DataProtection keys to the data dir so WebCredentialStore's encrypted eBay tokens survive
 // app-pool recycles and don't depend on the IIS identity having a roaming profile.
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(dataDir, "dataprotection-keys")));
+
+// --- MCP server: read-only tools over the collection/inventory/sales data, so MCP clients (Claude,
+// Gemini, etc.) can query the collection directly. Streamable-HTTP transport mapped at /mcp below.
+// This phase has NO authentication — the /mcp endpoint is gated to loopback only (see LoopbackOnly);
+// do not expose it remotely without adding auth first. Tool classes are scoped so they resolve the
+// DbContext factory + service singletons per MCP request, exactly like the API controllers. -->
+builder.Services.AddScoped<OmniCard.Web.Mcp.Tools.CollectionTools>();
+builder.Services.AddScoped<OmniCard.Web.Mcp.Tools.InventoryTools>();
+builder.Services.AddScoped<OmniCard.Web.Mcp.Tools.SalesTools>();
+builder.Services.AddScoped<OmniCard.Web.Mcp.Tools.CatalogTools>();
+builder.Services
+    .AddMcpServer(o => o.ServerInfo = new() { Name = "OmniCard", Version = "1.0.0" })
+    .WithHttpTransport()
+    .WithTools<OmniCard.Web.Mcp.Tools.CollectionTools>()
+    .WithTools<OmniCard.Web.Mcp.Tools.InventoryTools>()
+    .WithTools<OmniCard.Web.Mcp.Tools.SalesTools>()
+    .WithTools<OmniCard.Web.Mcp.Tools.CatalogTools>();
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
@@ -345,8 +375,29 @@ if (Directory.Exists(scansDir))
     });
 }
 
+// Phase-1 fallback: with no OAuth configured, restrict /mcp to the local machine (unless
+// Mcp:AllowRemote). Branched on the /mcp path so it never touches the SPA/API pipeline. Skipped
+// entirely under OAuth, where a valid IdP token is the trust boundary and remote access is the point.
+if (!mcpOAuth.IsValid)
+{
+    app.UseWhen(
+        ctx => ctx.Request.Path.StartsWithSegments("/mcp"),
+        branch => branch.UseMiddleware<OmniCard.Web.Mcp.LoopbackOnly>());
+}
+
 app.MapControllers();
 app.MapHub<OmniCard.Web.Hubs.ScanHub>("/hubs/scan");
+
+// MCP server (Streamable HTTP). Mapped before the SPA fallback so /mcp isn't swallowed by it. When
+// OAuth is configured, require a validated JWT (challenge/metadata served by the MCP auth scheme);
+// otherwise it's open to loopback per the branch above.
+var mcpEndpoint = app.MapMcp("/mcp");
+if (mcpOAuth.IsValid)
+{
+    mcpEndpoint.RequireAuthorization(policy => policy
+        .RequireAuthenticatedUser()
+        .AddAuthenticationSchemes(McpAuthenticationDefaults.AuthenticationScheme));
+}
 
 // OpenAPI document at /openapi/v1.json — consumed by the SPA's typed client generator.
 app.MapOpenApi();

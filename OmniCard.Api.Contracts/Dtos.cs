@@ -717,6 +717,40 @@ public sealed record EbayStatusDto(bool Connected, bool Configured, IReadOnlyLis
 
 public sealed record EbaySetupResultDto(bool Success, string? Message);
 
+/// <summary>Editable eBay seller settings (address for the inventory location + shipping/return policy
+/// inputs) surfaced in Settings ▸ eBay, plus read-only setup results (policy ids / provisioning state)
+/// for display. <see cref="ReturnShippingPaidBy"/> is "Buyer" or "Seller".</summary>
+public sealed record EbaySellingSettingsDto
+{
+    // Inventory location (editable)
+    public string? LocationName { get; init; }
+    public string? AddressLine1 { get; init; }
+    public string? AddressLine2 { get; init; }
+    public string? City { get; init; }
+    public string? State { get; init; }
+    public string? PostalCode { get; init; }
+    public string? Country { get; init; } // ISO 3166-1 alpha-2, e.g. "US"
+    public string? Phone { get; init; }
+
+    // Shipping policy (editable)
+    public bool FreeShipping { get; init; } = true;
+    public decimal ShippingCost { get; init; }
+    public int HandlingTimeDays { get; init; } = 1;
+    public string ShippingServiceCode { get; init; } = "USPSPriority";
+
+    // Return policy (editable)
+    public bool ReturnsAccepted { get; init; } = true;
+    public int ReturnWindowDays { get; init; } = 30;
+    public string ReturnShippingPaidBy { get; init; } = "Buyer";
+
+    // Setup results (read-only; written by "Run seller setup")
+    public bool LocationProvisioned { get; init; }
+    public string? FulfillmentPolicyId { get; init; }
+    public string? PaymentPolicyId { get; init; }
+    public string? ReturnPolicyId { get; init; }
+    public DateTime? SetupCompletedAt { get; init; }
+}
+
 // --- Decklist check ---
 
 public sealed record DecklistCheckRequest

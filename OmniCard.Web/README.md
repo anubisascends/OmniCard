@@ -214,6 +214,80 @@ They are **not** backed by inventory lots, so importing does not decrement stock
 - Custom templates persist to `<DataDirectory>/order-import-templates.json`; built-ins are merged in at
   read time and can't be edited or deleted.
 
+## MCP server (Claude, Gemini, etc.)
+
+OmniCard hosts an in-process **Model Context Protocol** server so MCP-capable apps (Claude Desktop,
+Claude Code, Gemini CLI, …) can query the collection directly. It's mounted at **`/mcp`** over the
+Streamable-HTTP transport, reusing the same services and read paths as the SPA API.
+
+**Scope:** read-only. Tools available:
+- `search_collection` (Scryfall-style syntax), `get_card`, `list_locations`, `top_value_cards`,
+  `collection_dashboard`
+- `list_inventory_products`, `list_inventory_lots`, `inventory_valuation`
+- `list_orders`, `get_order`, `list_customers`
+- `lookup_card_catalog`, `set_checklist`, `card_price`
+
+### Security — two modes
+
+The `/mcp` endpoint runs in one of two modes depending on config:
+
+1. **Loopback only (default, no OAuth configured).** Reachable only from the machine the server runs
+   on (any non-loopback request gets `403`), with no authentication. Good for local use. To allow
+   remote clients *without* OAuth (only if you put your own auth in front), set `Mcp:AllowRemote: true`
+   — otherwise leave it `false`.
+2. **OAuth resource server (for web/remote access).** When an external identity provider is
+   configured, `/mcp` requires a valid **JWT access token** from that IdP and the loopback restriction
+   is lifted. OmniCard only *validates* tokens (issuer, audience, signature via the IdP's JWKS) — it
+   never issues them. This is the mode to use behind your public HTTPS domain.
+
+### OAuth configuration
+
+Add to the shared `appsettings.json` (`%LocalAppData%\OmniCard\appsettings.json`):
+
+```jsonc
+"Mcp": {
+  "PublicBaseUrl": "https://omnicard.example.com",       // your public HTTPS origin
+  "OAuth": {
+    "Enabled": true,
+    "Authority": "https://login.example.com/...",         // IdP issuer (OIDC discovery finds the JWKS)
+    "Audience": "api://omnicard-mcp",                      // must equal the audience the IdP mints
+    "Scopes": [ "mcp:tools" ]
+  }
+}
+```
+
+OAuth activates only when `Enabled` **and** `Authority`, `Audience`, and `PublicBaseUrl` are all set;
+otherwise the server stays in loopback mode. Clients discover the IdP automatically via the
+**Protected Resource Metadata** document served at `/.well-known/oauth-protected-resource`.
+
+**Per-IdP setup** (set `Authority`/`Audience` to match):
+
+- **Microsoft Entra ID:** register an app, **Expose an API** → add a scope (e.g. `mcp:tools`) and note
+  the Application ID URI. `Authority = https://login.microsoftonline.com/<tenant-id>/v2.0`,
+  `Audience = <Application ID URI>` (e.g. `api://<client-id>`).
+- **Auth0:** create an **API** with an identifier and a permission/scope.
+  `Authority = https://<your-tenant>.auth0.com/`, `Audience = <API identifier>`.
+- **Keycloak:** a realm + client with an audience mapper.
+  `Authority = https://<host>/realms/<realm>`, `Audience = <client/audience id>`.
+
+**HTTPS / IIS:** OAuth requires HTTPS. In-process IIS hosting sees the public host/scheme, so the PRM
+document and challenge URLs come out correct. If you host **out-of-process** behind a reverse proxy,
+enable forwarded headers so the request scheme/host reflect the public URL.
+
+### Connecting a client
+
+**Loopback mode** (on the server host):
+- **Claude Code:** `claude mcp add --transport http omnicard http://localhost:5000/mcp`
+- **Claude Desktop** (`claude_desktop_config.json`): `"omnicard": { "type": "http", "url": "http://localhost:5000/mcp" }`
+- **Gemini CLI** (`~/.gemini/settings.json`): `"omnicard": { "httpUrl": "http://localhost:5000/mcp" }`
+
+**OAuth mode** (from anywhere): point the same client at your public URL, e.g.
+`claude mcp add --transport http omnicard https://omnicard.example.com/mcp`. On first connect the
+client discovers the IdP and runs the OAuth login in a browser; no token is entered by hand.
+
+Claude.ai *web* custom connectors additionally require Dynamic Client Registration, which this phase
+doesn't implement — it targets remote Claude Desktop / Claude Code / Gemini CLI.
+
 ## Localization
 
 The SPA is internationalized with **react-i18next** + **i18next-browser-languagedetector**. It picks

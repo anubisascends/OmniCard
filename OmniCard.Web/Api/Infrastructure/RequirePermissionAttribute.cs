@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,11 @@ public sealed class RequirePermissionAttribute(string permission) : Attribute, I
 
     public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
+        // Honor [AllowAnonymous] so external-redirect endpoints (e.g. the eBay OAuth callback) can opt
+        // out of the permission gate — matches ApiAuthAttribute's behavior.
+        if (context.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any())
+            return;
+
         var userId = AppAuthGate.CurrentUserId(context.HttpContext);
         if (userId is null)
         {

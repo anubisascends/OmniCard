@@ -18,6 +18,7 @@ import type {
   DeckTypeDto,
   DeckTypeUpsertRequest,
   ImportListResultDto,
+  EbaySellingSettingsDto,
   EbaySetupResultDto,
   EbayStatusDto,
   InventoryLotDto,
@@ -631,6 +632,9 @@ export const api = {
   ebayConnectUrl: '/api/ebay/connect',
   ebayDisconnect: () => request<void>('/api/ebay/disconnect', { method: 'POST' }),
   ebaySetup: () => request<EbaySetupResultDto>('/api/ebay/setup', { method: 'POST' }),
+  ebaySelling: () => request<EbaySellingSettingsDto>('/api/ebay/selling'),
+  ebaySellingSave: (body: EbaySellingSettingsDto) =>
+    request<EbaySellingSettingsDto>('/api/ebay/selling', { method: 'PUT', body: JSON.stringify(body) }),
 
   // Scan (server-side image matching)
   scanMatch: async (image: File, game: string, isFoil: boolean, sets?: string[]) => {
