@@ -37,6 +37,8 @@ import CheckIcon from '@mui/icons-material/Check';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import SyncIcon from '@mui/icons-material/Sync';
 import Snackbar from '@mui/material/Snackbar';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { api, type CustomerFields, type ListingFields } from '../api/client';
@@ -44,6 +46,7 @@ import { useGame } from '../context/GameContext';
 import type { CustomerDto, ListingDetailDto, OrderDto, WorkflowLaneDto } from '../api/types';
 import { OrderDetailDrawer } from '../components/dialogs/OrderDetailDrawer';
 import { ImportOrdersDialog } from '../components/dialogs/ImportOrdersDialog';
+import { EbayReviseDialog, type EbayReviseTarget } from '../components/dialogs/EbayReviseDialog';
 import { useFormatters } from '../i18n/format';
 
 function laneOf(order: OrderDto, lanes: WorkflowLaneDto[]): string {
@@ -335,6 +338,7 @@ function ListingsTable() {
   const { data, isLoading } = useQuery({ queryKey: ['listings'], queryFn: () => api.listingDetails() });
   const [editing, setEditing] = useState<ListingDetailDto | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [reviseTarget, setReviseTarget] = useState<EbayReviseTarget | null>(null);
   const [pickError, setPickError] = useState<string | null>(null);
   const invalidateAfterPick = () => {
     qc.invalidateQueries({ queryKey: ['listings'] });
@@ -433,6 +437,25 @@ function ListingsTable() {
                     <EditIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
+                {l.ebayViewUrl && (
+                  <Tooltip title={t('sales.listings.viewOnEbay')}>
+                    <IconButton size="small" component="a" href={l.ebayViewUrl} target="_blank" rel="noopener noreferrer">
+                      <OpenInNewIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                {l.ebayItemId && (
+                  <Tooltip title={t('sales.listings.updateOnEbay')}>
+                    <IconButton
+                      size="small"
+                      onClick={() =>
+                        setReviseTarget({ listingId: l.id, lotId: l.lotId, name: l.name, currentPrice: l.listedPrice })
+                      }
+                    >
+                      <SyncIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
                 <Tooltip title={t('sales.listings.unlist')}>
                   <IconButton size="small" onClick={() => unlist.mutate(l.lotId)}>
                     <LinkOffIcon fontSize="small" />
@@ -445,6 +468,7 @@ function ListingsTable() {
       </Table>
       </Paper>
       <ListingDialog open={dialogOpen} initial={editing} onClose={() => setDialogOpen(false)} />
+      <EbayReviseDialog target={reviseTarget} onClose={() => setReviseTarget(null)} />
     </Stack>
   );
 }

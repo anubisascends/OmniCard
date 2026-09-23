@@ -18,6 +18,8 @@ import type {
   DeckTypeDto,
   DeckTypeUpsertRequest,
   ImportListResultDto,
+  EbayListingDraftDto,
+  EbayListingResultDto,
   EbaySellingSettingsDto,
   EbaySetupResultDto,
   EbayStatusDto,
@@ -87,6 +89,29 @@ export interface BulkListingBody {
   items: { lotId: number; price: number }[];
   channel: string;
   note?: string | null;
+}
+export interface CreateEbayListingBody {
+  lotId: number;
+  quantity: number;
+  price: number;
+  note?: string | null;
+  title: string;
+  description: string;
+  condition: string;
+  listingType: string;
+  auctionDuration?: number | null;
+  categoryId?: string | null;
+}
+export interface ReviseEbayListingBody {
+  listingId: number;
+  lotId: number;
+  price: number;
+  title: string;
+  description: string;
+  condition: string;
+  listingType: string;
+  auctionDuration?: number | null;
+  categoryId?: string | null;
 }
 export interface ProductFields {
   game: string;
@@ -436,6 +461,15 @@ export const api = {
     request<void>(`/api/listings/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   listingUnlist: (lotId: number) =>
     request<void>(`/api/listings/lot/${lotId}`, { method: 'DELETE' }),
+  /** A draft eBay listing (suggested title/description + category candidates) to prefill the dialog. */
+  ebayListingPrepare: (lotId: number) =>
+    request<EbayListingDraftDto>(`/api/listings/ebay/prepare${qs({ lotId })}`),
+  /** List a lot for sale and push it to eBay. The lot is listed locally even if the eBay push fails. */
+  ebayListingCreate: (body: CreateEbayListingBody) =>
+    request<EbayListingResultDto>('/api/listings/ebay', { method: 'POST', body: JSON.stringify(body) }),
+  /** Update (revise) an already-published eBay listing with edited price/details. */
+  ebayListingRevise: (body: ReviseEbayListingBody) =>
+    request<EbayListingResultDto>('/api/listings/ebay/revise', { method: 'POST', body: JSON.stringify(body) }),
   pickListPdfUrl: (game?: string) => `/api/listings/picklist.pdf${qs({ game })}`,
   settings: () => request<SalesSettingsDto>('/api/settings'),
   settingsUpdate: (body: { forSaleLocationId: number | null; movePickedToForSaleLocation: boolean }) =>

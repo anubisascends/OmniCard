@@ -18,4 +18,9 @@ public record ListingDetail(
     int Quantity,
     string? Note,
     DateTime ListedAt,
-    DateTime? PickedAt);
+    DateTime? PickedAt,
+    /// <summary>The published eBay listing id for this lot, if it has one (null otherwise). Enables
+    /// the "View on eBay" link and the "Update on eBay" action on the Manage Listings screen.</summary>
+    string? EbayItemId = null,
+    /// <summary>The eBay listing status (Active/Ended/Error/…) for this lot, if any.</summary>
+    string? EbayStatus = null);

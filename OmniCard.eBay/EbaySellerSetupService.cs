@@ -105,8 +105,31 @@ public class EbaySellerSetupService : IEbaySellerSetupService
                         if (p.TryGetProperty("name", out var n) && n.GetString() == PolicyName
                             && p.TryGetProperty($"{policyType}PolicyId", out var idEl))
                         {
-                            StorePolicyId(s, policyType, idEl.GetString());
-                            return new EbaySetupStep(stepName, EbaySetupStepStatus.SkippedExisting, null);
+                            var existingId = idEl.GetString();
+                            StorePolicyId(s, policyType, existingId);
+
+                            // Update the existing policy in place so edits to shipping cost / handling
+                            // time / return window in Settings actually propagate to eBay. Previously
+                            // this returned early without updating, so a stale policy (e.g. an old
+                            // shipping cost) kept overriding the saved settings on every new listing.
+                            var updatePayload = BuildPolicyPayload(policyType, s);
+                            var updateResp = await client.PutAsync(
+                                $"{_settings.ApiBaseUrl}/sell/account/v1/{policyType}_policy/{Uri.EscapeDataString(existingId!)}",
+                                new StringContent(JsonSerializer.Serialize(updatePayload), Encoding.UTF8, "application/json"));
+                            if (!updateResp.IsSuccessStatusCode)
+                            {
+                                var updateErr = await updateResp.Content.ReadAsStringAsync();
+                                // eBay rejects a no-op update (identical payload) with errorId 20403
+                                // "Business Profile information in the request is the same as in the
+                                // system". That's not a failure — the policy already matches what we
+                                // want, so treat it as an existing/unchanged policy.
+                                if (updateErr.Contains("same as in the system", StringComparison.OrdinalIgnoreCase))
+                                    return new EbaySetupStep(stepName, EbaySetupStepStatus.SkippedExisting, "Already up to date.");
+
+                                _logger.LogWarning("Update {PolicyType} policy failed: {Status} — {Error}", policyType, updateResp.StatusCode, updateErr);
+                                return new EbaySetupStep(stepName, EbaySetupStepStatus.Failed, $"{updateResp.StatusCode}: {updateErr}");
+                            }
+                            return new EbaySetupStep(stepName, EbaySetupStepStatus.Ok, "Updated existing policy.");
                         }
                     }
                 }
@@ -157,6 +180,10 @@ public class EbaySellerSetupService : IEbaySellerSetupService
                 name = PolicyName,
                 marketplaceId = Marketplace,
                 categoryTypes,
+                // eBay requires globalShipping to be present (it's rejected as null on update with
+                // errorId 20403 "Global shipping field is null"). We don't use the Global Shipping
+                // Program, so it's false.
+                globalShipping = false,
                 handlingTime = new { unit = "DAY", value = s.HandlingTimeDays },
                 shippingOptions = new[]
                 {
@@ -185,6 +212,9 @@ public class EbaySellerSetupService : IEbaySellerSetupService
                 name = PolicyName,
                 marketplaceId = Marketplace,
                 categoryTypes,
+                // eBay-managed payments require immediate pay on fixed-price listings; the field is
+                // rejected as missing on update with errorId 20403 "Immediate Pay is required".
+                immediatePay = true,
                 paymentMethods = Array.Empty<object>(),
             },
             // When returns are accepted eBay requires refundMethod + returnPeriod + returnShippingCostPayer

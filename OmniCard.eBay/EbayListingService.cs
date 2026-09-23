@@ -24,6 +24,13 @@ public class EbayListingService : IEbayListingService
     private readonly IListingService _listingService;
     private readonly ILogger<EbayListingService> _logger;
 
+    // eBay's leaf category for trading-card singles ("Collectible Card Games ▸ CCG Individual Cards").
+    // It must be a LEAF (you can't list in a parent node) and must match the "Card Condition" descriptor
+    // (name 40001) we send on the inventory item — otherwise publish fails with a BadRequest. The
+    // per-listing category we accept from callers is only used when non-empty; otherwise we fall back
+    // to this known-good value rather than a parent node.
+    public const string SinglesCategoryId = "183454";
+
     // Trading-card singles (category 183454) accept only USED_VERY_GOOD (ungraded) or
     // LIKE_NEW (graded). Ungraded cards additionally carry a "Card Condition" descriptor
     // (name 40001) whose value encodes the grade (400010 = Near Mint or Better … 400013 = Poor).
@@ -34,6 +41,7 @@ public class EbayListingService : IEbayListingService
         ["MP"] = "400012", // Very Good
         ["HP"] = "400013", // Poor
         ["D"] = "400013",  // Poor (no distinct ungraded "damaged" grade)
+        ["DMG"] = "400013",// Poor (the app's "Damaged" condition code)
     };
 
     public EbayListingService(
@@ -96,7 +104,7 @@ public class EbayListingService : IEbayListingService
             {
                 var error = await inventoryResponse.Content.ReadAsStringAsync();
                 _logger.LogWarning("Failed to create inventory item: {Status} — {Error}", inventoryResponse.StatusCode, error);
-                await SaveListingError(lotId, options, $"Inventory creation failed: {inventoryResponse.StatusCode}");
+                await SaveListingError(lotId, options, $"Inventory creation failed: {DescribeEbayError(error, inventoryResponse.StatusCode)}");
                 return false;
             }
 
@@ -118,7 +126,7 @@ public class EbayListingService : IEbayListingService
                 {
                     var error = await offerResponse.Content.ReadAsStringAsync();
                     _logger.LogWarning("Failed to create offer: {Status} — {Error}", offerResponse.StatusCode, error);
-                    await SaveListingError(lotId, options, $"Offer creation failed: {offerResponse.StatusCode}");
+                    await SaveListingError(lotId, options, $"Offer creation failed: {DescribeEbayError(error, offerResponse.StatusCode)}");
                     return false;
                 }
 
@@ -153,30 +161,59 @@ public class EbayListingService : IEbayListingService
                 {
                     var error = await updateResponse.Content.ReadAsStringAsync();
                     _logger.LogWarning("Failed to update existing offer {OfferId}: {Status} — {Error}", offerId, updateResponse.StatusCode, error);
-                    await SaveListingError(lotId, options, $"Offer update failed: {updateResponse.StatusCode}");
+                    await SaveListingError(lotId, options, $"Offer update failed: {DescribeEbayError(error, updateResponse.StatusCode)}");
                     return false;
                 }
             }
 
-            // Step 3: Publish offer
-            var publishResponse = await client.PostAsync(
-                $"{_settings.ApiBaseUrl}/sell/inventory/v1/offer/{Uri.EscapeDataString(offerId)}/publish",
-                JsonContent("{}"));
+            // Step 3: Publish offer.
+            var (published, ebayItemId, publishError) = await TryPublishAsync(client, offerId);
 
-            string ebayItemId;
-            if (publishResponse.IsSuccessStatusCode)
+            // Relisting an item whose eBay listing has ended: a stale offer still exists for the SKU
+            // (so FindExistingOfferAsync returned it above), but its prior listing has ended and eBay
+            // won't republish it directly — the publish fails and the item never reaches eBay. Recover
+            // by deleting the eBay inventory item (which clears the leftover offer), recreating it, and
+            // creating + publishing a fresh offer. This only runs on a publish failure of an existing
+            // offer, so it never disturbs a normal first-time list or a successful revise/republish.
+            if (!published && existingOfferId is not null)
             {
-                var publishJson = await publishResponse.Content.ReadAsStringAsync();
-                using var publishDoc = JsonDocument.Parse(publishJson);
-                ebayItemId = publishDoc.RootElement.TryGetProperty("listingId", out var listingIdEl)
-                    ? listingIdEl.GetString() ?? ""
-                    : "";
+                _logger.LogInformation(
+                    "Publish of existing offer {OfferId} for lot {LotId} failed ({Error}); recreating for relist",
+                    offerId, lotId, publishError);
+
+                await client.DeleteAsync($"{_settings.ApiBaseUrl}/sell/inventory/v1/inventory_item/{Uri.EscapeDataString(sku)}");
+
+                var reInventory = await client.PutAsync(
+                    $"{_settings.ApiBaseUrl}/sell/inventory/v1/inventory_item/{Uri.EscapeDataString(sku)}",
+                    JsonContent(inventoryJson));
+                if (reInventory.IsSuccessStatusCode)
+                {
+                    var freshOfferResponse = await client.PostAsync(
+                        $"{_settings.ApiBaseUrl}/sell/inventory/v1/offer",
+                        JsonContent(JsonSerializer.Serialize(BuildOffer(sku, options, selling))));
+                    if (freshOfferResponse.IsSuccessStatusCode)
+                    {
+                        var freshJson = await freshOfferResponse.Content.ReadAsStringAsync();
+                        using var freshDoc = JsonDocument.Parse(freshJson);
+                        if (freshDoc.RootElement.TryGetProperty("listingId", out var freshListingId))
+                            (published, ebayItemId, publishError) = (true, freshListingId.GetString() ?? "", null);
+                        else if (freshDoc.RootElement.TryGetProperty("offerId", out var freshOfferId))
+                            (published, ebayItemId, publishError) = await TryPublishAsync(client, freshOfferId.GetString() ?? "");
+                    }
+                    else
+                    {
+                        publishError = $"Relist offer creation failed: {freshOfferResponse.StatusCode}";
+                    }
+                }
+                else
+                {
+                    publishError = $"Relist inventory creation failed: {reInventory.StatusCode}";
+                }
             }
-            else
+
+            if (!published)
             {
-                var error = await publishResponse.Content.ReadAsStringAsync();
-                _logger.LogWarning("Failed to publish offer: {Status} — {Error}", publishResponse.StatusCode, error);
-                await SaveListingError(lotId, options, $"Publish failed: {publishResponse.StatusCode}");
+                await SaveListingError(lotId, options, publishError ?? "Publish failed");
                 return false;
             }
 
@@ -331,6 +368,38 @@ public class EbayListingService : IEbayListingService
         }
     }
 
+    // Pulls a human-readable reason out of an eBay error response body (the { "errors": [...] } shape
+    // eBay returns on 4xx), so failures surface the actual cause (e.g. "Immediate Pay is required")
+    // instead of a bare "BadRequest". Falls back to the HTTP status when the body isn't parseable.
+    private static string DescribeEbayError(string body, System.Net.HttpStatusCode status)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("errors", out var errors)
+                && errors.ValueKind == JsonValueKind.Array && errors.GetArrayLength() > 0)
+            {
+                var parts = new List<string>();
+                foreach (var e in errors.EnumerateArray())
+                {
+                    var msg = e.TryGetProperty("longMessage", out var lm) ? lm.GetString()
+                        : e.TryGetProperty("message", out var m) ? m.GetString()
+                        : null;
+                    var id = e.TryGetProperty("errorId", out var idEl) ? idEl.GetRawText() : null;
+                    if (!string.IsNullOrWhiteSpace(msg))
+                        parts.Add(id is null ? msg! : $"{msg} (errorId {id})");
+                }
+                if (parts.Count > 0)
+                    return string.Join("; ", parts);
+            }
+        }
+        catch (JsonException)
+        {
+            // Not the expected JSON shape — fall through to the status code.
+        }
+        return status.ToString();
+    }
+
     // eBay's Inventory API requires a Content-Language header on inventory_item and
     // offer requests; omitting it fails createOffer with errorId 25709.
     private static StringContent JsonContent(string json)
@@ -380,7 +449,7 @@ public class EbayListingService : IEbayListingService
         {
             availability = new
             {
-                shipToLocationAvailability = new { quantity = 1 }
+                shipToLocationAvailability = new { quantity = Math.Max(1, options.Quantity) }
             },
             // Ungraded card. The granular grade (NM/LP/…) is carried by the Card Condition
             // descriptor below, which category 183454 requires.
@@ -423,7 +492,7 @@ public class EbayListingService : IEbayListingService
         {
             availability = new
             {
-                shipToLocationAvailability = new { quantity = 1 }
+                shipToLocationAvailability = new { quantity = Math.Max(1, options.Quantity) }
             },
             condition = "NEW",
             product = new
@@ -461,7 +530,7 @@ public class EbayListingService : IEbayListingService
                 returnPolicyId = options.ReturnPolicyId ?? selling.ReturnPolicyId,
                 paymentPolicyId = options.PaymentPolicyId ?? selling.PaymentPolicyId,
             },
-            categoryId = options.EbayCategoryId ?? "38292",
+            categoryId = string.IsNullOrWhiteSpace(options.EbayCategoryId) ? SinglesCategoryId : options.EbayCategoryId,
         };
     }
 
@@ -488,8 +557,29 @@ public class EbayListingService : IEbayListingService
                 returnPolicyId = options.ReturnPolicyId ?? selling.ReturnPolicyId,
                 paymentPolicyId = options.PaymentPolicyId ?? selling.PaymentPolicyId,
             },
-            categoryId = options.EbayCategoryId ?? "38292",
+            categoryId = string.IsNullOrWhiteSpace(options.EbayCategoryId) ? SinglesCategoryId : options.EbayCategoryId,
         };
+    }
+
+    // Publishes an offer. Returns (ok, ebayItemId, error). A failure is logged; the caller decides
+    // whether to recover (e.g. the relist path recreates the offer and tries again).
+    private async Task<(bool ok, string ebayItemId, string? error)> TryPublishAsync(HttpClient client, string offerId)
+    {
+        var response = await client.PostAsync(
+            $"{_settings.ApiBaseUrl}/sell/inventory/v1/offer/{Uri.EscapeDataString(offerId)}/publish",
+            JsonContent("{}"));
+
+        if (response.IsSuccessStatusCode)
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            var id = doc.RootElement.TryGetProperty("listingId", out var listingIdEl) ? listingIdEl.GetString() ?? "" : "";
+            return (true, id, null);
+        }
+
+        var error = await response.Content.ReadAsStringAsync();
+        _logger.LogWarning("Failed to publish offer {OfferId}: {Status} — {Error}", offerId, response.StatusCode, error);
+        return (false, "", $"Publish failed: {DescribeEbayError(error, response.StatusCode)}");
     }
 
     // Returns the offerId of an existing offer for this SKU (eBay allows one per SKU), or null.

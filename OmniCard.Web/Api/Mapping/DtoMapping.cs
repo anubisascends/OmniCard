@@ -194,9 +194,13 @@ public static class DtoMapping
     public static ActiveListingDto ToDto(ActiveListing l) =>
         new(l.LotId, l.Name, l.SetName, l.SetCode, l.Condition, l.IsFoil, l.ListedPrice, l.Status.ToString());
 
-    public static ListingDetailDto ToDto(ListingDetail l) =>
+    public static ListingDetailDto ToDto(ListingDetail l, string? ebayWebBaseUrl = null) =>
         new(l.Id, l.LotId, l.Name, l.SetName, l.SetCode, l.Condition, l.IsFoil,
-            l.Channel.ToString(), l.Status.ToString(), l.ListedPrice, l.Quantity, l.Note);
+            l.Channel.ToString(), l.Status.ToString(), l.ListedPrice, l.Quantity, l.Note,
+            l.EbayItemId, l.EbayStatus,
+            string.IsNullOrEmpty(l.EbayItemId) || string.IsNullOrEmpty(ebayWebBaseUrl)
+                ? null
+                : $"{ebayWebBaseUrl}/itm/{l.EbayItemId}");
 
     public static CustomerDto ToDto(Customer c) => new()
     {
