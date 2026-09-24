@@ -4,6 +4,10 @@ public class EbayListingOptions
 {
     public EbayListingType ListingType { get; set; } = EbayListingType.FixedPrice;
     public decimal Price { get; set; }
+    /// <summary>Quantity available on the eBay listing. eBay disallows two identical listings from the
+    /// same seller — multiple copies must be one multi-quantity listing — so this drives the inventory
+    /// item's available quantity.</summary>
+    public int Quantity { get; set; } = 1;
     public int? AuctionDuration { get; set; }
     public string Condition { get; set; } = "NM";
     public string Title { get; set; } = "";

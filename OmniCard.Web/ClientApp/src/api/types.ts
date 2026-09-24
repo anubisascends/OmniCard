@@ -295,6 +295,9 @@ export interface ListingDetailDto {
   listedPrice: number;
   quantity: number;
   note?: string | null;
+  ebayItemId?: string | null;
+  ebayStatus?: string | null;
+  ebayViewUrl?: string | null;
 }
 
 export interface SalesSettingsDto {
@@ -592,6 +595,28 @@ export interface EbayStatusDto {
   connected: boolean;
   configured: boolean;
   missingConfig: string[];
+}
+
+export interface EbayCategoryOptionDto {
+  categoryId: string;
+  title: string;
+  price?: number | null;
+}
+
+export interface EbayListingDraftDto {
+  suggestedTitle: string;
+  suggestedDescription: string;
+  condition: string;
+  isFoil: boolean;
+  game: string;
+  categories: EbayCategoryOptionDto[];
+}
+
+export interface EbayListingResultDto {
+  lotId: number;
+  success: boolean;
+  ebayItemId?: string | null;
+  error?: string | null;
 }
 
 export interface EbaySetupResultDto {

@@ -84,7 +84,17 @@
       "qty": "Qty",
       "cond": "Cond",
       "markPicked": "Mark picked (move to sales location)",
-      "unlist": "Unlist"
+      "unlist": "Unlist",
+      "viewOnEbay": "View on eBay",
+      "updateOnEbay": "Update on eBay"
+    },
+    "ebayRevise": {
+      "title": "Update eBay listing",
+      "titleNamed": "Update eBay listing — {{name}}",
+      "update": "Update on eBay",
+      "updating": "Updating…",
+      "failed": "eBay update failed.",
+      "failedWithError": "eBay update failed: {{error}}"
     },
     "customers": {
       "newCustomer": "New customer",
@@ -118,7 +128,28 @@
       "quantityYouHave": "Quantity (you have {{qty}})",
       "splitsHelper": "Splits {{quantity}} off your stack of {{total}}.",
       "listsWholeStack": "Lists the whole stack.",
-      "listing": "Listing…"
+      "listing": "Listing…",
+      "ebay": {
+        "sectionTitle": "eBay listing",
+        "listOnEbay": "List on eBay",
+        "notConnected": "Not connected to eBay. Connect and run seller setup in Settings ▸ eBay before listing.",
+        "title": "Listing title",
+        "titleHelper": "{{len}}/80 characters",
+        "description": "Description",
+        "condition": "Condition",
+        "listingType": "Listing type",
+        "fixedPrice": "Fixed price",
+        "auction": "Auction",
+        "auctionDuration": "Auction duration",
+        "days": "{{count}} day",
+        "days_other": "{{count}} days",
+        "category": "eBay category",
+        "defaultCategory": "Default (trading card singles)",
+        "loadingCategories": "Searching eBay catalog…",
+        "noCategories": "No catalog matches — the default category will be used.",
+        "pushFailed": "eBay listing failed.",
+        "listedLocallyError": "Listed locally, but the eBay push failed: {{error}}"
+      }
     }
   }
 }

@@ -113,6 +113,12 @@ public class EbaySellerSetupServiceTests
 
         var fulfillmentPost = handler.Requests.Single(r => r.Method == HttpMethod.Post && r.Uri.EndsWith("fulfillment_policy"));
         Assert.Contains("USPSPriority", fulfillmentPost.Body);
+        // eBay rejects a fulfillment policy whose globalShipping is null (errorId 20403).
+        Assert.Contains("globalShipping", fulfillmentPost.Body);
+
+        var paymentPost = handler.Requests.Single(r => r.Method == HttpMethod.Post && r.Uri.EndsWith("payment_policy"));
+        // eBay-managed payments require immediatePay (errorId 20403 "Immediate Pay is required").
+        Assert.Contains("immediatePay", paymentPost.Body);
 
         var returnPost = handler.Requests.Single(r => r.Method == HttpMethod.Post && r.Uri.EndsWith("return_policy"));
         Assert.Contains("MONEY_BACK", returnPost.Body);
@@ -289,6 +295,73 @@ public class EbaySellerSetupServiceTests
 
         Assert.Equal("fp-existing", settings.Current.FulfillmentPolicyId);
         Assert.DoesNotContain(handler.Requests, r => r.Method == HttpMethod.Post && r.Uri.EndsWith("fulfillment_policy"));
+    }
+
+    [Fact]
+    public async Task RunSetup_UpdatesExistingFulfillmentPolicy_WithCurrentShippingCost()
+    {
+        // Regression: previously an existing policy was skipped without updating, so edits to the
+        // shipping cost never reached eBay and listings kept the stale cost. Now the existing policy
+        // is PUT-updated with the current settings.
+        var settings = WithValidAddress();
+        settings.Current.FreeShipping = false;
+        settings.Current.ShippingCost = 11.99m;
+        var handler = new RoutingHandler((req, body) =>
+        {
+            var u = req.RequestUri!.AbsolutePath;
+            if (u.Contains("/program/opt_in")) return (HttpStatusCode.OK, "{}");
+            if (u.Contains("/location/")) return (req.Method == HttpMethod.Get) ? (HttpStatusCode.OK, JsonSerializer.Serialize(new { merchantLocationKey = "omnicard-primary" })) : (HttpStatusCode.NoContent, "");
+            if (u.EndsWith("fulfillment_policy") && req.Method == HttpMethod.Get) return (HttpStatusCode.OK, JsonSerializer.Serialize(new { fulfillmentPolicies = new[] { new { fulfillmentPolicyId = "fp-existing", name = "OmniCard Default" } } }));
+            if (u.EndsWith("return_policy") && req.Method == HttpMethod.Get) return (HttpStatusCode.OK, JsonSerializer.Serialize(new { returnPolicies = new[] { new { returnPolicyId = "rp-existing", name = "OmniCard Default" } } }));
+            if (u.EndsWith("payment_policy") && req.Method == HttpMethod.Get) return (HttpStatusCode.OK, JsonSerializer.Serialize(new { paymentPolicies = new[] { new { paymentPolicyId = "pp-existing", name = "OmniCard Default" } } }));
+            // PUT (update) to any policy succeeds.
+            if (u.Contains("_policy/") && req.Method == HttpMethod.Put) return (HttpStatusCode.OK, "{}");
+            return (HttpStatusCode.OK, "{}");
+        });
+        var svc = Create(handler, settings);
+
+        await svc.RunSetupAsync();
+
+        var put = handler.Requests.Single(r => r.Method == HttpMethod.Put && r.Uri.EndsWith("fulfillment_policy/fp-existing"));
+        Assert.Contains("11.99", put.Body);
+        // The existing policy id is still what listings use — no duplicate created.
+        Assert.Equal("fp-existing", settings.Current.FulfillmentPolicyId);
+        Assert.DoesNotContain(handler.Requests, r => r.Method == HttpMethod.Post && r.Uri.EndsWith("fulfillment_policy"));
+    }
+
+    [Fact]
+    public async Task RunSetup_NoOpPolicyUpdate_IsSkippedExisting_NotFailed()
+    {
+        // eBay rejects an identical (no-op) policy update with errorId 20403 "Business Profile
+        // information in the request is the same as in the system". That must be treated as success
+        // (the policy already matches), not a failed step.
+        var settings = WithValidAddress();
+        var handler = new RoutingHandler((req, body) =>
+        {
+            var u = req.RequestUri!.AbsolutePath;
+            if (u.Contains("/program/opt_in")) return (HttpStatusCode.OK, "{}");
+            if (u.Contains("/location/")) return (req.Method == HttpMethod.Get) ? (HttpStatusCode.OK, JsonSerializer.Serialize(new { merchantLocationKey = "omnicard-primary" })) : (HttpStatusCode.NoContent, "");
+            if (u.EndsWith("fulfillment_policy") && req.Method == HttpMethod.Get) return (HttpStatusCode.OK, JsonSerializer.Serialize(new { fulfillmentPolicies = new[] { new { fulfillmentPolicyId = "fp-1", name = "OmniCard Default" } } }));
+            if (u.EndsWith("return_policy") && req.Method == HttpMethod.Get) return (HttpStatusCode.OK, JsonSerializer.Serialize(new { returnPolicies = new[] { new { returnPolicyId = "rp-1", name = "OmniCard Default" } } }));
+            if (u.EndsWith("payment_policy") && req.Method == HttpMethod.Get) return (HttpStatusCode.OK, JsonSerializer.Serialize(new { paymentPolicies = new[] { new { paymentPolicyId = "pp-1", name = "OmniCard Default" } } }));
+            // Every PUT (update) reports the no-op error.
+            if (req.Method == HttpMethod.Put && u.Contains("_policy/"))
+                return (HttpStatusCode.BadRequest, JsonSerializer.Serialize(new
+                {
+                    errors = new[] { new { errorId = 20403, longMessage = "Business Profile information in the request is the same as in the system" } }
+                }));
+            return (HttpStatusCode.OK, "{}");
+        });
+        var svc = Create(handler, settings);
+
+        var result = await svc.RunSetupAsync();
+
+        var fulfillment = result.Steps.Single(s => s.Name == "Fulfillment (shipping) policy");
+        Assert.Equal(EbaySetupStepStatus.SkippedExisting, fulfillment.Status);
+        var payment = result.Steps.Single(s => s.Name == "Payment policy");
+        Assert.Equal(EbaySetupStepStatus.SkippedExisting, payment.Status);
+        Assert.True(result.Success);
+        Assert.Equal("fp-1", settings.Current.FulfillmentPolicyId);
     }
 
     [Fact]

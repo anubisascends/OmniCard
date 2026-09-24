@@ -68,10 +68,13 @@ public sealed class EbayController(
     public ActionResult<EbaySellingSettingsDto> GetSelling() => ToDto(selling.Get());
 
     /// <summary>Saves the editable seller settings. Load-then-patch: setup-written results (policy ids,
-    /// provisioning state) are preserved, only the user-editable fields are updated.</summary>
+    /// provisioning state) are preserved, only the user-editable fields are updated. When the seller
+    /// is already set up and connected, the saved shipping/return/location values are pushed to eBay
+    /// immediately (re-syncing the business policies) so changes like shipping cost take effect on new
+    /// listings without a separate "Run eBay Setup" click.</summary>
     [HttpPut("selling")]
     [RequirePermission(Permissions.EbayManage)]
-    public ActionResult<EbaySellingSettingsDto> SaveSelling([FromBody] EbaySellingSettingsDto dto)
+    public async Task<ActionResult<EbaySellingSettingsDto>> SaveSelling([FromBody] EbaySellingSettingsDto dto)
     {
         var s = selling.Get();
 
@@ -97,7 +100,24 @@ public sealed class EbayController(
             : ReturnShippingPayer.Buyer;
 
         selling.Save(s);
-        return ToDto(s);
+
+        // Push the saved values to eBay right away for sellers who have already completed setup, so
+        // edits like shipping cost propagate to the eBay business policies (which is where listings
+        // read shipping from) instead of silently keeping the stale policy. Best-effort: a save must
+        // never fail because of an eBay hiccup — the local settings are already persisted.
+        if (auth.IsConnected && selling.IsSetupComplete())
+        {
+            try
+            {
+                await sellerSetup.RunSetupAsync();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "eBay policy re-sync after saving selling settings failed");
+            }
+        }
+
+        return ToDto(selling.Get());
     }
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

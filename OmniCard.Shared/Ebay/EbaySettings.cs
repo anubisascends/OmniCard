@@ -16,4 +16,9 @@ public class EbaySettings
     public string ApiBaseUrl => Environment == "production"
         ? "https://api.ebay.com"
         : "https://api.sandbox.ebay.com";
+
+    /// <summary>Public buyer-facing site base, for building "view item" links (e.g. {WebBaseUrl}/itm/{id}).</summary>
+    public string WebBaseUrl => Environment == "production"
+        ? "https://www.ebay.com"
+        : "https://www.sandbox.ebay.com";
 }

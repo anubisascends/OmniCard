@@ -428,7 +428,8 @@ public sealed record ActiveListingDto(
 public sealed record ListingDetailDto(
     int Id, int LotId, string Name, string SetName, string SetCode,
     string? Condition, bool IsFoil, string Channel, string Status,
-    decimal ListedPrice, int Quantity, string? Note);
+    decimal ListedPrice, int Quantity, string? Note,
+    string? EbayItemId = null, string? EbayStatus = null, string? EbayViewUrl = null);
 
 /// <summary>Editable sale properties of an active listing.</summary>
 public sealed record UpdateListingRequest
@@ -448,6 +449,58 @@ public sealed record CreateListingRequest
     public decimal Price { get; init; }
     public string Channel { get; init; } = "Manual";
     public string? Note { get; init; }
+}
+
+/// <summary>A draft eBay listing for a lot: server-suggested title/description, the lot's current
+/// condition/foil, and eBay category candidates from the eBay catalog search — used to prefill the
+/// eBay section of the List for Sale dialog when the eBay channel is chosen.</summary>
+public sealed record EbayListingDraftDto(
+    string SuggestedTitle,
+    string SuggestedDescription,
+    string Condition,
+    bool IsFoil,
+    string Game,
+    IReadOnlyList<EbayCategoryOptionDto> Categories);
+
+/// <summary>One eBay catalog category candidate for a listing (from a catalog search match).</summary>
+public sealed record EbayCategoryOptionDto(string CategoryId, string Title, decimal? Price);
+
+/// <summary>List a lot for sale and push it to eBay as a published offer. Splits the lot like
+/// <see cref="CreateListingRequest"/>, lists the copies locally (channel eBay), then publishes an
+/// eBay offer for them. The local listing is kept even if the eBay push fails.</summary>
+public sealed record CreateEbayListingRequest
+{
+    public int LotId { get; init; }
+    public int Quantity { get; init; } = 1;
+    public decimal Price { get; init; }
+    public string? Note { get; init; }
+    public string Title { get; init; } = "";
+    public string Description { get; init; } = "";
+    public string Condition { get; init; } = "NM";
+    /// <summary>"FixedPrice" or "Auction".</summary>
+    public string ListingType { get; init; } = "FixedPrice";
+    public int? AuctionDuration { get; init; }
+    public string? CategoryId { get; init; }
+}
+
+/// <summary>Result of an eBay list-for-sale. The lot is always listed locally; <see cref="Success"/>
+/// reports whether the eBay push itself succeeded (false carries an <see cref="Error"/>).</summary>
+public sealed record EbayListingResultDto(int LotId, bool Success, string? EbayItemId, string? Error);
+
+/// <summary>Update (revise) an already-published eBay listing for a lot: re-pushes the offer with the
+/// edited price/details and keeps the local listing's price in sync.</summary>
+public sealed record ReviseEbayListingRequest
+{
+    public int ListingId { get; init; }
+    public int LotId { get; init; }
+    public decimal Price { get; init; }
+    public string Title { get; init; } = "";
+    public string Description { get; init; } = "";
+    public string Condition { get; init; } = "NM";
+    /// <summary>"FixedPrice" or "Auction".</summary>
+    public string ListingType { get; init; } = "FixedPrice";
+    public int? AuctionDuration { get; init; }
+    public string? CategoryId { get; init; }
 }
 
 /// <summary>List several whole lots for sale at once, each at its own price.</summary>

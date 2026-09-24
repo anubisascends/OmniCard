@@ -106,6 +106,43 @@ public class ListingService(
         return targetLotId;
     }
 
+    public int MergeIntoListing(int sourceLotId, int quantity, int targetLotId)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var source = ctx.Lots.FirstOrDefault(l => l.Id == sourceLotId)
+            ?? throw new InvalidOperationException("Source lot not found.");
+        var target = ctx.Lots.FirstOrDefault(l => l.Id == targetLotId)
+            ?? throw new InvalidOperationException("Target lot not found.");
+        if (quantity < 1 || quantity > source.Quantity)
+            throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity must be between 1 and the source lot's quantity.");
+
+        var listing = ctx.Listings.FirstOrDefault(l => l.LotId == targetLotId && ActiveStatuses.Contains(l.Status))
+            ?? throw new InvalidOperationException("Target lot has no active listing to merge into.");
+
+        // Move the physical copies from the source lot into the already-listed target lot (they're
+        // identical), then grow the target listing's quantity to match.
+        source.Quantity -= quantity;
+        target.Quantity += quantity;
+        ctx.Movements.Add(new InventoryMovement
+        {
+            ProductId = target.ProductId,
+            LotId = target.Id,
+            Type = MovementType.Move,
+            Quantity = quantity,
+            Timestamp = DateTime.UtcNow,
+            Note = "Merged into existing listing",
+        });
+
+        // A fully-consumed source lot is removed (no FK from movements/listings to Lots, so its history
+        // survives). A partial merge leaves the remainder in place, unlisted.
+        if (source.Quantity == 0)
+            ctx.Lots.Remove(source);
+
+        listing.Quantity += quantity;
+        ctx.SaveChanges();
+        return listing.Quantity;
+    }
+
     public void Unlist(IEnumerable<int> lotIds)
     {
         using var ctx = dbContextFactory.CreateDbContext();
@@ -290,6 +327,9 @@ public class ListingService(
             where ActiveStatuses.Contains(listing.Status)
             join lot in ctx.Lots.AsNoTracking() on listing.LotId equals lot.Id
             join p in ctx.Products.AsNoTracking() on lot.ProductId equals p.Id
+            // Left-join the eBay listing (if any) so the row can offer "View on eBay" / "Update on eBay".
+            join e in ctx.EbayListings.AsNoTracking() on lot.Id equals e.LotId into ebayGroup
+            from ebay in ebayGroup.DefaultIfEmpty()
             where game == null || p.Game == game
             orderby p.Name
             select new ListingDetail(
@@ -306,7 +346,9 @@ public class ListingService(
                 listing.Quantity,
                 listing.Note,
                 listing.ListedAt,
-                listing.PickedAt);
+                listing.PickedAt,
+                ebay != null && ebay.EbayItemId != "" ? ebay.EbayItemId : null,
+                ebay != null ? ebay.Status.ToString() : null);
 
         return query.ToList();
     }

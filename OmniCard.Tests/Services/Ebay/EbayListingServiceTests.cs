@@ -488,6 +488,108 @@ public class EbayListingServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateListingAsync_Relists_WhenExistingOfferCannotBePublished()
+    {
+        // Relisting an item whose eBay listing ended: a stale offer lingers for the SKU, but eBay
+        // won't republish it (publish fails). The service must delete the inventory item, recreate it,
+        // create a fresh offer, and publish that — so the relist actually reaches eBay.
+        var dbFactory = CreateDbFactory();
+        int lotId;
+        using (var ctx = dbFactory.CreateDbContext())
+        {
+            lotId = SeedLot(ctx);
+            // A prior, now-ended eBay listing for this lot.
+            ctx.EbayListings.Add(new EbayListing
+            {
+                LotId = lotId,
+                EbayItemId = "old-listing",
+                Status = EbayListingStatus.Ended,
+                ListedPrice = 5m,
+            });
+            ctx.SaveChanges();
+        }
+
+        var handler = new RoutingRecordingHttpHandler((method, uri) =>
+        {
+            if (method == HttpMethod.Get && uri.Contains("/offer?sku="))
+                return (HttpStatusCode.OK, JsonSerializer.Serialize(new { offers = new[] { new { offerId = "stale-1" } } }));
+            if (method == HttpMethod.Put && uri.Contains("/inventory_item/"))
+                return (HttpStatusCode.OK, "{}");
+            if (method == HttpMethod.Delete && uri.Contains("/inventory_item/"))
+                return (HttpStatusCode.NoContent, "");
+            if (method == HttpMethod.Put && uri.Contains("/offer/stale-1"))
+                return (HttpStatusCode.NoContent, "");
+            // The lingering ended offer cannot be republished.
+            if (method == HttpMethod.Post && uri.Contains("/offer/stale-1/publish"))
+                return (HttpStatusCode.BadRequest, JsonSerializer.Serialize(new { errors = new[] { new { message = "listing has ended" } } }));
+            // Fresh offer created after cleanup.
+            if (method == HttpMethod.Post && uri.EndsWith("/offer"))
+                return (HttpStatusCode.OK, JsonSerializer.Serialize(new { offerId = "fresh-2" }));
+            if (method == HttpMethod.Post && uri.Contains("/offer/fresh-2/publish"))
+                return (HttpStatusCode.OK, JsonSerializer.Serialize(new { listingId = "RELISTED-99" }));
+            return (HttpStatusCode.OK, "{}");
+        });
+
+        var svc = new EbayListingService(
+            Options.Create(_settings), new FakeHttpClientFactory(handler),
+            new FakeEbayAuthService("t"), dbFactory, CompleteSellingSettings(),
+            new RecordingListingService(),
+            NullLogger<EbayListingService>.Instance);
+
+        var ok = await svc.CreateListingAsync(new CollectionCard { Id = lotId, Name = "n" },
+            new EbayListingOptions { Title = "t", Description = "d", Price = 7m, ListingType = EbayListingType.FixedPrice });
+
+        Assert.True(ok);
+        // Self-heal ran: deleted the inventory item and created a fresh offer.
+        Assert.Contains(handler.Requests, r => r.Method == HttpMethod.Delete && r.Uri!.ToString().Contains("/inventory_item/"));
+        Assert.Contains(handler.Requests, r => r.Method == HttpMethod.Post && r.Uri!.ToString().EndsWith("/offer"));
+        Assert.Contains(handler.Requests, r => r.Method == HttpMethod.Post && r.Uri!.ToString().Contains("/offer/fresh-2/publish"));
+
+        using var verifyCtx = dbFactory.CreateDbContext();
+        var listing = verifyCtx.EbayListings.First(l => l.LotId == lotId);
+        Assert.Equal(EbayListingStatus.Active, listing.Status);
+        Assert.Equal("RELISTED-99", listing.EbayItemId);
+    }
+
+    [Fact]
+    public async Task CreateListingAsync_SurfacesEbayErrorMessage_OnPublishFailure()
+    {
+        // The failure message must carry eBay's actual reason (longMessage + errorId), not a bare
+        // "BadRequest", so the user can see and fix what eBay rejected.
+        var dbFactory = CreateDbFactory();
+        int lotId;
+        using (var ctx = dbFactory.CreateDbContext()) lotId = SeedLot(ctx);
+
+        var handler = new RoutingRecordingHttpHandler((method, uri) =>
+        {
+            if (method == HttpMethod.Put && uri.Contains("/inventory_item/")) return (HttpStatusCode.OK, "{}");
+            if (method == HttpMethod.Get && uri.Contains("/offer?sku=")) return (HttpStatusCode.OK, "{}"); // no existing offer
+            if (method == HttpMethod.Post && uri.EndsWith("/offer")) return (HttpStatusCode.OK, JsonSerializer.Serialize(new { offerId = "o-1" }));
+            if (method == HttpMethod.Post && uri.Contains("/offer/o-1/publish"))
+                return (HttpStatusCode.BadRequest, JsonSerializer.Serialize(new
+                {
+                    errors = new[] { new { errorId = 25007, longMessage = "The item condition is not valid for the selected category." } }
+                }));
+            return (HttpStatusCode.OK, "{}");
+        });
+
+        var svc = new EbayListingService(
+            Options.Create(_settings), new FakeHttpClientFactory(handler),
+            new FakeEbayAuthService("t"), dbFactory, CompleteSellingSettings(),
+            new RecordingListingService(), NullLogger<EbayListingService>.Instance);
+
+        var ok = await svc.CreateListingAsync(new CollectionCard { Id = lotId, Name = "n" },
+            new EbayListingOptions { Title = "t", Description = "d", Price = 5m, ListingType = EbayListingType.FixedPrice });
+
+        Assert.False(ok);
+        using var ctx2 = dbFactory.CreateDbContext();
+        var listing = ctx2.EbayListings.First(l => l.LotId == lotId);
+        Assert.Equal(EbayListingStatus.Error, listing.Status);
+        Assert.Contains("not valid for the selected category", listing.ErrorMessage);
+        Assert.Contains("25007", listing.ErrorMessage);
+    }
+
+    [Fact]
     public void DeletingLot_CascadesEbayListing()
     {
         var dbFactory = CreateDbFactory();
@@ -588,6 +690,7 @@ public class RecordingListingService : IListingService
         return lotId;
     }
 
+    public int MergeIntoListing(int sourceLotId, int quantity, int targetLotId) => quantity;
     public void Unlist(IEnumerable<int> lotIds) => UnlistCalls.Add(lotIds.ToList());
     public int MarkPicked(IEnumerable<int> lotIds) => 0;
     public List<PickListEntry> GetPickList(CardGame? game = null) => [];
