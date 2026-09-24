@@ -624,6 +624,57 @@ public class EbayListingServiceTests : IDisposable
         Assert.DoesNotContain(handler.Requests, r => r.Uri!.ToString().Contains("/offer"));
     }
 
+    // Runs retries instantly so the transient-retry test doesn't actually sleep.
+    private sealed class InstantRetryEbayListingService : EbayListingService
+    {
+        public InstantRetryEbayListingService(
+            Microsoft.Extensions.Options.IOptions<EbaySettings> settings, IHttpClientFactory httpClientFactory,
+            IEbayAuthService auth, IDbContextFactory<OmniCardDbContext> dbFactory, IEbaySellingSettingsService selling,
+            OmniCard.Shared.Sales.IListingService listings, Microsoft.Extensions.Logging.ILogger<EbayListingService> logger)
+            : base(settings, httpClientFactory, auth, dbFactory, selling, listings, logger) { }
+
+        protected override Task DelayBetweenPublishAttemptsAsync(int attempt) => Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task CreateListingAsync_RetriesPublish_OnTransientSystemError()
+    {
+        // eBay's "System error … please try again later" (errorId 25002) is transient — the service
+        // must retry publish rather than fail the whole listing on the first attempt.
+        var dbFactory = CreateDbFactory();
+        int lotId;
+        using (var ctx = dbFactory.CreateDbContext()) lotId = SeedLot(ctx);
+
+        var publishCalls = 0;
+        var handler = new RoutingRecordingHttpHandler((method, uri) =>
+        {
+            if (method == HttpMethod.Put && uri.Contains("/inventory_item/")) return (HttpStatusCode.OK, "{}");
+            if (method == HttpMethod.Get && uri.Contains("/offer?sku=")) return (HttpStatusCode.OK, "{}"); // no existing offer
+            if (method == HttpMethod.Post && uri.EndsWith("/offer")) return (HttpStatusCode.OK, JsonSerializer.Serialize(new { offerId = "o-1" }));
+            if (method == HttpMethod.Post && uri.Contains("/offer/o-1/publish"))
+            {
+                publishCalls++;
+                return publishCalls == 1
+                    ? (HttpStatusCode.BadRequest, JsonSerializer.Serialize(new { errors = new[] { new { errorId = 25002, longMessage = "System error. Unable to process your request. Please try again later." } } }))
+                    : (HttpStatusCode.OK, JsonSerializer.Serialize(new { listingId = "PUBLISHED-1" }));
+            }
+            return (HttpStatusCode.OK, "{}");
+        });
+
+        var svc = new InstantRetryEbayListingService(
+            Options.Create(_settings), new FakeHttpClientFactory(handler),
+            new FakeEbayAuthService("t"), dbFactory, CompleteSellingSettings(),
+            new RecordingListingService(), NullLogger<EbayListingService>.Instance);
+
+        var ok = await svc.CreateListingAsync(new CollectionCard { Id = lotId, Name = "n" },
+            new EbayListingOptions { Title = "t", Description = "d", Price = 5m, ListingType = EbayListingType.FixedPrice });
+
+        Assert.True(ok);
+        Assert.Equal(2, publishCalls); // failed once (transient), succeeded on retry
+        using var verify = dbFactory.CreateDbContext();
+        Assert.Equal("PUBLISHED-1", verify.EbayListings.First(l => l.LotId == lotId).EbayItemId);
+    }
+
     [Fact]
     public void DeletingLot_CascadesEbayListing()
     {

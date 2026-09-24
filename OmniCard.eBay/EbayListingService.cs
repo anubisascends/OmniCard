@@ -612,7 +612,29 @@ public class EbayListingService : IEbayListingService
 
     // Publishes an offer. Returns (ok, ebayItemId, error). A failure is logged; the caller decides
     // whether to recover (e.g. the relist path recreates the offer and tries again).
+    // Number of publish attempts before giving up on a transient eBay error.
+    private const int PublishAttempts = 3;
+
     private async Task<(bool ok, string ebayItemId, string? error)> TryPublishAsync(HttpClient client, string offerId)
+    {
+        (bool ok, string ebayItemId, string? error) result = default;
+        for (var attempt = 1; attempt <= PublishAttempts; attempt++)
+        {
+            result = await PublishOnceAsync(client, offerId);
+            // Success, or a real (non-transient) error → return immediately.
+            if (result.ok || !IsTransientEbayError(result.error))
+                return result;
+
+            // eBay reported a transient/system error and asked us to retry — wait briefly and try again.
+            _logger.LogInformation("Transient eBay publish error for offer {OfferId} (attempt {Attempt}/{Max}): {Error}",
+                offerId, attempt, PublishAttempts, result.error);
+            if (attempt < PublishAttempts)
+                await DelayBetweenPublishAttemptsAsync(attempt);
+        }
+        return result;
+    }
+
+    private async Task<(bool ok, string ebayItemId, string? error)> PublishOnceAsync(HttpClient client, string offerId)
     {
         var response = await client.PostAsync(
             $"{_settings.ApiBaseUrl}/sell/inventory/v1/offer/{Uri.EscapeDataString(offerId)}/publish",
@@ -630,6 +652,18 @@ public class EbayListingService : IEbayListingService
         _logger.LogWarning("Failed to publish offer {OfferId}: {Status} — {Error}", offerId, response.StatusCode, error);
         return (false, "", $"Publish failed: {DescribeEbayError(error, response.StatusCode)}");
     }
+
+    // eBay intermittently returns a transient "System error … please try again later" (errorId 25002) or
+    // "Availability not found … please try again" (25604) during publish. These are not real validation
+    // failures — eBay explicitly asks us to retry — so treat them as retryable.
+    private static bool IsTransientEbayError(string? error) =>
+        error is not null
+        && (error.Contains("try again", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("System error", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Delay between transient-publish retries. Virtual so tests can override it to run instantly.</summary>
+    protected virtual Task DelayBetweenPublishAttemptsAsync(int attempt) =>
+        Task.Delay(TimeSpan.FromSeconds(attempt)); // 1s, then 2s
 
     // Returns the offerId of an existing offer for this SKU (eBay allows one per SKU), or null.
     private async Task<string?> FindExistingOfferAsync(HttpClient client, string sku)
