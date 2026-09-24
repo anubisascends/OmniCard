@@ -266,6 +266,13 @@ public sealed record MoveCardsRequest
     public string? Section { get; init; }
 }
 
+/// <summary>Split <see cref="Quantity"/> copies off a stacked lot into a new loose sibling lot in the
+/// same location (so each copy can be placed in its own binder slot).</summary>
+public sealed record SplitStackRequest
+{
+    public int Quantity { get; init; } = 1;
+}
+
 /// <summary>Bulk-edit selected cards (lots). Each <c>SetX</c> flag opts that field into the change —
 /// only ticked fields are applied, so unticked fields keep their per-card values. Tags apply either
 /// additively (union) or as a full replacement, per <see cref="TagsMode"/>.</summary>

@@ -214,65 +214,110 @@ public sealed class ListingsController(
         if (source is null)
             return null;
 
+        // A live eBay listing has a published item id and isn't ended/sold. It may carry Status=Error
+        // if a prior operation on it failed (e.g. a transient quantity update) even though the listing
+        // is still live, so match on the item id + not-ended/sold rather than strictly Active — else a
+        // retry would try to create a duplicate and hit eBay's "identical item" error (25002).
         var match =
             (from e in ctx.EbayListings.AsNoTracking()
-             where e.Status == EbayListingStatus.Active
+             where e.EbayItemId != "" && e.Status != EbayListingStatus.Ended && e.Status != EbayListingStatus.Sold
              join l in ctx.Lots.AsNoTracking() on e.LotId equals l.Id
              where l.Id != sourceLotId && l.ProductId == source.ProductId && l.Condition == source.Condition
-             join listing in ctx.Listings.AsNoTracking() on l.Id equals listing.LotId
-             where listing.Status == ListingStatus.Listed || listing.Status == ListingStatus.Picked
-             select new { l.Id, listing.ListedPrice }).FirstOrDefault();
+             select new { l.Id, e.ListedPrice }).FirstOrDefault();
 
         return match is null ? null : (match.Id, match.ListedPrice);
     }
 
-    /// <summary>Grows an existing identical eBay listing's quantity by the requested amount. Pushes the
-    /// new total to eBay first; only on success does it move the physical copies into the listed lot, so
-    /// a failed push never leaves a half-merged local state (nor double-counts on retry).</summary>
+    /// <summary>Adds the new copies to an existing identical eBay listing as a multi-quantity listing.
+    /// The copies stay in their own lot (so each card keeps its binder slot — we do NOT merge lots): they
+    /// are listed locally on the eBay channel, and the eBay listing's quantity is bumped to the total of
+    /// all identical copies now listed. Only the <paramref name="backingLotId"/> lot owns the eBay
+    /// inventory item (its SKU); the other copies are covered by that one listing.</summary>
     private async Task<ActionResult<EbayListingResultDto>> MergeIntoEbayListingAsync(
-        CreateEbayListingRequest req, int targetLotId, decimal existingPrice)
+        CreateEbayListingRequest req, int backingLotId, decimal existingPrice)
     {
-        int currentQty, sourceQty;
+        int productId, sourceQty;
+        string? condition;
+        bool alreadyListed;
         using (var ctx = dbFactory.CreateDbContext())
         {
-            sourceQty = ctx.Lots.AsNoTracking().Where(l => l.Id == req.LotId).Select(l => l.Quantity).FirstOrDefault();
-            currentQty = ctx.Listings.AsNoTracking()
-                .Where(l => l.LotId == targetLotId && (l.Status == ListingStatus.Listed || l.Status == ListingStatus.Picked))
-                .Select(l => l.Quantity).FirstOrDefault();
+            var src = ctx.Lots.AsNoTracking().FirstOrDefault(l => l.Id == req.LotId);
+            if (src is null)
+                return NotFound(new { error = "Card lot not found." });
+            productId = src.ProductId; condition = src.Condition; sourceQty = src.Quantity;
+            alreadyListed = ctx.Listings.AsNoTracking().Any(l => l.LotId == req.LotId
+                && l.Channel == SalesChannel.Ebay
+                && (l.Status == ListingStatus.Listed || l.Status == ListingStatus.Picked));
         }
         if (req.Quantity < 1 || req.Quantity > sourceQty)
             return BadRequest(new { error = "Quantity must be between 1 and the lot's quantity." });
 
-        var target = LoadSingleCard(targetLotId);
-        if (target is null)
+        // List the copies locally (a whole-card list keeps the card in its binder slot; a partial list
+        // splits a sibling as usual). Skip if a prior attempt already listed them (idempotent retry).
+        if (!alreadyListed)
+        {
+            try
+            {
+                listings.ListForSaleSplitting(req.LotId, SalesChannel.Ebay, existingPrice, req.Quantity, req.Note);
+            }
+            catch (ArgumentOutOfRangeException ex) { return BadRequest(new { error = ex.Message }); }
+            catch (InvalidOperationException ex) { return Conflict(new { error = ex.Message }); }
+        }
+
+        var backing = LoadSingleCard(backingLotId);
+        if (backing is null)
             return NotFound(new { error = "Existing listed lot not found." });
 
-        var newQuantity = currentQty + req.Quantity;
+        // eBay quantity = every identical copy now listed on the Ebay channel.
+        var newQuantity = SumActiveEbayQuantity(productId, condition);
         var options = new EbayListingOptions
         {
-            Price = existingPrice,   // keep the live listing's price; a merge shouldn't silently reprice it
+            Price = existingPrice,   // keep the live listing's price; adding a copy shouldn't reprice it
             Quantity = newQuantity,
-            Condition = target.Condition,
-            Title = BuildEbayTitle(target),
-            Description = BuildEbayDescription(target),
+            Condition = backing.Condition,
+            Title = BuildEbayTitle(backing),
+            Description = BuildEbayDescription(backing),
             EbayCategoryId = EbayListingService.SinglesCategoryId,
         };
 
-        var ok = await ebayListings.CreateListingAsync(target, options);
-        if (!ok)
-        {
-            using var ctx = dbFactory.CreateDbContext();
-            var failed = ctx.EbayListings.AsNoTracking().FirstOrDefault(l => l.LotId == targetLotId);
-            return new EbayListingResultDto(targetLotId, false, failed?.EbayItemId,
-                failed?.ErrorMessage ?? "eBay quantity update failed. Check the server logs for details.");
-        }
-
-        // eBay accepted the new quantity — now fold the copies into the listed lot locally.
-        listings.MergeIntoListing(req.LotId, req.Quantity, targetLotId);
+        // Quantity-only change on an already-published listing: update the inventory item's quantity,
+        // not the whole offer (re-publishing here fails with errorId 25604 "Availability not found").
+        var ok = await ebayListings.UpdateQuantityAsync(backing, options);
 
         using var read = dbFactory.CreateDbContext();
-        var ebay = read.EbayListings.AsNoTracking().FirstOrDefault(l => l.LotId == targetLotId);
-        return new EbayListingResultDto(targetLotId, true, ebay?.EbayItemId, null);
+        var ebay = read.EbayListings.AsNoTracking().FirstOrDefault(l => l.LotId == backingLotId);
+        return new EbayListingResultDto(
+            backingLotId, ok, ebay?.EbayItemId,
+            ok ? null : ebay?.ErrorMessage ?? "eBay quantity update failed. Check the server logs for details.");
+    }
+
+    /// <summary>Total quantity of every lot of the same printing + condition currently listed on the
+    /// eBay channel (optionally excluding one lot) — i.e. the quantity the eBay multi-quantity listing
+    /// should show.</summary>
+    private int SumActiveEbayQuantity(int productId, string? condition, int? excludeLotId = null)
+    {
+        using var ctx = dbFactory.CreateDbContext();
+        return (from listing in ctx.Listings.AsNoTracking()
+                where listing.Channel == SalesChannel.Ebay
+                    && (listing.Status == ListingStatus.Listed || listing.Status == ListingStatus.Picked)
+                join lot in ctx.Lots.AsNoTracking() on listing.LotId equals lot.Id
+                where lot.ProductId == productId && lot.Condition == condition
+                    && (excludeLotId == null || lot.Id != excludeLotId)
+                select (int?)listing.Quantity).Sum() ?? 0;
+    }
+
+    /// <summary>The lot whose SKU backs the live eBay listing for a printing + condition (the one that
+    /// owns the eBay inventory item), plus its listed price; null if none.</summary>
+    private (int BackingLotId, decimal Price)? FindBackingEbayListing(int productId, string? condition)
+    {
+        using var ctx = dbFactory.CreateDbContext();
+        var match =
+            (from e in ctx.EbayListings.AsNoTracking()
+             where e.EbayItemId != "" && e.Status != EbayListingStatus.Ended && e.Status != EbayListingStatus.Sold
+             join l in ctx.Lots.AsNoTracking() on e.LotId equals l.Id
+             where l.ProductId == productId && l.Condition == condition
+             select new { l.Id, e.ListedPrice }).FirstOrDefault();
+        return match is null ? null : (match.Id, match.ListedPrice);
     }
 
     /// <summary>Update (revise) an already-published eBay listing: re-pushes the offer with the edited
@@ -396,21 +441,57 @@ public sealed class ListingsController(
         }
     }
 
-    /// <summary>Cancel the active listing on a lot (returns it to not-listed). If the lot has an active
-    /// eBay listing it is ended on eBay first so the item is removed from the marketplace too; the local
-    /// unlist proceeds regardless of the eBay outcome.</summary>
+    /// <summary>Cancel the active listing on a lot (returns it to not-listed). When the lot is part of an
+    /// eBay listing, the eBay side is reconciled first: if other identical copies are still listed the
+    /// multi-quantity listing is reduced; if this was the last copy the whole eBay listing is ended. The
+    /// local unlist proceeds regardless of the eBay outcome.</summary>
     [HttpDelete("lot/{lotId:int}")]
     [RequirePermission(Permissions.SalesListingsDelete)]
     public async Task<IActionResult> Unlist(int lotId)
     {
-        EbayListing? ebay;
+        int? productId = null;
+        string? condition = null;
+        bool onEbay = false;
         using (var ctx = dbFactory.CreateDbContext())
-            ebay = ctx.EbayListings.AsNoTracking().FirstOrDefault(l => l.LotId == lotId && l.Status == EbayListingStatus.Active);
+        {
+            var lot = ctx.Lots.AsNoTracking().FirstOrDefault(l => l.Id == lotId);
+            if (lot is not null) { productId = lot.ProductId; condition = lot.Condition; }
+            onEbay = ctx.Listings.AsNoTracking().Any(l => l.LotId == lotId
+                && l.Channel == SalesChannel.Ebay
+                && (l.Status == ListingStatus.Listed || l.Status == ListingStatus.Picked));
+        }
 
-        // EndListingAsync ends the eBay item and unlists locally; still unlist below to cover lots with
-        // no (or a failed) eBay listing, and so a failed eBay end doesn't leave the card listed locally.
-        if (ebay is not null)
-            await ebayListings.EndListingAsync(ebay);
+        if (onEbay && productId is int pid)
+        {
+            var backing = FindBackingEbayListing(pid, condition);
+            if (backing is not null)
+            {
+                var remaining = SumActiveEbayQuantity(pid, condition, excludeLotId: lotId);
+                if (remaining > 0)
+                {
+                    // Other identical copies remain — reduce the multi-quantity listing, don't end it.
+                    var card = LoadSingleCard(backing.Value.BackingLotId);
+                    if (card is not null)
+                        await ebayListings.UpdateQuantityAsync(card, new EbayListingOptions
+                        {
+                            Price = backing.Value.Price,
+                            Quantity = remaining,
+                            Condition = card.Condition,
+                            Title = BuildEbayTitle(card),
+                            Description = BuildEbayDescription(card),
+                            EbayCategoryId = EbayListingService.SinglesCategoryId,
+                        });
+                }
+                else
+                {
+                    // Last copy — end the eBay listing (removes the item from the marketplace).
+                    using var ctx = dbFactory.CreateDbContext();
+                    var ebay = ctx.EbayListings.AsNoTracking().FirstOrDefault(l => l.LotId == backing.Value.BackingLotId);
+                    if (ebay is not null)
+                        await ebayListings.EndListingAsync(ebay);
+                }
+            }
+        }
 
         listings.Unlist([lotId]);
         return NoContent();

@@ -8,6 +8,7 @@ using OmniCard.Shared.Collection;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Matching;
+using OmniCard.Shared.Sales;
 using OmniCard.Shared.Settings;
 
 namespace OmniCard.Web.Services;
@@ -588,6 +589,58 @@ public sealed class WebBinderCardService
             Quantity = 1,
         });
         context.SaveChanges();
+    }
+
+    /// <summary>Splits <paramref name="quantity"/> copies off a stacked lot (Quantity &gt; 1) into a new
+    /// loose sibling lot in the same container (no page/slot — it lands in the binder's Unplaced pool, so
+    /// the user can then place each copy in its own pocket). Returns the new lot id, or 0 if the lot
+    /// wasn't found. Throws if the lot is currently listed for sale (unlist first, since a listing's
+    /// quantity is tied to the lot) or the split quantity isn't between 1 and Quantity-1.</summary>
+    public int SplitStack(int lotId, int quantity)
+    {
+        if (quantity < 1)
+            throw new ArgumentOutOfRangeException(nameof(quantity), "Split quantity must be at least 1.");
+
+        using var context = _dbFactory.CreateDbContext();
+        var lot = context.Lots.Include(l => l.Product)
+            .FirstOrDefault(l => l.Id == lotId && l.Product.Category == ProductCategory.Single);
+        if (lot is null)
+            return 0;
+        if (quantity >= lot.Quantity)
+            throw new ArgumentOutOfRangeException(nameof(quantity), "Split quantity must be fewer than the stack's total.");
+
+        // A listed lot's quantity is tied to its listing (and possibly an eBay multi-quantity listing),
+        // so splitting it would desync those — require it to be unlisted first.
+        if (context.Listings.Any(l => l.LotId == lotId
+                && (l.Status == ListingStatus.Listed || l.Status == ListingStatus.Picked)))
+            throw new InvalidOperationException("Unlist this card before splitting the stack.");
+
+        lot.Quantity -= quantity;
+        var split = new InventoryLot
+        {
+            ProductId = lot.ProductId,
+            Quantity = quantity,
+            UnitCost = lot.UnitCost,
+            AcquisitionDate = lot.AcquisitionDate,
+            Source = lot.Source,
+            Condition = lot.Condition,
+            LocationId = lot.LocationId,
+            Section = lot.Section,
+            // Page/Slot left null → the new copies land loose in the same container (Unplaced pool).
+        };
+        context.Lots.Add(split);
+        context.SaveChanges();
+
+        context.Movements.Add(new InventoryMovement
+        {
+            ProductId = split.ProductId,
+            LotId = split.Id,
+            Type = MovementType.Move,
+            Quantity = quantity,
+            Note = "Split from stack",
+        });
+        context.SaveChanges();
+        return split.Id;
     }
 
     /// <summary>Relocates up to <paramref name="quantity"/> owned copies of <paramref name="lotId"/> into a

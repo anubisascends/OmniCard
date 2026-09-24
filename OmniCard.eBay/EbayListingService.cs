@@ -273,6 +273,55 @@ public class EbayListingService : IEbayListingService
         }
     }
 
+    public async Task<bool> UpdateQuantityAsync(CollectionCard card, EbayListingOptions options)
+    {
+        var token = await _ebayAuthService.GetAccessTokenAsync();
+        if (token is null)
+            return false;
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            // A published listing's quantity follows its inventory item, so re-PUT just the inventory
+            // item with the new quantity. We deliberately do NOT update/re-publish the offer here —
+            // doing so right after a quantity change fails with errorId 25604 "Availability not found".
+            var sku = $"omnicard-{card.Id}";
+            var inventoryJson = JsonSerializer.Serialize(BuildInventoryItem(card, options));
+
+            var response = await client.PutAsync(
+                $"{_settings.ApiBaseUrl}/sell/inventory/v1/inventory_item/{Uri.EscapeDataString(sku)}",
+                JsonContent(inventoryJson));
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                _logger.LogWarning("Failed to update listing quantity for lot {LotId}: {Status} — {Error}", card.Id, response.StatusCode, error);
+                await SaveListingError(card.Id, options, $"Quantity update failed: {DescribeEbayError(error, response.StatusCode)}");
+                return false;
+            }
+
+            using var ctx = _dbContextFactory.CreateDbContext();
+            var tracked = await ctx.EbayListings.FirstOrDefaultAsync(l => l.LotId == card.Id);
+            if (tracked is not null)
+            {
+                tracked.Status = EbayListingStatus.Active;
+                tracked.ErrorMessage = null;
+                tracked.LastSyncedAt = DateTime.UtcNow;
+                await ctx.SaveChangesAsync();
+            }
+
+            _logger.LogInformation("Updated eBay listing quantity to {Quantity} for lot {LotId}", options.Quantity, card.Id);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update eBay listing quantity for lot {LotId}", card.Id);
+            return false;
+        }
+    }
+
     public async Task<bool> EndListingAsync(EbayListing listing)
     {
         var token = await _ebayAuthService.GetAccessTokenAsync();

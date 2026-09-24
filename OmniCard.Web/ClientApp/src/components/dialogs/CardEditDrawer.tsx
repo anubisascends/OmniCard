@@ -7,6 +7,10 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   Drawer,
   FormControlLabel,
@@ -21,6 +25,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import SellIcon from '@mui/icons-material/Sell';
+import CallSplitIcon from '@mui/icons-material/CallSplit';
 import { Snackbar } from '@mui/material';
 import { api } from '../../api/client';
 import { useFormatters } from '../../i18n/format';
@@ -114,6 +119,24 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
 
   const [listOpen, setListOpen] = useState(false);
   const [listToast, setListToast] = useState(false);
+
+  // Split-stack: move some copies of a stacked lot into a new loose lot (e.g. to place each in its
+  // own binder slot). Only offered when the lot holds more than one copy.
+  const [splitOpen, setSplitOpen] = useState(false);
+  const [splitToast, setSplitToast] = useState(false);
+  const [splitQty, setSplitQty] = useState(1);
+  const split = useMutation({
+    mutationFn: () => api.cardSplit(card!.id, splitQty),
+    onSuccess: () => {
+      invalidate();
+      // The new loose copies land in the binder's Unplaced pool — refresh those views too.
+      qc.invalidateQueries({ queryKey: ['binder-unplaced'] });
+      qc.invalidateQueries({ queryKey: ['binder'] });
+      setSplitOpen(false);
+      setSplitToast(true);
+      onClose();
+    },
+  });
 
   return (
     <Drawer anchor="right" open={open} onClose={onClose}>
@@ -251,6 +274,22 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
               {t('dialogs.cardEdit.addToTrade')}
             </Button>
 
+            {card.quantity > 1 && (
+              <Tooltip title={card.listingStatus ? t('dialogs.cardEdit.splitListedTooltip') : ''}>
+                <span>
+                  <Button
+                    variant="outlined"
+                    startIcon={<CallSplitIcon />}
+                    onClick={() => { setSplitQty(1); setSplitOpen(true); }}
+                    disabled={!!card.listingStatus}
+                    fullWidth
+                  >
+                    {t('dialogs.cardEdit.splitStack')}
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
+
             <Stack direction="row" spacing={1} justifyContent="space-between">
               <Button
                 color="error"
@@ -289,6 +328,47 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
         message={t('dialogs.cardEdit.listToast')}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       />
+
+      <Snackbar
+        open={splitToast}
+        autoHideDuration={3000}
+        onClose={() => setSplitToast(false)}
+        message={t('dialogs.cardEdit.splitToast')}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
+
+      {card && (
+        <Dialog open={splitOpen} onClose={() => setSplitOpen(false)} fullWidth maxWidth="xs">
+          <DialogTitle>{t('dialogs.cardEdit.splitTitle', { name: card.name })}</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField
+                label={t('dialogs.cardEdit.splitQtyLabel')}
+                type="number"
+                value={splitQty}
+                onChange={(e) =>
+                  setSplitQty(Math.min(card.quantity - 1, Math.max(1, Math.floor(Number(e.target.value) || 1))))
+                }
+                slotProps={{ htmlInput: { min: 1, max: card.quantity - 1, step: 1 } }}
+                helperText={t('dialogs.cardEdit.splitHelper', {
+                  split: splitQty,
+                  remaining: card.quantity - splitQty,
+                })}
+                autoFocus
+              />
+              {split.error && (
+                <Typography color="error" variant="body2">{(split.error as Error).message}</Typography>
+              )}
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setSplitOpen(false)}>{t('common.actions.cancel')}</Button>
+            <Button variant="contained" onClick={() => split.mutate()} disabled={split.isPending}>
+              {split.isPending ? t('dialogs.cardEdit.splitting') : t('dialogs.cardEdit.splitStack')}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
 
       <ListForSaleDialog
         target={

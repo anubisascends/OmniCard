@@ -198,15 +198,64 @@ public class ListingsControllerEbayTests : IDisposable
         }));
 
         Assert.True(res.Success);
-        Assert.Equal(lotA, res.LotId);                 // folded into A's listing, not a new one
+        Assert.Equal(lotA, res.LotId);                 // reported against the backing (eBay-owning) lot
         Assert.Equal(2, _ebay.LastOptions!.Quantity);  // combined quantity pushed to eBay
         Assert.Equal(50m, _ebay.LastOptions.Price);    // kept the live listing's price, not B's 999
 
         using var check = new OmniCardDbContext(_opts);
-        Assert.Equal(2, check.Lots.Single(l => l.Id == lotA).Quantity);          // copies merged into A
-        Assert.False(check.Lots.Any(l => l.Id == lotB));                          // B fully consumed
-        Assert.Equal(2, check.Listings.Single(l => l.LotId == lotA).Quantity);   // listing quantity grew
-        Assert.Single(check.EbayListings.Where(l => l.Status == EbayListingStatus.Active)); // no duplicate eBay listing
+        // Both cards keep their own lot (and thus their binder slot) — no physical merge.
+        Assert.Equal(1, check.Lots.Single(l => l.Id == lotA).Quantity);
+        Assert.Equal(1, check.Lots.Single(l => l.Id == lotB).Quantity);
+        // B is now listed locally on the eBay channel (covered by A's listing), with no eBay item of its own.
+        var bListing = check.Listings.Single(l => l.LotId == lotB && l.Status == ListingStatus.Listed);
+        Assert.Equal(SalesChannel.Ebay, bListing.Channel);
+        Assert.DoesNotContain(check.EbayListings.ToList(), e => e.LotId == lotB);
+        Assert.Single(check.EbayListings.Where(e => e.EbayItemId != "")); // one eBay listing, not two
+    }
+
+    [Fact]
+    public async Task CreateEbay_StillMerges_WhenExistingListingWasLeftInErrorState()
+    {
+        // Reproduces the stuck state after a transient failure: the live eBay listing (lot A) was
+        // flipped to Error by a prior failed op, and the source lot (B) picked up a stale local listing
+        // from a normal-path retry. A further retry must still recognise A's live listing and merge.
+        int lotA, lotB;
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            var product = new Product
+            {
+                Game = CardGame.Mtg, Category = ProductCategory.Single, Name = "Thranduil, the Elvenking",
+                SetName = "The Hobbit", SetCode = "HOB", CollectorNumber = "246", GameCardId = "scryfall-t",
+            };
+            ctx.Products.Add(product);
+            ctx.StorageContainers.Add(new StorageContainer { Id = 7, Name = "Box 7" });
+            ctx.SaveChanges();
+            var a = new InventoryLot { ProductId = product.Id, Quantity = 1, LocationId = 7, Condition = "NM" };
+            var b = new InventoryLot { ProductId = product.Id, Quantity = 1, LocationId = 7, Condition = "NM" };
+            ctx.Lots.AddRange(a, b);
+            ctx.SaveChanges();
+            lotA = a.Id; lotB = b.Id;
+            // A: live on eBay but Status=Error (a prior op failed), plus its normal local listing.
+            ctx.Listings.Add(new Listing { LotId = lotA, Channel = SalesChannel.Ebay, Status = ListingStatus.Listed, ListedPrice = 50m, Quantity = 1, OriginalLocationId = 7, ListedAt = new DateTime(2026, 1, 1) });
+            ctx.EbayListings.Add(new EbayListing { LotId = lotA, EbayItemId = "117427856619", Status = EbayListingStatus.Error, ListedPrice = 50m, ErrorMessage = "Offer update failed", StartTime = new DateTime(2026, 1, 1) });
+            // B: stale local listing + errored (never-published) eBay row from a failed normal-path retry.
+            ctx.Listings.Add(new Listing { LotId = lotB, Channel = SalesChannel.Ebay, Status = ListingStatus.Listed, ListedPrice = 999m, Quantity = 1, OriginalLocationId = 7, ListedAt = new DateTime(2026, 1, 2) });
+            ctx.EbayListings.Add(new EbayListing { LotId = lotB, EbayItemId = "", Status = EbayListingStatus.Error, ListedPrice = 999m });
+            ctx.SaveChanges();
+        }
+
+        var res = Value(await _controller.CreateEbay(new CreateEbayListingRequest { LotId = lotB, Quantity = 1, Price = 999m, Condition = "NM" }));
+
+        Assert.True(res.Success);
+        Assert.Equal(lotA, res.LotId);
+        Assert.Equal(2, _ebay.LastOptions!.Quantity);  // quantity-only update to the live listing
+
+        using var check = new OmniCardDbContext(_opts);
+        // Both cards survive in their own lots (slots preserved); B stays listed on eBay, covered by A.
+        Assert.Equal(1, check.Lots.Single(l => l.Id == lotA).Quantity);
+        Assert.Equal(1, check.Lots.Single(l => l.Id == lotB).Quantity);
+        Assert.Contains(check.Listings.Where(l => l.LotId == lotB).ToList(),
+            l => l.Status == ListingStatus.Listed && l.Channel == SalesChannel.Ebay);
     }
 
     [Fact]
@@ -282,6 +331,59 @@ public class ListingsControllerEbayTests : IDisposable
 
         Assert.IsType<NoContentResult>(result);
         Assert.Null(_ebay.EndedLotId); // eBay end never attempted
+    }
+
+    /// <summary>Seeds two identical eBay-listed copies: lot A owns the eBay item, lot B is a linked copy
+    /// (listed on the eBay channel, covered by A's listing, no eBay item of its own).</summary>
+    private (int LotA, int LotB) SeedTwoIdenticalEbayCopies()
+    {
+        using var ctx = new OmniCardDbContext(_opts);
+        var product = new Product
+        {
+            Game = CardGame.Mtg, Category = ProductCategory.Single, Name = "Thranduil, the Elvenking",
+            SetName = "The Hobbit", SetCode = "HOB", CollectorNumber = "246", GameCardId = "scryfall-t",
+        };
+        ctx.Products.Add(product);
+        ctx.StorageContainers.Add(new StorageContainer { Id = 7, Name = "Box 7" });
+        ctx.SaveChanges();
+        var a = new InventoryLot { ProductId = product.Id, Quantity = 1, LocationId = 7, Condition = "NM" };
+        var b = new InventoryLot { ProductId = product.Id, Quantity = 1, LocationId = 7, Condition = "NM" };
+        ctx.Lots.AddRange(a, b);
+        ctx.SaveChanges();
+        ctx.Listings.Add(new Listing { LotId = a.Id, Channel = SalesChannel.Ebay, Status = ListingStatus.Listed, ListedPrice = 50m, Quantity = 1, OriginalLocationId = 7, ListedAt = new DateTime(2026, 1, 1) });
+        ctx.Listings.Add(new Listing { LotId = b.Id, Channel = SalesChannel.Ebay, Status = ListingStatus.Listed, ListedPrice = 50m, Quantity = 1, OriginalLocationId = 7, ListedAt = new DateTime(2026, 1, 2) });
+        ctx.EbayListings.Add(new EbayListing { LotId = a.Id, EbayItemId = "117427856619", Status = EbayListingStatus.Active, ListedPrice = 50m, StartTime = new DateTime(2026, 1, 1) });
+        ctx.SaveChanges();
+        return (a.Id, b.Id);
+    }
+
+    [Fact]
+    public async Task Unlist_ReducesEbayQuantity_WhenOtherIdenticalCopiesRemain()
+    {
+        var (lotA, lotB) = SeedTwoIdenticalEbayCopies();
+
+        var result = await _controller.Unlist(lotB);
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.Null(_ebay.EndedLotId);                 // listing not ended — other copies remain
+        Assert.Equal(1, _ebay.LastOptions!.Quantity);  // reduced to the remaining copy
+        using var check = new OmniCardDbContext(_opts);
+        Assert.True(check.Lots.Any(l => l.Id == lotB));  // B's lot (and slot) survives
+        Assert.DoesNotContain(check.Listings.Where(l => l.LotId == lotB).ToList(),
+            l => l.Status == ListingStatus.Listed || l.Status == ListingStatus.Picked);
+        Assert.Contains(check.Listings.Where(l => l.LotId == lotA).ToList(), l => l.Status == ListingStatus.Listed);
+    }
+
+    [Fact]
+    public async Task Unlist_EndsEbayListing_WhenRemovingTheLastCopy()
+    {
+        var (lotA, lotB) = SeedTwoIdenticalEbayCopies();
+        await _controller.Unlist(lotB); // now only A remains
+
+        var result = await _controller.Unlist(lotA);
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.Equal(lotA, _ebay.EndedLotId); // last copy → whole eBay listing ended
     }
 
     [Fact]
@@ -407,6 +509,12 @@ public class ListingsControllerEbayTests : IDisposable
         }
         public Task<bool> CreateSealedListingAsync(Product product, int lotId, EbayListingOptions options) => Task.FromResult(Result);
         public Task<bool> ReviseListingAsync(EbayListing listing, EbayListingOptions options) => Task.FromResult(Result);
+        public Task<bool> UpdateQuantityAsync(CollectionCard card, EbayListingOptions options)
+        {
+            LastCard = card;
+            LastOptions = options;
+            return Task.FromResult(Result);
+        }
         public Task<bool> EndListingAsync(EbayListing listing)
         {
             EndedLotId = listing.LotId;

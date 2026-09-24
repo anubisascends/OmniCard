@@ -332,6 +332,29 @@ public sealed class CollectionController(
         return NoContent();
     }
 
+    /// <summary>Split copies off a stacked lot (Quantity &gt; 1) into a new loose sibling lot in the same
+    /// location, so each copy can be placed in its own binder slot. Returns the new lot's id.</summary>
+    [HttpPost("{id:int}/split")]
+    [RequirePermission(Permissions.CollectionEdit)]
+    public IActionResult Split(int id, [FromBody] SplitStackRequest req)
+    {
+        try
+        {
+            var newLotId = binderCards.SplitStack(id, req.Quantity);
+            if (newLotId == 0) return NotFound(new { error = "Card lot not found." });
+            return Ok(new { lotId = newLotId });
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            // e.g. the lot is currently listed for sale.
+            return Conflict(new { error = ex.Message });
+        }
+    }
+
     /// <summary>Move one or more cards to another location. 409 if the target is a game-locked deck
     /// box and any card belongs to a different game.</summary>
     [HttpPost("move")]

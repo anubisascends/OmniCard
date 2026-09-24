@@ -590,6 +590,41 @@ public class EbayListingServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateQuantityAsync_UpdatesInventoryItemOnly_NotTheOffer()
+    {
+        // Quantity change must re-PUT only the inventory item — touching/re-publishing the offer right
+        // after a quantity change fails with errorId 25604 "Availability not found".
+        var dbFactory = CreateDbFactory();
+        int lotId;
+        using (var ctx = dbFactory.CreateDbContext())
+        {
+            lotId = SeedLot(ctx);
+            ctx.EbayListings.Add(new EbayListing { LotId = lotId, EbayItemId = "L1", Status = EbayListingStatus.Active, ListedPrice = 5m });
+            ctx.SaveChanges();
+        }
+
+        var handler = new RoutingRecordingHttpHandler((method, uri) =>
+        {
+            if (method == HttpMethod.Put && uri.Contains("/inventory_item/")) return (HttpStatusCode.OK, "{}");
+            // Any offer/publish call would be a bug — fail it so it can't accidentally "pass".
+            return (HttpStatusCode.BadRequest, JsonSerializer.Serialize(new { errors = new[] { new { errorId = 25604, message = "Availability not found" } } }));
+        });
+
+        var svc = new EbayListingService(
+            Options.Create(_settings), new FakeHttpClientFactory(handler),
+            new FakeEbayAuthService("t"), dbFactory, CompleteSellingSettings(),
+            new RecordingListingService(), NullLogger<EbayListingService>.Instance);
+
+        var card = new CollectionCard { Id = lotId, Name = "n" };
+        var ok = await svc.UpdateQuantityAsync(card, new EbayListingOptions { Price = 5m, Quantity = 2, Condition = "NM" });
+
+        Assert.True(ok);
+        var inv = Assert.Single(handler.Requests, r => r.Method == HttpMethod.Put && r.Uri!.ToString().Contains("/inventory_item/"));
+        Assert.Contains("\"quantity\":2", inv.Body!.Replace(" ", ""));
+        Assert.DoesNotContain(handler.Requests, r => r.Uri!.ToString().Contains("/offer"));
+    }
+
+    [Fact]
     public void DeletingLot_CascadesEbayListing()
     {
         var dbFactory = CreateDbFactory();
@@ -690,7 +725,6 @@ public class RecordingListingService : IListingService
         return lotId;
     }
 
-    public int MergeIntoListing(int sourceLotId, int quantity, int targetLotId) => quantity;
     public void Unlist(IEnumerable<int> lotIds) => UnlistCalls.Add(lotIds.ToList());
     public int MarkPicked(IEnumerable<int> lotIds) => 0;
     public List<PickListEntry> GetPickList(CardGame? game = null) => [];
