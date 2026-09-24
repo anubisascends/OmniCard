@@ -54,7 +54,14 @@
       "deleteConfirm": "Delete \"{{name}}\"? This removes the card from your collection.",
       "tradeToast": "Added to your trade — finalize it on the Trades page.",
       "listToast": "Listed for sale — pull it from Sales ▸ Listings.",
-      "moveTitle": "Move card to…"
+      "moveTitle": "Move card to…",
+      "splitStack": "Split stack",
+      "splitListedTooltip": "This card is listed for sale. Unlist it from Sales ▸ Listings before splitting.",
+      "splitTitle": "Split stack — {{name}}",
+      "splitQtyLabel": "Copies to move to a new stack",
+      "splitHelper": "Splits {{split}} into a separate stack, leaving {{remaining}} here. The new copies go to the binder's Unplaced pool.",
+      "splitting": "Splitting…",
+      "splitToast": "Stack split — the new copies are in the binder's Unplaced pool."
     },
     "locationPicker": {
       "defaultTitle": "Move to location",

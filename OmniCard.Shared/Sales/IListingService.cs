@@ -12,14 +12,6 @@ public interface IListingService
     /// the copies that weren't sold. Returns the listed (possibly newly split) lot id, or 0 if the lot
     /// wasn't found. Throws <see cref="ArgumentOutOfRangeException"/> if quantity is outside 1..lot quantity.</summary>
     int ListForSaleSplitting(int lotId, SalesChannel channel, decimal price, int quantity, string? note = null);
-
-    /// <summary>Merges <paramref name="quantity"/> copies from <paramref name="sourceLotId"/> into the
-    /// lot behind <paramref name="targetLotId"/>'s active listing — used when listing a card identical to
-    /// one already listed (eBay treats them as one multi-quantity listing). Moves the physical copies
-    /// (removing the source lot if fully consumed) and increases the target listing's quantity, which it
-    /// returns. Throws if the source/target lot or the target's active listing can't be found, or if
-    /// quantity is outside 1..source quantity.</summary>
-    int MergeIntoListing(int sourceLotId, int quantity, int targetLotId);
     void Unlist(IEnumerable<int> lotIds);
     int MarkPicked(IEnumerable<int> lotIds);
     List<PickListEntry> GetPickList(CardGame? game = null);

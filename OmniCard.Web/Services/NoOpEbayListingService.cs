@@ -15,6 +15,7 @@ public sealed class NoOpEbayListingService : IEbayListingService
     public Task<bool> CreateListingAsync(CollectionCard card, EbayListingOptions options) => Task.FromResult(false);
     public Task<bool> CreateSealedListingAsync(Product product, int lotId, EbayListingOptions options) => Task.FromResult(false);
     public Task<bool> ReviseListingAsync(EbayListing listing, EbayListingOptions options) => Task.FromResult(false);
+    public Task<bool> UpdateQuantityAsync(CollectionCard card, EbayListingOptions options) => Task.FromResult(false);
     public Task<bool> EndListingAsync(EbayListing listing) => Task.FromResult(false);
     public Task<List<EbaySellerPolicy>> GetSellerPoliciesAsync(string policyType) => Task.FromResult(new List<EbaySellerPolicy>());
 }

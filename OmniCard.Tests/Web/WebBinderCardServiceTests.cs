@@ -6,6 +6,7 @@ using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Matching;
+using OmniCard.Shared.Sales;
 using OmniCard.Shared.Settings;
 using OmniCard.Shared.Storage;
 using OmniCard.Collection.Inventory;
@@ -40,7 +41,7 @@ public class WebBinderCardServiceTests : IDisposable
 
     public void Dispose() => _conn.Dispose();
 
-    private int AddLot(string name, int? page = null, int? slot = null, bool foil = false, string condition = "NM")
+    private int AddLot(string name, int? page = null, int? slot = null, bool foil = false, string condition = "NM", int quantity = 1)
     {
         using var ctx = new OmniCardDbContext(_opts);
         var product = new Product
@@ -62,6 +63,7 @@ public class WebBinderCardServiceTests : IDisposable
             Page = page,
             Slot = slot,
             Condition = condition,
+            Quantity = quantity,
         };
         ctx.Lots.Add(lot);
         ctx.SaveChanges();
@@ -90,6 +92,64 @@ public class WebBinderCardServiceTests : IDisposable
 
         Assert.Single(result);
         Assert.Equal("Charizard", result[0].Name);
+    }
+
+    [Fact]
+    public void SplitStack_MovesCopiesToNewLooseLotInSameContainer()
+    {
+        var lotId = AddLot("Pikachu", page: 1, slot: 0, quantity: 3);
+
+        var newLotId = _service.SplitStack(lotId, 1);
+
+        Assert.NotEqual(0, newLotId);
+        using var ctx = new OmniCardDbContext(_opts);
+        var source = ctx.Lots.Single(l => l.Id == lotId);
+        var split = ctx.Lots.Single(l => l.Id == newLotId);
+        // Source keeps its slot and loses the split copies.
+        Assert.Equal(2, source.Quantity);
+        Assert.Equal(1, source.Page);
+        Assert.Equal(0, source.Slot);
+        // The new copies are loose (Unplaced pool) in the same binder, same identity/condition.
+        Assert.Equal(1, split.Quantity);
+        Assert.Equal(_binderId, split.LocationId);
+        Assert.Null(split.Page);
+        Assert.Null(split.Slot);
+        Assert.Equal(source.ProductId, split.ProductId);
+        Assert.Equal("NM", split.Condition);
+    }
+
+    [Fact]
+    public void SplitStack_Throws_WhenQuantityIsNotLessThanTotal()
+    {
+        var lotId = AddLot("Snorlax", quantity: 2);
+        Assert.Throws<ArgumentOutOfRangeException>(() => _service.SplitStack(lotId, 2));
+    }
+
+    [Fact]
+    public void SplitStack_ReturnsZero_WhenLotMissing()
+    {
+        Assert.Equal(0, _service.SplitStack(9999, 1));
+    }
+
+    [Fact]
+    public void SplitStack_Throws_WhenLotIsListedForSale()
+    {
+        var lotId = AddLot("Mewtwo", quantity: 2);
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            ctx.Listings.Add(new Listing
+            {
+                LotId = lotId,
+                Channel = SalesChannel.Ebay,
+                Status = ListingStatus.Listed,
+                ListedPrice = 10m,
+                Quantity = 1,
+                ListedAt = new DateTime(2026, 1, 1),
+            });
+            ctx.SaveChanges();
+        }
+
+        Assert.Throws<InvalidOperationException>(() => _service.SplitStack(lotId, 1));
     }
 
     [Fact]

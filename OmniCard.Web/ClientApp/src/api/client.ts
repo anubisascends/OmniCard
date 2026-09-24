@@ -355,6 +355,12 @@ export const api = {
     },
   ) => request<void>(`/api/collection/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   cardDelete: (id: number) => request<void>(`/api/collection/${id}`, { method: 'DELETE' }),
+  /** Split `quantity` copies off a stacked lot into a new loose lot (returns the new lot id). */
+  cardSplit: (id: number, quantity: number) =>
+    request<{ lotId: number }>(`/api/collection/${id}/split`, {
+      method: 'POST',
+      body: JSON.stringify({ quantity }),
+    }),
   cardMove: (cardIds: number[], containerId: number, section?: string) =>
     request<void>('/api/collection/move', {
       method: 'POST',
