@@ -12,12 +12,12 @@ jobs:
 
     steps:
       # fetch-depth: 0 pulls full history + tags so MinVer can derive the version from the git tag.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
@@ -31,7 +31,7 @@ jobs:
         run: dotnet test OmniCard.Tests/OmniCard.Tests.csproj --no-build -c Release --collect:"XPlat Code Coverage" --results-directory ./coverage
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-report
           path: coverage/**/coverage.cobertura.xml
