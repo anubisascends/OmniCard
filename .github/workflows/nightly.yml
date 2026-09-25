@@ -17,9 +17,17 @@ permissions:
   contents: write
 
 jobs:
-  # Decide whether a nightly build is needed: compare the current master HEAD to the commit
-  # the existing `nightly` release was built from (stored as the release's targetCommitish).
-  # Equal commit + not forced => skip everything below.
+  # Decide whether a nightly build is needed and compute its SemVer identity.
+  #
+  # Tag scheme: the nightly tag must strictly SUCCEED the latest stable release so GitHub's
+  # SemVer parser sorts it correctly on the Releases page. We take the latest stable release
+  # (vX.Y.Z, no prerelease suffix), bump the patch, and append a `-nightly.<date>.g<sha>`
+  # prerelease suffix — e.g. stable v1.0.0  ->  nightly tag v1.0.1-nightly.20260925.g1a2b3c4.
+  # (The `g` prefix on the short SHA keeps it an alphanumeric SemVer identifier, avoiding the
+  # "numeric identifier must not have leading zeros" rule when a short SHA is all digits.)
+  #
+  # Build is skipped when master's HEAD equals the commit the previous nightly was built from
+  # (stored as that release's targetCommitish) and force isn't set.
   check:
     runs-on: ubuntu-latest
     outputs:
@@ -27,26 +35,58 @@ jobs:
       sha: ${{ steps.check.outputs.sha }}
       short_sha: ${{ steps.check.outputs.short_sha }}
       date: ${{ steps.check.outputs.date }}
+      version: ${{ steps.check.outputs.version }}
+      tag: ${{ steps.check.outputs.tag }}
+      prev_nightly_tag: ${{ steps.check.outputs.prev_nightly_tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - name: Check for changes since last nightly
+      - name: Check for changes and compute version
         id: check
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          HEAD_SHA="$(git rev-parse HEAD)"
-          echo "sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
-          echo "short_sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
-          echo "date=$(date -u +'%Y%m%d')" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
 
-          # targetCommitish is the commit the last nightly was built from (we set --target to
-          # the SHA when publishing). Empty if no nightly release exists yet.
-          LAST_SHA="$(gh release view nightly --json targetCommitish -q .targetCommitish 2>/dev/null || echo '')"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          SHORT_SHA="$(git rev-parse --short HEAD)"
+          DATE="$(date -u +'%Y%m%d')"
+          echo "sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "date=$DATE" >> "$GITHUB_OUTPUT"
+
+          # --- Latest STABLE release: highest vX.Y.Z with no prerelease suffix. Default 0.0.0. ---
+          STABLE="$(gh release list --json tagName,isPrerelease,isDraft \
+            -q '.[] | select(.isPrerelease==false and .isDraft==false) | .tagName' 2>/dev/null \
+            | sed 's/^v//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1 || true)"
+          STABLE="${STABLE:-0.0.0}"
+
+          # Bump patch so the nightly baseline strictly succeeds the current stable.
+          IFS='.' read -r MAJ MIN PAT <<< "$STABLE"
+          BASE="${MAJ}.${MIN}.$((PAT + 1))"
+          VERSION="${BASE}-nightly.${DATE}.g${SHORT_SHA}"
+          TAG="v${VERSION}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          # --- Previous nightly release (rolling: at most one exists) for change-detection + cleanup. ---
+          PREV_TAG="$(gh release list --json tagName,isPrerelease,isDraft \
+            -q '.[] | select(.isPrerelease==true) | .tagName' 2>/dev/null \
+            | grep -- '-nightly' | head -n1 || true)"
+          echo "prev_nightly_tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
+
+          LAST_SHA=""
+          if [ -n "$PREV_TAG" ]; then
+            LAST_SHA="$(gh release view "$PREV_TAG" --json targetCommitish -q .targetCommitish 2>/dev/null || echo '')"
+          fi
+
+          echo "Latest stable:       v${STABLE}"
+          echo "New nightly tag:     $TAG"
           echo "Current master HEAD: $HEAD_SHA"
-          echo "Last nightly commit: ${LAST_SHA:-<none>}"
+          echo "Previous nightly:    ${PREV_TAG:-<none>} @ ${LAST_SHA:-<none>}"
 
           if [ "${{ github.event.inputs.force }}" = "true" ]; then
             echo "Forced rebuild requested."
@@ -73,25 +113,19 @@ jobs:
 
     steps:
       # fetch-depth: 0 pulls full history + tags so MinVer has context.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
-
-      # Semver-valid prerelease version, e.g. 0.0.0-nightly.20260924.abc1234, fed to MinVer.
-      - name: Compute nightly version
-        id: version
-        shell: bash
-        run: echo "VERSION=0.0.0-nightly.${{ needs.check.outputs.date }}.${{ needs.check.outputs.short_sha }}" >> "$GITHUB_OUTPUT"
+          node-version: '22'
 
       # --- Build the React SPA into OmniCard.Web/wwwroot/app so `dotnet publish` picks it up. ---
       - name: Build SPA
@@ -105,35 +139,38 @@ jobs:
         run: >
           dotnet publish OmniCard.Web/OmniCard.Web.csproj -c Release -r win-x64
           --self-contained false
-          -p:MinVerVersionOverride=${{ steps.version.outputs.VERSION }}
+          -p:MinVerVersionOverride=${{ needs.check.outputs.version }}
           -o publish-web
 
       - name: Package web release
         shell: bash
         run: |
           ROOT="$PWD"
-          ARTIFACT="OmniCard-Web-v${{ steps.version.outputs.VERSION }}-iis.zip"
+          ARTIFACT="OmniCard-Web-v${{ needs.check.outputs.version }}-iis.zip"
           rm -f publish-web/*.pdb
           cd publish-web
           7z a -tzip "$ROOT/$ARTIFACT" ./*
           cd "$ROOT"
           echo "ARTIFACT=$ARTIFACT" >> "$GITHUB_ENV"
 
-      # Roll the single `nightly` release+tag forward to the new commit: delete the old one
-      # (and its tag), then recreate it as a prerelease targeting this build's SHA. Storing
-      # the SHA as the target is what the `check` job reads next time.
+      # Roll the nightly forward: delete the previous nightly release+tag (so only the newest
+      # remains), then create a fresh prerelease under the new SemVer tag targeting this build's
+      # SHA. Storing the SHA as the target is what the `check` job reads next time.
       - name: Publish nightly release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          gh release delete nightly --cleanup-tag --yes || true
-          gh release create nightly "$ARTIFACT" \
+          PREV="${{ needs.check.outputs.prev_nightly_tag }}"
+          if [ -n "$PREV" ]; then
+            gh release delete "$PREV" --cleanup-tag --yes || true
+          fi
+          gh release create "${{ needs.check.outputs.tag }}" "$ARTIFACT" \
             --target "${{ needs.check.outputs.sha }}" \
             --prerelease \
             --title "Nightly Build (${{ needs.check.outputs.date }})" \
             --notes "Automated nightly build from master @ \`${{ needs.check.outputs.short_sha }}\`.
 
-          Version: \`${{ steps.version.outputs.VERSION }}\`
+          Version: \`${{ needs.check.outputs.version }}\`
 
           > Prerelease — built automatically whenever \`master\` moves. Not a stable release."
