@@ -26,8 +26,15 @@ public sealed class PerceptualHashService : IPerceptualHashService
 
     public ulong ComputeHash(Stream imageStream, Action<HashStageResult>? onStage = null)
     {
-        var sw = Stopwatch.StartNew();
         using var original = LoadBitmap(imageStream);
+        return ComputeHash(original, onStage);
+    }
+
+    /// <summary>pHash of an already-decoded image. Lets a caller that hashes several crops of one scan
+    /// decode it once instead of round-tripping each crop through an encoded stream.</summary>
+    public ulong ComputeHash(Bitmap original, Action<HashStageResult>? onStage = null)
+    {
+        var sw = Stopwatch.StartNew();
         onStage?.Invoke(new HashStageResult("Original", BitmapToPng(original)));
 
         // Grayscale + resize to 32x32 for DCT input
@@ -90,8 +97,14 @@ public sealed class PerceptualHashService : IPerceptualHashService
 
     public ulong ComputeEdgeHash(Stream imageStream, Action<HashStageResult>? onStage = null)
     {
-        var sw = Stopwatch.StartNew();
         using var original = LoadBitmap(imageStream);
+        return ComputeEdgeHash(original, onStage);
+    }
+
+    /// <summary>Edge hash of an already-decoded image (see <see cref="ComputeHash(Bitmap, Action{HashStageResult}?)"/>).</summary>
+    public ulong ComputeEdgeHash(Bitmap original, Action<HashStageResult>? onStage = null)
+    {
+        var sw = Stopwatch.StartNew();
         onStage?.Invoke(new HashStageResult("Original", BitmapToPng(original)));
 
         // Grayscale + resize to 32x32, then gradient magnitude — captures structure
@@ -135,6 +148,13 @@ public sealed class PerceptualHashService : IPerceptualHashService
     public ulong[] ComputeArtHash(Stream imageStream, (double X, double Y, double W, double H)[] cropRegions, Action<HashStageResult>? onStage = null)
     {
         using var original = new Bitmap(imageStream);
+        return ComputeArtHash(original, cropRegions, onStage);
+    }
+
+    /// <summary>Art-region hashes of an already-decoded image. Each crop is hashed in memory — PNG is
+    /// lossless, so this yields the same hashes the old encode-then-decode round trip did, far faster.</summary>
+    public ulong[] ComputeArtHash(Bitmap original, (double X, double Y, double W, double H)[] cropRegions, Action<HashStageResult>? onStage = null)
+    {
         var hashes = new ulong[cropRegions.Length];
 
         for (int i = 0; i < cropRegions.Length; i++)
@@ -152,11 +172,7 @@ public sealed class PerceptualHashService : IPerceptualHashService
             }
 
             using var cropped = original.Clone(new Rectangle(x, y, w, h), PixelFormat.Format32bppArgb);
-            using var croppedStream = new MemoryStream();
-            cropped.Save(croppedStream, ImageFormat.Png);
-            croppedStream.Position = 0;
-
-            hashes[i] = ComputeHash(croppedStream, onStage is not null ? stage => onStage(new HashStageResult($"Art[{i}] {stage.StageName}", stage.ImageData)) : null);
+            hashes[i] = ComputeHash(cropped, onStage is not null ? stage => onStage(new HashStageResult($"Art[{i}] {stage.StageName}", stage.ImageData)) : null);
         }
 
         return hashes;
