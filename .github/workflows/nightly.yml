@@ -1,0 +1,139 @@
+name: Nightly
+
+on:
+  # Nightly at 07:00 UTC. Runs every night but only actually builds when master has
+  # moved since the last nightly (see the `check` job) — no-op nights are cheap.
+  schedule:
+    - cron: '0 7 * * *'
+  # Manual trigger; set force=true to rebuild the nightly even if master hasn't changed.
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Rebuild the nightly even if master has not changed'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  # Decide whether a nightly build is needed: compare the current master HEAD to the commit
+  # the existing `nightly` release was built from (stored as the release's targetCommitish).
+  # Equal commit + not forced => skip everything below.
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      sha: ${{ steps.check.outputs.sha }}
+      short_sha: ${{ steps.check.outputs.short_sha }}
+      date: ${{ steps.check.outputs.date }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for changes since last nightly
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HEAD_SHA="$(git rev-parse HEAD)"
+          echo "sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "date=$(date -u +'%Y%m%d')" >> "$GITHUB_OUTPUT"
+
+          # targetCommitish is the commit the last nightly was built from (we set --target to
+          # the SHA when publishing). Empty if no nightly release exists yet.
+          LAST_SHA="$(gh release view nightly --json targetCommitish -q .targetCommitish 2>/dev/null || echo '')"
+          echo "Current master HEAD: $HEAD_SHA"
+          echo "Last nightly commit: ${LAST_SHA:-<none>}"
+
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            echo "Forced rebuild requested."
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          elif [ "$HEAD_SHA" = "$LAST_SHA" ]; then
+            echo "master unchanged since last nightly — skipping build."
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "master has new commits — building a new nightly."
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Re-run the full CI build+test suite before publishing, so a nightly can never ship
+  # from a broken build (same gate the tagged Release workflow uses).
+  ci:
+    needs: check
+    if: needs.check.outputs.should_build == 'true'
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: [check, ci]
+    if: needs.check.outputs.should_build == 'true'
+    runs-on: windows-latest
+
+    steps:
+      # fetch-depth: 0 pulls full history + tags so MinVer has context.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Semver-valid prerelease version, e.g. 0.0.0-nightly.20260924.abc1234, fed to MinVer.
+      - name: Compute nightly version
+        id: version
+        shell: bash
+        run: echo "VERSION=0.0.0-nightly.${{ needs.check.outputs.date }}.${{ needs.check.outputs.short_sha }}" >> "$GITHUB_OUTPUT"
+
+      # --- Build the React SPA into OmniCard.Web/wwwroot/app so `dotnet publish` picks it up. ---
+      - name: Build SPA
+        working-directory: OmniCard.Web/ClientApp
+        run: |
+          npm ci
+          npm run build
+
+      # --- Web app: framework-dependent package for IIS (same flags as the tagged Release). ---
+      - name: Publish web app
+        run: >
+          dotnet publish OmniCard.Web/OmniCard.Web.csproj -c Release -r win-x64
+          --self-contained false
+          -p:MinVerVersionOverride=${{ steps.version.outputs.VERSION }}
+          -o publish-web
+
+      - name: Package web release
+        shell: bash
+        run: |
+          ROOT="$PWD"
+          ARTIFACT="OmniCard-Web-v${{ steps.version.outputs.VERSION }}-iis.zip"
+          rm -f publish-web/*.pdb
+          cd publish-web
+          7z a -tzip "$ROOT/$ARTIFACT" ./*
+          cd "$ROOT"
+          echo "ARTIFACT=$ARTIFACT" >> "$GITHUB_ENV"
+
+      # Roll the single `nightly` release+tag forward to the new commit: delete the old one
+      # (and its tag), then recreate it as a prerelease targeting this build's SHA. Storing
+      # the SHA as the target is what the `check` job reads next time.
+      - name: Publish nightly release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release delete nightly --cleanup-tag --yes || true
+          gh release create nightly "$ARTIFACT" \
+            --target "${{ needs.check.outputs.sha }}" \
+            --prerelease \
+            --title "Nightly Build (${{ needs.check.outputs.date }})" \
+            --notes "Automated nightly build from master @ \`${{ needs.check.outputs.short_sha }}\`.
+
+          Version: \`${{ steps.version.outputs.VERSION }}\`
+
+          > Prerelease — built automatically whenever \`master\` moves. Not a stable release."
