@@ -3,6 +3,7 @@ using OmniCard.Shared.Cards;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Matching;
 using OmniCard.CardMatching.Games;
+using OmniCard.Imaging;
 
 namespace OmniCard.Web.Services;
 
@@ -17,7 +18,10 @@ namespace OmniCard.Web.Services;
 /// </summary>
 public sealed class WebScanMatchingService
 {
-    private readonly IPerceptualHashService _hashService;
+    // The concrete service (not IPerceptualHashService) for its Bitmap overloads: a scan is decoded
+    // once and every hash is taken from that bitmap, instead of re-decoding the upload per hash and
+    // PNG round-tripping each crop (which was ~75% of per-card matching time).
+    private readonly PerceptualHashService _hashService;
     private readonly IOcrMatchingService _ocrService;
     private readonly Dictionary<CardGame, ICardGameService> _gameServices;
     private readonly ILogger<WebScanMatchingService> _logger;
@@ -46,7 +50,7 @@ public sealed class WebScanMatchingService
         => ocrConfidence >= OcrSetOverrideConfidence ? null : setFilter;
 
     public WebScanMatchingService(
-        IPerceptualHashService hashService,
+        PerceptualHashService hashService,
         IOcrMatchingService ocrService,
         IEnumerable<ICardGameService> gameServices,
         ILogger<WebScanMatchingService> logger)
@@ -81,20 +85,27 @@ public sealed class WebScanMatchingService
         //    Measured on a real 294-scan Yu-Gi-Oh! batch: a ~2% edge trim dropped distance-to-correct
         //    from ~12 (right at the cliff) to ~3. Trying the trims and keeping the best match fixes this
         //    without hurting borderless sources — the 0% variant stays a candidate and wins there.
-        var hashCandidates = ComputeHashCandidates(imageBytes);
+        //    Steps 1-3 all hash the same decoded bitmap (decode once, crop in memory).
+        List<(double Frac, ulong Hash)> hashCandidates;
+        ulong[]? artHashes;
+        ulong? edgeHash;
+        using (var decoded = new System.Drawing.Bitmap(new MemoryStream(imageBytes)))
+        {
+            hashCandidates = ComputeHashCandidates(decoded);
+
+            // 2. Art-region hashes (MTG only — its art crop is stable enough to disambiguate reprints).
+            //    Computed from the full image (the art crop regions are relative to the whole card).
+            artHashes = game == CardGame.Mtg
+                ? _hashService.ComputeArtHash(decoded, ScryfallService.ArtCropRegions)
+                : null;
+
+            // 3. Foil edge hash — a holographic color shift corrupts the luminance pHash, so foils of the
+            //    color-shifting games get a color-robust edge hash for matching to fall back on.
+            edgeHash = isFoil && IsEdgeHashGame(game)
+                ? _hashService.ComputeEdgeHash(decoded)
+                : null;
+        }
         ulong hash = hashCandidates[0].Hash; // starts at the full-image hash; set to the winning candidate below
-
-        // 2. Art-region hashes (MTG only — its art crop is stable enough to disambiguate reprints).
-        //    Computed from the full image (the art crop regions are relative to the whole card).
-        ulong[]? artHashes = game == CardGame.Mtg
-            ? _hashService.ComputeArtHash(new MemoryStream(imageBytes), ScryfallService.ArtCropRegions)
-            : null;
-
-        // 3. Foil edge hash — a holographic color shift corrupts the luminance pHash, so foils of the
-        //    color-shifting games get a color-robust edge hash for matching to fall back on.
-        ulong? edgeHash = isFoil && IsEdgeHashGame(game)
-            ? _hashService.ComputeEdgeHash(new MemoryStream(imageBytes))
-            : null;
 
         // 4. MTG set-symbol detection — a soft set preference to break ties among reprints.
         IReadOnlySet<string>? detectedSets = null;
@@ -479,26 +490,23 @@ public sealed class WebScanMatchingService
     // real batch, with 4% covering thicker borders. Keeping 0 means borderless sources never regress.
     private static readonly double[] CropFractions = [0.0, 0.02, 0.04];
 
-    /// <summary>Perceptual hashes of the scan at each <see cref="CropFractions"/> border trim. The
-    /// image is decoded once; each trim is cropped in memory. The first entry is always the full image.</summary>
-    private List<(double Frac, ulong Hash)> ComputeHashCandidates(byte[] imageBytes)
+    /// <summary>Perceptual hashes of the scan at each <see cref="CropFractions"/> border trim, all taken
+    /// from the one decoded bitmap (each trim cropped in memory). The first entry is always the full image.</summary>
+    private List<(double Frac, ulong Hash)> ComputeHashCandidates(System.Drawing.Bitmap src)
     {
         var result = new List<(double, ulong)>();
-        using var src = new System.Drawing.Bitmap(new MemoryStream(imageBytes));
         foreach (var f in CropFractions)
         {
             if (f == 0)
             {
-                result.Add((0, _hashService.ComputeHash(new MemoryStream(imageBytes))));
+                result.Add((0, _hashService.ComputeHash(src)));
                 continue;
             }
             int x = (int)(src.Width * f), y = (int)(src.Height * f);
             int w = src.Width - 2 * x, h = src.Height - 2 * y;
             if (w < 10 || h < 10) continue;
             using var crop = src.Clone(new System.Drawing.Rectangle(x, y, w, h), src.PixelFormat);
-            using var ms = new MemoryStream();
-            crop.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-            result.Add((f, _hashService.ComputeHash(new MemoryStream(ms.ToArray()))));
+            result.Add((f, _hashService.ComputeHash(crop)));
         }
         return result;
     }

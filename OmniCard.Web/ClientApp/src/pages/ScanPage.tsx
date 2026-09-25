@@ -1221,8 +1221,9 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     // Match with BOUNDED concurrency. Firing an entire batch at once overwhelmed the server
     // (each match is heavy CPU: hashing + OCR + rotation retries) and raced the game services'
     // shared read context — the source of the batch "internal server error"s. A small worker
-    // pool keeps a few matches in flight without stampeding it.
-    const MAX_IN_FLIGHT = 4;
+    // pool keeps a few matches in flight without stampeding it. 8 measured best on a 12-thread
+    // server (~42→31 ms/card vs 4 in flight); beyond that GDI+ imaging contention flattens the gain.
+    const MAX_IN_FLIGHT = 8;
     const queue = [...staged];
     const setCodes = artSets.map((s) => s.setCode);
     async function worker() {

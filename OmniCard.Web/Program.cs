@@ -90,7 +90,9 @@ builder.Services.AddDbContextFactory<FinalFantasyDbContext>(options =>
 
 // Infrastructure services needed by game services
 builder.Services.AddSingleton<IDataPathService>(new WebDataPathService(dataDir));
-builder.Services.AddSingleton<IPerceptualHashService, OmniCard.Imaging.PerceptualHashService>();
+// One instance under both keys: WebScanMatchingService takes the concrete type for its Bitmap overloads.
+builder.Services.AddSingleton<OmniCard.Imaging.PerceptualHashService>();
+builder.Services.AddSingleton<IPerceptualHashService>(sp => sp.GetRequiredService<OmniCard.Imaging.PerceptualHashService>());
 builder.Services.AddSingleton<IOcrMatchingService, OmniCard.Imaging.OcrMatchingService>();
 builder.Services.AddSingleton<SetSymbolCache>();
 builder.Services.Configure<ScryfallSettings>(builder.Configuration.GetSection("Scryfall"));
