@@ -8,7 +8,6 @@ import {
   Box,
   Chip,
   LinearProgress,
-  Popover,
   Stack,
   TextField,
   Typography,
@@ -17,20 +16,13 @@ import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { api } from '../api/client';
 import type { SetChecklistCardDto, SetInfoDto } from '../api/types';
 import { useGame } from '../context/GameContext';
-import { CardImage } from '../components/CardImage';
+import { CardHoverPreview, type CardHover } from '../components/CardHoverPreview';
 import { useFormatters } from '../i18n/format';
-import {
-  usePreviewScale,
-  PREVIEW_BASE_WIDTH,
-  PREVIEW_BASE_MAX_HEIGHT,
-} from '../lib/previewScale';
-
-type HoverState = { el: HTMLElement; url: string; foil: boolean };
 
 const buildColumns = (
   t: TFunction,
   money: (n?: number | null) => string,
-  setHover: (h: HoverState | null) => void,
+  setHover: (h: CardHover | null) => void,
 ): GridColDef<SetChecklistCardDto>[] => [
   { field: 'collectorNumber', headerName: t('sets.columns.no'), width: 80 },
   {
@@ -85,8 +77,7 @@ export function SetsPage() {
   const fmt = useFormatters();
   const { game } = useGame();
   const [set, setSet] = useState<SetInfoDto | null>(null);
-  const [hover, setHover] = useState<HoverState | null>(null);
-  const previewScale = usePreviewScale();
+  const [hover, setHover] = useState<CardHover | null>(null);
   const columns = buildColumns(t, (n) => (n == null ? '' : fmt.money(n)), setHover);
 
   const setsQuery = useQuery({
@@ -160,29 +151,7 @@ export function SetsPage() {
       )}
 
       {/* Hover artwork preview — mirrors the collection list */}
-      <Popover
-        open={!!hover}
-        anchorEl={hover?.el}
-        onClose={() => setHover(null)}
-        anchorOrigin={{ vertical: 'center', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'center', horizontal: 'left' }}
-        disableRestoreFocus
-        sx={{ pointerEvents: 'none' }}
-        slotProps={{ paper: { sx: { p: 0.5 } } }}
-      >
-        {hover && (
-          <CardImage
-            src={hover.url}
-            foil={hover.foil}
-            sx={{
-              width: (PREVIEW_BASE_WIDTH * previewScale) / 100,
-              maxHeight: (PREVIEW_BASE_MAX_HEIGHT * previewScale) / 100,
-              objectFit: 'contain',
-              display: 'block',
-            }}
-          />
-        )}
-      </Popover>
+      <CardHoverPreview hover={hover} onClose={() => setHover(null)} />
     </Stack>
   );
 }

@@ -12,7 +12,6 @@ import {
   FormControlLabel,
   Menu,
   MenuItem,
-  Popover,
   Stack,
   Switch,
   TextField,
@@ -34,15 +33,10 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import SellIcon from '@mui/icons-material/Sell';
 import { api } from '../api/client';
 import type { CardDto } from '../api/types';
-import { CardImage } from './CardImage';
+import { CardHoverPreview, type CardHover } from './CardHoverPreview';
 import { CardEditDrawer } from './dialogs/CardEditDrawer';
 import { LocationPickerDialog } from './dialogs/LocationPickerDialog';
 import { BulkEditCardsDialog } from './dialogs/BulkEditCardsDialog';
-import {
-  usePreviewScale,
-  PREVIEW_BASE_WIDTH,
-  PREVIEW_BASE_MAX_HEIGHT,
-} from '../lib/previewScale';
 import { useFormatters } from '../i18n/format';
 
 const STACK_KEY = 'omnicard.stackDuplicates';
@@ -78,8 +72,7 @@ export function CardTable({
   const [selection, setSelection] = useState<GridRowSelectionModel>([]);
   const [detailCardId, setDetailCardId] = useState<number | null>(null);
   const [moveOpen, setMoveOpen] = useState(false);
-  const [hover, setHover] = useState<{ el: HTMLElement; url: string; foil: boolean } | null>(null);
-  const previewScale = usePreviewScale();
+  const [hover, setHover] = useState<CardHover | null>(null);
 
   // Reset to the first page whenever the scope/mode changes so we never sit on an out-of-range page.
   useEffect(() => {
@@ -338,29 +331,7 @@ export function CardTable({
       </Box>
 
       {/* Hover artwork preview */}
-      <Popover
-        open={!!hover}
-        anchorEl={hover?.el}
-        onClose={() => setHover(null)}
-        anchorOrigin={{ vertical: 'center', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'center', horizontal: 'left' }}
-        disableRestoreFocus
-        sx={{ pointerEvents: 'none' }}
-        slotProps={{ paper: { sx: { p: 0.5 } } }}
-      >
-        {hover && (
-          <CardImage
-            src={hover.url}
-            foil={hover.foil}
-            sx={{
-              width: (PREVIEW_BASE_WIDTH * previewScale) / 100,
-              maxHeight: (PREVIEW_BASE_MAX_HEIGHT * previewScale) / 100,
-              objectFit: 'contain',
-              display: 'block',
-            }}
-          />
-        )}
-      </Popover>
+      <CardHoverPreview hover={hover} onClose={() => setHover(null)} />
 
       <CardEditDrawer cardId={detailCardId} onClose={() => setDetailCardId(null)} />
 

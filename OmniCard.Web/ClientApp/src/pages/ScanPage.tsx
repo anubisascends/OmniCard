@@ -50,6 +50,7 @@ import type {
   ScanMatchDto,
   ScanSearchResultDto,
 } from '../api/types';
+import { CardHoverPreview, type CardHover } from '../components/CardHoverPreview';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
@@ -254,6 +255,8 @@ function CorrectionSearch({
   const { t } = useTranslation();
   const [q, setQ] = useState('');
   const [cn, setCn] = useState('');
+  // Hovering a result's thumbnail pops the enlarged art (same preview as the location grids).
+  const [hover, setHover] = useState<CardHover | null>(null);
   // Debounce so fast typing doesn't fan out overlapping requests (which previously raced on the
   // server's shared DbContext and returned spurious "No matches").
   const [dq, setDq] = useState('');
@@ -320,6 +323,8 @@ function CorrectionSearch({
                         component="img"
                         src={r.imageUri}
                         alt=""
+                        onMouseEnter={(e) => setHover({ el: e.currentTarget, url: r.imageUri!, foil: false })}
+                        onMouseLeave={() => setHover(null)}
                         sx={{ width: 24, height: 34, objectFit: 'contain', borderRadius: 0.5 }}
                       />
                     ) : undefined
@@ -335,6 +340,7 @@ function CorrectionSearch({
           )}
         </>
       )}
+      <CardHoverPreview hover={hover} onClose={() => setHover(null)} />
     </Box>
   );
 }
