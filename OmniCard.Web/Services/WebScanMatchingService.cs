@@ -240,7 +240,11 @@ public sealed class WebScanMatchingService
                 default: // MTG
                     {
                         // Ground truth: bottom-left (set, collector) uniquely identifies a Scryfall printing.
-                        var (ocrSet, ocrNumber, conf) = await _ocrService.DetectMtgSetAndNumberAsync(imageBytes);
+                        // The OCR passes can disagree on a digit; the alternates ride along so the catalog
+                        // lookup can let the image pick between them (ScryfallService Phase 0).
+                        var (reads, conf) = await _ocrService.DetectMtgSetAndNumberCandidatesAsync(imageBytes);
+                        var ocrSet = reads.Count > 0 ? reads[0].SetCode : null;
+                        var ocrNumber = reads.Count > 0 ? reads[0].CollectorNumber : null;
 
                         // The List (plst) reprint: the glyph tells us this is really a plst printing (a
                         // distinct, cheaper card) even though it prints the *original* set's code/collector.
@@ -264,7 +268,7 @@ public sealed class WebScanMatchingService
 
                         if (ocrSet is not null && ocrNumber is not null && conf >= 0.5)
                         {
-                            var gt = new OcrMatchResult { SetCode = ocrSet, CollectorNumber = ocrNumber, CollectorNumberConfidence = conf };
+                            var gt = new OcrMatchResult { SetCode = ocrSet, CollectorNumber = ocrNumber, CollectorNumberConfidence = conf, AlternateSetNumbers = reads.Skip(1).ToList() };
                             // A very confident printed (set, collector) read overrides the set filter (see
                             // EffectiveFilter); a weaker read stays bound to the user's chosen sets.
                             var gtMatch = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, gt, EffectiveFilter(setFilter, conf), detectedSets, scanEdgeHash: edgeHash));

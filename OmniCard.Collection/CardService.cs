@@ -373,7 +373,9 @@ public sealed class CardService : ICardService
                         // pHash guess (see ScryfallService Phase 0). Only when it doesn't resolve do we
                         // fall back to name + set-symbol OCR (which merely nudges the pHash match).
                         bool groundTruthResolved = false;
-                        var (ocrSet, ocrNumber, setNumConf) = await _ocrService.DetectMtgSetAndNumberAsync(rawBytes);
+                        var (setNumReads, setNumConf) = await _ocrService.DetectMtgSetAndNumberCandidatesAsync(rawBytes);
+                        var ocrSet = setNumReads.Count > 0 ? setNumReads[0].SetCode : null;
+                        var ocrNumber = setNumReads.Count > 0 ? setNumReads[0].CollectorNumber : null;
                         if (ocrSet is not null && ocrNumber is not null && setNumConf >= 0.5)
                         {
                             var gtResult = new OcrMatchResult
@@ -381,6 +383,7 @@ public sealed class CardService : ICardService
                                 SetCode = ocrSet,
                                 CollectorNumber = ocrNumber,
                                 CollectorNumberConfidence = setNumConf,
+                                AlternateSetNumbers = setNumReads.Skip(1).ToList(),
                             };
                             _logger.LogInformation("MTG set/collector detected: {Set} #{Number} (confidence {Conf:F2})", ocrSet, ocrNumber, setNumConf);
                             var (gtMatch, gtGame) = FindBestMatch(capturedHash, scannedCard.ArtHashes, gtResult, capturedSetFilter, null, scannedCard.ScanEdgeHash);
