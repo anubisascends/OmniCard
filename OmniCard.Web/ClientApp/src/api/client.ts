@@ -6,6 +6,7 @@ import type {
   CardDto,
   ComponentDto,
   CsvImportResultDto,
+  ImportUrlResultDto,
   AddListItemRequest,
   CardListDto,
   CardListItemDto,
@@ -582,6 +583,9 @@ export const api = {
     }
     return (await res.json()) as CsvImportResultDto;
   },
+  /** Import a Moxfield/Archidekt deck URL straight into a location as owned lots. */
+  importUrl: (body: { url: string; game: string; containerId: number; condition: string; skipDuplicates: boolean }) =>
+    request<ImportUrlResultDto>('/api/import/url', { method: 'POST', body: JSON.stringify(body) }),
   decklistCheck: (body: { url?: string; text?: string; game: string }) =>
     request<DecklistCheckDto>('/api/decklist/check', { method: 'POST', body: JSON.stringify(body) }),
 

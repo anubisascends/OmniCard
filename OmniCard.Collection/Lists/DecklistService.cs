@@ -213,8 +213,12 @@ public sealed partial class DecklistService(
                 var name = card.GetProperty("name").GetString() ?? "";
                 var setCode = card.GetProperty("set").GetString()?.ToUpperInvariant();
                 var cn = card.GetProperty("cn").GetString();
+                // "finish" is nonFoil | foil | etched; older payloads only carry the isFoil flag.
+                var finish = cardObj.TryGetProperty("finish", out var f) ? NormalizeFinish(f.GetString())
+                    : cardObj.TryGetProperty("isFoil", out var isFoil) && isFoil.ValueKind == JsonValueKind.True ? "Foil"
+                    : null;
 
-                entries.Add(new DecklistEntry(qty, name, setCode, cn));
+                entries.Add(new DecklistEntry(qty, name, setCode, cn, finish));
             }
         }
 
@@ -230,9 +234,27 @@ public sealed partial class DecklistService(
         var response = await client.GetAsync($"https://archidekt.com/api/decks/{deckId}/");
         response.EnsureSuccessStatusCode();
 
-        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        return ParseArchidektJson(await response.Content.ReadAsStringAsync());
+    }
+
+    /// <summary>Parse Archidekt's deck JSON into decklist entries. Cards whose categories are all marked
+    /// <c>includedInDeck: false</c> (Maybeboard and similar) are skipped, matching the Moxfield parser.</summary>
+    internal static (string DeckName, List<DecklistEntry> Entries) ParseArchidektJson(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
         var deckName = root.GetProperty("name").GetString() ?? "Archidekt Deck";
+
+        var excludedCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (root.TryGetProperty("categories", out var cats) && cats.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var cat in cats.EnumerateArray())
+            {
+                if (cat.TryGetProperty("includedInDeck", out var inc) && inc.ValueKind == JsonValueKind.False
+                    && cat.TryGetProperty("name", out var catName) && catName.GetString() is { } n)
+                    excludedCategories.Add(n);
+            }
+        }
 
         var entries = new List<DecklistEntry>();
 
@@ -240,6 +262,12 @@ public sealed partial class DecklistService(
         {
             foreach (var cardObj in cards.EnumerateArray())
             {
+                if (excludedCategories.Count > 0
+                    && cardObj.TryGetProperty("categories", out var cardCats) && cardCats.ValueKind == JsonValueKind.Array
+                    && cardCats.GetArrayLength() > 0
+                    && cardCats.EnumerateArray().All(c => excludedCategories.Contains(c.GetString() ?? "")))
+                    continue;
+
                 var qty = cardObj.GetProperty("quantity").GetInt32();
                 var card = cardObj.GetProperty("card");
                 var edition = card.GetProperty("edition");
@@ -248,13 +276,24 @@ public sealed partial class DecklistService(
                 var setCode = edition.GetProperty("editioncode").GetString()?.ToUpperInvariant();
                 var cn = card.TryGetProperty("collectorNumber", out var cnProp)
                     ? cnProp.GetString() : null;
+                // "modifier" is Normal | Foil | Etched.
+                var finish = cardObj.TryGetProperty("modifier", out var mod) ? NormalizeFinish(mod.GetString()) : null;
 
-                entries.Add(new DecklistEntry(qty, name, setCode, cn));
+                entries.Add(new DecklistEntry(qty, name, setCode, cn, finish));
             }
         }
 
         return (deckName, entries);
     }
+
+    /// <summary>Maps a site's finish token onto the app's MTG finish vocabulary (<c>FoilTypes</c>);
+    /// null for non-foil.</summary>
+    private static string? NormalizeFinish(string? raw) => raw?.Trim().ToLowerInvariant() switch
+    {
+        "foil" => "Foil",
+        "etched" => "Etched",
+        _ => null,
+    };
 
     public DecklistCheckResult CheckAgainstCollection(string deckName, string deckSource, List<DecklistEntry> entries, CardGame game)
     {

@@ -193,6 +193,21 @@ Until configured, `GET /api/ebay/status` reports what's missing and all listing 
 (so order status changes keep working without a live connection). Tokens are stored encrypted in
 `<DataDirectory>/web-credentials.dat`.
 
+## Deck URL import (Moxfield / Archidekt)
+
+**Import / Export → Import from Moxfield / Archidekt** takes a *public* deck URL
+(`moxfield.com/decks/{id}` or `archidekt.com/decks/{id}`, MTG only) and adds every card to the chosen
+location as owned lots in the chosen condition. Each line keeps its exact set + collector printing and its
+foil / etched finish. A printing that isn't in the catalog falls back to the cheapest printing of the name,
+and the result lists those cards along with any that couldn't be found. Moxfield maybeboards and Archidekt
+categories marked "not in deck" are skipped. "Skip duplicates" skips printings you already own in that
+condition.
+
+- API: `POST /api/import/url` (`ImportRun` permission).
+- Moxfield's API sits behind Cloudflare, which blocks .NET's `HttpClient`, so the server fetches it by
+  running Windows' built-in **`curl.exe`**. It must be on the server's `PATH` (it is by default on Windows
+  10 1803+ / Server 2019+). The server needs outbound HTTPS to `api2.moxfield.com` and `archidekt.com`.
+
 ## Order CSV import
 
 **Sales → Orders → Import CSV** creates orders from a CSV using a reusable column-mapping **template**.
