@@ -413,6 +413,15 @@ export interface CsvImportResultDto {
   warnings: string[];
 }
 
+export interface ImportUrlResultDto {
+  deckName: string;
+  imported: number;
+  skipped: number;
+  totalCards: number;
+  unresolvedNames: string[];
+  substitutedNames: string[];
+}
+
 export interface SetInfoDto {
   setCode: string;
   setName: string;

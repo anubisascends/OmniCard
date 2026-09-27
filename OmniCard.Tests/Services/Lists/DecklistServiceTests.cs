@@ -81,5 +81,60 @@ public class DecklistServiceTests
         Assert.Equal("FIN", island.SetCode);        // upper-cased
         Assert.Equal("299", island.CollectorNumber);
         Assert.Contains(entries, e => e.CardName == "Some Commander");
+        Assert.All(entries, e => Assert.Null(e.Finish));   // no finish field → non-foil
+    }
+
+    [Fact]
+    public void ParseMoxfieldJson_ReadsFinish()
+    {
+        const string json = """
+            {
+              "name": "D",
+              "mainboard": {
+                "A": { "quantity": 1, "finish": "foil", "isFoil": true, "card": { "name": "A", "set": "x", "cn": "1" } },
+                "B": { "quantity": 1, "finish": "etched", "isFoil": false, "card": { "name": "B", "set": "x", "cn": "2" } },
+                "C": { "quantity": 1, "finish": "nonFoil", "isFoil": false, "card": { "name": "C", "set": "x", "cn": "3" } }
+              }
+            }
+            """;
+
+        var (_, entries) = DecklistService.ParseMoxfieldJson(json);
+
+        Assert.Equal("Foil", entries.Single(e => e.CardName == "A").Finish);
+        Assert.Equal("Etched", entries.Single(e => e.CardName == "B").Finish);
+        Assert.Null(entries.Single(e => e.CardName == "C").Finish);
+    }
+
+    // Shape mirrors Archidekt's real /api/decks/{id}/ response (verified live): top-level categories carry
+    // includedInDeck; each card has quantity, modifier, categories and a nested card/edition/oracleCard.
+    [Fact]
+    public void ParseArchidektJson_ReadsFinish_AndSkipsOutOfDeckCategories()
+    {
+        const string json = """
+            {
+              "name": "Arch Deck",
+              "categories": [
+                { "name": "Commander", "includedInDeck": true },
+                { "name": "Maybeboard", "includedInDeck": false }
+              ],
+              "cards": [
+                { "quantity": 1, "modifier": "Foil", "categories": ["Commander"],
+                  "card": { "collectorNumber": "277", "edition": { "editioncode": "fra" }, "oracleCard": { "name": "Vraska" } } },
+                { "quantity": 2, "modifier": "Normal", "categories": [],
+                  "card": { "collectorNumber": "10", "edition": { "editioncode": "m10" }, "oracleCard": { "name": "Uncategorized" } } },
+                { "quantity": 1, "modifier": "Normal", "categories": ["Maybeboard"],
+                  "card": { "collectorNumber": "5", "edition": { "editioncode": "m10" }, "oracleCard": { "name": "Maybe" } } }
+              ]
+            }
+            """;
+
+        var (deckName, entries) = DecklistService.ParseArchidektJson(json);
+
+        Assert.Equal("Arch Deck", deckName);
+        Assert.Equal(2, entries.Count);
+        var vraska = entries.Single(e => e.CardName == "Vraska");
+        Assert.Equal(("FRA", "277", "Foil"), (vraska.SetCode, vraska.CollectorNumber, vraska.Finish));
+        Assert.Null(entries.Single(e => e.CardName == "Uncategorized").Finish);
+        Assert.DoesNotContain(entries, e => e.CardName == "Maybe");
     }
 }

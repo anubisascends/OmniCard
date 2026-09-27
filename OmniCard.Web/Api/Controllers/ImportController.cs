@@ -1,18 +1,27 @@
 using Microsoft.AspNetCore.Mvc;
+using OmniCard.Api.Contracts;
+using OmniCard.CardMatching;
+using OmniCard.Shared.Storage;
+using OmniCard.Collection.Lists;
 using OmniCard.Web.Services;
 using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
 using OmniCard.Shared.ImportExport;
+using OmniCard.Shared.Lists;
 using OmniCard.Shared.Security;
 using OmniCard.Web.Api.Infrastructure;
 
 namespace OmniCard.Web.Api.Controllers;
 
-/// <summary>CSV collection import via file upload. Parses with the shared
-/// <see cref="ICsvExportImportService"/> (auto-detects app-native / TCGplayer / Moxfield / Manabox),
-/// then writes the rows as new lots via <see cref="WebBinderCardService"/>.</summary>
+/// <summary>Collection import: CSV via file upload, or a Moxfield/Archidekt deck URL straight into a
+/// location. CSV parses with the shared <see cref="ICsvExportImportService"/> (auto-detects app-native /
+/// TCGplayer / Moxfield / Manabox); URLs are fetched by <see cref="IDecklistService"/> (curl.exe for
+/// Moxfield's Cloudflare-fronted API). Both write the rows as new lots via <see cref="WebBinderCardService"/>.</summary>
 public sealed class ImportController(
     ICsvExportImportService csv,
-    WebBinderCardService binderCards) : ApiControllerBase
+    WebBinderCardService binderCards,
+    IDecklistService decklists,
+    ICardService cardService) : ApiControllerBase
 {
     [HttpPost("csv")]
     [RequirePermission(Permissions.ImportRun)]
@@ -61,5 +70,100 @@ public sealed class ImportController(
             if (System.IO.File.Exists(path))
                 System.IO.File.Delete(path);
         }
+    }
+
+    /// <summary>Fetch a Moxfield/Archidekt deck by URL and add every card to <c>ContainerId</c> as owned
+    /// lots. Each line resolves to its exact set + collector printing (falling back to the cheapest
+    /// printing of the name, reported in <c>SubstitutedNames</c>) and keeps the deck's foil/etched finish.
+    /// Repeat lines of the same printing + finish merge into one lot.</summary>
+    [HttpPost("url")]
+    [RequirePermission(Permissions.ImportRun)]
+    public async Task<ActionResult<ImportUrlResultDto>> Url([FromBody] ImportUrlRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Url))
+            return BadRequest(new { error = "A deck URL is required." });
+        if (request.ContainerId <= 0)
+            return BadRequest(new { error = "A target location is required." });
+        if (LocationsController.ParseGame(request.Game) is not { } game)
+            return BadRequest(new { error = $"Unknown game '{request.Game}'." });
+
+        var fetched = await decklists.FetchDecklistAsync(request.Url);
+        if (fetched is null)
+            return BadRequest(new { error = "Couldn't fetch that deck URL. Supported: Moxfield, Archidekt (public decks)." });
+
+        var (deckName, entries) = fetched.Value;
+        if (entries.Count == 0)
+            return BadRequest(new { error = "That deck has no cards." });
+
+        var gs = cardService.GetGameService(game);
+        var condition = string.IsNullOrWhiteSpace(request.Condition) ? "NM" : request.Condition.Trim();
+        var unresolved = new List<string>();
+        var substituted = new List<string>();
+        var cards = new Dictionary<(string GameCardId, string? Finish), CollectionCard>();
+
+        foreach (var entry in entries)
+        {
+            var printing = DecklistPrintingResolver.Resolve(gs, entry);
+            if (printing is null)
+            {
+                printing = DecklistPrintingResolver.Resolve(gs, entry with { SetCode = null, CollectorNumber = null });
+                if (printing is null) { unresolved.Add(entry.CardName); continue; }
+                substituted.Add(entry.CardName);
+            }
+
+            var key = (printing.GameSpecificId, entry.Finish);
+            if (cards.TryGetValue(key, out var existing))
+            {
+                existing.Quantity += entry.Quantity;
+                continue;
+            }
+
+            cards[key] = new CollectionCard
+            {
+                Game = game,
+                GameCardId = printing.GameSpecificId,
+                Name = printing.Name,
+                SetCode = printing.SetCode,
+                SetName = printing.SetName,
+                Number = printing.CollectorNumber,
+                Rarity = printing.Rarity,
+                ImageUri = printing.ImageUri,
+                Color = CardAttributeExtractor.ExtractColor(printing, game),
+                CardType = CardAttributeExtractor.ExtractCardType(printing, game),
+                IsFoil = entry.Finish is not null,
+                FoilType = entry.Finish,
+                Quantity = Math.Max(1, entry.Quantity),
+                Condition = condition,
+                ContainerId = request.ContainerId,
+                DateAdded = DateTime.UtcNow,
+            };
+        }
+
+        var imported = 0;
+        var skipped = 0;
+        try
+        {
+            if (request.SkipDuplicates)
+            {
+                // One card per call so a skipped duplicate is attributable to its copy count.
+                foreach (var card in cards.Values)
+                {
+                    if (binderCards.ImportCollectionCards([card], skipDuplicates: true) > 0) imported += card.Quantity;
+                    else skipped += card.Quantity;
+                }
+            }
+            else if (cards.Count > 0)
+            {
+                binderCards.ImportCollectionCards(cards.Values.ToList(), skipDuplicates: false);
+                imported = cards.Values.Sum(c => c.Quantity);
+            }
+        }
+        catch (DeckBoxGameMismatchException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+
+        return new ImportUrlResultDto(
+            deckName, imported, skipped, entries.Sum(e => e.Quantity), unresolved, substituted);
     }
 }

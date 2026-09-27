@@ -12,7 +12,7 @@ Supports **Magic: The Gathering** (Scryfall), **One Piece TCG**, **Riftbound**, 
 - **Collection management** across storage locations (binders, boxes, deck boxes, bulk), with a visual binder editor
 - **Set completion tracking** + printable want-lists
 - **Decklist checking** against your collection (Moxfield / Archidekt)
-- **CSV import/export** (Manabox, Moxfield, TCGplayer, app-native)
+- **CSV import/export** (Manabox, Moxfield, TCGplayer, app-native), plus **import a Moxfield / Archidekt deck URL** straight into a location
 - **Sealed inventory** (booster boxes, packs, cases…) with lots and valuation
 - **Sales & fulfillment** — orders kanban, listings, customers, pick-list & receipt PDFs
 - **eBay listing integration** (server-side OAuth)

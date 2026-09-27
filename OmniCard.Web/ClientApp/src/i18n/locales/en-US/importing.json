@@ -25,6 +25,21 @@
       "warnings_one": " {{count}} warning.",
       "warnings_other": " {{count}} warnings."
     },
+    "url": {
+      "title": "Import from Moxfield / Archidekt",
+      "description": "Paste a public Moxfield or Archidekt deck URL (MTG) to add every card to a location as owned copies. Exact printings and foil/etched finishes are kept.",
+      "urlLabel": "Deck URL",
+      "targetLocation": "Target location",
+      "importing": "Importing…",
+      "result_one": "Imported {{imported}} of {{count}} card from \"{{deck}}\".",
+      "result_other": "Imported {{imported}} of {{count}} cards from \"{{deck}}\".",
+      "skipped_one": " {{count}} skipped as a duplicate.",
+      "skipped_other": " {{count}} skipped as duplicates.",
+      "substituted_one": "{{count}} card's exact printing wasn't in the catalog; used the cheapest printing:",
+      "substituted_other": "{{count}} cards' exact printings weren't in the catalog; used the cheapest printing:",
+      "unresolved_one": "{{count}} card couldn't be found:",
+      "unresolved_other": "{{count}} cards couldn't be found:"
+    },
     "decklist": {
       "title": "Check a decklist",
       "descriptionPrefix": "Paste a Moxfield/Archidekt URL, or a decklist, to see owned vs. missing against ",

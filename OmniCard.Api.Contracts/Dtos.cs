@@ -837,6 +837,25 @@ public sealed record DecklistCheckDto
 
 public sealed record CsvImportResultDto(int Imported, int TotalRows, string DetectedFormat, IReadOnlyList<string> Warnings);
 
+/// <summary>Import a Moxfield/Archidekt deck URL straight into a location as owned lots.</summary>
+public sealed record ImportUrlRequest
+{
+    public string Url { get; init; } = "";
+    public string Game { get; init; } = "Mtg";
+    public int ContainerId { get; init; }
+    public string? Condition { get; init; }
+    /// <summary>Skip a card when a lot of the same printing + finish + condition already exists.</summary>
+    public bool SkipDuplicates { get; init; }
+}
+
+/// <summary><see cref="Imported"/> counts copies (sum of quantities) written as new lots;
+/// <see cref="Skipped"/> copies skipped as duplicates; <see cref="UnresolvedNames"/> are deck lines
+/// with no matching printing in the catalog; <see cref="SubstitutedNames"/> are lines whose exact set +
+/// collector number wasn't in the catalog, so the cheapest printing of the name was used instead.</summary>
+public sealed record ImportUrlResultDto(
+    string DeckName, int Imported, int Skipped, int TotalCards,
+    IReadOnlyList<string> UnresolvedNames, IReadOnlyList<string> SubstitutedNames);
+
 // --- Scan (server-side image matching) ---
 
 /// <summary>The result of matching one uploaded card image against a game's catalog. When
