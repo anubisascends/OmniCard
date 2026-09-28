@@ -186,6 +186,7 @@ builder.Services.AddSingleton<IListingService>(sp =>
 builder.Services.AddSingleton(sp =>
     new WebBinderCardService(writableFactory, sp.GetRequiredService<IDataPathService>(),
         sp.GetRequiredService<IEnumerable<ICardGameService>>().ToDictionary(s => s.Game)));
+builder.Services.AddSingleton<LocationImportService>();
 builder.Services.AddScoped<BinderStateBuilder>();
 
 // User accounts + authentication. Passwords are stored only as salted PBKDF2 hashes; the built-in

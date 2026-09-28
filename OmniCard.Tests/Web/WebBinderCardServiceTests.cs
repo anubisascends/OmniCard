@@ -153,6 +153,59 @@ public class WebBinderCardServiceTests : IDisposable
     }
 
     [Fact]
+    public void SplitStackIntoSingles_OriginalKeepsOne_EachOtherCopyGetsItsOwnLooseLot()
+    {
+        var lotId = AddLot("Pikachu", page: 1, slot: 0, quantity: 4, condition: "LP");
+
+        var newLotIds = _service.SplitStackIntoSingles(lotId);
+
+        Assert.Equal(3, newLotIds!.Count);
+        using var ctx = new OmniCardDbContext(_opts);
+        var source = ctx.Lots.Single(l => l.Id == lotId);
+        Assert.Equal((1, 1, 0), (source.Quantity, source.Page, source.Slot));
+        var singles = ctx.Lots.Where(l => newLotIds.Contains(l.Id)).ToList();
+        Assert.Equal(3, singles.Count);
+        Assert.All(singles, s =>
+        {
+            Assert.Equal(1, s.Quantity);
+            Assert.Equal(_binderId, s.LocationId);
+            Assert.Null(s.Page);
+            Assert.Equal(source.ProductId, s.ProductId);
+            Assert.Equal("LP", s.Condition);
+        });
+        Assert.Equal(3, ctx.Movements.Count(m => m.Note == "Split from stack"));
+    }
+
+    [Fact]
+    public void SplitStackIntoSingles_SingleCopy_NoChange_MissingLot_Null()
+    {
+        var lotId = AddLot("Snorlax", quantity: 1);
+        Assert.Empty(_service.SplitStackIntoSingles(lotId)!);
+        Assert.Null(_service.SplitStackIntoSingles(9999));
+    }
+
+    [Fact]
+    public void SplitStackIntoSingles_Throws_WhenLotIsListedForSale()
+    {
+        var lotId = AddLot("Mewtwo", quantity: 3);
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            ctx.Listings.Add(new Listing
+            {
+                LotId = lotId,
+                Channel = SalesChannel.Manual,
+                Status = ListingStatus.Listed,
+                ListedPrice = 10m,
+                Quantity = 1,
+                ListedAt = new DateTime(2026, 1, 1),
+            });
+            ctx.SaveChanges();
+        }
+
+        Assert.Throws<InvalidOperationException>(() => _service.SplitStackIntoSingles(lotId));
+    }
+
+    [Fact]
     public void MoveCardsToContainer_ClearsPlacementAndMoves()
     {
         var lotId = AddLot("Mover", page: 1, slot: 2);

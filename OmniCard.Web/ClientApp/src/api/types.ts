@@ -441,6 +441,29 @@ export interface CsvImportResultDto {
   warnings: string[];
 }
 
+/** One problem (or note) about an import line. `row` is the CSV spreadsheet row (header = row 1);
+ *  null for deck-URL imports and whole-file problems. */
+export interface LocationImportIssueDto {
+  row: number | null;
+  card: string | null;
+  message: string;
+}
+
+/** A successful all-or-nothing location import. `format` is the detected CSV format (null for URLs). */
+export interface LocationImportResultDto {
+  source: string;
+  format: string | null;
+  lines: number;
+  copies: number;
+  substitutions: LocationImportIssueDto[];
+}
+
+/** A rejected location import (HTTP 422): nothing was written. */
+export interface LocationImportFailureDto {
+  error: string;
+  errors: LocationImportIssueDto[];
+}
+
 export interface ImportUrlResultDto {
   deckName: string;
   imported: number;

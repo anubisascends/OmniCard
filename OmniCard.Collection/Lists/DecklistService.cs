@@ -176,7 +176,8 @@ public sealed partial class DecklistService(
         return stdout;
     }
 
-    private static (string? Source, string? DeckId) ParseUrl(string url)
+    /// <summary>Recognizes a Moxfield or Archidekt deck URL; (null, null) for anything else.</summary>
+    public static (string? Source, string? DeckId) ParseUrl(string url)
     {
         if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri))
             return (null, null);

@@ -891,6 +891,29 @@ public sealed record ImportUrlResultDto(
     string DeckName, int Imported, int Skipped, int TotalCards,
     IReadOnlyList<string> UnresolvedNames, IReadOnlyList<string> SubstitutedNames);
 
+/// <summary>Body of <c>POST /api/import/location/{id}/url</c>: a Moxfield/Archidekt deck imported
+/// all-or-nothing into the location in the route.</summary>
+public sealed record LocationUrlImportRequest
+{
+    public string Url { get; init; } = "";
+    public string? Condition { get; init; }
+}
+
+/// <summary>One problem (or note) about an import line. <see cref="Row"/> is the CSV spreadsheet row
+/// (header = row 1); null for deck-URL imports and whole-file problems.</summary>
+public sealed record LocationImportIssueDto(int? Row, string? Card, string Message);
+
+/// <summary>A successful all-or-nothing location import: every line was written. <see cref="Source"/>
+/// is the deck name or file name; <see cref="Format"/> the detected CSV format (null for URLs).
+/// <see cref="Substitutions"/> lists lines whose exact printing wasn't in the catalog and were
+/// imported as another printing of the same card.</summary>
+public sealed record LocationImportResultDto(
+    string Source, string? Format, int Lines, int Copies, IReadOnlyList<LocationImportIssueDto> Substitutions);
+
+/// <summary>A rejected location import (HTTP 422): nothing was written. <see cref="Error"/> is the
+/// summary; <see cref="Errors"/> every problem found, so the user can fix them all in one pass.</summary>
+public sealed record LocationImportFailureDto(string Error, IReadOnlyList<LocationImportIssueDto> Errors);
+
 // --- Scan (server-side image matching) ---
 
 /// <summary>The result of matching one uploaded card image against a game's catalog. When

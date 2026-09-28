@@ -123,20 +123,29 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
   // Split-stack: move some copies of a stacked lot into a new loose lot (e.g. to place each in its
   // own binder slot). Only offered when the lot holds more than one copy.
   const [splitOpen, setSplitOpen] = useState(false);
-  const [splitToast, setSplitToast] = useState(false);
+  // Toast text after a split (null = hidden) — the count differs between the two split kinds.
+  const [splitToast, setSplitToast] = useState<string | null>(null);
   const [splitQty, setSplitQty] = useState(1);
+  const afterSplit = (toast: string) => {
+    invalidate();
+    // The new loose copies land in the binder's Unplaced pool — refresh those views too.
+    qc.invalidateQueries({ queryKey: ['binder-unplaced'] });
+    qc.invalidateQueries({ queryKey: ['binder'] });
+    setSplitOpen(false);
+    setSplitToast(toast);
+    onClose();
+  };
   const split = useMutation({
     mutationFn: () => api.cardSplit(card!.id, splitQty),
-    onSuccess: () => {
-      invalidate();
-      // The new loose copies land in the binder's Unplaced pool — refresh those views too.
-      qc.invalidateQueries({ queryKey: ['binder-unplaced'] });
-      qc.invalidateQueries({ queryKey: ['binder'] });
-      setSplitOpen(false);
-      setSplitToast(true);
-      onClose();
-    },
+    onSuccess: () => afterSplit(t('dialogs.cardEdit.splitToast')),
   });
+  // One click: every copy becomes its own lot (a stack of 4 → the original + 3 new singles).
+  const splitSingles = useMutation({
+    mutationFn: () => api.cardSplitSingles(card!.id),
+    onSuccess: (r) => afterSplit(t('dialogs.cardEdit.splitSinglesToast', { count: r.lotIds.length + 1 })),
+  });
+  const splitting = split.isPending || splitSingles.isPending;
+  const splitError = (split.error ?? splitSingles.error) as Error | null;
 
   return (
     <Drawer anchor="right" open={open} onClose={onClose}>
@@ -330,10 +339,10 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
       />
 
       <Snackbar
-        open={splitToast}
+        open={splitToast !== null}
         autoHideDuration={3000}
-        onClose={() => setSplitToast(false)}
-        message={t('dialogs.cardEdit.splitToast')}
+        onClose={() => setSplitToast(null)}
+        message={splitToast}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       />
 
@@ -356,14 +365,21 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
                 })}
                 autoFocus
               />
-              {split.error && (
-                <Typography color="error" variant="body2">{(split.error as Error).message}</Typography>
+              {splitError && (
+                <Typography color="error" variant="body2">{splitError.message}</Typography>
               )}
             </Stack>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setSplitOpen(false)}>{t('common.actions.cancel')}</Button>
-            <Button variant="contained" onClick={() => split.mutate()} disabled={split.isPending}>
+            <Tooltip title={t('dialogs.cardEdit.splitSinglesTooltip', { count: card.quantity - 1 })}>
+              <span>
+                <Button variant="outlined" onClick={() => splitSingles.mutate()} disabled={splitting}>
+                  {t('dialogs.cardEdit.splitSingles', { count: card.quantity })}
+                </Button>
+              </span>
+            </Tooltip>
+            <Button variant="contained" onClick={() => split.mutate()} disabled={splitting}>
               {split.isPending ? t('dialogs.cardEdit.splitting') : t('dialogs.cardEdit.splitStack')}
             </Button>
           </DialogActions>

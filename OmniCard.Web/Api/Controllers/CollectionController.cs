@@ -355,6 +355,26 @@ public sealed class CollectionController(
         }
     }
 
+    /// <summary>Split a stacked lot into single copies: the original keeps one and every other copy
+    /// becomes its own loose lot in the same location (a stack of 4 → the original + 3 new lots).
+    /// Returns the new lots' ids.</summary>
+    [HttpPost("{id:int}/split-singles")]
+    [RequirePermission(Permissions.CollectionEdit)]
+    public IActionResult SplitIntoSingles(int id)
+    {
+        try
+        {
+            var newLotIds = binderCards.SplitStackIntoSingles(id);
+            if (newLotIds is null) return NotFound(new { error = "Card lot not found." });
+            return Ok(new { lotIds = newLotIds });
+        }
+        catch (InvalidOperationException ex)
+        {
+            // e.g. the lot is currently listed for sale.
+            return Conflict(new { error = ex.Message });
+        }
+    }
+
     /// <summary>Move one or more cards to another location. 409 if the target is a game-locked deck
     /// box and any card belongs to a different game.</summary>
     [HttpPost("move")]

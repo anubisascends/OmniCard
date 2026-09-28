@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import { api } from '../api/client';
@@ -22,6 +23,7 @@ import { useGame } from '../context/GameContext';
 import { usePermissions } from '../context/usePermissions';
 import { CardTable } from '../components/CardTable';
 import { AddCardDialog } from '../components/dialogs/AddCardDialog';
+import { LocationImportDialog } from '../components/dialogs/LocationImportDialog';
 import { DeckBoxPanel } from '../components/DeckBoxPanel';
 import { DeckStackView } from '../components/deckstack/DeckStackView';
 import { SearchBox } from '../components/SearchBox';
@@ -40,6 +42,7 @@ export function LocationDetailPage() {
   const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   // Table (flat grid) vs. Stacks (Archidekt-style grouped stacks). Persisted; location-only feature.
   const [view, setView] = useState<'table' | 'stacks'>(
     () => (localStorage.getItem(VIEW_KEY) === 'stacks' ? 'stacks' : 'table'),
@@ -83,6 +86,11 @@ export function LocationDetailPage() {
             to={`/audit/${locationId}`}
           >
             {t('locations.detail.audit')}
+          </Button>
+        )}
+        {can('import.run') && (
+          <Button variant="outlined" startIcon={<UploadFileIcon />} onClick={() => setImportOpen(true)}>
+            {t('common.actions.import')}
           </Button>
         )}
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>
@@ -131,6 +139,12 @@ export function LocationDetailPage() {
         defaultGame={deckBoxGame ?? game}
         lockGame={isDeckBox && !!deckBoxGame}
         onClose={() => setAddOpen(false)}
+      />
+      <LocationImportDialog
+        open={importOpen}
+        locationId={locationId}
+        locationName={locQuery.data?.name ?? t('locations.detail.thisLocation')}
+        onClose={() => setImportOpen(false)}
       />
     </Stack>
   );

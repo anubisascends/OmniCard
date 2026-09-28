@@ -669,46 +669,77 @@ public sealed class WebBinderCardService
             throw new ArgumentOutOfRangeException(nameof(quantity), "Split quantity must be at least 1.");
 
         using var context = _dbFactory.CreateDbContext();
-        var lot = context.Lots.Include(l => l.Product)
-            .FirstOrDefault(l => l.Id == lotId && l.Product.Category == ProductCategory.Single);
-        if (lot is null)
+        if (LoadSplittableLot(context, lotId) is not { } lot)
             return 0;
         if (quantity >= lot.Quantity)
             throw new ArgumentOutOfRangeException(nameof(quantity), "Split quantity must be fewer than the stack's total.");
 
-        // A listed lot's quantity is tied to its listing (and possibly an eBay multi-quantity listing),
-        // so splitting it would desync those — require it to be unlisted first.
-        if (context.Listings.Any(l => l.LotId == lotId
-                && (l.Status == ListingStatus.Listed || l.Status == ListingStatus.Picked)))
-            throw new InvalidOperationException("Unlist this card before splitting the stack.");
-
         lot.Quantity -= quantity;
-        var split = new InventoryLot
-        {
-            ProductId = lot.ProductId,
-            Quantity = quantity,
-            UnitCost = lot.UnitCost,
-            AcquisitionDate = lot.AcquisitionDate,
-            Source = lot.Source,
-            Condition = lot.Condition,
-            LocationId = lot.LocationId,
-            Section = lot.Section,
-            // Page/Slot left null → the new copies land loose in the same container (Unplaced pool).
-        };
+        var split = NewSplitLot(lot, quantity);
         context.Lots.Add(split);
         context.SaveChanges();
 
-        context.Movements.Add(new InventoryMovement
-        {
-            ProductId = split.ProductId,
-            LotId = split.Id,
-            Type = MovementType.Move,
-            Quantity = quantity,
-            Note = "Split from stack",
-        });
+        context.Movements.Add(SplitMovement(split));
         context.SaveChanges();
         return split.Id;
     }
+
+    /// <summary>Splits a stacked lot into single copies: the original keeps one copy and each other copy
+    /// becomes its own loose lot (Quantity 1) in the same container — a stack of 4 becomes the original
+    /// plus 3 new lots. Returns the new lot ids (empty if the lot already holds a single copy), or null if
+    /// the lot wasn't found. Throws <see cref="InvalidOperationException"/> if the lot is listed for sale.</summary>
+    public IReadOnlyList<int>? SplitStackIntoSingles(int lotId)
+    {
+        using var context = _dbFactory.CreateDbContext();
+        if (LoadSplittableLot(context, lotId) is not { } lot)
+            return null;
+        if (lot.Quantity <= 1)
+            return [];
+
+        var singles = Enumerable.Range(0, lot.Quantity - 1).Select(_ => NewSplitLot(lot, 1)).ToList();
+        lot.Quantity = 1;
+        context.Lots.AddRange(singles);
+        context.SaveChanges();
+
+        context.Movements.AddRange(singles.Select(SplitMovement));
+        context.SaveChanges();
+        return singles.Select(l => l.Id).ToList();
+    }
+
+    /// <summary>Loads a single-card lot for splitting; null if it doesn't exist. A listed lot's quantity
+    /// is tied to its listing (and possibly an eBay multi-quantity listing), so splitting it would desync
+    /// those — throws <see cref="InvalidOperationException"/> to require it be unlisted first.</summary>
+    private static InventoryLot? LoadSplittableLot(OmniCardDbContext context, int lotId)
+    {
+        var lot = context.Lots.Include(l => l.Product)
+            .FirstOrDefault(l => l.Id == lotId && l.Product.Category == ProductCategory.Single);
+        if (lot is not null && context.Listings.Any(l => l.LotId == lotId
+                && (l.Status == ListingStatus.Listed || l.Status == ListingStatus.Picked)))
+            throw new InvalidOperationException("Unlist this card before splitting the stack.");
+        return lot;
+    }
+
+    private static InventoryLot NewSplitLot(InventoryLot lot, int quantity) => new()
+    {
+        ProductId = lot.ProductId,
+        Quantity = quantity,
+        UnitCost = lot.UnitCost,
+        AcquisitionDate = lot.AcquisitionDate,
+        Source = lot.Source,
+        Condition = lot.Condition,
+        LocationId = lot.LocationId,
+        Section = lot.Section,
+        // Page/Slot left null → the new copies land loose in the same container (Unplaced pool).
+    };
+
+    private static InventoryMovement SplitMovement(InventoryLot split) => new()
+    {
+        ProductId = split.ProductId,
+        LotId = split.Id,
+        Type = MovementType.Move,
+        Quantity = split.Quantity,
+        Note = "Split from stack",
+    };
 
     /// <summary>Relocates up to <paramref name="quantity"/> owned copies of <paramref name="lotId"/> into a
     /// location (no page/slot), splitting a larger stack so the remainder stays where it was. Returns the
