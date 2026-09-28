@@ -1,3 +1,5 @@
+using OmniCard.Shared.Storage;
+
 namespace OmniCard.Shared.Lists;
 
 public record DecklistCardLocation(
@@ -8,6 +10,24 @@ public record DecklistCardLocation(
     string SetCode,
     bool IsFoil,
     bool IsExactSetMatch);
+
+/// <summary>One owned lot (or part of a stacked lot) allocated to fill a decklist entry — the exact
+/// copy to pull, and where it lives. <see cref="Quantity"/> is how many copies to take from the lot
+/// (≤ the lot's quantity). Drives the printable pull list and the bulk move-to-deck-box.</summary>
+public record DecklistPick(
+    int LotId,
+    int? ContainerId,
+    string ContainerName,
+    ContainerType? ContainerType,
+    int? Page,
+    int? Slot,
+    string? Section,
+    string SetCode,
+    string CollectorNumber,
+    bool IsFoil,
+    string Condition,
+    int Quantity,
+    bool IsListed);
 
 public record OwnedDecklistEntry(
     string CardName,
@@ -23,7 +43,8 @@ public record OwnedDecklistEntry(
     string? Toughness = null,
     string? Rarity = null,
     string? ImageUri = null,
-    string? LocalImagePath = null);
+    string? LocalImagePath = null,
+    List<DecklistPick>? Picks = null);
 
 public record MissingDecklistEntry(
     string CardName,

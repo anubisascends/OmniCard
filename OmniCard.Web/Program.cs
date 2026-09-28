@@ -166,6 +166,7 @@ builder.Services.AddSingleton<ISetChecklistPdfExporter, SetChecklistPdfExporter>
 builder.Services.AddSingleton<IPriceSheetService, PriceSheetService>();
 builder.Services.AddSingleton<IPriceSheetPdfExporter, PriceSheetPdfExporter>();
 builder.Services.AddSingleton<IPickListPdfExporter, PickListPdfExporter>();
+builder.Services.AddSingleton<IDecklistPrintExporter, DecklistPrintExporter>();
 
 // --- Binder editor: the one deliberate WRITE surface in the otherwise read-only web app ---
 // A single writable factory against inventory.db, injected only into the binder-edit services so the

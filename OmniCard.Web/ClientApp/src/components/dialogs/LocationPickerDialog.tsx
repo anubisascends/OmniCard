@@ -27,13 +27,24 @@ import { LOCATION_TYPES, isDeckBoxType } from '../../lib/locationTypes';
 import { DeckBoxGamePicker } from '../DeckBoxGamePicker';
 
 /** Inline "create a new location" section, revealed from the picker so callers never have to leave. */
-function CreateLocationSection({ onCreated }: { onCreated: (id: number) => void }) {
+function CreateLocationSection({
+  onCreated,
+  types,
+  defaultGame,
+}: {
+  onCreated: (id: number) => void;
+  /** Restricts the type dropdown (the first entry is the default). */
+  types?: string[];
+  /** Pre-selected game for a new deck box. */
+  defaultGame?: string;
+}) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
-  const [type, setType] = useState('Box');
-  const [game, setGame] = useState('');
+  const typeOptions = types ? LOCATION_TYPES.filter((lt) => types.includes(lt.value)) : LOCATION_TYPES;
+  const [type, setType] = useState<string>(typeOptions[0]?.value ?? 'Box');
+  const [game, setGame] = useState(defaultGame ?? '');
   const [deckTypeId, setDeckTypeId] = useState<number | null>(null);
   const isDeckBox = isDeckBoxType(type);
 
@@ -57,7 +68,7 @@ function CreateLocationSection({ onCreated }: { onCreated: (id: number) => void 
     onSuccess: (loc) => {
       qc.invalidateQueries({ queryKey: ['locations'] });
       setName('');
-      setGame('');
+      setGame(defaultGame ?? '');
       setDeckTypeId(null);
       setOpen(false);
       onCreated(loc.id);
@@ -83,7 +94,7 @@ function CreateLocationSection({ onCreated }: { onCreated: (id: number) => void 
             }}
           />
           <TextField select size="small" label={t('common.labels.type')} value={type} onChange={(e) => setType(e.target.value)}>
-            {LOCATION_TYPES.map((t) => (
+            {typeOptions.map((t) => (
               <MenuItem key={t.value} value={t.value}>
                 {t.label}
               </MenuItem>
@@ -139,6 +150,7 @@ export function LocationPickerDialog({
   excludeId,
   allowCreate = true,
   cardGames,
+  types,
   onPick,
   onClose,
 }: {
@@ -149,6 +161,8 @@ export function LocationPickerDialog({
   /** Games of the card(s) being moved. When set, deck-box targets locked to a different game are
    * disabled (the server hard-blocks the move anyway — this is the matching UX guard). */
   cardGames?: string[];
+  /** Only offer locations of these types (e.g. `['DeckBox']`); inline create is limited to them too. */
+  types?: string[];
   onPick: (id: number) => void;
   onClose: () => void;
 }) {
@@ -164,9 +178,10 @@ export function LocationPickerDialog({
     const term = search.trim().toLowerCase();
     const filtered = (data ?? [])
       .filter((l) => l.id !== excludeId)
+      .filter((l) => !types || types.includes(l.type))
       .filter((l) => (term ? l.name.toLowerCase().includes(term) : true));
     return groupLocations(filtered);
-  }, [data, search, excludeId]);
+  }, [data, search, excludeId, types]);
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
@@ -233,7 +248,13 @@ export function LocationPickerDialog({
             ))}
           </List>
         )}
-        {allowCreate && !isLoading && <CreateLocationSection onCreated={onPick} />}
+        {allowCreate && !isLoading && (
+          <CreateLocationSection
+            onCreated={onPick}
+            types={types}
+            defaultGame={cardGames?.length === 1 ? cardGames[0] : undefined}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -123,6 +123,73 @@ public sealed class WebBinderCardService
         context.SaveChanges();
     }
 
+    /// <summary>Moves a set of (lot, quantity) picks into <paramref name="containerId"/> in one save —
+    /// the decklist check's "move to deck box". A pick taking the whole lot moves the lot; a partial pick
+    /// splits the copies off into a new lot at the destination, leaving the remainder in place (the
+    /// split rules of <c>CardService.MoveQuantityToContainer</c>). Picks whose lot is already in the
+    /// target, or no longer exists, are skipped. The deck-box game guard runs over every pick before any
+    /// write, so a mismatch moves nothing. Returns the number of copies moved.</summary>
+    public int MoveQuantitiesToContainer(IReadOnlyList<(int LotId, int Quantity)> picks, int containerId)
+    {
+        using var context = _dbFactory.CreateDbContext();
+        var ids = picks.Select(p => p.LotId).Distinct().ToList();
+        var lots = context.Lots.Include(l => l.Product)
+            .Where(l => ids.Contains(l.Id) && l.Product.Category == ProductCategory.Single)
+            .ToDictionary(l => l.Id);
+
+        DeckBoxGameGuard.ValidateIncoming(context, containerId, lots.Values.Select(l => l.Product.Game).Distinct());
+
+        var moved = 0;
+        var movements = new List<(InventoryLot Lot, int Quantity)>();
+        // Merge duplicate lot ids so a lot can't be over-taken by two picks.
+        foreach (var (lotId, quantity) in picks.GroupBy(p => p.LotId).Select(g => (g.Key, g.Sum(p => p.Quantity))))
+        {
+            if (quantity < 1 || !lots.TryGetValue(lotId, out var lot) || lot.LocationId == containerId)
+                continue;
+
+            if (quantity >= lot.Quantity)
+            {
+                lot.LocationId = containerId;
+                lot.Page = null;
+                lot.Slot = null;
+                lot.Section = null;
+                movements.Add((lot, lot.Quantity));
+                moved += lot.Quantity;
+                continue;
+            }
+
+            lot.Quantity -= quantity;
+            var split = new InventoryLot
+            {
+                ProductId = lot.ProductId,
+                Quantity = quantity,
+                UnitCost = lot.UnitCost,
+                AcquisitionDate = lot.AcquisitionDate,
+                Source = lot.Source,
+                Condition = lot.Condition,
+                LocationId = containerId,
+            };
+            context.Lots.Add(split);
+            movements.Add((split, quantity));
+            moved += quantity;
+        }
+        context.SaveChanges();
+
+        // Split lots only get their ids on save, so the movement rows are written afterwards.
+        foreach (var (lot, quantity) in movements)
+        {
+            context.Movements.Add(new InventoryMovement
+            {
+                ProductId = lot.ProductId,
+                LotId = lot.Id,
+                Type = MovementType.Move,
+                Quantity = quantity,
+            });
+        }
+        context.SaveChanges();
+        return moved;
+    }
+
     public void BulkUpdateField(IEnumerable<int> cardIds, Action<CollectionCard> update)
     {
         using var context = _dbFactory.CreateDbContext();

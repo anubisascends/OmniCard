@@ -39,20 +39,6 @@
       "substituted_other": "{{count}} cards' exact printings weren't in the catalog; used the cheapest printing:",
       "unresolved_one": "{{count}} card couldn't be found:",
       "unresolved_other": "{{count}} cards couldn't be found:"
-    },
-    "decklist": {
-      "title": "Check a decklist",
-      "descriptionPrefix": "Paste a Moxfield/Archidekt URL, or a decklist, to see owned vs. missing against ",
-      "urlLabel": "Decklist URL (Moxfield / Archidekt)",
-      "orPaste": "or paste",
-      "textLabel": "Decklist text",
-      "textPlaceholder": "4 Lightning Bolt\n2 Counterspell",
-      "checking": "Checking…",
-      "check": "Check",
-      "owned": "{{count}} owned",
-      "missing": "{{count}} missing",
-      "toComplete": "{{cost}} to complete",
-      "missingHeading": "Missing"
     }
   }
 }

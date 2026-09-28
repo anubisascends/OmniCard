@@ -8,6 +8,7 @@ using OmniCard.Shared.Games;
 using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Lists;
 using OmniCard.Shared.Matching;
+using OmniCard.Shared.Sales;
 using OmniCard.Shared.Scanning;
 using OmniCard.Shared.Sets;
 using OmniCard.Shared.Storage;
@@ -49,8 +50,8 @@ public class DecklistMatchingTests : IDisposable
         return new DecklistService(_dbFactory, null!, cardService ?? new StubCardService());
     }
 
-    private void SeedCard(string name, string setCode, string number, int containerId = 1,
-        int? page = null, int? slot = null, string? section = null, bool isFoil = false)
+    private int SeedCard(string name, string setCode, string number, int containerId = 1,
+        int? page = null, int? slot = null, string? section = null, bool isFoil = false, int quantity = 1)
     {
         using var ctx = _dbFactory.CreateDbContext();
         var product = new Product
@@ -68,7 +69,7 @@ public class DecklistMatchingTests : IDisposable
         ctx.Products.Add(product);
         ctx.SaveChanges();
 
-        ctx.Lots.Add(new InventoryLot
+        var lot = new InventoryLot
         {
             ProductId = product.Id,
             Condition = "NM",
@@ -76,8 +77,11 @@ public class DecklistMatchingTests : IDisposable
             Page = page,
             Slot = slot,
             Section = section,
-        });
+            Quantity = quantity,
+        };
+        ctx.Lots.Add(lot);
         ctx.SaveChanges();
+        return lot.Id;
     }
 
     private int SeedContainer(string name, ContainerType type)
@@ -167,6 +171,67 @@ public class DecklistMatchingTests : IDisposable
         // Should show both locations but exact set match first
         Assert.Equal(2, owned.Locations.Count);
         Assert.True(owned.Locations[0].IsExactSetMatch);
+    }
+
+    [Fact]
+    public void CheckAgainstCollection_StackedLot_CountsEveryCopy()
+    {
+        var lotId = SeedCard("Lightning Bolt", "M11", "149", quantity: 4);
+
+        var service = CreateService();
+        var entries = new List<DecklistEntry> { new(3, "Lightning Bolt", "M11", "149") };
+        var result = service.CheckAgainstCollection("Test", "Test", entries, CardGame.Mtg);
+
+        Assert.Equal(3, result.TotalOwned);
+        Assert.Equal(0, result.TotalMissing);
+        var pick = Assert.Single(Assert.Single(result.OwnedEntries).Picks!);
+        Assert.Equal(lotId, pick.LotId);
+        Assert.Equal(3, pick.Quantity);
+    }
+
+    [Fact]
+    public void CheckAgainstCollection_RepeatedEntry_DoesNotReuseTheSameCopy()
+    {
+        SeedCard("Lightning Bolt", "M11", "149", quantity: 2);
+
+        var service = CreateService();
+        // Same card in two boards (as a URL import produces): 2 + 1 needed, only 2 owned.
+        var entries = new List<DecklistEntry>
+        {
+            new(2, "Lightning Bolt", "M11", "149"),
+            new(1, "Lightning Bolt", "M11", "149"),
+        };
+        var result = service.CheckAgainstCollection("Test", "Test", entries, CardGame.Mtg);
+
+        Assert.Equal(2, result.TotalOwned);
+        Assert.Equal(1, result.TotalMissing);
+    }
+
+    [Fact]
+    public void CheckAgainstCollection_Picks_PreferFreeCopiesOverDeckBoxAndListed()
+    {
+        var deckBoxId = SeedContainer("Other Deck", ContainerType.DeckBox);
+        var binderId = SeedContainer("Binder A", ContainerType.Binder);
+        SeedCard("Lightning Bolt", "M11", "149", deckBoxId);
+        var listedLot = SeedCard("Lightning Bolt", "M11", "149", binderId, page: 1, slot: 1);
+        var freeLot = SeedCard("Lightning Bolt", "2ED", "162", binderId, page: 2, slot: 1);
+        using (var ctx = _dbFactory.CreateDbContext())
+        {
+            ctx.Listings.Add(new Listing { LotId = listedLot, Status = ListingStatus.Listed, ListedPrice = 1m });
+            ctx.SaveChanges();
+        }
+
+        var service = CreateService();
+        var entries = new List<DecklistEntry> { new(2, "Lightning Bolt", "M11", "149") };
+        var result = service.CheckAgainstCollection("Test", "Test", entries, CardGame.Mtg);
+
+        var picks = Assert.Single(result.OwnedEntries).Picks!;
+        Assert.Equal(2, picks.Count);
+        // The free copy comes first even though it's a different printing, then the deck-box copy.
+        // The listed copy is left alone while anything else can fill the slot.
+        Assert.Equal(freeLot, picks[0].LotId);
+        Assert.Equal("Other Deck", picks[1].ContainerName);
+        Assert.DoesNotContain(picks, p => p.IsListed);
     }
 
     private class TestOmniDbFactory(DbContextOptions<OmniCardDbContext> options)

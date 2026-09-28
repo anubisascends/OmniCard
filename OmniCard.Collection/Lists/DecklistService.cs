@@ -4,9 +4,12 @@ using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
 using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
 using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Lists;
 using OmniCard.Shared.Matching;
+using OmniCard.Shared.Sales;
+using OmniCard.Shared.Storage;
 
 namespace OmniCard.Collection.Lists;
 
@@ -311,9 +314,21 @@ public sealed partial class DecklistService(
             {
                 var dto = CollectionCardMapper.ToDto(x.Lot, x.Product, 0m);
                 dto.Container = x.Container;
+                // The mapper leaves Quantity at its default of 1; a stacked lot holds every copy.
+                dto.Quantity = x.Lot.Quantity;
                 return dto;
             })
             .ToList();
+
+        // Lots currently listed for sale — still owned, but pulled only as a last resort.
+        var listedLotIds = ctx.Listings.AsNoTracking()
+            .Where(l => l.Status == ListingStatus.Listed || l.Status == ListingStatus.Picked)
+            .Select(l => l.LotId)
+            .ToHashSet();
+
+        // Copies still unallocated per lot. Shared across entries so a card that appears twice (e.g.
+        // mainboard + sideboard from a URL import) can't claim the same physical copy twice.
+        var remaining = allCards.ToDictionary(c => c.Id, c => Math.Max(c.Quantity, 1));
 
         var ownedEntries = new List<OwnedDecklistEntry>();
         var missingEntries = new List<MissingDecklistEntry>();
@@ -355,7 +370,8 @@ public sealed partial class DecklistService(
                     string.Equals(c.SetCode, entry.SetCode, StringComparison.OrdinalIgnoreCase)
             )).ToList();
 
-            var ownedCount = Math.Min(ownedCopies.Count, entry.Quantity);
+            var picks = AllocatePicks(entry, ownedCopies, remaining, listedLotIds);
+            var ownedCount = picks.Sum(p => p.Quantity);
             var missingCount = entry.Quantity - ownedCount;
 
             // Look up card details from Scryfall DB for type/image/detail info
@@ -394,7 +410,7 @@ public sealed partial class DecklistService(
                     entry.CardName, entry.SetCode, entry.CollectorNumber,
                     ownedCount, locations,
                     typeCategory, typeLine, manaCost, oracleText,
-                    power, toughness, rarity, imageUri, localImagePath));
+                    power, toughness, rarity, imageUri, localImagePath, picks));
             }
 
             if (missingCount > 0)
@@ -420,5 +436,57 @@ public sealed partial class DecklistService(
                 .OrderByDescending(e => (e.MarketPrice ?? 0) * e.QuantityNeeded)
                 .ToList(),
         };
+    }
+
+    /// <summary>Chooses which owned copies fill <paramref name="entry"/>, taking from
+    /// <paramref name="remaining"/> (lot id → unallocated copies) so stacked lots count every copy.
+    /// Preference: copies that are free to take (not listed for sale, flagged missing, or traded), then
+    /// ones not already sleeved in another deck box, then the exact printing, then the same set, then
+    /// by location/page/slot so the pull list walks each location in order.</summary>
+    private static List<DecklistPick> AllocatePicks(
+        DecklistEntry entry, List<CollectionCard> ownedCopies, Dictionary<int, int> remaining, HashSet<int> listedLotIds)
+    {
+        var picks = new List<DecklistPick>();
+        var needed = entry.Quantity;
+
+        var ordered = ownedCopies
+            .OrderBy(c => listedLotIds.Contains(c.Id) || c.IsMissing || c.IsTraded)
+            .ThenBy(c => c.Container?.ContainerType == ContainerType.DeckBox)
+            .ThenByDescending(c => entry.SetCode is not null && entry.CollectorNumber is not null
+                && string.Equals(c.SetCode, entry.SetCode, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(c.Number, entry.CollectorNumber, StringComparison.OrdinalIgnoreCase))
+            .ThenByDescending(c => entry.SetCode is not null
+                && string.Equals(c.SetCode, entry.SetCode, StringComparison.OrdinalIgnoreCase))
+            .ThenBy(c => c.Container?.Name ?? "", StringComparer.OrdinalIgnoreCase)
+            .ThenBy(c => c.Section ?? "", StringComparer.OrdinalIgnoreCase)
+            .ThenBy(c => c.Page ?? int.MaxValue)
+            .ThenBy(c => c.Slot ?? int.MaxValue);
+
+        foreach (var c in ordered)
+        {
+            if (needed == 0) break;
+            var available = remaining.GetValueOrDefault(c.Id);
+            if (available <= 0) continue;
+
+            var take = Math.Min(available, needed);
+            remaining[c.Id] = available - take;
+            needed -= take;
+            picks.Add(new DecklistPick(
+                LotId: c.Id,
+                ContainerId: c.ContainerId,
+                ContainerName: c.Container?.Name ?? "Unknown",
+                ContainerType: c.Container?.ContainerType,
+                Page: c.Page,
+                Slot: c.Slot,
+                Section: c.Section,
+                SetCode: c.SetCode,
+                CollectorNumber: c.Number,
+                IsFoil: c.IsFoil,
+                Condition: c.Condition,
+                Quantity: take,
+                IsListed: listedLotIds.Contains(c.Id)));
+        }
+
+        return picks;
     }
 }

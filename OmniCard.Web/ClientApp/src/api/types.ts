@@ -388,16 +388,44 @@ export interface InventoryLotDto {
   acquisitionDate?: string | null;
 }
 
+/** An owned copy allocated to a decklist entry: which lot to pull, how many copies, and where it is. */
+export interface DecklistPickDto {
+  lotId: number;
+  locationId?: number | null;
+  locationName: string;
+  locationType?: string | null;
+  page?: number | null;
+  slot?: number | null;
+  section?: string | null;
+  setCode: string;
+  collectorNumber: string;
+  isFoil: boolean;
+  condition: string;
+  quantity: number;
+  isListed: boolean;
+}
+
 export interface DecklistEntryDto {
   cardName: string;
   quantityNeeded: number;
   setCode?: string | null;
   marketPrice?: number | null;
   imageUri?: string | null;
+  collectorNumber?: string | null;
+  /** Owned entries only: the copies chosen to fill this entry. */
+  picks?: DecklistPickDto[] | null;
+}
+
+/** The decklist source for a check (and for re-running it to print): a URL, or pasted text. */
+export interface DecklistCheckRequest {
+  url?: string;
+  text?: string;
+  game: string;
 }
 
 export interface DecklistCheckDto {
   deckName: string;
+  game: string;
   totalOwned: number;
   totalMissing: number;
   totalCards: number;

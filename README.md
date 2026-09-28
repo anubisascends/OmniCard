@@ -11,7 +11,7 @@ Supports **Magic: The Gathering** (Scryfall), **One Piece TCG**, **Riftbound**, 
 - **Image scanning** — upload card photos/scans (or use the phone camera); matching runs **server-side** (pHash + foil edge hash + OCR), with a review-and-commit queue
 - **Collection management** across storage locations (binders, boxes, deck boxes, bulk), with a visual binder editor
 - **Set completion tracking** + printable want-lists
-- **Decklist checking** against your collection (Moxfield / Archidekt)
+- **Decklist checking** against your collection (Moxfield / Archidekt): printable pull list + missing list, and one-click move into a deck box
 - **CSV import/export** (Manabox, Moxfield, TCGplayer, app-native), plus **import a Moxfield / Archidekt deck URL** straight into a location
 - **Sealed inventory** (booster boxes, packs, cases…) with lots and valuation
 - **Sales & fulfillment** — orders kanban, listings, customers, pick-list & receipt PDFs
@@ -92,12 +92,12 @@ The React app is served at `/app`:
 |-------|-------------|
 | `/` | Dashboard — holdings + realized P&L |
 | `/scan` | Upload/scan cards; server-side match, review, and commit |
-| `/collection` | Searchable collection grid with edit drawer |
+| `/collection` | Searchable collection grid with edit drawer + decklist check (pull/missing PDFs, move to deck box) |
 | `/locations`, `/location/:id`, `/binder/:id` | Storage locations + visual binder |
 | `/sets` | Set-completion checklist + want-list PDF |
 | `/inventory` | Sealed product + lots + valuation |
 | `/lists`, `/trades` | Saved card lists; trade history |
-| `/import` | CSV import/export + decklist check |
+| `/import` | CSV import/export + deck URL import |
 | `/sales` | Orders kanban, listings, customers |
 | `/settings` | eBay connection, catalog refresh, artwork download |
 

@@ -197,6 +197,54 @@ public class WebBinderCardServiceTests : IDisposable
     }
 
     [Fact]
+    public void MoveQuantitiesToContainer_WholeAndPartialPicks()
+    {
+        var single = AddLot("Pikachu");
+        var stack = AddLot("Raichu", quantity: 4);
+        var deckBox = _containers.Create("Pokémon Deck", ContainerType.DeckBox, game: CardGame.Pokemon);
+
+        var moved = _service.MoveQuantitiesToContainer([(single, 1), (stack, 3)], deckBox.Id);
+
+        Assert.Equal(4, moved);
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.Equal(deckBox.Id, ctx.Lots.Single(l => l.Id == single).LocationId);
+        // The stack keeps one copy in the binder; three are split off into the deck box.
+        var remainder = ctx.Lots.Single(l => l.Id == stack);
+        Assert.Equal(_binderId, remainder.LocationId);
+        Assert.Equal(1, remainder.Quantity);
+        var split = ctx.Lots.Single(l => l.ProductId == remainder.ProductId && l.Id != stack);
+        Assert.Equal(deckBox.Id, split.LocationId);
+        Assert.Equal(3, split.Quantity);
+        Assert.Equal(2, ctx.Movements.Count(m => m.Type == MovementType.Move));
+    }
+
+    [Fact]
+    public void MoveQuantitiesToContainer_SkipsLotsAlreadyInTarget()
+    {
+        var deckBox = _containers.Create("Pokémon Deck", ContainerType.DeckBox, game: CardGame.Pokemon);
+        var lotId = AddLot("Pikachu");
+        _service.MoveCardsToContainer([lotId], deckBox.Id);
+
+        Assert.Equal(0, _service.MoveQuantitiesToContainer([(lotId, 1)], deckBox.Id));
+    }
+
+    [Fact]
+    public void MoveQuantitiesToContainer_MismatchedGame_MovesNothing()
+    {
+        var lotId = AddLot("Pikachu", quantity: 2);
+        var deckBox = _containers.Create("MTG Deck", ContainerType.DeckBox, game: CardGame.Mtg);
+
+        Assert.Throws<DeckBoxGameMismatchException>(() =>
+            _service.MoveQuantitiesToContainer([(lotId, 1)], deckBox.Id));
+
+        using var ctx = new OmniCardDbContext(_opts);
+        var lot = ctx.Lots.Single(l => l.Id == lotId);
+        Assert.Equal(_binderId, lot.LocationId);
+        Assert.Equal(2, lot.Quantity);
+        Assert.Single(ctx.Lots);
+    }
+
+    [Fact]
     public void SetFoil_MovesLotToFoilProduct()
     {
         var lotId = AddLot("Foiler", foil: false);
