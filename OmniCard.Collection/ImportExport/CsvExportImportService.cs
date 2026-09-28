@@ -22,10 +22,8 @@ public class CsvExportImportService(
         ["MP"] = "Moderately Played",
         ["HP"] = "Heavily Played",
         ["D"] = "Damaged",
+        ["DMG"] = "Damaged",
     };
-
-    private static readonly Dictionary<string, string> TcgPlayerToCondition =
-        ConditionToTcgPlayer.ToDictionary(kvp => kvp.Value, kvp => kvp.Key, StringComparer.OrdinalIgnoreCase);
 
     private static readonly Dictionary<string, string> ConditionToManabox = new()
     {
@@ -34,10 +32,37 @@ public class CsvExportImportService(
         ["MP"] = "moderately_played",
         ["HP"] = "heavily_played",
         ["D"] = "damaged",
+        ["DMG"] = "damaged",
     };
 
-    private static readonly Dictionary<string, string> ManaboxToCondition =
-        ConditionToManabox.ToDictionary(kvp => kvp.Value, kvp => kvp.Key, StringComparer.OrdinalIgnoreCase);
+    /// <summary>The app's condition codes (the web UI's NM/LP/MP/HP/DMG), accepted by every importer
+    /// alongside the format's own spelling.</summary>
+    private static readonly Dictionary<string, string> ConditionCodes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["NM"] = "NM", ["LP"] = "LP", ["MP"] = "MP", ["HP"] = "HP", ["DMG"] = "DMG", ["D"] = "DMG",
+    };
+
+    /// <summary>TCGplayer / Moxfield spell conditions out ("Near Mint"); Moxfield also has "Mint".</summary>
+    private static readonly Dictionary<string, string> TcgPlayerToCondition = new(ConditionCodes, StringComparer.OrdinalIgnoreCase)
+    {
+        ["Mint"] = "NM",
+        ["Near Mint"] = "NM",
+        ["Lightly Played"] = "LP",
+        ["Moderately Played"] = "MP",
+        ["Heavily Played"] = "HP",
+        ["Damaged"] = "DMG",
+    };
+
+    private static readonly Dictionary<string, string> ManaboxToCondition = new(ConditionCodes, StringComparer.OrdinalIgnoreCase)
+    {
+        ["mint"] = "NM",
+        ["near_mint"] = "NM",
+        ["lightly_played"] = "LP",
+        ["light_played"] = "LP",
+        ["moderately_played"] = "MP",
+        ["heavily_played"] = "HP",
+        ["damaged"] = "DMG",
+    };
 
     // ── App-Native Export ──
 
@@ -63,6 +88,7 @@ public class CsvExportImportService(
         csv.WriteField("Page");
         csv.WriteField("Slot");
         csv.WriteField("Section");
+        csv.WriteField("Quantity");
         csv.NextRecord();
 
         foreach (var card in cards)
@@ -84,6 +110,7 @@ public class CsvExportImportService(
             csv.WriteField(card.Page?.ToString() ?? "");
             csv.WriteField(card.Slot?.ToString() ?? "");
             csv.WriteField(card.Section ?? "");
+            csv.WriteField(card.Quantity);
             csv.NextRecord();
         }
 
@@ -365,37 +392,51 @@ public class CsvExportImportService(
             return new CsvImportPreview
             {
                 DetectedFormat = CsvFormat.AppNative,
+                FormatRecognized = false,
+                Headers = [.. headers],
                 Warnings = ["Unrecognized CSV format"],
                 TotalRows = 0,
             };
         }
 
         var cards = new List<CollectionCard>();
+        var cardRows = new List<int>();
         var warnings = new List<string>();
+        var issues = new List<CsvRowIssue>();
         var totalRows = 0;
 
         while (csv.Read())
         {
             totalRows++;
+            var row = csv.Parser.Row;
+            var rowIssues = new List<string>();
             try
             {
                 var card = format.Value switch
                 {
-                    CsvFormat.AppNative => ParseAppNativeRow(csv),
-                    CsvFormat.TcgPlayer => ParseTcgPlayerRow(csv),
-                    CsvFormat.Moxfield => ParseMoxfieldRow(csv),
-                    CsvFormat.Manabox => ParseManaboxRow(csv),
+                    CsvFormat.AppNative => ParseAppNativeRow(csv, rowIssues),
+                    CsvFormat.TcgPlayer => ParseTcgPlayerRow(csv, rowIssues),
+                    CsvFormat.Moxfield => ParseMoxfieldRow(csv, rowIssues),
+                    CsvFormat.Manabox => ParseManaboxRow(csv, rowIssues),
                     _ => null,
                 };
 
                 if (card is not null)
+                {
                     cards.Add(card);
+                    cardRows.Add(row);
+                    issues.AddRange(rowIssues.Select(m => new CsvRowIssue(row, NullIfBlank(card.Name), m)));
+                }
                 else
+                {
                     warnings.Add($"Row {totalRows}: could not parse card");
+                    issues.Add(new CsvRowIssue(row, null, "This row couldn't be read as a card."));
+                }
             }
             catch (Exception ex)
             {
                 warnings.Add($"Row {totalRows}: {ex.Message}");
+                issues.Add(new CsvRowIssue(row, NullIfBlank(TryGetField(csv, "Name")), ex.Message));
             }
         }
 
@@ -404,8 +445,11 @@ public class CsvExportImportService(
         return new CsvImportPreview
         {
             DetectedFormat = format.Value,
+            Headers = [.. headers],
             Cards = cards,
+            CardRows = cardRows,
             Warnings = warnings,
+            Issues = issues,
             TotalRows = totalRows,
         };
     }
@@ -463,19 +507,26 @@ public class CsvExportImportService(
     }
 
     // ── Row Parsers ──
+    // Each parser appends to `issues` any value it had to default (the lenient import ignores these;
+    // the all-or-nothing location import rejects the file over them).
 
-    private static CollectionCard ParseAppNativeRow(CsvReader csv)
+    private static CollectionCard ParseAppNativeRow(CsvReader csv, List<string> issues)
     {
+        var gameRaw = csv.GetField("Game");
+        if (!Enum.TryParse<CardGame>(gameRaw, ignoreCase: true, out var game) || !Enum.IsDefined(game))
+            throw new FormatException(
+                $"Unknown game '{gameRaw}'. Expected one of: {string.Join(", ", Enum.GetNames<CardGame>())}.");
+
         var card = new CollectionCard
         {
-            Game = Enum.Parse<CardGame>(csv.GetField("Game")!, ignoreCase: true),
+            Game = game,
             GameCardId = csv.GetField("GameCardId") ?? "",
             Name = csv.GetField("Name") ?? "",
             SetName = csv.GetField("SetName") ?? "",
             SetCode = csv.GetField("SetCode") ?? "",
             Number = csv.GetField("Number") ?? "",
             Rarity = csv.GetField("Rarity") ?? "",
-            Condition = csv.GetField("Condition") ?? "NM",
+            Condition = csv.GetField("Condition") is { Length: > 0 } cond ? cond : "NM",
             IsFoil = bool.TryParse(csv.GetField("IsFoil"), out var foil) && foil,
             FoilType = csv.GetField("FoilType") is { Length: > 0 } ft ? ft : null,
             PurchasePrice = decimal.TryParse(csv.GetField("PurchasePrice"), CultureInfo.InvariantCulture, out var price) ? price : null,
@@ -483,6 +534,7 @@ public class CsvExportImportService(
             Page = int.TryParse(csv.GetField("Page"), out var page) ? page : null,
             Slot = int.TryParse(csv.GetField("Slot"), out var slot) ? slot : null,
             Section = csv.GetField("Section") is { Length: > 0 } sec ? sec : null,
+            Quantity = ParseQuantity(csv, "Quantity", issues),
         };
 
         var containerName = csv.GetField("ContainerName");
@@ -496,11 +548,8 @@ public class CsvExportImportService(
         return card;
     }
 
-    private static CollectionCard ParseTcgPlayerRow(CsvReader csv)
+    private static CollectionCard ParseTcgPlayerRow(CsvReader csv, List<string> issues)
     {
-        var conditionRaw = csv.GetField("Condition") ?? "Near Mint";
-        var condition = TcgPlayerToCondition.GetValueOrDefault(conditionRaw, "NM");
-
         return new CollectionCard
         {
             Game = CardGame.Mtg,
@@ -510,14 +559,15 @@ public class CsvExportImportService(
             SetCode = "",
             Number = csv.GetField("Number") ?? "",
             Rarity = "",
-            Condition = condition,
+            Condition = MapCondition(csv.GetField("Condition"), TcgPlayerToCondition, issues),
             IsFoil = csv.GetField("Printing") == "Foil",
             PurchasePrice = decimal.TryParse(csv.GetField("Price"), CultureInfo.InvariantCulture, out var price) ? price : null,
             DateAdded = DateTime.UtcNow,
+            Quantity = ParseQuantity(csv, "Quantity", issues),
         };
     }
 
-    private static CollectionCard ParseMoxfieldRow(CsvReader csv)
+    private static CollectionCard ParseMoxfieldRow(CsvReader csv, List<string> issues)
     {
         return new CollectionCard
         {
@@ -528,17 +578,17 @@ public class CsvExportImportService(
             SetCode = csv.GetField("Edition") ?? "",
             Number = csv.GetField("Collector Number") ?? "",
             Rarity = "",
-            Condition = csv.GetField("Condition") ?? "NM",
+            Condition = MapCondition(csv.GetField("Condition"), TcgPlayerToCondition, issues),
             IsFoil = csv.GetField("Foil") == "foil",
             PurchasePrice = decimal.TryParse(csv.GetField("Purchase Price"), CultureInfo.InvariantCulture, out var price) ? price : null,
             DateAdded = DateTime.UtcNow,
+            Quantity = ParseQuantity(csv, "Count", issues),
         };
     }
 
-    private static CollectionCard ParseManaboxRow(CsvReader csv)
+    private static CollectionCard ParseManaboxRow(CsvReader csv, List<string> issues)
     {
         var scryfallId = csv.GetField("Scryfall ID");
-        var manaboxCondition = csv.GetField("Condition") ?? "near_mint";
 
         return new CollectionCard
         {
@@ -549,10 +599,42 @@ public class CsvExportImportService(
             SetCode = csv.GetField("Set code") ?? "",
             Number = csv.GetField("Collector number") ?? "",
             Rarity = csv.GetField("Rarity") ?? "",
-            Condition = ManaboxToCondition.GetValueOrDefault(manaboxCondition, "NM"),
+            Condition = MapCondition(csv.GetField("Condition"), ManaboxToCondition, issues),
             IsFoil = csv.GetField("Foil") == "foil",
             PurchasePrice = decimal.TryParse(csv.GetField("Purchase price"), CultureInfo.InvariantCulture, out var price) ? price : null,
             DateAdded = DateTime.UtcNow,
+            Quantity = ParseQuantity(csv, "Quantity", issues),
         };
     }
+
+    /// <summary>A blank condition means NM; an unrecognized one is read as NM and reported.</summary>
+    private static string MapCondition(string? raw, Dictionary<string, string> map, List<string> issues)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return "NM";
+        if (map.TryGetValue(raw.Trim(), out var condition))
+            return condition;
+        issues.Add($"Unrecognized condition '{raw}'. Use one of: {string.Join(", ", map.Keys)}.");
+        return "NM";
+    }
+
+    /// <summary>A missing/blank quantity means 1; anything but a whole number of 1+ is read as 1 and reported.</summary>
+    private static int ParseQuantity(CsvReader csv, string column, List<string> issues)
+    {
+        var raw = csv.GetField(column);
+        if (string.IsNullOrWhiteSpace(raw))
+            return 1;
+        if (int.TryParse(raw.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var qty) && qty > 0)
+            return qty;
+        issues.Add($"{column} '{raw}' must be a whole number of 1 or more.");
+        return 1;
+    }
+
+    private static string? TryGetField(CsvReader csv, string name)
+    {
+        try { return csv.GetField(name); }
+        catch { return null; }
+    }
+
+    private static string? NullIfBlank(string? s) => string.IsNullOrWhiteSpace(s) ? null : s;
 }

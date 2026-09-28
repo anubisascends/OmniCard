@@ -7,6 +7,7 @@ import type {
   ComponentDto,
   CsvImportResultDto,
   ImportUrlResultDto,
+  LocationImportResultDto,
   AddListItemRequest,
   CardListDto,
   CardListItemDto,
@@ -131,11 +132,13 @@ export interface LotFields {
   source?: string | null;
 }
 
-/** Thrown for non-2xx responses; carries the HTTP status so callers can special-case 401. */
+/** Thrown for non-2xx responses; carries the HTTP status so callers can special-case 401, and the
+ *  parsed JSON error body (when there was one) for endpoints that return structured errors. */
 export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public body?: unknown,
   ) {
     super(message);
   }
@@ -150,13 +153,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     let message = res.statusText;
+    let body: unknown;
     try {
-      const body = await res.json();
-      if (body?.error) message = body.error;
+      body = await res.json();
+      if ((body as { error?: string })?.error) message = (body as { error: string }).error;
     } catch {
       /* non-JSON error body */
     }
-    throw new ApiError(res.status, message);
+    throw new ApiError(res.status, message, body);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -167,13 +171,14 @@ async function postForm<T>(path: string, form: FormData): Promise<T> {
   const res = await fetch(path, { method: 'POST', body: form, credentials: 'same-origin' });
   if (!res.ok) {
     let message = res.statusText;
+    let b: { error?: string } | undefined;
     try {
-      const b = await res.json();
+      b = await res.json();
       if (b?.error) message = b.error;
     } catch {
       /* non-JSON error body */
     }
-    throw new ApiError(res.status, message);
+    throw new ApiError(res.status, message, b);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -618,6 +623,19 @@ export const api = {
   /** Import a Moxfield/Archidekt deck URL straight into a location as owned lots. */
   importUrl: (body: { url: string; game: string; containerId: number; condition: string; skipDuplicates: boolean }) =>
     request<ImportUrlResultDto>('/api/import/url', { method: 'POST', body: JSON.stringify(body) }),
+  /** All-or-nothing CSV import into one location (the Location view's Import). A rejected import
+   *  throws an ApiError (422) whose body is a LocationImportFailureDto listing every problem. */
+  importCsvToLocation: (locationId: number, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return postForm<LocationImportResultDto>(`/api/import/location/${locationId}/csv`, form);
+  },
+  /** All-or-nothing Moxfield/Archidekt deck import into one location (422 + LocationImportFailureDto on rejection). */
+  importUrlToLocation: (locationId: number, body: { url: string; condition: string }) =>
+    request<LocationImportResultDto>(`/api/import/location/${locationId}/url`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   decklistCheck: (body: DecklistCheckRequest) =>
     request<DecklistCheckDto>('/api/decklist/check', { method: 'POST', body: JSON.stringify(body) }),
   /** Download the printable pull list (owned copies to pull, with tick-boxes) for a decklist. */

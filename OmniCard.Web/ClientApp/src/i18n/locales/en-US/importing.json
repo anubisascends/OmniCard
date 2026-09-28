@@ -39,6 +39,21 @@
       "substituted_other": "{{count}} cards' exact printings weren't in the catalog; used the cheapest printing:",
       "unresolved_one": "{{count}} card couldn't be found:",
       "unresolved_other": "{{count}} cards couldn't be found:"
+    },
+    "location": {
+      "title": "Import into {{name}}",
+      "csvTab": "CSV file",
+      "urlTab": "Deck URL",
+      "allOrNothing": "Every card is added to {{name}}. It's all or nothing: if any line has a problem, nothing is imported and each problem is listed below so you can fix it and try again.",
+      "csvHelp": "An OmniCard, TCGplayer, Moxfield or ManaBox collection CSV. Every row must match a card in the catalog.",
+      "urlHelp": "A public Moxfield or Archidekt deck (Magic: The Gathering). Every card must match a card in the catalog.",
+      "row": "Row {{row}}",
+      "more_one": "…and {{count}} more.",
+      "more_other": "…and {{count}} more.",
+      "success_one": "Imported {{copies}} card from \"{{source}}\" into {{name}}.",
+      "success_other": "Imported {{copies}} cards ({{lines}} lines) from \"{{source}}\" into {{name}}.",
+      "substituted_one": "{{count}} line's exact printing wasn't in the catalog, so another printing of the same card was used:",
+      "substituted_other": "{{count}} lines' exact printings weren't in the catalog, so another printing of the same card was used:"
     }
   }
 }

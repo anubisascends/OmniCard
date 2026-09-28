@@ -208,6 +208,31 @@ condition.
   running Windows' built-in **`curl.exe`**. It must be on the server's `PATH` (it is by default on Windows
   10 1803+ / Server 2019+). The server needs outbound HTTPS to `api2.moxfield.com` and `archidekt.com`.
 
+## Import into a location (all-or-nothing)
+
+A location's page has an **Import** button that takes a collection CSV (OmniCard, TCGplayer, Moxfield or
+ManaBox) or a Moxfield / Archidekt deck URL and adds every line to *that* location. It's stricter than the
+Import / Export page:
+
+- **No location choice.** Every card goes into the current location, whatever location the file names.
+  Binder page/slot positions from the file are dropped, so the cards arrive unplaced. A deck-box section is
+  kept only when importing into a deck box.
+- **No duplicate skipping.** Every line is imported, even if you already own that card.
+- **All or nothing.** Every line has to parse cleanly and match a real catalog card before anything is
+  written. Rows with an ID (OmniCard, ManaBox) are checked by ID. Other rows are matched by name plus
+  set/collector number (TCGplayer by set name). Game-locked deck boxes reject other games. If any line
+  fails, including an unrecognized condition or a bad quantity, nothing is imported. The user sees every
+  problem, with its CSV row number, card name and a fix.
+
+A printing that isn't in the catalog is imported as another printing of the same card, as the lenient URL
+import does, and the success message lists those lines.
+
+- API: `POST /api/import/location/{id}/csv` (multipart `file`) and `POST /api/import/location/{id}/url`
+  (`{ url, condition }`), both `ImportRun`. A rejected import returns **422** with
+  `{ error, errors: [{ row, card, message }] }`.
+- CSV quantities are now read on every import (`Quantity` for TCGplayer/ManaBox, `Count` for Moxfield). The
+  OmniCard export writes a `Quantity` column, so a stacked lot round-trips.
+
 ## Order CSV import
 
 **Sales → Orders → Import CSV** creates orders from a CSV using a reusable column-mapping **template**.

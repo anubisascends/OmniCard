@@ -21,7 +21,8 @@ public sealed class ImportController(
     ICsvExportImportService csv,
     WebBinderCardService binderCards,
     IDecklistService decklists,
-    ICardService cardService) : ApiControllerBase
+    ICardService cardService,
+    LocationImportService locationImport) : ApiControllerBase
 {
     [HttpPost("csv")]
     [RequirePermission(Permissions.ImportRun)]
@@ -166,4 +167,40 @@ public sealed class ImportController(
         return new ImportUrlResultDto(
             deckName, imported, skipped, entries.Sum(e => e.Quantity), unresolved, substituted);
     }
+
+    /// <summary>All-or-nothing CSV import into the location in the route (the Location view's Import).
+    /// Every row must parse and resolve to a catalog card; otherwise nothing is written and the response
+    /// is a 422 <see cref="LocationImportFailureDto"/> listing every problem.</summary>
+    [HttpPost("location/{locationId:int}/csv")]
+    [RequirePermission(Permissions.ImportRun)]
+    public ActionResult<LocationImportResultDto> LocationCsv(int locationId, IFormFile? file)
+    {
+        if (file is null || file.Length == 0)
+            return UnprocessableEntity(new LocationImportFailureDto("Choose a CSV file to import — the file was empty or missing.", []));
+
+        var path = Path.Combine(Path.GetTempPath(), $"omnicard-import-{Guid.NewGuid():N}.csv");
+        try
+        {
+            using (var fs = System.IO.File.Create(path))
+                file.CopyTo(fs);
+            return ToResult(locationImport.ImportCsv(locationId, path, file.FileName));
+        }
+        finally
+        {
+            if (System.IO.File.Exists(path))
+                System.IO.File.Delete(path);
+        }
+    }
+
+    /// <summary>All-or-nothing Moxfield/Archidekt deck import into the location in the route. Every card
+    /// must resolve to a catalog printing; otherwise nothing is written (422 + every unresolved card).</summary>
+    [HttpPost("location/{locationId:int}/url")]
+    [RequirePermission(Permissions.ImportRun)]
+    public async Task<ActionResult<LocationImportResultDto>> LocationUrl(int locationId, [FromBody] LocationUrlImportRequest request) =>
+        ToResult(await locationImport.ImportUrlAsync(locationId, request));
+
+    private ActionResult<LocationImportResultDto> ToResult(LocationImportService.Outcome outcome) =>
+        outcome.LocationNotFound ? NotFound(new { error = "That location no longer exists." })
+        : outcome.Failure is { } failure ? UnprocessableEntity(failure)
+        : outcome.Result!;
 }
