@@ -820,11 +820,46 @@ public sealed record DecklistCheckRequest
     public string Game { get; init; } = "Mtg";
 }
 
-public sealed record DecklistEntryDto(string CardName, int QuantityNeeded, string? SetCode, decimal? MarketPrice, string? ImageUri);
+/// <summary>An owned copy allocated to a decklist entry — which lot to pull, how many copies, and where it is.</summary>
+public sealed record DecklistPickDto(
+    int LotId,
+    int? LocationId,
+    string LocationName,
+    string? LocationType,
+    int? Page,
+    int? Slot,
+    string? Section,
+    string SetCode,
+    string CollectorNumber,
+    bool IsFoil,
+    string Condition,
+    int Quantity,
+    bool IsListed);
+
+public sealed record DecklistEntryDto(
+    string CardName,
+    int QuantityNeeded,
+    string? SetCode,
+    decimal? MarketPrice,
+    string? ImageUri,
+    string? CollectorNumber = null,
+    IReadOnlyList<DecklistPickDto>? Picks = null);
+
+/// <summary>A single (lot, copies) pair to move — taken from a decklist check's picks.</summary>
+public sealed record DecklistMovePick(int LotId, int Quantity);
+
+public sealed record DecklistMoveRequest
+{
+    public int ContainerId { get; init; }
+    public IReadOnlyList<DecklistMovePick> Picks { get; init; } = [];
+}
+
+public sealed record DecklistMoveResultDto(int Moved);
 
 public sealed record DecklistCheckDto
 {
     public string DeckName { get; init; } = "";
+    public string Game { get; init; } = "";
     public int TotalOwned { get; init; }
     public int TotalMissing { get; init; }
     public int TotalCards { get; init; }

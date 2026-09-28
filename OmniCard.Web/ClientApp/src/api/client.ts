@@ -26,6 +26,7 @@ import type {
   EbayStatusDto,
   InventoryLotDto,
   DecklistCheckDto,
+  DecklistCheckRequest,
   GameDto,
   InventoryValuationDto,
   ListingDetailDto,
@@ -176,6 +177,37 @@ async function postForm<T>(path: string, form: FormData): Promise<T> {
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+/** POST a JSON body and save the response as a file (name from Content-Disposition, else `fallbackName`). */
+async function postDownload(path: string, body: unknown, fallbackName: string): Promise<void> {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    credentials: 'same-origin',
+  });
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const b = await res.json();
+      if (b?.error) message = b.error;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(res.status, message);
+  }
+  const blob = await res.blob();
+  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = match ? decodeURIComponent(match[1]) : fallbackName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function qs(params: Record<string, string | number | boolean | undefined | null>): string {
@@ -586,8 +618,20 @@ export const api = {
   /** Import a Moxfield/Archidekt deck URL straight into a location as owned lots. */
   importUrl: (body: { url: string; game: string; containerId: number; condition: string; skipDuplicates: boolean }) =>
     request<ImportUrlResultDto>('/api/import/url', { method: 'POST', body: JSON.stringify(body) }),
-  decklistCheck: (body: { url?: string; text?: string; game: string }) =>
+  decklistCheck: (body: DecklistCheckRequest) =>
     request<DecklistCheckDto>('/api/decklist/check', { method: 'POST', body: JSON.stringify(body) }),
+  /** Download the printable pull list (owned copies to pull, with tick-boxes) for a decklist. */
+  decklistPullListPdf: (body: DecklistCheckRequest) =>
+    postDownload('/api/decklist/pull-list.pdf', body, 'pull-list.pdf'),
+  /** Download the printable missing-cards list (with prices and tick-boxes) for a decklist. */
+  decklistMissingListPdf: (body: DecklistCheckRequest) =>
+    postDownload('/api/decklist/missing-list.pdf', body, 'missing-cards.pdf'),
+  /** Move a decklist check's picks into a deck box (stacks are split so only the needed copies move). */
+  decklistMoveToDeckBox: (containerId: number, picks: { lotId: number; quantity: number }[]) =>
+    request<{ moved: number }>('/api/decklist/move-to-deck-box', {
+      method: 'POST',
+      body: JSON.stringify({ containerId, picks }),
+    }),
 
   // Trades (read-only history)
   trades: () => request<TradeSummaryDto[]>('/api/trades'),
