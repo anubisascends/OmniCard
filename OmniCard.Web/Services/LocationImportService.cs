@@ -17,7 +17,8 @@ namespace OmniCard.Web.Services;
 /// Location view's Import). Unlike the lenient Import page there's no location choice and no duplicate
 /// skipping: every line is validated first — parsed cleanly, resolved to a real catalog printing,
 /// allowed into the location — and if any line fails, nothing is written and every problem is returned
-/// so the user can fix them in one pass. The write itself is a single <c>SaveChanges</c>, so it's atomic too.</summary>
+/// so the user can fix them in one pass. The write itself is a single <c>SaveChanges</c>, so it's atomic too.
+/// These are physical cards, so a line with quantity N becomes N separate lots of one copy each.</summary>
 public sealed class LocationImportService(
     IDbContextFactory<OmniCardDbContext> dbFactory,
     ICsvExportImportService csv,
@@ -178,7 +179,7 @@ public sealed class LocationImportService(
 
         var errors = new List<LocationImportIssueDto>();
         var substitutions = new List<LocationImportIssueDto>();
-        var cards = new Dictionary<(string GameCardId, string? Finish), CollectionCard>();
+        var cards = new List<CollectionCard>();
 
         foreach (var entry in entries)
         {
@@ -194,13 +195,6 @@ public sealed class LocationImportService(
                 substitutions.Add(new LocationImportIssueDto(null, entry.CardName,
                     $"{DescribeDeckPrinting(entry).Trim(' ', '(', ')')} isn't in the catalog, so it was imported as {printing.SetCode} #{printing.CollectorNumber}."));
 
-            var key = (printing.GameSpecificId, entry.Finish);
-            if (cards.TryGetValue(key, out var existing))
-            {
-                existing.Quantity += Math.Max(1, entry.Quantity);
-                continue;
-            }
-
             var card = new CollectionCard
             {
                 Game = game,
@@ -212,7 +206,7 @@ public sealed class LocationImportService(
             };
             ApplyPrinting(card, printing);
             PlaceInTarget(card, target);
-            cards[key] = card;
+            cards.Add(card);
         }
 
         if (errors.Count > 0)
@@ -220,7 +214,7 @@ public sealed class LocationImportService(
                 $"Nothing was imported. {Plural(errors.Count, "card")} in \"{deckName}\" couldn't be found — fix {(errors.Count == 1 ? "it" : "them")} on the deck site (or refresh the catalog) and import again.",
                 errors);
 
-        return Write(cards.Values.ToList(), target, deckName, null, substitutions);
+        return Write(cards, target, deckName, null, substitutions);
     }
 
     private Target? LoadTarget(int locationId)
@@ -238,12 +232,14 @@ public sealed class LocationImportService(
         catch (Exception) { return null; }
     }
 
-    private Outcome Write(List<CollectionCard> cards, Target target, string source, string? format,
+    /// <summary>Writes the validated <paramref name="lines"/>, one lot per physical copy.</summary>
+    private Outcome Write(List<CollectionCard> lines, Target target, string source, string? format,
         List<LocationImportIssueDto> substitutions)
     {
+        var singles = lines.SelectMany(ToSingleCopies).ToList();
         try
         {
-            binderCards.ImportCollectionCards(cards, skipDuplicates: false);
+            binderCards.ImportCollectionCards(singles, skipDuplicates: false);
         }
         catch (DeckBoxGameMismatchException ex)
         {
@@ -257,9 +253,35 @@ public sealed class LocationImportService(
         }
 
         logger.LogInformation("Imported {Lines} lines ({Copies} copies) from {Source} into location {Location}",
-            cards.Count, cards.Sum(c => c.Quantity), source, target.Name);
-        return new Outcome(new LocationImportResultDto(source, format, cards.Count, cards.Sum(c => c.Quantity), substitutions), null);
+            lines.Count, singles.Count, source, target.Name);
+        return new Outcome(new LocationImportResultDto(source, format, lines.Count, singles.Count, substitutions), null);
     }
+
+    /// <summary>One card per physical copy: a line of quantity N becomes N cards of quantity 1, each
+    /// written as its own lot.</summary>
+    private static IEnumerable<CollectionCard> ToSingleCopies(CollectionCard line) =>
+        Enumerable.Range(0, Math.Max(1, line.Quantity)).Select(_ => new CollectionCard
+        {
+            Game = line.Game,
+            GameCardId = line.GameCardId,
+            Name = line.Name,
+            SetName = line.SetName,
+            SetCode = line.SetCode,
+            Number = line.Number,
+            Rarity = line.Rarity,
+            ImageUri = line.ImageUri,
+            Color = line.Color,
+            CardType = line.CardType,
+            Condition = line.Condition,
+            IsFoil = line.IsFoil,
+            FoilType = line.FoilType,
+            PurchasePrice = line.PurchasePrice,
+            Note = line.Note,
+            DateAdded = line.DateAdded,
+            ContainerId = line.ContainerId,
+            Section = line.Section,
+            Quantity = 1,
+        });
 
     /// <summary>Confirms a row's catalog id is real and backfills what the file doesn't carry (art,
     /// color, type). False when the id isn't in the catalog.</summary>

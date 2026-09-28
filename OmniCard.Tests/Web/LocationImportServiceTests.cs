@@ -114,8 +114,11 @@ public class LocationImportServiceTests : IDisposable
         var lots = Lots();
         Assert.All(lots, l => Assert.Equal((int?)_boxId, l.LocationId));
         Assert.All(lots, l => Assert.Null(l.Page));
-        Assert.Contains(lots, l => l.GameCardId == "bolt-2x2" && l.Qty == 4 && l.Condition == "LP");
-        Assert.Contains(lots, l => l.GameCardId == "sol-scd" && l.Qty == 1 && l.Condition == "DMG");
+        // Physical cards: a quantity-4 row becomes 4 separate single-copy lots.
+        Assert.Equal(5, lots.Count);
+        Assert.All(lots, l => Assert.Equal(1, l.Qty));
+        Assert.Equal(4, lots.Count(l => l.GameCardId == "bolt-2x2" && l.Condition == "LP"));
+        Assert.Single(lots, l => l.GameCardId == "sol-scd" && l.Condition == "DMG");
 
         using var ctx = new OmniCardDbContext(_opts);
         Assert.DoesNotContain(ctx.StorageContainers, c => c.Name == "Blue Binder");
@@ -187,8 +190,9 @@ public class LocationImportServiceTests : IDisposable
             "3,Lightning Bolt,Magic 2010,146,Lightly Played,Normal,1.00\n");
 
         Assert.Null(outcome.Failure);
-        var lot = Assert.Single(Lots());
-        Assert.Equal(("bolt-m10", 3, "LP"), (lot.GameCardId, lot.Qty, lot.Condition));
+        var lots = Lots();
+        Assert.Equal(3, lots.Count);
+        Assert.All(lots, l => Assert.Equal(("bolt-m10", 1, "LP"), (l.GameCardId, l.Qty, l.Condition)));
     }
 
     [Fact]
@@ -232,7 +236,7 @@ public class LocationImportServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Url_AllResolved_ImportsIntoLocation_MergingRepeats()
+    public async Task Url_AllResolved_ImportsIntoLocation_OneLotPerCopy()
     {
         _decklists.FetchResult = ("My Deck",
         [
@@ -243,8 +247,11 @@ public class LocationImportServiceTests : IDisposable
 
         var outcome = await _service.ImportUrlAsync(_boxId, new LocationUrlImportRequest { Url = "https://moxfield.com/decks/abc", Condition = "LP" });
 
-        Assert.Equal(("My Deck", 2, 5), (outcome.Result!.Source, outcome.Result.Lines, outcome.Result.Copies));
-        Assert.Contains(Lots(), l => l.GameCardId == "bolt-2x2" && l.Qty == 4 && l.Condition == "LP" && l.LocationId == _boxId);
+        Assert.Equal(("My Deck", 3, 5), (outcome.Result!.Source, outcome.Result.Lines, outcome.Result.Copies));
+        var lots = Lots();
+        Assert.Equal(5, lots.Count);
+        Assert.All(lots, l => Assert.Equal((1, (int?)_boxId), (l.Qty, l.LocationId)));
+        Assert.Equal(4, lots.Count(l => l.GameCardId == "bolt-2x2" && l.Condition == "LP"));
     }
 
     [Fact]

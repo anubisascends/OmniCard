@@ -61,7 +61,12 @@
       "splitQtyLabel": "Copies to move to a new stack",
       "splitHelper": "Splits {{split}} into a separate stack, leaving {{remaining}} here. The new copies go to the binder's Unplaced pool.",
       "splitting": "Splitting…",
-      "splitToast": "Stack split — the new copies are in the binder's Unplaced pool."
+      "splitToast": "Stack split — the new copies are in the binder's Unplaced pool.",
+      "splitSingles": "Split into {{count}} singles",
+      "splitSinglesTooltip_one": "This card keeps 1 copy and {{count}} new single card is created in the same location (in a binder, it goes to the Unplaced pool).",
+      "splitSinglesTooltip_other": "This card keeps 1 copy and {{count}} new single cards are created in the same location (in a binder, they go to the Unplaced pool).",
+      "splitSinglesToast_one": "Split into {{count}} single card — the new copies are in the binder's Unplaced pool.",
+      "splitSinglesToast_other": "Split into {{count}} single cards — the new copies are in the binder's Unplaced pool."
     },
     "locationPicker": {
       "defaultTitle": "Move to location",

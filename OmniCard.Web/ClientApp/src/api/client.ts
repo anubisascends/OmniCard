@@ -399,6 +399,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ quantity }),
     }),
+  /** Split a stacked lot into single copies — the original keeps one, each other copy gets its own
+   *  loose lot (returns the new lot ids). */
+  cardSplitSingles: (id: number) =>
+    request<{ lotIds: number[] }>(`/api/collection/${id}/split-singles`, { method: 'POST' }),
   cardMove: (cardIds: number[], containerId: number, section?: string) =>
     request<void>('/api/collection/move', {
       method: 'POST',

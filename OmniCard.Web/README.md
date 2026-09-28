@@ -218,6 +218,8 @@ Import / Export page:
   Binder page/slot positions from the file are dropped, so the cards arrive unplaced. A deck-box section is
   kept only when importing into a deck box.
 - **No duplicate skipping.** Every line is imported, even if you already own that card.
+- **One record per physical card.** A line with quantity 4 creates 4 separate lots of 1, so each copy can
+  be placed, listed or moved on its own.
 - **All or nothing.** Every line has to parse cleanly and match a real catalog card before anything is
   written. Rows with an ID (OmniCard, ManaBox) are checked by ID. Other rows are matched by name plus
   set/collector number (TCGplayer by set name). Game-locked deck boxes reject other games. If any line
