@@ -15,4 +15,9 @@ public class OcrMatchResult
     /// own, so the (SetCode, CollectorNumber) pair is what identifies a printing — see
     /// ScryfallService.FindClosestMatch Phase 0. Null for games that look up by collector number alone.</summary>
     public string? SetCode { get; init; }
+
+    /// <summary>MTG only: other (set, collector) reads the OCR passes disagreed on, besides
+    /// <see cref="SetCode"/>/<see cref="CollectorNumber"/>. ScryfallService Phase 0 resolves each and lets the
+    /// scan's image hash pick between them, so one misread digit can't pin the wrong printing.</summary>
+    public IReadOnlyList<MtgPrintedIdentity> AlternateSetNumbers { get; init; } = [];
 }

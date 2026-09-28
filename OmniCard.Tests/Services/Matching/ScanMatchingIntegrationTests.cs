@@ -97,6 +97,57 @@ public class ScanMatchingIntegrationTests : IDisposable
         Assert.Equal("OcrSetCollector", _scryfallService.LastMatchDiagnostics?.DecisionPhase);
     }
 
+    // Two catalog printings whose image hashes are far apart — stand-ins for a misread digit landing on
+    // an unrelated card (real case: "155/277" read as "185/277" by two of three OCR passes).
+    private (OmniCard.Shared.Cards.Card Top, OmniCard.Shared.Cards.Card Alternate) TwoDistinctPrintings()
+    {
+        using var ctx = _dbFactory.CreateDbContext();
+        var cards = ctx.Cards.AsNoTracking().Where(c => c.ImageHash != null).Take(50).ToList();
+        var top = cards[0];
+        var alternate = cards.First(c => PerceptualHashService.HammingDistance(top.ImageHash!.Value, c.ImageHash!.Value)
+                                         > ScryfallService.AlternateReadMinHashAdvantage * 2);
+        return (top, alternate);
+    }
+
+    [Fact]
+    public void FindClosestMatch_OcrAlternateRead_ClearlyCloserToScan_DisplacesTopRead()
+    {
+        var (top, alternate) = TwoDistinctPrintings();
+        var ocr = new OcrMatchResult
+        {
+            SetCode = top.SetCode.ToUpperInvariant(),
+            CollectorNumber = top.CollectorNumber,
+            CollectorNumberConfidence = 0.9,
+            AlternateSetNumbers = [new MtgPrintedIdentity(alternate.SetCode.ToUpperInvariant(), alternate.CollectorNumber, 1)],
+        };
+
+        // The scan looks like the alternate — the image settles the OCR disagreement.
+        var match = _scryfallService.FindClosestMatch(alternate.ImageHash!.Value, ocrResult: ocr);
+
+        Assert.NotNull(match);
+        Assert.Equal(alternate.Id.ToString(), match!.GameSpecificId);
+        Assert.Equal("OcrSetCollector", _scryfallService.LastMatchDiagnostics?.DecisionPhase);
+    }
+
+    [Fact]
+    public void FindClosestMatch_OcrAlternateRead_NotClearlyCloser_KeepsTopRead()
+    {
+        var (top, alternate) = TwoDistinctPrintings();
+        var ocr = new OcrMatchResult
+        {
+            SetCode = top.SetCode.ToUpperInvariant(),
+            CollectorNumber = top.CollectorNumber,
+            CollectorNumberConfidence = 0.9,
+            AlternateSetNumbers = [new MtgPrintedIdentity(alternate.SetCode.ToUpperInvariant(), alternate.CollectorNumber, 1)],
+        };
+
+        // The scan looks like the top-voted read, so the alternate can't displace it.
+        var match = _scryfallService.FindClosestMatch(top.ImageHash!.Value, ocrResult: ocr);
+
+        Assert.NotNull(match);
+        Assert.Equal(top.Id.ToString(), match!.GameSpecificId);
+    }
+
     [Fact]
     public void FindClosestMatch_OcrSetAndNumber_UnknownPair_FallsBackToPHash()
     {

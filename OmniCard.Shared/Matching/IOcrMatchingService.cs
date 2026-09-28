@@ -15,6 +15,16 @@ public interface IOcrMatchingService
     /// number (e.g. "66"). Both are needed to identify a printing; either being null means the read
     /// isn't usable for a ground-truth lookup (e.g. pre-2015 cards that print neither).</summary>
     Task<(string? SetCode, string? CollectorNumber, double Confidence)> DetectMtgSetAndNumberAsync(byte[] imageData);
+    /// <summary>Every distinct (set code, collector number) the OCR passes read from the MTG bottom-left
+    /// corner, best first (empty when nothing usable was read). The first entry is what
+    /// <see cref="DetectMtgSetAndNumberAsync"/> returns; the rest are alternates for the catalog lookup to
+    /// weigh against the image when the passes disagree. Default wraps the single best read so test doubles
+    /// needn't implement it; the real service overrides it.</summary>
+    async Task<(IReadOnlyList<MtgPrintedIdentity> Reads, double Confidence)> DetectMtgSetAndNumberCandidatesAsync(byte[] imageData)
+    {
+        var (set, number, confidence) = await DetectMtgSetAndNumberAsync(imageData);
+        return set is null || number is null ? ([], 0) : ([new MtgPrintedIdentity(set, number, 1)], confidence);
+    }
     /// <summary>Detects the MTG Planeswalker "hand" glyph printed in the bottom-left collector block of
     /// The List (plst) reprints. When present the card is a plst reprint even though its printed set code
     /// is the original set's — see WebScanMatchingService's MTG branch, which remaps the lookup to plst.

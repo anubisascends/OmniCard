@@ -146,7 +146,9 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
         if (ocrResult?.SetCode is not null && ocrResult.CollectorNumber is not null
             && ocrResult.CollectorNumberConfidence >= 0.5)
         {
-            var groundTruth = LookupBySetAndNumber(ocrResult.SetCode, ocrResult.CollectorNumber, imageHash, setFilter);
+            var reads = new List<(string SetCode, string CollectorNumber)> { (ocrResult.SetCode, ocrResult.CollectorNumber) };
+            reads.AddRange(ocrResult.AlternateSetNumbers.Select(r => (r.SetCode, r.CollectorNumber)));
+            var groundTruth = LookupBySetAndNumber(reads, imageHash, setFilter);
             if (groundTruth is not null)
             {
                 _logger.LogInformation("MTG matched by OCR set+collector: {Set} #{Number} → \"{Name}\"",
@@ -838,7 +840,44 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
     // matched case-insensitively (the catalog stores them lower-case); the collector number is compared
     // with leading zeros stripped on both sides so an OCR'd "0066" matches a stored "66". In the rare
     // case more than one row shares the pair, the closest pHash wins.
-    private CardMatch? LookupBySetAndNumber(string setCode, string collectorNumber, ulong imageHash, IReadOnlySet<string>? setFilter)
+    // How much closer (in pHash bits) an alternate OCR read's printing must be to the scan than the top
+    // read's printing before it displaces it. The top read has the most OCR passes behind it, so an
+    // alternate needs the image clearly on its side — a misread digit lands on an unrelated card whose art
+    // is ~20+ bits away, while noise between near-identical candidates stays well under this margin.
+    internal const int AlternateReadMinHashAdvantage = 6;
+
+    // Resolves OCR (set code, collector number) reads to a catalog printing. `reads` is best-first; the
+    // first is the top-voted read and the rest are alternates the OCR passes disagreed on. Each is looked
+    // up; when more than one resolves, the scan's pHash settles it (see AlternateReadMinHashAdvantage).
+    private CardMatch? LookupBySetAndNumber(IReadOnlyList<(string SetCode, string CollectorNumber)> reads, ulong imageHash, IReadOnlySet<string>? setFilter)
+    {
+        // Best printing per read, in read order.
+        var resolved = new List<Card>();
+        foreach (var (setCode, collectorNumber) in reads)
+        {
+            var card = LookupBySetAndNumber(setCode, collectorNumber, imageHash, setFilter);
+            if (card is not null && resolved.All(c => c.Id != card.Id))
+                resolved.Add(card);
+        }
+        if (resolved.Count == 0) return null;
+
+        int Distance(Card c) => c.ImageHash is null ? int.MaxValue : PerceptualHashService.HammingDistance(imageHash, c.ImageHash.Value);
+        var best = resolved[0];
+        foreach (var alternate in resolved.Skip(1))
+        {
+            if (Distance(alternate) <= Distance(best) - AlternateReadMinHashAdvantage)
+            {
+                _logger.LogInformation(
+                    "MTG OCR reads disagreed: preferring {AltSet} #{AltNum} \"{AltName}\" (pHash {AltDist}) over top read {Set} #{Num} \"{Name}\" (pHash {Dist})",
+                    alternate.SetCode, alternate.CollectorNumber, alternate.Name, Distance(alternate),
+                    best.SetCode, best.CollectorNumber, best.Name, Distance(best));
+                best = alternate;
+            }
+        }
+        return ToGroundTruthMatch(best);
+    }
+
+    private Card? LookupBySetAndNumber(string setCode, string collectorNumber, ulong imageHash, IReadOnlySet<string>? setFilter)
     {
         var setUpper = setCode.Trim().ToUpperInvariant();
         var num = NormalizeCollectorNumber(collectorNumber);
@@ -856,12 +895,15 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
 
         if (candidates.Count == 0) return null;
 
-        var best = candidates.Count == 1
+        return candidates.Count == 1
             ? candidates[0]
             : (candidates.Where(c => c.ImageHash != null)
                   .OrderBy(c => PerceptualHashService.HammingDistance(imageHash, c.ImageHash!.Value))
                   .FirstOrDefault() ?? candidates[0]);
+    }
 
+    private static CardMatch ToGroundTruthMatch(Card best)
+    {
         return new CardMatch
         {
             Name = best.Name,

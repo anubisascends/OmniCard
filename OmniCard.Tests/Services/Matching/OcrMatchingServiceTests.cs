@@ -1,4 +1,5 @@
 using OmniCard.Imaging;
+using OmniCard.Shared.Matching;
 
 namespace OmniCard.Tests.Services.Matching;
 
@@ -72,6 +73,72 @@ public class OcrMatchingServiceTests
         Assert.True(ok);
         Assert.Equal("EOC", set);
         Assert.Equal("100", number);
+    }
+
+    // Verbatim OCR passes from a real 1000-card MID/SPM audit batch (Audit_Vault_N) that the old
+    // "first digit run anywhere" parser got wrong — each resolved to a real but WRONG printing (or none).
+    [Theory]
+    [InlineData("C0012\nSPM * EN ANIEKAN UD\n4", "SPM", "12")]               // rarity glued to number; old: border-noise "4"
+    [InlineData("5 2G CTR A N\n040/277 C\nMID * EN * RYAN PANCO\n4", "MID", "40")] // rules-box noise above; old: "5"
+    [InlineData("A 2\n029/277 U\nMID*EN *CTI BALAI", "MID", "29")]          // rules-box noise above; old: "2"
+    [InlineData("C0053\nSPM * EN * BEN HARVEY", "SPM", "53")]               // old: no match at all
+    [InlineData("455 2\n185/277 U\nMID*EN ZEZHO CHE", "MID", "185")]        // the line above the set code wins
+    [InlineData("C 0053\nSPM EN BEN HARVEY", "SPM", "53")]
+    public void TryExtractMtgSetAndNumber_ReadsCollectorFromLineAboveSetCode(string ocr, string expectedSet, string expectedNumber)
+    {
+        var ok = OcrMatchingService.TryExtractMtgSetAndNumber(ocr, out var set, out var number, out var evidence);
+
+        Assert.True(ok);
+        Assert.Equal(expectedSet, set);
+        Assert.Equal(expectedNumber, number);
+        Assert.True(evidence >= OcrMatchingService.MtgEvidencePaddedAboveSet);
+    }
+
+    [Theory]
+    [InlineData("066/281 M\nDMU • EN", OcrMatchingService.MtgEvidenceFractionAboveSet)]
+    [InlineData("R 0066\nMKC • EN SVETLIN VELINOV", OcrMatchingService.MtgEvidencePaddedAboveSet)]
+    [InlineData("MID • EN\n040/277", OcrMatchingService.MtgEvidenceFractionElsewhere)]
+    [InlineData("2\nSPM EN ANIEKAN U", OcrMatchingService.MtgEvidenceLoose)]   // a lone digit isn't a printed collector
+    public void TryExtractMtgSetAndNumber_ReportsEvidence(string ocr, int expectedEvidence)
+    {
+        Assert.True(OcrMatchingService.TryExtractMtgSetAndNumber(ocr, out _, out _, out var evidence));
+        Assert.Equal(expectedEvidence, evidence);
+    }
+
+    [Fact]
+    public void RankMtgReads_KeepsDisagreeingAnchoredReadsAsAlternates_MostVotesFirst()
+    {
+        // Real case: two passes misread "155/277" as "185/277"; the lone correct read must survive as an
+        // alternate so the catalog lookup can let the image pick it.
+        var reads = OcrMatchingService.RankMtgReads([
+            ("MID", "185", OcrMatchingService.MtgEvidenceFractionAboveSet),
+            ("MID", "185", OcrMatchingService.MtgEvidenceFractionAboveSet),
+            ("MID", "155", OcrMatchingService.MtgEvidenceFractionAboveSet),
+        ]);
+
+        Assert.Equal([new MtgPrintedIdentity("MID", "185", 2), new MtgPrintedIdentity("MID", "155", 1)], reads);
+    }
+
+    [Fact]
+    public void RankMtgReads_AnchoredReadOutranksLooseReads_AndLooseAlternatesAreDropped()
+    {
+        // Loose digit runs are border/rules-box noise: even with more votes they can't beat an anchored
+        // read, and they aren't offered as alternates (they'd only drag in random printings).
+        var reads = OcrMatchingService.RankMtgReads([
+            ("SPM", "4", OcrMatchingService.MtgEvidenceLoose),
+            ("SPM", "4", OcrMatchingService.MtgEvidenceLoose),
+            ("SPM", "12", OcrMatchingService.MtgEvidencePaddedAboveSet),
+        ]);
+
+        Assert.Equal([new MtgPrintedIdentity("SPM", "12", 1)], reads);
+    }
+
+    [Fact]
+    public void RankMtgReads_LooseReadSurvivesWhenNothingAnchoredWasRead()
+    {
+        var reads = OcrMatchingService.RankMtgReads([("EOC", "100", OcrMatchingService.MtgEvidenceLoose)]);
+
+        Assert.Equal([new MtgPrintedIdentity("EOC", "100", 1)], reads);
     }
 
     [Theory]

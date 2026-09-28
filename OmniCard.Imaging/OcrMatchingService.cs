@@ -102,10 +102,36 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
             System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
 
     // Matches the collector number: a run of 1-4 digits, optionally "{collector}/{total}".
-    // Group 1 is the collector number (the numerator).
+    // Group 1 is the collector number (the numerator). The loosest fallback — see TryExtractMtgSetAndNumber.
     private static readonly System.Text.RegularExpressions.Regex MtgCollectorNumberPattern =
         new(@"\b(\d{1,4})\s*(?:/\s*\d{1,4})?\b",
             System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    // "{collector}/{total}" (e.g. "040/277") — how 2015-2022 frames print line 1. Group 1 is the collector.
+    private static readonly System.Text.RegularExpressions.Regex MtgCollectorFractionPattern =
+        new(@"(?<!\d)(\d{1,4})\s*/\s*\d{2,4}(?!\d)",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    // A zero-padded 3-4 digit collector (e.g. "0012", "025") — how 2023+ frames print line 1, after the
+    // rarity letter. Bounded by non-digits rather than \b, because OCR often glues the rarity letter to the
+    // number ("C0012"), which a word boundary rejects.
+    private static readonly System.Text.RegularExpressions.Regex MtgCollectorPaddedPattern =
+        new(@"(?<!\d)(\d{3,4})(?!\d)",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    // How strongly a parsed collector number is anchored to where it's printed (line 1, directly above the
+    // set-code line). Used to rank reads across OCR passes: stray digits from the rules-text box above the
+    // corner or from border texture only ever reach the Loose tier.
+    internal const int MtgEvidenceLoose = 0;             // first plausible digit run anywhere in the crop
+    internal const int MtgEvidenceFractionElsewhere = 1; // "nnn/ttt" not on the line above the set code
+    internal const int MtgEvidencePaddedAboveSet = 2;    // zero-padded "0012" on the line above the set code
+    internal const int MtgEvidenceFractionAboveSet = 3;  // "nnn/ttt" on the line above the set code
+
+    // Reported confidence when every OCR pass independently read the same anchored (set, collector).
+    // Deliberately at/above WebScanMatchingService's set-filter override bar (0.95): three agreeing
+    // reads of the printed identity are trusted over the user's "Sets (art fallback)" selection, whereas
+    // a split or single read stays at the 0.9 floor and remains bound by that filter.
+    private const double MtgUnanimousReadConfidence = 0.96;
 
     public Dictionary<string, ulong> SymbolHashes { get; set; } = [];
 
@@ -661,26 +687,32 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         _ => spec.MultiLine ? PageSegMode.SingleBlock : PageSegMode.SingleLine,
     };
 
-    public Task<(string? SetCode, string? CollectorNumber, double Confidence)> DetectMtgSetAndNumberAsync(byte[] imageData)
+    public async Task<(string? SetCode, string? CollectorNumber, double Confidence)> DetectMtgSetAndNumberAsync(byte[] imageData)
+    {
+        var (reads, confidence) = await DetectMtgSetAndNumberCandidatesAsync(imageData);
+        return reads.Count == 0 ? (null, null, 0) : (reads[0].SetCode, reads[0].CollectorNumber, confidence);
+    }
+
+    public Task<(IReadOnlyList<MtgPrintedIdentity> Reads, double Confidence)> DetectMtgSetAndNumberCandidatesAsync(byte[] imageData)
         => Task.Run(() => DetectMtgSetAndNumber(imageData));
 
-    private (string? SetCode, string? CollectorNumber, double Confidence) DetectMtgSetAndNumber(byte[] imageData)
+    private (IReadOnlyList<MtgPrintedIdentity> Reads, double Confidence) DetectMtgSetAndNumber(byte[] imageData)
     {
-        if (!_ocrAvailable) return (null, null, 0);
+        if (!_ocrAvailable) return ([], 0);
         try
         {
             using var bitmap = new Bitmap(new MemoryStream(imageData));
             // Only meaningful for portrait card scans; skip clearly non-card / landscape crops.
-            if (bitmap.Width > bitmap.Height) return (null, null, 0);
+            if (bitmap.Width > bitmap.Height) return ([], 0);
 
             var rect = ToPixelRect(MtgCollectorRegion, bitmap.Width, bitmap.Height);
-            if (rect.Width < 10 || rect.Height < 5) return (null, null, 0);
+            if (rect.Width < 10 || rect.Height < 5) return ([], 0);
 
-            // Read the two-line block. The corner text is small and low-contrast on dark borders and
-            // foils, so try passes in order of cheap-to-aggressive and stop at the first that yields
-            // both a set code and a collector number: plain crop → Otsu binarization → high-contrast
-            // grayscale upscale (each wins on different finishes; the gray pass rescues foil glare that
-            // the binarization crushes).
+            // Read the two-line block with three preprocessing passes: plain crop → Otsu binarization →
+            // high-contrast grayscale upscale (each wins on different finishes; the gray pass rescues foil
+            // glare that the binarization crushes). All three always run: on real scans the first pass to
+            // parse was often the wrong one (a stray digit from the rules box, or a misread digit that two
+            // passes shared), so the passes vote and every anchored read is kept as a candidate.
             using var crop = bitmap.Clone(rect, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
 
             IEnumerable<(string Text, double Confidence)> Passes()
@@ -692,28 +724,63 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
                 yield return RunOcr(gray, PageSegMode.SingleBlock, MtgCollectorWhitelist);
             }
 
+            var parsed = new List<(string Set, string Number, int Evidence, double Confidence)>();
+            var raw = new List<string>();
+            int passCount = 0;
             foreach (var (text, confidence) in Passes())
             {
-                if (string.IsNullOrWhiteSpace(text)) continue;
-                if (TryExtractMtgSetAndNumber(text, out var setCode, out var number))
-                {
-                    // Floor the reported confidence: the real gate is the exact (set, collector) DB
-                    // lookup downstream, which either resolves to one printing or it doesn't.
-                    var reported = Math.Max(0.9, confidence);
-                    _logger.LogInformation("MTG set/number detected: {Set} #{Number} (raw: {Raw}, ocrConf: {Conf:F2})",
-                        setCode, number, text.Replace("\n", " ").Trim(), confidence);
-                    return (setCode, number, reported);
-                }
+                passCount++;
+                raw.Add(text.Replace("\n", " | ").Trim());
+                if (TryExtractMtgSetAndNumber(text, out var setCode, out var number, out var evidence))
+                    parsed.Add((setCode!, number!, evidence, confidence));
             }
 
-            _logger.LogDebug("MTG set/number OCR found no usable (set, collector) pair");
-            return (null, null, 0);
+            if (parsed.Count == 0)
+            {
+                _logger.LogDebug("MTG set/number OCR found no usable (set, collector) pair (raw: {Raw})", string.Join(" || ", raw));
+                return ([], 0);
+            }
+
+            var reads = RankMtgReads(parsed.Select(p => (p.Set, p.Number, p.Evidence)).ToList());
+            var best = reads[0];
+            var bestEvidence = parsed.Where(p => p.Set == best.SetCode && p.Number == best.CollectorNumber).Max(p => p.Evidence);
+            var bestConfidence = parsed.Where(p => p.Set == best.SetCode && p.Number == best.CollectorNumber).Max(p => p.Confidence);
+
+            // Floor the reported confidence: the real gate is the exact (set, collector) DB lookup
+            // downstream, which either resolves to a printing or it doesn't. A unanimous anchored read is
+            // raised past the set-filter override bar (see MtgUnanimousReadConfidence).
+            var unanimous = reads.Count == 1 && best.Votes == passCount && bestEvidence >= MtgEvidencePaddedAboveSet;
+            var reported = Math.Max(unanimous ? MtgUnanimousReadConfidence : 0.9, bestConfidence);
+            _logger.LogInformation("MTG set/number detected: {Set} #{Number} ({Votes}/{Passes} passes{Alts}; raw: {Raw})",
+                best.SetCode, best.CollectorNumber, best.Votes, passCount,
+                reads.Count > 1 ? "; alternates " + string.Join(", ", reads.Skip(1).Select(r => $"{r.SetCode} #{r.CollectorNumber}")) : "",
+                string.Join(" || ", raw));
+            return (reads, reported);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "MTG set/number detection failed");
-            return (null, null, 0);
+            return ([], 0);
         }
+    }
+
+    // Collapses per-pass reads into distinct (set, collector) candidates, best first: anchored reads
+    // (evidence ≥ FractionElsewhere) outrank loose digit runs, then more agreeing passes, then stronger
+    // anchoring. Loose reads are dropped as alternates (border noise would only offer random printings)
+    // and survive only as the sole candidate when nothing anchored was read.
+    internal static List<MtgPrintedIdentity> RankMtgReads(IReadOnlyList<(string Set, string Number, int Evidence)> parsed)
+    {
+        var ranked = parsed
+            .GroupBy(p => (p.Set, p.Number))
+            .Select(g => (g.Key.Set, g.Key.Number, Votes: g.Count(), Evidence: g.Max(p => p.Evidence)))
+            .OrderByDescending(g => g.Evidence >= MtgEvidenceFractionElsewhere)
+            .ThenByDescending(g => g.Votes)
+            .ThenByDescending(g => g.Evidence)
+            .ToList();
+        return ranked
+            .Where((g, i) => i == 0 || g.Evidence >= MtgEvidenceFractionElsewhere)
+            .Select(g => new MtgPrintedIdentity(g.Set, g.Number, g.Votes))
+            .ToList();
     }
 
     public Task<(bool Present, double Confidence)> DetectMtgListSymbolAsync(byte[] imageData)
@@ -869,41 +936,73 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     // Parses the modern MTG bottom-left block into (set code, collector number). Both must be found
     // for a usable result. Exposed internal for the OCR tuning tests.
     internal static bool TryExtractMtgSetAndNumber(string ocrText, out string? setCode, out string? collectorNumber)
+        => TryExtractMtgSetAndNumber(ocrText, out setCode, out collectorNumber, out _);
+
+    // As above, also reporting how well-anchored the collector number is (MtgEvidence* constants).
+    // The collector number is read from where it's printed — line 1, directly above the set-code line —
+    // before falling back to looser matches. Taking the first digit run anywhere (the old behaviour) picked
+    // up stray digits from the rules-text box above the corner ("5 2G…" before "040/277") and missed
+    // numbers OCR'd with the rarity letter attached ("C0012"), landing on the wrong printing.
+    internal static bool TryExtractMtgSetAndNumber(string ocrText, out string? setCode, out string? collectorNumber, out int evidence)
     {
         setCode = null;
         collectorNumber = null;
+        evidence = MtgEvidenceLoose;
         if (string.IsNullOrWhiteSpace(ocrText)) return false;
 
         var upper = ocrText.ToUpperInvariant();
+        var lines = upper.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
 
         // Set code: the alphanumeric token immediately before the "• EN" language marker on line 2.
-        var setMatch = MtgSetCodePattern.Match(upper);
-        if (setMatch.Success)
+        // A language code can't be a set code (guards "EN • EN"-style misreads); a valid set code
+        // carries at least one letter (pure-digit tokens are the collector/total, not a set).
+        int setLine = -1, setIndex = 0;
+        for (int i = 0; i < lines.Count && setCode is null; i++)
         {
-            var candidate = setMatch.Groups[1].Value;
-            // A language code can't be a set code (guards "EN • EN"-style misreads); a valid set code
-            // carries at least one letter (pure-digit tokens are the collector/total, not a set).
-            if (!MtgLanguageCodes.Contains(candidate) && candidate.Any(char.IsLetter))
+            foreach (System.Text.RegularExpressions.Match m in MtgSetCodePattern.Matches(lines[i]))
+            {
+                var candidate = m.Groups[1].Value;
+                if (MtgLanguageCodes.Contains(candidate) || !candidate.Any(char.IsLetter)) continue;
                 setCode = candidate;
+                setLine = i;
+                setIndex = m.Index;
+                break;
+            }
         }
 
-        // Collector number: the first digit run (line 1), leading zeros stripped to match how Scryfall
-        // stores it ("0066" → "66"). Guard against picking up a stray year like "2024" from the
-        // copyright line by preferring a run that isn't a plausible 4-digit year when a shorter one exists.
-        var numbers = MtgCollectorNumberPattern.Matches(upper)
-            .Select(m => m.Groups[1].Value)
-            .ToList();
-        if (numbers.Count > 0)
+        // Collector number, strongest anchoring first. "Above the set" is the line before the set-code
+        // line plus anything preceding the set code on its own line (OCR sometimes merges the two lines).
+        string? number = null;
+        if (setLine >= 0)
         {
-            // Drop 4-digit tokens in the 1990-2099 year range if any other number is present (the
-            // copyright year prints on the same corner block on some frames).
-            var nonYear = numbers.Where(n => !(n.Length == 4 && int.TryParse(n, out var y) && y is >= 1990 and <= 2099)).ToList();
-            var chosen = (nonYear.Count > 0 ? nonYear : numbers)[0];
-            var normalized = chosen.TrimStart('0');
+            var aboveSet = (setLine > 0 ? lines[setLine - 1] : "") + " " + lines[setLine][..setIndex];
+            number = FirstCollector(MtgCollectorFractionPattern, aboveSet);
+            if (number is not null) evidence = MtgEvidenceFractionAboveSet;
+            else if ((number = FirstCollector(MtgCollectorPaddedPattern, aboveSet)) is not null) evidence = MtgEvidencePaddedAboveSet;
+        }
+        if (number is null && (number = FirstCollector(MtgCollectorFractionPattern, upper)) is not null)
+            evidence = MtgEvidenceFractionElsewhere;
+        // Loosest: the first digit run anywhere (e.g. a set line read with no line above it).
+        number ??= FirstCollector(MtgCollectorNumberPattern, upper);
+
+        if (number is not null)
+        {
+            // Leading zeros stripped to match how Scryfall stores it ("0066" → "66").
+            var normalized = number.TrimStart('0');
             collectorNumber = normalized.Length == 0 ? "0" : normalized;
         }
 
         return setCode is not null && collectorNumber is not null;
+    }
+
+    // First group-1 match of `pattern` in `text`, skipping 4-digit tokens in the 1990-2099 year range when
+    // any other match exists (the copyright year prints on the same corner block on some frames).
+    private static string? FirstCollector(System.Text.RegularExpressions.Regex pattern, string text)
+    {
+        var numbers = pattern.Matches(text).Select(m => m.Groups[1].Value).ToList();
+        if (numbers.Count == 0) return null;
+        var nonYear = numbers.Where(n => !(n.Length == 4 && int.TryParse(n, out var y) && y is >= 1990 and <= 2099)).ToList();
+        return (nonYear.Count > 0 ? nonYear : numbers)[0];
     }
 
     // Best code-like token from noisy OCR text: split on non-code characters, then take the run
