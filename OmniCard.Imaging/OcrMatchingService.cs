@@ -1031,6 +1031,321 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
             .FirstOrDefault();
     }
 
+    // ── Old-frame (pre-2015) MTG printing evidence ─────────────────────────────────────────────────────
+    // These frames print no set code / collector number bottom-left, and same-art reprints hash identically,
+    // so the printing is told apart by physical cues instead (see MtgPrintEvidence). Regions are fractions
+    // of the scan, calibrated on real 1993–2003 frame scans (Revised through Legions, plus MH2 retro).
+
+    // Title bar, stopping short of the mana cost.
+    internal static readonly (double X, double Y, double W, double H) OldFrameTitleRegion = (0.06, 0.04, 0.64, 0.065);
+    // Illustrator credit + copyright line (+ "nnn/ttt" collector on 1999–2003 frames).
+    internal static readonly (double X, double Y, double W, double H) OldFrameBottomRegion = (0.05, 0.915, 0.90, 0.07);
+    // Rules/flavor text box.
+    internal static readonly (double X, double Y, double W, double H) OldFrameTextBoxRegion = (0.10, 0.60, 0.80, 0.31);
+
+    // Border classification by the median luminance of a band just inside the card edge. Measured on real
+    // scans: white borders sit at ~230–240, black at ~25–100 (FEM's grainy black is the brightest).
+    private const int WhiteBorderMinLuminance = 170;
+    private const int BlackBorderMaxLuminance = 120;
+
+    public Task<MtgPrintEvidence> ReadMtgPrintEvidenceAsync(byte[] imageData) => Task.Run(() => ReadMtgPrintEvidence(imageData));
+
+    private MtgPrintEvidence ReadMtgPrintEvidence(byte[] imageData)
+    {
+        try
+        {
+            using var bitmap = CropToCard(new Bitmap(new MemoryStream(imageData)));
+            var border = ClassifyBorder(bitmap);
+            if (!_ocrAvailable)
+                return new MtgPrintEvidence { BorderColor = border };
+
+            var titles = new List<string>();
+            var bottoms = new List<string>();
+            using (var title = bitmap.Clone(ToPixelRect(OldFrameTitleRegion, bitmap.Width, bitmap.Height), System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+            {
+                // Old-frame titles are white glyphs with a dark drop shadow on a coloured bar. Keeping only
+                // bright, near-neutral pixels as ink isolates the glyphs from the frame texture — the plain
+                // crop reads "Elvish Scout" as "Wei. |", the white-ink mask reads it cleanly. The plain read is
+                // kept for the frames where it does better (light title bars, 2003 frame).
+                using (var plain = UpscaleColor(title, 1400)) AddRead(titles, RunOcr(plain, PageSegMode.SingleLine, null).Text);
+                // White-frame cards (white artifacts/lands, Chronicles white) put the white title on a cream bar,
+                // which the white-ink mask can't separate; only the brightest pixels are glyph there. The mask
+                // then also catches the card's white border (blanked as near-solid rows/columns) and speckle.
+                // Each mask is read as scanned and auto-levelled: levelling rescues dim scans but can push a
+                // well-exposed cream bar over the threshold, and the name lookup keeps the best read anyway.
+                foreach (var levels in new[] { false, true })
+                {
+                    using (var ink = InkMask(title, 1400, IsWhiteInk, levels: levels)) AddRead(titles, RunOcr(ink, PageSegMode.SingleLine, null).Text);
+                    using (var bright = InkMask(title, 1400, IsBrightInk, clean: true, levels: levels)) AddRead(titles, RunOcr(bright, PageSegMode.SingleLine, null).Text);
+                }
+            }
+            using (var bottom = bitmap.Clone(ToPixelRect(OldFrameBottomRegion, bitmap.Width, bitmap.Height), System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+            {
+                // The credit/copyright text is small and light-on-dark; each variant reads some frames the
+                // others garble, so all are kept and the catalog side looks for its cues across them.
+                using (var plain = UpscaleColor(bottom, 1800)) AddRead(bottoms, RunOcr(plain, PageSegMode.SingleBlock, null).Text);
+                using (var light = InkMask(bottom, 1800, IsLightInk, levels: true)) AddRead(bottoms, RunOcr(light, PageSegMode.SingleBlock, null).Text);
+                using (var white = InkMask(bottom, 1800, IsWhiteInk, levels: true)) AddRead(bottoms, RunOcr(white, PageSegMode.SingleBlock, null).Text);
+            }
+            return new MtgPrintEvidence { TitleReads = titles, BorderColor = border, BottomLineReads = bottoms };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Old-frame MTG print evidence read failed");
+            return MtgPrintEvidence.Empty;
+        }
+
+        static void AddRead(List<string> reads, string text)
+        {
+            text = text.Replace('\n', ' ').Trim();
+            if (text.Length > 0) reads.Add(text);
+        }
+    }
+
+    public Task<string?> ReadMtgTextBoxAsync(byte[] imageData) => Task.Run(() => ReadMtgTextBox(imageData));
+
+    private string? ReadMtgTextBox(byte[] imageData)
+    {
+        if (!_ocrAvailable) return null;
+        try
+        {
+            using var bitmap = CropToCard(new Bitmap(new MemoryStream(imageData)));
+            using var box = bitmap.Clone(ToPixelRect(OldFrameTextBoxRegion, bitmap.Width, bitmap.Height), System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            using var gray = UpscaleGray(box, 1400, 1.2f);
+            var text = RunOcr(gray, PageSegMode.SingleBlock, null).Text.Replace('\n', ' ').Trim();
+            return text.Length > 0 ? text : null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Old-frame MTG text box read failed");
+            return null;
+        }
+    }
+
+    /// <summary>Takes ownership of <paramref name="scan"/> and returns it cropped to the card when it sits on
+    /// a visible margin of scanner bed / mat (<see cref="FindCardBounds"/>), else unchanged. The old-frame
+    /// regions are fractions of the card, so a margin would shift every crop.</summary>
+    private static Bitmap CropToCard(Bitmap scan)
+    {
+        var bounds = FindCardBounds(scan);
+        if (bounds.Width == scan.Width && bounds.Height == scan.Height)
+            return scan;
+        using (scan)
+            return scan.Clone(bounds, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+    }
+
+    /// <summary>
+    /// The card's rectangle within a scan that has a uniform margin around it, or the whole image. The
+    /// background colour is read from the corners (rounded card corners expose it even on tight scans). Only
+    /// a background that can't be mistaken for a card border is trimmed — mid-grey or coloured, not
+    /// near-white or near-black — since trimming a white lid off a white-bordered card would eat the border.
+    /// </summary>
+    internal static Rectangle FindCardBounds(Bitmap bitmap)
+    {
+        int w = bitmap.Width, h = bitmap.Height;
+        var full = new Rectangle(0, 0, w, h);
+        if (w < 50 || h < 50) return full;
+        using var argb = bitmap.Clone(full, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        var data = argb.LockBits(full, System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        byte[] buf;
+        int stride = data.Stride;
+        try
+        {
+            buf = new byte[stride * h];
+            System.Runtime.InteropServices.Marshal.Copy(data.Scan0, buf, 0, buf.Length);
+        }
+        finally { argb.UnlockBits(data); }
+
+        (int R, int G, int B) Px(int x, int y) { var i = y * stride + x * 4; return (buf[i + 2], buf[i + 1], buf[i]); }
+
+        // Background = median colour over four small corner patches.
+        int patch = Math.Max(2, Math.Min(w, h) / 70);
+        var rs = new List<int>(); var gs = new List<int>(); var bs = new List<int>();
+        foreach (var (cx, cy) in new[] { (0, 0), (w - patch, 0), (0, h - patch), (w - patch, h - patch) })
+            for (int y = cy; y < cy + patch; y++)
+                for (int x = cx; x < cx + patch; x++)
+                {
+                    var (r, g, b) = Px(x, y); rs.Add(r); gs.Add(g); bs.Add(b);
+                }
+        rs.Sort(); gs.Sort(); bs.Sort();
+        var bg = (R: rs[rs.Count / 2], G: gs[gs.Count / 2], B: bs[bs.Count / 2]);
+        var bgLum = 0.299 * bg.R + 0.587 * bg.G + 0.114 * bg.B;
+        var bgChroma = Math.Max(bg.R, Math.Max(bg.G, bg.B)) - Math.Min(bg.R, Math.Min(bg.G, bg.B));
+        bool bgLooksLikeBorder = bgChroma < 40 && (bgLum > 215 || bgLum < 60);
+        if (bgLooksLikeBorder) return full;
+
+        const int Tolerance = 24;
+        bool IsBg((int R, int G, int B) p) =>
+            Math.Abs(p.R - bg.R) <= Tolerance && Math.Abs(p.G - bg.G) <= Tolerance && Math.Abs(p.B - bg.B) <= Tolerance;
+        // A row/column is margin when nearly all of its middle 60% is background.
+        bool RowIsBg(int y) { int n = 0, t = 0; for (int x = w / 5; x < w * 4 / 5; x += 2) { t++; if (IsBg(Px(x, y))) n++; } return n >= t * 0.9; }
+        bool ColIsBg(int x) { int n = 0, t = 0; for (int y = h / 5; y < h * 4 / 5; y += 2) { t++; if (IsBg(Px(x, y))) n++; } return n >= t * 0.9; }
+
+        int maxW = w * 15 / 100, maxH = h * 15 / 100;
+        int top = 0; while (top < maxH && RowIsBg(top)) top++;
+        int bottom = 0; while (bottom < maxH && RowIsBg(h - 1 - bottom)) bottom++;
+        int left = 0; while (left < maxW && ColIsBg(left)) left++;
+        int right = 0; while (right < maxW && ColIsBg(w - 1 - right)) right++;
+        if (top + bottom + left + right == 0) return full;
+        return new Rectangle(left, top, w - left - right, h - top - bottom);
+    }
+
+    /// <summary>"white"/"black" from the median luminance of a band 1–2.5% inside each edge (corners
+    /// skipped — rounded corners show the scanner background), or null when it's neither clearly.</summary>
+    internal static string? ClassifyBorder(Bitmap bitmap)
+    {
+        int w = bitmap.Width, h = bitmap.Height;
+        if (w < 50 || h < 50) return null;
+        using var argb = bitmap.Clone(new Rectangle(0, 0, w, h), System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        var data = argb.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        try
+        {
+            var stride = data.Stride;
+            var buf = new byte[stride * h];
+            System.Runtime.InteropServices.Marshal.Copy(data.Scan0, buf, 0, buf.Length);
+            int Lum(int x, int y)
+            {
+                var i = y * stride + x * 4; // BGRA
+                return (int)(0.114 * buf[i] + 0.587 * buf[i + 1] + 0.299 * buf[i + 2]);
+            }
+            var lums = new List<int>();
+            for (double t = 0.15; t <= 0.85; t += 0.01)
+                for (double d = 0.010; d <= 0.0251; d += 0.005)
+                {
+                    lums.Add(Lum((int)(t * w), (int)(d * h)));
+                    lums.Add(Lum((int)(t * w), (int)((1 - d) * h)));
+                    lums.Add(Lum((int)(d * w), (int)(t * h)));
+                    lums.Add(Lum((int)((1 - d) * w), (int)(t * h)));
+                }
+            lums.Sort();
+            var median = lums[lums.Count / 2];
+            return median >= WhiteBorderMinLuminance ? "white" : median <= BlackBorderMaxLuminance ? "black" : null;
+        }
+        finally { argb.UnlockBits(data); }
+    }
+
+    // Bright and near-neutral: the white title/credit glyphs, not the coloured frame behind them.
+    private static bool IsWhiteInk(byte r, byte g, byte b)
+    {
+        int mx = Math.Max(r, Math.Max(g, b)), mn = Math.Min(r, Math.Min(g, b));
+        return mn > 175 && mx - mn < 60;
+    }
+
+    private static bool IsLightInk(byte r, byte g, byte b) => 0.299 * r + 0.587 * g + 0.114 * b > 170;
+
+    // Brighter and more neutral than the cream of a white frame's title bar.
+    private static bool IsBrightInk(byte r, byte g, byte b)
+    {
+        int mx = Math.Max(r, Math.Max(g, b)), mn = Math.Min(r, Math.Min(g, b));
+        return mn > 228 && mx - mn < 35;
+    }
+
+    private static Bitmap UpscaleColor(Bitmap crop, int targetW)
+    {
+        var scale = (double)targetW / crop.Width;
+        var outBmp = new Bitmap(targetW, Math.Max(1, (int)(crop.Height * scale)));
+        using var g = Graphics.FromImage(outBmp);
+        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+        g.DrawImage(crop, 0, 0, outBmp.Width, outBmp.Height);
+        return outBmp;
+    }
+
+    /// <summary>Upscales <paramref name="crop"/> and renders pixels passing <paramref name="isInk"/> black on
+    /// white — Tesseract's preferred polarity. With <paramref name="levels"/> the crop is auto-levelled first
+    /// (<see cref="AutoLevels"/>); with <paramref name="clean"/>, near-solid ink rows/columns (a border caught
+    /// in the crop) are blanked and speckle is removed with a 3×3 majority filter.</summary>
+    private static Bitmap InkMask(Bitmap crop, int targetW, Func<byte, byte, byte, bool> isInk, bool clean = false, bool levels = false)
+    {
+        var outBmp = UpscaleColor(crop, targetW); // new Bitmap(w, h) is 32bpp ARGB
+        int w = outBmp.Width, h = outBmp.Height;
+        var data = outBmp.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.ReadWrite, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        try
+        {
+            var buf = new byte[data.Stride * h];
+            System.Runtime.InteropServices.Marshal.Copy(data.Scan0, buf, 0, buf.Length);
+            if (levels)
+                AutoLevels(buf, data.Stride, w, h);
+            var ink = new bool[w * h];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    var i = y * data.Stride + x * 4; // BGRA
+                    ink[y * w + x] = isInk(buf[i + 2], buf[i + 1], buf[i]);
+                }
+            if (clean)
+                ink = CleanInk(ink, w, h);
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    var i = y * data.Stride + x * 4;
+                    byte v = ink[y * w + x] ? (byte)0 : (byte)255;
+                    buf[i] = buf[i + 1] = buf[i + 2] = v;
+                    buf[i + 3] = 255;
+                }
+            System.Runtime.InteropServices.Marshal.Copy(buf, 0, data.Scan0, buf.Length);
+        }
+        finally { outBmp.UnlockBits(data); }
+        return outBmp;
+    }
+
+    /// <summary>Stretches a BGRA buffer's luminance range (1st–99.5th percentile) to full scale, all channels
+    /// by the same factor so chroma is kept. The ink predicates use absolute thresholds, which a dim or
+    /// low-contrast scan would otherwise fall under; a normally exposed crop is left nearly unchanged.</summary>
+    private static void AutoLevels(byte[] buf, int stride, int w, int h)
+    {
+        var hist = new int[256];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                var i = y * stride + x * 4;
+                hist[(int)(0.114 * buf[i] + 0.587 * buf[i + 1] + 0.299 * buf[i + 2])]++;
+            }
+        int total = w * h, lo = 0, hi = 255;
+        for (int acc = 0; lo < 255 && (acc += hist[lo]) < total * 0.01; lo++) { }
+        for (int acc = 0; hi > 0 && (acc += hist[hi]) < total * 0.005; hi--) { }
+        if (hi - lo < 40 || (lo <= 8 && hi >= 245)) return; // flat crop, or already full-range
+        var lut = new byte[256];
+        for (int v = 0; v < 256; v++)
+            lut[v] = (byte)Math.Clamp((v - lo) * 255 / (hi - lo), 0, 255);
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                var i = y * stride + x * 4;
+                buf[i] = lut[buf[i]]; buf[i + 1] = lut[buf[i + 1]]; buf[i + 2] = lut[buf[i + 2]];
+            }
+    }
+
+    private static bool[] CleanInk(bool[] ink, int w, int h)
+    {
+        const double SolidFraction = 0.6;
+        for (int y = 0; y < h; y++)
+        {
+            int n = 0;
+            for (int x = 0; x < w; x++) if (ink[y * w + x]) n++;
+            if (n > w * SolidFraction) Array.Fill(ink, false, y * w, w);
+        }
+        for (int x = 0; x < w; x++)
+        {
+            int n = 0;
+            for (int y = 0; y < h; y++) if (ink[y * w + x]) n++;
+            if (n > h * SolidFraction) for (int y = 0; y < h; y++) ink[y * w + x] = false;
+        }
+        var outInk = new bool[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                int n = 0;
+                for (int dy = -1; dy <= 1; dy++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int xx = x + dx, yy = y + dy;
+                        if (xx >= 0 && yy >= 0 && xx < w && yy < h && ink[yy * w + xx]) n++;
+                    }
+                outInk[y * w + x] = n >= 5;
+            }
+        return outInk;
+    }
+
     private (List<string> SetCodes, double Confidence) MatchSymbol(Bitmap source, Rectangle symbolRect)
     {
         // Crop and hash the symbol region

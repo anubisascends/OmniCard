@@ -36,5 +36,14 @@ public interface IOcrMatchingService
     /// and non-OCR implementations needn't implement it; the real service overrides it.</summary>
     Task<(string? Edition, double Confidence)> DetectYugiohEditionAsync(byte[] imageData)
         => Task.FromResult<(string?, double)>((null, 0));
+    /// <summary>Reads the printing cues of an old-frame (pre-2015) MTG card — title, border colour and the
+    /// bottom credit/copyright line — for when there is no set code + collector number to OCR. Default
+    /// returns no evidence so test doubles needn't implement it; the real service overrides it.</summary>
+    Task<MtgPrintEvidence> ReadMtgPrintEvidenceAsync(byte[] imageData)
+        => Task.FromResult(MtgPrintEvidence.Empty);
+    /// <summary>OCR of an old-frame MTG card's text box. Only requested when same-art candidate printings
+    /// differ solely in flavor text (e.g. Alliances' a/b variants). Default null (no read).</summary>
+    Task<string?> ReadMtgTextBoxAsync(byte[] imageData)
+        => Task.FromResult<string?>(null);
     Dictionary<string, ulong> SymbolHashes { get; set; }
 }
