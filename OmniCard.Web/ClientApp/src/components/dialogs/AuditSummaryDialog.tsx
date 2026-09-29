@@ -107,7 +107,7 @@ function AuditSection({
 }) {
   const { t } = useTranslation();
   return (
-    <Accordion disableGutters defaultExpanded={lines.length > 0}>
+    <Accordion disableGutters>
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
         <Stack direction="row" spacing={1} alignItems="center">
           {icon}
