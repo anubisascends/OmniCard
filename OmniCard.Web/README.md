@@ -29,7 +29,10 @@ whole app — the original WPF desktop app has been retired.
   admin's change takes effect on the affected user's **next request — no re-login**. The permission
   catalog is defined in `OmniCard.Shared/Security/Permissions.cs` (exposed at `GET /api/meta/permissions`).
 - **Server-side scanning** — image upload → perceptual hash + OCR matching via the per-game
-  `ICardGameService` pipeline; no TWAIN, no desktop agent.
+  `ICardGameService` pipeline; no TWAIN, no desktop agent. Modern MTG frames are identified by the
+  printed set code + collector number; pre-2015 ("old") frames, which print neither, are identified by
+  title OCR and their printing picked from border colour, the copyright line/year, any printed collector
+  number and flavor text (`OmniCard.CardMatching/OldFrame`), since same-art reprints hash identically.
 - **Server-hosted artwork** — card images cached under `{dataDir}/card-images`, served at
   `/card-images` (see [Catalog data](#catalog-data)).
 - **Localized UI** — every SPA string runs through `react-i18next`; the display language follows the

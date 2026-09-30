@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, Link as RouterLink } from 'react-router-dom';
+import { useParams, useLocation, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
@@ -24,6 +24,8 @@ import { usePermissions } from '../context/usePermissions';
 import { CardTable } from '../components/CardTable';
 import { AddCardDialog } from '../components/dialogs/AddCardDialog';
 import { LocationImportDialog } from '../components/dialogs/LocationImportDialog';
+import { AuditSummaryDialog } from '../components/dialogs/AuditSummaryDialog';
+import type { AuditReturnState } from './AuditPage';
 import { DeckBoxPanel } from '../components/DeckBoxPanel';
 import { DeckStackView } from '../components/deckstack/DeckStackView';
 import { SearchBox } from '../components/SearchBox';
@@ -43,6 +45,12 @@ export function LocationDetailPage() {
   const [q, setQ] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  // An audit commit returns here with its summary in router state (see AuditPage).
+  const location = useLocation();
+  const navigate = useNavigate();
+  const auditSummary = (location.state as AuditReturnState | null)?.auditSummary ?? null;
+  // Clear the state on close so a reload or Back/Forward doesn't reopen the summary.
+  const closeAuditSummary = () => navigate(location.pathname + location.search, { replace: true, state: null });
   // Table (flat grid) vs. Stacks (Archidekt-style grouped stacks). Persisted; location-only feature.
   const [view, setView] = useState<'table' | 'stacks'>(
     () => (localStorage.getItem(VIEW_KEY) === 'stacks' ? 'stacks' : 'table'),
@@ -145,6 +153,12 @@ export function LocationDetailPage() {
         locationId={locationId}
         locationName={locQuery.data?.name ?? t('locations.detail.thisLocation')}
         onClose={() => setImportOpen(false)}
+      />
+      <AuditSummaryDialog
+        open={auditSummary != null}
+        result={auditSummary}
+        locationName={locQuery.data?.name ?? t('locations.detail.thisLocation')}
+        onClose={closeAuditSummary}
       />
     </Stack>
   );

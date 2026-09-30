@@ -185,12 +185,7 @@ public sealed class WebScanMatchingService
     }
 
     /// <summary>Run one catalog match under the shared-context gate (see <see cref="_matchGate"/>).</summary>
-    private async Task<CardMatch?> FindMatchAsync(Func<CardMatch?> find)
-    {
-        await _matchGate.WaitAsync();
-        try { return find(); }
-        finally { _matchGate.Release(); }
-    }
+    private Task<CardMatch?> FindMatchAsync(Func<CardMatch?> find) => RunGatedAsync(find);
 
     /// <summary>Current market price of the matched printing (finish-aware), or null if unavailable.
     /// Serialized behind <see cref="_matchGate"/> because it reads the game service's shared context.</summary>
@@ -272,9 +267,19 @@ public sealed class WebScanMatchingService
                             // A very confident printed (set, collector) read overrides the set filter (see
                             // EffectiveFilter); a weaker read stays bound to the user's chosen sets.
                             var gtMatch = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, gt, EffectiveFilter(setFilter, conf), detectedSets, scanEdgeHash: edgeHash));
-                            if (gtMatch is not null)
+                            // Only a printing the read actually names is ground truth. When the read doesn't
+                            // resolve (e.g. an old-frame credit line misread as "BSR 2"), FindClosestMatch falls
+                            // through to plain pHash — and with the set filter lifted for a confident read —
+                            // so that result must not short-circuit the rest of the pipeline.
+                            if (gtMatch is not null && reads.Any(r => IsSamePrinting(r, gtMatch)))
                                 return gtMatch;
                         }
+
+                        // Old frames (pre-2015) print no set code/collector, and their same-art reprints hash
+                        // identically — identify by title and pick the printing from border/copyright/etc.
+                        var oldFrame = await ResolveOldFrameAsync(imageBytes, gameService, hash, artHashes, setFilter, current);
+                        if (oldFrame is not null)
+                            return oldFrame;
 
                         // Fallback: name + set-symbol recognition, with pHash still primary.
                         var ocr = await _ocrService.AnalyzeCardAsync(imageBytes);
@@ -300,6 +305,42 @@ public sealed class WebScanMatchingService
             _logger.LogWarning(ex, "OCR refinement failed for {Game}", game);
             return current;
         }
+    }
+
+    /// <summary>
+    /// MTG old-frame identification (see <see cref="ScryfallService.ResolveOldFramePrinting"/>): reads the
+    /// title, border and bottom credit line, and — only when the surviving printings differ just in flavor
+    /// text — the text box. Null when the card isn't old-frame or the user has already corrected this exact
+    /// scan (their confirmed card stands).
+    /// </summary>
+    private async Task<CardMatch?> ResolveOldFrameAsync(
+        byte[] imageBytes, ICardGameService gameService, ulong hash, ulong[]? artHashes,
+        IReadOnlySet<string>? setFilter, CardMatch? current)
+    {
+        if (gameService is not ScryfallService scryfall || scryfall.HasExactCorrection(hash))
+            return null;
+
+        var evidence = await _ocrService.ReadMtgPrintEvidenceAsync(imageBytes);
+        var resolution = await RunGatedAsync(() => scryfall.ResolveOldFramePrinting(hash, artHashes, evidence, null, setFilter, current));
+        if (resolution is { NeedsTextBox: true })
+        {
+            // An unreadable text box just means ranking without flavor text.
+            var textBox = await _ocrService.ReadMtgTextBoxAsync(imageBytes);
+            resolution = await RunGatedAsync(() => scryfall.ResolveOldFramePrinting(hash, artHashes, evidence, textBox, setFilter, current, mayRequestTextBox: false));
+        }
+        return resolution?.Match;
+    }
+
+    private static bool IsSamePrinting(MtgPrintedIdentity read, CardMatch match) =>
+        string.Equals(read.SetCode, match.SetCode, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(read.CollectorNumber.TrimStart('0'), match.CollectorNumber?.TrimStart('0'), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Run any catalog read under the shared-context gate (see <see cref="_matchGate"/>).</summary>
+    private async Task<T> RunGatedAsync<T>(Func<T> read)
+    {
+        await _matchGate.WaitAsync();
+        try { return read(); }
+        finally { _matchGate.Release(); }
     }
 
     private async Task<CardMatch?> ApplyCollectorOcrAsync(

@@ -677,6 +677,152 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
         return i > 0 && int.TryParse(span[..i], out var num) ? num : int.MaxValue;
     }
 
+    // ── Old-frame printing resolution ──────────────────────────────────────────────────────────────────
+    // Title OCR at/above this similarity identifies the card on its own; between the floor and this it
+    // must also look like the scan (see TitleImageSupportMaxDistance).
+    internal const double TitleTrustedSimilarity = 0.85;
+    internal const double TitleMinSimilarity = 0.70;
+    internal const int TitleImageSupportMaxDistance = 14;
+
+    private OldFrame.CardNameIndex? _nameIndex;
+    private static readonly string[] NonScannableLayouts =
+        ["token", "double_faced_token", "emblem", "art_series", "planar", "scheme", "vanguard"];
+
+    /// <summary>Whether the user has confirmed a card for exactly this scan hash (Phase 1 of
+    /// <see cref="FindClosestMatch"/>). Such a match is ground truth and must not be second-guessed.</summary>
+    public bool HasExactCorrection(ulong scanHash) => _correctionsCache?.Any(c => c.ScanHash == scanHash) == true;
+
+    /// <summary>Result of <see cref="ResolveOldFramePrinting"/>: the chosen printing, or a request to re-run
+    /// with the scan's text box read because the remaining candidates differ only in flavor text.</summary>
+    public sealed record OldFrameResolution(CardMatch? Match, bool NeedsTextBox);
+
+    /// <summary>
+    /// Identifies an old-frame (1993/1997 frame) card and picks its printing from physical evidence, for
+    /// scans with no readable set code + collector number. The card is identified by its title (fuzzy-matched
+    /// against every catalog name), falling back to <paramref name="current"/> (the pHash match) when the
+    /// title can't be read; the printing is then chosen among that card's same-art printings by
+    /// <see cref="OldFrame.OldFramePrintingResolver"/>. Returns null when the card isn't old-frame (modern
+    /// frames are left to the pHash/OCR pipeline) or nothing could be identified.
+    /// </summary>
+    /// <param name="mayRequestTextBox">False when the caller has already tried (and failed) to read the text
+    /// box: rank without flavor text instead of asking again.</param>
+    public OldFrameResolution? ResolveOldFramePrinting(
+        ulong imageHash, ulong[]? artHashes, MtgPrintEvidence evidence, string? textBox,
+        IReadOnlySet<string>? setFilter, CardMatch? current, bool mayRequestTextBox = true)
+    {
+        // Only names a scanned card can carry — tokens, emblems, art-series and oversized Planechase/Archenemy/
+        // Vanguard cards would otherwise be fuzzy-match targets for a garbled title ("Gargoyle" the token).
+        var index = _nameIndex ??= new OldFrame.CardNameIndex(
+            _readContext.Cards.AsNoTracking()
+                .Where(c => !NonScannableLayouts.Contains(c.Layout))
+                .Select(c => c.Name).Distinct().ToList());
+
+        var title = index.BestMatch(evidence.TitleReads);
+        List<OldFrame.PrintingCandidate>? printings = null;
+        string? anchor = null;
+        double nameSimilarity = 0;
+
+        if (title is { } t && t.Similarity >= TitleMinSimilarity)
+        {
+            var titled = LoadPrintings(t.Name, imageHash, artHashes, setFilter);
+            // A middling title read must be backed by the image, so a garbled title can't drag the match to
+            // some unrelated card whose name happens to be close.
+            if (titled.Count > 0 && (t.Similarity >= TitleTrustedSimilarity
+                || titled.Min(p => Math.Min(p.PHashDistance, p.ArtDistance ?? int.MaxValue)) <= TitleImageSupportMaxDistance))
+            {
+                (anchor, nameSimilarity, printings) = (t.Name, t.Similarity, titled);
+            }
+        }
+        if (printings is null && current is not null)
+        {
+            // Untitled: trust the pHash match's identity and only re-pick among its printings.
+            printings = LoadPrintings(current.Name, imageHash, artHashes, setFilter);
+            anchor = current.Name;
+            nameSimilarity = title is { } t2 && string.Equals(t2.Name, current.Name, StringComparison.OrdinalIgnoreCase) ? t2.Similarity : 0.5;
+        }
+        if (printings is not { Count: > 0 })
+        {
+            _logger.LogDebug("Old-frame resolution: no card identified (title '{Title}' sim {Sim:F2}, pHash match '{Current}')",
+                title?.Name, title?.Similarity ?? 0, current?.Name);
+            return null;
+        }
+
+        // Modern frames print their set + collector and resolve upstream; don't second-guess them here. pHash
+        // barely sees the frame (a 9th Edition reprint of the same art can hash closer than the 7th Edition
+        // original), so this asks whether the same-art group has an old-frame printing at all, not whether
+        // the single closest one is; the resolver's evidence then separates the frames.
+        int bestVisual = printings.Min(p => p.Visual);
+        if (!printings.Any(p => p.Visual <= bestVisual + OldFrame.OldFramePrintingResolver.SameArtVisualMargin && p.Card.Frame is "1993" or "1997"))
+        {
+            _logger.LogDebug("Old-frame resolution: \"{Name}\" has no old-frame printing matching the scan — left to the modern pipeline", anchor);
+            return null;
+        }
+
+        var ranked = OldFrame.OldFramePrintingResolver.Rank(printings, evidence, textBox, current?.GameSpecificId, DeprioritizedSets);
+        if (textBox is null && mayRequestTextBox && OldFrame.OldFramePrintingResolver.NeedsTextBox(ranked))
+            return new OldFrameResolution(null, NeedsTextBox: true);
+
+        if (_logger.IsEnabled(LogLevel.Debug))
+            foreach (var r in ranked)
+                _logger.LogDebug("  old-frame candidate {Set} #{Num}: score {Score:F1} (pHash {P}, art {A}) {Reasons}",
+                    r.Candidate.Card.SetCode, r.Candidate.Card.CollectorNumber, r.Score, r.Candidate.PHashDistance, r.Candidate.ArtDistance, r.Reasons);
+
+        var winner = ranked[0];
+        var card = winner.Candidate.Card;
+        // Name certainty and image agreement, equally weighted. Title-identified cards whose image also
+        // matches report ~90–100; an untitled re-pick of the pHash match stays modest.
+        var imageConf = Math.Max(0, 1.0 - winner.Candidate.PHashDistance / 20.0);
+        var confidence = 100 * (0.5 * nameSimilarity + 0.5 * imageConf);
+        _logger.LogInformation(
+            "MTG old-frame match: \"{Name}\" {Set} #{Num} (title '{Title}' sim {Sim:F2}, border {Border}, score {Score:F1}: {Reasons})",
+            card.Name, card.SetCode, card.CollectorNumber, title?.Name, title?.Similarity ?? 0, evidence.BorderColor ?? "?", winner.Score, winner.Reasons);
+        _lastMatchDiagnostics = new MatchDiagnostics
+        {
+            SetFilterActive = setFilter is not null,
+            ActiveSets = setFilter?.ToList(),
+            DecisionPhase = "OldFramePrinting",
+            PHashDistance = winner.Candidate.PHashDistance,
+            ArtHashDistance = winner.Candidate.ArtDistance,
+            OcrRecognizedName = anchor,
+            OcrNameConfidence = nameSimilarity,
+        };
+
+        var match = new CardMatch
+        {
+            Name = card.Name,
+            SetCode = card.SetCode,
+            SetName = card.SetName,
+            CollectorNumber = card.CollectorNumber,
+            Rarity = card.Rarity,
+            ImageUri = card.ImageUris?.Normal ?? card.ImageUris?.Small,
+            GameSpecificId = card.Id.ToString(),
+            LocalImagePath = card.LocalImagePath,
+            Confidence = confidence,
+            Source = card,
+        };
+        return new OldFrameResolution(match, NeedsTextBox: false);
+    }
+
+    // Paper printings of one card name, with their image distances to the scan.
+    private List<OldFrame.PrintingCandidate> LoadPrintings(string name, ulong imageHash, ulong[]? artHashes, IReadOnlySet<string>? setFilter)
+    {
+        var cards = _readContext.Cards.AsNoTracking()
+            .Where(c => c.Name == name && !c.Digital && c.ImageHash != null)
+            .ToList();
+        if (setFilter is not null)
+            cards = cards.Where(c => setFilter.Contains(c.SetCode)).ToList();
+        return cards.Select(c =>
+        {
+            int? art = null;
+            if (artHashes is not null && c.ArtHash is ulong refArt)
+            {
+                var d = artHashes.Where(h => h != 0).Select(h => PerceptualHashService.HammingDistance(h, refArt)).DefaultIfEmpty(int.MaxValue).Min();
+                art = d == int.MaxValue ? null : d;
+            }
+            return new OldFrame.PrintingCandidate(c, PerceptualHashService.HammingDistance(imageHash, c.ImageHash!.Value), art);
+        }).ToList();
+    }
+
     internal static double StringSimilarity(string? a, string? b)
     {
         if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b))
@@ -1191,6 +1337,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             _readContext = _dbContextFactory.CreateDbContext();
             _hashCache = null;
             _artHashCache = null;
+            _nameIndex = null;
             _hashSetLookup = null;
             _hashCollectorNumberLookup = null;
             _symbolHashCache = null;
@@ -1446,6 +1593,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
         _readContext = _dbContextFactory.CreateDbContext();
         _hashCache = null;
         _artHashCache = null;
+        _nameIndex = null;
         _hashSetLookup = null;
         _hashCollectorNumberLookup = null;
         _symbolHashCache = null;
