@@ -45,6 +45,7 @@ import { RolesCard } from '../components/settings/RolesCard';
 import { PermissionChecklist } from '../components/settings/PermissionChecklist';
 import { usePermissions } from '../context/usePermissions';
 import { currencySymbol } from '../lib/scanBadges';
+import { ENGLISH, languageName } from '../lib/cardLanguages';
 import { useFormatters } from '../i18n/format';
 import {
   usePreviewScale,
@@ -61,6 +62,84 @@ const OPERATIONS: { key: 'prices' | 'bulk' | 'hashes' | 'images' }[] = [
   { key: 'hashes' },
   { key: 'images' },
 ];
+
+/**
+ * Per-game "languages to download" checklist. English is always on (it anchors matching and prices).
+ * Toggling saves straight away; the next "Download catalog" fetches the ticked languages and prunes
+ * un-ticked ones. Games whose source is English-only get an explanatory note instead.
+ */
+function CatalogLanguages({ game, disabled }: { game: string; disabled: boolean }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const { can } = usePermissions();
+  const canEdit = can('catalog.refresh');
+  const languages = useQuery({ queryKey: ['catalog-languages'], queryFn: api.catalogLanguages });
+  const entry = languages.data?.find((l) => l.game === game);
+
+  const save = useMutation({
+    mutationFn: (selected: string[]) => api.catalogSetLanguages(game, selected),
+    onSuccess: (updated) =>
+      qc.setQueryData(['catalog-languages'], (prev: typeof languages.data) =>
+        prev?.map((l) => (l.game === updated.game ? updated : l)),
+      ),
+  });
+
+  if (!entry) return null;
+  const selected = new Set(entry.selected);
+  const toggle = (code: string, on: boolean) => {
+    const next = new Set(selected);
+    if (on) next.add(code);
+    else next.delete(code);
+    save.mutate(entry.downloadable.filter((c) => next.has(c)));
+  };
+
+  return (
+    <Box>
+      <Typography variant="subtitle2">{t('settings.catalog.languages.heading')}</Typography>
+      {entry.downloadable.length <= 1 ? (
+        <Typography variant="body2" color="text.secondary">
+          {t('settings.catalog.languages.englishOnly')}
+        </Typography>
+      ) : (
+        <>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+            {t('settings.catalog.languages.help')}
+          </Typography>
+          <Stack direction="row" flexWrap="wrap" useFlexGap columnGap={1}>
+            {entry.downloadable.map((code) => (
+              <FormControlLabel
+                key={code}
+                label={languageName(t, code)}
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={selected.has(code)}
+                    disabled={code === ENGLISH || disabled || !canEdit || save.isPending}
+                    onChange={(e) => toggle(code, e.target.checked)}
+                  />
+                }
+              />
+            ))}
+          </Stack>
+          {game === 'Mtg' && entry.selected.length > 1 && (
+            <Typography variant="caption" color="text.secondary" display="block">
+              {t('settings.catalog.languages.mtgSizeWarning')}
+            </Typography>
+          )}
+          <Typography variant="caption" color="text.secondary" display="block">
+            {t('settings.catalog.languages.pricesNote')}
+          </Typography>
+          {save.isSuccess && (
+            <Typography variant="caption" color="success.main" display="block">
+              {t('settings.catalog.languages.saved')}
+            </Typography>
+          )}
+          {save.error && <Alert severity="error">{(save.error as Error).message}</Alert>}
+        </>
+      )}
+    </Box>
+  );
+}
 
 function CatalogCard() {
   const { t } = useTranslation();
@@ -120,6 +199,8 @@ function CatalogCard() {
             </Button>
           ))}
         </Stack>
+
+        <CatalogLanguages game={game} disabled={!!running} />
 
         {refresh.error && <Alert severity="error">{(refresh.error as Error).message}</Alert>}
 

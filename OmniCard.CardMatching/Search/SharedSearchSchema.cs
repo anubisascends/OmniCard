@@ -27,6 +27,8 @@ public static class SharedSearchSchema
                 Description = "Colors (WUBRG letters, or colorless/multicolor).", Example = "c:u" },
         new() { Canonical = "condition", Aliases = ["condition", "cond"], Kind = SearchFieldKind.Core,
                 Description = "Card condition (NM, LP, …).", Example = "cond:nm" },
+        new() { Canonical = "lang", Aliases = ["lang", "language"], Kind = SearchFieldKind.Core,
+                Description = "Card language (en, ja, de, fr, it, es, pt, ko, zhs, …).", Example = "lang:ja" },
         new() { Canonical = "location", Aliases = ["location", "loc"], Kind = SearchFieldKind.Core,
                 Description = "Storage location name.", Example = "loc:binder" },
         new() { Canonical = "is", Aliases = ["is", "not"], Kind = SearchFieldKind.Special,

@@ -174,7 +174,34 @@ longer needs the desktop to keep them current. In **Settings → Catalog data**,
 
 One job runs at a time; progress is shown live. The per-game catalog databases (and their schemas)
 are created on first run, so a fresh server with an empty SQL Server instance can build them from
-scratch.
+scratch. Columns added in later versions (e.g. the catalog `Lang` column) are added to existing
+catalog DBs automatically at startup.
+
+### Card languages
+
+Every owned copy carries a **language** (`InventoryLot.Language`; null = English). It's set on the
+Scan page (a session **Card language** picker plus per-card/bulk overrides), editable in the card
+editor and collection bulk edit, shown as a `JA`-style chip in the collection grid, searchable with
+`lang:ja`, round-tripped through native/ManaBox CSV (Moxfield/TCGplayer `Language` columns are read on
+import), and sent to eBay as the *Language* item specific.
+
+**Languages to download** (Settings → Catalog data, per game) controls which non-English printings
+the catalog holds. English is always included; changes apply on the next **Download catalog**, which
+also prunes rows for languages that were un-ticked. The selection is stored in
+`{dataDir}/catalog-languages.json`.
+
+| Game | Downloadable | Source | Notes |
+|---|---|---|---|
+| MTG | all Scryfall languages | Scryfall `all_cards` (~400 MB gz) instead of `default_cards` once any non-English language is ticked | Same set + collector number as English; prices fall back to the English printing; placeholder scans borrow English art |
+| One Piece | en, ja, fr | poneglyph `/v1/search?lang=` | Rows keyed `OP01-001@ja`; names/colours kept English, art is the language's own; English price fallback |
+| Pokémon | en, ja | TCGCSV category 85 "Pokemon Japan" | Separate sets (codes prefixed `JP-`), Japanese art, **real prices** |
+| Yu-Gi-Oh!, FFTCG, Riftbound | English only | — | Copies can still be tagged with any printed language |
+
+When scanning, a copy's language is: the language **printed on the card** where OCR can read it (MTG's
+`• JP` marker next to the set code; Yu-Gi-Oh!'s `-DE`/`-JP` region code, which is also swapped to `-EN`
+so the English catalog matches), else the session's **Card language**, else the matched printing's own
+language. With a language chosen, the match is remapped to that language's printing when the catalog
+holds it.
 
 ## eBay setup
 

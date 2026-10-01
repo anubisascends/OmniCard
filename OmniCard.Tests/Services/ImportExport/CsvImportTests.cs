@@ -116,6 +116,66 @@ public class CsvImportTests : IDisposable
         Assert.Equal(CsvFormat.Moxfield, preview.DetectedFormat);
     }
 
+    [Theory]
+    [InlineData("ja", "ja")]
+    [InlineData("en", "en")]
+    [InlineData("", "en")]
+    public void PreviewImport_Manabox_ReadsLanguage(string language, string expected)
+    {
+        var csv = "Name,Set code,Set name,Collector number,Foil,Rarity,Quantity,Scryfall ID,Purchase price,Misprint,Altered,Condition,Language,Purchase price currency,Added\n"
+                + $"Lightning Bolt,lea,Alpha,1,normal,common,1,abc-123,5.99,false,false,near_mint,{language},USD,2026-01-01T00:00:00.0000000Z\n";
+        var preview = CreateService().PreviewImport(WriteCsv("manabox-lang.csv", csv));
+
+        Assert.Equal(expected, Assert.Single(preview.Cards).Language);
+    }
+
+    [Fact]
+    public void PreviewImport_Moxfield_ReadsLanguageName()
+    {
+        var path = WriteCsv("mox-lang.csv",
+            "Count,Name,Edition,Collector Number,Condition,Language,Foil,Purchase Price\n" +
+            "1,Lightning Bolt,LEA,161,NM,Japanese,,5.99\n");
+
+        Assert.Equal("ja", Assert.Single(CreateService().PreviewImport(path).Cards).Language);
+    }
+
+    [Fact]
+    public void PreviewImport_AppNative_WithoutLanguageColumn_DefaultsToEnglish()
+    {
+        var path = WriteCsv("native-old.csv",
+            "Game,GameCardId,Name,SetName,SetCode,Number,Rarity,Condition,IsFoil,PurchasePrice,DateAdded,ContainerName,ContainerType,Page,Slot,Section\n" +
+            "Mtg,abc-123,Lightning Bolt,Alpha,LEA,161,common,NM,False,5.99,2026-01-15T00:00:00.0000000Z,,,,\n");
+
+        Assert.Equal("en", Assert.Single(CreateService().PreviewImport(path).Cards).Language);
+    }
+
+    [Fact]
+    public void ExportAppNative_RoundTripsLanguage()
+    {
+        var path = Path.Combine(_tempDir, "roundtrip.csv");
+        var svc = CreateService();
+        svc.ExportAppNative(path, [new CollectionCard
+        {
+            Game = CardGame.OnePiece, GameCardId = "OP01-001@ja", Name = "Zoro", SetCode = "OP01", Number = "OP01-001",
+            Condition = "NM", Language = "ja", Quantity = 1,
+        }]);
+
+        var card = Assert.Single(svc.PreviewImport(path).Cards);
+        Assert.Equal("ja", card.Language);
+        Assert.Equal("OP01-001@ja", card.GameCardId);
+    }
+
+    [Fact]
+    public void PreviewImport_UnknownLanguage_ReadsEnglishAndWarns()
+    {
+        var csv = "Name,Set code,Set name,Collector number,Foil,Rarity,Quantity,Scryfall ID,Purchase price,Misprint,Altered,Condition,Language,Purchase price currency,Added\n"
+                + "Lightning Bolt,lea,Alpha,1,normal,common,1,abc-123,5.99,false,false,near_mint,klingon,USD,2026-01-01T00:00:00.0000000Z\n";
+        var preview = CreateService().PreviewImport(WriteCsv("manabox-bad-lang.csv", csv));
+
+        Assert.Equal("en", Assert.Single(preview.Cards).Language);
+        Assert.Contains(preview.Issues, i => i.Message.Contains("klingon"));
+    }
+
     [Fact]
     public void PreviewImport_DetectsManaboxFormat()
     {

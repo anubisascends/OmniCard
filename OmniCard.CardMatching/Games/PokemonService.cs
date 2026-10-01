@@ -16,6 +16,15 @@ public sealed class PokemonService : TcgCsvGameService<PokemonDbContext>
         : base(httpClientFactory, dbContextFactory, hashService, dataPathService, logger) { }
 
     protected override int CategoryId => 3;
+
+    // TCGCSV category 85 "Pokemon Japan": Japanese sets with their own numbering, Japanese card images
+    // and real TCGplayer prices. English names (TCGplayer's listing titles).
+    private const int JapaneseCategoryId = 85;
+    protected override IReadOnlyDictionary<string, int> LanguageCategories => new Dictionary<string, int>
+    {
+        [CardLanguages.English] = CategoryId,
+        ["ja"] = JapaneseCategoryId,
+    };
     public override CardGame Game => CardGame.Pokemon;
     protected override string GameKey => "pokemon";
 

@@ -30,6 +30,14 @@ public sealed class MetaController(IEnumerable<ICardGameService> gameServices) :
         return DtoMapping.ToDto(SharedSearchSchema.Default, "all");
     }
 
+    /// <summary>The languages an owned copy of each game can be tagged with (CardLanguages codes, English
+    /// first) — drives the language pickers on the scan page, card editor and bulk editor. Keyed by game
+    /// id. Reference data; any signed-in user may fetch it.</summary>
+    [HttpGet("card-languages")]
+    public ActionResult<IReadOnlyDictionary<string, IReadOnlyList<string>>> CardLanguagesByGame() =>
+        Enum.GetValues<OmniCard.Shared.Cards.CardGame>()
+            .ToDictionary(DtoMapping.GameId, g => CardLanguages.ForGame(g));
+
     /// <summary>The granular permission catalog grouped by feature section — drives the role/user
     /// permission checklists in Administration. Read-only reference data; any signed-in user may fetch it.</summary>
     [HttpGet("permissions")]

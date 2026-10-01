@@ -89,7 +89,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     // (the token immediately before the language is the set code) and to reject a language token
     // being mistaken for a set code.
     private static readonly HashSet<string> MtgLanguageCodes =
-        new(StringComparer.OrdinalIgnoreCase) { "EN", "DE", "FR", "IT", "ES", "PT", "JA", "JP", "KO", "RU", "ZH", "CT", "CS", "PH" };
+        new(StringComparer.OrdinalIgnoreCase) { "EN", "DE", "FR", "IT", "ES", "SP", "PT", "JA", "JP", "KO", "KR", "RU", "ZH", "CT", "CS", "PH" };
 
     // Matches "{setcode} {sep} {lang}" on line 2, e.g. "MKC • EN", "DMU•EN", "M21 . EN".
     // Group 1 is the set code (3-5 alphanumerics); the separator and language anchor it. At least one
@@ -98,7 +98,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     // A single stray letter may sit between the separator and the language code: the promo/special
     // "★" printed between set code and language OCRs as a whitelisted letter (e.g. "SOC ★ EN" → "SOC XEN").
     private static readonly System.Text.RegularExpressions.Regex MtgSetCodePattern =
-        new(@"\b([A-Z0-9]{3,5})[\s•·.*\-]+[A-Z]?(EN|DE|FR|IT|ES|PT|JA|JP|KO|RU|ZH|CT|CS|PH)\b",
+        new(@"\b([A-Z0-9]{3,5})[\s•·.*\-]+[A-Z]?(EN|DE|FR|IT|ES|SP|PT|JA|JP|KO|KR|RU|ZH|CT|CS|PH)\b",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
 
     // Matches the collector number: a run of 1-4 digits, optionally "{collector}/{total}".
@@ -724,15 +724,15 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
                 yield return RunOcr(gray, PageSegMode.SingleBlock, MtgCollectorWhitelist);
             }
 
-            var parsed = new List<(string Set, string Number, int Evidence, double Confidence)>();
+            var parsed = new List<(string Set, string Number, int Evidence, double Confidence, string? Language)>();
             var raw = new List<string>();
             int passCount = 0;
             foreach (var (text, confidence) in Passes())
             {
                 passCount++;
                 raw.Add(text.Replace("\n", " | ").Trim());
-                if (TryExtractMtgSetAndNumber(text, out var setCode, out var number, out var evidence))
-                    parsed.Add((setCode!, number!, evidence, confidence));
+                if (TryExtractMtgSetAndNumber(text, out var setCode, out var number, out var evidence, out var language))
+                    parsed.Add((setCode!, number!, evidence, confidence, language));
             }
 
             if (parsed.Count == 0)
@@ -741,7 +741,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
                 return ([], 0);
             }
 
-            var reads = RankMtgReads(parsed.Select(p => (p.Set, p.Number, p.Evidence)).ToList());
+            var reads = RankMtgReads(parsed.Select(p => (p.Set, p.Number, p.Evidence, p.Language)).ToList());
             var best = reads[0];
             var bestEvidence = parsed.Where(p => p.Set == best.SetCode && p.Number == best.CollectorNumber).Max(p => p.Evidence);
             var bestConfidence = parsed.Where(p => p.Set == best.SetCode && p.Number == best.CollectorNumber).Max(p => p.Confidence);
@@ -769,17 +769,24 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     // anchoring. Loose reads are dropped as alternates (border noise would only offer random printings)
     // and survive only as the sole candidate when nothing anchored was read.
     internal static List<MtgPrintedIdentity> RankMtgReads(IReadOnlyList<(string Set, string Number, int Evidence)> parsed)
+        => RankMtgReads(parsed.Select(p => (p.Set, p.Number, p.Evidence, (string?)null)).ToList());
+
+    // As above, carrying each pass's printed-language read. A candidate's language is the one most of its
+    // passes agreed on (passes that didn't read a language abstain).
+    internal static List<MtgPrintedIdentity> RankMtgReads(IReadOnlyList<(string Set, string Number, int Evidence, string? Language)> parsed)
     {
         var ranked = parsed
             .GroupBy(p => (p.Set, p.Number))
-            .Select(g => (g.Key.Set, g.Key.Number, Votes: g.Count(), Evidence: g.Max(p => p.Evidence)))
+            .Select(g => (g.Key.Set, g.Key.Number, Votes: g.Count(), Evidence: g.Max(p => p.Evidence),
+                Language: g.Where(p => p.Language is not null).GroupBy(p => p.Language)
+                    .OrderByDescending(l => l.Count()).Select(l => l.Key).FirstOrDefault()))
             .OrderByDescending(g => g.Evidence >= MtgEvidenceFractionElsewhere)
             .ThenByDescending(g => g.Votes)
             .ThenByDescending(g => g.Evidence)
             .ToList();
         return ranked
             .Where((g, i) => i == 0 || g.Evidence >= MtgEvidenceFractionElsewhere)
-            .Select(g => new MtgPrintedIdentity(g.Set, g.Number, g.Votes))
+            .Select(g => new MtgPrintedIdentity(g.Set, g.Number, g.Votes, g.Language))
             .ToList();
     }
 
@@ -944,7 +951,13 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     // up stray digits from the rules-text box above the corner ("5 2G…" before "040/277") and missed
     // numbers OCR'd with the rarity letter attached ("C0012"), landing on the wrong printing.
     internal static bool TryExtractMtgSetAndNumber(string ocrText, out string? setCode, out string? collectorNumber, out int evidence)
+        => TryExtractMtgSetAndNumber(ocrText, out setCode, out collectorNumber, out evidence, out _);
+
+    // As above, also returning the printed language marker that anchored the set code ("• JP" → "ja"),
+    // normalized to a CardLanguages code.
+    internal static bool TryExtractMtgSetAndNumber(string ocrText, out string? setCode, out string? collectorNumber, out int evidence, out string? language)
     {
+        language = null;
         setCode = null;
         collectorNumber = null;
         evidence = MtgEvidenceLoose;
@@ -964,6 +977,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
                 var candidate = m.Groups[1].Value;
                 if (MtgLanguageCodes.Contains(candidate) || !candidate.Any(char.IsLetter)) continue;
                 setCode = candidate;
+                language = OmniCard.Shared.Games.CardLanguages.Normalize(m.Groups[2].Value);
                 setLine = i;
                 setIndex = m.Index;
                 break;

@@ -9,6 +9,7 @@ using OmniCard.Shared.Audit;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Ebay;
+using OmniCard.Shared.Games;
 using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Sales;
 using OmniCard.Shared.Security;
@@ -386,6 +387,8 @@ public sealed class ListingsController(
         if (!string.IsNullOrWhiteSpace(card.SetName)) parts.Add(card.SetName);
         if (!string.IsNullOrWhiteSpace(card.Number)) parts.Add($"#{card.Number}");
         if (card.IsFoil) parts.Add("Foil");
+        // Buyers filter on language — call out a non-English copy in the title as well as the aspect.
+        if (!CardLanguages.IsEnglish(card.Language)) parts.Add(EbayListingService.EbayLanguageAspect(card.Language));
         if (!string.IsNullOrWhiteSpace(card.Condition)) parts.Add(card.Condition);
         var title = string.Join(" ", parts);
         return title.Length <= 80 ? title : title[..80];

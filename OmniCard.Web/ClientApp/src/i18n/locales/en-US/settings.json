@@ -68,7 +68,15 @@
       },
       "running": "{{game}} · {{operation}} — running",
       "recentHeading": "Recent",
-      "recentItem": "{{icon}} {{game}} · {{operation}} — {{message}}"
+      "recentItem": "{{icon}} {{game}} · {{operation}} — {{message}}",
+      "languages": {
+        "heading": "Languages to download",
+        "help": "Download non-English printings too, so scans of foreign cards match their own art. English is always included. Changes apply on the next “Download catalog”; unticked languages are removed then.",
+        "englishOnly": "This game’s catalog source only provides English cards. Foreign copies can still be tagged with their language when scanning or editing.",
+        "saved": "Language selection saved — run “Download catalog” to apply it.",
+        "mtgSizeWarning": "Any non-English language switches MTG to Scryfall’s all-languages file (~400 MB download) and hashes each language’s art.",
+        "pricesNote": "Non-English cards rarely have their own prices; they’re valued at the English printing’s price (Pokémon Japan has real prices)."
+      }
     },
     "ebay": {
       "title": "eBay",

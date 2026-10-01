@@ -11,6 +11,7 @@ import type {
   AddListItemRequest,
   CardListDto,
   CardListItemDto,
+  CatalogLanguagesDto,
   CatalogStatusDto,
   CommitListResultDto,
   CustomerDto,
@@ -273,6 +274,8 @@ export const api = {
   components: () => request<ComponentDto[]>('/api/meta/components'),
   permissionCatalog: () => request<PermissionCatalogDto>('/api/meta/permissions'),
   searchFields: (game?: string) => request<SearchSchemaDto>(`/api/meta/search-fields${qs({ game })}`),
+  /** Languages an owned copy of each game can be tagged with, keyed by game id. */
+  cardLanguages: () => request<Record<string, string[]>>('/api/meta/card-languages'),
 
   // Dashboard
   dashboard: () => request<DashboardDto>('/api/dashboard'),
@@ -385,6 +388,7 @@ export const api = {
     id: number,
     body: {
       condition: string;
+      language?: string;
       isFoil: boolean;
       foilType?: string | null;
       quantity: number;
@@ -415,6 +419,8 @@ export const api = {
     cardIds: number[];
     setCondition?: boolean;
     condition?: string;
+    setLanguage?: boolean;
+    language?: string;
     setFoil?: boolean;
     isFoil?: boolean;
     setQuantity?: boolean;
@@ -730,6 +736,12 @@ export const api = {
 
   // Catalog refresh
   catalogStatus: () => request<CatalogStatusDto>('/api/catalog/status'),
+  catalogLanguages: () => request<CatalogLanguagesDto[]>('/api/catalog/languages'),
+  catalogSetLanguages: (game: string, languages: string[]) =>
+    request<CatalogLanguagesDto>('/api/catalog/languages', {
+      method: 'PUT',
+      body: JSON.stringify({ game, languages }),
+    }),
   catalogRefresh: (game: string, operation: 'prices' | 'bulk' | 'hashes' | 'images') =>
     request<void>('/api/catalog/refresh', {
       method: 'POST',
@@ -747,11 +759,14 @@ export const api = {
     request<EbaySellingSettingsDto>('/api/ebay/selling', { method: 'PUT', body: JSON.stringify(body) }),
 
   // Scan (server-side image matching)
-  scanMatch: async (image: File, game: string, isFoil: boolean, sets?: string[]) => {
+  /** `language` is the scan session's card language (blank = auto: read off the card / taken from
+   * the matched printing). */
+  scanMatch: async (image: File, game: string, isFoil: boolean, sets?: string[], language?: string) => {
     const form = new FormData();
     form.append('image', image);
     form.append('game', game);
     form.append('isFoil', String(isFoil));
+    if (language) form.append('language', language);
     // One `set` entry per chosen art-fallback set; the server unions them.
     for (const s of sets ?? []) if (s) form.append('set', s);
     const res = await fetch('/api/scan/match', {

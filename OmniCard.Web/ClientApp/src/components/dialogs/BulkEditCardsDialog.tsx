@@ -19,6 +19,7 @@ import {
   Typography,
 } from '@mui/material';
 import { api } from '../../api/client';
+import { ENGLISH, LanguageSelect } from '../../lib/cardLanguages';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
@@ -45,6 +46,8 @@ export function BulkEditCardsDialog({
   // Per-field enable flags + values.
   const [setCondition, setSetCondition] = useState(false);
   const [condition, setCondition_] = useState('NM');
+  const [setLanguage, setSetLanguage] = useState(false);
+  const [language, setLanguage_] = useState(ENGLISH);
   const [setFoil, setSetFoil] = useState(false);
   const [isFoil, setIsFoil] = useState(false);
   const [setQuantity, setSetQuantity] = useState(false);
@@ -57,13 +60,14 @@ export function BulkEditCardsDialog({
   const [tagsMode, setTagsMode] = useState<'add' | 'replace'>('add');
   const [tags, setTags_] = useState<string[]>([]);
 
-  const anyField = setCondition || setFoil || setQuantity || setPrice || setNote || setTags;
+  const anyField = setCondition || setLanguage || setFoil || setQuantity || setPrice || setNote || setTags;
 
   // Reset the form each time the dialog (re)opens.
   const [wasOpen, setWasOpen] = useState(false);
   if (open && !wasOpen) {
     setWasOpen(true);
     setSetCondition(false);
+    setSetLanguage(false);
     setSetFoil(false);
     setSetQuantity(false);
     setSetPrice(false);
@@ -79,6 +83,8 @@ export function BulkEditCardsDialog({
         cardIds: lotIds,
         setCondition,
         condition,
+        setLanguage,
+        language,
         setFoil,
         isFoil,
         setQuantity,
@@ -138,6 +144,12 @@ export function BulkEditCardsDialog({
                 </MenuItem>
               ))}
             </TextField>,
+          )}
+          {row(
+            setLanguage,
+            setSetLanguage,
+            t('common.labels.language'),
+            <LanguageSelect game={null} value={language} onChange={setLanguage_} label="" fullWidth sx={{}} />,
           )}
           {row(
             setFoil,

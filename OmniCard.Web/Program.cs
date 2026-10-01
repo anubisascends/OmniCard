@@ -181,6 +181,8 @@ builder.Services.AddSingleton<IDeckLegalityService>(sp =>
 builder.Services.AddSingleton<ITagService>(_ => new TagService(writableFactory));
 builder.Services.AddSingleton<ISalesSettingsService, SalesSettingsService>();
 builder.Services.AddSingleton<IScanBadgeSettingsService, ScanBadgeSettingsService>();
+// Per-game "languages to download" (Settings ▸ Catalog data); applied by CatalogRefreshService.
+builder.Services.AddSingleton<ICatalogLanguageSettingsService, CatalogLanguageSettingsService>();
 builder.Services.AddSingleton<IListingService>(sp =>
     new ListingService(writableFactory, sp.GetRequiredService<ISalesSettingsService>()));
 builder.Services.AddSingleton(sp =>
@@ -292,6 +294,12 @@ using (var scope = app.Services.CreateScope())
         {
             using var ctx = scope.ServiceProvider.GetRequiredService<IDbContextFactory<TContext>>().CreateDbContext();
             ctx.Database.EnsureCreated();
+            // EnsureCreated never alters an existing DB — add columns introduced since (e.g. Lang).
+            switch (ctx)
+            {
+                case OptcgDbContext optcg: optcg.ApplySchemaUpgrades(); break;
+                case TcgCsvDbContext tcgcsv: tcgcsv.ApplySchemaUpgrades(); break;
+            }
         }
         catch (Exception ex)
         {

@@ -4,6 +4,7 @@
     "columns": {
       "number": "No.",
       "condition": "Cond",
+      "language": "Lang",
       "quantity": "Qty",
       "market": "Market"
     },

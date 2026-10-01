@@ -4,6 +4,7 @@ using OmniCard.Web.Services;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Matching;
 using OmniCard.Shared.Collection;
+using OmniCard.Shared.Games;
 using OmniCard.Shared.Security;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
@@ -65,12 +66,15 @@ public sealed class CardScanController(
             || ext.Equals(".tiff", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>Match one uploaded card image against <paramref name="game"/>'s catalog.</summary>
+    /// <summary>Match one uploaded card image against <paramref name="game"/>'s catalog.
+    /// <paramref name="language"/> is the scan session's card language ("ja", …); blank = auto — the
+    /// language is then read off the card where it prints one, else taken from the matched printing.</summary>
     [HttpPost("match")]
     [RequestSizeLimit(MaxFileSize)]
     [RequirePermission(Permissions.ScanView)]
     public async Task<ActionResult<ScanMatchDto>> Match(
-        IFormFile image, [FromForm] string game, [FromForm] bool isFoil, [FromForm] string[]? set, CancellationToken ct)
+        IFormFile image, [FromForm] string game, [FromForm] bool isFoil, [FromForm] string[]? set,
+        CancellationToken ct, [FromForm] string? language = null)
     {
         if (image is null || image.Length == 0)
             return BadRequest(new { error = "No image provided" });
@@ -91,7 +95,7 @@ public sealed class CardScanController(
             .Where(s => !string.IsNullOrWhiteSpace(s))
             .Select(s => s.Trim())
             .ToArray();
-        var result = await matcher.MatchAsync(bytes, parsedGame, isFoil, setCodes, ct);
+        var result = await matcher.MatchAsync(bytes, parsedGame, isFoil, setCodes, CardLanguages.Normalize(language), ct);
 
         // Flag whether this is a card the collection doesn't already hold (drives the "new card"
         // gold-star badge). IsNewCard opens its own DbContext, so it's safe alongside concurrent
@@ -166,7 +170,7 @@ public sealed class CardScanController(
         }
 
         var results = matches.Select(m => new ScanSearchResultDto(
-            m.GameSpecificId, m.Name, m.SetCode, m.SetName, m.CollectorNumber, m.Rarity, m.ImageUri)).ToList();
+            m.GameSpecificId, m.Name, m.SetCode, m.SetName, m.CollectorNumber, m.Rarity, m.ImageUri, m.Language)).ToList();
         return Ok(results);
     }
 
@@ -253,6 +257,7 @@ public sealed class CardScanController(
             Rarity = item.Rarity,
             ImageUri = item.ImageUri,
             Condition = string.IsNullOrWhiteSpace(item.Condition) ? "NM" : item.Condition,
+            Language = CardLanguages.Normalize(item.Language) ?? CardLanguages.English,
             IsFoil = item.IsFoil,
             FoilType = foilType,
             Quantity = Math.Max(1, item.Quantity),

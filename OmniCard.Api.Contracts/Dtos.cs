@@ -46,6 +46,8 @@ public sealed record CardDto
     public string? ImageUri { get; init; }
     public string? ScanImagePath { get; init; }
     public string Condition { get; init; } = "NM";
+    /// <summary>Printed language code of this copy ("en", "ja", …).</summary>
+    public string Language { get; init; } = "en";
     public bool IsFoil { get; init; }
     public string? FoilType { get; init; }
     public int Quantity { get; init; } = 1;
@@ -252,6 +254,8 @@ public sealed record NameAvailableDto(bool Available);
 public sealed record UpdateCardRequest
 {
     public string Condition { get; init; } = "NM";
+    /// <summary>Printed language code (e.g. "ja"); null ⇒ leave the copy's language unchanged.</summary>
+    public string? Language { get; init; }
     public bool IsFoil { get; init; }
     public string? FoilType { get; init; }
     public int Quantity { get; init; } = 1;
@@ -282,6 +286,10 @@ public sealed record BulkUpdateCardsRequest
 
     public bool SetCondition { get; init; }
     public string? Condition { get; init; }
+
+    public bool SetLanguage { get; init; }
+    /// <summary>Printed language code (e.g. "ja"); unknown/blank ⇒ English.</summary>
+    public string? Language { get; init; }
 
     public bool SetFoil { get; init; }
     public bool IsFoil { get; init; }
@@ -768,6 +776,18 @@ public sealed record CatalogRefreshRequest
     public string Operation { get; init; } = "prices";
 }
 
+/// <summary>A game's language options. <see cref="Downloadable"/> are the languages its catalog source
+/// can download (English first); <see cref="Selected"/> is the saved download selection (always includes
+/// "en"); <see cref="CardLanguages"/> are every language an owned copy can be tagged with.</summary>
+public sealed record CatalogLanguagesDto(
+    string Game, IReadOnlyList<string> Downloadable, IReadOnlyList<string> Selected, IReadOnlyList<string> CardLanguages);
+
+public sealed record SetCatalogLanguagesRequest
+{
+    public string Game { get; init; } = "";
+    public IReadOnlyList<string> Languages { get; init; } = [];
+}
+
 // --- eBay ---
 
 /// <summary>eBay connection state for the settings screen. <see cref="Connected"/> = valid OAuth
@@ -961,12 +981,18 @@ public sealed record ScanMatchDto
     /// catalog (e.g. a very new List card), so the match fell back to the original-set printing. Signals
     /// that the identity/price may be the more expensive original and should be checked manually.</summary>
     public bool ListReprintUnresolved { get; init; }
+    /// <summary>The copy's printed language (CardLanguages code): read from the print (MTG "• JP",
+    /// Yu-Gi-Oh! "-DE001"), else the scan session's chosen language, else the matched catalog row's
+    /// language. Null when unmatched.</summary>
+    public string? Language { get; init; }
+    /// <summary>True when <see cref="Language"/> was read off the card itself rather than assumed.</summary>
+    public bool LanguageDetected { get; init; }
 }
 
 /// <summary>One catalog card returned by the correction search (<c>GET /api/scan/search</c>).</summary>
 public sealed record ScanSearchResultDto(
     string GameCardId, string Name, string SetCode, string SetName,
-    string CollectorNumber, string Rarity, string? ImageUri);
+    string CollectorNumber, string Rarity, string? ImageUri, string? Language = null);
 
 /// <summary>One card the user confirmed from a scan, to be written to inventory as an owned lot.</summary>
 public sealed record ScanCommitItem
@@ -980,6 +1006,8 @@ public sealed record ScanCommitItem
     public string Rarity { get; init; } = "";
     public string? ImageUri { get; init; }
     public string Condition { get; init; } = "NM";
+    /// <summary>Printed language code of this copy (e.g. "ja"); null/unknown ⇒ English.</summary>
+    public string? Language { get; init; }
     public bool IsFoil { get; init; }
     public string? FoilType { get; init; }
     public int Quantity { get; init; } = 1;

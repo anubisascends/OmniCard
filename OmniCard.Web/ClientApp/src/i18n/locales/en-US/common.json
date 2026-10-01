@@ -42,6 +42,7 @@
       "set": "Set",
       "quantity": "Quantity",
       "condition": "Condition",
+      "language": "Language",
       "foil": "Foil",
       "price": "Price",
       "note": "Note",
@@ -67,6 +68,22 @@
       "MP": "MP",
       "HP": "HP",
       "DMG": "DMG"
+    },
+    "languages": {
+      "en": "English",
+      "ja": "Japanese",
+      "de": "German",
+      "fr": "French",
+      "it": "Italian",
+      "es": "Spanish",
+      "pt": "Portuguese",
+      "ko": "Korean",
+      "ru": "Russian",
+      "zhs": "Chinese (Simplified)",
+      "zht": "Chinese (Traditional)",
+      "th": "Thai",
+      "id": "Indonesian",
+      "ph": "Phyrexian"
     },
     "channels": {
       "Manual": "Manual",

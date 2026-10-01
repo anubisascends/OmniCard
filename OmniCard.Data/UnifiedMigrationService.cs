@@ -140,6 +140,8 @@ public static class UnifiedMigrationService
             AddColumnIfMissing(cmd, "Lots", "FulfilledTradeId", "INTEGER");
             // Multi-card trade sessions: replacement scans now link to a TradeSession.
             AddColumnIfMissing(cmd, "Lots", "FulfilledTradeSessionId", "INTEGER");
+            // Printed language of the physical copy (null = English).
+            AddColumnIfMissing(cmd, "Lots", "Language", "TEXT");
         }
 
         if (TableExists(cmd, "Orders"))

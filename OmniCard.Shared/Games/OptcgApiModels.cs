@@ -16,6 +16,22 @@ public sealed class OptcgSetSummary
     public int CardCount { get; set; }
 }
 
+/// <summary><c>GET /v1/search</c> page — used to fetch a set's cards in a non-English language
+/// (<c>/v1/sets/{code}</c> has no <c>lang</c> parameter). Pages cap at 100 cards.</summary>
+public sealed class OptcgSearchResponse
+{
+    public List<OptcgApiCard> Data { get; set; } = [];
+    public OptcgPagination Pagination { get; set; } = new();
+}
+
+public sealed class OptcgPagination
+{
+    public int Page { get; set; }
+    public int Limit { get; set; }
+    public int Total { get; set; }
+    public bool HasMore { get; set; }
+}
+
 public sealed class OptcgSetDetailResponse
 {
     public OptcgSetDetail Data { get; set; } = new();

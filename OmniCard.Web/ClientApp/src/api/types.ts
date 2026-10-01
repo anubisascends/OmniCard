@@ -48,6 +48,8 @@ export interface CardDto {
   imageUri?: string | null;
   scanImagePath?: string | null;
   condition: string;
+  /** Printed language code of this copy ("en", "ja", …). */
+  language: string;
   isFoil: boolean;
   foilType?: string | null;
   quantity: number;
@@ -593,6 +595,11 @@ export interface ScanMatchDto {
   /** True when the List glyph was detected but the plst printing wasn't found in the catalog, so the
    * match fell back to the original (pricier) printing — the price should be sanity-checked. */
   listReprintUnresolved?: boolean;
+  /** The copy's printed language: read off the card (MTG "• JP", Yu-Gi-Oh! "-DE"), else the session's
+   * chosen language, else the matched catalog row's. Null when unmatched. */
+  language?: string | null;
+  /** True when `language` was read from the card rather than assumed. */
+  languageDetected?: boolean;
 }
 
 export interface ScanSearchResultDto {
@@ -603,6 +610,8 @@ export interface ScanSearchResultDto {
   collectorNumber: string;
   rarity: string;
   imageUri?: string | null;
+  /** Catalog row language, for catalogs that hold several (MTG / One Piece / Pokémon Japan). */
+  language?: string | null;
 }
 
 export interface ScanCommitItem {
@@ -615,6 +624,8 @@ export interface ScanCommitItem {
   rarity: string;
   imageUri?: string | null;
   condition: string;
+  /** Printed language code of this copy; omitted/unknown ⇒ English. */
+  language?: string | null;
   isFoil: boolean;
   foilType?: string | null;
   quantity: number;
@@ -725,6 +736,17 @@ export interface CatalogJobDto {
 export interface CatalogStatusDto {
   running?: CatalogJobDto | null;
   recent: CatalogJobDto[];
+}
+
+/** A game's catalog language options (Settings ▸ Catalog data). */
+export interface CatalogLanguagesDto {
+  game: string;
+  /** Languages the game's source can download (English first). */
+  downloadable: string[];
+  /** Saved download selection (always includes "en"). */
+  selected: string[];
+  /** Every language an owned copy can be tagged with. */
+  cardLanguages: string[];
 }
 
 // --- Trades ---

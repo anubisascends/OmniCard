@@ -32,6 +32,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import SellIcon from '@mui/icons-material/Sell';
 import { api } from '../api/client';
+import { LanguageChip } from '../lib/cardLanguages';
 import type { CardDto } from '../api/types';
 import { CardHoverPreview, type CardHover } from './CardHoverPreview';
 import { CardEditDrawer } from './dialogs/CardEditDrawer';
@@ -196,6 +197,13 @@ export function CardTable({
     { field: 'number', headerName: t('collection.columns.number'), width: 80 },
     { field: 'rarity', headerName: t('common.labels.rarity'), width: 90 },
     { field: 'condition', headerName: t('collection.columns.condition'), width: 80 },
+    {
+      field: 'language',
+      headerName: t('collection.columns.language'),
+      width: 70,
+      // English is the default — only call out foreign copies.
+      renderCell: (p) => <LanguageChip language={p.row.language} />,
+    },
     { field: 'isFoil', headerName: t('common.labels.foil'), width: 70, type: 'boolean' },
     { field: 'quantity', headerName: t('collection.columns.quantity'), width: 70, type: 'number', align: 'right', headerAlign: 'right' },
     {

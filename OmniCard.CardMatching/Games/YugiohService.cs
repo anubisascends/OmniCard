@@ -86,4 +86,46 @@ public sealed class YugiohService : TcgCsvGameService<YugiohDbContext>
 
     // OCR of small holofoil set codes is noisy; resolve reads to the catalog fuzzily + by pHash.
     protected override bool UseFuzzyOcrMatch => true;
+
+    // "{SET}-{REGION}{NUMBER}", e.g. "RA05-DE085", "LOB-G001", "PHNI-JP001". Group 2 is the region.
+    private static readonly System.Text.RegularExpressions.Regex RegionCodePattern =
+        new(@"^([A-Z0-9]+)-([A-Z]{1,2})(\d+)$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    // Printed region code → card language. Two-letter codes are the modern form; the single letters are
+    // the early European prints (LOB-G001 German, LOB-E001 English, …). AE is English (Asia).
+    private static readonly Dictionary<string, string> RegionLanguages = new()
+    {
+        ["EN"] = "en", ["E"] = "en", ["AE"] = "en",
+        ["DE"] = "de", ["G"] = "de",
+        ["FR"] = "fr", ["F"] = "fr",
+        ["IT"] = "it", ["I"] = "it",
+        ["SP"] = "es", ["S"] = "es",
+        ["PT"] = "pt", ["P"] = "pt",
+        ["JP"] = "ja", ["JA"] = "ja",
+        ["KR"] = "ko",
+        ["SC"] = "zhs",
+        ["TC"] = "zht",
+    };
+
+    /// <summary>
+    /// Maps an OCR'd Yu-Gi-Oh! set code's region onto the English catalog: the TCGCSV catalog only holds
+    /// English printings, but the European TCG languages (and the modern OCG core sets) print the same set
+    /// prefix + number with a different region — "RA05-DE085" is the German "RA05-EN085". The region is
+    /// swapped to EN (single-letter early-EU regions to E) and its language returned via
+    /// <paramref name="language"/>; the fuzzy/pHash catalog match takes it from there. Codes without a
+    /// recognized region come back unchanged with a null language.
+    /// </summary>
+    public static string NormalizeRegionCode(string collectorNumber, out string? language)
+    {
+        language = null;
+        var m = RegionCodePattern.Match(collectorNumber.Trim().ToUpperInvariant());
+        if (!m.Success || !RegionLanguages.TryGetValue(m.Groups[2].Value, out var lang))
+            return collectorNumber;
+
+        language = lang;
+        if (lang == CardLanguages.English)
+            return collectorNumber;
+        var englishRegion = m.Groups[2].Value.Length == 1 ? "E" : "EN";
+        return $"{m.Groups[1].Value}-{englishRegion}{m.Groups[3].Value}";
+    }
 }

@@ -43,6 +43,7 @@ import { useGame } from '../context/GameContext';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import { WebcamScanDialog } from '../components/dialogs/WebcamScanDialog';
 import { ScanValueBadges, ListReprintChip } from '../lib/scanBadges';
+import { ENGLISH, LanguageChip, LanguageSelect, languageName } from '../lib/cardLanguages';
 import type {
   AuditCommitResultDto,
   ScanBadgeSettingsDto,
@@ -60,6 +61,9 @@ type ItemStatus = 'matching' | 'done' | 'error';
  * overridable per item or in bulk before commit). */
 interface ItemProps {
   condition: string;
+  /** Printed language code of the copy ("en", "ja", …). Seeded from the session's language, then
+   * from the server's match (which reads the printed language where the card shows one). */
+  language: string;
   isFoil: boolean;
   foilType: string | null;
   quantity: number;
@@ -426,6 +430,7 @@ function Thumb({ src, alt }: { src?: string | null; alt: string }) {
 /** A one-line summary of an item's per-copy properties, shown on the master row. */
 function propsSummary(item: ScanItem, t: TFunction): string {
   const parts = [t(`common.conditions.${item.condition}`)];
+  if (item.language !== ENGLISH) parts.push(languageName(t, item.language));
   if (item.isFoil)
     parts.push(item.foilType ? t('scan.props.foilWithType', { type: item.foilType }) : t('common.labels.foil'));
   if (item.quantity > 1) parts.push(`×${item.quantity}`);
@@ -510,6 +515,7 @@ function MasterRow({
         </Typography>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
           <ConfidenceChip item={item} />
+          <LanguageChip language={item.language} detected={badgeMatch?.languageDetected} />
           <ScanValueBadges
             isNew={badgeMatch?.isNew}
             price={badgeMatch?.marketPrice}
@@ -527,11 +533,13 @@ function MasterRow({
 
 /** The per-copy property editors, reused by the detail panel and (a subset) the bulk dialog. */
 function PropertyFields({
+  game,
   props,
   onChange,
   foilTypeOptions,
   tagOptions,
 }: {
+  game: string;
   props: ItemProps;
   onChange: (patch: Partial<ItemProps>) => void;
   foilTypeOptions: string[];
@@ -555,6 +563,7 @@ function PropertyFields({
             </MenuItem>
           ))}
         </TextField>
+        <LanguageSelect game={game} value={props.language} onChange={(language) => onChange({ language })} />
         <TextField
           size="small"
           type="number"
@@ -751,6 +760,7 @@ function DetailPanel({
           </Typography>
         </Divider>
         <PropertyFields
+          game={game}
           props={item}
           onChange={onProps}
           foilTypeOptions={foilTypeOptions}
@@ -786,6 +796,7 @@ function DetailPanel({
 /** Which fields the bulk-edit dialog will write, plus their values. Only enabled fields apply. */
 interface BulkEditState {
   setCondition: boolean;
+  setLanguage: boolean;
   setFoil: boolean;
   setTags: boolean;
   tagsMode: 'add' | 'replace';
@@ -798,13 +809,14 @@ interface BulkEditState {
 function newBulkState(): BulkEditState {
   return {
     setCondition: false,
+    setLanguage: false,
     setFoil: false,
     setTags: false,
     tagsMode: 'add',
     setQuantity: false,
     setPrice: false,
     setNote: false,
-    props: { condition: 'NM', isFoil: false, foilType: null, quantity: 1, purchasePrice: '', tags: [], note: '' },
+    props: { condition: 'NM', language: ENGLISH, isFoil: false, foilType: null, quantity: 1, purchasePrice: '', tags: [], note: '' },
   };
 }
 
@@ -812,6 +824,7 @@ function newBulkState(): BulkEditState {
 function applyBulk(state: BulkEditState, item: ScanItem): Partial<ItemProps> {
   const patch: Partial<ItemProps> = {};
   if (state.setCondition) patch.condition = state.props.condition;
+  if (state.setLanguage) patch.language = state.props.language;
   if (state.setFoil) {
     patch.isFoil = state.props.isFoil;
     patch.foilType = state.props.isFoil ? state.props.foilType : null;
@@ -830,6 +843,7 @@ function applyBulk(state: BulkEditState, item: ScanItem): Partial<ItemProps> {
 
 function BulkEditDialog({
   open,
+  game,
   count,
   foilTypeOptions,
   tagOptions,
@@ -837,6 +851,7 @@ function BulkEditDialog({
   onClose,
 }: {
   open: boolean;
+  game: string;
   count: number;
   foilTypeOptions: string[];
   tagOptions: string[];
@@ -853,7 +868,13 @@ function BulkEditDialog({
   const patchProps = (patch: Partial<ItemProps>) =>
     setState((s) => ({ ...s, props: { ...s.props, ...patch } }));
   const anyEnabled =
-    state.setCondition || state.setFoil || state.setTags || state.setQuantity || state.setPrice || state.setNote;
+    state.setCondition ||
+    state.setLanguage ||
+    state.setFoil ||
+    state.setTags ||
+    state.setQuantity ||
+    state.setPrice ||
+    state.setNote;
 
   const row = (enabled: boolean, toggle: (v: boolean) => void, control: React.ReactNode) => (
     <Stack direction="row" spacing={2} alignItems="center">
@@ -889,6 +910,17 @@ function BulkEditDialog({
                 </MenuItem>
               ))}
             </TextField>,
+          )}
+          {row(
+            state.setLanguage,
+            (v) => setState((s) => ({ ...s, setLanguage: v })),
+            <LanguageSelect
+              game={game}
+              fullWidth
+              sx={{}}
+              value={state.props.language}
+              onChange={(language) => patchProps({ language })}
+            />,
           )}
           {row(
             state.setFoil,
@@ -1014,6 +1046,8 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   const [artSets, setArtSets] = useState<{ setCode: string; setName: string }[]>([]);
   const [isFoil, setIsFoil] = useState(false);
   const [condition, setCondition] = useState('NM');
+  // The scan session's card language; '' = auto (read off the card / taken from the matched printing).
+  const [language, setLanguage] = useState('');
   // In audit mode the target location is fixed to the audited container and cannot be changed.
   const [containerId, setContainerId] = useState<number | ''>(lockedContainerId ?? '');
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -1115,6 +1149,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   // Reset the set filter whenever the game changes (a set only belongs to one game).
   useEffect(() => {
     setArtSets([]);
+    setLanguage('');
   }, [game]);
 
   // A scan is committable only when it is BOTH confirmed (verified) AND checked (include).
@@ -1131,6 +1166,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
           ...id,
           game,
           condition: it.condition,
+          language: it.language,
           isFoil: it.isFoil,
           foilType: it.isFoil ? it.foilType : null,
           quantity: it.quantity,
@@ -1213,6 +1249,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
       status: 'matching',
       include: false,
       condition,
+      language: language || ENGLISH,
       isFoil,
       foilType: null,
       quantity: 1,
@@ -1237,9 +1274,11 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         const staging = queue.shift();
         if (!staging) return;
         try {
-          const match = await api.scanMatch(staging.file, game, isFoil, setCodes);
+          const match = await api.scanMatch(staging.file, game, isFoil, setCodes, language);
           // TIFF uploads carry no local preview; adopt the server-rendered one when present.
           const patch: Partial<ScanItem> = { status: 'done', match, include: match.matched };
+          // The server's language (printed marker > session choice > matched printing) seeds the copy.
+          if (match.language) patch.language = match.language;
           if (match.scanPreviewDataUri) patch.previewUrl = match.scanPreviewDataUri;
           updateItem(staging.key, patch);
         } catch (e) {
@@ -1328,6 +1367,17 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
               </MenuItem>
             ))}
           </TextField>
+          <Tooltip title={t('scan.controls.languageHelp')}>
+            <Box>
+              <LanguageSelect
+                game={game}
+                allowAuto
+                label={t('scan.controls.language')}
+                value={language}
+                onChange={setLanguage}
+              />
+            </Box>
+          </Tooltip>
           <FormControlLabel
             control={<Checkbox checked={isFoil} onChange={(e) => setIsFoil(e.target.checked)} />}
             label={t('common.labels.foil')}
@@ -1627,7 +1677,12 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
               onToggle={(v) => updateItem(selectedItem.key, { include: v })}
               onVerify={() => updateItem(selectedItem.key, { verified: true, include: true })}
               onCorrect={(r) =>
-                updateItem(selectedItem.key, { override: r, include: true, verified: true })
+                updateItem(selectedItem.key, {
+                  override: r,
+                  include: true,
+                  verified: true,
+                  ...(r.language && r.language !== ENGLISH ? { language: r.language } : {}),
+                })
               }
               onRemove={() => dropItems((it) => it.key === selectedItem.key)}
               onProps={(patch) => updateItem(selectedItem.key, patch)}
@@ -1645,6 +1700,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
 
       <BulkEditDialog
         open={bulkOpen}
+        game={game}
         count={checkedCount}
         foilTypeOptions={foilTypeOptions}
         tagOptions={tagOptions}

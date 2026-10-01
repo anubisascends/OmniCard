@@ -67,6 +67,7 @@ public static class DtoMapping
         ImageUri = c.ImageUri,
         ScanImagePath = c.ScanImagePath,
         Condition = c.Condition,
+        Language = c.Language,
         IsFoil = c.IsFoil,
         FoilType = c.FoilType,
         Quantity = c.Quantity,

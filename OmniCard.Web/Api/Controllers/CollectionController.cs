@@ -109,6 +109,7 @@ public sealed class CollectionController(
         "number" => "number",
         "rarity" => "rarity",
         "condition" => "condition",
+        "language" => "language",
         "isfoil" => "isfoil",
         "quantity" => "quantity",
         "marketprice" => "marketprice",
@@ -130,6 +131,7 @@ public sealed class CollectionController(
             "number" => c => c.Number,
             "rarity" => c => c.Rarity,
             "condition" => c => c.Condition,
+            "language" => c => c.Language,
             "isfoil" => c => c.IsFoil,
             "containername" => c => c.Container?.Name,
             _ => c => c.Name,
@@ -167,6 +169,7 @@ public sealed class CollectionController(
             "number" => Dir(query, c => c.Number, desc),
             "rarity" => Dir(query, c => c.Rarity, desc),
             "condition" => Dir(query, c => c.Condition, desc),
+            "language" => Dir(query, c => c.Language, desc),
             "isfoil" => Dir(query, c => c.IsFoil, desc),
             "quantity" => Dir(query, c => c.Quantity, desc),
             "containername" => Dir(query, c => c.Container != null ? c.Container.Name : null, desc),
@@ -198,7 +201,7 @@ public sealed class CollectionController(
 
         // Distinct printing identity. Ordered so pagination is stable across requests.
         var keys = query
-            .Select(c => new { c.Name, c.SetCode, c.Number, c.IsFoil })
+            .Select(c => new { c.Name, c.SetCode, c.Number, c.IsFoil, c.Language })
             .Distinct();
         var total = keys.Count();
         IOrderedQueryable<T> KeyDir<T, TKey>(IQueryable<T> q, System.Linq.Expressions.Expression<Func<T, TKey>> k)
@@ -211,7 +214,7 @@ public sealed class CollectionController(
             _ => KeyDir(keys, k => k.Name),
         };
         var pageKeys = orderedKeys
-            .ThenBy(k => k.Name).ThenBy(k => k.SetCode).ThenBy(k => k.Number).ThenBy(k => k.IsFoil)
+            .ThenBy(k => k.Name).ThenBy(k => k.SetCode).ThenBy(k => k.Number).ThenBy(k => k.IsFoil).ThenBy(k => k.Language)
             .Skip(skip).Take(take)
             .ToList();
         if (pageKeys.Count == 0)
@@ -220,11 +223,11 @@ public sealed class CollectionController(
         // Load lots for the page's names (Contains on a scalar is EF-translatable), then narrow to the
         // exact page keys in memory — composite-key Contains doesn't translate to SQL.
         var pageNames = pageKeys.Select(k => k.Name).Distinct().ToList();
-        var pageKeySet = pageKeys.Select(k => (k.Name, k.SetCode, k.Number, k.IsFoil)).ToHashSet();
+        var pageKeySet = pageKeys.Select(k => (k.Name, k.SetCode, k.Number, k.IsFoil, k.Language)).ToHashSet();
         var members = query.Where(c => pageNames.Contains(c.Name)).ToList();
         var rows = members
-            .Where(c => pageKeySet.Contains((c.Name, c.SetCode, c.Number, c.IsFoil)))
-            .GroupBy(c => (c.Name, c.SetCode, c.Number, c.IsFoil))
+            .Where(c => pageKeySet.Contains((c.Name, c.SetCode, c.Number, c.IsFoil, c.Language)))
+            .GroupBy(c => (c.Name, c.SetCode, c.Number, c.IsFoil, c.Language))
             .Select(g =>
             {
                 var rep = g.OrderBy(c => c.Id).First();
@@ -248,7 +251,7 @@ public sealed class CollectionController(
         string sort, bool desc, Action<IReadOnlyCollection<CollectionCard>>? hydratePrices)
     {
         var rows = query.ToList()
-            .GroupBy(c => (c.Name, c.SetCode, c.Number, c.IsFoil))
+            .GroupBy(c => (c.Name, c.SetCode, c.Number, c.IsFoil, c.Language))
             .Select(g =>
             {
                 var rep = g.OrderBy(c => c.Id).First();
@@ -305,7 +308,7 @@ public sealed class CollectionController(
         return DtoMapping.ToDto(card);
     }
 
-    /// <summary>Edit a card's condition / foil / quantity / cost.</summary>
+    /// <summary>Edit a card's condition / language / foil / quantity / cost.</summary>
     [HttpPut("{id:int}")]
     [RequirePermission(Permissions.CollectionEdit)]
     public IActionResult Update(int id, [FromBody] UpdateCardRequest req)
@@ -314,6 +317,9 @@ public sealed class CollectionController(
         if (card is null) return NotFound();
 
         card.Condition = req.Condition;
+        // Omitted (older clients) ⇒ keep the copy's language; otherwise normalize (unknown ⇒ English).
+        if (req.Language is not null)
+            card.Language = CardLanguages.Normalize(req.Language) ?? CardLanguages.English;
         card.IsFoil = req.IsFoil;
         card.FoilType = req.FoilType;
         card.PurchasePrice = req.PurchasePrice;
@@ -394,7 +400,7 @@ public sealed class CollectionController(
     }
 
     /// <summary>Bulk-edit the selected cards. Only the ticked fields (SetX flags) are applied; each
-    /// otherwise keeps its per-card value. Condition/foil/price/note go through one batched write,
+    /// otherwise keeps its per-card value. Condition/language/foil/price/note go through one batched write,
     /// quantity through the bulk quantity setter, and tags add-union or replace per TagsMode.</summary>
     [HttpPost("bulk-update")]
     [RequirePermission(Permissions.CollectionEdit)]
@@ -405,12 +411,15 @@ public sealed class CollectionController(
         var ids = req.CardIds;
 
         // Fields carried by the identity/attribute copy path — set in one pass over the lots.
-        if (req.SetCondition || req.SetFoil || req.SetPurchasePrice || req.SetNote)
+        if (req.SetCondition || req.SetLanguage || req.SetFoil || req.SetPurchasePrice || req.SetNote)
         {
+            var language = CardLanguages.Normalize(req.Language) ?? CardLanguages.English;
             binderCards.BulkUpdateField(ids, c =>
             {
                 if (req.SetCondition && !string.IsNullOrWhiteSpace(req.Condition))
                     c.Condition = req.Condition;
+                if (req.SetLanguage)
+                    c.Language = language;
                 if (req.SetFoil)
                     c.IsFoil = req.IsFoil;
                 if (req.SetPurchasePrice)
