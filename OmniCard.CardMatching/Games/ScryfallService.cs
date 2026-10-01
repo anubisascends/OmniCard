@@ -179,6 +179,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
     private List<(Guid Id, ulong ArtHash)>? _artHashCache;
     private Dictionary<Guid, string>? _hashSetLookup;
     private Dictionary<Guid, int>? _hashCollectorNumberLookup;
+    private HashSet<string>? _knownSetCodes;
 
     // Sets that should be deprioritized in matching — reprints/promos that share art with canonical sets
     private static readonly HashSet<string> DeprioritizedSets = new(StringComparer.OrdinalIgnoreCase)
@@ -877,6 +878,107 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
         return new OldFrameResolution(match, NeedsTextBox: false);
     }
 
+    // Collector-line identification (ResolveByCollectorLine): the chosen printing's pHash must be within
+    // this many bits of the scan, and its art must beat the next different-art candidate by
+    // CollectorLineMinVisualAdvantage combined bits. On foreign 2008–2014 prints the right printing sat at
+    // ≤ 14 pHash bits while the other cards sharing its (number, total, year) sat at 25+.
+    internal const int CollectorLineMaxDistance = 18;
+    internal const int CollectorLineMinVisualAdvantage = 10;
+
+    /// <summary>
+    /// Identifies an MTG card from its printed bottom line alone — "™ &amp; © 2011 Wizards of the Coast LLC
+    /// 18/249" — for 1998–2014 frames, which print a collector number and total but no set code. The
+    /// (number, total, copyright year) triple narrows the catalog to a handful of printings across all sets,
+    /// and the scan's image picks among them. Unlike <see cref="ResolveOldFramePrinting"/> it needs no title,
+    /// so it identifies non-English prints (whose title OCR can't read) that otherwise fall to a pHash guess
+    /// — often an unrelated English card. Null unless the line was read and one printing clearly wins.
+    /// </summary>
+    public CardMatch? ResolveByCollectorLine(ulong imageHash, ulong[]? artHashes, MtgPrintEvidence evidence, IReadOnlySet<string>? setFilter)
+    {
+        if (OldFrame.OldFramePrintingResolver.ParseCollectorLine(evidence.BottomLineReads) is not { } line)
+            return null;
+        var number = line.Number.ToString(CultureInfo.InvariantCulture);
+        var total = line.Total.ToString(CultureInfo.InvariantCulture);
+
+        using var ctx = _dbContextFactory.CreateDbContext();
+        // The printed total names the set's size, so the set must run to at least that number.
+        var setsReachingTotal = ctx.Cards.AsNoTracking()
+            .Where(c => c.CollectorNumber == total && !c.Digital)
+            .Select(c => c.SetCode).Distinct().ToList();
+        var cards = ctx.Cards.AsNoTracking()
+            .Where(c => c.CollectorNumber == number && !c.Digital && c.ImageHash != null
+                && setsReachingTotal.Contains(c.SetCode) && !NonScannableLayouts.Contains(c.Layout))
+            .ToList();
+        if (setFilter is not null)
+            cards = cards.Where(c => setFilter.Contains(c.SetCode)).ToList();
+        // The © year is the release year (give or take a year-end release); a range ("1993-2011") offers both.
+        if (line.Years.Count > 0)
+            cards = cards.Where(c => c.ReleasedAt.Length >= 4 && int.TryParse(c.ReleasedAt[..4], out var y)
+                && line.Years.Any(read => Math.Abs(read - y) <= 1)).ToList();
+
+        var candidates = cards.Select(c =>
+        {
+            int? art = null;
+            if (artHashes is not null && c.ArtHash is ulong refArt)
+            {
+                var d = artHashes.Where(h => h != 0).Select(h => PerceptualHashService.HammingDistance(h, refArt)).DefaultIfEmpty(int.MaxValue).Min();
+                art = d == int.MaxValue ? null : d;
+            }
+            return new OldFrame.PrintingCandidate(c, PerceptualHashService.HammingDistance(imageHash, c.ImageHash!.Value), art);
+        }).OrderBy(p => p.Visual).ToList();
+        if (candidates.Count == 0)
+        {
+            _logger.LogDebug("Collector-line resolution: no printing is #{Number}/{Total} (years {Years})",
+                number, total, string.Join("/", line.Years));
+            return null;
+        }
+
+        // Language rows and same-art reprints all compete on the image; the runner-up that must be beaten is
+        // the closest *different art*.
+        var best = candidates[0];
+        var runnerUp = candidates.Skip(1).FirstOrDefault(p => p.Card.IllustrationId is null || p.Card.IllustrationId != best.Card.IllustrationId);
+        if (best.PHashDistance > CollectorLineMaxDistance
+            || (runnerUp is not null && runnerUp.Visual - best.Visual < CollectorLineMinVisualAdvantage))
+        {
+            _logger.LogDebug("Collector-line resolution #{Number}/{Total}: no clear printing (best {Set} #{Num} \"{Name}\" pHash {P} visual {V}; next {Next} visual {NextV})",
+                number, total, best.Card.SetCode, best.Card.CollectorNumber, best.Card.Name, best.PHashDistance, best.Visual,
+                runnerUp?.Card.Name, runnerUp?.Visual);
+            return null;
+        }
+
+        // These frames print no language marker, and the image can't tell one CJK print from another (a
+        // Chinese copy hashes as close to the Japanese row as a Japanese one), so return the English row like
+        // the set-code path does; the session's language choice then remaps it (ResolveLanguageAsync).
+        var card = cards.FirstOrDefault(c => c.SetCode == best.Card.SetCode && c.CollectorNumber == best.Card.CollectorNumber
+            && c.Lang == CardLanguages.English) ?? best.Card;
+        _logger.LogInformation("MTG matched by collector line #{Number}/{Total} (© {Years}): \"{Name}\" {Set} #{Num} [{Lang}] (pHash {P}, art {A}; next {Next} visual {NextV})",
+            number, total, string.Join("/", line.Years), card.Name, card.SetCode, card.CollectorNumber, card.Lang,
+            best.PHashDistance, best.ArtDistance, runnerUp?.Card.Name ?? "none", runnerUp?.Visual);
+        _lastMatchDiagnostics = new MatchDiagnostics
+        {
+            SetFilterActive = setFilter is not null,
+            ActiveSets = setFilter?.ToList(),
+            DecisionPhase = "CollectorLine",
+            PHashDistance = best.PHashDistance,
+            ArtHashDistance = best.ArtDistance,
+        };
+        return new CardMatch
+        {
+            Name = card.Name,
+            SetCode = card.SetCode,
+            SetName = card.SetName,
+            CollectorNumber = card.CollectorNumber,
+            Rarity = card.Rarity,
+            ImageUri = card.ImageUris?.Normal ?? card.ImageUris?.Small,
+            GameSpecificId = card.Id.ToString(),
+            Language = card.Lang,
+            LocalImagePath = card.LocalImagePath,
+            // The printed line pins the printing; the image confirms it.
+            Confidence = 100 * (0.5 + 0.5 * Math.Max(0, 1.0 - best.PHashDistance / 20.0)),
+            Source = card,
+        };
+    }
+
     // Paper printings of one card name, with their image distances to the scan.
     private List<OldFrame.PrintingCandidate> LoadPrintings(string name, ulong imageHash, ulong[]? artHashes, IReadOnlySet<string>? setFilter)
     {
@@ -1126,6 +1228,101 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             : (candidates.Where(c => c.ImageHash != null)
                   .OrderBy(c => PerceptualHashService.HammingDistance(imageHash, c.ImageHash!.Value))
                   .FirstOrDefault() ?? candidates[0]);
+    }
+
+    // OCR set-code correction (see CorrectOcrSetCodes). A corrected set is no longer read off the card, so
+    // the image has to vouch for it: its printing must sit within a cap of pHash bits of the scan and beat
+    // every other neighbouring set's printing by AlternateReadMinHashAdvantage. A confusable-glyph swap
+    // ("TOM" → TDM, "SO1" → SOI) is strong evidence on its own, so it gets the looser cap (right printings
+    // measured 2–14 bits); a dropped/extra character guesses at a glyph, so it gets the tight one (right
+    // printings 2–8; "TPR" read as "WR" → WAR landed an unrelated card at 14).
+    internal const int SetCorrectionMaxDistance = 20;
+    internal const int SetCorrectionMaxDistanceLengthEdit = 12;
+
+    // Characters the collector-line OCR swaps for one another (the narrow serif "I" beside the "•" reads
+    // as "1"; "O" as "0"; …). A set-code substitution is only considered within one of these groups.
+    private static readonly string[] OcrConfusableGroups = ["1IL", "0OQD", "5S", "8B", "2Z", "6G", "7T", "4A"];
+
+    /// <summary>
+    /// Repairs OCR'd set codes that aren't real sets. The collector line's narrow glyphs get misread
+    /// ("SOI" → "SO1") or swallowed by the bullet ("SOI • JP" → "SO"), and an unknown code can never
+    /// resolve, which drops the scan to pHash — and for a foreign-language print that lands on an
+    /// English reprint of the same art. For each read whose set isn't in the catalog, the known sets one
+    /// OCR edit away (a confusable substitution, or a dropped/extra character) are tried with the read's
+    /// collector number, and the one whose printing the scan's image matches clearly best replaces the
+    /// read's set. Reads with a real set code, or with no clear winner, are returned unchanged.
+    /// </summary>
+    public IReadOnlyList<MtgPrintedIdentity> CorrectOcrSetCodes(IReadOnlyList<MtgPrintedIdentity> reads, ulong imageHash)
+    {
+        if (reads.Count == 0) return reads;
+        using var ctx = _dbContextFactory.CreateDbContext();
+        var known = _knownSetCodes ??= ctx.Cards.AsNoTracking().Select(c => c.SetCode).Distinct()
+            .AsEnumerable().ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var corrected = new List<MtgPrintedIdentity>(reads.Count);
+        foreach (var read in reads)
+        {
+            var neighbours = known.Contains(read.SetCode) ? []
+                : known.Where(code => IsOcrNeighbour(read.SetCode.ToUpperInvariant(), code.ToUpperInvariant())).ToList();
+            if (neighbours.Count == 0)
+            {
+                corrected.Add(read);
+                continue;
+            }
+
+            var num = NormalizeCollectorNumber(read.CollectorNumber);
+            var bySet = ctx.Cards.AsNoTracking()
+                .Where(c => neighbours.Contains(c.SetCode) && c.ImageHash != null)
+                .Select(c => new { c.SetCode, c.CollectorNumber, c.Name, c.ImageHash })
+                .AsEnumerable()
+                .Where(c => NormalizeCollectorNumber(c.CollectorNumber) == num)
+                .GroupBy(c => c.SetCode, StringComparer.OrdinalIgnoreCase)
+                .Select(g => (Set: g.Key, Name: g.First().Name,
+                    Distance: g.Min(c => PerceptualHashService.HammingDistance(imageHash, c.ImageHash!.Value))))
+                .OrderBy(s => s.Distance)
+                .ToList();
+
+            var best = bySet.FirstOrDefault();
+            var runnerUp = bySet.Count > 1 ? bySet[1].Distance : int.MaxValue;
+            var cap = best.Set?.Length == read.SetCode.Length ? SetCorrectionMaxDistance : SetCorrectionMaxDistanceLengthEdit;
+            if (best.Set is not null && best.Distance <= cap
+                && runnerUp - best.Distance >= AlternateReadMinHashAdvantage)
+            {
+                _logger.LogInformation("MTG OCR set code {Read} #{Number} corrected to {Set} (\"{Name}\", pHash {Distance}; next {RunnerUp})",
+                    read.SetCode, read.CollectorNumber, best.Set, best.Name, best.Distance, runnerUp == int.MaxValue ? "none" : runnerUp);
+                corrected.Add(read with { SetCode = best.Set.ToUpperInvariant() });
+            }
+            else
+            {
+                _logger.LogDebug("MTG OCR set code {Read} #{Number} is not a known set and no neighbour set matched the image ({Candidates})",
+                    read.SetCode, read.CollectorNumber, string.Join(", ", bySet.Select(s => $"{s.Set}:{s.Distance}")));
+                corrected.Add(read);
+            }
+        }
+
+        // Two reads can now name the same printing; keep the first (best-ranked) of each.
+        return corrected
+            .GroupBy(r => (Set: r.SetCode.ToUpperInvariant(), Num: NormalizeCollectorNumber(r.CollectorNumber)))
+            .Select(g => g.First() with { Votes = g.Sum(r => r.Votes) })
+            .ToList();
+    }
+
+    // True when `code` is one OCR edit from `read`: a single confusable substitution, or one character
+    // dropped from / added to the read. Both upper-case.
+    internal static bool IsOcrNeighbour(string read, string code)
+    {
+        if (read == code) return false;
+        if (read.Length == code.Length)
+        {
+            var diffs = Enumerable.Range(0, read.Length).Where(i => read[i] != code[i]).ToList();
+            return diffs.Count == 1
+                && OcrConfusableGroups.Any(g => g.Contains(read[diffs[0]]) && g.Contains(code[diffs[0]]));
+        }
+        var (shorter, longer) = read.Length < code.Length ? (read, code) : (code, read);
+        if (longer.Length - shorter.Length != 1) return false;
+        for (int i = 0; i < longer.Length; i++)
+            if (longer.Remove(i, 1) == shorter) return true;
+        return false;
     }
 
     private static CardMatch ToGroundTruthMatch(Card best)
@@ -1446,6 +1643,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             _nameIndex = null;
             _hashSetLookup = null;
             _hashCollectorNumberLookup = null;
+            _knownSetCodes = null;
             _symbolHashCache = null;
             oldContext.Dispose();
         }

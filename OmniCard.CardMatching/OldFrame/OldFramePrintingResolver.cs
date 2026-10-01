@@ -248,6 +248,29 @@ public static class OldFramePrintingResolver
         return new BottomLineFacts(hasCopyright, years, collector, collectorHasTotal, mark);
     }
 
+    /// <summary>The printed "nnn/ttt" collector fraction and copyright years off the bottom band, without
+    /// reference to any candidate card — for identifying a card whose title can't be read (a non-English
+    /// print). The fraction is the one most reads agree on; null when no read shows one.</summary>
+    internal static (int Number, int Total, IReadOnlySet<int> Years)? ParseCollectorLine(IReadOnlyList<string> reads)
+    {
+        var fractions = new List<(int Number, int Total)>();
+        var years = new HashSet<int>();
+        foreach (var read in reads)
+        {
+            foreach (Match m in CollectorFraction.Matches(read))
+            {
+                var printedTotal = int.Parse(m.Groups[2].Value);
+                if (printedTotal >= 20) fractions.Add((int.Parse(m.Groups[1].Value), printedTotal));
+            }
+            foreach (Match m in YearToken.Matches(read))
+                foreach (var y in PlausibleYears(m.Groups[1].Value))
+                    years.Add(y);
+        }
+        if (fractions.Count == 0) return null;
+        var (number, total) = fractions.GroupBy(f => f).OrderByDescending(g => g.Count()).First().Key;
+        return (number, total, years);
+    }
+
     // Whether the "©" sits between "Illus." and the artist's first name in one read: true/false when the
     // artist's first name was found, null when the read doesn't show the credit clearly enough to say.
     private static bool? IllusMarkIn(string[] tokens, string[] keys, string? artistFirst)

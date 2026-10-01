@@ -113,6 +113,30 @@ public class OldFramePrintingResolverTests
     }
 
     [Fact]
+    public void ParseCollectorLine_TakesTheMostAgreedFraction_AndAllYears()
+    {
+        // Real reads off a Chinese M12 card: one pass loses the slash ("18 249"), one garbles the year.
+        var line = OldFramePrintingResolver.ParseCollectorLine([
+            "-- Steve rrescott j Bie T & c 1993-2011 Wizards of the Coast LLC 18/249",
+            "ae Steve Fresco T & c 1993-2011 Wizards of the Coast LILC 18 249 ;",
+            ". : WER c 1993-204 Wizards of the Coast LLC 18/249 . -_",
+        ]);
+
+        Assert.NotNull(line);
+        Assert.Equal(18, line.Value.Number);
+        Assert.Equal(249, line.Value.Total);
+        Assert.Contains(2011, line.Value.Years);
+    }
+
+    [Theory]
+    [InlineData("Steve Prescott T & c 1993-2011 Wizards of the Coast LLC")] // no collector printed
+    [InlineData("1/1 power and toughness")]                                // a P/T box isn't a total
+    public void ParseCollectorLine_NoFraction_IsNull(string read)
+    {
+        Assert.Null(OldFramePrintingResolver.ParseCollectorLine([read]));
+    }
+
+    [Fact]
     public void ParseBottomLine_UnreadableBand_IsUnknown()
     {
         var facts = OldFramePrintingResolver.ParseBottomLine(["SUS) feree Wlerves b/d"], "Jeff A. Menges");
