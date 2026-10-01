@@ -16,6 +16,11 @@ public class InventoryLot
     public string? Condition { get; set; }
     /// <summary>Free-text user note on this physical copy (e.g. "signed", "creased corner").</summary>
     public string? Note { get; set; }
+    /// <summary>The printed language of this physical copy as a <see cref="OmniCard.Shared.Games.CardLanguages"/>
+    /// code (e.g. "ja"). Null means English — the implied default, so pre-existing lots need no backfill.
+    /// A per-copy attribute (like <see cref="Condition"/>): a Japanese copy can be owned even when the
+    /// game's catalog has no Japanese row, in which case it rides on the English printing.</summary>
+    public string? Language { get; set; }
     public string? ScanImagePath { get; set; }
     public int? Page { get; set; }
     public int? Slot { get; set; }

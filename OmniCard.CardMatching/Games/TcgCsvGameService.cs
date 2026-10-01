@@ -22,7 +22,7 @@ namespace OmniCard.CardMatching.Games;
 // Abstract base for all TCGCSV-backed games. Concrete games subclass this, supplying a
 // category id, extended-data mapping, and sub-type→price mapping. Catalog download, image
 // hashing, price refresh, matching, and queries live here — implemented once.
-public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameFieldResolver, IDisposable
+public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameFieldResolver, ICatalogLanguageAware, IDisposable
     where TContext : TcgCsvDbContext
 {
     protected const string TcgCsvBaseUrl = "https://tcgcsv.com";
@@ -61,6 +61,47 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
 
     // === Per-game hooks ===
     protected abstract int CategoryId { get; }
+
+    /// <summary>The TCGCSV category per card language. Most games have only their English category;
+    /// Pokémon adds its separate "Pokemon Japan" category. A non-English category's products are a
+    /// distinct product line (own sets, own numbering, own prices), not translations of English rows.</summary>
+    protected virtual IReadOnlyDictionary<string, int> LanguageCategories =>
+        new Dictionary<string, int> { [CardLanguages.English] = CategoryId };
+
+    /// <summary>Set-code prefix marking a non-English category's groups ("JP-SV11B"). Needed because
+    /// those groups' abbreviations collide with English ones (Pokémon Japan reuses "SM12", "XY", …) and
+    /// many have none at all.</summary>
+    protected static string LanguageSetPrefix(string language) => language switch
+    {
+        "ja" => "JP",
+        _ => language.ToUpperInvariant(),
+    };
+
+    // === ICatalogLanguageAware ===
+
+    private IReadOnlyCollection<string> _catalogLanguages = [CardLanguages.English];
+
+    public IReadOnlyList<string> DownloadableLanguages =>
+        CardLanguages.DownloadableFor(Game).Where(LanguageCategories.ContainsKey).ToList();
+
+    public IReadOnlyCollection<string> CatalogLanguages
+    {
+        get => _catalogLanguages;
+        set => _catalogLanguages = CardLanguages.SanitizeCatalogSelection(Game, value)
+            .Where(LanguageCategories.ContainsKey).ToList();
+    }
+
+    public string? GetCardLanguage(string gameCardId)
+    {
+        if (!int.TryParse(gameCardId, out var id)) return null;
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking().Where(c => c.ProductId == id).Select(c => c.Lang).FirstOrDefault();
+    }
+
+    /// <summary>Always null: a TCGCSV language category is its own product line (Pokémon Japan sets and
+    /// numbers don't correspond to English ones), so there's no same-printing row to remap to. The
+    /// scanned copy keeps its English match and is tagged with the language instead.</summary>
+    public CardMatch? FindLanguageVariant(string gameCardId, string language) => null;
     public abstract CardGame Game { get; }
     protected abstract string GameKey { get; }   // art-dir prefix, e.g. "pokemon"
 
@@ -176,9 +217,14 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
         var client = CreateClient();
 
         progress?.Report($"Fetching {Game} set list...");
-        var groups = await client.GetFromJsonAsync<TcgCsvGroupsResponse>(
-            $"{TcgCsvBaseUrl}/tcgplayer/{CategoryId}/groups", TcgCsvJsonOptions, ct);
-        var groupList = groups?.Results ?? [];
+        var groupList = new List<(TcgCsvGroup Group, int CategoryId, string Lang)>();
+        foreach (var lang in _catalogLanguages.Prepend(CardLanguages.English).Distinct())
+        {
+            if (!LanguageCategories.TryGetValue(lang, out var categoryId)) continue;
+            var groups = await client.GetFromJsonAsync<TcgCsvGroupsResponse>(
+                $"{TcgCsvBaseUrl}/tcgplayer/{categoryId}/groups", TcgCsvJsonOptions, ct);
+            groupList.AddRange((groups?.Results ?? []).Select(g => (g, categoryId, lang)));
+        }
         _logger.LogInformation("Discovered {Count} {Game} groups", groupList.Count, Game);
 
         var allCards = new List<TcgCsvCard>();
@@ -186,14 +232,21 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
         var done = 0;
 
         await Parallel.ForEachAsync(groupList, new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = ct },
-            async (group, token) =>
+            async (entry, token) =>
             {
+                var (group, categoryId, lang) = entry;
                 try
                 {
                     var products = await client.GetFromJsonAsync<TcgCsvProductsResponse>(
-                        $"{TcgCsvBaseUrl}/tcgplayer/{CategoryId}/{group.GroupId}/products", TcgCsvJsonOptions, token);
+                        $"{TcgCsvBaseUrl}/tcgplayer/{categoryId}/{group.GroupId}/products", TcgCsvJsonOptions, token);
                     var setCode = string.IsNullOrWhiteSpace(group.Abbreviation) ? group.GroupId.ToString() : group.Abbreviation!;
-                    var rows = (products?.Results ?? []).Select(p => MapProduct(p, setCode, group.Name)).ToList();
+                    var setName = group.Name;
+                    if (lang != CardLanguages.English)
+                    {
+                        setCode = $"{LanguageSetPrefix(lang)}-{setCode}";
+                        setName = $"{setName} ({LanguageSetPrefix(lang)})";
+                    }
+                    var rows = (products?.Results ?? []).Select(p => MapProduct(p, setCode, setName, lang)).ToList();
                     lock (cardsLock) allCards.AddRange(rows);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -232,6 +285,7 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
                     {
                         // Refresh catalog fields; preserve computed hashes/paths and prices.
                         existing.Game = c.Game;
+                        existing.Lang = c.Lang;
                         existing.Name = c.Name;
                         existing.CleanName = c.CleanName;
                         existing.GroupId = c.GroupId;
@@ -261,6 +315,20 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
             progress?.Report($"Processed {inserted + updated} cards ({inserted} new, {updated} updated)...");
         }
 
+        // Languages un-ticked since the last download: drop their rows (never English, and never after a
+        // download that fetched nothing).
+        if (deduped.Count > 0)
+        {
+            var keep = deduped.Select(c => c.ProductId).ToHashSet();
+            var stale = (await importContext.Cards.Where(c => c.Lang != CardLanguages.English)
+                    .Select(c => c.ProductId).ToListAsync(ct))
+                .Where(id => !keep.Contains(id)).ToList();
+            foreach (var chunk in stale.Chunk(500))
+                await importContext.Cards.Where(c => chunk.Contains(c.ProductId)).ExecuteDeleteAsync(ct);
+            if (stale.Count > 0)
+                _logger.LogInformation("Pruned {Count} {Game} rows in languages no longer selected", stale.Count, Game);
+        }
+
         if (deduped.Count > 0) importContext.MarkMigrationComplete();
 
         var oldContext = _readContext;
@@ -275,12 +343,13 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
         if (inserted > 0) await ComputeImageHashesAsync(forceAll: false, progress, ct);
     }
 
-    protected TcgCsvCard MapProduct(TcgCsvProduct p, string setCode, string setName)
+    protected TcgCsvCard MapProduct(TcgCsvProduct p, string setCode, string setName, string lang = CardLanguages.English)
     {
         var card = new TcgCsvCard
         {
             ProductId = p.ProductId,
             Game = Game,
+            Lang = lang,
             Name = p.Name,
             CleanName = p.CleanName,
             GroupId = p.GroupId,
@@ -310,7 +379,15 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
 
         _logger.LogInformation("Starting {Game} price refresh via TCGCSV", Game);
         var client = CreateClient();
-        var priceMap = await FetchTcgCsvPriceMapAsync(client, progress, ct);
+        List<string> catalogLanguages;
+        await using (var ctx = _dbContextFactory.CreateDbContext())
+            catalogLanguages = await ctx.Cards.Select(c => c.Lang).Distinct().ToListAsync(ct);
+        var categories = catalogLanguages.Prepend(CardLanguages.English)
+            .Where(LanguageCategories.ContainsKey).Select(l => LanguageCategories[l]).Distinct().ToList();
+        var priceMap = new Dictionary<int, (decimal? Normal, decimal? Foil)>();
+        foreach (var categoryId in categories)
+            foreach (var (pid, prices) in await FetchTcgCsvPriceMapAsync(client, categoryId, progress, ct))
+                priceMap[pid] = prices;
 
         await using var context = _dbContextFactory.CreateDbContext();
         context.Database.EnsureCreated();
@@ -343,10 +420,10 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
     }
 
     private async Task<Dictionary<int, (decimal? Normal, decimal? Foil)>> FetchTcgCsvPriceMapAsync(
-        HttpClient client, IProgress<PriceUpdateProgress>? progress, CancellationToken ct)
+        HttpClient client, int categoryId, IProgress<PriceUpdateProgress>? progress, CancellationToken ct)
     {
         var groups = await client.GetFromJsonAsync<TcgCsvGroupsResponse>(
-            $"{TcgCsvBaseUrl}/tcgplayer/{CategoryId}/groups", TcgCsvJsonOptions, ct);
+            $"{TcgCsvBaseUrl}/tcgplayer/{categoryId}/groups", TcgCsvJsonOptions, ct);
         var groupList = groups?.Results ?? [];
         var rowsByProduct = new Dictionary<int, List<TcgCsvPrice>>();
         var done = 0;
@@ -357,7 +434,7 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
             try
             {
                 var prices = await client.GetFromJsonAsync<TcgCsvPricesResponse>(
-                    $"{TcgCsvBaseUrl}/tcgplayer/{CategoryId}/{group.GroupId}/prices", TcgCsvJsonOptions, ct);
+                    $"{TcgCsvBaseUrl}/tcgplayer/{categoryId}/{group.GroupId}/prices", TcgCsvJsonOptions, ct);
                 foreach (var row in prices?.Results ?? [])
                 {
                     if (!rowsByProduct.TryGetValue(row.ProductId, out var list))
@@ -873,7 +950,9 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
                 CatalogSearchExpressionBuilder.StringPredicate(p, nameof(TcgCsvCard.SetName), op, v)))
             .Field("cn", (p, op, v) => CatalogSearchExpressionBuilder.StringPredicate(p, nameof(TcgCsvCard.CollectorNumber), op, v))
             .Field("type", (p, op, v) => CatalogSearchExpressionBuilder.StringPredicate(p, nameof(TcgCsvCard.CardType), op, v))
-            .Field("rarity", (p, op, v) => CatalogSearchExpressionBuilder.StringPredicate(p, nameof(TcgCsvCard.Rarity), op, v));
+            .Field("rarity", (p, op, v) => CatalogSearchExpressionBuilder.StringPredicate(p, nameof(TcgCsvCard.Rarity), op, v))
+            .Field("lang", (p, op, v) => CatalogSearchExpressionBuilder.StringPredicate(p, nameof(TcgCsvCard.Lang), op,
+                CardLanguages.Normalize(v) ?? v));
     }
 
     /// <summary>The subset of <paramref name="node"/> safe to push to SQL: top-level, non-negated,
@@ -886,7 +965,7 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
             switch (n)
             {
                 case FieldFilter f when !f.Negated && !SearchSchema.IsGameSpecific(f.Field)
-                        && f.Field is "name" or "set" or "cn" or "type" or "rarity":
+                        && f.Field is "name" or "set" or "cn" or "type" or "rarity" or "lang":
                     conjuncts.Add(f);
                     break;
                 case AndFilter a:
@@ -940,6 +1019,7 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
                     "cn" => FieldOperatorEvaluator.Matches(c.CollectorNumber, f.Op, value),
                     "type" => FieldOperatorEvaluator.Matches(c.CardType, f.Op, value),
                     "rarity" => FieldOperatorEvaluator.Matches(c.Rarity, f.Op, value),
+                    "lang" => FieldOperatorEvaluator.Matches(c.Lang, f.Op, CardLanguages.Normalize(value) ?? value),
                     // Ownership-only fields (is/foil/tag/location/price/date) have no catalog meaning.
                     "is" or "foil" or "tag" or "condition" or "location" or "price" or "date" => true,
                     _ => FieldOperatorEvaluator.Matches(c.Name, f.Op, value),
@@ -1033,6 +1113,7 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
         Rarity = c.Rarity,
         ImageUri = c.ImageUrl,
         GameSpecificId = c.ProductId.ToString(),
+        Language = c.Lang,
         LocalImagePath = ResolveLocalArtPath(c.LocalImagePath),
         Confidence = confidence,
         Source = c

@@ -87,6 +87,58 @@ public class CatalogRefreshServiceTests
         Assert.Contains("boom", recent[0].Message);
     }
 
+    [Fact]
+    public async Task BulkDownload_AppliesSavedLanguageSelection()
+    {
+        var game = new LanguageRecordingGameService();
+        var settings = new FixedLanguageSettings(["en", "ja"]);
+        var svc = new CatalogRefreshService([game], ImageCache(), NullLogger<CatalogRefreshService>.Instance, settings);
+
+        Assert.True(svc.TryStart(CardGame.Mtg, "bulk", out _));
+        await WaitUntil(() => svc.Status().Running is null);
+
+        Assert.Equal(["en", "ja"], game.LanguagesAtDownload);
+        Assert.Equal("succeeded", svc.Status().Recent[0].State);
+    }
+
+    private sealed class FixedLanguageSettings(IReadOnlyList<string> languages) : ICatalogLanguageSettingsService
+    {
+        public IReadOnlyList<string> GetLanguages(CardGame game) => languages;
+        public IReadOnlyList<string> SetLanguages(CardGame game, IEnumerable<string> langs) => languages;
+    }
+
+    /// <summary>A language-aware game whose bulk download records the languages it was told to fetch.</summary>
+    private sealed class LanguageRecordingGameService : ICardGameService, ICatalogLanguageAware
+    {
+        public IReadOnlyCollection<string>? LanguagesAtDownload;
+        public IReadOnlyList<string> DownloadableLanguages => ["en", "ja"];
+        public IReadOnlyCollection<string> CatalogLanguages { get; set; } = ["en"];
+        public string? GetCardLanguage(string gameCardId) => null;
+        public CardMatch? FindLanguageVariant(string gameCardId, string language) => null;
+
+        public CardGame Game => CardGame.Mtg;
+        public Task DownloadBulkDataAsync(IProgress<string>? progress = null, CancellationToken ct = default)
+        {
+            LanguagesAtDownload = CatalogLanguages;
+            return Task.CompletedTask;
+        }
+
+        public MatchDiagnostics? LastMatchDiagnostics => null;
+        public Task UpdatePricesAsync(IProgress<PriceUpdateProgress>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
+        public Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default) => Task.CompletedTask;
+        public CardMatch? FindClosestMatch(ulong imageHash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, int maxDistance = 14, ulong? scanEdgeHash = null) => null;
+        public List<CardMatch> SearchCards(string query, int maxResults = 20) => [];
+        public List<CardMatch> GetPrintings(string cardName) => [];
+        public decimal? GetCurrentPrice(string gameCardId, bool isFoil) => null;
+        public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil) => new();
+        public void RecordCorrection(ulong scanHash, string correctCardId, ulong? artScanHash = null) { }
+        public IReadOnlyList<SetInfo> GetAvailableSets() => [];
+        public Task<List<SetCompletionSummary>> GetSetCompletionAsync(IEnumerable<CollectionCard> ownedCards, IProgress<string>? progress = null) => Task.FromResult(new List<SetCompletionSummary>());
+        public List<MissingCard> GetMissingCards(string setCode, IEnumerable<string> ownedCollectorNumbers) => [];
+        public List<SetCatalogCard> GetSetCards(string setCode) => [];
+        public object? FindCardById(string gameCardId) => null;
+    }
+
     /// <summary>Game service whose price refresh blocks until <see cref="Release"/> is called, so the
     /// job's running window is controllable from the test.</summary>
     private sealed class GatedGameService(CardGame game) : ICardGameService

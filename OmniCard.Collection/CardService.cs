@@ -894,6 +894,7 @@ public sealed class CardService : ICardService
 
         // Copy attributes always live on the Lot, independent of identity.
         lot.Condition = card.Condition;
+        lot.Language = CardLanguages.ToStored(card.Language);
         lot.UnitCost = card.PurchasePrice;
         lot.LocationId = card.ContainerId;
         lot.Page = card.Page;
@@ -1185,6 +1186,7 @@ public sealed class CardService : ICardService
             {
                 Product = product,
                 Condition = card.Condition,
+                Language = CardLanguages.ToStored(card.Language),
                 UnitCost = card.PurchasePrice,
                 AcquisitionDate = card.DateAdded,
                 LocationId = card.ContainerId,
@@ -1759,6 +1761,7 @@ public sealed class CardService : ICardService
             Source = lot.Source,
             LocationId = containerId,
             Condition = lot.Condition,
+            Language = lot.Language,
             Section = section,
         };
         context.Lots.Add(moved);

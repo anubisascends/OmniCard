@@ -45,9 +45,13 @@ public class OptcgDbContext : DbContext
 
     public void ApplySchemaUpgrades()
     {
-        // SQL Server schema comes from EF migrations; the additive ALTER TABLEs below are SQLite-only.
+        // SQL Server: EnsureCreated never alters an existing catalog DB, so columns added after it was
+        // first created are added here (idempotent). The ALTER TABLEs below are the SQLite equivalents.
         if (!Database.IsSqlite())
+        {
+            CatalogSchema.AddSqlServerColumnIfMissing(this, "Cards", "Lang", "nvarchar(16) NOT NULL CONSTRAINT DF_Cards_Lang DEFAULT 'en'");
             return;
+        }
 
         var conn = Database.GetDbConnection();
         conn.Open();
@@ -58,6 +62,7 @@ public class OptcgDbContext : DbContext
         AddColumnIfMissing(conn, "VariantLabel TEXT");
         AddColumnIfMissing(conn, "Artist TEXT");
         AddColumnIfMissing(conn, "EdgeHash INTEGER");
+        AddColumnIfMissing(conn, "Lang TEXT NOT NULL DEFAULT 'en'");
     }
 
     private static void AddColumnIfMissing(System.Data.Common.DbConnection conn, string columnDef)
@@ -81,6 +86,7 @@ public class OptcgDbContext : DbContext
         var card = modelBuilder.Entity<OptcgCard>();
 
         card.HasKey(c => c.CardSetId);
+        card.Property(c => c.Lang).HasMaxLength(16);
 
         card.HasIndex(c => c.CardName);
         card.HasIndex(c => c.SetId);

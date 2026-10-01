@@ -22,6 +22,9 @@ public class CollectionCard : INotifyPropertyChanged
     public string? ImageUri { get; set; }
     public string? ScanImagePath { get; set; }
     public string Condition { get; set; } = "NM";
+    /// <summary>Printed language of this physical copy (<see cref="OmniCard.Shared.Games.CardLanguages"/> code).
+    /// Mirrors <see cref="InventoryLot.Language"/>, with null (English) surfaced as "en".</summary>
+    public string Language { get; set; } = "en";
     public bool IsFoil { get; set; }
     /// <summary>Foil finish sub-type (e.g. "Etched", "Reverse Holofoil"). Null for non-foil.
     /// Mirrors <see cref="Product.FoilType"/>. See <see cref="FoilTypes"/>.</summary>

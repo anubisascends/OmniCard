@@ -20,4 +20,9 @@ public class OcrMatchResult
     /// <see cref="SetCode"/>/<see cref="CollectorNumber"/>. ScryfallService Phase 0 resolves each and lets the
     /// scan's image hash pick between them, so one misread digit can't pin the wrong printing.</summary>
     public IReadOnlyList<MtgPrintedIdentity> AlternateSetNumbers { get; init; } = [];
+
+    /// <summary>The card language read from the print (MTG's "• JP" marker), as a canonical
+    /// <see cref="OmniCard.Shared.Games.CardLanguages"/> code. When several catalog rows share the read
+    /// (set, collector) — one per downloaded language — this picks the matching one. Null ⇒ unread.</summary>
+    public string? Language { get; init; }
 }

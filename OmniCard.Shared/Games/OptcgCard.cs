@@ -5,8 +5,14 @@ namespace OmniCard.Shared.Games;
 public class OptcgCard
 {
     // Variant uid: bare card number for the base printing (index 0),
-    // "{CardNumber}_p{index}" for alternate arts.
+    // "{CardNumber}_p{index}" for alternate arts. Non-English printings append "@{lang}"
+    // (e.g. "OP01-001@ja") — poneglyph numbers variants per language, so the suffix keeps the
+    // Japanese "OP01-001_p2" from colliding with the English one.
     public string CardSetId { get; set; } = "";
+
+    /// <summary>Card language (CardLanguages code): "en" for the English catalog, "ja"/"fr" for
+    /// rows downloaded via poneglyph's <c>lang=</c>.</summary>
+    public string Lang { get; set; } = "en";
 
     // Printed collector number, e.g. "OP01-001" (shared across variants).
     public string CardNumber { get; set; } = "";

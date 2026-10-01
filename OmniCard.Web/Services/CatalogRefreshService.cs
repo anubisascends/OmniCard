@@ -2,6 +2,7 @@ using OmniCard.Shared.Cards;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Sets;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Web.Services;
 
@@ -19,6 +20,7 @@ public sealed class CatalogRefreshService
 
     private readonly Dictionary<CardGame, ICardGameService> _games;
     private readonly CardImageCacheService _imageCache;
+    private readonly ICatalogLanguageSettingsService? _languages;
     private readonly ILogger<CatalogRefreshService> _logger;
     private readonly object _lock = new();
     private JobState? _running;
@@ -27,11 +29,13 @@ public sealed class CatalogRefreshService
     public CatalogRefreshService(
         IEnumerable<ICardGameService> games,
         CardImageCacheService imageCache,
-        ILogger<CatalogRefreshService> logger)
+        ILogger<CatalogRefreshService> logger,
+        ICatalogLanguageSettingsService? languages = null)
     {
         _games = games.ToDictionary(g => g.Game);
         _imageCache = imageCache;
         _logger = logger;
+        _languages = languages;
     }
 
     /// <summary>Immutable snapshot of a refresh job for the API.</summary>
@@ -99,6 +103,10 @@ public sealed class CatalogRefreshService
 
         try
         {
+            // Apply the saved language selection so a bulk download fetches (and prunes) exactly it.
+            if (_languages is not null && service is ICatalogLanguageAware languageAware)
+                languageAware.CatalogLanguages = _languages.GetLanguages(job.Game);
+
             _logger.LogInformation("Catalog refresh started: {Game} {Operation}", job.Game, job.Operation);
             switch (job.Operation)
             {

@@ -85,6 +85,7 @@ public class OmniCardDbContext : DbContext
                 .OnDelete(DeleteBehavior.SetNull);
             e.HasIndex(l => l.LocationId);
             e.Property(l => l.FlagReason).HasConversion<string?>();
+            e.Property(l => l.Language).HasMaxLength(16);
         });
 
         modelBuilder.Entity<InventoryMovement>(e =>

@@ -65,7 +65,10 @@ public sealed class WebScanMatchingService
     /// <param name="setCodes">Optional set(s) to constrain matching to — the user tells us which set(s)
     /// they're scanning, which bounds the pHash/artwork fallback (and every other match path) to their
     /// union. Empty/null ⇒ no set constraint.</param>
-    public async Task<ScanMatchDto> MatchAsync(byte[] imageBytes, CardGame game, bool isFoil, IReadOnlyCollection<string>? setCodes = null, CancellationToken ct = default)
+    /// <param name="language">The scan session's card language (CardLanguages code), or null for auto.
+    /// A language printed on the card (MTG "• JP", Yu-Gi-Oh! "-DE") always wins; otherwise this is the
+    /// copy's language, and the match is remapped to that language's printing when the catalog has it.</param>
+    public async Task<ScanMatchDto> MatchAsync(byte[] imageBytes, CardGame game, bool isFoil, IReadOnlyCollection<string>? setCodes = null, string? language = null, CancellationToken ct = default)
     {
         if (!_gameServices.TryGetValue(game, out var gameService))
             return new ScanMatchDto { Matched = false, Game = game.ToString(), Error = $"Game {game} is not available" };
@@ -145,18 +148,27 @@ public sealed class WebScanMatchingService
 
         // 6. OCR refinement — for MTG the printed (set, collector) is ground truth and overrides even
         //    a confident pHash guess; the other games use the collector number to pin the printing.
-        match = await RefineWithOcrAsync(imageBytes, game, gameService, hash, artHashes, edgeHash, detectedSets, setFilter, match, isListReprint);
+        var languageEvidence = new LanguageEvidence();
+        match = await RefineWithOcrAsync(imageBytes, game, gameService, hash, artHashes, edgeHash, detectedSets, setFilter, match, isListReprint, languageEvidence);
 
         // 7. If still nothing, retry rotated 180° (cards are often fed upside down).
         if (match is null)
-            (match, hash) = await RetryRotatedAsync(imageBytes, game, gameService, isFoil, setFilter, hash);
+            (match, hash) = await RetryRotatedAsync(imageBytes, game, gameService, isFoil, setFilter, hash, languageEvidence);
+
+        // 8. Language: printed marker > session choice > the matched row's own language. Remaps the match
+        //    to the same printing in that language when the catalog holds it (downloaded languages).
+        (match, var copyLanguage) = await ResolveLanguageAsync(gameService, match, languageEvidence.Detected, CardLanguages.Normalize(language));
 
         _logger.LogInformation(
             match is null ? "Scan produced no match for {Game} (pHash {Hash:X16})"
                           : "Scan matched \"{Name}\" ({Set} #{Num}) for {Game}",
             match?.Name, match?.SetCode, match?.CollectorNumber, game, hash);
 
-        var dto = ToDto(match, game, hash);
+        var dto = ToDto(match, game, hash) with
+        {
+            Language = copyLanguage,
+            LanguageDetected = match is not null && languageEvidence.Detected is not null,
+        };
         // Attach the current market price so the client can render the value-tier badge. The lookup
         // hits the game service's shared read context, so it goes through the same gate as matching.
         if (match is not null)
@@ -205,11 +217,78 @@ public sealed class WebScanMatchingService
         finally { _matchGate.Release(); }
     }
 
+    /// <summary>The card language read off the print during OCR refinement, if any (see
+    /// <see cref="ResolveLanguageAsync"/>). A holder so the many OCR return paths needn't thread it.</summary>
+    private sealed class LanguageEvidence
+    {
+        public string? Detected;
+    }
+
+    /// <summary>
+    /// Decides the copy's language and, for catalogs that hold several languages
+    /// (<see cref="ICatalogLanguageAware"/>), swaps the match to that language's printing. The copy's
+    /// language is the printed marker when OCR read one, else the session's choice, else the matched
+    /// row's own language (e.g. a Pokémon Japan product, or a Japanese row the image — or a learned
+    /// correction — matched). Only an explicit language (printed or chosen) triggers a remap; otherwise
+    /// the matched printing stands. MTG's OCR lookup already defaults to the English row when no marker
+    /// is read, so the image only decides the language when OCR couldn't.
+    /// </summary>
+    private async Task<(CardMatch? Match, string? Language)> ResolveLanguageAsync(
+        ICardGameService gameService, CardMatch? match, string? detected, string? sessionLanguage)
+    {
+        if (match is null) return (null, null);
+        var explicitLanguage = detected ?? sessionLanguage;
+        if (gameService is not ICatalogLanguageAware aware || string.IsNullOrEmpty(match.GameSpecificId))
+            return (match, explicitLanguage ?? CardLanguages.English);
+
+        var rowLanguage = match.Language
+            ?? await RunGatedAsync(() => aware.GetCardLanguage(match.GameSpecificId))
+            ?? CardLanguages.English;
+        if (explicitLanguage is { } target && rowLanguage != target)
+        {
+            var variant = await RunGatedAsync(() => aware.FindLanguageVariant(match.GameSpecificId, target));
+            if (variant is not null)
+            {
+                _logger.LogInformation("Scan remapped to the {Language} printing of \"{Name}\" ({Set} #{Num})",
+                    target, match.Name, match.SetCode, match.CollectorNumber);
+                return (WithConfidence(variant, match.Confidence), target);
+            }
+        }
+        return (match, explicitLanguage ?? rowLanguage);
+    }
+
+    private static CardMatch WithConfidence(CardMatch m, double? confidence) => new()
+    {
+        Name = m.Name,
+        SetCode = m.SetCode,
+        SetName = m.SetName,
+        CollectorNumber = m.CollectorNumber,
+        Rarity = m.Rarity,
+        ImageUri = m.ImageUri,
+        GameSpecificId = m.GameSpecificId,
+        LocalImagePath = m.LocalImagePath,
+        Language = m.Language,
+        Confidence = confidence,
+        Source = m.Source,
+    };
+
+    /// <summary>Game-specific clean-up of an OCR'd collector number before the catalog lookup. Yu-Gi-Oh!
+    /// codes carry a region ("RA05-DE085"); the catalog only holds the English printing ("RA05-EN085"),
+    /// so the region is swapped to EN and recorded as the copy's language.</summary>
+    private static string? NormalizeCollectorRead(CardGame game, string? collectorNumber, LanguageEvidence evidence)
+    {
+        if (game != CardGame.YuGiOh || collectorNumber is null) return collectorNumber;
+        var normalized = YugiohService.NormalizeRegionCode(collectorNumber, out var language);
+        if (language is not null) evidence.Detected ??= language;
+        return normalized;
+    }
+
     private async Task<CardMatch?> RefineWithOcrAsync(
         byte[] imageBytes, CardGame game, ICardGameService gameService, ulong hash,
         ulong[]? artHashes, ulong? edgeHash, IReadOnlySet<string>? detectedSets,
-        IReadOnlySet<string>? setFilter, CardMatch? current, bool isListReprint = false)
+        IReadOnlySet<string>? setFilter, CardMatch? current, bool isListReprint = false, LanguageEvidence? languageEvidence = null)
     {
+        languageEvidence ??= new LanguageEvidence();
         try
         {
             switch (game)
@@ -230,6 +309,7 @@ public sealed class WebScanMatchingService
                             _ => FinalFantasyService.OcrSpec,
                         };
                         var (cn, conf) = await _ocrService.DetectCollectorNumberAsync(imageBytes, spec);
+                        cn = NormalizeCollectorRead(game, cn, languageEvidence);
                         return await ApplyCollectorOcrAsync(gameService, hash, artHashes, edgeHash, setFilter, cn, conf, current);
                     }
                 default: // MTG
@@ -240,6 +320,9 @@ public sealed class WebScanMatchingService
                         var (reads, conf) = await _ocrService.DetectMtgSetAndNumberCandidatesAsync(imageBytes);
                         var ocrSet = reads.Count > 0 ? reads[0].SetCode : null;
                         var ocrNumber = reads.Count > 0 ? reads[0].CollectorNumber : null;
+                        // The "• JP" marker next to the set code: the copy's printed language.
+                        var ocrLanguage = conf >= 0.5 ? reads.FirstOrDefault(r => r.Language is not null)?.Language : null;
+                        languageEvidence.Detected ??= ocrLanguage;
 
                         // The List (plst) reprint: the glyph tells us this is really a plst printing (a
                         // distinct, cheaper card) even though it prints the *original* set's code/collector.
@@ -263,7 +346,7 @@ public sealed class WebScanMatchingService
 
                         if (ocrSet is not null && ocrNumber is not null && conf >= 0.5)
                         {
-                            var gt = new OcrMatchResult { SetCode = ocrSet, CollectorNumber = ocrNumber, CollectorNumberConfidence = conf, AlternateSetNumbers = reads.Skip(1).ToList() };
+                            var gt = new OcrMatchResult { SetCode = ocrSet, CollectorNumber = ocrNumber, CollectorNumberConfidence = conf, AlternateSetNumbers = reads.Skip(1).ToList(), Language = ocrLanguage };
                             // A very confident printed (set, collector) read overrides the set filter (see
                             // EffectiveFilter); a weaker read stays bound to the user's chosen sets.
                             var gtMatch = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, gt, EffectiveFilter(setFilter, conf), detectedSets, scanEdgeHash: edgeHash));
@@ -480,8 +563,9 @@ public sealed class WebScanMatchingService
 
     private async Task<(CardMatch? Match, ulong Hash)> RetryRotatedAsync(
         byte[] imageBytes, CardGame game, ICardGameService gameService, bool isFoil,
-        IReadOnlySet<string>? setFilter, ulong originalHash)
+        IReadOnlySet<string>? setFilter, ulong originalHash, LanguageEvidence? languageEvidence = null)
     {
+        languageEvidence ??= new LanguageEvidence();
         try
         {
             var rotatedBytes = RotateImage(imageBytes, System.Drawing.RotateFlipType.Rotate180FlipNone);
@@ -511,6 +595,7 @@ public sealed class WebScanMatchingService
                             _ => FinalFantasyService.OcrSpec,
                         };
                         var (cn, conf) = await _ocrService.DetectCollectorNumberAsync(rotatedBytes, spec);
+                        cn = NormalizeCollectorRead(game, cn, languageEvidence);
                         if (cn is not null && conf >= 0.5) ocr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
                         break;
                     }
@@ -598,6 +683,7 @@ public sealed class WebScanMatchingService
         Rarity = match?.Rarity,
         ImageUri = match?.ImageUri,
         Confidence = match?.Confidence,
+        Language = match?.Language,
         ScanHash = hash.ToString(),
     };
 }

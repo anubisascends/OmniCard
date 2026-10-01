@@ -33,6 +33,7 @@ public static class CollectionCardMapper
 
             // Copy attributes come from the Lot (unique per physical copy).
             Condition = lot.Condition ?? "NM",
+            Language = lot.Language ?? "en",
             Note = lot.Note,
             ScanImagePath = lot.ScanImagePath,
             Page = lot.Page,

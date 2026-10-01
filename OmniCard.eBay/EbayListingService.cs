@@ -471,6 +471,24 @@ public class EbayListingService : IEbayListingService
         _ => "Magic: The Gathering",
     };
 
+    /// <summary>eBay's "Language" item-specific value for a copy's CardLanguages code (eBay expects the
+    /// English language name; both Chinese scripts list as "Chinese").</summary>
+    public static string EbayLanguageAspect(string? language) => language switch
+    {
+        "ja" => "Japanese",
+        "de" => "German",
+        "fr" => "French",
+        "it" => "Italian",
+        "es" => "Spanish",
+        "pt" => "Portuguese",
+        "ko" => "Korean",
+        "ru" => "Russian",
+        "zhs" or "zht" => "Chinese",
+        "th" => "Thai",
+        "id" => "Indonesian",
+        _ => "English",
+    };
+
     private static object BuildInventoryItem(CollectionCard? card, EbayListingOptions options)
     {
         var descriptorValue = CardConditionDescriptorMap.GetValueOrDefault(options.Condition, "400010");
@@ -481,7 +499,7 @@ public class EbayListingService : IEbayListingService
         {
             ["Game"] = [EbayGameAspect(card.Game)],
             ["Card Name"] = [string.IsNullOrWhiteSpace(card.Name) ? options.Title : card.Name],
-            ["Language"] = ["English"],
+            ["Language"] = [EbayLanguageAspect(card.Language)],
         };
 
         // eBay fetches listing images from public URLs. The card's catalog image (Scryfall etc.)

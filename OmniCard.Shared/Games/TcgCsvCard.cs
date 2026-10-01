@@ -10,6 +10,10 @@ public class TcgCsvCard
 
     public CardGame Game { get; set; }
 
+    /// <summary>Card language (CardLanguages code) of the TCGCSV category this row came from — "en"
+    /// for a game's main category, "ja" for e.g. Pokémon Japan (category 85).</summary>
+    public string Lang { get; set; } = "en";
+
     public string Name { get; set; } = "";
     public string? CleanName { get; set; }
 

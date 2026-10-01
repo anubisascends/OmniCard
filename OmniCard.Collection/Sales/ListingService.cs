@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
 using OmniCard.Shared.Cards;
+using OmniCard.Shared.Games;
 using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Sales;
 
@@ -84,6 +85,7 @@ public class ListingService(
                     Source = lot.Source,
                     LocationId = lot.LocationId,
                     Condition = lot.Condition,
+                    Language = lot.Language,
                     Section = lot.Section,
                 };
                 ctx.Lots.Add(split);

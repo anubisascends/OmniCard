@@ -46,14 +46,19 @@ public abstract class TcgCsvDbContext : DbContext
 
     public void ApplySchemaUpgrades()
     {
-        // SQL Server schema comes from EF migrations; the additive ALTER TABLEs below are SQLite-only.
+        // SQL Server: EnsureCreated never alters an existing catalog DB, so columns added after it was
+        // first created are added here (idempotent). The ALTER TABLEs below are the SQLite equivalents.
         if (!Database.IsSqlite())
+        {
+            CatalogSchema.AddSqlServerColumnIfMissing(this, "Cards", "Lang", "nvarchar(16) NOT NULL CONSTRAINT DF_Cards_Lang DEFAULT 'en'");
             return;
+        }
 
         var conn = Database.GetDbConnection();
         conn.Open();
         // Additive columns for forward-compatibility (idempotent; safe on read-only DBs).
         AddColumnIfMissing(conn, "EdgeHash INTEGER");
+        AddColumnIfMissing(conn, "Lang TEXT NOT NULL DEFAULT 'en'");
         AddColumnIfMissing(conn, "LocalImagePath TEXT");
         AddColumnIfMissing(conn, "ExtendedDataJson TEXT");
         AddColumnIfMissing(conn, "MarketPrice TEXT");
@@ -80,6 +85,7 @@ public abstract class TcgCsvDbContext : DbContext
         var card = modelBuilder.Entity<TcgCsvCard>();
         card.HasKey(c => c.ProductId);
         card.Property(c => c.ProductId).ValueGeneratedNever();
+        card.Property(c => c.Lang).HasMaxLength(16);
         card.HasIndex(c => c.Name);
         card.HasIndex(c => c.SetCode);
         card.HasIndex(c => c.CollectorNumber);

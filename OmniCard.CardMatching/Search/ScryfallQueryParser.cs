@@ -242,6 +242,7 @@ public static class ScryfallQueryParser
         "not" => "not",
         "foil" => "foil",
         "cond" or "condition" => "condition",
+        "lang" or "language" => "lang",
         "price" => "price",
         "date" => "date",
         "loc" or "location" => "location",

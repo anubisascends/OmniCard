@@ -11,6 +11,10 @@ public class CardMatch
     public string GameSpecificId { get; init; } = "";
     public string? LocalImagePath { get; init; }
 
+    /// <summary>The catalog row's language (<see cref="OmniCard.Shared.Games.CardLanguages"/> code), when the
+    /// game's catalog tracks it; null for English-only catalogs.</summary>
+    public string? Language { get; init; }
+
     /// <summary>Confidence percentage (0-100) based on match distance.</summary>
     public double? Confidence { get; init; }
 

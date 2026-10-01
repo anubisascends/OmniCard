@@ -107,6 +107,15 @@ return 0;
 static string CatalogConn(string baseConn, string suffix) =>
     new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(baseConn) { InitialCatalog = $"OmniCard_{suffix}" }.ConnectionString;
 
+static void ApplyCatalogSchemaUpgrades(DbContext ctx)
+{
+    switch (ctx)
+    {
+        case OptcgDbContext optcg: optcg.ApplySchemaUpgrades(); break;
+        case TcgCsvDbContext tcgcsv: tcgcsv.ApplySchemaUpgrades(); break;
+    }
+}
+
 // Generic SQLite->SQL Server copy for a catalog context. EnsureCreated builds the target DB + schema
 // (catalogs are disposable caches, no migrations); the copy preserves keys, using IDENTITY_INSERT only
 // for store-generated (identity) keys and inserting explicit values for ValueGeneratedNever keys.
@@ -118,6 +127,12 @@ static int CopyCatalog<TContext>(string sqlitePath, string targetConn) where TCo
         return 0;
     }
 
+    // Older SQLite catalogs predate columns added since (e.g. Lang); add them first so the entity read
+    // below doesn't select a missing column. Same idempotent ALTERs the services run at startup.
+    using (var upgrade = (TContext)Activator.CreateInstance(typeof(TContext),
+               new DbContextOptionsBuilder<TContext>().UseSqlite($"Data Source={sqlitePath}").Options)!)
+        ApplyCatalogSchemaUpgrades(upgrade);
+
     var srcOpts = new DbContextOptionsBuilder<TContext>().UseSqlite($"Data Source={sqlitePath};Mode=ReadOnly").Options;
     var dstOpts = new DbContextOptionsBuilder<TContext>().UseSqlServer(targetConn).Options;
     using var src = (TContext)Activator.CreateInstance(typeof(TContext), srcOpts)!;
@@ -126,6 +141,8 @@ static int CopyCatalog<TContext>(string sqlitePath, string targetConn) where TCo
     src.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
     dst.ChangeTracker.AutoDetectChangesEnabled = false;
     dst.Database.EnsureCreated();
+    // EnsureCreated is a no-op on an existing target DB, so bring its schema up to date too.
+    ApplyCatalogSchemaUpgrades(dst);
 
     var entityTypes = dst.Model.GetEntityTypes()
         // Exclude owned types (ImageUris/Prices/Preview): they're stored as JSON inside the owning

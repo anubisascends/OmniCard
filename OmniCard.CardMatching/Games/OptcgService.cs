@@ -19,9 +19,14 @@ using OmniCard.Data.Catalogs;
 
 namespace OmniCard.CardMatching.Games;
 
-public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDisposable
+public sealed class OptcgService : ICardGameService, IGameFieldResolver, ICatalogLanguageAware, IDisposable
 {
     private const string ApiBaseUrl = "https://api.poneglyph.one";
+
+    /// <summary>Separator between a variant uid and its language on non-English rows ("OP01-001@ja").</summary>
+    internal const char LanguageSeparator = '@';
+
+    private IReadOnlyCollection<string> _catalogLanguages = [CardLanguages.English];
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IDbContextFactory<OptcgDbContext> _dbContextFactory;
@@ -112,6 +117,60 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
 
     public CardGame Game => CardGame.OnePiece;
 
+    // === ICatalogLanguageAware ===
+
+    public IReadOnlyList<string> DownloadableLanguages => CardLanguages.DownloadableFor(CardGame.OnePiece);
+
+    public IReadOnlyCollection<string> CatalogLanguages
+    {
+        get => _catalogLanguages;
+        set => _catalogLanguages = CardLanguages.SanitizeCatalogSelection(CardGame.OnePiece, value);
+    }
+
+    /// <summary>The row key for a variant in <paramref name="language"/>: English keeps the bare uid.</summary>
+    internal static string LanguageCardSetId(string englishUid, string language) =>
+        language == CardLanguages.English ? englishUid : $"{englishUid}{LanguageSeparator}{language}";
+
+    /// <summary>The English uid a (possibly language-suffixed) row key belongs to.</summary>
+    internal static string EnglishCardSetId(string cardSetId)
+    {
+        var at = cardSetId.IndexOf(LanguageSeparator);
+        return at < 0 ? cardSetId : cardSetId[..at];
+    }
+
+    public string? GetCardLanguage(string gameCardId)
+    {
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking().Where(c => c.CardSetId == gameCardId).Select(c => c.Lang).FirstOrDefault();
+    }
+
+    /// <summary>The same variant in <paramref name="language"/>. poneglyph numbers each language's
+    /// variants separately, so alt-art indices only line up approximately; the base printing (index 0)
+    /// always corresponds.</summary>
+    public CardMatch? FindLanguageVariant(string gameCardId, string language)
+    {
+        var target = LanguageCardSetId(EnglishCardSetId(gameCardId), language);
+        if (target == gameCardId) return null;
+        using var ctx = _dbContextFactory.CreateDbContext();
+        var card = ctx.Cards.AsNoTracking().FirstOrDefault(c => c.CardSetId == target);
+        return card is null ? null : ToMatch(card, confidence: null);
+    }
+
+    private CardMatch ToMatch(OptcgCard card, double? confidence) => new()
+    {
+        Name = card.CardName,
+        SetCode = card.SetId,
+        SetName = card.SetName,
+        CollectorNumber = card.CardNumber,
+        Rarity = card.Rarity,
+        ImageUri = card.CardImageUri,
+        GameSpecificId = card.CardSetId,
+        Language = card.Lang,
+        LocalImagePath = ResolveLocalArtPath(card.LocalImagePath),
+        Confidence = confidence,
+        Source = card,
+    };
+
     public MatchDiagnostics? LastMatchDiagnostics { get; private set; }
 
     private List<(string CardSetId, ulong Hash)>? _hashCache;
@@ -135,8 +194,9 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
         };
 
         progress?.Report("Fetching OPTCG set list...");
+        var languages = _catalogLanguages;
         var allCards = await FetchAllVariantsAsync(client, jsonOptions,
-            (done, total, _) => progress?.Report($"Fetched {done}/{total} sets..."), ct);
+            (done, total, _) => progress?.Report($"Fetched {done}/{total} sets..."), ct, languages);
 
         // Dedupe defensively on the variant uid (primary key).
         var deduped = allCards
@@ -182,6 +242,7 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
                 {
                     if (tracked.TryGetValue(card.CardSetId, out var existing))
                     {
+                        existing.Lang = card.Lang;
                         existing.CardNumber = card.CardNumber;
                         existing.VariantIndex = card.VariantIndex;
                         existing.VariantLabel = card.VariantLabel;
@@ -226,6 +287,20 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
             progress?.Report($"Processed {inserted + updated} cards ({inserted} new, {updated} updated)...");
         }
 
+        // Languages un-ticked since the last download: drop their rows. Only non-English rows, and only
+        // when this download fetched something (a failed fetch must not wipe the catalog).
+        if (deduped.Count > 0)
+        {
+            var keep = deduped.Select(c => c.CardSetId).ToHashSet();
+            var stale = (await importContext.Cards.Where(c => c.Lang != CardLanguages.English)
+                    .Select(c => c.CardSetId).ToListAsync(ct))
+                .Where(id => !keep.Contains(id)).ToList();
+            foreach (var chunk in stale.Chunk(500))
+                await importContext.Cards.Where(c => chunk.Contains(c.CardSetId)).ExecuteDeleteAsync(ct);
+            if (stale.Count > 0)
+                _logger.LogInformation("Pruned {Count} OPTCG rows in languages no longer selected", stale.Count);
+        }
+
         // Migration complete: stamp the version so future launches skip the wipe.
         // Only stamp when we actually imported data, so a total per-set fetch
         // failure leaves the DB unmigrated and eligible for re-download.
@@ -255,8 +330,10 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
     // download and the price-only refresh.
     private async Task<List<OptcgCard>> FetchAllVariantsAsync(
         HttpClient client, JsonSerializerOptions jsonOptions,
-        Action<int, int, string>? onSetCompleted, CancellationToken ct)
+        Action<int, int, string>? onSetCompleted, CancellationToken ct,
+        IReadOnlyCollection<string>? languages = null)
     {
+        var extraLanguages = (languages ?? []).Where(l => l != CardLanguages.English).ToList();
         var setList = await client.GetFromJsonAsync<OptcgSetListResponse>(
             $"{ApiBaseUrl}/v1/sets", jsonOptions, ct)
             ?? throw new InvalidOperationException("Failed to fetch set list from poneglyph API.");
@@ -295,6 +372,21 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
                     .SelectMany(card => card.Variants.Select(v => MapVariant(card, v, setName)))
                     .ToList();
 
+                // Other languages come from /v1/search (the set endpoint is English-only). Their rows
+                // borrow the English card's name + gameplay fields so search/filters stay uniform; only
+                // the art (and so the image hash) is the language's own.
+                var englishByNumber = detail.Data.Cards
+                    .GroupBy(c => c.CardNumber)
+                    .ToDictionary(g => g.Key, g => g.First());
+                foreach (var lang in extraLanguages)
+                {
+                    foreach (var card in await FetchSetInLanguageAsync(client, jsonOptions, set.Code, lang, token))
+                    {
+                        var english = englishByNumber.GetValueOrDefault(card.CardNumber);
+                        rows.AddRange(card.Variants.Select(v => MapVariant(english ?? card, v, setName, lang)));
+                    }
+                }
+
                 lock (cardsLock)
                     allCards.AddRange(rows);
             }
@@ -310,6 +402,31 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
         });
 
         return allCards;
+    }
+
+    // Every card of one set in `language`, paging /v1/search (100 per page).
+    private async Task<List<OptcgApiCard>> FetchSetInLanguageAsync(
+        HttpClient client, JsonSerializerOptions jsonOptions, string setCode, string language, CancellationToken ct)
+    {
+        var cards = new List<OptcgApiCard>();
+        for (var page = 1; page <= 50; page++)
+        {
+            try
+            {
+                var response = await client.GetFromJsonAsync<OptcgSearchResponse>(
+                    $"{ApiBaseUrl}/v1/search?set={Uri.EscapeDataString(setCode)}&lang={language}&limit=100&page={page}",
+                    jsonOptions, ct);
+                if (response is null) break;
+                cards.AddRange(response.Data.Where(c => string.Equals(c.Set, setCode, StringComparison.OrdinalIgnoreCase)));
+                if (!response.Pagination.HasMore || response.Data.Count == 0) break;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Failed to fetch OPTCG set {SetCode} in {Language} (page {Page}); skipping", setCode, language, page);
+                break;
+            }
+        }
+        return cards;
     }
 
     public async Task UpdatePricesAsync(IProgress<PriceUpdateProgress>? progress = null, CancellationToken ct = default)
@@ -373,9 +490,13 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
             $"One Piece prices updated ({updated} cards)"));
     }
 
-    private static OptcgCard MapVariant(OptcgApiCard card, OptcgApiVariant variant, string? setName = null)
+    /// <param name="card">The card's metadata source — for a non-English variant, the English card of the
+    /// same number (so names/colours stay English), falling back to the language's own card.</param>
+    internal static OptcgCard MapVariant(OptcgApiCard card, OptcgApiVariant variant, string? setName = null,
+        string language = CardLanguages.English)
     {
-        var uid = variant.Index == 0 ? card.CardNumber : $"{card.CardNumber}_p{variant.Index}";
+        var uid = LanguageCardSetId(
+            variant.Index == 0 ? card.CardNumber : $"{card.CardNumber}_p{variant.Index}", language);
 
         var imageUri = variant.Images.Scan.Display
             ?? variant.Images.Scan.Full
@@ -385,6 +506,7 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
         return new OptcgCard
         {
             CardSetId = uid,
+            Lang = language,
             CardNumber = card.CardNumber,
             VariantIndex = variant.Index,
             VariantLabel = variant.Label,
@@ -762,6 +884,7 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
             Rarity = card.Rarity,
             ImageUri = card.CardImageUri,
             GameSpecificId = card.CardSetId,
+            Language = card.Lang,
             LocalImagePath = ResolveLocalArtPath(card.LocalImagePath),
             Confidence = confidence,
             Source = card
@@ -773,6 +896,7 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
         using var ctx = _dbContextFactory.CreateDbContext();
         return ctx.Cards
             .AsNoTracking()
+            .Where(c => c.Lang == CardLanguages.English)
             .Select(c => new { c.SetId, c.SetName })
             .Distinct()
             .AsEnumerable()
@@ -789,6 +913,7 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
         using var ctx = _dbContextFactory.CreateDbContext();
         var setTotals = ctx.Cards
             .AsNoTracking()
+            .Where(c => c.Lang == CardLanguages.English)
             .Select(c => new { c.SetId, c.SetName, c.CardNumber })
             .Distinct()
             .AsEnumerable()
@@ -835,7 +960,7 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
         using var ctx = _dbContextFactory.CreateDbContext();
         return ctx.Cards
             .AsNoTracking()
-            .Where(c => c.SetId == setCode)
+            .Where(c => c.SetId == setCode && c.Lang == CardLanguages.English)
             .AsEnumerable()
             .Where(c => !ownedSet.Contains(c.CardNumber))
             .GroupBy(c => c.CardNumber)
@@ -861,7 +986,7 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
     {
         using var ctx = _dbContextFactory.CreateDbContext();
         return ctx.Cards.AsNoTracking()
-            .Where(c => c.SetId == setCode).AsEnumerable()
+            .Where(c => c.SetId == setCode && c.Lang == CardLanguages.English).AsEnumerable()
             .GroupBy(c => c.CardNumber)
             .Select(g => g.OrderBy(c => c.VariantIndex).First())
             .Select(c => new SetCatalogCard
@@ -896,6 +1021,7 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
             Rarity = card.Rarity,
             ImageUri = card.CardImageUri,
             GameSpecificId = card.CardSetId,
+            Language = card.Lang,
             LocalImagePath = ResolveLocalArtPath(card.LocalImagePath),
             Confidence = confidence,
             Source = card
@@ -944,7 +1070,9 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
            .Num("counter", nameof(OptcgCard.CounterAmount))
            .Str("life", nameof(OptcgCard.Life))
            .Str("attribute", nameof(OptcgCard.Attribute))
-           .Str("subtype", nameof(OptcgCard.SubTypes));
+           .Str("subtype", nameof(OptcgCard.SubTypes))
+           .Field("lang", (p, op, v) => CatalogSearchExpressionBuilder.StringPredicate(p, nameof(OptcgCard.Lang), op,
+               CardLanguages.Normalize(v) ?? v));
         return map;
     }
 
@@ -973,6 +1101,7 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
             Rarity = c.Rarity,
             ImageUri = c.CardImageUri,
             GameSpecificId = c.CardSetId,
+            Language = c.Lang,
             LocalImagePath = ResolveLocalArtPath(c.LocalImagePath),
             Source = c
         }).ToList();
@@ -1009,26 +1138,24 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
             Rarity = c.Rarity,
             ImageUri = c.CardImageUri,
             GameSpecificId = c.CardSetId,
+            Language = c.Lang,
             LocalImagePath = ResolveLocalArtPath(c.LocalImagePath),
             Source = c
         }).ToList();
     }
 
     public decimal? GetCurrentPrice(string gameCardId, bool isFoil)
-    {
-        using var ctx = _dbContextFactory.CreateDbContext();
-        return ctx.Cards.AsNoTracking()
-            .Where(c => c.CardSetId == gameCardId)
-            .Select(c => c.MarketPrice)
-            .FirstOrDefault();
-    }
+        => GetCurrentPrices([gameCardId], isFoil).TryGetValue(gameCardId, out var price) ? price : null;
 
     public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil)
     {
-        var ids = gameCardIds.Distinct().ToList();
-        if (ids.Count == 0)
+        var requested = gameCardIds.Distinct().ToList();
+        if (requested.Count == 0)
             return [];
 
+        // Non-English rows carry no market price (poneglyph prices only the English listing), so they
+        // are valued at their English variant's price — look both up in one pass.
+        var ids = requested.Concat(requested.Select(EnglishCardSetId)).Distinct().ToList();
         var result = new Dictionary<string, decimal>(ids.Count);
 
         using var ctx = _dbContextFactory.CreateDbContext();
@@ -1046,7 +1173,13 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, IDispos
             }
         }
 
-        return result;
+        var priced = new Dictionary<string, decimal>(requested.Count);
+        foreach (var id in requested)
+        {
+            if (result.TryGetValue(id, out var own) || result.TryGetValue(EnglishCardSetId(id), out own))
+                priced[id] = own;
+        }
+        return priced;
     }
 
     public void RecordCorrection(ulong scanHash, string correctCardId, ulong? artScanHash = null)

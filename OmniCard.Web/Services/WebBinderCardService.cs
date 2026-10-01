@@ -167,6 +167,7 @@ public sealed class WebBinderCardService
                 AcquisitionDate = lot.AcquisitionDate,
                 Source = lot.Source,
                 Condition = lot.Condition,
+                Language = lot.Language,
                 LocationId = containerId,
             };
             context.Lots.Add(split);
@@ -248,11 +249,13 @@ public sealed class WebBinderCardService
             var cardFoilType = card.IsFoil ? card.FoilType : null;
             if (skipDuplicates)
             {
+                var cardLanguage = CardLanguages.ToStored(card.Language);
                 var exists = context.Lots.Any(l => l.Product.Game == card.Game
                     && l.Product.GameCardId == card.GameCardId
                     && l.Product.Foil == card.IsFoil
                     && l.Product.FoilType == cardFoilType
-                    && l.Condition == card.Condition);
+                    && l.Condition == card.Condition
+                    && l.Language == cardLanguage);
                 if (exists)
                     continue;
             }
@@ -265,6 +268,7 @@ public sealed class WebBinderCardService
             {
                 Product = product,
                 Condition = card.Condition,
+                Language = CardLanguages.ToStored(card.Language),
                 Note = card.Note,
                 Quantity = Math.Max(1, card.Quantity),
                 UnitCost = card.PurchasePrice,
@@ -324,6 +328,7 @@ public sealed class WebBinderCardService
         {
             Product = product,
             Condition = card.Condition,
+            Language = CardLanguages.ToStored(card.Language),
             Note = card.Note,
             Quantity = Math.Max(1, card.Quantity),
             UnitCost = card.PurchasePrice,
@@ -472,7 +477,7 @@ public sealed class WebBinderCardService
             new(l.Product.Name, l.Product.SetCode ?? "", l.Product.CollectorNumber ?? "", l.Condition, l.Product.Foil, qty);
     }
 
-    /// <summary>Overwrites a matched lot's condition and foil from the scanned copy (the audit is the
+    /// <summary>Overwrites a matched lot's condition, language and foil from the scanned copy (the audit is the
     /// source of truth for those fields). Reassigns the lot to the correct foil-variant product when
     /// the foil state changed, preserving the product's identity fields. Returns whether anything
     /// changed. Purchase price, notes, tags and binder position on matched lots are left intact.</summary>
@@ -483,6 +488,8 @@ public sealed class WebBinderCardService
     {
         var changed = false;
         if ((lot.Condition ?? "") != (scanned.Condition ?? "")) { lot.Condition = scanned.Condition; changed = true; }
+        var scannedLanguage = CardLanguages.ToStored(scanned.Language);
+        if (lot.Language != scannedLanguage) { lot.Language = scannedLanguage; changed = true; }
 
         var foilType = scanned.IsFoil ? scanned.FoilType : null;
         var product = lot.Product;
@@ -641,6 +648,7 @@ public sealed class WebBinderCardService
             AcquisitionDate = lot.AcquisitionDate,
             Source = lot.Source,
             Condition = lot.Condition,
+            Language = lot.Language,
             LocationId = containerId,
             Page = page,
             Slot = slot,
@@ -727,6 +735,7 @@ public sealed class WebBinderCardService
         AcquisitionDate = lot.AcquisitionDate,
         Source = lot.Source,
         Condition = lot.Condition,
+        Language = lot.Language,
         LocationId = lot.LocationId,
         Section = lot.Section,
         // Page/Slot left null → the new copies land loose in the same container (Unplaced pool).
@@ -787,6 +796,7 @@ public sealed class WebBinderCardService
             AcquisitionDate = lot.AcquisitionDate,
             Source = lot.Source,
             Condition = lot.Condition,
+            Language = lot.Language,
             LocationId = containerId,
         };
         context.Lots.Add(moved);
@@ -887,6 +897,8 @@ public sealed class WebBinderCardService
         }
 
         lot.Condition = card.Condition;
+
+        lot.Language = CardLanguages.ToStored(card.Language);
         lot.Note = card.Note;
         lot.UnitCost = card.PurchasePrice;
         lot.LocationId = card.ContainerId;

@@ -53,6 +53,7 @@ public static class CollectionQueryBuilder
                 ImageUri = p.ImageUri,
                 ScanImagePath = l.ScanImagePath,
                 Condition = l.Condition ?? "NM",
+                Language = l.Language ?? "en",
                 IsFoil = p.Foil,
                 PurchasePrice = l.UnitCost,
                 DateAdded = l.AcquisitionDate,
@@ -150,6 +151,7 @@ public static class CollectionQueryBuilder
             "is" => BuildIsExpression(param, filter.Value),
             "foil" => BuildLegacyFoilExpression(param, filter.Value),
             "condition" or "cond" => BuildStringExpression(param, nameof(CollectionCard.Condition), filter.Op, filter.Value),
+            "lang" or "language" => BuildLanguageExpression(param, filter.Op, filter.Value),
             "location" or "loc" => BuildLocationExpression(param, filter.Op, filter.Value),
             "tag" => BuildTagExpression(param, context, filter.Op, filter.Value),
             // Unknown field: try each game's per-game field resolver (element:, cost:, might:, …),
@@ -265,6 +267,16 @@ public static class CollectionQueryBuilder
             ComparisonOp.NotEqual => LinqExpression.Not(CallLike(prop, value)),
             _ => CallLike(prop, $"%{value}%"),
         };
+    }
+
+    // lang:ja — exact match on the copy's language code. The value is normalized first so printed/ISO
+    // spellings work too (lang:jp, lang:japanese); an unrecognized value falls back to a literal match.
+    private static LinqExpression BuildLanguageExpression(System.Linq.Expressions.ParameterExpression param, ComparisonOp op, string value)
+    {
+        var prop = LinqExpression.Property(param, nameof(CollectionCard.Language));
+        var code = CardLanguages.Normalize(value) ?? value.Trim().ToLowerInvariant();
+        var equal = LinqExpression.Equal(prop, LinqExpression.Constant(code));
+        return op == ComparisonOp.NotEqual ? LinqExpression.Not(equal) : equal;
     }
 
     private static LinqExpression BuildNullableStringExpression(System.Linq.Expressions.ParameterExpression param, string propertyName, ComparisonOp op, string value)

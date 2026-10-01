@@ -20,7 +20,7 @@ using OmniCard.Data.Catalogs;
 
 namespace OmniCard.CardMatching.Games;
 
-public sealed class ScryfallService : IScryfallService, ICardGameService, IGameFieldResolver, IDisposable
+public sealed class ScryfallService : IScryfallService, ICardGameService, IGameFieldResolver, IDisposable, ICatalogLanguageAware
 {
     // MTG exposes the full Scryfall vocabulary (see MtgSearchSchema). The catalog search
     // (SearchCards) understands every field; owned-collection search additionally resolves the
@@ -61,7 +61,10 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
     private readonly IPerceptualHashService _hashService;
     private readonly SetSymbolCache _symbolCache;
     private readonly ILogger<ScryfallService> _logger;
-    private readonly HashSet<string> _languages;
+    // Languages from the legacy "Scryfall:Languages" config (default ["en"]); unioned with the saved
+    // Settings ▸ Catalog data selection (CatalogLanguages), so either source can add a language.
+    private readonly HashSet<string> _configLanguages;
+    private IReadOnlyCollection<string> _catalogLanguages = [CardLanguages.English];
     private readonly string _dataDirectory;
     private ScryfallDbContext _readContext;
 
@@ -73,7 +76,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
         _symbolCache = symbolCache;
         _logger = logger;
         _dataDirectory = dataPathService.DataDirectory;
-        _languages = scryfallSettings.Value.Languages.Select(l => l.ToLowerInvariant()).ToHashSet();
+        _configLanguages = scryfallSettings.Value.Languages.Select(l => l.ToLowerInvariant()).ToHashSet();
 
         _logger.LogInformation("Initializing Scryfall service");
         _readContext = _dbContextFactory.CreateDbContext();
@@ -97,6 +100,75 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
     }
 
     public CardGame Game => CardGame.Mtg;
+
+    // === ICatalogLanguageAware ===
+
+    public IReadOnlyList<string> DownloadableLanguages => CardLanguages.DownloadableFor(CardGame.Mtg);
+
+    public IReadOnlyCollection<string> CatalogLanguages
+    {
+        get => _catalogLanguages;
+        set => _catalogLanguages = CardLanguages.SanitizeCatalogSelection(CardGame.Mtg, value);
+    }
+
+    /// <summary>The languages a bulk download keeps: the saved selection plus any configured ones.</summary>
+    private HashSet<string> EffectiveLanguages()
+    {
+        var langs = new HashSet<string>(_configLanguages, StringComparer.OrdinalIgnoreCase);
+        langs.UnionWith(_catalogLanguages);
+        langs.Add(CardLanguages.English);
+        return langs;
+    }
+
+    public string? GetCardLanguage(string gameCardId)
+    {
+        if (!Guid.TryParse(gameCardId, out var id)) return null;
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking().Where(c => c.Id == id).Select(c => c.Lang).FirstOrDefault();
+    }
+
+    /// <summary>The (set, collector number) printing in <paramref name="language"/>. Scryfall gives every
+    /// language its own card object sharing the English set + number. A non-English row whose scan is a
+    /// placeholder/missing borrows the English art so the collection doesn't show a blank.</summary>
+    public CardMatch? FindLanguageVariant(string gameCardId, string language)
+    {
+        if (!Guid.TryParse(gameCardId, out var id)) return null;
+        using var ctx = _dbContextFactory.CreateDbContext();
+        var source = ctx.Cards.AsNoTracking().Where(c => c.Id == id)
+            .Select(c => new { c.SetCode, c.CollectorNumber }).FirstOrDefault();
+        if (source is null) return null;
+
+        var siblings = ctx.Cards.AsNoTracking()
+            .Where(c => c.SetCode == source.SetCode && c.CollectorNumber == source.CollectorNumber
+                        && (c.Lang == language || c.Lang == CardLanguages.English))
+            .ToList();
+        var variant = siblings.FirstOrDefault(c => c.Lang == language);
+        if (variant is null) return null;
+
+        var imageUri = variant.ImageUris?.Normal ?? variant.ImageUris?.Small;
+        if (HasNoRealImage(variant))
+        {
+            var english = siblings.FirstOrDefault(c => c.Lang == CardLanguages.English);
+            imageUri = english?.ImageUris?.Normal ?? english?.ImageUris?.Small ?? imageUri;
+        }
+        return new CardMatch
+        {
+            Name = variant.Name,
+            SetCode = variant.SetCode,
+            SetName = variant.SetName,
+            CollectorNumber = variant.CollectorNumber,
+            Rarity = variant.Rarity,
+            ImageUri = imageUri,
+            GameSpecificId = variant.Id.ToString(),
+            Language = variant.Lang,
+            LocalImagePath = variant.LocalImagePath,
+            Source = variant,
+        };
+    }
+
+    // Scryfall marks non-English cards it has no scan of as "placeholder"/"missing" — their image_uris
+    // are a generic stand-in, useless for display or hashing.
+    private static bool HasNoRealImage(Card c) => c.ImageStatus is "placeholder" or "missing";
 
     public IQueryable<Card> Cards => _readContext.Cards.AsNoTracking();
 
@@ -148,7 +220,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
         {
             var reads = new List<(string SetCode, string CollectorNumber)> { (ocrResult.SetCode, ocrResult.CollectorNumber) };
             reads.AddRange(ocrResult.AlternateSetNumbers.Select(r => (r.SetCode, r.CollectorNumber)));
-            var groundTruth = LookupBySetAndNumber(reads, imageHash, setFilter);
+            var groundTruth = LookupBySetAndNumber(reads, imageHash, setFilter, ocrResult.Language);
             if (groundTruth is not null)
             {
                 _logger.LogInformation("MTG matched by OCR set+collector: {Set} #{Number} → \"{Name}\"",
@@ -659,6 +731,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             Rarity = card.Rarity,
             ImageUri = card.ImageUris?.Normal ?? card.ImageUris?.Small,
             GameSpecificId = card.Id.ToString(),
+            Language = card.Lang,
             LocalImagePath = card.LocalImagePath,
             Confidence = matchConfidence,
             Source = card
@@ -796,6 +869,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             Rarity = card.Rarity,
             ImageUri = card.ImageUris?.Normal ?? card.ImageUris?.Small,
             GameSpecificId = card.Id.ToString(),
+            Language = card.Lang,
             LocalImagePath = card.LocalImagePath,
             Confidence = confidence,
             Source = card,
@@ -928,7 +1002,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             .Where(c => c.SetCode == setCode)
             .AsEnumerable()
             .Where(c => !ownedSet.Contains(c.CollectorNumber))
-            .GroupBy(c => c.CollectorNumber).Select(g => g.First())
+            .GroupBy(c => c.CollectorNumber).Select(g => g.OrderBy(c => c.Lang == CardLanguages.English ? 0 : 1).First())
             .Select(c => new MissingCard
             {
                 Name = c.Name,
@@ -953,7 +1027,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
         using var ctx = _dbContextFactory.CreateDbContext();
         return ctx.Cards.AsNoTracking()
             .Where(c => c.SetCode == setCode).AsEnumerable()
-            .GroupBy(c => c.CollectorNumber).Select(g => g.First())
+            .GroupBy(c => c.CollectorNumber).Select(g => g.OrderBy(c => c.Lang == CardLanguages.English ? 0 : 1).First())
             .Select(c => new SetCatalogCard
             {
                 GameCardId = c.Id.ToString(),
@@ -995,13 +1069,13 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
     // Resolves OCR (set code, collector number) reads to a catalog printing. `reads` is best-first; the
     // first is the top-voted read and the rest are alternates the OCR passes disagreed on. Each is looked
     // up; when more than one resolves, the scan's pHash settles it (see AlternateReadMinHashAdvantage).
-    private CardMatch? LookupBySetAndNumber(IReadOnlyList<(string SetCode, string CollectorNumber)> reads, ulong imageHash, IReadOnlySet<string>? setFilter)
+    private CardMatch? LookupBySetAndNumber(IReadOnlyList<(string SetCode, string CollectorNumber)> reads, ulong imageHash, IReadOnlySet<string>? setFilter, string? language = null)
     {
         // Best printing per read, in read order.
         var resolved = new List<Card>();
         foreach (var (setCode, collectorNumber) in reads)
         {
-            var card = LookupBySetAndNumber(setCode, collectorNumber, imageHash, setFilter);
+            var card = LookupBySetAndNumber(setCode, collectorNumber, imageHash, setFilter, language);
             if (card is not null && resolved.All(c => c.Id != card.Id))
                 resolved.Add(card);
         }
@@ -1023,7 +1097,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
         return ToGroundTruthMatch(best);
     }
 
-    private Card? LookupBySetAndNumber(string setCode, string collectorNumber, ulong imageHash, IReadOnlySet<string>? setFilter)
+    private Card? LookupBySetAndNumber(string setCode, string collectorNumber, ulong imageHash, IReadOnlySet<string>? setFilter, string? language = null)
     {
         var setUpper = setCode.Trim().ToUpperInvariant();
         var num = NormalizeCollectorNumber(collectorNumber);
@@ -1040,6 +1114,12 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             candidates = candidates.Where(c => setFilter.Contains(c.SetCode)).ToList();
 
         if (candidates.Count == 0) return null;
+
+        // With several languages downloaded, one (set, number) has a row per language sharing the same
+        // art — pHash can't separate them. Take the printed language when OCR read it, else English.
+        var inLanguage = candidates.Where(c => c.Lang == (language ?? CardLanguages.English)).ToList();
+        if (inLanguage.Count > 0)
+            candidates = inLanguage;
 
         return candidates.Count == 1
             ? candidates[0]
@@ -1059,6 +1139,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             Rarity = best.Rarity,
             ImageUri = best.ImageUris?.Normal ?? best.ImageUris?.Small,
             GameSpecificId = best.Id.ToString(),
+            Language = best.Lang,
             LocalImagePath = best.LocalImagePath,
             Confidence = 100,
             Source = best,
@@ -1087,6 +1168,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             Rarity = card.Rarity,
             ImageUri = card.ImageUris?.Normal ?? card.ImageUris?.Small,
             GameSpecificId = card.Id.ToString(),
+            Language = card.Lang,
             LocalImagePath = card.LocalImagePath,
             Confidence = confidence,
             Source = card
@@ -1221,6 +1303,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             Rarity = c.Rarity,
             ImageUri = c.ImageUris?.Normal ?? c.ImageUris?.Small,
             GameSpecificId = c.Id.ToString(),
+            Language = c.Lang,
             LocalImagePath = c.LocalImagePath,
             Source = c
         }).ToList();
@@ -1248,6 +1331,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             Rarity = c.Rarity,
             ImageUri = c.ImageUris?.Normal ?? c.ImageUris?.Small,
             GameSpecificId = c.Id.ToString(),
+            Language = c.Lang,
             LocalImagePath = c.LocalImagePath,
             Source = c
         }).ToList();
@@ -1265,18 +1349,26 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
         client.DefaultRequestHeaders.UserAgent.ParseAdd("OmniCard/1.0");
         client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
 
-        // 1. Get the bulk data download URI
+        // 1. Get the bulk data download URI. default_cards holds English (plus cards printed in only one
+        //    language); every other language's printings are only in the much larger all_cards file, so
+        //    a full download switches to it when a non-English language is selected. Prices come from
+        //    default_cards regardless — non-English printings carry no prices of their own.
+        var languages = EffectiveLanguages();
+        var bulkType = !pricesOnly && languages.Any(l => l != CardLanguages.English) ? "all_cards" : "default_cards";
         progress?.Report("Fetching bulk data info...");
-        _logger.LogDebug("Fetching bulk data metadata from Scryfall API");
+        _logger.LogDebug("Fetching {BulkType} bulk data metadata from Scryfall API (languages: {Languages})",
+            bulkType, string.Join(",", languages));
         using var bulkDataResponse = await client.GetAsync(
-            "https://api.scryfall.com/bulk-data/default_cards", ct);
+            $"https://api.scryfall.com/bulk-data/{bulkType}", ct);
         bulkDataResponse.EnsureSuccessStatusCode();
         var bulkData = await bulkDataResponse.Content.ReadFromJsonAsync<BulkDataInfo>(ScryfallJsonOptions, ct)
             ?? throw new InvalidOperationException("Failed to fetch bulk data info from Scryfall.");
         _logger.LogInformation("Bulk data download URI obtained: {Uri}", bulkData.JsonlDownloadUri);
 
         // 2. Stream the card data (gzip-compressed JSON-Lines: one Card object per line)
-        progress?.Report("Downloading card data...");
+        progress?.Report(bulkType == "all_cards"
+            ? $"Downloading all-language card data ({string.Join(", ", languages.Order())})..."
+            : "Downloading card data...");
         using var cardResponse = await client.GetAsync(bulkData.JsonlDownloadUri,
             HttpCompletionOption.ResponseHeadersRead, ct);
         cardResponse.EnsureSuccessStatusCode();
@@ -1297,6 +1389,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
         var inserted = 0;
         var updated = 0;
         var batch = new List<Card>(1000);
+        var seenIds = new HashSet<Guid>();
 
         string? line;
         while ((line = await reader.ReadLineAsync(ct)) != null)
@@ -1306,10 +1399,11 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             var card = JsonSerializer.Deserialize<Card>(line, ScryfallJsonOptions);
             if (card is null) continue;
 
-            // Filter by configured languages
-            if (!_languages.Contains(card.Lang))
+            // Filter by the selected languages
+            if (!languages.Contains(card.Lang))
                 continue;
 
+            seenIds.Add(card.Id);
             FlattenFrontFace(card);
             batch.Add(card);
 
@@ -1328,6 +1422,18 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             var (ins, upd) = await UpsertBatchAsync(importContext, batch, existingIds, pricesOnly, ct);
             inserted += ins;
             updated += upd;
+        }
+
+        // Un-ticked languages: drop non-English rows this full download no longer delivered (English rows
+        // are never pruned — existing behaviour keeps them even if Scryfall retires one).
+        if (!pricesOnly)
+        {
+            var pruned = await PruneUnseenNonEnglishAsync(importContext, seenIds, ct);
+            if (pruned > 0)
+            {
+                _logger.LogInformation("Pruned {Count} non-English MTG printings no longer selected", pruned);
+                progress?.Report($"Removed {pruned} printings in languages no longer selected...");
+            }
         }
 
         // Swap read context to pick up new data and invalidate hash cache
@@ -1359,6 +1465,19 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             _logger.LogInformation("Auto-computing hashes for new/changed cards ({Count} inserted this run)", inserted);
             await ComputeImageHashesAsync(forceAll: false, progress, ct);
         }
+    }
+
+    private static async Task<int> PruneUnseenNonEnglishAsync(ScryfallDbContext context, HashSet<Guid> seenIds, CancellationToken ct)
+    {
+        var stale = (await context.Cards
+                .Where(c => c.Lang != CardLanguages.English)
+                .Select(c => c.Id)
+                .ToListAsync(ct))
+            .Where(id => !seenIds.Contains(id))
+            .ToList();
+        foreach (var chunk in stale.Chunk(500))
+            await context.Cards.Where(c => chunk.Contains(c.Id)).ExecuteDeleteAsync(ct);
+        return stale.Count;
     }
 
     public async Task UpdatePricesAsync(IProgress<PriceUpdateProgress>? progress = null, CancellationToken ct = default)
@@ -1470,19 +1589,24 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
 
         // forceAll: re-download art and recompute ALL hashes
         // incremental: only cards missing a hash or with changed art
-        var query = context.Cards.Where(c => c.ImageUris != null);
+        // Non-English cards Scryfall has no real scan of are skipped: their placeholder image would hash
+        // as garbage. They stay reachable via FindLanguageVariant (the English match remaps to them).
+        var query = context.Cards.Where(c => c.ImageUris != null
+            && (c.Lang == CardLanguages.English || (c.ImageStatus != "placeholder" && c.ImageStatus != "missing")));
         if (!forceAll)
             query = query.Where(c => c.ImageHash == null || c.ArtHash == null || c.IllustrationId != c.HashedIllustrationId);
 
         var cards = await query
-            .Select(c => new { c.Id, c.IllustrationId, c.SetCode, c.CollectorNumber, c.ImageUris!.Small, c.ImageUris!.Normal })
+            .Select(c => new { c.Id, c.IllustrationId, c.SetCode, c.CollectorNumber, c.Lang, c.ImageUris!.Small, c.ImageUris!.Normal })
             .ToListAsync(ct);
 
         _logger.LogInformation("Found {Count} cards requiring hash computation", cards.Count);
 
-        // Group by IllustrationId — hash one representative per unique illustration
+        // Group by (IllustrationId, language) — hash one representative per unique illustration per
+        // language. Languages share an IllustrationId, but a Japanese card's printed text changes its
+        // whole-card hash, so each language needs its own image.
         var groups = cards
-            .GroupBy(c => c.IllustrationId ?? Guid.NewGuid()) // null IllustrationId = unique group each
+            .GroupBy(c => (Illustration: c.IllustrationId ?? Guid.NewGuid(), c.Lang)) // null IllustrationId = unique group each
             .Select(g => new
             {
                 IllustrationId = g.First().IllustrationId,
@@ -1503,7 +1627,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
         var failed = 0;
 
         // Process in parallel batches, save to DB every 100 illustrations
-        var results = new List<(Guid? IllustrationId, List<(Guid Id, string SetCode, string CollectorNumber)> Cards, ulong Hash, ulong[] ArtHashes)>();
+        var results = new List<(Guid? IllustrationId, List<(Guid Id, string SetCode, string CollectorNumber, string Lang)> Cards, ulong Hash, ulong[] ArtHashes)>();
         var saveLock = new object();
 
         await Parallel.ForEachAsync(groups, new ParallelOptions
@@ -1530,7 +1654,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
                     var imageBytes = await response.Content.ReadAsByteArrayAsync(token);
 
                     // Save art to disk for the representative
-                    var artFullPath = GetLocalArtFullPath(rep.SetCode, rep.CollectorNumber);
+                    var artFullPath = GetLocalArtFullPath(rep.SetCode, rep.CollectorNumber, rep.Lang);
                     var artDir = Path.GetDirectoryName(artFullPath)!;
                     Directory.CreateDirectory(artDir);
                     await File.WriteAllBytesAsync(artFullPath, imageBytes, token);
@@ -1544,7 +1668,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
                     var artHashes = _hashService.ComputeArtHash(buffer, ArtCropRegions);
 
                     var cardInfos = group.AllCards
-                        .Select(c => (c.Id, c.SetCode, c.CollectorNumber))
+                        .Select(c => (c.Id, c.SetCode, c.CollectorNumber, c.Lang))
                         .ToList();
 
                     lock (saveLock)
@@ -1570,7 +1694,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
                 progress?.Report($"Processed {done}/{groups.Count} illustrations ({failed} failed)...");
 
             // Flush to DB periodically
-            List<(Guid? IllustrationId, List<(Guid Id, string SetCode, string CollectorNumber)> Cards, ulong Hash, ulong[] ArtHashes)>? toSave = null;
+            List<(Guid? IllustrationId, List<(Guid Id, string SetCode, string CollectorNumber, string Lang)> Cards, ulong Hash, ulong[] ArtHashes)>? toSave = null;
             lock (saveLock)
             {
                 if (results.Count >= 100)
@@ -1609,7 +1733,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
     }
 
     private async Task SaveArtHashBatchAsync(
-        List<(Guid? IllustrationId, List<(Guid Id, string SetCode, string CollectorNumber)> Cards, ulong Hash, ulong[] ArtHashes)> batch,
+        List<(Guid? IllustrationId, List<(Guid Id, string SetCode, string CollectorNumber, string Lang)> Cards, ulong Hash, ulong[] ArtHashes)> batch,
         CancellationToken ct)
     {
         await using var context = _dbContextFactory.CreateDbContext();
@@ -1620,9 +1744,9 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             ulong? bestArtHash = artHashes.Length > 0 ? artHashes[0] : null;
 
             var repCard = cards[0];
-            var artRelativePath = GetLocalArtRelativePath(repCard.SetCode, repCard.CollectorNumber);
+            var artRelativePath = GetLocalArtRelativePath(repCard.SetCode, repCard.CollectorNumber, repCard.Lang);
 
-            foreach (var (id, setCode, collectorNumber) in cards)
+            foreach (var (id, _, _, _) in cards)
             {
                 // All cards in the group point to the same art file (the representative's)
                 await context.Cards
@@ -1754,17 +1878,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
         if (!Guid.TryParse(gameCardId, out var id))
             return null;
 
-        using var ctx = _dbContextFactory.CreateDbContext();
-        var prices = ctx.Cards.AsNoTracking()
-            .Where(c => c.Id == id)
-            .Select(c => c.Prices)
-            .FirstOrDefault();
-
-        if (prices is null)
-            return null;
-
-        var priceStr = isFoil ? prices.UsdFoil : prices.Usd;
-        return decimal.TryParse(priceStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var price) ? price : null;
+        return GetCurrentPrices([gameCardId], isFoil).TryGetValue(gameCardId, out var price) ? price : null;
     }
 
     public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil)
@@ -1786,19 +1900,44 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
         {
             var rows = ctx.Cards.AsNoTracking()
                 .Where(c => chunk.Contains(c.Id))
-                .Select(c => new { c.Id, c.Prices })
+                .Select(c => new { c.Id, c.Prices, c.Lang, c.SetCode, c.CollectorNumber })
                 .ToList();
 
+            // Non-English printings have no TCGplayer listing of their own (their prices are null), so
+            // they're valued at their English sibling's price — the closest proxy available.
+            var unpricedForeign = new List<(Guid Id, string SetCode, string CollectorNumber)>();
             foreach (var row in rows)
             {
-                if (row.Prices is null) continue;
-                var priceStr = isFoil ? row.Prices.UsdFoil : row.Prices.Usd;
-                if (decimal.TryParse(priceStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var price))
+                if (TryPrice(row.Prices, isFoil) is { } price)
                     result[row.Id.ToString()] = price;
+                else if (row.Lang != CardLanguages.English)
+                    unpricedForeign.Add((row.Id, row.SetCode, row.CollectorNumber));
+            }
+
+            if (unpricedForeign.Count > 0)
+            {
+                var sets = unpricedForeign.Select(r => r.SetCode).Distinct().ToList();
+                var english = ctx.Cards.AsNoTracking()
+                    .Where(c => c.Lang == CardLanguages.English && sets.Contains(c.SetCode))
+                    .Select(c => new { c.SetCode, c.CollectorNumber, c.Prices })
+                    .AsEnumerable()
+                    .GroupBy(c => (c.SetCode, c.CollectorNumber))
+                    .ToDictionary(g => g.Key, g => g.First().Prices);
+                foreach (var (foreignId, setCode, number) in unpricedForeign)
+                {
+                    if (english.TryGetValue((setCode, number), out var prices) && TryPrice(prices, isFoil) is { } price)
+                        result[foreignId.ToString()] = price;
+                }
             }
         }
 
         return result;
+    }
+
+    private static decimal? TryPrice(Prices? prices, bool isFoil)
+    {
+        var priceStr = isFoil ? prices?.UsdFoil : prices?.Usd;
+        return decimal.TryParse(priceStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var price) ? price : null;
     }
 
     public object? FindCardById(string gameCardId)
@@ -1811,14 +1950,19 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
 
     public void Dispose() => _readContext.Dispose();
 
-    private static string GetLocalArtRelativePath(string setCode, string collectorNumber)
+    // English keeps its original path; other languages get a ".{lang}" suffix so a Japanese printing's
+    // art doesn't overwrite the English file for the same (set, collector number).
+    private static string ArtFileName(string collectorNumber, string? lang) =>
+        string.IsNullOrEmpty(lang) || lang == CardLanguages.English ? $"{collectorNumber}.jpg" : $"{collectorNumber}.{lang}.jpg";
+
+    private static string GetLocalArtRelativePath(string setCode, string collectorNumber, string? lang = null)
     {
-        return $"art/{setCode}/{collectorNumber}.jpg";
+        return $"art/{setCode}/{ArtFileName(collectorNumber, lang)}";
     }
 
-    private string GetLocalArtFullPath(string setCode, string collectorNumber)
+    private string GetLocalArtFullPath(string setCode, string collectorNumber, string? lang = null)
     {
-        return Path.Combine(_dataDirectory, "art", setCode, $"{collectorNumber}.jpg");
+        return Path.Combine(_dataDirectory, "art", setCode, ArtFileName(collectorNumber, lang));
     }
 
     private class BulkDataInfo

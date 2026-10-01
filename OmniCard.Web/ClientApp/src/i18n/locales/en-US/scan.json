@@ -16,7 +16,8 @@
     "props": {
       "foilWithType": "Foil ({{type}})",
       "foilType": "Foil type",
-      "notePlaceholder": "e.g. signed, played, misprint…"
+      "notePlaceholder": "e.g. signed, played, misprint…",
+      "languageDetected": "Language read from the card"
     },
     "controls": {
       "artSets": "Sets (art fallback)",
@@ -24,7 +25,10 @@
       "takePhoto": "Take photo",
       "useWebcam": "Use webcam",
       "addImages": "Add images",
-      "seedHint": "Game / sets / condition / foil above seed each new scan; edit any card (or several at once) below before committing."
+      "seedHint": "Game / sets / language / condition / foil above seed each new scan; edit any card (or several at once) below before committing.",
+      "language": "Card language",
+      "languageAuto": "Auto (detect)",
+      "languageHelp": "Auto reads the language printed on MTG and Yu-Gi-Oh! cards; otherwise pick the language of the cards you’re scanning."
     },
     "commit": {
       "addToLocation": "Add to location…",

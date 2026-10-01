@@ -74,6 +74,7 @@ public static class CollectionCardMatcher
             "is" => IsMatch(c, f.Value),
             "foil" => c.IsFoil == ParseFoil(f.Value),
             "condition" or "cond" => StrOp(c.Condition, f.Op, f.Value),
+            "lang" or "language" => LanguageMatch(c.Language, f.Op, f.Value),
             "location" or "loc" => LocationMatch(c.Container?.Name, f.Op, f.Value),
             "tag" => TagMatch(c.Tags, f.Op, f.Value),
             // Unknown field: try the card's game resolver (element:, might:, …); else name search.
@@ -81,6 +82,13 @@ public static class CollectionCardMatcher
         };
 
         return f.Negated ? !result : result;
+    }
+
+    private static bool LanguageMatch(string language, ComparisonOp op, string value)
+    {
+        var code = CardLanguages.Normalize(value) ?? value.Trim().ToLowerInvariant();
+        var equal = string.Equals(language, code, StringComparison.OrdinalIgnoreCase);
+        return op == ComparisonOp.NotEqual ? !equal : equal;
     }
 
     private static bool? GameFieldMatch(CollectionCard c, FieldFilter f, GameFieldResolve? resolve)

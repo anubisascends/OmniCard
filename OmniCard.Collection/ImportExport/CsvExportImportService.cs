@@ -4,6 +4,7 @@ using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
+using OmniCard.Shared.Games;
 using OmniCard.Shared.ImportExport;
 using OmniCard.Shared.Scanning;
 using OmniCard.Shared.Storage;
@@ -89,6 +90,7 @@ public class CsvExportImportService(
         csv.WriteField("Slot");
         csv.WriteField("Section");
         csv.WriteField("Quantity");
+        csv.WriteField("Language");
         csv.NextRecord();
 
         foreach (var card in cards)
@@ -111,6 +113,7 @@ public class CsvExportImportService(
             csv.WriteField(card.Slot?.ToString() ?? "");
             csv.WriteField(card.Section ?? "");
             csv.WriteField(card.Quantity);
+            csv.WriteField(card.Language);
             csv.NextRecord();
         }
 
@@ -240,7 +243,7 @@ public class CsvExportImportService(
             csv.WriteField(false);
             csv.WriteField(false);
             csv.WriteField(ConditionToManabox.GetValueOrDefault(card.Condition, "near_mint"));
-            csv.WriteField("en");
+            csv.WriteField(card.Language);
             csv.WriteField("USD");
             csv.WriteField(card.DateAdded.ToString("o"));
             csv.NextRecord();
@@ -535,6 +538,7 @@ public class CsvExportImportService(
             Slot = int.TryParse(csv.GetField("Slot"), out var slot) ? slot : null,
             Section = csv.GetField("Section") is { Length: > 0 } sec ? sec : null,
             Quantity = ParseQuantity(csv, "Quantity", issues),
+            Language = ParseLanguage(csv, issues),
         };
 
         var containerName = csv.GetField("ContainerName");
@@ -564,6 +568,7 @@ public class CsvExportImportService(
             PurchasePrice = decimal.TryParse(csv.GetField("Price"), CultureInfo.InvariantCulture, out var price) ? price : null,
             DateAdded = DateTime.UtcNow,
             Quantity = ParseQuantity(csv, "Quantity", issues),
+            Language = ParseLanguage(csv, issues),
         };
     }
 
@@ -583,6 +588,7 @@ public class CsvExportImportService(
             PurchasePrice = decimal.TryParse(csv.GetField("Purchase Price"), CultureInfo.InvariantCulture, out var price) ? price : null,
             DateAdded = DateTime.UtcNow,
             Quantity = ParseQuantity(csv, "Count", issues),
+            Language = ParseLanguage(csv, issues),
         };
     }
 
@@ -604,7 +610,21 @@ public class CsvExportImportService(
             PurchasePrice = decimal.TryParse(csv.GetField("Purchase price"), CultureInfo.InvariantCulture, out var price) ? price : null,
             DateAdded = DateTime.UtcNow,
             Quantity = ParseQuantity(csv, "Quantity", issues),
+            Language = ParseLanguage(csv, issues),
         };
+    }
+
+    /// <summary>The row's "Language" column (codes like "ja" or names like "Japanese"). Missing/blank
+    /// means English; an unrecognized value is read as English and reported.</summary>
+    private static string ParseLanguage(CsvReader csv, List<string> issues)
+    {
+        var raw = csv.GetField("Language");
+        if (string.IsNullOrWhiteSpace(raw))
+            return CardLanguages.English;
+        if (CardLanguages.Normalize(raw) is { } code)
+            return code;
+        issues.Add($"Unrecognized language '{raw}'. Use a code like en, ja, de, fr, it, es, pt, ko, zhs.");
+        return CardLanguages.English;
     }
 
     /// <summary>A blank condition means NM; an unrecognized one is read as NM and reported.</summary>

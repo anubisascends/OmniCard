@@ -28,6 +28,7 @@ import SellIcon from '@mui/icons-material/Sell';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
 import { Snackbar } from '@mui/material';
 import { api } from '../../api/client';
+import { ENGLISH, LanguageSelect } from '../../lib/cardLanguages';
 import { useFormatters } from '../../i18n/format';
 import { CardImage } from '../CardImage';
 import { LocationPickerDialog } from './LocationPickerDialog';
@@ -50,6 +51,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
   const tagsQuery = useQuery({ queryKey: ['tags'], queryFn: api.tags });
 
   const [condition, setCondition] = useState('NM');
+  const [language, setLanguage] = useState(ENGLISH);
   const [isFoil, setIsFoil] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [purchasePrice, setPurchasePrice] = useState<string>('');
@@ -62,6 +64,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
   useEffect(() => {
     if (card) {
       setCondition(card.condition);
+      setLanguage(card.language ?? ENGLISH);
       setIsFoil(card.isFoil);
       setQuantity(card.quantity);
       setPurchasePrice(card.purchasePrice?.toString() ?? '');
@@ -83,6 +86,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
       if (!card) return;
       await api.cardUpdate(card.id, {
         condition,
+        language,
         isFoil,
         foilType: card.foilType,
         quantity,
@@ -197,6 +201,8 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
                 </MenuItem>
               ))}
             </TextField>
+
+            <LanguageSelect game={card.game} value={language} onChange={setLanguage} fullWidth sx={{}} />
 
             <FormControlLabel
               control={<Switch checked={isFoil} onChange={(e) => setIsFoil(e.target.checked)} />}
