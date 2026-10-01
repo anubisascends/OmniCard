@@ -142,6 +142,28 @@ public class OcrMatchingServiceTests
     }
 
     [Theory]
+    // Real reads off Japanese Shadows over Innistrad cards: the narrow "I" beside the bullet is read as
+    // a digit or swallowed. The truncated code is kept (the catalog side repairs it) so the language reads.
+    [InlineData("017/297 C\nSO* JP  IGR KIERYL", "SO", "17")]
+    [InlineData("267/297 C\nSO JP M CHRISTINE C", "SO", "267")]
+    [InlineData("040/297 C\nSO1* JP IOHNN STANKO", "SO1", "40")]
+    public void TryExtractMtgSetAndNumber_KeepsMisreadJapaneseSetCode_WithItsLanguage(string ocr, string expectedSet, string expectedNumber)
+    {
+        Assert.True(OcrMatchingService.TryExtractMtgSetAndNumber(ocr, out var set, out var number, out var evidence, out var language));
+        Assert.Equal(expectedSet, set);
+        Assert.Equal(expectedNumber, number);
+        Assert.Equal(OcrMatchingService.MtgEvidenceFractionAboveSet, evidence);
+        Assert.Equal("ja", language);
+    }
+
+    [Fact]
+    public void TryExtractMtgSetAndNumber_PrefersAFullSetCode_OverATruncatedOne()
+    {
+        Assert.True(OcrMatchingService.TryExtractMtgSetAndNumber("012/297 C\nXX • EN\nSOI • EN", out var set, out _, out _, out _));
+        Assert.Equal("SOI", set);
+    }
+
+    [Theory]
     [InlineData("SOME RULES TEXT 123")]     // no language marker → no anchored set code
     [InlineData("MKC • EN")]                 // set code but no collector number
     [InlineData("0066")]                     // collector number but no set code

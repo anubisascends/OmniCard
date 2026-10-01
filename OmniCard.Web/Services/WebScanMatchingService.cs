@@ -318,6 +318,10 @@ public sealed class WebScanMatchingService
                         // The OCR passes can disagree on a digit; the alternates ride along so the catalog
                         // lookup can let the image pick between them (ScryfallService Phase 0).
                         var (reads, conf) = await _ocrService.DetectMtgSetAndNumberCandidatesAsync(imageBytes);
+                        // A misread set code ("SOI" → "SO1"/"SO") can never resolve; repair it against the
+                        // catalog first, with the image choosing among the neighbouring sets.
+                        if (gameService is ScryfallService scryfall && reads.Count > 0)
+                            reads = await RunGatedAsync(() => scryfall.CorrectOcrSetCodes(reads, hash));
                         var ocrSet = reads.Count > 0 ? reads[0].SetCode : null;
                         var ocrNumber = reads.Count > 0 ? reads[0].CollectorNumber : null;
                         // The "• JP" marker next to the set code: the copy's printed language.
@@ -393,8 +397,10 @@ public sealed class WebScanMatchingService
     /// <summary>
     /// MTG old-frame identification (see <see cref="ScryfallService.ResolveOldFramePrinting"/>): reads the
     /// title, border and bottom credit line, and — only when the surviving printings differ just in flavor
-    /// text — the text box. Null when the card isn't old-frame or the user has already corrected this exact
-    /// scan (their confirmed card stands).
+    /// text — the text box. When that doesn't identify an old-frame card, the same bottom-band read is tried
+    /// as a 1998–2014 "nnn/ttt" collector line (see <see cref="ScryfallService.ResolveByCollectorLine"/>),
+    /// which needs no title — so non-English prints of those frames resolve too. Null when neither applies
+    /// or the user has already corrected this exact scan (their confirmed card stands).
     /// </summary>
     private async Task<CardMatch?> ResolveOldFrameAsync(
         byte[] imageBytes, ICardGameService gameService, ulong hash, ulong[]? artHashes,
@@ -411,7 +417,8 @@ public sealed class WebScanMatchingService
             var textBox = await _ocrService.ReadMtgTextBoxAsync(imageBytes);
             resolution = await RunGatedAsync(() => scryfall.ResolveOldFramePrinting(hash, artHashes, evidence, textBox, setFilter, current, mayRequestTextBox: false));
         }
-        return resolution?.Match;
+        return resolution?.Match
+            ?? await RunGatedAsync(() => scryfall.ResolveByCollectorLine(hash, artHashes, evidence, setFilter));
     }
 
     private static bool IsSamePrinting(MtgPrintedIdentity read, CardMatch match) =>

@@ -101,6 +101,13 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         new(@"\b([A-Z0-9]{3,5})[\s•·.*\-]+[A-Z]?(EN|DE|FR|IT|ES|SP|PT|JA|JP|KO|KR|RU|ZH|CT|CS|PH)\b",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
 
+    // Last-resort set-code read: a two-character token before the language marker. No real set code is
+    // that short — a narrow glyph beside the bullet got swallowed ("SOI • JP" → "SO* JP"). It's kept so
+    // ScryfallService.CorrectOcrSetCodes can restore it from the catalog, and so the language still reads.
+    private static readonly System.Text.RegularExpressions.Regex MtgTruncatedSetCodePattern =
+        new(@"\b([A-Z0-9]{2})[\s•·.*\-]+[A-Z]?(EN|DE|FR|IT|ES|SP|PT|JA|JP|KO|KR|RU|ZH|CT|CS|PH)\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
     // Matches the collector number: a run of 1-4 digits, optionally "{collector}/{total}".
     // Group 1 is the collector number (the numerator). The loosest fallback — see TryExtractMtgSetAndNumber.
     private static readonly System.Text.RegularExpressions.Regex MtgCollectorNumberPattern =
@@ -970,18 +977,22 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         // A language code can't be a set code (guards "EN • EN"-style misreads); a valid set code
         // carries at least one letter (pure-digit tokens are the collector/total, not a set).
         int setLine = -1, setIndex = 0;
-        for (int i = 0; i < lines.Count && setCode is null; i++)
+        foreach (var pattern in new[] { MtgSetCodePattern, MtgTruncatedSetCodePattern })
         {
-            foreach (System.Text.RegularExpressions.Match m in MtgSetCodePattern.Matches(lines[i]))
+            for (int i = 0; i < lines.Count && setCode is null; i++)
             {
-                var candidate = m.Groups[1].Value;
-                if (MtgLanguageCodes.Contains(candidate) || !candidate.Any(char.IsLetter)) continue;
-                setCode = candidate;
-                language = OmniCard.Shared.Games.CardLanguages.Normalize(m.Groups[2].Value);
-                setLine = i;
-                setIndex = m.Index;
-                break;
+                foreach (System.Text.RegularExpressions.Match m in pattern.Matches(lines[i]))
+                {
+                    var candidate = m.Groups[1].Value;
+                    if (MtgLanguageCodes.Contains(candidate) || !candidate.Any(char.IsLetter)) continue;
+                    setCode = candidate;
+                    language = OmniCard.Shared.Games.CardLanguages.Normalize(m.Groups[2].Value);
+                    setLine = i;
+                    setIndex = m.Index;
+                    break;
+                }
             }
+            if (setCode is not null) break;
         }
 
         // Collector number, strongest anchoring first. "Above the set" is the line before the set-code
