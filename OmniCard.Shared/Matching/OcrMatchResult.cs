@@ -11,6 +11,11 @@ public class OcrMatchResult
     public string? CollectorNumber { get; init; }
     public double CollectorNumberConfidence { get; init; }
 
+    /// <summary>OPTCG only: the raw OCR reads of the collector-number line. OptcgService Phase 0 snaps
+    /// them to catalog numbers (OptcgCollectorNumberResolver) and lets the scan's image hash settle
+    /// disagreements and the alt-art variant. Considered alongside <see cref="CollectorNumber"/>.</summary>
+    public IReadOnlyList<string> CollectorTexts { get; init; } = [];
+
     /// <summary>Set code read via OCR (e.g. "MKC"). For MTG the collector number is not unique on its
     /// own, so the (SetCode, CollectorNumber) pair is what identifies a printing — see
     /// ScryfallService.FindClosestMatch Phase 0. Null for games that look up by collector number alone.</summary>

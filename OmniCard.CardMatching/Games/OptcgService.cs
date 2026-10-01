@@ -109,6 +109,7 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, ICatalo
         _hashCache = null;
         _edgeHashCache = null;
         _hashSetLookup = null;
+        _numberIndex = null;
         _correctionsCache = null;
         oldContext.Dispose();
 
@@ -312,6 +313,7 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, ICatalo
         _hashCache = null;
         _edgeHashCache = null;
         _hashSetLookup = null;
+        _numberIndex = null;
         oldContext.Dispose();
 
         sw.Stop();
@@ -648,6 +650,7 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, ICatalo
         _hashCache = null;
         _edgeHashCache = null;
         _hashSetLookup = null;
+        _numberIndex = null;
         oldContext.Dispose();
 
         sw.Stop();
@@ -675,25 +678,15 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, ICatalo
         _logger.LogDebug("Finding closest OPTCG match for pHash {Hash:X16} (set filter: {SetFilter}, max distance: {MaxDistance})", imageHash, setFilter is not null ? string.Join(",", setFilter) : "none", maxDistance);
         LastMatchDiagnostics = new MatchDiagnostics { SetFilterActive = setFilter is not null };
 
-        // Phase 0: Direct lookup via OCR collector number (most reliable for OPTCG)
-        if (ocrResult?.CollectorNumber is not null && ocrResult.CollectorNumberConfidence >= 0.5)
+        // Phase 0: the printed collector number (most reliable for OPTCG). The OCR reads are snapped to
+        // catalog numbers; the image only settles disagreeing reads and which alt-art variant this is.
+        if (ocrResult is not null)
         {
-            // OCR reads only the shared printed number, so this resolves to the base
-            // (index-0) variant by design — alt-art disambiguation falls to pHash below.
-            var ocrMatch = LookupOptcgCard(ocrResult.CollectorNumber, confidence: 100);
+            var ocrMatch = MatchCollectorReads(ocrResult, imageHash, setFilter, maxDistance);
             if (ocrMatch is not null)
             {
-                if (setFilter is null || setFilter.Contains(ocrMatch.SetCode))
-                {
-                    _logger.LogInformation("OPTCG OCR direct match: {CardName} ({CardSetId})", ocrMatch.Name, ocrMatch.CollectorNumber);
-                    LastMatchDiagnostics.DecisionPhase = "OcrCollectorNumber";
-                    return ocrMatch;
-                }
-                _logger.LogDebug("OPTCG OCR match {CardSetId} rejected by set filter", ocrResult.CollectorNumber);
-            }
-            else
-            {
-                _logger.LogDebug("OPTCG OCR collector number {Number} not found in database", ocrResult.CollectorNumber);
+                LastMatchDiagnostics.DecisionPhase = "OcrCollectorNumber";
+                return ocrMatch;
             }
         }
 
@@ -864,6 +857,9 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, ICatalo
             }
         }
 
+        // A same-art variant out-hashes its watermarked base image; keep the base unless clearly nearer.
+        (bestPHashId, bestPHashDistance) = PreferBasePrinting(bestPHashId, bestPHashDistance, imageHash, setFilter);
+
         var card = _readContext.Cards.AsNoTracking().FirstOrDefault(c => c.CardSetId == bestPHashId);
         _logger.LogDebug("Best OPTCG match: {CardName} with Hamming distance {Distance}", card?.CardName, bestPHashDistance);
         if (card is null)
@@ -1005,6 +1001,132 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, ICatalo
             })
             .OrderBy(c => c.CollectorNumber, CollectorNumberComparer.Instance)
             .ToList();
+    }
+
+    // At most this many voted numbers are weighed against the image.
+    private const int MaxOcrCandidates = 3;
+    // A lower-voted number displaces the top-voted one only when the scan's pHash is at least this many
+    // bits closer to it — e.g. Tesseract dropping "09" from "OP09-110" reads "OP-11088", an exact hit on
+    // the wrong card OP11-088, whose art is nowhere near the scan's.
+    internal const int AlternateReadMinHashAdvantage = 6;
+    // An alt-art variant is preferred over the base printing of the same number only when the image is
+    // clearly nearer to it. Same-art variants (Release Event / anniversary stamps, reprints) still hash
+    // 2–8 bits nearer a plain scan than the base does, because the catalog's base images carry a large
+    // "SAMPLE" watermark the variants lack; a genuinely different alt-art measured 14 (24 vs 10).
+    internal const int VariantMinHashAdvantage = 10;
+    // Confidence of a number read only approximately (no pass read it exactly).
+    private const double FuzzyReadConfidence = 80;
+
+    private sealed record NumberedRow(string CardSetId, int VariantIndex, string SetId, ulong? Hash);
+    private sealed record NumberIndex(OptcgCollectorNumberResolver Resolver, Dictionary<string, List<NumberedRow>> Rows, Dictionary<string, string> NumberById);
+    private NumberIndex? _numberIndex;
+
+    // English rows grouped by printed card number (variants share it), plus the OCR resolver over them.
+    // Language rows are reached afterwards via FindLanguageVariant.
+    private NumberIndex GetNumberIndex()
+    {
+        if (_numberIndex is not null) return _numberIndex;
+        var separator = LanguageSeparator.ToString();
+        var rows = _readContext.Cards
+            .AsNoTracking()
+            .Where(c => !c.CardSetId.Contains(separator))
+            .Select(c => new { c.CardSetId, c.CardNumber, c.VariantIndex, c.SetId, c.ImageHash })
+            .AsEnumerable()
+            .Where(c => !string.IsNullOrWhiteSpace(c.CardNumber)) // unnumbered rows aren't variants of one another
+            .GroupBy(c => c.CardNumber, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(c => new NumberedRow(c.CardSetId, c.VariantIndex, c.SetId, c.ImageHash)).OrderBy(r => r.VariantIndex).ToList(),
+                StringComparer.OrdinalIgnoreCase);
+        var numberById = rows.SelectMany(kv => kv.Value.Select(r => (r.CardSetId, Number: kv.Key)))
+            .ToDictionary(x => x.CardSetId, x => x.Number, StringComparer.OrdinalIgnoreCase);
+        _logger.LogInformation("OPTCG card-number index built: {Count} numbers", rows.Count);
+        return _numberIndex = new NumberIndex(new OptcgCollectorNumberResolver(rows.Keys), rows, numberById);
+    }
+
+    private CardMatch? MatchCollectorReads(OcrMatchResult ocr, ulong imageHash, IReadOnlySet<string>? setFilter, int maxDistance)
+    {
+        var reads = ocr.CollectorTexts.AsEnumerable();
+        if (ocr.CollectorNumber is not null && ocr.CollectorNumberConfidence >= 0.5)
+            reads = reads.Append(ocr.CollectorNumber);
+        var readList = reads.ToList();
+        if (readList.Count == 0) return null;
+
+        var index = GetNumberIndex();
+        var picks = new List<(OptcgNumberCandidate Candidate, NumberedRow Row, int? Distance)>();
+        foreach (var candidate in index.Resolver.Resolve(readList).Take(MaxOcrCandidates))
+        {
+            var rows = index.Rows[candidate.CardNumber].Where(r => setFilter is null || setFilter.Contains(r.SetId)).ToList();
+            if (rows.Count == 0)
+            {
+                _logger.LogDebug("OPTCG OCR read {Number} rejected by set filter", candidate.CardNumber);
+                continue;
+            }
+            var (row, distance) = PickVariant(rows, imageHash, maxDistance);
+            picks.Add((candidate, row, distance));
+        }
+        if (picks.Count == 0)
+        {
+            _logger.LogDebug("OPTCG OCR reads resolved to no catalog number: {Reads}", string.Join(" | ", readList));
+            return null;
+        }
+
+        // An unhashed top pick can't be compared; let only a near-certain image match displace it.
+        var best = picks[0];
+        foreach (var alternate in picks.Skip(1))
+        {
+            if (alternate.Distance is int d && d <= (best.Distance ?? maxDistance) - AlternateReadMinHashAdvantage)
+            {
+                _logger.LogInformation(
+                    "OPTCG OCR reads disagreed: preferring {Alt} (pHash {AltDist}) over top read {Top} (pHash {TopDist})",
+                    alternate.Row.CardSetId, d, best.Row.CardSetId, best.Distance);
+                best = alternate;
+            }
+        }
+
+        var confidence = best.Candidate.ExactVotes > 0 ? 100 : FuzzyReadConfidence;
+        var match = LookupOptcgCard(best.Row.CardSetId, confidence);
+        if (match is not null)
+        {
+            if (best.Distance is int distance) LastMatchDiagnostics!.PHashDistance = distance;
+            _logger.LogInformation("OPTCG OCR match: {CardName} ({CardSetId}) from {Reads}", match.Name, best.Row.CardSetId, string.Join(" | ", readList));
+        }
+        return match;
+    }
+
+    // The pHash path's pick, moved to its number's base printing when that is about as near (see
+    // VariantMinHashAdvantage) — the same rule the OCR path applies via PickVariant.
+    private (string CardSetId, int Distance) PreferBasePrinting(string cardSetId, int distance, ulong imageHash, IReadOnlySet<string>? setFilter)
+    {
+        var index = GetNumberIndex();
+        if (!index.NumberById.TryGetValue(cardSetId, out var number)) return (cardSetId, distance);
+        var baseRow = index.Rows[number][0];
+        if (baseRow.CardSetId == cardSetId || baseRow.Hash is not ulong baseHash
+            || (setFilter is not null && !setFilter.Contains(baseRow.SetId)))
+            return (cardSetId, distance);
+        var baseDistance = PerceptualHashService.HammingDistance(imageHash, baseHash);
+        return distance <= baseDistance - VariantMinHashAdvantage ? (cardSetId, distance) : (baseRow.CardSetId, baseDistance);
+    }
+
+    // Variants share the printed number, so the image picks among them. The base printing wins unless a
+    // variant is clearly nearer (or the base is unhashed and the variant is a confident match).
+    private (NumberedRow Row, int? Distance) PickVariant(List<NumberedRow> rows, ulong imageHash, int maxDistance)
+    {
+        var baseRow = rows[0];
+        int? baseDistance = baseRow.Hash is ulong bh ? PerceptualHashService.HammingDistance(imageHash, bh) : null;
+        var nearest = rows
+            .Where(r => r.Hash is not null)
+            .Select(r => (Row: r, Distance: PerceptualHashService.HammingDistance(imageHash, r.Hash!.Value)))
+            .OrderBy(x => x.Distance)
+            .ThenBy(x => x.Row.VariantIndex)
+            .FirstOrDefault();
+        if (nearest.Row is null || nearest.Row == baseRow) return (baseRow, baseDistance);
+        _logger.LogDebug("OPTCG variant choice: base {Base} pHash {BaseDist}, nearest {Variant} pHash {VariantDist}",
+            baseRow.CardSetId, baseDistance, nearest.Row.CardSetId, nearest.Distance);
+        var clearlyNearer = baseDistance is int b
+            ? nearest.Distance <= b - VariantMinHashAdvantage
+            : nearest.Distance <= maxDistance;
+        return clearlyNearer ? (nearest.Row, nearest.Distance) : (baseRow, baseDistance);
     }
 
     private CardMatch? LookupOptcgCard(string cardSetId, double? confidence = null)

@@ -456,6 +456,42 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         }
     }
 
+    public Task<IReadOnlyList<string>> ReadOptcgCollectorTextsAsync(byte[] imageData)
+        => Task.Run(() => ReadOptcgCollectorTexts(imageData));
+
+    // Raw OCR of the located collector-number line(s), right-most first, then the legacy fixed-region
+    // read as a fallback for scans where no line was found. Left raw on purpose: Tesseract garbles the
+    // card font's prefix ("P14-109", "EBO3-054"), so OptcgCollectorNumberResolver snaps these to the
+    // catalog rather than a strict pattern here.
+    private IReadOnlyList<string> ReadOptcgCollectorTexts(byte[] imageData)
+    {
+        if (!_ocrAvailable) return [];
+        var reads = new List<string>();
+        try
+        {
+            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            foreach (var line in OptcgCollectorLineLocator.Locate(bitmap))
+                using (line)
+                {
+                    var (text, _) = RunOcr(line, PageSegMode.SingleLine, CollectorNumberWhitelist);
+                    if (!string.IsNullOrWhiteSpace(text)) reads.Add(text);
+                }
+
+            var rect = ToPixelRect(OptcgCollectorNumberRegion, bitmap.Width, bitmap.Height);
+            if (rect.Width >= 10 && rect.Height >= 5)
+            {
+                var (text, _) = OcrCroppedRegion(bitmap, rect, PageSegMode.SingleLine, CollectorNumberWhitelist);
+                if (!string.IsNullOrWhiteSpace(text)) reads.Add(text);
+            }
+            _logger.LogDebug("OPTCG collector line reads: {Reads}", string.Join(" | ", reads));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "OPTCG collector line read failed");
+        }
+        return reads;
+    }
+
     // Extracts "{SET}-{collector}" from an OCR'd Riftbound collector line, or false if no match.
     internal static bool TryExtractRiftboundNumber(string ocrText, out string? formatted)
     {

@@ -43,6 +43,9 @@ public sealed class WebScanMatchingService
     // still binds, so an uncertain read can't drag in a wrong-set match.
     private const double OcrSetOverrideConfidence = 0.95;
 
+    // MatchDiagnostics.DecisionPhase a game service reports when its collector-number read decided the match.
+    private const string OcrCollectorNumberPhase = "OcrCollectorNumber";
+
     /// <summary>The effective set constraint for an OCR lookup: the user's chosen sets normally, but
     /// unconstrained (null) once the OCR read is confident enough (<see cref="OcrSetOverrideConfidence"/>)
     /// to override the "Sets (art fallback)" filter.</summary>
@@ -295,8 +298,18 @@ public sealed class WebScanMatchingService
             {
                 case CardGame.OnePiece:
                     {
-                        var (cn, conf) = await _ocrService.DetectOptcgCollectorNumberAsync(imageBytes);
-                        return await ApplyCollectorOcrAsync(gameService, hash, artHashes, edgeHash, setFilter, cn, conf, current);
+                        // The printed number names the card. OptcgService Phase 0 snaps the raw reads to the
+                        // catalog and lets the image settle disagreeing reads and the alt-art variant.
+                        var texts = await _ocrService.ReadOptcgCollectorTextsAsync(imageBytes);
+                        if (texts.Count == 0) return current;
+                        var ocr = new OcrMatchResult { CollectorTexts = texts };
+                        var (ocrMatch, fromRead) = await RunGatedAsync(() =>
+                        {
+                            var m = gameService.FindClosestMatch(hash, artHashes, ocr, setFilter, null, scanEdgeHash: edgeHash);
+                            return (m, gameService.LastMatchDiagnostics?.DecisionPhase == OcrCollectorNumberPhase);
+                        });
+                        // When no read resolved, FindClosestMatch fell through to the same pHash match as step 5.
+                        return fromRead ? ocrMatch : current;
                     }
                 case CardGame.Riftbound:
                     return await RefineRiftboundAsync(imageBytes, gameService, hash, edgeHash, setFilter, current);
@@ -583,8 +596,8 @@ public sealed class WebScanMatchingService
             {
                 case CardGame.OnePiece:
                     {
-                        var (cn, conf) = await _ocrService.DetectOptcgCollectorNumberAsync(rotatedBytes);
-                        if (cn is not null && conf >= 0.5) ocr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
+                        var texts = await _ocrService.ReadOptcgCollectorTextsAsync(rotatedBytes);
+                        if (texts.Count > 0) ocr = new OcrMatchResult { CollectorTexts = texts };
                         break;
                     }
                 case CardGame.Riftbound:
