@@ -14,6 +14,7 @@ using OmniCard.Collection.Lists;
 using OmniCard.Audit.Exporters;
 using OmniCard.Shared.Collection;
 using OmniCard.Web.Api.Controllers;
+using OmniCard.Tests.Fakes;
 
 namespace OmniCard.Tests.Web;
 
@@ -37,7 +38,7 @@ public class ListsControllerTests : IDisposable
         using (var ctx = new OmniCardDbContext(_opts)) ctx.Database.EnsureCreated();
 
         var factory = new MockFactory(_opts);
-        var cardService = new WebCardService([]);
+        var cardService = new WebCardService([new ConfigurableGameService()]);
         var listService = new ListService(factory, cardService);
         _binderCards = new WebBinderCardService(factory, new StubDataPath());
         var imageCache = new CardImageCacheService(new StubDataPath(), new StubHttpClientFactory(), NullLogger<CardImageCacheService>.Instance);
@@ -100,15 +101,148 @@ public class ListsControllerTests : IDisposable
     }
 
     /// <summary>Seeds one owned lot (a stack of <paramref name="qty"/>) whose printing matches <see cref="SeedItem"/>'s.</summary>
-    private void SeedOwned(string name, int qty, int containerId, bool foil = false) =>
+    private void SeedOwned(string name, int qty, int containerId, bool foil = false,
+        string? gameCardId = null, string set = "SET", string number = "1", string language = "en") =>
         _binderCards.ImportCollectionCards(
         [
             new CollectionCard
             {
-                Game = CardGame.Mtg, GameCardId = name.ToLowerInvariant(), Name = name, SetCode = "SET", Number = "1",
-                IsFoil = foil, Quantity = qty, Condition = "NM", ContainerId = containerId, DateAdded = DateTime.UtcNow,
+                Game = CardGame.Mtg, GameCardId = gameCardId ?? name.ToLowerInvariant(), Name = name, SetCode = set,
+                Number = number, IsFoil = foil, Language = language, Quantity = qty, Condition = "NM",
+                ContainerId = containerId, DateAdded = DateTime.UtcNow,
             },
         ], skipDuplicates: false);
+
+    [Fact]
+    public void Items_AnyLanguage_CountsOtherLanguageRowOfSamePrinting_ForcedLanguageFilters()
+    {
+        var src = _containers.Create("Src", ContainerType.Box).Id;
+        // A Japanese copy on its own catalog row (different id, same set + collector number).
+        SeedOwned("Bolt", 1, src, gameCardId: "bolt-ja", language: "ja");
+        var list = Value(_controller.Create(new CreateListRequest { Name = "L", Game = "Mtg" }));
+        SeedItem(list.Id, "Bolt", qty: 1);
+
+        Assert.Equal(1, Value(_controller.Items(list.Id))[0].OwnedQuantity); // any language
+
+        Assert.IsType<NoContentResult>(_controller.SetLanguage(list.Id, new SetListLanguageRequest { Language = "en" }));
+        Assert.Equal(0, Value(_controller.Items(list.Id))[0].OwnedQuantity);
+
+        Assert.IsType<NoContentResult>(_controller.SetLanguage(list.Id, new SetListLanguageRequest { Language = "JP" }));
+        Assert.Equal(1, Value(_controller.Items(list.Id))[0].OwnedQuantity);
+        Assert.Equal("ja", Value(_controller.Get("Mtg"))[0].Language);
+
+        Assert.IsType<BadRequestObjectResult>(_controller.SetLanguage(list.Id, new SetListLanguageRequest { Language = "klingon" }));
+    }
+
+    [Fact]
+    public void Fulfill_AddNew_UsesForcedLanguage_ElseEnglish()
+    {
+        var box = _containers.Create("Box", ContainerType.Box).Id;
+        var list = Value(_controller.Create(new CreateListRequest { Name = "L", Game = "Mtg" }));
+        SeedItem(list.Id, "Bolt", qty: 1);
+        SeedItem(list.Id, "Island", qty: 1);
+        _controller.SetLanguage(list.Id, new SetListLanguageRequest { Language = "ja" });
+
+        Value(_controller.Fulfill(list.Id, new FulfillListRequest { AddToContainerId = box }));
+
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.All(ctx.Lots.Where(l => l.LocationId == box).ToList(), l => Assert.Equal("ja", l.Language));
+    }
+
+    [Fact]
+    public void Substitutes_OfferOtherPrinting_ApplyMakesItOwned()
+    {
+        var src = _containers.Create("Src", ContainerType.Box).Id;
+        SeedOwned("Bolt", 3, src, gameCardId: "bolt-other", set: "OTH", number: "5");
+        var list = Value(_controller.Create(new CreateListRequest { Name = "L", Game = "Mtg" }));
+        SeedItem(list.Id, "Bolt", qty: 2);
+        Assert.Equal(0, Value(_controller.Items(list.Id))[0].OwnedQuantity); // not the exact printing
+
+        var found = Assert.Single(Value(_controller.FindSubstitutes(list.Id)));
+        Assert.Equal(2, found.Missing);
+        var candidate = Assert.Single(found.Candidates);
+        Assert.Equal(3, candidate.Available);
+        Assert.Equal(2, candidate.Suggested);
+
+        Assert.IsType<NoContentResult>(_controller.ApplySubstitutes(list.Id, new ListSubstitutionsApplyRequest
+        {
+            Substitutions = [new ListSubstitutionDto(found.ItemId, candidate.LotId, candidate.Suggested)],
+        }));
+
+        var item = Assert.Single(Value(_controller.Items(list.Id)));
+        Assert.True(item.IsSubstitute);
+        Assert.Equal("bolt-other", item.GameCardId);
+        Assert.Equal(2, item.OwnedQuantity);
+        Assert.Empty(Value(_controller.FindSubstitutes(list.Id))); // nothing left short
+    }
+
+    [Fact]
+    public void IgnoredLocation_NotCountedOrPulled_ShownAsIgnoredInFindInCollection()
+    {
+        var sales = _containers.Create("Sales binder", ContainerType.Binder).Id;
+        var deck = _containers.Create("Deck", ContainerType.Box).Id;
+        _containers.SetExcludeFromDeckCheck(sales, true);
+        SeedOwned("Bolt", 2, sales);
+        var list = Value(_controller.Create(new CreateListRequest { Name = "L", Game = "Mtg" }));
+        SeedItem(list.Id, "Bolt", qty: 2);
+
+        var item = Assert.Single(Value(_controller.Items(list.Id)));
+        Assert.Equal(0, item.OwnedQuantity);
+        Assert.Equal(2, item.IgnoredQuantity);
+
+        // Shown in Find in collection, but flagged and never suggested.
+        var found = Assert.Single(Value(_controller.FindSubstitutes(list.Id)));
+        var candidate = Assert.Single(found.Candidates);
+        Assert.Equal("Location", candidate.IgnoredReason);
+        Assert.Equal(0, candidate.Suggested);
+        Assert.IsType<BadRequestObjectResult>(_controller.ApplySubstitutes(list.Id, new ListSubstitutionsApplyRequest
+        {
+            Substitutions = [new ListSubstitutionDto(found.ItemId, candidate.LotId, 1)],
+        }));
+
+        // Putting the list away never pulls from the ignored location.
+        Value(_controller.Fulfill(list.Id, new FulfillListRequest { MoveToContainerId = deck }));
+        Assert.Equal(2, CopiesIn(sales, "bolt"));
+        Assert.Equal(0, CopiesIn(deck, "bolt"));
+    }
+
+    [Fact]
+    public void IgnoredLocation_WinsOverCardAddedFromCollection()
+    {
+        var sales = _containers.Create("Sales binder", ContainerType.Binder).Id;
+        SeedOwned("Bolt", 1, sales);
+        int lotId;
+        using (var ctx = new OmniCardDbContext(_opts)) lotId = ctx.Lots.Single().Id;
+        var list = Value(_controller.Create(new CreateListRequest { Name = "L", Game = "Mtg" }));
+        Value(_controller.AddItemFromCollection(list.Id, new AddListItemFromCollectionRequest { LotId = lotId, Quantity = 1 }));
+        Assert.Equal(1, Value(_controller.Items(list.Id))[0].OwnedQuantity);
+
+        _containers.SetExcludeFromDeckCheck(sales, true);
+
+        var item = Assert.Single(Value(_controller.Items(list.Id)));
+        Assert.Equal(0, item.OwnedQuantity);
+        Assert.Equal(1, item.IgnoredQuantity);
+    }
+
+    [Fact]
+    public void Substitutes_RespectForcedLanguage()
+    {
+        var src = _containers.Create("Src", ContainerType.Box).Id;
+        SeedOwned("Bolt", 1, src, gameCardId: "bolt-other", set: "OTH", number: "5", language: "de");
+        var list = Value(_controller.Create(new CreateListRequest { Name = "L", Game = "Mtg" }));
+        SeedItem(list.Id, "Bolt", qty: 1);
+        _controller.SetLanguage(list.Id, new SetListLanguageRequest { Language = "en" });
+
+        Assert.Empty(Assert.Single(Value(_controller.FindSubstitutes(list.Id))).Candidates);
+    }
+
+    [Fact]
+    public async Task UpdatePreview_NoSourceUrl_Returns400()
+    {
+        var list = Value(_controller.Create(new CreateListRequest { Name = "L", Game = "Mtg" }));
+        var result = await _controller.PreviewUpdate(list.Id, new ListUpdatePreviewRequest());
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+    }
 
     private int CopiesIn(int containerId, string gameCardId)
     {

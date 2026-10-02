@@ -245,4 +245,19 @@ public sealed class LocationsController(
         containers.SetExcludeFromDeckCheck(id, req.Value);
         return NoContent();
     }
+
+    /// <summary>Ignore (or stop ignoring) several locations when lists and decklist checks look for cards —
+    /// the bulk form of <see cref="SetExcludeFromDeckCheck"/>. Needs write access to every location's site.</summary>
+    [HttpPut("ignore-for-lists")]
+    [RequirePermission(Permissions.LocationsEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "Ids")]
+    public IActionResult SetIgnoredForLists([FromBody] LocationsBoolRequest req)
+    {
+        var ids = req.Ids.Distinct().ToList();
+        if (ids.Count == 0)
+            return BadRequest(new { error = "Choose at least one location." });
+        foreach (var id in ids)
+            containers.SetExcludeFromDeckCheck(id, req.Value);
+        return NoContent();
+    }
 }

@@ -271,9 +271,34 @@ import does, and the success message lists those lines.
 ## Lists: print and put away
 
 Each list on the Lists page shows how many copies of every line are already **owned**. Owned means the
-same printing and finish (foil / non-foil) in a site you can read. A copy that's listed for sale, flagged
-missing, traded, or kept in a location excluded from deck checks doesn't count. A card added from the
-collection always counts its own copy.
+same printing and finish (foil / non-foil) in a site you can read. With the list's **card language** set
+to *Any language* (the default), a copy of that printing in any language counts (MTG matches set +
+collector number, One Piece ignores the `@lang` suffix). Set a language to count only copies in it. A copy
+that's flagged missing or traded doesn't count. Neither does one that's listed for sale or kept in an
+**ignored location**, not even a card added from that very lot. The row shows those copies as "+N
+ignored". Otherwise a card added from the collection always counts its own copy.
+
+- **Ignored locations** (a sales binder, a deck in use, a whole site…): lists never count or pull cards
+  from them, and decklist checks skip them too. Toggle one from its ⋮ menu on the Locations page
+  (*Ignore for lists*). Toggle many at once in **Locations ▸ Ignored locations…**, which is also linked
+  from *Put cards away* and *Find in collection*. That dialog groups locations by site and type, with a
+  tick-box per site and per type. Ignored locations get an *Ignored* chip on the Locations page. *Find in
+  collection* still lists their copies, greyed out with the reason (*Ignored location* / *Listed for
+  sale*), and they can't be chosen. Stored as `StorageContainer.ExcludeFromDeckCheck`; bulk API
+  `PUT /api/locations/ignore-for-lists` with `{ ids, value }` (`LocationsEdit`, write access to every
+  location's site).
+
+- **Card language**: chosen when importing a list and changeable on the list. New cards created when
+  putting the list away use it, on that language's catalog row when the catalog has one. With *Any
+  language* they're created in English.
+- **Update from URL**: imported lists remember their Moxfield / Archidekt URL. Update fetches the deck
+  again and lists every change (added, removed, quantity changed) with a tick-box. Nothing changes until
+  you apply the ticked rows. Removing a card that wasn't imported from the URL starts unticked. Copies
+  already moved off the list by *Put cards away* aren't tracked, so an update offers to add them back.
+- **Find in collection**: for cards the collection doesn't have in the exact printing, it lists owned
+  copies of other printings with the same name (in the list's language), with suggested amounts. Approved
+  copies replace the missing ones on the list as stand-ins (shown with a swap icon). A later update from
+  the URL counts a stand-in toward the card it replaces.
 
 - **Print ▾**: the whole **list** (quantities, owned counts, prices, totals), a **pick list** (the owned
   copies to pull, grouped by location in section/page/slot order) or a **buy list** (what's missing, with
@@ -287,6 +312,9 @@ collection always counts its own copy.
   `POST /api/lists/{id}/fulfill` with `{ moveToContainerId?, addToContainerId?, condition }`
   (`ListsCommit`). It needs write access to both targets and to every site an owned copy moves out of.
   Both targets are checked first, including deck-box game locks, so a rejected request changes nothing.
+  `PUT /api/lists/{id}/language` (`{ language }`, null = any), `POST /api/lists/{id}/update-preview`
+  (`{ url? }`) then `/update-apply` (`{ url, rows }`), and `POST /api/lists/{id}/substitutes` then
+  `/substitutes/apply` (`{ substitutions: [{ itemId, lotId, quantity }] }`).
 
 ## Sites
 

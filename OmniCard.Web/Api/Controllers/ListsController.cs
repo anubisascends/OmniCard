@@ -6,6 +6,7 @@ using OmniCard.Web.Helpers;
 using OmniCard.Shared.Audit;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
+using OmniCard.Shared.Games;
 using OmniCard.Shared.Lists;
 using OmniCard.Shared.Matching;
 using OmniCard.Shared.Security;
@@ -42,7 +43,7 @@ public sealed class ListsController(
         if (LocationsController.ParseGame(game) is not { } g)
             return BadRequest(new { error = "A game is required" });
         return lists.GetLists(g)
-            .Select(l => new CardListDto(l.Id, l.Name, l.Game.ToString(), l.Notes, lists.GetItems(l.Id).Count))
+            .Select(l => ToDto(l, lists.GetItems(l.Id).Count))
             .ToList();
     }
 
@@ -56,7 +57,21 @@ public sealed class ListsController(
             return BadRequest(new { error = $"Unknown game '{request.Game}'" });
 
         var created = lists.CreateList(request.Name.Trim(), game);
-        return new CardListDto(created.Id, created.Name, created.Game.ToString(), created.Notes, 0);
+        return ToDto(created, 0);
+    }
+
+    /// <summary>Sets the list's forced card language (null/blank = any language). Owned counts, prints,
+    /// fulfillment and "find in collection" all follow it.</summary>
+    [HttpPut("{id:int}/language")]
+    [RequirePermission(Permissions.ListsEdit)]
+    public IActionResult SetLanguage(int id, [FromBody] SetListLanguageRequest request)
+    {
+        if (FindList(id) is null)
+            return NotFound();
+        if (!string.IsNullOrWhiteSpace(request.Language) && CardLanguages.Normalize(request.Language) is null)
+            return BadRequest(new { error = $"Unknown language '{request.Language}'" });
+        lists.SetLanguage(id, request.Language);
+        return NoContent();
     }
 
     [HttpPut("{id:int}")]
@@ -78,9 +93,11 @@ public sealed class ListsController(
     }
 
     /// <summary>Fetch a Moxfield/Archidekt decklist by URL and add its cards to a list. Creates a new list
-    /// (named after the deck) when <c>ListId</c> is null, otherwise appends to the existing list. Card names
-    /// are resolved to printings via <see cref="IListService.AddCardsByName"/>; any that don't resolve come
-    /// back in <c>UnresolvedNames</c>.</summary>
+    /// (named after the deck, with the request's forced language) when <c>ListId</c> is null, otherwise
+    /// appends to the existing list. The URL is remembered as the list's source for "update from URL" (an
+    /// existing list keeps the source it already has). Card names are resolved to printings via
+    /// <see cref="IListService.AddCardsByName"/>; any that don't resolve come back in
+    /// <c>UnresolvedNames</c>.</summary>
     [HttpPost("import-url")]
     [RequirePermission(Permissions.ListsCreate)]
     public async Task<ActionResult<ImportListResultDto>> ImportUrl([FromBody] ImportListUrlRequest request)
@@ -105,13 +122,19 @@ public sealed class ListsController(
                 return NotFound();
             list = existing;
             created = false;
+            if (string.IsNullOrWhiteSpace(existing.SourceUrl))
+                lists.SetSourceUrl(list.Id, request.Url);
         }
         else
         {
             if (LocationsController.ParseGame(request.Game) is not { } game)
                 return BadRequest(new { error = $"Unknown game '{request.Game}'" });
             var name = string.IsNullOrWhiteSpace(deckName) ? "Imported deck" : deckName;
+            if (!string.IsNullOrWhiteSpace(request.Language) && CardLanguages.Normalize(request.Language) is null)
+                return BadRequest(new { error = $"Unknown language '{request.Language}'" });
             list = lists.CreateList(name, game);
+            lists.SetSourceUrl(list.Id, request.Url);
+            lists.SetLanguage(list.Id, request.Language);
             created = true;
         }
 
@@ -126,7 +149,116 @@ public sealed class ListsController(
         var list = FindList(id);
         if (list is null)
             return new List<CardListItemDto>();
-        return BuildItemDtos(list.Game, lists.GetItems(id));
+        return BuildItemDtos(list, lists.GetItems(id));
+    }
+
+    /// <summary>Re-fetch the list's deck (the stored source URL, or <c>Url</c> when given) and return what
+    /// would change: cards added, removed, or with a different quantity. Nothing is written — the user
+    /// reviews the rows and sends the approved ones to <see cref="ApplyUpdate"/>. Added cards carry how many
+    /// copies the collection already covers (forced language and readable sites apply).</summary>
+    [HttpPost("{id:int}/update-preview")]
+    [RequirePermission(Permissions.ListsEdit)]
+    public async Task<ActionResult<ListUpdatePreviewDto>> PreviewUpdate(int id, [FromBody] ListUpdatePreviewRequest request)
+    {
+        var list = FindList(id);
+        if (list is null)
+            return NotFound();
+        var url = string.IsNullOrWhiteSpace(request.Url) ? list.SourceUrl : request.Url.Trim();
+        if (string.IsNullOrWhiteSpace(url))
+            return BadRequest(new { error = "This list has no source URL. Enter the Moxfield / Archidekt URL to update from." });
+
+        var fetched = await decklists.FetchDecklistAsync(url);
+        if (fetched is null)
+            return BadRequest(new { error = "Couldn't fetch that decklist URL. Supported: Moxfield, Archidekt." });
+        var (deckName, entries) = fetched.Value;
+
+        var preview = lists.PreviewUpdate(id, deckName, entries);
+
+        // How much of each newly added card the collection already covers, as if it were on the list.
+        var adds = preview.Rows.Where(r => r.Kind == ListUpdateKind.Add).ToList();
+        var ownedByCard = new Dictionary<string, int>();
+        if (adds.Count > 0)
+        {
+            var hypothetical = adds.Select((r, n) => new CardListItem
+            {
+                Id = -(n + 1), GameCardId = r.GameCardId, CardName = r.CardName, SetCode = r.SetCode,
+                CollectorNumber = r.CollectorNumber, IsFoil = r.IsFoil, Quantity = r.NewQuantity,
+            }).ToList();
+            foreach (var plan in planner.Plan(list.Game, hypothetical, siteAccess?.Current.ReadableSiteIds, language: list.Language))
+                ownedByCard[plan.Item.GameCardId] = plan.OwnedQuantity;
+        }
+
+        var rows = preview.Rows.Select(r => new ListUpdateRowDto(
+            r.Kind.ToString(), r.GameCardId, r.CardName, r.SetCode, r.SetName, r.CollectorNumber, r.Rarity, r.ImageUri,
+            r.IsFoil, r.OldQuantity, r.NewQuantity, r.Price, r.HandAdded,
+            r.Kind == ListUpdateKind.Add ? ownedByCard.GetValueOrDefault(r.GameCardId) : 0)).ToList();
+        return new ListUpdatePreviewDto(preview.DeckName, url, rows, preview.UnchangedCount, preview.UnresolvedNames);
+    }
+
+    /// <summary>Apply the update rows the user approved (each sets its printing's quantity on the list) and
+    /// remember the URL they came from as the list's source.</summary>
+    [HttpPost("{id:int}/update-apply")]
+    [RequirePermission(Permissions.ListsEdit)]
+    public IActionResult ApplyUpdate(int id, [FromBody] ListUpdateApplyRequest request)
+    {
+        if (FindList(id) is null)
+            return NotFound();
+        var rows = new List<ListUpdateRow>();
+        foreach (var r in request.Rows)
+        {
+            if (!Enum.TryParse<ListUpdateKind>(r.Kind, ignoreCase: true, out var kind) || string.IsNullOrWhiteSpace(r.GameCardId))
+                return BadRequest(new { error = "Invalid update row" });
+            rows.Add(new ListUpdateRow(kind, r.GameCardId, r.CardName, r.SetCode, r.SetName, r.CollectorNumber,
+                r.Rarity, r.ImageUri, r.IsFoil, r.OldQuantity, Math.Max(0, r.NewQuantity), r.Price, r.HandAdded));
+        }
+        lists.ApplyUpdate(id, rows);
+        if (!string.IsNullOrWhiteSpace(request.Url))
+            lists.SetSourceUrl(id, request.Url);
+        return NoContent();
+    }
+
+    /// <summary>"Find in collection": for each card the exact-printing match leaves short, owned copies of
+    /// other printings with the same name that could stand in, with suggested quantities. Read-only — the
+    /// user approves stand-ins via <see cref="ApplySubstitutes"/>.</summary>
+    [HttpPost("{id:int}/substitutes")]
+    [RequirePermission(Permissions.ListsView)]
+    public ActionResult<IReadOnlyList<ListItemSubstitutesDto>> FindSubstitutes(int id)
+    {
+        var list = FindList(id);
+        if (list is null)
+            return NotFound();
+        var found = planner.FindSubstitutes(list.Game, lists.GetItems(id), siteAccess?.Current.ReadableSiteIds, list.Language);
+        var images = ImagesFor(list.Game, found.SelectMany(f => f.Candidates).Select(c => c.GameCardId));
+        return found.Select(f => new ListItemSubstitutesDto(
+            f.Item.Id, f.Item.CardName, f.Item.SetCode, f.Item.CollectorNumber, f.Item.IsFoil, f.MissingQuantity,
+            f.Candidates.Select(c => new ListSubstituteCandidateDto(
+                c.LotId, c.GameCardId, c.CardName, c.SetCode, c.CollectorNumber, c.IsFoil, c.Language, c.Condition,
+                c.ContainerName, c.Page, c.Slot, c.Section, c.Available, c.Suggested,
+                images.GetValueOrDefault(c.GameCardId), c.IgnoredReason)).ToList())).ToList();
+    }
+
+    /// <summary>Apply approved stand-ins: each moves copies of a list card onto an owned lot of another
+    /// printing (a reference only — the lot isn't moved until the list is put away). Each (card, lot) pair
+    /// must be one <see cref="FindSubstitutes"/> offers as usable right now — so a lot in a site the user
+    /// can't read, in a location ignored for lists, or listed for sale is rejected.</summary>
+    [HttpPost("{id:int}/substitutes/apply")]
+    [RequirePermission(Permissions.ListsEdit)]
+    public IActionResult ApplySubstitutes(int id, [FromBody] ListSubstitutionsApplyRequest request)
+    {
+        var list = FindList(id);
+        if (list is null)
+            return NotFound();
+        var subs = request.Substitutions.Where(s => s.Quantity > 0).ToList();
+        if (subs.Count == 0)
+            return BadRequest(new { error = "Choose at least one card to use" });
+
+        var offered = planner.FindSubstitutes(list.Game, lists.GetItems(id), siteAccess?.Current.ReadableSiteIds, list.Language)
+            .SelectMany(f => f.Candidates.Where(c => c.IgnoredReason is null).Select(c => (f.Item.Id, c.LotId)))
+            .ToHashSet();
+        if (subs.Any(s => !offered.Contains((s.ItemId, s.LotId))))
+            return BadRequest(new { error = "Some of those copies can't be used any more (moved, listed, or in an ignored location). Check again." });
+        lists.ApplySubstitutions(id, subs.Select(s => new ListSubstitution(s.ItemId, s.LotId, s.Quantity)).ToList());
+        return NoContent();
     }
 
     /// <summary>Add a single "wholly new" card (chosen from the catalog) to the list. This only records a
@@ -153,7 +285,7 @@ public sealed class ListsController(
         };
         var item = lists.AddPrinting(id, match, request.IsFoil, request.IsFoil ? request.FoilType : null,
             Math.Max(1, request.Quantity), ListItemSource.Manual);
-        return BuildItemDtos(list.Game, [item])[0];
+        return BuildItemDtos(list, [item])[0];
     }
 
     /// <summary>Add a card the user already owns to the list by referencing an existing inventory lot.
@@ -171,7 +303,7 @@ public sealed class ListsController(
             return NotFound();
 
         var item = lists.AddOwnedLot(id, request.LotId, Math.Max(1, request.Quantity));
-        return BuildItemDtos(list.Game, [item])[0];
+        return BuildItemDtos(list, [item])[0];
     }
 
     [HttpDelete("items/{itemId:int}")]
@@ -265,7 +397,7 @@ public sealed class ListsController(
         if (items.Count == 0)
             return BadRequest(new { error = "The list is empty" });
 
-        var plan = planner.Plan(list.Game, items, siteAccess?.Current.ReadableSiteIds, moveTo);
+        var plan = planner.Plan(list.Game, items, siteAccess?.Current.ReadableSiteIds, moveTo, list.Language);
         var picks = moveTo is null ? [] : plan.SelectMany(p => p.Picks).ToList();
         var toAdd = addTo is null ? [] : plan.Where(p => p.MissingQuantity > 0).ToList();
 
@@ -306,19 +438,29 @@ public sealed class ListsController(
         if (addTo is int addTarget && toAdd.Count > 0)
         {
             var condition = string.IsNullOrWhiteSpace(request.Condition) ? "NM" : request.Condition;
-            var cards = toAdd.Select(p => new CollectionCard
+            // New copies take the list's forced language (English when it allows any), on that language's
+            // catalog row when the catalog has one.
+            var language = list.Language ?? CardLanguages.English;
+            var languageAware = language == CardLanguages.English ? null : LanguageAware(list.Game);
+            var cards = toAdd.Select(p =>
             {
-                Game = list.Game,
-                GameCardId = p.Item.GameCardId,
-                Name = p.Item.CardName,
-                SetCode = p.Item.SetCode ?? "",
-                Number = p.Item.CollectorNumber ?? "",
-                IsFoil = p.Item.IsFoil,
-                FoilType = p.Item.IsFoil ? p.Item.FoilType : null,
-                Quantity = p.MissingQuantity,
-                Condition = condition,
-                ContainerId = addTarget,
-                DateAdded = DateTime.UtcNow,
+                var variant = languageAware?.FindLanguageVariant(p.Item.GameCardId, language);
+                return new CollectionCard
+                {
+                    Game = list.Game,
+                    GameCardId = variant?.GameSpecificId ?? p.Item.GameCardId,
+                    Name = p.Item.CardName,
+                    SetCode = variant?.SetCode ?? p.Item.SetCode ?? "",
+                    Number = variant?.CollectorNumber ?? p.Item.CollectorNumber ?? "",
+                    ImageUri = variant?.ImageUri,
+                    IsFoil = p.Item.IsFoil,
+                    FoilType = p.Item.IsFoil ? p.Item.FoilType : null,
+                    Language = language,
+                    Quantity = p.MissingQuantity,
+                    Condition = condition,
+                    ContainerId = addTarget,
+                    DateAdded = DateTime.UtcNow,
+                };
             }).ToList();
             binderCards.ImportCollectionCards(cards, skipDuplicates: false);
             added = toAdd.Sum(p => p.MissingQuantity);
@@ -338,7 +480,7 @@ public sealed class ListsController(
         var list = FindList(id);
         if (list is null)
             return null;
-        return (list, planner.Plan(list.Game, lists.GetItems(id), siteAccess?.Current.ReadableSiteIds));
+        return (list, planner.Plan(list.Game, lists.GetItems(id), siteAccess?.Current.ReadableSiteIds, language: list.Language));
     }
 
     /// <summary>No <c>GetList(id)</c> on the service — scan the (few) games to find the owning list.</summary>
@@ -353,39 +495,60 @@ public sealed class ListsController(
         return null;
     }
 
+    /// <summary>The game's catalog when it can serve other-language rows; null otherwise (or when the game
+    /// has no service registered).</summary>
+    private ICatalogLanguageAware? LanguageAware(CardGame game)
+    {
+        try { return cardService.GetGameService(game) as ICatalogLanguageAware; }
+        catch (ArgumentException) { return null; }
+    }
+
+    private static CardListDto ToDto(CardList l, int itemCount) =>
+        new(l.Id, l.Name, l.Game.ToString(), l.Notes, itemCount, l.Language, l.SourceUrl);
+
     /// <summary>Maps list items to DTOs, enriching each with how many copies the collection already covers
-    /// (exact printing over readable sites, the same split fulfillment uses) and its best display art
-    /// (local cache → catalog CDN) for hover previews.</summary>
-    private List<CardListItemDto> BuildItemDtos(CardGame game, IReadOnlyList<CardListItem> items)
+    /// (exact printing in the list's language over readable sites, the same split fulfillment uses) and its
+    /// best display art (local cache → catalog CDN) for hover previews.</summary>
+    private List<CardListItemDto> BuildItemDtos(CardList list, IReadOnlyList<CardListItem> items)
     {
         if (items.Count == 0)
             return [];
 
-        var ownedByItem = planner.Plan(game, items, siteAccess?.Current.ReadableSiteIds)
-            .ToDictionary(p => p.Item.Id, p => p.OwnedQuantity);
-
-        // Resolve art the same way the collection does: hydrate missing URIs from the catalog, then
-        // prefer the locally-cached copy where one exists.
-        var stubs = items
-            .Select(i => new CollectionCard { Game = game, GameCardId = i.GameCardId })
-            .ToList();
-        CardArtHydrator.HydrateMissingImageUris(cardService, stubs);
-        imageCache.PreferCached(stubs);
-        var imageByCardId = stubs
-            .Where(s => !string.IsNullOrEmpty(s.ImageUri))
-            .GroupBy(s => s.GameCardId)
-            .ToDictionary(g => g.Key, g => g.First().ImageUri);
+        var planByItem = planner.Plan(list.Game, items, siteAccess?.Current.ReadableSiteIds, language: list.Language)
+            .ToDictionary(p => p.Item.Id);
+        var images = ImagesFor(list.Game, items.Select(i => i.GameCardId));
 
         return items.Select(i =>
         {
-            var owned = ownedByItem.GetValueOrDefault(i.Id);
+            var owned = planByItem.GetValueOrDefault(i.Id)?.OwnedQuantity ?? 0;
             return new CardListItemDto(
                 i.Id, i.GameCardId, i.CardName, i.SetCode, i.CollectorNumber,
                 i.IsFoil, i.FoilType, i.Quantity, i.AddedMarketPrice, i.IsUnpriced,
                 InCollection: owned > 0,
-                ImageUri: imageByCardId.GetValueOrDefault(i.GameCardId),
+                ImageUri: images.GetValueOrDefault(i.GameCardId),
                 OwnedQuantity: owned,
-                AwaitingPurchase: i.AwaitingPurchase);
+                AwaitingPurchase: i.AwaitingPurchase,
+                IsSubstitute: i.SubstituteForCardId is not null,
+                IgnoredQuantity: planByItem.GetValueOrDefault(i.Id)?.IgnoredQuantity ?? 0);
         }).ToList();
+    }
+
+    /// <summary>Best display art per card id, resolved the way the collection does: hydrate missing URIs
+    /// from the catalog, then prefer the locally-cached copy where one exists.</summary>
+    private Dictionary<string, string?> ImagesFor(CardGame game, IEnumerable<string> gameCardIds)
+    {
+        var stubs = gameCardIds
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Distinct()
+            .Select(id => new CollectionCard { Game = game, GameCardId = id })
+            .ToList();
+        if (stubs.Count == 0)
+            return [];
+        CardArtHydrator.HydrateMissingImageUris(cardService, stubs);
+        imageCache.PreferCached(stubs);
+        return stubs
+            .Where(s => !string.IsNullOrEmpty(s.ImageUri))
+            .GroupBy(s => s.GameCardId)
+            .ToDictionary(g => g.Key, g => g.First().ImageUri);
     }
 }

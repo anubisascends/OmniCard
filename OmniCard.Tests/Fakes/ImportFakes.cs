@@ -161,6 +161,11 @@ public sealed class RecordingListService : IListService
     public void RemoveItem(int itemId) => throw new NotImplementedException();
     public void SetQuantity(int itemId, int quantity) => throw new NotImplementedException();
     public bool ConsumeItems(int listId, IReadOnlyList<ListItemConsumption> consumed) => throw new NotImplementedException();
+    public void SetLanguage(int listId, string? language) => throw new NotImplementedException();
+    public void SetSourceUrl(int listId, string? url) => throw new NotImplementedException();
+    public ListUpdatePreview PreviewUpdate(int listId, string deckName, IEnumerable<DecklistEntry> entries) => throw new NotImplementedException();
+    public void ApplyUpdate(int listId, IReadOnlyList<ListUpdateRow> approved) => throw new NotImplementedException();
+    public void ApplySubstitutions(int listId, IReadOnlyList<ListSubstitution> substitutions) => throw new NotImplementedException();
     public AddCardsResult AddCardsByName(int listId, IEnumerable<DecklistEntry> entries, ListItemSource source = ListItemSource.Paste) => throw new NotImplementedException();
     public void RefreshPrices(int listId) => throw new NotImplementedException();
     public List<DecklistEntry> ToDecklistEntries(int listId) => throw new NotImplementedException();

@@ -6,6 +6,7 @@
     "deckUrlLabel": "Moxfield / Archidekt deck URL",
     "deckUrlPlaceholder": "https://moxfield.com/decks/…",
     "importAsNewList": "Import as new list",
+    "anyLanguage": "Any language",
     "importing": "Importing…",
     "imported": "Imported “{{name}}” — added {{count}} card.",
     "imported_other": "Imported “{{name}}” — added {{count}} cards.",
@@ -51,7 +52,63 @@
         "owned": "Owned"
       },
       "ownedTooltip": "{{owned}} of {{qty}} in your collection",
-      "awaitingPurchaseTooltip": "Your copies were already moved. The rest is to buy."
+      "awaitingPurchaseTooltip": "Your copies were already moved. The rest is to buy.",
+      "languageLabel": "Card language",
+      "languageHelp": "Only copies in this language count as owned. New cards are added in it (English for any).",
+      "updateFromUrl": "Update from URL",
+      "updateFromUrlNoSource": "Fetch the Moxfield / Archidekt deck again and review the changes",
+      "findInCollection": "Find in collection",
+      "substituteTooltip": "Another printing from your collection, standing in for this card",
+      "ignoredTooltip_one": "{{count}} more in an ignored location or listed for sale",
+      "ignoredTooltip_other": "{{count}} more in ignored locations or listed for sale",
+      "ignoredLocations": "Ignored locations…"
+    },
+    "update": {
+      "title": "Update “{{name}}” from URL",
+      "check": "Check for changes",
+      "summary": "{{deck}}: {{changes}} changed, {{unchanged}} unchanged.",
+      "unresolved": "Couldn't match: {{names}}.",
+      "upToDate": "The list already matches the deck.",
+      "handAdded": "(not from the URL)",
+      "owned_one": "you own {{count}}",
+      "owned_other": "you own {{count}}",
+      "apply_one": "Apply {{count}} change",
+      "apply_other": "Apply {{count}} changes",
+      "columns": {
+        "change": "Change"
+      },
+      "kinds": {
+        "Add": "Added",
+        "Remove": "Removed",
+        "Change": "Quantity"
+      }
+    },
+    "substitutes": {
+      "title": "Find in collection",
+      "intro": "These cards aren't in your collection in the exact printing, but you own other printings. Choose how many to use. They replace the missing copies on the list.",
+      "introLanguage": "These cards aren't in your collection in the exact printing, but you own other printings. Only {{language}} copies are shown. Choose how many to use. They replace the missing copies on the list.",
+      "nothingMissing": "Every card on the list is already in your collection.",
+      "noneFound": "No other printings of the missing cards are in your collection.",
+      "need_one": "need {{count}}",
+      "need_other": "need {{count}}",
+      "tooMany": "Use at most {{count}}.",
+      "lotOverUsed": "Some copies are chosen for more than one card. Lower the highlighted amounts.",
+      "page": "Page {{page}}",
+      "slot": "Slot {{slot}}",
+      "columns": {
+        "printing": "Printing",
+        "condition": "Cond",
+        "available": "Available",
+        "use": "Use"
+      },
+      "apply_one": "Use {{count}} copy",
+      "apply_other": "Use {{count}} copies",
+      "ignoredReasons": {
+        "Location": "Ignored location",
+        "Listed": "Listed for sale"
+      },
+      "ignoredHint": "Greyed-out copies are in ignored locations or listed for sale, so they can't be used.",
+      "manageIgnored": "Ignored locations…"
     }
   }
 }

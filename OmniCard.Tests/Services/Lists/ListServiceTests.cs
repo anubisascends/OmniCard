@@ -372,6 +372,107 @@ public class ListServiceTests : IDisposable
         Assert.Single(svc.GetItems(list.Id));
     }
 
+    private static FakeCardService DeckCatalog()
+    {
+        var cards = new FakeCardService();
+        cards.Game.Printings.Add(Printing("Sol Ring", "sol", "C21", "263"));
+        cards.Game.Printings.Add(Printing("Lightning Bolt", "bolt", "M11", "149"));
+        cards.Game.Printings.Add(Printing("Counterspell", "cs", "MH2", "267"));
+        cards.Game.Printings.Add(Printing("Island", "isl", "UNF", "235"));
+        return cards;
+    }
+
+    [Fact]
+    public void PreviewUpdate_ReportsChanges_ApplyMakesListMatchApprovedRows()
+    {
+        var svc = CreateService(DeckCatalog());
+        var list = svc.CreateList("Deck", CardGame.Mtg);
+        svc.AddCardsByName(list.Id,
+            [new DecklistEntry(1, "Sol Ring", "C21", "263"), new DecklistEntry(2, "Lightning Bolt", "M11", "149")],
+            ListItemSource.Url);
+        svc.AddPrinting(list.Id, Printing("Island", "isl", "UNF", "235"), false, null, 1, ListItemSource.Manual);
+
+        var preview = svc.PreviewUpdate(list.Id, "Deck v2",
+            [new DecklistEntry(2, "Sol Ring", "C21", "263"), new DecklistEntry(1, "Counterspell", "MH2", "267")]);
+
+        Assert.Equal(0, preview.UnchangedCount);
+        var sol = Assert.Single(preview.Rows, r => r.GameCardId == "sol");
+        Assert.Equal((ListUpdateKind.Change, 1, 2), (sol.Kind, sol.OldQuantity, sol.NewQuantity));
+        var cs = Assert.Single(preview.Rows, r => r.GameCardId == "cs");
+        Assert.Equal((ListUpdateKind.Add, 0, 1), (cs.Kind, cs.OldQuantity, cs.NewQuantity));
+        var bolt = Assert.Single(preview.Rows, r => r.GameCardId == "bolt");
+        Assert.Equal((ListUpdateKind.Remove, false), (bolt.Kind, bolt.HandAdded));
+        var island = Assert.Single(preview.Rows, r => r.GameCardId == "isl");
+        Assert.Equal((ListUpdateKind.Remove, true), (island.Kind, island.HandAdded)); // added by hand
+
+        // Approve everything except removing the hand-added Island.
+        svc.ApplyUpdate(list.Id, preview.Rows.Where(r => r.GameCardId != "isl").ToList());
+
+        var items = svc.GetItems(list.Id).ToDictionary(i => i.GameCardId, i => i.Quantity);
+        Assert.Equal(new Dictionary<string, int> { ["sol"] = 2, ["cs"] = 1, ["isl"] = 1 }, items);
+        Assert.Equal(ListItemSource.Url, svc.GetItems(list.Id).Single(i => i.GameCardId == "cs").Source);
+    }
+
+    [Fact]
+    public void PreviewUpdate_NothingChanged_OnlyCountsUnchanged()
+    {
+        var svc = CreateService(DeckCatalog());
+        var list = svc.CreateList("Deck", CardGame.Mtg);
+        DecklistEntry[] deck = [new(1, "Sol Ring", "C21", "263"), new(1, "Lightning Bolt", "M11", "149")];
+        svc.AddCardsByName(list.Id, deck, ListItemSource.Url);
+
+        var preview = svc.PreviewUpdate(list.Id, "Deck", [.. deck, new DecklistEntry(1, "Nope Card", null, null)]);
+
+        Assert.Empty(preview.Rows);
+        Assert.Equal(2, preview.UnchangedCount);
+        Assert.Equal(["Nope Card"], preview.UnresolvedNames);
+    }
+
+    [Fact]
+    public void ApplySubstitutions_SplitsItem_AndStandInCountsTowardOriginalOnUpdate()
+    {
+        var svc = CreateService(DeckCatalog());
+        var list = svc.CreateList("Deck", CardGame.Mtg);
+        svc.AddCardsByName(list.Id, [new DecklistEntry(2, "Lightning Bolt", "M11", "149")], ListItemSource.Url);
+        int lotId;
+        using (var ctx = _dbFactory.CreateDbContext())
+        {
+            var product = new Product
+            {
+                Game = CardGame.Mtg, Category = ProductCategory.Single, Name = "Lightning Bolt",
+                GameCardId = "bolt-2ed", SetCode = "2ED", CollectorNumber = "162",
+            };
+            var lot = new InventoryLot { Product = product, Quantity = 3 };
+            ctx.Lots.Add(lot);
+            ctx.SaveChanges();
+            lotId = lot.Id;
+        }
+        var itemId = Assert.Single(svc.GetItems(list.Id)).Id;
+
+        svc.ApplySubstitutions(list.Id, [new ListSubstitution(itemId, lotId, 1)]);
+
+        var items = svc.GetItems(list.Id);
+        Assert.Equal(1, items.Single(i => i.GameCardId == "bolt").Quantity);
+        var standIn = items.Single(i => i.GameCardId == "bolt-2ed");
+        Assert.Equal((1, lotId, "bolt"), (standIn.Quantity, standIn.SourceLotId!.Value, standIn.SubstituteForCardId));
+
+        // The deck still asks for 2 Bolts: 1 + the stand-in already covers it.
+        var preview = svc.PreviewUpdate(list.Id, "Deck", [new DecklistEntry(2, "Lightning Bolt", "M11", "149")]);
+        Assert.Empty(preview.Rows);
+        Assert.Equal(1, preview.UnchangedCount);
+    }
+
+    [Fact]
+    public void SetLanguage_NormalizesAndClears()
+    {
+        var svc = CreateService();
+        var list = svc.CreateList("L", CardGame.Mtg);
+        svc.SetLanguage(list.Id, "Japanese");
+        Assert.Equal("ja", svc.GetLists(CardGame.Mtg)[0].Language);
+        svc.SetLanguage(list.Id, " ");
+        Assert.Null(svc.GetLists(CardGame.Mtg)[0].Language);
+    }
+
     private class FakeCardService : ICardService
     {
         public ObservableCollection<ScannedCard> ScannedCards { get; } = [];

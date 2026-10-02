@@ -107,6 +107,7 @@ public static class DtoMapping
         Game = s.Container.Game is { } g ? GameId(g) : null,
         DeckTypeId = s.Container.DeckTypeId,
         DeckTypeName = s.DeckTypeName,
+        IgnoredForLists = s.Container.ExcludeFromDeckCheck,
     };
 
     public static DeckTypeDto ToDto(DeckType d) => new()

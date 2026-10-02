@@ -11,6 +11,26 @@ public interface IListService
     void RenameList(int listId, string name);
     void DeleteList(int listId);
 
+    /// <summary>Sets the list's forced card language (null = any). See <see cref="CardList.Language"/>.</summary>
+    void SetLanguage(int listId, string? language);
+
+    /// <summary>Records the deck URL "update from URL" re-fetches. See <see cref="CardList.SourceUrl"/>.</summary>
+    void SetSourceUrl(int listId, string? url);
+
+    /// <summary>Compares the list with a freshly fetched deck (resolved to printings the same way an import
+    /// does) and returns the differences without changing anything. Substitute items count toward the card
+    /// they stand in for.</summary>
+    ListUpdatePreview PreviewUpdate(int listId, string deckName, IEnumerable<DecklistEntry> entries);
+
+    /// <summary>Applies approved update rows: each sets its printing's total quantity on the list to the row's
+    /// new quantity, adding a URL-sourced item when the printing is new and removing items at zero. The list
+    /// itself is kept even if it ends up empty.</summary>
+    void ApplyUpdate(int listId, IReadOnlyList<ListUpdateRow> approved);
+
+    /// <summary>Applies approved stand-ins in one save: each takes copies off its item and adds them back as
+    /// an item for the substitute lot's printing (referencing that lot, tagged with the replaced card).</summary>
+    void ApplySubstitutions(int listId, IReadOnlyList<ListSubstitution> substitutions);
+
     IReadOnlyList<CardListItem> GetItems(int listId);
     CardListItem AddPrinting(int listId, CardMatch printing, bool isFoil, string? foilType, int quantity, ListItemSource source, int? sourceLotId = null);
 
