@@ -143,7 +143,7 @@ public sealed class DecklistController(
         p.LotId, p.ContainerId, p.ContainerName, p.ContainerType?.ToString(), p.Page, p.Slot, p.Section,
         p.SetCode, p.CollectorNumber, p.IsFoil, p.Condition, p.Quantity, p.IsListed);
 
-    private static string SafeFileName(string name)
+    internal static string SafeFileName(string name)
     {
         var invalid = Path.GetInvalidFileNameChars();
         var cleaned = new string(name.Select(c => invalid.Contains(c) ? '-' : c).ToArray()).Trim();

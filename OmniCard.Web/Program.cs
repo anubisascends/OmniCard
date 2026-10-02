@@ -127,6 +127,7 @@ builder.Services.AddSingleton<ITradeService, TradeService>();
 // factory, which is read-write on SQL Server.
 builder.Services.AddSingleton<ITradeImportService, TradeImportService>();
 builder.Services.AddSingleton<IListService, ListService>();
+builder.Services.AddSingleton<ListFulfillmentPlanner>();
 
 // Read-only reporting/query services backing the SPA API (they read via the Mode=ReadOnly
 // OmniCardDbContext factory registered above).

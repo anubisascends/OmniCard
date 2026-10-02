@@ -268,6 +268,26 @@ import does, and the success message lists those lines.
 - CSV quantities are now read on every import (`Quantity` for TCGplayer/ManaBox, `Count` for Moxfield). The
   OmniCard export writes a `Quantity` column, so a stacked lot round-trips.
 
+## Lists: print and put away
+
+Each list on the Lists page shows how many copies of every line are already **owned**. Owned means the
+same printing and finish (foil / non-foil) in a site you can read. A copy that's listed for sale, flagged
+missing, traded, or kept in a location excluded from deck checks doesn't count. A card added from the
+collection always counts its own copy.
+
+- **Print ▾**: the whole **list** (quantities, owned counts, prices, totals), a **pick list** (the owned
+  copies to pull, grouped by location in section/page/slot order) or a **buy list** (what's missing, with
+  prices). Every print has tick-boxes.
+- **Put cards away**: choose where the **owned** cards go and where the **new** cards go (picking one fills
+  in the other if it's still empty). Then click **Move owned**, **Add new** (new lots in the chosen
+  condition) or **Move & add** to do both at once. Moving splits a larger stack so only the needed copies
+  move. Done copies come off the list, and an emptied list is deleted. After a move-only run, any shortfall
+  stays on the list as *to buy*, so the copies you just moved aren't counted against it again.
+- API: `GET /api/lists/{id}/print.pdf`, `/pick-list.pdf`, `/buy-list.pdf` (`ListsView`), and
+  `POST /api/lists/{id}/fulfill` with `{ moveToContainerId?, addToContainerId?, condition }`
+  (`ListsCommit`). It needs write access to both targets and to every site an owned copy moves out of.
+  Both targets are checked first, including deck-box game locks, so a rejected request changes nothing.
+
 ## Sites
 
 A **site** is a MAJOR physical location — a home, a shop, a storage unit — that contains many child
@@ -290,7 +310,7 @@ House, and Partner's account doesn't see the children's own site.
   user's next request (no re-login).
 - **Read** = browse and search the site's locations and cards, export them, and add them to lists.
   **Write** = also change them (edit/move/delete cards, scan or import into its locations, edit binders,
-  create/rename/delete locations in it, commit lists into it).
+  create/rename/delete locations in it, put lists away into it).
 - **Locations page:** a **Site** filter next to the game filter — *All Sites* (every site you can read,
   the default), then *Default*, then your other sites. View-only locations show a lock and their
   actions are hidden. Locations can be created in, or moved to (*⋮ ▸ Move to site…*), any site you can

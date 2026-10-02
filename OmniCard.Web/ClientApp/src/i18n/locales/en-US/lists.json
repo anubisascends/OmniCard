@@ -17,21 +17,41 @@
     "detail": {
       "addCard": "Add card",
       "refreshPrices": "Refresh prices",
-      "chooseLocation": "— choose —",
+      "print": "Print",
+      "printList": "Print list",
+      "printPickList": "Print pick list",
+      "printBuyList": "Print buy list",
       "conditionLabel": "Cond",
-      "commit": "Commit to location",
-      "committing": "Committing…",
+      "fulfill": {
+        "title": "Put cards away",
+        "ownedTo_one": "Move {{count}} owned card to",
+        "ownedTo_other": "Move {{count}} owned cards to",
+        "newTo_one": "Add {{count}} new card to",
+        "newTo_other": "Add {{count}} new cards to",
+        "chooseLocation": "Choose location…",
+        "pickOwnedTitle": "Move owned cards to…",
+        "pickNewTitle": "Add new cards to…",
+        "move": "Move owned",
+        "add": "Add new",
+        "moveAndAdd": "Move & add",
+        "working": "Working…",
+        "hint": "Owned means the same printing and finish, in a site you can see. Moving splits a larger stack, and finished cards come off the list.",
+        "done": "Moved {{moved}}, added {{added}}.",
+        "listDone": "“{{name}}” is done: moved {{moved}}, added {{added}}. The list was removed."
+      },
       "addFromUrlLabel": "Add from URL (Moxfield / Archidekt)",
       "totalValue": "Total market value:",
-      "missingValue": "Not in collection:",
-      "inCollectionTooltip": "Already in your collection",
+      "missingValue": "To buy:",
       "added": "Added {{count}} card.",
       "added_other": "Added {{count}} cards.",
       "empty": "This list is empty. Add a card with the “Add card” button above, import a Moxfield/Archidekt URL, or add from the scan/import flow.",
       "columns": {
         "card": "Card",
-        "qty": "Qty"
-      }
+        "qty": "Qty",
+        "owned": "Owned"
+      },
+      "ownedTooltip": "{{owned}} of {{qty}} in your collection",
+      "awaitingPurchaseTooltip": "Your copies were already moved. The rest is to buy."
     }
   }
 }

@@ -21,6 +21,12 @@ public interface IListService
     void RemoveItem(int itemId);
     void SetQuantity(int itemId, int quantity);
 
+    /// <summary>Takes the given quantities off the list's items in one save: an item reduced to zero is
+    /// removed, otherwise its quantity drops (and it is flagged awaiting purchase when asked, which also
+    /// drops its owned-lot reference). The list is deleted once it has no items left; returns true when
+    /// that happened.</summary>
+    bool ConsumeItems(int listId, IReadOnlyList<ListItemConsumption> consumed);
+
     /// <summary>Adds each decklist entry to the list, resolving to the exact printing named by the entry's
     /// set + collector number when present (falling back to the cheapest printing by name otherwise). The
     /// <paramref name="source"/> is stamped on new items and governs how <see cref="RefreshPrices"/> treats

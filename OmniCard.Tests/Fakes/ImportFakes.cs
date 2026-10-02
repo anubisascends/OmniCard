@@ -160,6 +160,7 @@ public sealed class RecordingListService : IListService
     public IReadOnlyList<CardListItem> GetItems(int listId) => throw new NotImplementedException();
     public void RemoveItem(int itemId) => throw new NotImplementedException();
     public void SetQuantity(int itemId, int quantity) => throw new NotImplementedException();
+    public bool ConsumeItems(int listId, IReadOnlyList<ListItemConsumption> consumed) => throw new NotImplementedException();
     public AddCardsResult AddCardsByName(int listId, IEnumerable<DecklistEntry> entries, ListItemSource source = ListItemSource.Paste) => throw new NotImplementedException();
     public void RefreshPrices(int listId) => throw new NotImplementedException();
     public List<DecklistEntry> ToDecklistEntries(int listId) => throw new NotImplementedException();

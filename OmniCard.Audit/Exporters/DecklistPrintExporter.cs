@@ -85,7 +85,7 @@ public sealed class DecklistPrintExporter : IDecklistPrintExporter
         }).GeneratePdf(filePath);
     }
 
-    public void ExportPullList(DecklistCheckResult result, string filePath)
+    public void ExportPullList(DecklistCheckResult result, string filePath, string title = "Pull List")
     {
         var picks = result.OwnedEntries
             .SelectMany(e => (e.Picks ?? []).Select(p => (Entry: e, Pick: p)))
@@ -93,7 +93,7 @@ public sealed class DecklistPrintExporter : IDecklistPrintExporter
         var copies = picks.Sum(x => x.Pick.Quantity);
         var summary = $"{copies} {Plural(copies, "card", "cards")} to pull of {result.TotalCards}";
         var note = result.TotalMissing > 0
-            ? $"{result.TotalMissing} {Plural(result.TotalMissing, "card isn't", "cards aren't")} in the collection — see the missing list."
+            ? $"{result.TotalMissing} {Plural(result.TotalMissing, "card isn't", "cards aren't")} in the collection."
             : null;
 
         var groups = picks
@@ -101,7 +101,7 @@ public sealed class DecklistPrintExporter : IDecklistPrintExporter
             .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        Render("Pull List", result.DeckName, summary, note, content => content.Column(col =>
+        Render(title, result.DeckName, summary, note, content => content.Column(col =>
         {
             if (groups.Count == 0)
             {
@@ -161,7 +161,7 @@ public sealed class DecklistPrintExporter : IDecklistPrintExporter
         }), filePath);
     }
 
-    public void ExportMissingList(DecklistCheckResult result, string filePath)
+    public void ExportMissingList(DecklistCheckResult result, string filePath, string title = "Missing Cards")
     {
         var entries = result.MissingEntries
             .OrderBy(e => e.CardName, StringComparer.OrdinalIgnoreCase)
@@ -169,7 +169,7 @@ public sealed class DecklistPrintExporter : IDecklistPrintExporter
         var summary = $"{result.TotalMissing} {Plural(result.TotalMissing, "card", "cards")} missing of {result.TotalCards}"
             + $"  ·  Est. ${result.EstimatedCost:N2} to complete";
 
-        Render("Missing Cards", result.DeckName, summary, null, content => content.Table(table =>
+        Render(title, result.DeckName, summary, null, content => content.Table(table =>
         {
             table.ColumnsDefinition(columns =>
             {
@@ -213,6 +213,68 @@ public sealed class DecklistPrintExporter : IDecklistPrintExporter
             {
                 table.Cell().ColumnSpan(5).Padding(4).AlignRight().Text("Estimated total").Bold();
                 table.Cell().Padding(4).AlignRight().Text($"${result.EstimatedCost:N2}").Bold();
+            }
+        }), filePath);
+    }
+
+    public void ExportCardList(string listName, IReadOnlyList<ListPrintLine> lines, string filePath)
+    {
+        var ordered = lines.OrderBy(l => l.CardName, StringComparer.OrdinalIgnoreCase).ToList();
+        var total = ordered.Sum(l => l.Quantity);
+        var owned = ordered.Sum(l => Math.Min(l.OwnedQuantity, l.Quantity));
+        var totalValue = ordered.Where(l => l.Price.HasValue).Sum(l => l.Price!.Value * l.Quantity);
+        var toBuyValue = ordered.Where(l => l.Price.HasValue)
+            .Sum(l => l.Price!.Value * Math.Max(0, l.Quantity - l.OwnedQuantity));
+        var summary = $"{total} {Plural(total, "card", "cards")}  ·  {owned} in the collection  ·  {total - owned} to buy";
+
+        Render("Card List", listName, summary, null, content => content.Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.ConstantColumn(24);   // Tick-box
+                columns.RelativeColumn(0.6f); // Qty
+                columns.RelativeColumn(4);    // Card
+                columns.RelativeColumn(1.4f); // Printing
+                columns.RelativeColumn(0.8f); // Owned
+                columns.RelativeColumn(1);    // Price
+                columns.RelativeColumn(1);    // Subtotal
+            });
+
+            table.Header(header =>
+            {
+                HeaderCell(header, "");
+                HeaderCell(header, "Qty");
+                HeaderCell(header, "Card");
+                HeaderCell(header, "Printing");
+                HeaderCell(header, "Owned", right: true);
+                HeaderCell(header, "Price", right: true);
+                HeaderCell(header, "Subtotal", right: true);
+            });
+
+            var row = 0;
+            foreach (var l in ordered)
+            {
+                Color fill = row++ % 2 == 0 ? Colors.White : RowStripe;
+                CheckboxCell(table, fill);
+                BodyCell(table, fill).Text(l.Quantity.ToString());
+                BodyCell(table, fill).Text(l.IsFoil ? $"{l.CardName}  ✦" : l.CardName);
+                BodyCell(table, fill).Text(FormatPrinting(l.SetCode, l.CollectorNumber));
+                BodyCell(table, fill).AlignRight().Text(Math.Min(l.OwnedQuantity, l.Quantity).ToString());
+                BodyCell(table, fill).AlignRight().Text(l.Price is decimal p ? $"${p:N2}" : "—");
+                BodyCell(table, fill).AlignRight().Text(l.Price is decimal s ? $"${s * l.Quantity:N2}" : "—");
+            }
+
+            if (ordered.Count == 0)
+            {
+                table.Cell().ColumnSpan(7).Padding(12).AlignCenter()
+                    .Text("This list is empty.").Italic().FontColor(Colors.Grey.Medium);
+            }
+            else
+            {
+                table.Cell().ColumnSpan(6).Padding(4).AlignRight().Text("Total value").Bold();
+                table.Cell().Padding(4).AlignRight().Text($"${totalValue:N2}").Bold();
+                table.Cell().ColumnSpan(6).Padding(4).AlignRight().Text("To buy");
+                table.Cell().Padding(4).AlignRight().Text($"${toBuyValue:N2}");
             }
         }), filePath);
     }

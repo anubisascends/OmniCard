@@ -39,8 +39,18 @@ public class CardListItem
     /// commit as newly-created lots.</summary>
     public int? SourceLotId { get; set; }
 
+    /// <summary>Set when this item's owned copies were already moved out by a list fulfillment and only
+    /// the remainder (still to buy) is left. Such an item is no longer matched against the collection, or
+    /// the copies that were just moved would be counted against the quantity still needed.</summary>
+    public bool AwaitingPurchase { get; set; }
+
     public ListItemSource Source { get; set; }
 }
+
+/// <summary>Takes <see cref="Quantity"/> copies off a list item once they've been moved or added to a
+/// location. With <see cref="MarkAwaitingPurchase"/>, any remainder is flagged
+/// <see cref="CardListItem.AwaitingPurchase"/> (see <c>IListService.ConsumeItems</c>).</summary>
+public record ListItemConsumption(int ItemId, int Quantity, bool MarkAwaitingPurchase = false);
 
 public record AddCardsResult(int AddedCount, IReadOnlyList<string> UnresolvedNames);
 

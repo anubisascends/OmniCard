@@ -9,6 +9,7 @@ import {
   CircularProgress,
   Divider,
   IconButton,
+  Menu,
   MenuItem,
   Paper,
   Stack,
@@ -22,30 +23,67 @@ import {
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
+import PlaceIcon from '@mui/icons-material/Place';
+import PrintIcon from '@mui/icons-material/Print';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import { api } from '../api/client';
 import { AddCardToListDialog } from '../components/dialogs/AddCardToListDialog';
-import { locationSelectOptions } from '../components/LocationSelectOptions';
+import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import { useGame } from '../context/GameContext';
 import { useFormatters } from '../i18n/format';
 import type { CardListDto } from '../api/types';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
-function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => void }) {
+type PickerTarget = 'move' | 'add';
+
+/** Print menu: the whole list, the pick list (owned copies by location) and the buy list (what's missing). */
+function PrintMenu({ listId, disabled, onError }: { listId: number; disabled: boolean; onError: (e: Error) => void }) {
+  const { t } = useTranslation();
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const print = (fn: (id: number) => Promise<void>) => {
+    setAnchor(null);
+    fn(listId).catch(onError);
+  };
+  return (
+    <>
+      <Button
+        size="small"
+        startIcon={<PrintIcon />}
+        endIcon={<ArrowDropDownIcon />}
+        disabled={disabled}
+        onClick={(e) => setAnchor(e.currentTarget)}
+      >
+        {t('lists.detail.print')}
+      </Button>
+      <Menu anchorEl={anchor} open={anchor !== null} onClose={() => setAnchor(null)}>
+        <MenuItem onClick={() => print(api.listPrintPdf)}>{t('lists.detail.printList')}</MenuItem>
+        <MenuItem onClick={() => print(api.listPickListPdf)}>{t('lists.detail.printPickList')}</MenuItem>
+        <MenuItem onClick={() => print(api.listBuyListPdf)}>{t('lists.detail.printBuyList')}</MenuItem>
+      </Menu>
+    </>
+  );
+}
+
+function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (message: string) => void }) {
   const { t } = useTranslation();
   const fmt = useFormatters();
   const qc = useQueryClient();
   const items = useQuery({ queryKey: ['list-items', list.id], queryFn: () => api.listItems(list.id) });
   const locations = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations() });
-  const [containerId, setContainerId] = useState<number | ''>('');
+  const [moveTo, setMoveTo] = useState<number | null>(null);
+  const [addTo, setAddTo] = useState<number | null>(null);
+  const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
   const [condition, setCondition] = useState('NM');
   const [addUrl, setAddUrl] = useState('');
   const [addCardOpen, setAddCardOpen] = useState(false);
+  const [printError, setPrintError] = useState<Error | null>(null);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['list-items', list.id] });
@@ -68,23 +106,53 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
     onSuccess: invalidate,
   });
   const refreshPrices = useMutation({ mutationFn: () => api.listRefreshPrices(list.id), onSuccess: invalidate });
-  const commit = useMutation({
-    mutationFn: () => api.listCommit(list.id, containerId as number, condition),
-    onSuccess: () => {
+  const fulfill = useMutation({
+    mutationFn: (what: { move: boolean; add: boolean }) =>
+      api.listFulfill(list.id, {
+        moveToContainerId: what.move ? moveTo : null,
+        addToContainerId: what.add ? addTo : null,
+        condition,
+      }),
+    onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['lists'] });
       qc.invalidateQueries({ queryKey: ['collection'] });
       qc.invalidateQueries({ queryKey: ['locations'] });
-      onDeleted(); // the list is consumed + deleted on commit
+      if (r.listDeleted) {
+        onDeleted(t('lists.detail.fulfill.listDone', { name: list.name, moved: r.moved, added: r.added }));
+      } else {
+        qc.invalidateQueries({ queryKey: ['list-items', list.id] });
+      }
     },
   });
 
   if (items.isLoading || !items.data) return <CircularProgress />;
 
-  // Market-value roll-ups: the whole list, and the subset not already in the collection ("missing").
+  // Market-value roll-ups: the whole list, and the copies the collection doesn't cover ("to buy").
   // Unpriced items contribute nothing (matching the "—" shown per row).
-  const lineValue = (it: (typeof items.data)[number]) => (it.isUnpriced ? 0 : (it.marketPrice ?? 0) * it.quantity);
-  const totalValue = items.data.reduce((sum, it) => sum + lineValue(it), 0);
-  const missingValue = items.data.reduce((sum, it) => sum + (it.inCollection ? 0 : lineValue(it)), 0);
+  const price = (it: (typeof items.data)[number]) => (it.isUnpriced ? 0 : (it.marketPrice ?? 0));
+  const missingQty = (it: (typeof items.data)[number]) => Math.max(0, it.quantity - it.ownedQuantity);
+  const totalValue = items.data.reduce((sum, it) => sum + price(it) * it.quantity, 0);
+  const missingValue = items.data.reduce((sum, it) => sum + price(it) * missingQty(it), 0);
+  const ownedCount = items.data.reduce((sum, it) => sum + Math.min(it.ownedQuantity, it.quantity), 0);
+  const missingCount = items.data.reduce((sum, it) => sum + missingQty(it), 0);
+
+  const locationName = (id: number | null) =>
+    id == null ? t('lists.detail.fulfill.chooseLocation') : (locations.data?.find((l) => l.id === id)?.name ?? `#${id}`);
+
+  const onPick = (id: number) => {
+    // Picking one side pre-fills the other when it's still empty: usually both go to the same place.
+    if (pickerTarget === 'move') {
+      setMoveTo(id);
+      if (addTo == null) setAddTo(id);
+    } else {
+      setAddTo(id);
+      if (moveTo == null) setMoveTo(id);
+    }
+    setPickerTarget(null);
+  };
+
+  const canMove = moveTo != null && ownedCount > 0;
+  const canAdd = addTo != null && missingCount > 0;
 
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
@@ -104,40 +172,17 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
         >
           {t('lists.detail.refreshPrices')}
         </Button>
-        <Box sx={{ flexGrow: 1 }} />
-        <TextField
-          select
-          size="small"
-          label={t('common.labels.location')}
-          value={containerId}
-          onChange={(e) => setContainerId(e.target.value === '' ? '' : Number(e.target.value))}
-          sx={{ minWidth: 180 }}
-        >
-          {locationSelectOptions(locations.data, { label: t('lists.detail.chooseLocation') })}
-        </TextField>
-        <TextField
-          select
-          size="small"
-          label={t('lists.detail.conditionLabel')}
-          value={condition}
-          onChange={(e) => setCondition(e.target.value)}
-          sx={{ width: 90 }}
-        >
-          {CONDITIONS.map((c) => (
-            <MenuItem key={c} value={c}>
-              {t(`common.conditions.${c}`)}
-            </MenuItem>
-          ))}
-        </TextField>
-        <Button
-          variant="contained"
-          disabled={containerId === '' || items.data.length === 0 || commit.isPending}
-          onClick={() => commit.mutate()}
-        >
-          {commit.isPending ? t('lists.detail.committing') : t('lists.detail.commit')}
-        </Button>
+        <PrintMenu
+          listId={list.id}
+          disabled={items.data.length === 0}
+          onError={(e) => setPrintError(e)}
+        />
       </Stack>
-      {commit.error && <Alert severity="error">{(commit.error as Error).message}</Alert>}
+      {printError && (
+        <Alert severity="error" sx={{ mb: 1 }} onClose={() => setPrintError(null)}>
+          {printError.message}
+        </Alert>
+      )}
 
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }} flexWrap="wrap" useFlexGap>
         <TextField
@@ -169,6 +214,96 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
       )}
 
       {items.data.length > 0 && (
+        <Box sx={{ mb: 1, p: 1.5, borderRadius: 1, border: 1, borderColor: 'divider' }}>
+          <Typography variant="subtitle2" gutterBottom>
+            {t('lists.detail.fulfill.title')}
+          </Typography>
+          <Stack spacing={1}>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Typography variant="body2" sx={{ minWidth: 190 }}>
+                {t('lists.detail.fulfill.ownedTo', { count: ownedCount })}
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<PlaceIcon />}
+                disabled={ownedCount === 0}
+                onClick={() => setPickerTarget('move')}
+              >
+                {locationName(moveTo)}
+              </Button>
+            </Stack>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Typography variant="body2" sx={{ minWidth: 190 }}>
+                {t('lists.detail.fulfill.newTo', { count: missingCount })}
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<PlaceIcon />}
+                disabled={missingCount === 0}
+                onClick={() => setPickerTarget('add')}
+              >
+                {locationName(addTo)}
+              </Button>
+              <TextField
+                select
+                size="small"
+                label={t('lists.detail.conditionLabel')}
+                value={condition}
+                disabled={missingCount === 0}
+                onChange={(e) => setCondition(e.target.value)}
+                sx={{ width: 90 }}
+              >
+                {CONDITIONS.map((c) => (
+                  <MenuItem key={c} value={c}>
+                    {t(`common.conditions.${c}`)}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Stack>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Button
+                size="small"
+                disabled={!canMove || fulfill.isPending}
+                onClick={() => fulfill.mutate({ move: true, add: false })}
+              >
+                {t('lists.detail.fulfill.move')}
+              </Button>
+              <Button
+                size="small"
+                disabled={!canAdd || fulfill.isPending}
+                onClick={() => fulfill.mutate({ move: false, add: true })}
+              >
+                {t('lists.detail.fulfill.add')}
+              </Button>
+              <Button
+                size="small"
+                variant="contained"
+                disabled={!canMove || !canAdd || fulfill.isPending}
+                onClick={() => fulfill.mutate({ move: true, add: true })}
+              >
+                {fulfill.isPending ? t('lists.detail.fulfill.working') : t('lists.detail.fulfill.moveAndAdd')}
+              </Button>
+              <Typography variant="caption" color="text.secondary" sx={{ flexBasis: '100%' }}>
+                {t('lists.detail.fulfill.hint')}
+              </Typography>
+            </Stack>
+          </Stack>
+          {fulfill.error && (
+            <Alert severity="error" sx={{ mt: 1 }}>
+              {(fulfill.error as Error).message}
+            </Alert>
+          )}
+          {fulfill.data && !fulfill.data.listDeleted && (
+            <Alert severity="success" sx={{ mt: 1 }} onClose={() => fulfill.reset()}>
+              {t('lists.detail.fulfill.done', { moved: fulfill.data.moved, added: fulfill.data.added })}
+            </Alert>
+          )}
+        </Box>
+      )}
+
+      {items.data.length > 0 && (
         <Stack
           direction="row"
           spacing={2}
@@ -197,6 +332,16 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
         onDone={invalidate}
       />
 
+      <LocationPickerDialog
+        open={pickerTarget !== null}
+        title={
+          pickerTarget === 'add' ? t('lists.detail.fulfill.pickNewTitle') : t('lists.detail.fulfill.pickOwnedTitle')
+        }
+        cardGames={[list.game]}
+        onPick={onPick}
+        onClose={() => setPickerTarget(null)}
+      />
+
       {items.data.length === 0 ? (
         <Typography color="text.secondary" variant="body2">
           {t('lists.detail.empty')}
@@ -209,6 +354,7 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
               <TableCell>{t('lists.detail.columns.card')}</TableCell>
               <TableCell>{t('common.labels.set')}</TableCell>
               <TableCell align="right">{t('lists.detail.columns.qty')}</TableCell>
+              <TableCell align="right">{t('lists.detail.columns.owned')}</TableCell>
               <TableCell align="right">{t('common.labels.price')}</TableCell>
               <TableCell align="right"></TableCell>
             </TableRow>
@@ -217,10 +363,25 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
             {items.data.map((it) => (
               <TableRow key={it.id} hover>
                 <TableCell padding="checkbox">
-                  {it.inCollection && (
-                    <Tooltip title={t('lists.detail.inCollectionTooltip')}>
-                      <CollectionsBookmarkIcon fontSize="small" color="success" sx={{ display: 'block' }} />
+                  {it.awaitingPurchase ? (
+                    <Tooltip title={t('lists.detail.awaitingPurchaseTooltip')}>
+                      <ShoppingCartIcon fontSize="small" color="action" sx={{ display: 'block' }} />
                     </Tooltip>
+                  ) : (
+                    it.ownedQuantity > 0 && (
+                      <Tooltip
+                        title={t('lists.detail.ownedTooltip', {
+                          owned: fmt.number(Math.min(it.ownedQuantity, it.quantity)),
+                          qty: fmt.number(it.quantity),
+                        })}
+                      >
+                        <CollectionsBookmarkIcon
+                          fontSize="small"
+                          color={it.ownedQuantity >= it.quantity ? 'success' : 'warning'}
+                          sx={{ display: 'block' }}
+                        />
+                      </Tooltip>
+                    )
                   )}
                 </TableCell>
                 <TableCell>
@@ -262,6 +423,7 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: () => v
                     sx={{ width: 70 }}
                   />
                 </TableCell>
+                <TableCell align="right">{fmt.number(Math.min(it.ownedQuantity, it.quantity))}</TableCell>
                 <TableCell align="right">{it.isUnpriced ? '—' : fmt.money(it.marketPrice)}</TableCell>
                 <TableCell align="right">
                   <IconButton size="small" onClick={() => removeItem.mutate(it.id)}>
@@ -285,6 +447,7 @@ export function ListsPage() {
   const [newName, setNewName] = useState('');
   const [importUrl, setImportUrl] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [doneMessage, setDoneMessage] = useState<string | null>(null);
 
   const games = useQuery({ queryKey: ['games'], queryFn: api.games });
   const lists = useQuery({ queryKey: ['lists', game], queryFn: () => api.lists(game) });
@@ -402,6 +565,12 @@ export function ListsPage() {
         )}
       </Paper>
 
+      {doneMessage && (
+        <Alert severity="success" onClose={() => setDoneMessage(null)}>
+          {doneMessage}
+        </Alert>
+      )}
+
       {lists.isLoading || !lists.data ? (
         <CircularProgress />
       ) : lists.data.length === 0 ? (
@@ -437,7 +606,14 @@ export function ListsPage() {
               {t('common.actions.rename')}
             </Button>
           </Stack>
-          <ListDetail list={selected} onDeleted={() => setSelectedId(null)} />
+          <ListDetail
+            key={selected.id}
+            list={selected}
+            onDeleted={(message) => {
+              setSelectedId(null);
+              setDoneMessage(message);
+            }}
+          />
         </>
       )}
     </Stack>
