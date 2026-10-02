@@ -13,6 +13,11 @@ public class StorageContainer
     public int? CoverCardId { get; set; }
     public bool ExcludeFromDeckCheck { get; set; }
 
+    /// <summary>The <see cref="Sites.Site"/> (major physical location — a home, a shop) this location
+    /// sits in. Defaults to the seeded default site; the system Bulk location always stays there.
+    /// Controls who can see/edit this location and its cards (see <see cref="Sites.SiteAccessGrant"/>).</summary>
+    public int SiteId { get; set; } = Sites.Site.DefaultSiteId;
+
     /// <summary>The game system this location holds. Only meaningful for
     /// <see cref="ContainerType.DeckBox"/> — a deck box is assigned one game and rejects cards from
     /// other games (see the deck-box game guard). Null on every other container type and on legacy

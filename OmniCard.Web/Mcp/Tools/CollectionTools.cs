@@ -18,7 +18,9 @@ namespace OmniCard.Web.Mcp.Tools;
 /// Read-only MCP tools over the owned-card collection. These mirror the read paths of
 /// <see cref="CollectionController"/> (same query builder, paging, and price/art hydration) so MCP
 /// clients see exactly what the SPA does. No writes and no per-user permission checks — the endpoint
-/// is loopback-gated (see <see cref="LoopbackOnly"/>).
+/// is loopback-gated (see <see cref="LoopbackOnly"/>), so every site is visible. Locations carry their
+/// site (a major physical location such as a home); the optional <c>site</c> argument scopes a query
+/// to one (see <see cref="SiteTools"/>).
 /// </summary>
 [McpServerToolType]
 public sealed class CollectionTools(
@@ -28,7 +30,8 @@ public sealed class CollectionTools(
     CardImageCacheService imageCache,
     ICollectionQueryService collectionQuery,
     IAnalyticsService analytics,
-    IEnumerable<ICardGameService> gameServices)
+    IEnumerable<ICardGameService> gameServices,
+    SiteService sites)
 {
     private readonly IReadOnlyDictionary<CardGame, ICardGameService> _gameServices =
         gameServices.ToDictionary(s => s.Game);
@@ -36,7 +39,8 @@ public sealed class CollectionTools(
     [McpServerTool(Name = "search_collection")]
     [Description("Search the owned-card collection using Scryfall-style query syntax (e.g. set:, cn:, " +
         "c: color, r: rarity, t: type, tag:, is:foil, cmc>=, pow>=). Returns matching cards with " +
-        "market price, quantity, set, condition, and storage location. Results are paged.")]
+        "market price, quantity, set, condition, and storage location. Results are paged. Pass 'site' to " +
+        "search only one site (a major physical location such as a home — see list_sites).")]
     public PagedResult<CardDto> SearchCollection(
         [Description("Scryfall-style query. Empty returns everything. Example: 't:creature c:u r>=rare'.")]
         string? query = null,
@@ -44,6 +48,8 @@ public sealed class CollectionTools(
         string? game = null,
         [Description("Optional storage-location (container) id to restrict to.")]
         int? containerId = null,
+        [Description("Optional site id or name (see list_sites) — only cards in that site's locations.")]
+        string? site = null,
         [Description("Rows to skip (paging). Default 0.")] int skip = 0,
         [Description("Rows to return. Default 50, max 500.")] int take = 50,
         [Description("When true, collapse identical printings into one row with summed quantity.")]
@@ -59,7 +65,9 @@ public sealed class CollectionTools(
         var desc = string.Equals(dir, "desc", StringComparison.OrdinalIgnoreCase);
 
         using var ctx = dbFactory.CreateDbContext();
-        var q = CollectionQueryBuilder.BuildFilteredQuery(ctx, query ?? "", gameFilter, containerId, filterPreset: null, _gameServices);
+        var siteId = McpSiteParsing.ResolveSite(sites, site);
+        var q = CollectionQueryBuilder.BuildFilteredQuery(ctx, query ?? "", gameFilter, containerId, filterPreset: null,
+            _gameServices, siteId is int sid ? [sid] : null);
 
         void HydratePrices(IReadOnlyCollection<CollectionCard> cs) => MarketPriceHydrator.Populate(cardService, cs);
 
@@ -91,13 +99,18 @@ public sealed class CollectionTools(
     }
 
     [McpServerTool(Name = "list_locations")]
-    [Description("List storage locations (binders, boxes, deck boxes, bulk) with card counts and total value.")]
+    [Description("List storage locations (binders, boxes, deck boxes, bulk) with card counts and total value. " +
+        "Each location belongs to one site (siteId/siteName) — a major physical location such as a home; " +
+        "pass 'site' to list only that site's locations.")]
     public async Task<IReadOnlyList<LocationSummaryDto>> ListLocations(
         [Description("Optional game filter: mtg, pokemon, optcg, riftbound, yugioh, finalfantasy.")]
-        string? game = null)
+        string? game = null,
+        [Description("Optional site id or name (see list_sites).")]
+        string? site = null)
     {
+        var siteId = McpSiteParsing.ResolveSite(sites, site);
         var overviews = await collectionQuery.GetLocationOverviewsAsync(McpGameParsing.ParseGame(game));
-        return overviews.Select(DtoMapping.ToDto).ToList();
+        return LocationsController.ToSiteScopedDtos(overviews, SiteAccess.Unrestricted, sites.GetAll(), siteId);
     }
 
     [McpServerTool(Name = "top_value_cards")]

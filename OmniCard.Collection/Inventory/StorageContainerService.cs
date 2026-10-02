@@ -4,6 +4,7 @@ using OmniCard.Shared.Binder;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Sites;
 using OmniCard.Shared.Storage;
 
 namespace OmniCard.Collection.Inventory;
@@ -39,7 +40,7 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
     }
 
     public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9,
-        CardGame? game = null, int? deckTypeId = null)
+        CardGame? game = null, int? deckTypeId = null, int? siteId = null)
     {
         var trimmed = (name ?? "").Trim();
         if (NameExists(trimmed))
@@ -56,7 +57,8 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
             ContainerType = type,
             IsSystem = false,
             SortOrder = maxSort + 1,
-            SlotsPerPage = slotsPerPage > 0 ? slotsPerPage : 9
+            SlotsPerPage = slotsPerPage > 0 ? slotsPerPage : 9,
+            SiteId = siteId ?? Site.DefaultSiteId,
         };
 
         // Game + deck type are only meaningful for deck boxes; ignore them on every other type so a
@@ -148,6 +150,20 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
             throw new InvalidOperationException("Cannot rename system container");
 
         container.Name = trimmed;
+        context.SaveChanges();
+    }
+
+    public void SetSite(int containerId, int siteId)
+    {
+        using var context = dbContextFactory.CreateDbContext();
+        var container = context.StorageContainers.Find(containerId)
+            ?? throw new InvalidOperationException($"Container {containerId} not found");
+        if (container.IsSystem)
+            throw new InvalidOperationException("The Bulk location always stays in the default site.");
+        if (!context.Sites.Any(s => s.Id == siteId))
+            throw new InvalidOperationException($"Site {siteId} not found");
+
+        container.SiteId = siteId;
         context.SaveChanges();
     }
 

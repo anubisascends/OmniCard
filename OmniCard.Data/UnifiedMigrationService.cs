@@ -204,7 +204,38 @@ public static class UnifiedMigrationService
             AddColumnIfMissing(cmd, "StorageContainers", "SheetSides", "TEXT");
             // "Always Available" locations: always grouped with Bulk and never hidden by game filter.
             AddColumnIfMissing(cmd, "StorageContainers", "AlwaysAvailable", "INTEGER NOT NULL DEFAULT 0");
+            // Sites: every location belongs to a site; legacy rows land in the default site (id 1).
+            AddColumnIfMissing(cmd, "StorageContainers", "SiteId", "INTEGER NOT NULL DEFAULT 1");
         }
+
+        // Sites (major physical locations) + per-user/role access grants. The SQL Server store gets
+        // these from the AddSites migration; this keeps a legacy SQLite file readable by the copier
+        // (which reads every mapped table) and seeds the default site its locations point at.
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS Sites (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL,
+                Description TEXT,
+                IsDefault INTEGER NOT NULL DEFAULT 0,
+                SortOrder INTEGER NOT NULL DEFAULT 0
+            )
+            """;
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS IX_Sites_Name ON Sites(Name)";
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = "INSERT OR IGNORE INTO Sites (Id, Name, IsDefault, SortOrder) VALUES (1, 'Default', 1, 0)";
+        cmd.ExecuteNonQuery();
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS SiteAccessGrants (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SiteId INTEGER NOT NULL,
+                PrincipalType TEXT NOT NULL,
+                PrincipalId INTEGER NOT NULL,
+                Level TEXT NOT NULL,
+                FOREIGN KEY (SiteId) REFERENCES Sites(Id) ON DELETE CASCADE
+            )
+            """;
+        cmd.ExecuteNonQuery();
 
         // If EbayListings already exists from before the Task-5 rename, get its FK column
         // renamed to LotId before (re)running the CREATE TABLE/index statements below — SQLite's

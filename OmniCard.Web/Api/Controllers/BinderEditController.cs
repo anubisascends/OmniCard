@@ -6,6 +6,7 @@ using OmniCard.Shared.Games;
 using OmniCard.Shared.Matching;
 using OmniCard.Shared.Sales;
 using OmniCard.Shared.Security;
+using OmniCard.Shared.Sites;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Web.Api.Infrastructure;
@@ -18,6 +19,9 @@ namespace OmniCard.Web.Api.Controllers;
 /// registered in <c>Program.cs</c>. Gated by the site-wide passphrase (<see cref="ApiAuthAttribute"/>),
 /// same as every other SPA API — the legacy binder-only <c>BinderEditGate</c> is retired.
 /// Live eBay actions are intentionally out of scope here.
+///
+/// <para>Site-scoped: reads need read access to the binder's site, every write needs write access to
+/// the site of the binder and of any card it touches (<see cref="RequireSiteAccessAttribute"/>).</para>
 /// </summary>
 [ApiController]
 [Route("api/binder")]
@@ -31,6 +35,7 @@ public sealed class BinderEditController : ControllerBase
     private readonly IListingService _listings;
     private readonly ICardService _cardService;
     private readonly BinderStateBuilder _state;
+    private readonly RequestSiteAccess _siteAccess;
 
     public BinderEditController(
         IStorageContainerService containers,
@@ -38,8 +43,10 @@ public sealed class BinderEditController : ControllerBase
         ITagService tags,
         IListingService listings,
         ICardService cardService,
-        BinderStateBuilder state)
+        BinderStateBuilder state,
+        RequestSiteAccess siteAccess)
     {
+        _siteAccess = siteAccess;
         _containers = containers;
         _binderCards = binderCards;
         _tags = tags;
@@ -51,14 +58,17 @@ public sealed class BinderEditController : ControllerBase
     // ---------------------------------------------------------------- Read: spread + unplaced pool
 
     [HttpGet("state")]
+    [RequireSiteAccess(SiteAccessLevel.Read, Location = "containerId")]
     public IActionResult State(int containerId, int spreadIndex = 0)
         => Ok(_state.BuildState(containerId, spreadIndex));
 
     [HttpGet("unplaced")]
+    [RequireSiteAccess(SiteAccessLevel.Read, Location = "containerId")]
     public IActionResult Unplaced(int containerId, string? filter = null)
         => Ok(new { cards = _state.BuildUnplaced(containerId, filter) });
 
     [HttpGet("sheets")]
+    [RequireSiteAccess(SiteAccessLevel.Read, Location = "containerId")]
     public IActionResult Sheets(int containerId)
         => Ok(new { sheets = _containers.GetSheets(containerId) });
 
@@ -67,6 +77,7 @@ public sealed class BinderEditController : ControllerBase
     public sealed record AssignRequest(int LotId, int ContainerId, int Page, int Slot);
 
     [HttpPost("assign")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "LotId", Location = "ContainerId")]
     public IActionResult Assign([FromBody] AssignRequest r)
     {
         _containers.AssignCardToSlot(r.LotId, r.ContainerId, r.Page, r.Slot);
@@ -76,6 +87,7 @@ public sealed class BinderEditController : ControllerBase
     public sealed record UnassignRequest(int LotId);
 
     [HttpPost("unassign")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "LotId")]
     public IActionResult Unassign([FromBody] UnassignRequest r)
     {
         _containers.UnassignFromPage(r.LotId);
@@ -85,6 +97,7 @@ public sealed class BinderEditController : ControllerBase
     public sealed record LayoutRequest(int ContainerId, int SlotsPerPage, int Columns);
 
     [HttpPost("layout")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "ContainerId")]
     public IActionResult Layout([FromBody] LayoutRequest r)
     {
         if (r.SlotsPerPage <= 0 || r.Columns <= 0)
@@ -99,6 +112,7 @@ public sealed class BinderEditController : ControllerBase
     public sealed record AddPageRequest(int ContainerId, string? Mode);
 
     [HttpPost("page/add")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "ContainerId")]
     public IActionResult AddPage([FromBody] AddPageRequest r)
     {
         var doubleSided = !string.Equals(r.Mode, "single", StringComparison.OrdinalIgnoreCase);
@@ -111,6 +125,7 @@ public sealed class BinderEditController : ControllerBase
     public sealed record InsertPageRequest(int ContainerId, int InsertIndex, bool DoubleSided);
 
     [HttpPost("page/insert")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "ContainerId")]
     public IActionResult InsertPage([FromBody] InsertPageRequest r)
     {
         _containers.InsertBinderSheet(r.ContainerId, r.InsertIndex, r.DoubleSided);
@@ -124,6 +139,7 @@ public sealed class BinderEditController : ControllerBase
     public sealed record MovePageRequest(int ContainerId, int FromPage, int ToIndex);
 
     [HttpPost("page/move")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "ContainerId")]
     public IActionResult MovePage([FromBody] MovePageRequest r)
     {
         _containers.MoveBinderSheet(r.ContainerId, r.FromPage, r.ToIndex);
@@ -136,6 +152,7 @@ public sealed class BinderEditController : ControllerBase
     public sealed record RemovePageRequest(int ContainerId, int Page);
 
     [HttpPost("page/remove")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "ContainerId")]
     public IActionResult RemovePage([FromBody] RemovePageRequest r)
     {
         try
@@ -152,6 +169,7 @@ public sealed class BinderEditController : ControllerBase
     public sealed record ShiftPageRequest(int ContainerId, int Page, int DeltaPages, string Scope);
 
     [HttpPost("page/shift")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "ContainerId")]
     public IActionResult ShiftPage([FromBody] ShiftPageRequest r)
     {
         if (!Enum.TryParse<BinderShiftScope>(r.Scope, ignoreCase: true, out var scope))
@@ -174,6 +192,7 @@ public sealed class BinderEditController : ControllerBase
     public sealed record MoveLocationRequest(List<int> Ids, int ContainerId, string? Section);
 
     [HttpPost("card/move-location")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "Ids", Location = "ContainerId")]
     public IActionResult MoveLocation([FromBody] MoveLocationRequest r)
     {
         _binderCards.MoveCardsToContainer(r.Ids, r.ContainerId, r.Section);
@@ -183,6 +202,7 @@ public sealed class BinderEditController : ControllerBase
     public sealed record ListRequest(List<int> Ids, string Channel, decimal Price, int Quantity);
 
     [HttpPost("card/list")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "Ids")]
     public IActionResult ListForSale([FromBody] ListRequest r)
     {
         if (!Enum.TryParse<SalesChannel>(r.Channel, ignoreCase: true, out var channel))
@@ -194,6 +214,7 @@ public sealed class BinderEditController : ControllerBase
     }
 
     [HttpPost("card/unlist")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "Ids")]
     public IActionResult Unlist([FromBody] IdsRequest r)
     {
         _listings.Unlist(r.Ids);
@@ -201,6 +222,7 @@ public sealed class BinderEditController : ControllerBase
     }
 
     [HttpPost("card/mark-picked")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "Ids")]
     public IActionResult MarkPicked([FromBody] IdsRequest r)
     {
         try { _listings.MarkPicked(r.Ids); }
@@ -211,6 +233,7 @@ public sealed class BinderEditController : ControllerBase
     public sealed record ConditionRequest(List<int> Ids, string Value);
 
     [HttpPost("card/condition")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "Ids")]
     public IActionResult SetCondition([FromBody] ConditionRequest r)
     {
         _binderCards.SetCondition(r.Ids, r.Value);
@@ -220,6 +243,7 @@ public sealed class BinderEditController : ControllerBase
     public sealed record FoilRequest(List<int> Ids, bool IsFoil);
 
     [HttpPost("card/foil")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "Ids")]
     public IActionResult SetFoil([FromBody] FoilRequest r)
     {
         _binderCards.SetFoil(r.Ids, r.IsFoil);
@@ -227,6 +251,7 @@ public sealed class BinderEditController : ControllerBase
     }
 
     [HttpPost("card/delete")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "Ids")]
     public IActionResult Delete([FromBody] IdsRequest r)
     {
         foreach (var id in r.Ids)
@@ -237,6 +262,7 @@ public sealed class BinderEditController : ControllerBase
     public sealed record TagRequest(List<int> Ids, string Tag, bool Apply);
 
     [HttpPost("card/tags")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "Ids")]
     public IActionResult Tags([FromBody] TagRequest r)
     {
         var name = r.Tag.Trim();
@@ -250,6 +276,7 @@ public sealed class BinderEditController : ControllerBase
     public sealed record UpdateCardRequest(int Id, string Condition, bool IsFoil, string? FoilType, decimal? PurchasePrice);
 
     [HttpPost("card/update")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "Id")]
     public IActionResult UpdateCard([FromBody] UpdateCardRequest r)
     {
         // Load the current DTO (identity + placement) and apply only the editor-editable fields, so
@@ -271,6 +298,7 @@ public sealed class BinderEditController : ControllerBase
     /// <summary>Relocate an owned card straight into a binder pocket (the "Add card ▸ from your
     /// collection" flow). One copy is split off a stack; a displaced occupant returns to the pool.</summary>
     [HttpPost("card/place-owned")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "LotId", Location = "ContainerId")]
     public IActionResult PlaceOwned([FromBody] PlaceOwnedRequest r)
     {
         try { _binderCards.PlaceOwnedCardInSlot(r.LotId, r.ContainerId, r.Page, r.Slot); }
@@ -288,6 +316,7 @@ public sealed class BinderEditController : ControllerBase
     /// <summary>Place a card chosen from the game catalog straight into a binder pocket (the "Add card
     /// ▸ from the catalog" flow), creating a new loose lot. Displaces any current occupant to the pool.</summary>
     [HttpPost("card/add-missing")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "ContainerId")]
     public IActionResult AddMissing([FromBody] AddMissingRequest r)
     {
         if (!Enum.TryParse<CardGame>(r.Game, ignoreCase: true, out var game))
@@ -314,7 +343,9 @@ public sealed class BinderEditController : ControllerBase
     [HttpGet("locations")]
     public IActionResult Locations()
     {
+        // Move targets: only locations in sites the user can write to.
         var containers = _containers.GetAll()
+            .Where(c => _siteAccess.Current.CanWrite(c.SiteId))
             .Select(c => new
             {
                 c.Id,

@@ -200,6 +200,15 @@ builder.Services.AddSingleton(new UserService(writableFactory));
 // is shared). RequirePermissionAttribute reads it per request; user/role edits invalidate it, so
 // permission changes apply immediately without a re-login.
 builder.Services.AddSingleton(new PermissionService(writableFactory));
+// Sites (major physical locations holding many storage locations): per-user site visibility, cached
+// like permissions and invalidated on any site/grant/user/role edit. RequestSiteAccess is the
+// per-request view the controllers + [RequireSiteAccess] consult; SiteService is the admin CRUD.
+builder.Services.AddHttpContextAccessor();
+var siteAccessService = new SiteAccessService(writableFactory);
+builder.Services.AddSingleton(siteAccessService);
+builder.Services.AddSingleton(new SiteService(writableFactory, siteAccessService));
+builder.Services.AddScoped(sp => new RequestSiteAccess(
+    sp.GetRequiredService<IHttpContextAccessor>(), siteAccessService, writableFactory));
 
 // MCP OAuth resource-server mode (Phase 2). When configured (Mcp:OAuth:Enabled + Authority/Audience/
 // PublicBaseUrl), /mcp is exposed to remote MCP clients and gated by JWTs from an external IdP;
@@ -241,13 +250,15 @@ builder.Services.AddScoped<OmniCard.Web.Mcp.Tools.CollectionTools>();
 builder.Services.AddScoped<OmniCard.Web.Mcp.Tools.InventoryTools>();
 builder.Services.AddScoped<OmniCard.Web.Mcp.Tools.SalesTools>();
 builder.Services.AddScoped<OmniCard.Web.Mcp.Tools.CatalogTools>();
+builder.Services.AddScoped<OmniCard.Web.Mcp.Tools.SiteTools>();
 builder.Services
     .AddMcpServer(o => o.ServerInfo = new() { Name = "OmniCard", Version = "1.0.0" })
     .WithHttpTransport()
     .WithTools<OmniCard.Web.Mcp.Tools.CollectionTools>()
     .WithTools<OmniCard.Web.Mcp.Tools.InventoryTools>()
     .WithTools<OmniCard.Web.Mcp.Tools.SalesTools>()
-    .WithTools<OmniCard.Web.Mcp.Tools.CatalogTools>();
+    .WithTools<OmniCard.Web.Mcp.Tools.CatalogTools>()
+    .WithTools<OmniCard.Web.Mcp.Tools.SiteTools>();
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>

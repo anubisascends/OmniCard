@@ -6,6 +6,7 @@ using OmniCard.Shared.Matching;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Security;
+using OmniCard.Shared.Sites;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Web.Api.Infrastructure;
@@ -187,6 +188,7 @@ public sealed class CardScanController(
     /// <summary>Write a batch of confirmed scans into a storage location as owned lots.</summary>
     [HttpPost("commit")]
     [RequirePermission(Permissions.ScanCommit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "ContainerId")]
     public ActionResult<ScanCommitResultDto> Commit([FromBody] ScanCommitRequest request)
     {
         if (request.ContainerId <= 0)
@@ -274,6 +276,7 @@ public sealed class CardScanController(
     /// Destructive (deletes lots), so it requires the collection-delete grant rather than scan-commit.</summary>
     [HttpPost("audit-commit")]
     [RequirePermission(Permissions.CollectionDelete)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "ContainerId")]
     public ActionResult<AuditCommitResultDto> AuditCommit([FromBody] AuditCommitRequest request)
     {
         if (request.ContainerId <= 0)

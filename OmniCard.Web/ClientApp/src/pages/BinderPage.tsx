@@ -383,6 +383,9 @@ export function BinderPage() {
     queryFn: () => api.binder(binderId, spread),
     placeholderData: keepPreviousData,
   });
+  // Site access: a binder in a site the user can only view can be flipped through but not edited.
+  const locQuery = useQuery({ queryKey: ['location', binderId], queryFn: () => api.location(binderId) });
+  const canWrite = locQuery.data?.canWrite !== false;
   const unplaced = useQuery({
     queryKey: ['binder-unplaced', binderId, debouncedFilter],
     queryFn: () => api.binderUnplaced(binderId, debouncedFilter || undefined),
@@ -434,14 +437,16 @@ export function BinderPage() {
         </Typography>
         {isFetching && <CircularProgress size={16} />}
         <Box sx={{ flexGrow: 1 }} />
-        <Button
-          size="small"
-          variant={editMode ? 'contained' : 'outlined'}
-          startIcon={<EditIcon />}
-          onClick={() => setEditMode((v) => !v)}
-        >
-          {editMode ? t('binder.doneEditing') : t('common.actions.edit')}
-        </Button>
+        {canWrite && (
+          <Button
+            size="small"
+            variant={editMode ? 'contained' : 'outlined'}
+            startIcon={<EditIcon />}
+            onClick={() => setEditMode((v) => !v)}
+          >
+            {editMode ? t('binder.doneEditing') : t('common.actions.edit')}
+          </Button>
+        )}
       </Stack>
 
       {/* Edit toolbar */}

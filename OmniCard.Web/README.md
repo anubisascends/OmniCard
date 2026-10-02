@@ -28,6 +28,9 @@ whole app — the original WPF desktop app has been retired.
   enforces each permission per request (`RequirePermission` filter → `PermissionService`), so an
   admin's change takes effect on the affected user's **next request — no re-login**. The permission
   catalog is defined in `OmniCard.Shared/Security/Permissions.cs` (exposed at `GET /api/meta/permissions`).
+- **Sites** — a site is a **major physical location** (a home, a shop, a storage unit) that holds many
+  storage locations; locations live inside a site (`Site ▸ Location ▸ Card`). Sites let several people
+  share one collection while each sees only the places they're allowed to (see [Sites](#sites)).
 - **Server-side scanning** — image upload → perceptual hash + OCR matching via the per-game
   `ICardGameService` pipeline; no TWAIN, no desktop agent. Modern MTG frames are identified by the
   printed set code + collector number; pre-2015 ("old") frames, which print neither, are identified by
@@ -265,6 +268,43 @@ import does, and the success message lists those lines.
 - CSV quantities are now read on every import (`Quantity` for TCGplayer/ManaBox, `Count` for Moxfield). The
   OmniCard export writes a `Quantity` column, so a stacked lot round-trips.
 
+## Sites
+
+A **site** is a MAJOR physical location — a home, a shop, a storage unit — that contains many child
+storage locations (binders, boxes, deck boxes). It is *not* a shelf, a binder or a box; it's the place
+those things live. The hierarchy is **Site ▸ Location ▸ Card**, and every location belongs to exactly
+one site.
+
+Use sites when several people share one OmniCard database. Example: *Andrew's House* and *Partner's
+House* are two sites; the children's role can **read** Andrew's House but sees nothing of Partner's
+House, and Partner's account doesn't see the children's own site.
+
+- **Default site.** Every database has one Default site (id 1, seeded by the `AddSites` migration). It
+  is **always visible and writable for every signed-in user** (normal section permissions still apply),
+  holds the system **Bulk** location, and is where new locations land unless another site is chosen.
+  It can be renamed but never deleted. The migration assigned every pre-existing location to it.
+- **Administration ▸ Sites** (administrators only) creates, renames, describes and deletes sites
+  (deleting moves the site's locations — with their cards — to a site you choose), and sets **who can
+  see each site**: per **role** and per **user**, `None` / `Read` / `Write`. A user's level is the higher
+  of their own grant and their role's grant; administrators always see every site. Changes apply on the
+  user's next request (no re-login).
+- **Read** = browse and search the site's locations and cards, export them, and add them to lists.
+  **Write** = also change them (edit/move/delete cards, scan or import into its locations, edit binders,
+  create/rename/delete locations in it, commit lists into it).
+- **Locations page:** a **Site** filter next to the game filter — *All Sites* (every site you can read,
+  the default), then *Default*, then your other sites. View-only locations show a lock and their
+  actions are hidden. Locations can be created in, or moved to (*⋮ ▸ Move to site…*), any site you can
+  write to.
+- **Enforcement** is server-side: collection search/export, location lists, binders, decklist checks,
+  lists, trades and scan/import commits only see readable sites (an unreadable location/card answers
+  **404**), and writes need write access to every site involved (**403** otherwise) —
+  `RequireSiteAccessAttribute` + `RequestSiteAccess` → `SiteAccessService`. Sales listings/orders and
+  sealed-product inventory are **not** site-scoped (gate them with section permissions).
+- API: `GET /api/sites` (the caller's visible sites + access level); admin-only `POST/PUT/DELETE
+  /api/sites[/{id}]` (`DELETE ?moveToSiteId=`), `GET/PUT /api/sites/{id}/grants`;
+  `PUT /api/locations/{id}/site`; `siteId` query param on `GET /api/locations`, `GET /api/collection`
+  and `GET /api/export/collection`; `siteId` on `POST /api/locations`.
+
 ## Order CSV import
 
 **Sales → Orders → Import CSV** creates orders from a CSV using a reusable column-mapping **template**.
@@ -295,6 +335,9 @@ Streamable-HTTP transport, reusing the same services and read paths as the SPA A
 **Scope:** read-only. Tools available:
 - `search_collection` (Scryfall-style syntax), `get_card`, `list_locations`, `top_value_cards`,
   `collection_dashboard`
+- `list_sites` — sites are major physical locations holding many storage locations; pass a site id or
+  name as `site` to `search_collection` / `list_locations` to scope to one place. MCP calls carry no
+  OmniCard user identity, so they see **every** site (per-user site visibility applies to the SPA/API).
 - `list_inventory_products`, `list_inventory_lots`, `inventory_valuation`
 - `list_orders`, `get_order`, `list_customers`
 - `lookup_card_catalog`, `set_checklist`, `card_price`

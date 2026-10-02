@@ -28,10 +28,15 @@ public static class CollectionQueryBuilder
     /// container / free-text query / <see cref="FilterPreset"/> filters. The returned query is
     /// unmaterialized so callers can add their own <c>.Where</c>/<c>.OrderBy</c> (e.g. the binder
     /// "unplaced pool" adds <c>.Where(c =&gt; c.Page == null)</c>).
+    /// <para><paramref name="siteIds"/> restricts the result to cards whose location sits in one of
+    /// those <see cref="Shared.Sites.Site"/>s (cards with no location count as the default site);
+    /// null = every site. Callers pass the signed-in user's readable sites so a search never reveals
+    /// cards in a site they can't see.</para>
     /// </summary>
     public static IQueryable<CollectionCard> BuildFilteredQuery(
         OmniCardDbContext context, string query, CardGame? gameFilter, int? containerFilter, FilterPreset? filterPreset,
-        IReadOnlyDictionary<CardGame, ICardGameService>? gameServices = null)
+        IReadOnlyDictionary<CardGame, ICardGameService>? gameServices = null,
+        IReadOnlyCollection<int>? siteIds = null)
     {
         IQueryable<CollectionCard> cards =
             from l in context.Lots.AsNoTracking()
@@ -76,6 +81,9 @@ public static class CollectionQueryBuilder
         if (containerFilter.HasValue)
             cards = cards.Where(c => c.ContainerId == containerFilter.Value);
 
+        if (siteIds is not null)
+            cards = ApplySiteFilter(cards, context, siteIds);
+
         // Resolve the active game's field schema so game-specific aliases (e.g. FFTCG e:→element)
         // parse correctly. Null when no single game is selected or no resolver is wired — the parser
         // then uses the shared default aliases and game-specific fields still resolve by full name.
@@ -90,6 +98,21 @@ public static class CollectionQueryBuilder
             cards = ApplyScryfallFilter(cards, filterPreset.Query, context, gameFilter, gameServices, schema);
 
         return cards;
+    }
+
+    /// <summary>Keeps only cards located in one of <paramref name="siteIds"/>; unlocated cards are
+    /// treated as the default site. Translates to an <c>IN (subquery)</c> over StorageContainers.</summary>
+    public static IQueryable<CollectionCard> ApplySiteFilter(
+        IQueryable<CollectionCard> cards, OmniCardDbContext context, IReadOnlyCollection<int> siteIds)
+    {
+        var ids = siteIds.Distinct().ToList();
+        var includeUnlocated = ids.Contains(Shared.Sites.Site.DefaultSiteId);
+        var visibleContainerIds = context.StorageContainers.AsNoTracking()
+            .Where(sc => ids.Contains(sc.SiteId))
+            .Select(sc => sc.Id);
+        return cards.Where(c =>
+            (includeUnlocated && c.ContainerId == null)
+            || (c.ContainerId != null && visibleContainerIds.Contains(c.ContainerId.Value)));
     }
 
     private static IQueryable<CollectionCard> ApplyScryfallFilter(

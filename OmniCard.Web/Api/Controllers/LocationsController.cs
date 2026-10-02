@@ -5,25 +5,34 @@ using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Sales;
 using OmniCard.Shared.Security;
+using OmniCard.Shared.Sites;
 using OmniCard.Shared.Storage;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Api.Mapping;
+using OmniCard.Web.Services;
 
 namespace OmniCard.Web.Api.Controllers;
 
 /// <summary>Storage-location overview tiles + create/rename/delete (the web equivalent of the
-/// desktop Manage Storage Locations dialog). Writes go to the SQL Server unified store.</summary>
+/// desktop Manage Storage Locations dialog). Writes go to the SQL Server unified store.
+///
+/// <para>Every location belongs to a <see cref="Site"/> (a major physical location such as a home).
+/// Listing only returns locations in sites the user can read; changing a location needs write access
+/// to its site (enforced by <see cref="RequireSiteAccessAttribute"/> on top of the section permission).</para></summary>
 public sealed class LocationsController(
     ICollectionQueryService queryService,
     IStorageContainerService containers,
     IDeckTypeService deckTypes,
     IDeckLegalityService deckLegality,
     IPriceSheetService priceSheets,
-    IPriceSheetPdfExporter priceSheetPdf) : ApiControllerBase
+    IPriceSheetPdfExporter priceSheetPdf,
+    SiteService sites,
+    RequestSiteAccess siteAccess) : ApiControllerBase
 {
     /// <summary>Printable price-sheet PDF for a location's cards.</summary>
     [HttpGet("{id:int}/pricesheet.pdf")]
     [RequirePermission(Permissions.LocationsView)]
+    [RequireSiteAccess(SiteAccessLevel.Read, Location = "id")]
     public IActionResult PriceSheet(int id)
     {
         var container = containers.GetAll().FirstOrDefault(c => c.Id == id);
@@ -33,25 +42,46 @@ public sealed class LocationsController(
         return File(bytes, "application/pdf", $"pricesheet-{container.Name}.pdf");
     }
 
-    /// <summary>All locations (optionally filtered to one game) with card counts and valuations.</summary>
+    /// <summary>Locations in the sites the user can read (optionally one game and/or one site) with
+    /// card counts and valuations. <paramref name="siteId"/> omitted = all readable sites.</summary>
     [HttpGet]
     [RequirePermission(Permissions.LocationsView)]
-    public async Task<ActionResult<IReadOnlyList<LocationSummaryDto>>> Get([FromQuery] string? game)
+    public async Task<ActionResult<IReadOnlyList<LocationSummaryDto>>> Get(
+        [FromQuery] string? game, [FromQuery] int? siteId = null)
     {
         var gameFilter = ParseGame(game);
         var summaries = await queryService.GetLocationOverviewsAsync(gameFilter);
-        return summaries.Select(DtoMapping.ToDto).ToList();
+        return ToSiteScopedDtos(summaries, siteAccess.Current, sites.GetAll(), siteId);
     }
 
     /// <summary>One location's overview tile. Its cards come from
-    /// <c>GET /api/collection?containerId={id}</c>.</summary>
+    /// <c>GET /api/collection?containerId={id}</c>. 404 when its site isn't readable.</summary>
     [HttpGet("{id:int}")]
     [RequirePermission(Permissions.LocationsView)]
     public async Task<ActionResult<LocationSummaryDto>> GetOne(int id)
     {
         var summaries = await queryService.GetLocationOverviewsAsync();
-        var match = summaries.FirstOrDefault(s => s.Container.Id == id);
-        return match is null ? NotFound() : DtoMapping.ToDto(match);
+        var match = ToSiteScopedDtos(summaries.Where(s => s.Container.Id == id), siteAccess.Current, sites.GetAll(), null);
+        return match.Count == 0 ? NotFound() : match[0];
+    }
+
+    /// <summary>Maps overview tiles to DTOs carrying their site (id, name, whether the user can write
+    /// to it), dropping any the user can't read and — when <paramref name="siteId"/> is given — any
+    /// outside that site. Shared with the MCP <c>list_locations</c> tool.</summary>
+    internal static List<LocationSummaryDto> ToSiteScopedDtos(
+        IEnumerable<LocationTileSummary> summaries, SiteAccess access, IReadOnlyList<Site> allSites, int? siteId)
+    {
+        var names = allSites.ToDictionary(s => s.Id, s => s.Name);
+        return summaries
+            .Where(s => access.CanRead(s.Container.SiteId))
+            .Where(s => siteId is null || s.Container.SiteId == siteId)
+            .Select(s => DtoMapping.ToDto(s) with
+            {
+                SiteId = s.Container.SiteId,
+                SiteName = names.GetValueOrDefault(s.Container.SiteId),
+                CanWrite = access.CanWrite(s.Container.SiteId),
+            })
+            .ToList();
     }
 
     internal static CardGame? ParseGame(string? game) =>
@@ -68,12 +98,20 @@ public sealed class LocationsController(
     public ActionResult<NameAvailableDto> NameAvailable([FromQuery] string name, [FromQuery] int? excludeId) =>
         new NameAvailableDto(!containers.NameExists(name ?? "", excludeId));
 
-    /// <summary>Create a new location. 409 if the name is taken, 400 for an invalid/Bulk type or a
-    /// deck box without a valid game.</summary>
+    /// <summary>Create a new location in <c>req.SiteId</c> (default: the default site). 409 if the name
+    /// is taken, 400 for an invalid/Bulk type, a deck box without a valid game or an unknown site, 403
+    /// without write access to the site.</summary>
     [HttpPost]
     [RequirePermission(Permissions.LocationsCreate)]
     public ActionResult<LocationSummaryDto> Create([FromBody] CreateLocationRequest req)
     {
+        var siteId = req.SiteId ?? Site.DefaultSiteId;
+        var site = sites.Get(siteId);
+        if (site is null || !siteAccess.Current.CanRead(siteId))
+            return BadRequest(new { error = "Unknown site." });
+        if (!siteAccess.Current.CanWrite(siteId))
+            return RequireSiteAccessAttribute.Forbidden();
+
         var name = (req.Name ?? "").Trim();
         if (name.Length == 0)
             return BadRequest(new { error = "Name is required." });
@@ -93,18 +131,42 @@ public sealed class LocationsController(
         if (containers.NameExists(name))
             return Conflict(new { error = $"A location named \"{name}\" already exists." });
 
-        var created = containers.Create(name, type, req.SlotsPerPage, game, type == ContainerType.DeckBox ? req.DeckTypeId : null);
+        var created = containers.Create(name, type, req.SlotsPerPage, game,
+            type == ContainerType.DeckBox ? req.DeckTypeId : null, siteId);
         return DtoMapping.ToDto(new LocationTileSummary
         {
             Container = created,
             DeckTypeName = created.DeckTypeId is int id ? deckTypes.GetById(id)?.Name : null,
-        });
+        }) with { SiteId = siteId, SiteName = site.Name, CanWrite = true };
+    }
+
+    /// <summary>Move a location — with all of its cards — to another site. Needs write access to both
+    /// the current and the target site. 400 for Bulk (always in the default site) or an unknown site.</summary>
+    [HttpPut("{id:int}/site")]
+    [RequirePermission(Permissions.LocationsEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "id")]
+    public IActionResult SetSite(int id, [FromBody] SetLocationSiteRequest req)
+    {
+        if (sites.Get(req.SiteId) is null || !siteAccess.Current.CanRead(req.SiteId))
+            return BadRequest(new { error = "Unknown site." });
+        if (!siteAccess.Current.CanWrite(req.SiteId))
+            return RequireSiteAccessAttribute.Forbidden();
+        try
+        {
+            containers.SetSite(id, req.SiteId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        return NoContent();
     }
 
     /// <summary>Assign/reassign a deck box's game system and deck type. 400 if not a deck box or the
     /// game/deck type is invalid; 409 if the box already holds cards from a different game.</summary>
     [HttpPut("{id:int}/deck-box")]
     [RequirePermission(Permissions.LocationsEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "id")]
     public IActionResult SetDeckBox(int id, [FromBody] SetDeckBoxRequest req)
     {
         var game = ParseGame(req.Game);
@@ -133,6 +195,7 @@ public sealed class LocationsController(
     /// <summary>Advisory deck-legality check for a deck box against its deck type's rules.</summary>
     [HttpGet("{id:int}/deck-legality")]
     [RequirePermission(Permissions.LocationsView)]
+    [RequireSiteAccess(SiteAccessLevel.Read, Location = "id")]
     public ActionResult<DeckLegalityDto> DeckLegality(int id) =>
         DtoMapping.ToDto(deckLegality.Check(id));
 
@@ -142,6 +205,7 @@ public sealed class LocationsController(
     /// <summary>Rename a location. 409 if the new name is taken.</summary>
     [HttpPut("{id:int}")]
     [RequirePermission(Permissions.LocationsEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "id")]
     public IActionResult Rename(int id, [FromBody] RenameRequest req)
     {
         var name = (req.Name ?? "").Trim();
@@ -157,6 +221,7 @@ public sealed class LocationsController(
     /// deletes them.</summary>
     [HttpDelete("{id:int}")]
     [RequirePermission(Permissions.LocationsDelete)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "id")]
     public IActionResult Delete(int id, [FromQuery] bool moveToBulk = true)
     {
         containers.Delete(id, moveToBulk);
@@ -165,6 +230,7 @@ public sealed class LocationsController(
 
     [HttpPut("{id:int}/always-available")]
     [RequirePermission(Permissions.LocationsEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "id")]
     public IActionResult SetAlwaysAvailable(int id, [FromBody] BoolValueRequest req)
     {
         containers.SetAlwaysAvailable(id, req.Value);
@@ -173,6 +239,7 @@ public sealed class LocationsController(
 
     [HttpPut("{id:int}/exclude-deck-check")]
     [RequirePermission(Permissions.LocationsEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "id")]
     public IActionResult SetExcludeFromDeckCheck(int id, [FromBody] BoolValueRequest req)
     {
         containers.SetExcludeFromDeckCheck(id, req.Value);

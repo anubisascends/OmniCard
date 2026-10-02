@@ -7,6 +7,7 @@ using OmniCard.Shared.Collection;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.ImportExport;
 using OmniCard.Shared.Security;
+using OmniCard.Shared.Sites;
 using OmniCard.Web.Helpers;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Services;
@@ -19,7 +20,8 @@ public sealed class ExportController(
     ICardService cardService,
     ICsvExportImportService csv,
     WebBinderCardService binderCards,
-    IEnumerable<ICardGameService> gameServices) : ApiControllerBase
+    IEnumerable<ICardGameService> gameServices,
+    RequestSiteAccess siteAccess) : ApiControllerBase
 {
     private readonly IReadOnlyDictionary<CardGame, ICardGameService> _gameServices = gameServices.ToDictionary(s => s.Game);
 
@@ -27,16 +29,19 @@ public sealed class ExportController(
     public sealed record SelectionRequest(IReadOnlyList<int> Ids, string Format = "appnative");
 
     /// <summary>Export the (optionally filtered) collection as CSV. <paramref name="format"/> =
-    /// appnative | tcgplayer | moxfield | manabox.</summary>
+    /// appnative | tcgplayer | moxfield | manabox. Only cards in sites the user can read are exported;
+    /// <paramref name="siteId"/> narrows to one site.</summary>
     [HttpGet("collection")]
     [RequirePermission(Permissions.ExportRun)]
     public IActionResult Collection(
-        [FromQuery] string? game, [FromQuery] string? q, [FromQuery] string format = "appnative")
+        [FromQuery] string? game, [FromQuery] string? q, [FromQuery] string format = "appnative",
+        [FromQuery] int? siteId = null)
     {
         var gameFilter = LocationsController.ParseGame(game);
         using var ctx = dbFactory.CreateDbContext();
         var cards = CollectionQueryBuilder
-            .BuildFilteredQuery(ctx, q ?? "", gameFilter, containerFilter: null, filterPreset: null, _gameServices)
+            .BuildFilteredQuery(ctx, q ?? "", gameFilter, containerFilter: null, filterPreset: null, _gameServices,
+                siteAccess.Current.ScopeTo(siteId))
             .OrderBy(c => c.Name).ThenBy(c => c.SetCode).ThenBy(c => c.Number)
             .ToList();
 
@@ -52,6 +57,7 @@ public sealed class ExportController(
     /// the query-string limit.</summary>
     [HttpPost("selection")]
     [RequirePermission(Permissions.ExportRun)]
+    [RequireSiteAccess(SiteAccessLevel.Read, Lots = "Ids")]
     public IActionResult Selection([FromBody] SelectionRequest request)
     {
         if (request.Ids is null || request.Ids.Count == 0)

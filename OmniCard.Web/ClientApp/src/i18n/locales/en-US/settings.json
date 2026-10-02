@@ -10,6 +10,7 @@
       "catalog": "Catalog Data",
       "ebay": "eBay",
       "roles": "Roles",
+      "sites": "Sites",
       "users": "Users",
       "components": "Components"
     },
@@ -231,6 +232,34 @@
       "singletonValue": "1 (singleton)",
       "emptyState": "No deck types for this game yet.",
       "confirmDelete": "Delete deck type \"{{name}}\"? Deck boxes using it will be unset."
+    },
+    "sites": {
+      "title": "Sites",
+      "description": "A site is a MAJOR physical location — a home, a shop, a storage unit — that holds many storage locations (binders, boxes, deck boxes). Use sites when several people share this collection: each person only sees the sites they are allowed to. The Default site is always visible to everyone and holds every location not assigned elsewhere, including Bulk.",
+      "whatIsASite": "A site is a major physical place (for example \"Andrew's House\" or \"The Shop\"), not a shelf or a box. Locations are created inside a site.",
+      "addSite": "Add site",
+      "editTitle": "Edit {{name}}",
+      "colName": "Name",
+      "colDescription": "Description",
+      "colLocations": "Locations",
+      "namePlaceholder": "e.g. Andrew's House",
+      "descriptionPlaceholder": "Optional — address, who lives there, …",
+      "defaultChip": "Default",
+      "access": "Who can see this site",
+      "defaultAccessTooltip": "The Default site is always visible to every user.",
+      "defaultDeleteTooltip": "The Default site can't be deleted.",
+      "deleteTitle": "Delete {{name}}?",
+      "deleteHelp_one": "This site has {{count}} location. It will be moved, with all of its cards, to the site you choose below.",
+      "deleteHelp_other": "This site has {{count}} locations. They will be moved, with all of their cards, to the site you choose below.",
+      "moveLocationsTo": "Move its locations to",
+      "accessTitle": "Who can see {{name}}",
+      "accessHelp": "Read lets someone browse and search this site's locations and cards (and add them to lists). Write also lets them change those locations and cards, subject to their normal permissions. A user gets the higher of their own and their role's level. Administrators always see every site.",
+      "roles": "Roles",
+      "users": "Users",
+      "levelNone": "None",
+      "levelRead": "Read",
+      "levelWrite": "Write",
+      "adminAllSites": "Administrator — every site"
     }
   }
 }

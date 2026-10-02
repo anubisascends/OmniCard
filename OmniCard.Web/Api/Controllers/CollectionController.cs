@@ -9,6 +9,7 @@ using OmniCard.Shared.Collection;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Sales;
 using OmniCard.Shared.Security;
+using OmniCard.Shared.Sites;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Web.Helpers;
@@ -21,6 +22,9 @@ namespace OmniCard.Web.Api.Controllers;
 /// Collection search + single-card edit. Reads reuse the desktop's Scryfall-syntax filter
 /// (<see cref="CollectionQueryBuilder"/>) against the read DB; writes go through
 /// <see cref="WebBinderCardService"/> to the SQL Server unified store.
+///
+/// <para>Site-scoped: searches only return cards in sites the user can read, and edits need write
+/// access to the site(s) the cards (and any move target) sit in — see <see cref="RequireSiteAccessAttribute"/>.</para>
 /// </summary>
 public sealed class CollectionController(
     IDbContextFactory<OmniCardDbContext> dbFactory,
@@ -29,7 +33,8 @@ public sealed class CollectionController(
     ITagService tags,
     CardImageCacheService imageCache,
     IListingService listings,
-    IEnumerable<ICardGameService> gameServices) : ApiControllerBase
+    IEnumerable<ICardGameService> gameServices,
+    RequestSiteAccess siteAccess) : ApiControllerBase
 {
     private readonly IReadOnlyDictionary<CardGame, ICardGameService> _gameServices = gameServices.ToDictionary(s => s.Game);
 
@@ -61,13 +66,15 @@ public sealed class CollectionController(
     /// <paramref name="sort"/> is a column key (name/setCode/number/rarity/condition/isFoil/quantity/
     /// marketPrice/containerName) and <paramref name="dir"/> is asc|desc. Sorting runs server-side over
     /// the *whole* filtered result set — never just the current page — so ordering by market price (or
-    /// any column) returns the true top-of-collection, not the top of page 1.</summary>
+    /// any column) returns the true top-of-collection, not the top of page 1. Only cards in sites the
+    /// user can read are searched; <paramref name="siteId"/> narrows to one of them.</summary>
     [HttpGet]
     [RequirePermission(Permissions.CollectionView)]
     public ActionResult<PagedResult<CardDto>> Get(
         [FromQuery] string? game,
         [FromQuery] string? q,
         [FromQuery] int? containerId,
+        [FromQuery] int? siteId,
         [FromQuery] int skip = 0,
         [FromQuery] int take = 100,
         [FromQuery] bool stacked = false,
@@ -81,7 +88,8 @@ public sealed class CollectionController(
         var desc = string.Equals(dir, "desc", StringComparison.OrdinalIgnoreCase);
 
         using var ctx = dbFactory.CreateDbContext();
-        var query = CollectionQueryBuilder.BuildFilteredQuery(ctx, q ?? "", gameFilter, containerId, filterPreset: null, _gameServices);
+        var query = CollectionQueryBuilder.BuildFilteredQuery(ctx, q ?? "", gameFilter, containerId, filterPreset: null,
+            _gameServices, siteAccess.Current.ScopeTo(siteId));
 
         // Market-price sorting needs prices in hand *before* paging, so the paging helpers hydrate the
         // full set through this delegate. All other sorts page in the DB and only the page is priced below.
@@ -292,6 +300,7 @@ public sealed class CollectionController(
     /// <summary>One card with its tags, for the edit drawer.</summary>
     [HttpGet("{id:int}")]
     [RequirePermission(Permissions.CollectionView)]
+    [RequireSiteAccess(SiteAccessLevel.Read, Lots = "id")]
     public ActionResult<CardDto> GetOne(int id)
     {
         var card = binderCards.GetCollectionCards([id]).FirstOrDefault();
@@ -311,6 +320,7 @@ public sealed class CollectionController(
     /// <summary>Edit a card's condition / language / foil / quantity / cost.</summary>
     [HttpPut("{id:int}")]
     [RequirePermission(Permissions.CollectionEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "id")]
     public IActionResult Update(int id, [FromBody] UpdateCardRequest req)
     {
         var card = binderCards.GetCollectionCards([id]).FirstOrDefault();
@@ -332,6 +342,7 @@ public sealed class CollectionController(
 
     [HttpDelete("{id:int}")]
     [RequirePermission(Permissions.CollectionDelete)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "id")]
     public IActionResult Delete(int id)
     {
         binderCards.DeleteCollectionCard(id);
@@ -342,6 +353,7 @@ public sealed class CollectionController(
     /// location, so each copy can be placed in its own binder slot. Returns the new lot's id.</summary>
     [HttpPost("{id:int}/split")]
     [RequirePermission(Permissions.CollectionEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "id")]
     public IActionResult Split(int id, [FromBody] SplitStackRequest req)
     {
         try
@@ -366,6 +378,7 @@ public sealed class CollectionController(
     /// Returns the new lots' ids.</summary>
     [HttpPost("{id:int}/split-singles")]
     [RequirePermission(Permissions.CollectionEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "id")]
     public IActionResult SplitIntoSingles(int id)
     {
         try
@@ -385,6 +398,7 @@ public sealed class CollectionController(
     /// box and any card belongs to a different game.</summary>
     [HttpPost("move")]
     [RequirePermission(Permissions.CollectionEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "CardIds", Location = "ContainerId")]
     public IActionResult Move([FromBody] MoveCardsRequest req)
     {
         if (req.CardIds.Count == 0) return BadRequest(new { error = "No cards specified." });
@@ -404,6 +418,7 @@ public sealed class CollectionController(
     /// quantity through the bulk quantity setter, and tags add-union or replace per TagsMode.</summary>
     [HttpPost("bulk-update")]
     [RequirePermission(Permissions.CollectionEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "CardIds")]
     public IActionResult BulkUpdate([FromBody] BulkUpdateCardsRequest req)
     {
         if (req.CardIds.Count == 0)
@@ -450,10 +465,12 @@ public sealed class CollectionController(
 
     [HttpGet("{id:int}/tags")]
     [RequirePermission(Permissions.CollectionView)]
+    [RequireSiteAccess(SiteAccessLevel.Read, Lots = "id")]
     public ActionResult<IReadOnlyList<string>> GetTags(int id) => tags.GetTagsForLot(id);
 
     [HttpPut("{id:int}/tags")]
     [RequirePermission(Permissions.CollectionEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "id")]
     public IActionResult SetTags(int id, [FromBody] SetTagsRequest req)
     {
         tags.SetTagsForLot(id, req.Tags);

@@ -19,10 +19,14 @@ function headingFor(key: string, fallback: string): string {
  *
  * Returns a flat array of elements (not a component) on purpose — `Select` reads each child's `value`
  * to render the current selection, so the `<MenuItem>`s must be direct children, not nested in a wrapper.
+ *
+ * These pickers choose a *target* for cards, so locations in sites the user can only read are left
+ * out unless `includeReadOnly` is set.
  */
 export function locationSelectOptions(
   locations: LocationSummaryDto[] | undefined,
   placeholder?: { label: string; value?: '' | number },
+  { includeReadOnly = false }: { includeReadOnly?: boolean } = {},
 ): ReactNode[] {
   const nodes: ReactNode[] = [];
   if (placeholder)
@@ -31,7 +35,8 @@ export function locationSelectOptions(
         {placeholder.label}
       </MenuItem>,
     );
-  for (const g of groupLocations(locations ?? [])) {
+  const usable = (locations ?? []).filter((l) => includeReadOnly || l.canWrite !== false);
+  for (const g of groupLocations(usable)) {
     nodes.push(
       <ListSubheader key={g.key} disableSticky>
         {headingFor(g.key, g.heading)}

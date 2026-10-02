@@ -433,7 +433,7 @@ public class CsvImportTests : IDisposable
         public bool NameExists(string name, int? excludeId = null) =>
             _containers.Any(c => (excludeId == null || c.Id != excludeId)
                 && string.Equals(c.Name, name?.Trim(), StringComparison.OrdinalIgnoreCase));
-        public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9, CardGame? game = null, int? deckTypeId = null)
+        public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9, CardGame? game = null, int? deckTypeId = null, int? siteId = null)
         {
             var c = new StorageContainer
             {
@@ -447,6 +447,7 @@ public class CsvImportTests : IDisposable
         public void SetDeckBox(int containerId, CardGame game, int? deckTypeId) { }
         public List<DeckBoxNeedsGame> GetDeckBoxesMissingGame() => [];
         public void Rename(int id, string newName) { }
+        public void SetSite(int containerId, int siteId) { }
         public void Delete(int id, bool moveCardsToBulk = true) { }
         public int GetCardCount(int containerId) => 0;
         public void SetCoverCard(int containerId, int? cardId) { }

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Shared.Security;
+using OmniCard.Shared.Sites;
 using OmniCard.Web.Services;
 using OmniCard.Web.Api.Infrastructure;
 
@@ -16,6 +17,7 @@ public sealed class BinderController(BinderStateBuilder stateBuilder) : ApiContr
     /// (0-based; 0 shows page 1 alone on the right).</summary>
     [HttpGet("{id:int}")]
     [RequirePermission(Permissions.BinderView)]
+    [RequireSiteAccess(SiteAccessLevel.Read, Location = "id")]
     public ActionResult<BinderStateDto> Get(int id, [FromQuery] int spread = 0)
     {
         try

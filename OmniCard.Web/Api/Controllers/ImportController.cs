@@ -9,6 +9,7 @@ using OmniCard.Shared.Collection;
 using OmniCard.Shared.ImportExport;
 using OmniCard.Shared.Lists;
 using OmniCard.Shared.Security;
+using OmniCard.Shared.Sites;
 using OmniCard.Web.Api.Infrastructure;
 
 namespace OmniCard.Web.Api.Controllers;
@@ -26,6 +27,7 @@ public sealed class ImportController(
 {
     [HttpPost("csv")]
     [RequirePermission(Permissions.ImportRun)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "targetContainerId")]
     public IActionResult Csv(
         IFormFile file,
         [FromQuery] bool skipDuplicates = true,
@@ -79,6 +81,7 @@ public sealed class ImportController(
     /// Repeat lines of the same printing + finish merge into one lot.</summary>
     [HttpPost("url")]
     [RequirePermission(Permissions.ImportRun)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "ContainerId")]
     public async Task<ActionResult<ImportUrlResultDto>> Url([FromBody] ImportUrlRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Url))
@@ -173,6 +176,7 @@ public sealed class ImportController(
     /// is a 422 <see cref="LocationImportFailureDto"/> listing every problem.</summary>
     [HttpPost("location/{locationId:int}/csv")]
     [RequirePermission(Permissions.ImportRun)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "locationId")]
     public ActionResult<LocationImportResultDto> LocationCsv(int locationId, IFormFile? file)
     {
         if (file is null || file.Length == 0)
@@ -196,6 +200,7 @@ public sealed class ImportController(
     /// must resolve to a catalog printing; otherwise nothing is written (422 + every unresolved card).</summary>
     [HttpPost("location/{locationId:int}/url")]
     [RequirePermission(Permissions.ImportRun)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "locationId")]
     public async Task<ActionResult<LocationImportResultDto>> LocationUrl(int locationId, [FromBody] LocationUrlImportRequest request) =>
         ToResult(await locationImport.ImportUrlAsync(locationId, request));
 

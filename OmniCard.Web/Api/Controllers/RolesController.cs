@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
 using OmniCard.Shared.Settings;
+using OmniCard.Shared.Sites;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Services;
 
@@ -13,7 +14,7 @@ namespace OmniCard.Web.Api.Controllers;
 /// takes effect on affected users' next request.
 /// </summary>
 [ApiAuth(RequireAdmin = true)]
-public sealed class RolesController(UserService users, PermissionService permissions) : ApiControllerBase
+public sealed class RolesController(UserService users, PermissionService permissions, SiteService sites) : ApiControllerBase
 {
     private static RoleDto ToDto(Role r) => new(r.Id, r.Name, r.IsSystem, r.Permissions);
 
@@ -63,6 +64,7 @@ public sealed class RolesController(UserService users, PermissionService permiss
         if (!ok)
             return BadRequest(new { error = "That role can't be deleted." });
         permissions.InvalidateAll();
+        sites.RemovePrincipal(SitePrincipalType.Role, id); // also invalidates cached site access
         return NoContent();
     }
 }

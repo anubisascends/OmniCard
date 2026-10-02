@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Alert,
   Autocomplete,
   Box,
   Button,
@@ -61,6 +62,10 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
   const [moveOpen, setMoveOpen] = useState(false);
 
   const card = cardQuery.data;
+  // A card in a site the user can only view is shown, but every change is disabled (the server
+  // rejects them anyway).
+  const cardLocation = locationsQuery.data?.find((l) => l.id === card?.containerId);
+  const readOnly = cardLocation?.canWrite === false;
   useEffect(() => {
     if (card) {
       setCondition(card.condition);
@@ -158,6 +163,11 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
           <CircularProgress />
         ) : (
           <Stack spacing={2}>
+            {readOnly && (
+              <Alert severity="info">
+                {t('dialogs.cardEdit.readOnlySite', { site: cardLocation?.siteName ?? '' })}
+              </Alert>
+            )}
             <Typography variant="h6">{card.name}</Typography>
             <Typography variant="body2" color="text.secondary">
               {card.setName} · #{card.number} · {card.rarity}
@@ -248,7 +258,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
                     t('dialogs.cardEdit.noLocation')}
                 </Typography>
               </Box>
-              <Button size="small" startIcon={<DriveFileMoveIcon />} onClick={() => setMoveOpen(true)}>
+              <Button size="small" startIcon={<DriveFileMoveIcon />} onClick={() => setMoveOpen(true)} disabled={readOnly}>
                 {t('common.actions.change')}
               </Button>
             </Stack>
@@ -272,7 +282,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
                   variant="outlined"
                   startIcon={<SellIcon />}
                   onClick={() => setListOpen(true)}
-                  disabled={!!card.listingStatus}
+                  disabled={!!card.listingStatus || readOnly}
                   fullWidth
                 >
                   {card.listingStatus ? t('dialogs.cardEdit.alreadyListed') : t('dialogs.cardEdit.listForSale')}
@@ -284,7 +294,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
               variant="outlined"
               startIcon={<SwapHorizIcon />}
               onClick={() => addToTrade.mutate()}
-              disabled={addToTrade.isPending}
+              disabled={addToTrade.isPending || readOnly}
             >
               {t('dialogs.cardEdit.addToTrade')}
             </Button>
@@ -296,7 +306,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
                     variant="outlined"
                     startIcon={<CallSplitIcon />}
                     onClick={() => { setSplitQty(1); setSplitOpen(true); }}
-                    disabled={!!card.listingStatus}
+                    disabled={!!card.listingStatus || readOnly}
                     fullWidth
                   >
                     {t('dialogs.cardEdit.splitStack')}
@@ -313,13 +323,13 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
                   if (confirm(t('dialogs.cardEdit.deleteConfirm', { name: card.name })))
                     del.mutate();
                 }}
-                disabled={del.isPending}
+                disabled={del.isPending || readOnly}
               >
                 {t('common.actions.delete')}
               </Button>
               <Stack direction="row" spacing={1}>
                 <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
-                <Button variant="contained" onClick={() => save.mutate()} disabled={save.isPending}>
+                <Button variant="contained" onClick={() => save.mutate()} disabled={save.isPending || readOnly}>
                   {save.isPending ? t('common.states.saving') : t('common.actions.save')}
                 </Button>
               </Stack>

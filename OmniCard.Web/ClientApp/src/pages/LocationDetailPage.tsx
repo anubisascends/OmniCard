@@ -62,6 +62,8 @@ export function LocationDetailPage() {
 
   const locQuery = useQuery({ queryKey: ['location', locationId], queryFn: () => api.location(locationId) });
   const isDeckBox = locQuery.data?.type === 'Deck Box';
+  // Locations in a site the user can only view hide every write action (the server enforces it too).
+  const canWrite = locQuery.data?.canWrite !== false;
   // A game-locked deck box forces its game onto the add dialog.
   const deckBoxGame = isDeckBox ? locQuery.data?.game ?? undefined : undefined;
   const refresh = () => {
@@ -80,13 +82,23 @@ export function LocationDetailPage() {
       <Stack direction="row" spacing={2} alignItems="center">
         <Typography variant="h4">{locQuery.data?.name ?? t('locations.detail.fallbackName')}</Typography>
         {locQuery.data && <Chip label={locQuery.data.type} />}
+        {locQuery.data?.siteName && (
+          <Chip
+            variant="outlined"
+            label={
+              canWrite
+                ? locQuery.data.siteName
+                : `${locQuery.data.siteName} · ${t('locations.sites.readOnly')}`
+            }
+          />
+        )}
         {locQuery.data?.type === 'Binder' && (
           <Link component={RouterLink} to={`/binder/${locationId}`}>
             {t('locations.detail.openBinderView')}
           </Link>
         )}
         <Box sx={{ flexGrow: 1 }} />
-        {can('collection.delete') && (
+        {canWrite && can('collection.delete') && (
           <Button
             variant="outlined"
             startIcon={<FactCheckIcon />}
@@ -96,14 +108,16 @@ export function LocationDetailPage() {
             {t('locations.detail.audit')}
           </Button>
         )}
-        {can('import.run') && (
+        {canWrite && can('import.run') && (
           <Button variant="outlined" startIcon={<UploadFileIcon />} onClick={() => setImportOpen(true)}>
             {t('common.actions.import')}
           </Button>
         )}
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>
-          {t('locations.detail.addCard')}
-        </Button>
+        {canWrite && (
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>
+            {t('locations.detail.addCard')}
+          </Button>
+        )}
       </Stack>
       {locQuery.data && (
         <Typography variant="body2" color="text.secondary">

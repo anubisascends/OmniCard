@@ -94,6 +94,35 @@ public class DecklistMatchingTests : IDisposable
     }
 
     [Fact]
+    public void CheckAgainstCollection_SiteFilter_IgnoresCopiesInHiddenSites()
+    {
+        int otherSite;
+        using (var ctx = _dbFactory.CreateDbContext())
+        {
+            var site = new OmniCard.Shared.Sites.Site { Name = "Partner's House" };
+            ctx.Sites.Add(site);
+            ctx.SaveChanges();
+            otherSite = site.Id;
+        }
+        var boxId = SeedContainer("Her Box", ContainerType.Box);
+        using (var ctx = _dbFactory.CreateDbContext())
+        {
+            ctx.StorageContainers.Single(c => c.Id == boxId).SiteId = otherSite;
+            ctx.SaveChanges();
+        }
+        SeedCard("Lightning Bolt", "M11", "149", boxId);
+
+        var service = CreateService();
+        var entries = new List<DecklistEntry> { new(1, "Lightning Bolt", "M11", "149") };
+
+        Assert.Equal(1, service.CheckAgainstCollection("T", "T", entries, CardGame.Mtg).TotalOwned);
+        var defaultOnly = service.CheckAgainstCollection("T", "T", entries, CardGame.Mtg,
+            [OmniCard.Shared.Sites.Site.DefaultSiteId]);
+        Assert.Equal(0, defaultOnly.TotalOwned);
+        Assert.Equal(1, defaultOnly.TotalMissing);
+    }
+
+    [Fact]
     public void CheckAgainstCollection_CardOwned_ShowsInOwnedWithLocation()
     {
         var binderId = SeedContainer("Binder A", ContainerType.Binder);

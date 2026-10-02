@@ -90,6 +90,30 @@ export interface LocationSummaryDto {
   deckTypeId?: number | null;
   /** Assigned deck type display name. */
   deckTypeName?: string | null;
+  /** The site (major physical location — a home, a shop) this location sits in. */
+  siteId: number;
+  siteName?: string | null;
+  /** False when the current user only has read access to the location's site. */
+  canWrite: boolean;
+}
+
+/** A site: a MAJOR physical location (a home, a shop) holding many storage locations. `access` is
+ * the current user's level on it. The default site is always present and visible to everyone. */
+export interface SiteDto {
+  id: number;
+  name: string;
+  description?: string | null;
+  isDefault: boolean;
+  sortOrder: number;
+  access: 'Read' | 'Write';
+  locationCount: number;
+}
+
+/** One access grant on a site (admin). `level` "None" removes the grant when saving. */
+export interface SiteGrantDto {
+  principalType: 'User' | 'Role';
+  principalId: number;
+  level: 'None' | 'Read' | 'Write';
 }
 
 export interface DeckTypeDto {

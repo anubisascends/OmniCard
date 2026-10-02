@@ -40,7 +40,8 @@ public class CollectionToolsTests : IDisposable
         // collectionQuery/analytics back top_value_cards/collection_dashboard, which these tests don't
         // exercise; SearchCollection + GetCard never touch them.
         _tools = new CollectionTools(factory, cardService, binderCards, imageCache,
-            collectionQuery: null!, analytics: null!, gameServices: []);
+            collectionQuery: null!, analytics: null!, gameServices: [],
+            sites: new SiteService(factory, new SiteAccessService(factory)));
     }
 
     public void Dispose() => _conn.Dispose();
