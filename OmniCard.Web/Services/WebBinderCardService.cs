@@ -94,6 +94,15 @@ public sealed class WebBinderCardService
             .ToHashSet();
     }
 
+    /// <summary>Throws <see cref="DeckBoxGameMismatchException"/> when <paramref name="containerId"/> is a deck
+    /// box locked to a game other than <paramref name="game"/> — lets a multi-step write check every target
+    /// before it changes anything.</summary>
+    public void ValidateDeckBoxGame(int containerId, CardGame game)
+    {
+        using var context = _dbFactory.CreateDbContext();
+        DeckBoxGameGuard.ValidateIncoming(context, containerId, [game]);
+    }
+
     public void MoveCardsToContainer(IEnumerable<int> cardIds, int containerId, string? section = null)
     {
         using var context = _dbFactory.CreateDbContext();

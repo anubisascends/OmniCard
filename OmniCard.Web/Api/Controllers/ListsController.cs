@@ -1,31 +1,38 @@
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
+using OmniCard.Collection.Lists;
 using OmniCard.Web.Services;
 using OmniCard.Web.Helpers;
+using OmniCard.Shared.Audit;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Lists;
 using OmniCard.Shared.Matching;
 using OmniCard.Shared.Security;
 using OmniCard.Shared.Sites;
+using OmniCard.Shared.Storage;
 using OmniCard.Web.Api.Infrastructure;
 
 namespace OmniCard.Web.Api.Controllers;
 
 /// <summary>Saved card lists (want-lists, buy-lists, trade binders…). CRUD + item management via
-/// <see cref="IListService"/>; committing a list into a location goes through
-/// <see cref="WebBinderCardService"/> (the web-safe write path), since the desktop's
-/// <c>CommitToLocation</c> relies on a WPF-only <c>ICardService</c> method.
+/// <see cref="IListService"/>. <see cref="ListFulfillmentPlanner"/> splits a list into owned copies (exact
+/// printing) and copies still to buy; that split drives the per-row owned counts, the printable pick / buy
+/// lists, and fulfillment, which writes through <see cref="WebBinderCardService"/> (the web-safe write
+/// path) since the desktop's <c>CommitToLocation</c> relies on a WPF-only <c>ICardService</c> method.
 ///
 /// <para>Site rules: any owned card the user can <em>read</em> may be added to a list (the collection
-/// search already only shows readable sites); committing needs <em>write</em> access to the target
-/// location's site and to the site of every owned card it relocates.</para></summary>
+/// search already only shows readable sites), and owned counts only look at readable sites. Fulfilling
+/// needs <em>write</em> access to each target location's site and to the site of every owned card it
+/// relocates.</para></summary>
 public sealed class ListsController(
     IListService lists,
     IDecklistService decklists,
     WebBinderCardService binderCards,
     ICardService cardService,
     CardImageCacheService imageCache,
+    ListFulfillmentPlanner planner,
+    IDecklistPrintExporter printExporter,
     RequestSiteAccess? siteAccess = null) : ApiControllerBase
 {
     [HttpGet]
@@ -193,18 +200,62 @@ public sealed class ListsController(
         return NoContent();
     }
 
-    /// <summary>Commit the list into <paramref name="request"/>'s location, then delete the (now-consumed)
-    /// list. Items that reference a card already in the collection (added via "from collection") are
-    /// <em>relocated</em> to the target location — no duplicate lot is created — while catalog/URL items are
-    /// written as brand-new owned lots. An owned reference whose lot has since vanished falls back to being
-    /// created new, so nothing on the list is silently dropped.</summary>
-    [HttpPost("{id:int}/commit")]
-    [RequirePermission(Permissions.ListsCommit)]
-    [RequireSiteAccess(SiteAccessLevel.Write, Location = "ContainerId")]
-    public ActionResult<CommitListResultDto> Commit(int id, [FromBody] CommitListRequest request)
+    /// <summary>Printable copy of the whole list (quantities, owned counts, prices, totals).</summary>
+    [HttpGet("{id:int}/print.pdf")]
+    [RequirePermission(Permissions.ListsView)]
+    public IActionResult PrintPdf(int id)
     {
-        if (request.ContainerId <= 0)
-            return BadRequest(new { error = "A target location is required" });
+        if (PlanList(id) is not var (list, plan))
+            return NotFound();
+        var lines = plan.Select(p => new ListPrintLine(p.Item.CardName, p.Item.SetCode, p.Item.CollectorNumber,
+            p.Item.IsFoil, p.Item.Quantity, p.OwnedQuantity, p.Item.IsUnpriced ? null : p.Item.AddedMarketPrice)).ToList();
+        var bytes = TempFile.Produce(".pdf", path => printExporter.ExportCardList(list.Name, lines, path));
+        return File(bytes, "application/pdf", $"{DecklistController.SafeFileName(list.Name)}.pdf");
+    }
+
+    /// <summary>Printable pick list: the owned copies to pull for this list, grouped by location and walked in
+    /// section/page/slot order, each with a tick-box.</summary>
+    [HttpGet("{id:int}/pick-list.pdf")]
+    [RequirePermission(Permissions.ListsView)]
+    public IActionResult PickListPdf(int id)
+    {
+        if (PlanList(id) is not var (list, plan))
+            return NotFound();
+        var result = ListFulfillmentPlanner.ToCheckResult(list.Name, plan);
+        var bytes = TempFile.Produce(".pdf", path => printExporter.ExportPullList(result, path, "Pick List"));
+        return File(bytes, "application/pdf", $"pick-list-{DecklistController.SafeFileName(list.Name)}.pdf");
+    }
+
+    /// <summary>Printable buy list: the copies the collection doesn't cover, with prices and a tick-box.</summary>
+    [HttpGet("{id:int}/buy-list.pdf")]
+    [RequirePermission(Permissions.ListsView)]
+    public IActionResult BuyListPdf(int id)
+    {
+        if (PlanList(id) is not var (list, plan))
+            return NotFound();
+        var result = ListFulfillmentPlanner.ToCheckResult(list.Name, plan);
+        var bytes = TempFile.Produce(".pdf", path => printExporter.ExportMissingList(result, path, "Buy List"));
+        return File(bytes, "application/pdf", $"buy-list-{DecklistController.SafeFileName(list.Name)}.pdf");
+    }
+
+    /// <summary>Fulfil the list: copies already in the collection (exact printing, see
+    /// <see cref="ListFulfillmentPlanner"/>) move to <c>MoveToContainerId</c>, splitting a larger stack as
+    /// needed, and copies the collection doesn't have are created as new lots at <c>AddToContainerId</c>.
+    /// Either half can run alone; with both set it's a one-click "put this list away".
+    ///
+    /// <para>Done copies come off the list (an item is removed once fully done) and the list is deleted when
+    /// it's empty. After a move-only run, an item's leftover is flagged awaiting purchase so the copies just
+    /// moved aren't counted against it again. Both targets are checked (site write + deck-box game lock)
+    /// before anything changes.</para></summary>
+    [HttpPost("{id:int}/fulfill")]
+    [RequirePermission(Permissions.ListsCommit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "MoveToContainerId,AddToContainerId")]
+    public ActionResult<FulfillListResultDto> Fulfill(int id, [FromBody] FulfillListRequest request)
+    {
+        var moveTo = request.MoveToContainerId is > 0 ? request.MoveToContainerId : null;
+        var addTo = request.AddToContainerId is > 0 ? request.AddToContainerId : null;
+        if (moveTo is null && addTo is null)
+            return BadRequest(new { error = "Choose a location for the cards you own, the new cards, or both" });
 
         var list = FindList(id);
         if (list is null)
@@ -214,57 +265,80 @@ public sealed class ListsController(
         if (items.Count == 0)
             return BadRequest(new { error = "The list is empty" });
 
-        // Owned references are relocated, which changes the site they currently sit in.
-        if (siteAccess is not null && !siteAccess.Current.IsUnrestricted)
+        var plan = planner.Plan(list.Game, items, siteAccess?.Current.ReadableSiteIds, moveTo);
+        var picks = moveTo is null ? [] : plan.SelectMany(p => p.Picks).ToList();
+        var toAdd = addTo is null ? [] : plan.Where(p => p.MissingQuantity > 0).ToList();
+
+        // Moving an owned copy is a write to the site it sits in now.
+        if (siteAccess is not null && !siteAccess.Current.IsUnrestricted && picks.Count > 0
+            && siteAccess.SitesOfLots(picks.Select(p => p.LotId)).Any(s => !siteAccess.Current.CanWrite(s)))
+            return StatusCode(403, new
+            {
+                error = "Some cards on this list would be moved out of a site you only have read access to. " +
+                        "Remove them from the list, or ask an administrator for write access to that site.",
+            });
+
+        try
         {
-            var sourceSites = siteAccess.SitesOfLots(items.Where(i => i.SourceLotId is not null).Select(i => i.SourceLotId!.Value));
-            if (sourceSites.Any(s => !siteAccess.Current.CanWrite(s)))
-                return StatusCode(403, new
-                {
-                    error = "Some cards on this list would be moved out of a site you only have read access to. " +
-                            "Remove them from the list, or ask an administrator for write access to that site.",
-                });
+            if (moveTo is int m && picks.Count > 0) binderCards.ValidateDeckBoxGame(m, list.Game);
+            if (addTo is int a && toAdd.Count > 0) binderCards.ValidateDeckBoxGame(a, list.Game);
+        }
+        catch (DeckBoxGameMismatchException ex)
+        {
+            return Conflict(new { error = ex.Message });
         }
 
-        var condition = string.IsNullOrWhiteSpace(request.Condition) ? "NM" : request.Condition;
         var moved = 0;
-        var toCreate = new List<CollectionCard>();
+        var added = 0;
+        var listDeleted = false;
 
-        foreach (var item in items)
+        if (moveTo is int moveTarget && picks.Count > 0)
         {
-            var quantity = Math.Max(1, item.Quantity);
+            // Copies already sitting in the target are skipped by the move but still count as done.
+            binderCards.MoveQuantitiesToContainer(picks.Select(p => (p.LotId, p.Quantity)).ToList(), moveTarget);
+            moved = picks.Sum(p => p.Quantity);
+            listDeleted = lists.ConsumeItems(id, plan
+                .Where(p => p.OwnedQuantity > 0)
+                .Select(p => new ListItemConsumption(p.Item.Id, p.OwnedQuantity, MarkAwaitingPurchase: true))
+                .ToList());
+        }
 
-            // Cards already in the collection are just moved to the chosen location (split off a larger
-            // stack as needed). If the referenced lot is gone, fall through and create it fresh.
-            if (item.SourceLotId is { } lotId)
-            {
-                var relocated = binderCards.MoveOwnedCopiesToContainer(lotId, quantity, request.ContainerId);
-                if (relocated > 0)
-                {
-                    moved += relocated;
-                    continue;
-                }
-            }
-
-            toCreate.Add(new CollectionCard
+        if (addTo is int addTarget && toAdd.Count > 0)
+        {
+            var condition = string.IsNullOrWhiteSpace(request.Condition) ? "NM" : request.Condition;
+            var cards = toAdd.Select(p => new CollectionCard
             {
                 Game = list.Game,
-                GameCardId = item.GameCardId,
-                Name = item.CardName,
-                SetCode = item.SetCode ?? "",
-                Number = item.CollectorNumber ?? "",
-                IsFoil = item.IsFoil,
-                FoilType = item.IsFoil ? item.FoilType : null,
-                Quantity = quantity,
+                GameCardId = p.Item.GameCardId,
+                Name = p.Item.CardName,
+                SetCode = p.Item.SetCode ?? "",
+                Number = p.Item.CollectorNumber ?? "",
+                IsFoil = p.Item.IsFoil,
+                FoilType = p.Item.IsFoil ? p.Item.FoilType : null,
+                Quantity = p.MissingQuantity,
                 Condition = condition,
-                ContainerId = request.ContainerId,
+                ContainerId = addTarget,
                 DateAdded = DateTime.UtcNow,
-            });
+            }).ToList();
+            binderCards.ImportCollectionCards(cards, skipDuplicates: false);
+            added = toAdd.Sum(p => p.MissingQuantity);
+            listDeleted = lists.ConsumeItems(id, toAdd
+                .Select(p => new ListItemConsumption(p.Item.Id, p.MissingQuantity))
+                .ToList());
         }
 
-        var imported = toCreate.Count > 0 ? binderCards.ImportCollectionCards(toCreate, skipDuplicates: false) : 0;
-        lists.DeleteList(id);
-        return new CommitListResultDto(imported + moved, ListDeleted: true);
+        var remaining = Math.Max(0, items.Sum(i => i.Quantity) - moved - added);
+        return new FulfillListResultDto(moved, added, remaining, listDeleted);
+    }
+
+    /// <summary>The list and its owned/missing split over the sites the user can read; null when the list
+    /// doesn't exist.</summary>
+    private (CardList List, IReadOnlyList<ListItemPlan> Plan)? PlanList(int id)
+    {
+        var list = FindList(id);
+        if (list is null)
+            return null;
+        return (list, planner.Plan(list.Game, lists.GetItems(id), siteAccess?.Current.ReadableSiteIds));
     }
 
     /// <summary>No <c>GetList(id)</c> on the service — scan the (few) games to find the owning list.</summary>
@@ -279,14 +353,16 @@ public sealed class ListsController(
         return null;
     }
 
-    /// <summary>Maps list items to DTOs, enriching each with whether the collection already owns the
-    /// printing (one bulk query) and its best display art (local cache → catalog CDN) for hover previews.</summary>
+    /// <summary>Maps list items to DTOs, enriching each with how many copies the collection already covers
+    /// (exact printing over readable sites, the same split fulfillment uses) and its best display art
+    /// (local cache → catalog CDN) for hover previews.</summary>
     private List<CardListItemDto> BuildItemDtos(CardGame game, IReadOnlyList<CardListItem> items)
     {
         if (items.Count == 0)
             return [];
 
-        var owned = binderCards.GetOwnedGameCardIds(game, items.Select(i => i.GameCardId));
+        var ownedByItem = planner.Plan(game, items, siteAccess?.Current.ReadableSiteIds)
+            .ToDictionary(p => p.Item.Id, p => p.OwnedQuantity);
 
         // Resolve art the same way the collection does: hydrate missing URIs from the catalog, then
         // prefer the locally-cached copy where one exists.
@@ -300,10 +376,16 @@ public sealed class ListsController(
             .GroupBy(s => s.GameCardId)
             .ToDictionary(g => g.Key, g => g.First().ImageUri);
 
-        return items.Select(i => new CardListItemDto(
-            i.Id, i.GameCardId, i.CardName, i.SetCode, i.CollectorNumber,
-            i.IsFoil, i.FoilType, i.Quantity, i.AddedMarketPrice, i.IsUnpriced,
-            InCollection: owned.Contains(i.GameCardId),
-            ImageUri: imageByCardId.GetValueOrDefault(i.GameCardId))).ToList();
+        return items.Select(i =>
+        {
+            var owned = ownedByItem.GetValueOrDefault(i.Id);
+            return new CardListItemDto(
+                i.Id, i.GameCardId, i.CardName, i.SetCode, i.CollectorNumber,
+                i.IsFoil, i.FoilType, i.Quantity, i.AddedMarketPrice, i.IsUnpriced,
+                InCollection: owned > 0,
+                ImageUri: imageByCardId.GetValueOrDefault(i.GameCardId),
+                OwnedQuantity: owned,
+                AwaitingPurchase: i.AwaitingPurchase);
+        }).ToList();
     }
 }

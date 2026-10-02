@@ -704,13 +704,15 @@ public sealed record TradeSummaryDto(
 
 public sealed record CardListDto(int Id, string Name, string Game, string? Notes, int ItemCount);
 
-/// <summary>A card on a saved list. <see cref="InCollection"/> is true when the collection already owns
-/// at least one copy of this printing (by game + card id); <see cref="ImageUri"/> is the best display art
-/// (local cache when downloaded, else catalog CDN) for hover previews.</summary>
+/// <summary>A card on a saved list. <see cref="OwnedQuantity"/> is how many of <see cref="Quantity"/> the
+/// collection already covers with the exact printing (see <c>ListFulfillmentPlanner</c>);
+/// <see cref="InCollection"/> is true when that's at least one. <see cref="AwaitingPurchase"/> marks an item
+/// whose owned copies were already moved, leaving only copies to buy. <see cref="ImageUri"/> is the best
+/// display art (local cache when downloaded, else catalog CDN) for hover previews.</summary>
 public sealed record CardListItemDto(
     int Id, string GameCardId, string CardName, string? SetCode, string? CollectorNumber,
     bool IsFoil, string? FoilType, int Quantity, decimal? MarketPrice, bool IsUnpriced,
-    bool InCollection, string? ImageUri);
+    bool InCollection, string? ImageUri, int OwnedQuantity = 0, bool AwaitingPurchase = false);
 
 public sealed record CreateListRequest
 {
@@ -718,13 +720,19 @@ public sealed record CreateListRequest
     public string Game { get; init; } = "Mtg";
 }
 
-public sealed record CommitListRequest
+/// <summary>Fulfil a list in one step: owned copies move to <see cref="MoveToContainerId"/> and copies not in
+/// the collection are created as new lots (in <see cref="Condition"/>) at <see cref="AddToContainerId"/>.
+/// Either may be omitted to do only the other half; at least one is required.</summary>
+public sealed record FulfillListRequest
 {
-    public int ContainerId { get; init; }
+    public int? MoveToContainerId { get; init; }
+    public int? AddToContainerId { get; init; }
     public string Condition { get; init; } = "NM";
 }
 
-public sealed record CommitListResultDto(int Imported, bool ListDeleted);
+/// <summary>Copies moved and created, how many copies are still on the list, and whether the list was
+/// emptied (and so deleted).</summary>
+public sealed record FulfillListResultDto(int Moved, int Added, int Remaining, bool ListDeleted);
 
 public sealed record SetQuantityRequest
 {

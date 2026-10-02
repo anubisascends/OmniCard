@@ -66,8 +66,11 @@ public class ListService(
                    ?? throw new InvalidOperationException($"List {listId} not found.");
 
         if (!isFoil) foilType = null;
+        // An item awaiting purchase has already had its owned copies moved out; keep new additions separate
+        // so they're matched against the collection again.
         var existing = ctx.CardListItems.FirstOrDefault(i =>
-            i.CardListId == listId && i.GameCardId == printing.GameSpecificId && i.IsFoil == isFoil && i.FoilType == foilType);
+            i.CardListId == listId && i.GameCardId == printing.GameSpecificId && i.IsFoil == isFoil && i.FoilType == foilType
+            && !i.AwaitingPurchase);
         if (existing is not null)
         {
             existing.Quantity += quantity;
@@ -148,6 +151,34 @@ public class ListService(
         ctx.SaveChanges();
     }
 
+    public bool ConsumeItems(int listId, IReadOnlyList<ListItemConsumption> consumed)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var items = ctx.CardListItems.Where(i => i.CardListId == listId).ToList();
+        foreach (var c in consumed.Where(c => c.Quantity > 0).GroupBy(c => c.ItemId))
+        {
+            var item = items.FirstOrDefault(i => i.Id == c.Key);
+            if (item is null) continue;
+            item.Quantity -= c.Sum(x => x.Quantity);
+            if (item.Quantity <= 0)
+            {
+                ctx.CardListItems.Remove(item);
+                items.Remove(item);
+            }
+            else if (c.Any(x => x.MarkAwaitingPurchase))
+            {
+                item.AwaitingPurchase = true;
+                item.SourceLotId = null;
+            }
+        }
+
+        var deleted = items.Count == 0;
+        if (deleted && ctx.CardLists.FirstOrDefault(l => l.Id == listId) is { } list)
+            ctx.CardLists.Remove(list);
+        ctx.SaveChanges();
+        return deleted;
+    }
+
     public AddCardsResult AddCardsByName(int listId, IEnumerable<DecklistEntry> entries, ListItemSource source = ListItemSource.Paste)
     {
         using var ctx = dbContextFactory.CreateDbContext();
@@ -174,7 +205,7 @@ public class ListService(
             var existing = pendingByGameCardId.TryGetValue(printing.GameSpecificId, out var pending)
                 ? pending
                 : ctx.CardListItems.FirstOrDefault(i =>
-                    i.CardListId == listId && i.GameCardId == printing.GameSpecificId && !i.IsFoil);
+                    i.CardListId == listId && i.GameCardId == printing.GameSpecificId && !i.IsFoil && !i.AwaitingPurchase);
             if (existing is not null)
             {
                 existing.Quantity += entry.Quantity;

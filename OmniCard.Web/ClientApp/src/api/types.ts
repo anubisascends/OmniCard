@@ -856,14 +856,27 @@ export interface CardListItemDto {
   quantity: number;
   marketPrice?: number | null;
   isUnpriced: boolean;
-  /** True when the collection already owns at least one copy of this printing (by game + card id). */
+  /** True when the collection covers at least one copy (`ownedQuantity > 0`). */
   inCollection: boolean;
   /** Best display art (local cache when downloaded, else catalog CDN) for hover previews. */
   imageUri?: string | null;
+  /** How many of `quantity` the collection already covers with this exact printing (readable sites). */
+  ownedQuantity: number;
+  /** The owned copies were already moved by a fulfillment; what's left is to buy. */
+  awaitingPurchase: boolean;
 }
 
-export interface CommitListResultDto {
-  imported: number;
+/** One-click list fulfillment: either location may be omitted to do only that half. */
+export interface FulfillListRequest {
+  moveToContainerId?: number | null;
+  addToContainerId?: number | null;
+  condition: string;
+}
+
+export interface FulfillListResultDto {
+  moved: number;
+  added: number;
+  remaining: number;
   listDeleted: boolean;
 }
 

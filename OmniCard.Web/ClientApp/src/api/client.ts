@@ -13,7 +13,8 @@ import type {
   CardListItemDto,
   CatalogLanguagesDto,
   CatalogStatusDto,
-  CommitListResultDto,
+  FulfillListRequest,
+  FulfillListResultDto,
   CustomerDto,
   DashboardDto,
   DeckBoxNeedsGameDto,
@@ -188,13 +189,18 @@ async function postForm<T>(path: string, form: FormData): Promise<T> {
 }
 
 /** POST a JSON body and save the response as a file (name from Content-Disposition, else `fallbackName`). */
-async function postDownload(path: string, body: unknown, fallbackName: string): Promise<void> {
-  const res = await fetch(path, {
+function postDownload(path: string, body: unknown, fallbackName: string): Promise<void> {
+  return download(path, fallbackName, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-    credentials: 'same-origin',
   });
+}
+
+/** Fetch `path` (GET unless `init` says otherwise) and save the response as a file (name from
+ * Content-Disposition, else `fallbackName`). Server errors surface as an ApiError, not a broken file. */
+async function download(path: string, fallbackName: string, init?: RequestInit): Promise<void> {
+  const res = await fetch(path, { ...init, credentials: 'same-origin' });
   if (!res.ok) {
     let message = res.statusText;
     try {
@@ -744,11 +750,17 @@ export const api = {
     request<void>(`/api/lists/items/${itemId}`, { method: 'PUT', body: JSON.stringify({ quantity }) }),
   listRefreshPrices: (id: number) =>
     request<void>(`/api/lists/${id}/refresh-prices`, { method: 'POST' }),
-  listCommit: (id: number, containerId: number, condition: string) =>
-    request<CommitListResultDto>(`/api/lists/${id}/commit`, {
-      method: 'POST',
-      body: JSON.stringify({ containerId, condition }),
-    }),
+  /** Fulfil a list: owned copies (exact printing) move to `moveToContainerId`, copies not in the collection
+   * are created as new lots at `addToContainerId`. Omit either to do only the other half. Done copies come
+   * off the list; an emptied list is deleted. */
+  listFulfill: (id: number, body: FulfillListRequest) =>
+    request<FulfillListResultDto>(`/api/lists/${id}/fulfill`, { method: 'POST', body: JSON.stringify(body) }),
+  /** Download the whole list as a printable PDF (quantities, owned counts, prices). */
+  listPrintPdf: (id: number) => download(`/api/lists/${id}/print.pdf`, 'list.pdf'),
+  /** Download the pick list: owned copies to pull, grouped by location, with tick-boxes. */
+  listPickListPdf: (id: number) => download(`/api/lists/${id}/pick-list.pdf`, 'pick-list.pdf'),
+  /** Download the buy list: copies not in the collection, with prices and tick-boxes. */
+  listBuyListPdf: (id: number) => download(`/api/lists/${id}/buy-list.pdf`, 'buy-list.pdf'),
   /** Import a Moxfield/Archidekt decklist URL. Omit `listId` to create a new list named after the deck. */
   listImportUrl: (url: string, game: string, listId?: number) =>
     request<ImportListResultDto>('/api/lists/import-url', {
