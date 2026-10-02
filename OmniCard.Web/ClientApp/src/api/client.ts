@@ -15,6 +15,10 @@ import type {
   CatalogStatusDto,
   FulfillListRequest,
   FulfillListResultDto,
+  ListItemSubstitutesDto,
+  ListSubstitutionDto,
+  ListUpdatePreviewDto,
+  ListUpdateRowDto,
   CustomerDto,
   DashboardDto,
   DeckBoxNeedsGameDto,
@@ -762,10 +766,31 @@ export const api = {
   /** Download the buy list: copies not in the collection, with prices and tick-boxes. */
   listBuyListPdf: (id: number) => download(`/api/lists/${id}/buy-list.pdf`, 'buy-list.pdf'),
   /** Import a Moxfield/Archidekt decklist URL. Omit `listId` to create a new list named after the deck. */
-  listImportUrl: (url: string, game: string, listId?: number) =>
+  listImportUrl: (url: string, game: string, listId?: number, language?: string | null) =>
     request<ImportListResultDto>('/api/lists/import-url', {
       method: 'POST',
-      body: JSON.stringify({ url, game, listId }),
+      body: JSON.stringify({ url, game, listId, language: language || null }),
+    }),
+  /** Force a list's card language (`null` = any language). */
+  listSetLanguage: (id: number, language: string | null) =>
+    request<void>(`/api/lists/${id}/language`, { method: 'PUT', body: JSON.stringify({ language }) }),
+  /** Re-fetch the list's deck (its stored URL, or `url`) and return the changes, without applying them. */
+  listUpdatePreview: (id: number, url?: string) =>
+    request<ListUpdatePreviewDto>(`/api/lists/${id}/update-preview`, {
+      method: 'POST',
+      body: JSON.stringify({ url: url || null }),
+    }),
+  /** Apply the approved update rows and remember `url` as the list's source. */
+  listUpdateApply: (id: number, url: string, rows: ListUpdateRowDto[]) =>
+    request<void>(`/api/lists/${id}/update-apply`, { method: 'POST', body: JSON.stringify({ url, rows }) }),
+  /** Owned copies of other printings that could stand in for cards the collection is missing. */
+  listSubstitutes: (id: number) =>
+    request<ListItemSubstitutesDto[]>(`/api/lists/${id}/substitutes`, { method: 'POST' }),
+  /** Apply approved stand-ins. */
+  listApplySubstitutes: (id: number, substitutions: ListSubstitutionDto[]) =>
+    request<void>(`/api/lists/${id}/substitutes/apply`, {
+      method: 'POST',
+      body: JSON.stringify({ substitutions }),
     }),
 
   // Catalog refresh

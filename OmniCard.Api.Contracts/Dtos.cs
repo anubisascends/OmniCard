@@ -702,17 +702,22 @@ public sealed record TradeSummaryDto(
 
 // --- Card lists ---
 
-public sealed record CardListDto(int Id, string Name, string Game, string? Notes, int ItemCount);
+/// <summary>A saved list. <see cref="Language"/> is its forced card language (null = any);
+/// <see cref="SourceUrl"/> is the deck URL it was imported from (what "update from URL" re-fetches).</summary>
+public sealed record CardListDto(int Id, string Name, string Game, string? Notes, int ItemCount,
+    string? Language = null, string? SourceUrl = null);
 
 /// <summary>A card on a saved list. <see cref="OwnedQuantity"/> is how many of <see cref="Quantity"/> the
 /// collection already covers with the exact printing (see <c>ListFulfillmentPlanner</c>);
 /// <see cref="InCollection"/> is true when that's at least one. <see cref="AwaitingPurchase"/> marks an item
-/// whose owned copies were already moved, leaving only copies to buy. <see cref="ImageUri"/> is the best
-/// display art (local cache when downloaded, else catalog CDN) for hover previews.</summary>
+/// whose owned copies were already moved, leaving only copies to buy. <see cref="IsSubstitute"/> marks an
+/// owned copy of another printing approved to stand in for a missing card. <see cref="ImageUri"/> is the
+/// best display art (local cache when downloaded, else catalog CDN) for hover previews.</summary>
 public sealed record CardListItemDto(
     int Id, string GameCardId, string CardName, string? SetCode, string? CollectorNumber,
     bool IsFoil, string? FoilType, int Quantity, decimal? MarketPrice, bool IsUnpriced,
-    bool InCollection, string? ImageUri, int OwnedQuantity = 0, bool AwaitingPurchase = false);
+    bool InCollection, string? ImageUri, int OwnedQuantity = 0, bool AwaitingPurchase = false,
+    bool IsSubstitute = false);
 
 public sealed record CreateListRequest
 {
@@ -772,6 +777,56 @@ public sealed record ImportListUrlRequest
     public string Url { get; init; } = "";
     public int? ListId { get; init; }
     public string Game { get; init; } = "Mtg";
+    /// <summary>Forced card language for a newly created list (null/blank = any). Ignored when appending.</summary>
+    public string? Language { get; init; }
+}
+
+public sealed record SetListLanguageRequest
+{
+    /// <summary>A card language code, or null/blank for any language.</summary>
+    public string? Language { get; init; }
+}
+
+/// <summary>Re-fetch a list's deck. <see cref="Url"/> overrides (and, on apply, replaces) the stored source URL.</summary>
+public sealed record ListUpdatePreviewRequest
+{
+    public string? Url { get; init; }
+}
+
+/// <summary>One reviewed difference: <see cref="Kind"/> is <c>Add</c>, <c>Remove</c> or <c>Change</c>.
+/// Applying it sets the printing's quantity on the list to <see cref="NewQuantity"/>.</summary>
+public sealed record ListUpdateRowDto(
+    string Kind, string GameCardId, string CardName, string? SetCode, string? SetName, string? CollectorNumber,
+    string? Rarity, string? ImageUri, bool IsFoil, int OldQuantity, int NewQuantity, decimal? Price,
+    bool HandAdded, int OwnedQuantity);
+
+public sealed record ListUpdatePreviewDto(
+    string DeckName, string Url, IReadOnlyList<ListUpdateRowDto> Rows, int UnchangedCount,
+    IReadOnlyList<string> UnresolvedNames);
+
+/// <summary>The rows the user approved (as returned by the preview), applied as-is.</summary>
+public sealed record ListUpdateApplyRequest
+{
+    public string? Url { get; init; }
+    public List<ListUpdateRowDto> Rows { get; init; } = [];
+}
+
+/// <summary>An owned copy of another printing that could stand in for a missing list card.</summary>
+public sealed record ListSubstituteCandidateDto(
+    int LotId, string GameCardId, string CardName, string? SetCode, string? CollectorNumber, bool IsFoil,
+    string Language, string Condition, string LocationName, int? Page, int? Slot, string? Section,
+    int Available, int Suggested, string? ImageUri);
+
+/// <summary>A list card the exact-printing match left short by <see cref="Missing"/> copies, and the stand-ins found.</summary>
+public sealed record ListItemSubstitutesDto(
+    int ItemId, string CardName, string? SetCode, string? CollectorNumber, bool IsFoil, int Missing,
+    IReadOnlyList<ListSubstituteCandidateDto> Candidates);
+
+public sealed record ListSubstitutionDto(int ItemId, int LotId, int Quantity);
+
+public sealed record ListSubstitutionsApplyRequest
+{
+    public List<ListSubstitutionDto> Substitutions { get; init; } = [];
 }
 
 /// <summary>Outcome of a URL import. <see cref="ListId"/>/<see cref="ListName"/> identify the target list

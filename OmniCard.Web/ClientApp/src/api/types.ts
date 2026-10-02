@@ -843,6 +843,10 @@ export interface CardListDto {
   game: string;
   notes?: string | null;
   itemCount: number;
+  /** Forced card language (a language code), or null/absent for any language. */
+  language?: string | null;
+  /** The Moxfield / Archidekt URL the list was imported from ("update from URL" re-fetches it). */
+  sourceUrl?: string | null;
 }
 
 export interface CardListItemDto {
@@ -864,6 +868,72 @@ export interface CardListItemDto {
   ownedQuantity: number;
   /** The owned copies were already moved by a fulfillment; what's left is to buy. */
   awaitingPurchase: boolean;
+  /** An owned copy of another printing, approved to stand in for a card the collection didn't have. */
+  isSubstitute: boolean;
+}
+
+/** One difference between a list and a fresh fetch of its deck URL. Applying it sets the printing's
+ * quantity on the list to `newQuantity` (0 removes it). */
+export interface ListUpdateRowDto {
+  kind: 'Add' | 'Remove' | 'Change';
+  gameCardId: string;
+  cardName: string;
+  setCode?: string | null;
+  setName?: string | null;
+  collectorNumber?: string | null;
+  rarity?: string | null;
+  imageUri?: string | null;
+  isFoil: boolean;
+  oldQuantity: number;
+  newQuantity: number;
+  price?: number | null;
+  /** A removal of a card that wasn't imported from a URL (added by hand or as a stand-in). */
+  handAdded: boolean;
+  /** For an added card: copies the collection already covers. */
+  ownedQuantity: number;
+}
+
+export interface ListUpdatePreviewDto {
+  deckName: string;
+  url: string;
+  rows: ListUpdateRowDto[];
+  unchangedCount: number;
+  unresolvedNames: string[];
+}
+
+/** An owned copy of another printing that could stand in for a missing list card. */
+export interface ListSubstituteCandidateDto {
+  lotId: number;
+  gameCardId: string;
+  cardName: string;
+  setCode?: string | null;
+  collectorNumber?: string | null;
+  isFoil: boolean;
+  language: string;
+  condition: string;
+  locationName: string;
+  page?: number | null;
+  slot?: number | null;
+  section?: string | null;
+  available: number;
+  suggested: number;
+  imageUri?: string | null;
+}
+
+export interface ListItemSubstitutesDto {
+  itemId: number;
+  cardName: string;
+  setCode?: string | null;
+  collectorNumber?: string | null;
+  isFoil: boolean;
+  missing: number;
+  candidates: ListSubstituteCandidateDto[];
+}
+
+export interface ListSubstitutionDto {
+  itemId: number;
+  lotId: number;
+  quantity: number;
 }
 
 /** One-click list fulfillment: either location may be omitted to do only that half. */

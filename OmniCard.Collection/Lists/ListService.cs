@@ -70,7 +70,7 @@ public class ListService(
         // so they're matched against the collection again.
         var existing = ctx.CardListItems.FirstOrDefault(i =>
             i.CardListId == listId && i.GameCardId == printing.GameSpecificId && i.IsFoil == isFoil && i.FoilType == foilType
-            && !i.AwaitingPurchase);
+            && !i.AwaitingPurchase && i.SubstituteForCardId == null);
         if (existing is not null)
         {
             existing.Quantity += quantity;
@@ -179,6 +179,215 @@ public class ListService(
         return deleted;
     }
 
+    public void SetLanguage(int listId, string? language)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var list = ctx.CardLists.FirstOrDefault(l => l.Id == listId);
+        if (list is null) return;
+        list.Language = CardLanguages.Normalize(language);
+        ctx.SaveChanges();
+    }
+
+    public void SetSourceUrl(int listId, string? url)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var list = ctx.CardLists.FirstOrDefault(l => l.Id == listId);
+        if (list is null) return;
+        list.SourceUrl = string.IsNullOrWhiteSpace(url) ? null : url.Trim();
+        ctx.SaveChanges();
+    }
+
+    public ListUpdatePreview PreviewUpdate(int listId, string deckName, IEnumerable<DecklistEntry> entries)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var list = ctx.CardLists.AsNoTracking().FirstOrDefault(l => l.Id == listId)
+                   ?? throw new InvalidOperationException($"List {listId} not found.");
+        var gs = cardService.GetGameService(list.Game);
+
+        // The deck, resolved exactly as an import would resolve it (imports are always non-foil).
+        var unresolved = new List<string>();
+        var deck = new Dictionary<string, (CardMatch Printing, int Quantity)>();
+        foreach (var entry in entries)
+        {
+            var printing = ResolvePrinting(gs, entry);
+            if (printing is null) { unresolved.Add(entry.CardName); continue; }
+            deck[printing.GameSpecificId] = deck.TryGetValue(printing.GameSpecificId, out var d)
+                ? (d.Printing, d.Quantity + entry.Quantity)
+                : (printing, entry.Quantity);
+        }
+
+        var groups = ctx.CardListItems.AsNoTracking()
+            .Where(i => i.CardListId == listId)
+            .AsEnumerable()
+            .GroupBy(UpdateKey)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var rows = new List<ListUpdateRow>();
+        var unchanged = 0;
+        foreach (var (cardId, (printing, quantity)) in deck)
+        {
+            if (groups.TryGetValue((cardId, false), out var current))
+            {
+                var had = current.Sum(i => i.Quantity);
+                if (had == quantity) { unchanged++; continue; }
+                var first = current.FirstOrDefault(i => i.SubstituteForCardId == null) ?? current[0];
+                rows.Add(new ListUpdateRow(ListUpdateKind.Change, cardId, printing.Name, printing.SetCode, printing.SetName,
+                    printing.CollectorNumber, printing.Rarity, printing.ImageUri, false, had, quantity,
+                    first.IsUnpriced ? null : first.AddedMarketPrice));
+            }
+            else
+            {
+                rows.Add(new ListUpdateRow(ListUpdateKind.Add, cardId, printing.Name, printing.SetCode, printing.SetName,
+                    printing.CollectorNumber, printing.Rarity, printing.ImageUri, false, 0, quantity,
+                    gs.GetCurrentPrice(cardId, isFoil: false)));
+            }
+        }
+
+        foreach (var ((cardId, isFoil), current) in groups)
+        {
+            if (!isFoil && deck.ContainsKey(cardId)) continue;
+            // A substitute's group is keyed by the card it replaces; show the replaced card's name.
+            var first = current[0];
+            rows.Add(new ListUpdateRow(ListUpdateKind.Remove, cardId, first.CardName,
+                first.SubstituteForCardId is null ? first.SetCode : null, null,
+                first.SubstituteForCardId is null ? first.CollectorNumber : null, null, null, isFoil,
+                current.Sum(i => i.Quantity), 0, first.IsUnpriced ? null : first.AddedMarketPrice,
+                HandAdded: current.All(i => i.Source != ListItemSource.Url)));
+        }
+
+        return new ListUpdatePreview(deckName,
+            rows.OrderBy(r => r.Kind).ThenBy(r => r.CardName, StringComparer.OrdinalIgnoreCase).ToList(),
+            unchanged, unresolved);
+    }
+
+    public void ApplyUpdate(int listId, IReadOnlyList<ListUpdateRow> approved)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        if (!ctx.CardLists.Any(l => l.Id == listId))
+            throw new InvalidOperationException($"List {listId} not found.");
+        var groups = ctx.CardListItems
+            .Where(i => i.CardListId == listId)
+            .AsEnumerable()
+            .GroupBy(UpdateKey)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        foreach (var row in approved.Where(r => !string.IsNullOrEmpty(r.GameCardId)))
+        {
+            var items = groups.GetValueOrDefault((row.GameCardId, row.IsFoil)) ?? [];
+            var target = Math.Max(0, row.NewQuantity);
+            var diff = target - items.Sum(i => i.Quantity);
+
+            if (diff > 0)
+            {
+                var grow = items.FirstOrDefault(i => !i.AwaitingPurchase && i.SubstituteForCardId == null);
+                if (grow is not null)
+                {
+                    grow.Quantity += diff;
+                    continue;
+                }
+                ctx.CardListItems.Add(new CardListItem
+                {
+                    CardListId = listId,
+                    Quantity = diff,
+                    GameCardId = row.GameCardId,
+                    CardName = row.CardName,
+                    SetCode = string.IsNullOrEmpty(row.SetCode) ? null : row.SetCode,
+                    CollectorNumber = string.IsNullOrEmpty(row.CollectorNumber) ? null : row.CollectorNumber,
+                    IsFoil = row.IsFoil,
+                    AddedMarketPrice = row.Price,
+                    IsUnpriced = row.Price is null,
+                    Source = ListItemSource.Url,
+                });
+            }
+            else if (diff < 0)
+            {
+                // Shrink what's still to buy first, then the card itself, and stand-ins last.
+                var shrink = -diff;
+                foreach (var item in items
+                             .OrderBy(i => i.SubstituteForCardId != null)
+                             .ThenByDescending(i => i.AwaitingPurchase))
+                {
+                    if (shrink == 0) break;
+                    var take = Math.Min(item.Quantity, shrink);
+                    item.Quantity -= take;
+                    shrink -= take;
+                    if (item.Quantity == 0) ctx.CardListItems.Remove(item);
+                }
+            }
+        }
+        ctx.SaveChanges();
+    }
+
+    public void ApplySubstitutions(int listId, IReadOnlyList<ListSubstitution> substitutions)
+    {
+        using var ctx = dbContextFactory.CreateDbContext();
+        var list = ctx.CardLists.AsNoTracking().FirstOrDefault(l => l.Id == listId)
+                   ?? throw new InvalidOperationException($"List {listId} not found.");
+        var gs = cardService.GetGameService(list.Game);
+        var items = ctx.CardListItems.Where(i => i.CardListId == listId).ToList();
+        var lotIds = substitutions.Select(s => s.LotId).Distinct().ToList();
+        var lots = ctx.Lots.AsNoTracking().Include(l => l.Product)
+            .Where(l => lotIds.Contains(l.Id))
+            .ToDictionary(l => l.Id);
+
+        foreach (var sub in substitutions)
+        {
+            var item = items.FirstOrDefault(i => i.Id == sub.ItemId);
+            if (item is null || !lots.TryGetValue(sub.LotId, out var lot) || lot.Product.Game != list.Game) continue;
+            var quantity = Math.Min(Math.Min(sub.Quantity, item.Quantity), Math.Max(lot.Quantity, 1));
+            if (quantity < 1) continue;
+
+            var replaces = item.SubstituteForCardId ?? item.GameCardId;
+            var p = lot.Product;
+            var existing = items.FirstOrDefault(i => i.SourceLotId == lot.Id && i.SubstituteForCardId == replaces);
+            if (existing is not null)
+            {
+                existing.Quantity += quantity;
+            }
+            else
+            {
+                var price = gs.GetCurrentPrice(p.GameCardId ?? "", p.Foil);
+                var added = new CardListItem
+                {
+                    CardListId = listId,
+                    Quantity = quantity,
+                    GameCardId = p.GameCardId ?? "",
+                    CardName = p.Name,
+                    SetCode = string.IsNullOrEmpty(p.SetCode) ? null : p.SetCode,
+                    CollectorNumber = string.IsNullOrEmpty(p.CollectorNumber) ? null : p.CollectorNumber,
+                    IsFoil = p.Foil,
+                    FoilType = p.Foil ? p.FoilType : null,
+                    AddedMarketPrice = price,
+                    IsUnpriced = price is null,
+                    SourceLotId = lot.Id,
+                    SubstituteForCardId = replaces,
+                    Source = ListItemSource.Manual,
+                };
+                ctx.CardListItems.Add(added);
+                items.Add(added);
+            }
+
+            item.Quantity -= quantity;
+            if (item.Quantity <= 0)
+            {
+                ctx.CardListItems.Remove(item);
+                items.Remove(item);
+            }
+        }
+        ctx.SaveChanges();
+    }
+
+    /// <summary>The printing an item counts toward when comparing with its source deck: a stand-in counts
+    /// toward the (non-foil, as imported) card it replaces.</summary>
+    private static (string CardId, bool IsFoil) UpdateKey(CardListItem i) =>
+        i.SubstituteForCardId is { } replaces ? (replaces, false) : (i.GameCardId, i.IsFoil);
+
+    /// <summary>Honors the exact printing (set + collector number) the entry specifies — e.g. the printing a
+    /// Moxfield/Archidekt URL points at — falling back to the cheapest printing by name so a card is never
+    /// dropped just because its printing couldn't be located.</summary>
+    private static CardMatch? ResolvePrinting(ICardGameService gs, DecklistEntry entry) =>
+        DecklistPrintingResolver.Resolve(gs, entry) ?? ResolveCheapest(gs, entry.CardName)?.Printing;
+
     public AddCardsResult AddCardsByName(int listId, IEnumerable<DecklistEntry> entries, ListItemSource source = ListItemSource.Paste)
     {
         using var ctx = dbContextFactory.CreateDbContext();
@@ -198,14 +407,15 @@ public class ListService(
             // Moxfield/Archidekt URL points at — instead of collapsing to the cheapest printing of the name.
             // Fall back to cheapest-by-name so a card is never dropped just because its printing couldn't be
             // located (a name-only line, or an exact set/collector that isn't in the catalog).
-            var printing = DecklistPrintingResolver.Resolve(gs, entry) ?? ResolveCheapest(gs, entry.CardName)?.Printing;
+            var printing = ResolvePrinting(gs, entry);
             if (printing is null) { unresolved.Add(entry.CardName); continue; }
             var price = gs.GetCurrentPrice(printing.GameSpecificId, isFoil: false);
 
             var existing = pendingByGameCardId.TryGetValue(printing.GameSpecificId, out var pending)
                 ? pending
                 : ctx.CardListItems.FirstOrDefault(i =>
-                    i.CardListId == listId && i.GameCardId == printing.GameSpecificId && !i.IsFoil && !i.AwaitingPurchase);
+                    i.CardListId == listId && i.GameCardId == printing.GameSpecificId && !i.IsFoil && !i.AwaitingPurchase
+                    && i.SubstituteForCardId == null);
             if (existing is not null)
             {
                 existing.Quantity += entry.Quantity;

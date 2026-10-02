@@ -271,9 +271,23 @@ import does, and the success message lists those lines.
 ## Lists: print and put away
 
 Each list on the Lists page shows how many copies of every line are already **owned**. Owned means the
-same printing and finish (foil / non-foil) in a site you can read. A copy that's listed for sale, flagged
-missing, traded, or kept in a location excluded from deck checks doesn't count. A card added from the
-collection always counts its own copy.
+same printing and finish (foil / non-foil) in a site you can read. With the list's **card language** set
+to *Any language* (the default), a copy of that printing in any language counts (MTG matches set +
+collector number, One Piece ignores the `@lang` suffix). Set a language to count only copies in it. A copy
+that's listed for sale, flagged missing, traded, or kept in a location excluded from deck checks doesn't
+count. A card added from the collection always counts its own copy.
+
+- **Card language**: chosen when importing a list and changeable on the list. New cards created when
+  putting the list away use it, on that language's catalog row when the catalog has one. With *Any
+  language* they're created in English.
+- **Update from URL**: imported lists remember their Moxfield / Archidekt URL. Update fetches the deck
+  again and lists every change (added, removed, quantity changed) with a tick-box. Nothing changes until
+  you apply the ticked rows. Removing a card that wasn't imported from the URL starts unticked. Copies
+  already moved off the list by *Put cards away* aren't tracked, so an update offers to add them back.
+- **Find in collection**: for cards the collection doesn't have in the exact printing, it lists owned
+  copies of other printings with the same name (in the list's language), with suggested amounts. Approved
+  copies replace the missing ones on the list as stand-ins (shown with a swap icon). A later update from
+  the URL counts a stand-in toward the card it replaces.
 
 - **Print ▾**: the whole **list** (quantities, owned counts, prices, totals), a **pick list** (the owned
   copies to pull, grouped by location in section/page/slot order) or a **buy list** (what's missing, with
@@ -287,6 +301,9 @@ collection always counts its own copy.
   `POST /api/lists/{id}/fulfill` with `{ moveToContainerId?, addToContainerId?, condition }`
   (`ListsCommit`). It needs write access to both targets and to every site an owned copy moves out of.
   Both targets are checked first, including deck-box game locks, so a rejected request changes nothing.
+  `PUT /api/lists/{id}/language` (`{ language }`, null = any), `POST /api/lists/{id}/update-preview`
+  (`{ url? }`) then `/update-apply` (`{ url, rows }`), and `POST /api/lists/{id}/substitutes` then
+  `/substitutes/apply` (`{ substitutions: [{ itemId, lotId, quantity }] }`).
 
 ## Sites
 

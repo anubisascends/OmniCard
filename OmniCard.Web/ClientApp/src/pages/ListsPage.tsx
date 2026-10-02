@@ -28,15 +28,21 @@ import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
+import ManageSearchIcon from '@mui/icons-material/ManageSearch';
 import PlaceIcon from '@mui/icons-material/Place';
 import PrintIcon from '@mui/icons-material/Print';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import SyncIcon from '@mui/icons-material/Sync';
 import { api } from '../api/client';
 import { AddCardToListDialog } from '../components/dialogs/AddCardToListDialog';
+import { ListSubstitutesDialog } from '../components/dialogs/ListSubstitutesDialog';
+import { ListUpdateDialog } from '../components/dialogs/ListUpdateDialog';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import { useGame } from '../context/GameContext';
 import { useFormatters } from '../i18n/format';
+import { LanguageSelect } from '../lib/cardLanguages';
 import type { CardListDto } from '../api/types';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
@@ -84,6 +90,12 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (messag
   const [addUrl, setAddUrl] = useState('');
   const [addCardOpen, setAddCardOpen] = useState(false);
   const [printError, setPrintError] = useState<Error | null>(null);
+  const [updateOpen, setUpdateOpen] = useState(false);
+  const [substitutesOpen, setSubstitutesOpen] = useState(false);
+  const setLanguage = useMutation({
+    mutationFn: (language: string | null) => api.listSetLanguage(list.id, language),
+    onSuccess: () => invalidate(),
+  });
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['list-items', list.id] });
@@ -156,13 +168,37 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (messag
 
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
-      <Typography variant="h6" gutterBottom>
-        {list.name}
-      </Typography>
+      <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 1.5 }} flexWrap="wrap" useFlexGap>
+        <Typography variant="h6">{list.name}</Typography>
+        <Box sx={{ flexGrow: 1 }} />
+        <LanguageSelect
+          game={list.game}
+          allowAuto
+          emptyLabel={t('lists.anyLanguage')}
+          label={t('lists.detail.languageLabel')}
+          value={list.language ?? ''}
+          onChange={(language) => setLanguage.mutate(language || null)}
+          helperText={t('lists.detail.languageHelp')}
+        />
+      </Stack>
+      {setLanguage.error && <Alert severity="error">{(setLanguage.error as Error).message}</Alert>}
 
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }} flexWrap="wrap" useFlexGap>
         <Button size="small" variant="outlined" startIcon={<AddIcon />} onClick={() => setAddCardOpen(true)}>
           {t('lists.detail.addCard')}
+        </Button>
+        <Tooltip title={list.sourceUrl ?? t('lists.detail.updateFromUrlNoSource')}>
+          <Button size="small" startIcon={<SyncIcon />} onClick={() => setUpdateOpen(true)}>
+            {t('lists.detail.updateFromUrl')}
+          </Button>
+        </Tooltip>
+        <Button
+          size="small"
+          startIcon={<ManageSearchIcon />}
+          disabled={items.data.length === 0}
+          onClick={() => setSubstitutesOpen(true)}
+        >
+          {t('lists.detail.findInCollection')}
         </Button>
         <Button
           size="small"
@@ -332,6 +368,14 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (messag
         onDone={invalidate}
       />
 
+      <ListUpdateDialog open={updateOpen} list={list} onClose={() => setUpdateOpen(false)} onApplied={invalidate} />
+      <ListSubstitutesDialog
+        open={substitutesOpen}
+        list={list}
+        onClose={() => setSubstitutesOpen(false)}
+        onApplied={invalidate}
+      />
+
       <LocationPickerDialog
         open={pickerTarget !== null}
         title={
@@ -366,6 +410,14 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (messag
                   {it.awaitingPurchase ? (
                     <Tooltip title={t('lists.detail.awaitingPurchaseTooltip')}>
                       <ShoppingCartIcon fontSize="small" color="action" sx={{ display: 'block' }} />
+                    </Tooltip>
+                  ) : it.isSubstitute ? (
+                    <Tooltip title={t('lists.detail.substituteTooltip')}>
+                      <SwapHorizIcon
+                        fontSize="small"
+                        color={it.ownedQuantity >= it.quantity ? 'success' : 'warning'}
+                        sx={{ display: 'block' }}
+                      />
                     </Tooltip>
                   ) : (
                     it.ownedQuantity > 0 && (
@@ -446,6 +498,7 @@ export function ListsPage() {
   const [game, setGame] = useState(contextGame ?? 'Mtg');
   const [newName, setNewName] = useState('');
   const [importUrl, setImportUrl] = useState('');
+  const [importLanguage, setImportLanguage] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [doneMessage, setDoneMessage] = useState<string | null>(null);
 
@@ -461,7 +514,7 @@ export function ListsPage() {
     },
   });
   const importNew = useMutation({
-    mutationFn: () => api.listImportUrl(importUrl.trim(), game),
+    mutationFn: () => api.listImportUrl(importUrl.trim(), game, undefined, importLanguage),
     onSuccess: (r) => {
       setImportUrl('');
       qc.invalidateQueries({ queryKey: ['lists'] });
@@ -535,6 +588,13 @@ export function ListsPage() {
               if (e.key === 'Enter' && importUrl.trim() && !importNew.isPending) importNew.mutate();
             }}
             sx={{ flexGrow: 1, minWidth: 280 }}
+          />
+          <LanguageSelect
+            game={game}
+            allowAuto
+            emptyLabel={t('lists.anyLanguage')}
+            value={importLanguage}
+            onChange={setImportLanguage}
           />
           <Button
             variant="outlined"

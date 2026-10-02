@@ -34,6 +34,7 @@ export function LanguageSelect({
   value,
   onChange,
   allowAuto = false,
+  emptyLabel,
   label,
   fullWidth,
   sx,
@@ -43,6 +44,8 @@ export function LanguageSelect({
   value: string;
   onChange: (language: string) => void;
   allowAuto?: boolean;
+  /** Label for the leading empty-value option shown with `allowAuto` (defaults to "Auto (detect)"). */
+  emptyLabel?: string;
   label?: string;
   fullWidth?: boolean;
   sx?: SxProps<Theme>;
@@ -62,7 +65,7 @@ export function LanguageSelect({
       helperText={helperText}
       sx={sx ?? { minWidth: 150 }}
     >
-      {allowAuto && <MenuItem value="">{t('scan.controls.languageAuto')}</MenuItem>}
+      {allowAuto && <MenuItem value="">{emptyLabel ?? t('scan.controls.languageAuto')}</MenuItem>}
       {options.map((code) => (
         <MenuItem key={code} value={code}>
           {languageName(t, code)}
