@@ -389,6 +389,9 @@ export const api = {
     request<void>(`/api/locations/${id}`, { method: 'PUT', body: JSON.stringify({ name }) }),
   locationDelete: (id: number, moveToBulk: boolean) =>
     request<void>(`/api/locations/${id}${qs({ moveToBulk })}`, { method: 'DELETE' }),
+  /** Ignore (or stop ignoring) locations when lists and decklist checks look for cards. */
+  locationsSetIgnoredForLists: (ids: number[], value: boolean) =>
+    request<void>('/api/locations/ignore-for-lists', { method: 'PUT', body: JSON.stringify({ ids, value }) }),
   locationSetAlwaysAvailable: (id: number, value: boolean) =>
     request<void>(`/api/locations/${id}/always-available`, {
       method: 'PUT',

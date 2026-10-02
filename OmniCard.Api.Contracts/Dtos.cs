@@ -103,6 +103,11 @@ public sealed record LocationSummaryDto
     /// <summary>True when the current user may change this location and its cards (write access to
     /// its site). Read-only locations still list, but edit/move targets should skip them.</summary>
     public bool CanWrite { get; init; } = true;
+
+    /// <summary>True when lists ("find in collection", owned counts, putting a list away) and decklist checks
+    /// ignore this location's cards: a sales binder, a deck in use… (the stored
+    /// <c>StorageContainer.ExcludeFromDeckCheck</c> flag).</summary>
+    public bool IgnoredForLists { get; init; }
 }
 
 /// <summary>One row of a valuation breakdown (by game / category / location).</summary>
@@ -257,6 +262,13 @@ public sealed record RenameRequest
 
 public sealed record BoolValueRequest
 {
+    public bool Value { get; init; }
+}
+
+/// <summary>Sets one on/off flag on several locations at once.</summary>
+public sealed record LocationsBoolRequest
+{
+    public List<int> Ids { get; init; } = [];
     public bool Value { get; init; }
 }
 
@@ -711,13 +723,15 @@ public sealed record CardListDto(int Id, string Name, string Game, string? Notes
 /// collection already covers with the exact printing (see <c>ListFulfillmentPlanner</c>);
 /// <see cref="InCollection"/> is true when that's at least one. <see cref="AwaitingPurchase"/> marks an item
 /// whose owned copies were already moved, leaving only copies to buy. <see cref="IsSubstitute"/> marks an
-/// owned copy of another printing approved to stand in for a missing card. <see cref="ImageUri"/> is the
+/// owned copy of another printing approved to stand in for a missing card. <see cref="IgnoredQuantity"/> counts
+/// copies of the printing that don't count because they're in a location ignored for lists or listed for
+/// sale. <see cref="ImageUri"/> is the
 /// best display art (local cache when downloaded, else catalog CDN) for hover previews.</summary>
 public sealed record CardListItemDto(
     int Id, string GameCardId, string CardName, string? SetCode, string? CollectorNumber,
     bool IsFoil, string? FoilType, int Quantity, decimal? MarketPrice, bool IsUnpriced,
     bool InCollection, string? ImageUri, int OwnedQuantity = 0, bool AwaitingPurchase = false,
-    bool IsSubstitute = false);
+    bool IsSubstitute = false, int IgnoredQuantity = 0);
 
 public sealed record CreateListRequest
 {
@@ -811,11 +825,12 @@ public sealed record ListUpdateApplyRequest
     public List<ListUpdateRowDto> Rows { get; init; } = [];
 }
 
-/// <summary>An owned copy of another printing that could stand in for a missing list card.</summary>
+/// <summary>An owned copy that could stand in for a missing list card. <see cref="IgnoredReason"/>
+/// (<c>Location</c> / <c>Listed</c>) marks a copy shown for information only: it can't be used.</summary>
 public sealed record ListSubstituteCandidateDto(
     int LotId, string GameCardId, string CardName, string? SetCode, string? CollectorNumber, bool IsFoil,
     string Language, string Condition, string LocationName, int? Page, int? Slot, string? Section,
-    int Available, int Suggested, string? ImageUri);
+    int Available, int Suggested, string? ImageUri, string? IgnoredReason = null);
 
 /// <summary>A list card the exact-printing match left short by <see cref="Missing"/> copies, and the stand-ins found.</summary>
 public sealed record ListItemSubstitutesDto(

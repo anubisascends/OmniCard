@@ -5,6 +5,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -20,7 +21,9 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import DoNotDisturbOnOutlinedIcon from '@mui/icons-material/DoNotDisturbOnOutlined';
 import { api } from '../../api/client';
+import { IgnoredLocationsDialog } from './IgnoredLocationsDialog';
 import { useFormatters } from '../../i18n/format';
 import { LanguageChip, languageName } from '../../lib/cardLanguages';
 import type { CardListDto, ListItemSubstitutesDto, ListSubstituteCandidateDto } from '../../api/types';
@@ -31,7 +34,9 @@ const pickKey = (itemId: number, lotId: number) => `${itemId}:${lotId}`;
  * "Find in collection": for every list card the exact-printing match left short, offers owned copies of
  * other printings with the same name (in the list's forced language, if any). Quantities start at the
  * server's suggestion; nothing changes until the user applies them, which turns the chosen copies into
- * stand-in list items pointing at those lots.
+ * stand-in list items pointing at those lots. Copies in locations ignored for lists, or listed for sale,
+ * are shown greyed out with the reason (including the exact printing), and the ignored locations can be
+ * changed from here.
  */
 export function ListSubstitutesDialog({
   open,
@@ -54,6 +59,7 @@ export function ListSubstitutesDialog({
     gcTime: 0,
   });
   const [picks, setPicks] = useState<Record<string, number>>({});
+  const [ignoredOpen, setIgnoredOpen] = useState(false);
 
   useEffect(() => {
     if (!found.data) return;
@@ -82,6 +88,9 @@ export function ListSubstitutesDialog({
 
   const items = found.data ?? [];
   const withCandidates = items.filter((i) => i.candidates.length > 0);
+  const usable = (c: ListSubstituteCandidateDto) => !c.ignoredReason;
+  const usableCount = items.reduce((n, i) => n + i.candidates.filter(usable).length, 0);
+  const anyIgnored = items.some((i) => i.candidates.some((c) => !usable(c)));
   const chosen = (item: ListItemSubstitutesDto) =>
     item.candidates.reduce((sum, c) => sum + (picks[pickKey(item.itemId, c.lotId)] ?? 0), 0);
 
@@ -89,7 +98,7 @@ export function ListSubstitutesDialog({
   const overUsedLots = useMemo(() => {
     const used = new Map<number, { total: number; available: number }>();
     for (const item of items)
-      for (const c of item.candidates) {
+      for (const c of item.candidates.filter(usable)) {
         const q = picks[pickKey(item.itemId, c.lotId)] ?? 0;
         const u = used.get(c.lotId) ?? { total: 0, available: c.available };
         used.set(c.lotId, { total: u.total + q, available: c.available });
@@ -122,8 +131,13 @@ export function ListSubstitutesDialog({
           {found.isLoading && <CircularProgress size={28} />}
           {found.error && <Alert severity="error">{(found.error as Error).message}</Alert>}
           {found.data && items.length === 0 && <Alert severity="success">{t('lists.substitutes.nothingMissing')}</Alert>}
-          {found.data && items.length > 0 && withCandidates.length === 0 && (
+          {found.data && items.length > 0 && usableCount === 0 && (
             <Alert severity="info">{t('lists.substitutes.noneFound')}</Alert>
+          )}
+          {anyIgnored && (
+            <Typography variant="caption" color="text.secondary">
+              {t('lists.substitutes.ignoredHint')}
+            </Typography>
           )}
 
           {withCandidates.map((item) => (
@@ -156,8 +170,9 @@ export function ListSubstitutesDialog({
                 <TableBody>
                   {item.candidates.map((c) => {
                     const key = pickKey(item.itemId, c.lotId);
+                    const ignored = !usable(c);
                     return (
-                      <TableRow key={c.lotId} hover>
+                      <TableRow key={c.lotId} hover={!ignored} sx={ignored ? { opacity: 0.55 } : undefined}>
                         <TableCell>
                           <Tooltip
                             disableInteractive
@@ -189,18 +204,28 @@ export function ListSubstitutesDialog({
                         <TableCell>{position(c)}</TableCell>
                         <TableCell align="right">{fmt.number(c.available)}</TableCell>
                         <TableCell align="right">
-                          <TextField
-                            type="number"
-                            size="small"
-                            value={picks[key] ?? 0}
-                            error={overUsedLots.has(c.lotId)}
-                            onChange={(e) => {
-                              const q = Math.max(0, Math.min(Number(e.target.value) || 0, c.available));
-                              setPicks((prev) => ({ ...prev, [key]: q }));
-                            }}
-                            slotProps={{ htmlInput: { min: 0, max: c.available } }}
-                            sx={{ width: 76 }}
-                          />
+                          {ignored ? (
+                            <Chip
+                              size="small"
+                              variant="outlined"
+                              icon={<DoNotDisturbOnOutlinedIcon />}
+                              label={t(`lists.substitutes.ignoredReasons.${c.ignoredReason}`)}
+                              sx={{ height: 22, fontSize: 11 }}
+                            />
+                          ) : (
+                            <TextField
+                              type="number"
+                              size="small"
+                              value={picks[key] ?? 0}
+                              error={overUsedLots.has(c.lotId)}
+                              onChange={(e) => {
+                                const q = Math.max(0, Math.min(Number(e.target.value) || 0, c.available));
+                                setPicks((prev) => ({ ...prev, [key]: q }));
+                              }}
+                              slotProps={{ htmlInput: { min: 0, max: c.available } }}
+                              sx={{ width: 76 }}
+                            />
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -214,6 +239,10 @@ export function ListSubstitutesDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
+        <Button startIcon={<DoNotDisturbOnOutlinedIcon />} onClick={() => setIgnoredOpen(true)}>
+          {t('lists.substitutes.manageIgnored')}
+        </Button>
+        <Box sx={{ flexGrow: 1 }} />
         <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
         <Button
           variant="contained"
@@ -223,6 +252,7 @@ export function ListSubstitutesDialog({
           {t('lists.substitutes.apply', { count: totalChosen })}
         </Button>
       </DialogActions>
+      <IgnoredLocationsDialog open={ignoredOpen} onClose={() => setIgnoredOpen(false)} onSaved={onApplied} />
     </Dialog>
   );
 }

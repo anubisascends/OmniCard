@@ -7,6 +7,7 @@ import {
   Alert,
   Button,
   ButtonBase,
+  Chip,
   CircularProgress,
   Collapse,
   Dialog,
@@ -30,6 +31,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import DoNotDisturbOnOutlinedIcon from '@mui/icons-material/DoNotDisturbOnOutlined';
 
 const COLLAPSED_KEY = 'omnicard.locations.collapsed';
 const HIDE_EMPTY_KEY = 'omnicard.locations.hideEmpty';
@@ -46,6 +48,7 @@ import { LOCATION_TYPES, isDeckBoxType } from '../lib/locationTypes';
 import { DeckBoxGamePicker } from '../components/DeckBoxGamePicker';
 import { DeckBoxGameBanner } from '../components/DeckBoxGameBanner';
 import { DeckBoxGameDialog } from '../components/dialogs/DeckBoxGameDialog';
+import { IgnoredLocationsDialog } from '../components/dialogs/IgnoredLocationsDialog';
 
 function AddLocationBar({ onAdded, siteFilter }: { onAdded: () => void; siteFilter: SiteFilterValue }) {
   const { t } = useTranslation();
@@ -224,6 +227,10 @@ function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: 
     mutationFn: () => api.locationSetAlwaysAvailable(loc.id, !loc.isAlwaysAvailable),
     onSuccess: onChanged,
   });
+  const toggleIgnored = useMutation({
+    mutationFn: () => api.locationsSetIgnoredForLists([loc.id], !loc.ignoredForLists),
+    onSuccess: onChanged,
+  });
 
   // Read-only site: the location is visible but none of its actions apply.
   if (!loc.canWrite)
@@ -278,6 +285,14 @@ function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: 
           {loc.isAlwaysAvailable
             ? t('locations.menu.unsetAlwaysAvailable')
             : t('locations.menu.setAlwaysAvailable')}
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            close();
+            toggleIgnored.mutate();
+          }}
+        >
+          {loc.ignoredForLists ? t('locations.menu.stopIgnoring') : t('locations.menu.ignoreForLists')}
         </MenuItem>
         <MenuItem
           disabled={loc.isSystem}
@@ -345,9 +360,23 @@ function buildColumns(
       flex: 2,
       minWidth: 200,
       renderCell: (p) => (
-        <Link component={RouterLink} to={locationHref(p.row)} underline="hover" noWrap>
-          {p.row.name}
-        </Link>
+        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ height: '100%', minWidth: 0 }}>
+          <Link component={RouterLink} to={locationHref(p.row)} underline="hover" noWrap>
+            {p.row.name}
+          </Link>
+          {p.row.ignoredForLists && (
+            <Tooltip title={t('locations.ignored.rowTooltip')}>
+              <Chip
+                size="small"
+                variant="outlined"
+                color="warning"
+                icon={<DoNotDisturbOnOutlinedIcon />}
+                label={t('locations.ignored.chip')}
+                sx={{ height: 20, fontSize: 11 }}
+              />
+            </Tooltip>
+          )}
+        </Stack>
       ),
     },
     ...siteColumn,
@@ -482,6 +511,7 @@ export function LocationsPage() {
     qc.invalidateQueries({ queryKey: ['sites'] }); // location counts per site
   };
 
+  const [ignoredOpen, setIgnoredOpen] = useState(false);
   const [hideEmpty, setHideEmpty] = useState<boolean>(
     () => localStorage.getItem(HIDE_EMPTY_KEY) === '1',
   );
@@ -539,17 +569,24 @@ export function LocationsPage() {
         sx={{ alignSelf: 'flex-start', width: 260 }}
       />
       <AddLocationBar onAdded={refresh} siteFilter={effectiveSite} />
-      <FormControlLabel
-        control={
-          <Switch
-            checked={hideEmpty}
-            onChange={(e) => toggleHideEmpty(e.target.checked)}
-            size="small"
-          />
-        }
-        label={t('locations.hideEmpty')}
-        sx={{ alignSelf: 'flex-start' }}
-      />
+      <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+        <FormControlLabel
+          control={
+            <Switch
+              checked={hideEmpty}
+              onChange={(e) => toggleHideEmpty(e.target.checked)}
+              size="small"
+            />
+          }
+          label={t('locations.hideEmpty')}
+        />
+        <Tooltip title={t('locations.ignored.buttonTooltip')}>
+          <Button size="small" startIcon={<DoNotDisturbOnOutlinedIcon />} onClick={() => setIgnoredOpen(true)}>
+            {t('locations.ignored.button')}
+          </Button>
+        </Tooltip>
+      </Stack>
+      <IgnoredLocationsDialog open={ignoredOpen} onClose={() => setIgnoredOpen(false)} onSaved={refresh} />
       {isLoading || !data ? (
         <CircularProgress />
       ) : (
