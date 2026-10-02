@@ -29,6 +29,8 @@
       "gameDeckType": "Game & deck type…",
       "setAlwaysAvailable": "Set always-available",
       "unsetAlwaysAvailable": "Unset always-available",
+      "ignoreForLists": "Ignore for lists",
+      "stopIgnoring": "Stop ignoring for lists",
       "delete": "Delete…",
       "deleteConfirm": "Delete \"{{name}}\"?",
       "moveToBulkConfirm": "Move its cards to Bulk?  (Cancel = delete the cards)"
@@ -64,6 +66,23 @@
       "moveHelp": "A site is a major physical location (a home, a shop). Moving this location to another site moves every card in it too — it currently sits in {{site}}.",
       "moveTo": "Destination site",
       "move": "Move"
+    },
+    "ignored": {
+      "title": "Ignored locations",
+      "button": "Ignored locations…",
+      "buttonTooltip": "Choose locations that lists and decklist checks should never take cards from",
+      "intro": "Lists won't count or pull cards from ticked locations. Use it for a sales binder, a deck in use, or a whole site. Find in collection still shows those cards, marked as ignored. Decklist checks skip them too.",
+      "search": "Filter locations",
+      "count_one": "{{count}} ignored",
+      "count_other": "{{count}} ignored",
+      "wholeSite": "whole site",
+      "noMatches": "No locations match.",
+      "cards_one": "{{formatted}} card",
+      "cards_other": "{{formatted}} cards",
+      "save_one": "Save {{count}} change",
+      "save_other": "Save {{count}} changes",
+      "chip": "Ignored",
+      "rowTooltip": "Lists and decklist checks don't take cards from here"
     }
   }
 }

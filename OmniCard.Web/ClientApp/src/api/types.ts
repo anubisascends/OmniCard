@@ -95,6 +95,9 @@ export interface LocationSummaryDto {
   siteName?: string | null;
   /** False when the current user only has read access to the location's site. */
   canWrite: boolean;
+  /** Lists (find in collection, owned counts, putting a list away) and decklist checks ignore this
+   * location's cards — e.g. a sales binder or a deck in use. */
+  ignoredForLists: boolean;
 }
 
 /** A site: a MAJOR physical location (a home, a shop) holding many storage locations. `access` is
@@ -870,6 +873,8 @@ export interface CardListItemDto {
   awaitingPurchase: boolean;
   /** An owned copy of another printing, approved to stand in for a card the collection didn't have. */
   isSubstitute: boolean;
+  /** Copies of this printing that don't count: in a location ignored for lists, or listed for sale. */
+  ignoredQuantity: number;
 }
 
 /** One difference between a list and a fresh fetch of its deck URL. Applying it sets the printing's
@@ -918,6 +923,8 @@ export interface ListSubstituteCandidateDto {
   available: number;
   suggested: number;
   imageUri?: string | null;
+  /** Set when this copy is shown for information only: its location is ignored for lists, or it's listed for sale. */
+  ignoredReason?: 'Location' | 'Listed' | null;
 }
 
 export interface ListItemSubstitutesDto {

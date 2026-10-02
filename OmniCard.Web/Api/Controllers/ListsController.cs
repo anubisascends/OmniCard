@@ -234,23 +234,29 @@ public sealed class ListsController(
             f.Candidates.Select(c => new ListSubstituteCandidateDto(
                 c.LotId, c.GameCardId, c.CardName, c.SetCode, c.CollectorNumber, c.IsFoil, c.Language, c.Condition,
                 c.ContainerName, c.Page, c.Slot, c.Section, c.Available, c.Suggested,
-                images.GetValueOrDefault(c.GameCardId))).ToList())).ToList();
+                images.GetValueOrDefault(c.GameCardId), c.IgnoredReason)).ToList())).ToList();
     }
 
     /// <summary>Apply approved stand-ins: each moves copies of a list card onto an owned lot of another
-    /// printing (a reference only — the lot isn't moved until the list is put away). The lots must be in
-    /// sites the user can read.</summary>
+    /// printing (a reference only — the lot isn't moved until the list is put away). Each (card, lot) pair
+    /// must be one <see cref="FindSubstitutes"/> offers as usable right now — so a lot in a site the user
+    /// can't read, in a location ignored for lists, or listed for sale is rejected.</summary>
     [HttpPost("{id:int}/substitutes/apply")]
     [RequirePermission(Permissions.ListsEdit)]
     public IActionResult ApplySubstitutes(int id, [FromBody] ListSubstitutionsApplyRequest request)
     {
-        if (FindList(id) is null)
+        var list = FindList(id);
+        if (list is null)
             return NotFound();
         var subs = request.Substitutions.Where(s => s.Quantity > 0).ToList();
         if (subs.Count == 0)
             return BadRequest(new { error = "Choose at least one card to use" });
-        if (siteAccess is not null && !siteAccess.CanReadLots(subs.Select(s => s.LotId)))
-            return NotFound(new { error = "Not found." });
+
+        var offered = planner.FindSubstitutes(list.Game, lists.GetItems(id), siteAccess?.Current.ReadableSiteIds, list.Language)
+            .SelectMany(f => f.Candidates.Where(c => c.IgnoredReason is null).Select(c => (f.Item.Id, c.LotId)))
+            .ToHashSet();
+        if (subs.Any(s => !offered.Contains((s.ItemId, s.LotId))))
+            return BadRequest(new { error = "Some of those copies can't be used any more (moved, listed, or in an ignored location). Check again." });
         lists.ApplySubstitutions(id, subs.Select(s => new ListSubstitution(s.ItemId, s.LotId, s.Quantity)).ToList());
         return NoContent();
     }
@@ -508,13 +514,13 @@ public sealed class ListsController(
         if (items.Count == 0)
             return [];
 
-        var ownedByItem = planner.Plan(list.Game, items, siteAccess?.Current.ReadableSiteIds, language: list.Language)
-            .ToDictionary(p => p.Item.Id, p => p.OwnedQuantity);
+        var planByItem = planner.Plan(list.Game, items, siteAccess?.Current.ReadableSiteIds, language: list.Language)
+            .ToDictionary(p => p.Item.Id);
         var images = ImagesFor(list.Game, items.Select(i => i.GameCardId));
 
         return items.Select(i =>
         {
-            var owned = ownedByItem.GetValueOrDefault(i.Id);
+            var owned = planByItem.GetValueOrDefault(i.Id)?.OwnedQuantity ?? 0;
             return new CardListItemDto(
                 i.Id, i.GameCardId, i.CardName, i.SetCode, i.CollectorNumber,
                 i.IsFoil, i.FoilType, i.Quantity, i.AddedMarketPrice, i.IsUnpriced,
@@ -522,7 +528,8 @@ public sealed class ListsController(
                 ImageUri: images.GetValueOrDefault(i.GameCardId),
                 OwnedQuantity: owned,
                 AwaitingPurchase: i.AwaitingPurchase,
-                IsSubstitute: i.SubstituteForCardId is not null);
+                IsSubstitute: i.SubstituteForCardId is not null,
+                IgnoredQuantity: planByItem.GetValueOrDefault(i.Id)?.IgnoredQuantity ?? 0);
         }).ToList();
     }
 

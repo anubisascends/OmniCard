@@ -10,17 +10,19 @@ using OmniCard.Shared.Storage;
 namespace OmniCard.Collection.Lists;
 
 /// <summary>How much of one list item the collection already covers: the exact copies to pull
-/// (<see cref="Picks"/>) and how many still have to be bought.</summary>
-public sealed record ListItemPlan(CardListItem Item, IReadOnlyList<DecklistPick> Picks)
+/// (<see cref="Picks"/>) and how many still have to be bought. <see cref="IgnoredQuantity"/> counts copies
+/// that would have matched but are ignored (in a location ignored for lists, or listed for sale).</summary>
+public sealed record ListItemPlan(CardListItem Item, IReadOnlyList<DecklistPick> Picks, int IgnoredQuantity = 0)
 {
     public int OwnedQuantity => Picks.Sum(p => p.Quantity);
     public int MissingQuantity => Math.Max(0, Item.Quantity - OwnedQuantity);
 }
 
-/// <summary>An owned lot of a <em>different</em> printing (same card name) that could stand in for a list
-/// item the collection doesn't have. <see cref="Available"/> is what's left after the exact-printing plan
-/// took its copies; <see cref="Suggested"/> is the pre-filled amount, shared across items so two items
-/// aren't both offered the same copies.</summary>
+/// <summary>An owned lot of the same card name that could stand in for a list item the collection doesn't
+/// have. <see cref="Available"/> is what's left after the exact-printing plan took its copies;
+/// <see cref="Suggested"/> is the pre-filled amount, shared across items so two items aren't both offered the
+/// same copies. A copy with an <see cref="IgnoredReason"/> (<c>"Location"</c>: its location is ignored for
+/// lists; <c>"Listed"</c>: listed for sale) is shown so the user knows it exists, but can't be used.</summary>
 public sealed record SubstituteCandidate(
     int LotId,
     string GameCardId,
@@ -35,7 +37,8 @@ public sealed record SubstituteCandidate(
     int? Slot,
     string? Section,
     int Available,
-    int Suggested);
+    int Suggested,
+    string? IgnoredReason = null);
 
 /// <summary>A list item the exact-printing match left short, with the owned stand-ins found for it.</summary>
 public sealed record ItemSubstitutes(CardListItem Item, int MissingQuantity, IReadOnlyList<SubstituteCandidate> Candidates);
@@ -45,15 +48,22 @@ public sealed record ItemSubstitutes(CardListItem Item, int MissingQuantity, IRe
 /// "find in collection" stand-in search.</summary>
 public sealed class ListFulfillmentPlanner(IDbContextFactory<OmniCardDbContext> dbContextFactory)
 {
-    private sealed record Candidate(InventoryLot Lot, Product Product, StorageContainer? Container, string Language, string PrintingKey);
+    private sealed record Candidate(
+        InventoryLot Lot, Product Product, StorageContainer? Container, string Language, string PrintingKey, bool IsListed)
+    {
+        /// <summary>Why lists may not draw on this copy, or null when they may.</summary>
+        public string? IgnoredReason =>
+            Container?.ExcludeFromDeckCheck == true ? "Location" : IsListed ? "Listed" : null;
+    }
 
     /// <summary>Allocates owned copies to each item by <em>exact printing</em>: the same card id, or the same
     /// printing in another language (same <see cref="PrintingIdentity"/> key and card name), with the same
-    /// foil flag. A forced
-    /// <paramref name="language"/> (null = any) only counts copies in that language. The lot an item was
-    /// added from is claimed first, whatever its finish, language or location. Copies that are listed for
-    /// sale, flagged missing, traded, or kept in a location excluded from deck checks are left alone.
-    /// Items <see cref="CardListItem.AwaitingPurchase"/> get no picks.
+    /// foil flag. A forced <paramref name="language"/> (null = any) only counts copies in that language. The
+    /// lot an item was added from is claimed first, whatever its finish or language. Copies that are flagged
+    /// missing or traded are left alone, and so are copies listed for sale or kept in a location ignored for
+    /// lists (<c>ExcludeFromDeckCheck</c>), even when the item was added from that very lot; those are
+    /// reported as <see cref="ListItemPlan.IgnoredQuantity"/> instead. Items
+    /// <see cref="CardListItem.AwaitingPurchase"/> get no picks.
     ///
     /// <para>Allocation is shared across the list so two items can't claim the same physical copy. Copies
     /// already in <paramref name="preferContainerId"/> are taken first (they need no move), then copies
@@ -70,8 +80,10 @@ public sealed class ListFulfillmentPlanner(IDbContextFactory<OmniCardDbContext> 
     /// <summary>For every item the exact-printing plan leaves short, the owned copies of <em>other</em>
     /// printings of the same card name (matched case-insensitively; Riftbound's ", " vs " - " spelling is
     /// tried too) that are still free after the plan. Same rules as <see cref="Plan"/>: forced language,
-    /// readable sites, no listed/missing/traded copies or deck-check-excluded locations. Candidates come
-    /// same set first, then same finish, then outside deck boxes, then by location.</summary>
+    /// readable sites, no missing/traded copies. Copies in ignored locations or listed for sale (including
+    /// the exact printing) are returned too, flagged with an <see cref="SubstituteCandidate.IgnoredReason"/>
+    /// and never suggested, after the usable ones. Usable candidates come same set first, then same finish,
+    /// then outside deck boxes, then by location.</summary>
     public IReadOnlyList<ItemSubstitutes> FindSubstitutes(CardGame game, IReadOnlyList<CardListItem> items,
         IReadOnlyCollection<int>? siteIds = null, string? language = null)
     {
@@ -89,9 +101,9 @@ public sealed class ListFulfillmentPlanner(IDbContextFactory<OmniCardDbContext> 
             var ordered = candidates
                 .Where(c => names.Contains(c.Product.Name, StringComparer.OrdinalIgnoreCase)
                     && remaining.GetValueOrDefault(c.Lot.Id) > 0
-                    && c.Container?.ExcludeFromDeckCheck != true
                     && (language is null || c.Language == language))
-                .OrderByDescending(c => string.Equals(c.Product.SetCode, item.SetCode, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(c => c.IgnoredReason is not null)
+                .ThenByDescending(c => string.Equals(c.Product.SetCode, item.SetCode, StringComparison.OrdinalIgnoreCase))
                 .ThenByDescending(c => c.Product.Foil == item.IsFoil)
                 .ThenBy(c => c.Container?.ContainerType == ContainerType.DeckBox)
                 .ThenBy(c => c.Container?.Name ?? "", StringComparer.OrdinalIgnoreCase)
@@ -103,7 +115,7 @@ public sealed class ListFulfillmentPlanner(IDbContextFactory<OmniCardDbContext> 
             var found = new List<SubstituteCandidate>();
             foreach (var c in ordered)
             {
-                var suggest = Math.Min(needed, suggestLeft.GetValueOrDefault(c.Lot.Id));
+                var suggest = c.IgnoredReason is null ? Math.Min(needed, suggestLeft.GetValueOrDefault(c.Lot.Id)) : 0;
                 if (suggest > 0)
                 {
                     suggestLeft[c.Lot.Id] -= suggest;
@@ -112,7 +124,7 @@ public sealed class ListFulfillmentPlanner(IDbContextFactory<OmniCardDbContext> 
                 found.Add(new SubstituteCandidate(
                     c.Lot.Id, c.Product.GameCardId ?? "", c.Product.Name, c.Product.SetCode, c.Product.CollectorNumber,
                     c.Product.Foil, c.Language, c.Lot.Condition ?? "", c.Container?.Name ?? "Unknown",
-                    c.Lot.Page, c.Lot.Slot, c.Lot.Section, remaining[c.Lot.Id], suggest));
+                    c.Lot.Page, c.Lot.Slot, c.Lot.Section, remaining[c.Lot.Id], suggest, c.IgnoredReason));
             }
             result.Add(new ItemSubstitutes(item, plan.MissingQuantity, found));
         }
@@ -124,19 +136,23 @@ public sealed class ListFulfillmentPlanner(IDbContextFactory<OmniCardDbContext> 
     {
         var remaining = candidates.ToDictionary(c => c.Lot.Id, c => Math.Max(c.Lot.Quantity, 1));
         var picksByItem = new Dictionary<int, List<DecklistPick>>();
+        var ignoredByItem = new Dictionary<int, int>();
         var matchable = items.Where(i => !i.AwaitingPurchase && !string.IsNullOrEmpty(i.GameCardId));
 
         // Items pointing at a specific owned lot claim it before same-printing items can take it.
         foreach (var item in matchable.OrderBy(i => i.SourceLotId is null))
         {
             var key = PrintingIdentity.Key(game, item.GameCardId, item.SetCode, item.CollectorNumber);
-            var ordered = candidates
+            var matching = candidates
                 .Where(c => c.Lot.Id == item.SourceLotId
                     || ((c.Product.GameCardId == item.GameCardId
                          || (c.PrintingKey == key && string.Equals(c.Product.Name, item.CardName, StringComparison.OrdinalIgnoreCase)))
                         && c.Product.Foil == item.IsFoil
-                        && c.Container?.ExcludeFromDeckCheck != true
                         && (language is null || c.Language == language)))
+                .ToList();
+            ignoredByItem[item.Id] = matching.Where(c => c.IgnoredReason is not null).Sum(c => Math.Max(c.Lot.Quantity, 1));
+            var ordered = matching
+                .Where(c => c.IgnoredReason is null)
                 .OrderByDescending(c => c.Lot.Id == item.SourceLotId)
                 .ThenByDescending(c => preferContainerId is not null && c.Lot.LocationId == preferContainerId)
                 .ThenBy(c => c.Container?.ContainerType == ContainerType.DeckBox)
@@ -174,14 +190,16 @@ public sealed class ListFulfillmentPlanner(IDbContextFactory<OmniCardDbContext> 
             picksByItem[item.Id] = picks;
         }
 
-        var plans = items.Select(i => new ListItemPlan(i, picksByItem.GetValueOrDefault(i.Id) ?? [])).ToList();
+        var plans = items
+            .Select(i => new ListItemPlan(i, picksByItem.GetValueOrDefault(i.Id) ?? [], ignoredByItem.GetValueOrDefault(i.Id)))
+            .ToList();
         return (plans, remaining);
     }
 
     /// <summary>Every owned single the list could draw on: copies of the items' cards by id or by name
     /// (other-language rows of a printing carry the English name, and stand-ins are found by name), plus the
-    /// lots items were added from. Lots outside <paramref name="siteIds"/>, flagged missing, traded, or listed
-    /// for sale are dropped.</summary>
+    /// lots items were added from. Lots outside <paramref name="siteIds"/>, flagged missing or traded are
+    /// dropped; lots listed for sale are kept (flagged) so they can be shown as ignored.</summary>
     private static List<Candidate> LoadCandidates(OmniCardDbContext ctx, CardGame game,
         IReadOnlyList<CardListItem> items, IReadOnlyCollection<int>? siteIds)
     {
@@ -213,10 +231,10 @@ public sealed class ListFulfillmentPlanner(IDbContextFactory<OmniCardDbContext> 
             .ToHashSet();
 
         return rows
-            .Where(r => !listedLotIds.Contains(r.Lot.Id))
             .Select(r => new Candidate(r.Lot, r.Product, r.Container,
                 CardLanguages.Normalize(r.Lot.Language) ?? CardLanguages.English,
-                PrintingIdentity.Key(game, r.Product.GameCardId, r.Product.SetCode, r.Product.CollectorNumber)))
+                PrintingIdentity.Key(game, r.Product.GameCardId, r.Product.SetCode, r.Product.CollectorNumber),
+                listedLotIds.Contains(r.Lot.Id)))
             .ToList();
     }
 

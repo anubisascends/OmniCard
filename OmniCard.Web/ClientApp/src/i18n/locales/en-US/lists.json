@@ -58,7 +58,10 @@
       "updateFromUrl": "Update from URL",
       "updateFromUrlNoSource": "Fetch the Moxfield / Archidekt deck again and review the changes",
       "findInCollection": "Find in collection",
-      "substituteTooltip": "Another printing from your collection, standing in for this card"
+      "substituteTooltip": "Another printing from your collection, standing in for this card",
+      "ignoredTooltip_one": "{{count}} more in an ignored location or listed for sale",
+      "ignoredTooltip_other": "{{count}} more in ignored locations or listed for sale",
+      "ignoredLocations": "Ignored locations…"
     },
     "update": {
       "title": "Update “{{name}}” from URL",
@@ -99,7 +102,13 @@
         "use": "Use"
       },
       "apply_one": "Use {{count}} copy",
-      "apply_other": "Use {{count}} copies"
+      "apply_other": "Use {{count}} copies",
+      "ignoredReasons": {
+        "Location": "Ignored location",
+        "Listed": "Listed for sale"
+      },
+      "ignoredHint": "Greyed-out copies are in ignored locations or listed for sale, so they can't be used.",
+      "manageIgnored": "Ignored locations…"
     }
   }
 }

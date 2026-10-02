@@ -177,6 +177,54 @@ public class ListsControllerTests : IDisposable
     }
 
     [Fact]
+    public void IgnoredLocation_NotCountedOrPulled_ShownAsIgnoredInFindInCollection()
+    {
+        var sales = _containers.Create("Sales binder", ContainerType.Binder).Id;
+        var deck = _containers.Create("Deck", ContainerType.Box).Id;
+        _containers.SetExcludeFromDeckCheck(sales, true);
+        SeedOwned("Bolt", 2, sales);
+        var list = Value(_controller.Create(new CreateListRequest { Name = "L", Game = "Mtg" }));
+        SeedItem(list.Id, "Bolt", qty: 2);
+
+        var item = Assert.Single(Value(_controller.Items(list.Id)));
+        Assert.Equal(0, item.OwnedQuantity);
+        Assert.Equal(2, item.IgnoredQuantity);
+
+        // Shown in Find in collection, but flagged and never suggested.
+        var found = Assert.Single(Value(_controller.FindSubstitutes(list.Id)));
+        var candidate = Assert.Single(found.Candidates);
+        Assert.Equal("Location", candidate.IgnoredReason);
+        Assert.Equal(0, candidate.Suggested);
+        Assert.IsType<BadRequestObjectResult>(_controller.ApplySubstitutes(list.Id, new ListSubstitutionsApplyRequest
+        {
+            Substitutions = [new ListSubstitutionDto(found.ItemId, candidate.LotId, 1)],
+        }));
+
+        // Putting the list away never pulls from the ignored location.
+        Value(_controller.Fulfill(list.Id, new FulfillListRequest { MoveToContainerId = deck }));
+        Assert.Equal(2, CopiesIn(sales, "bolt"));
+        Assert.Equal(0, CopiesIn(deck, "bolt"));
+    }
+
+    [Fact]
+    public void IgnoredLocation_WinsOverCardAddedFromCollection()
+    {
+        var sales = _containers.Create("Sales binder", ContainerType.Binder).Id;
+        SeedOwned("Bolt", 1, sales);
+        int lotId;
+        using (var ctx = new OmniCardDbContext(_opts)) lotId = ctx.Lots.Single().Id;
+        var list = Value(_controller.Create(new CreateListRequest { Name = "L", Game = "Mtg" }));
+        Value(_controller.AddItemFromCollection(list.Id, new AddListItemFromCollectionRequest { LotId = lotId, Quantity = 1 }));
+        Assert.Equal(1, Value(_controller.Items(list.Id))[0].OwnedQuantity);
+
+        _containers.SetExcludeFromDeckCheck(sales, true);
+
+        var item = Assert.Single(Value(_controller.Items(list.Id)));
+        Assert.Equal(0, item.OwnedQuantity);
+        Assert.Equal(1, item.IgnoredQuantity);
+    }
+
+    [Fact]
     public void Substitutes_RespectForcedLanguage()
     {
         var src = _containers.Create("Src", ContainerType.Box).Id;

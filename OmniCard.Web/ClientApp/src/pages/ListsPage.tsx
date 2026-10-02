@@ -9,6 +9,7 @@ import {
   CircularProgress,
   Divider,
   IconButton,
+  Link,
   Menu,
   MenuItem,
   Paper,
@@ -26,6 +27,7 @@ import AddIcon from '@mui/icons-material/Add';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DoNotDisturbOnOutlinedIcon from '@mui/icons-material/DoNotDisturbOnOutlined';
 import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
 import ManageSearchIcon from '@mui/icons-material/ManageSearch';
@@ -37,6 +39,7 @@ import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import SyncIcon from '@mui/icons-material/Sync';
 import { api } from '../api/client';
 import { AddCardToListDialog } from '../components/dialogs/AddCardToListDialog';
+import { IgnoredLocationsDialog } from '../components/dialogs/IgnoredLocationsDialog';
 import { ListSubstitutesDialog } from '../components/dialogs/ListSubstitutesDialog';
 import { ListUpdateDialog } from '../components/dialogs/ListUpdateDialog';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
@@ -92,6 +95,7 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (messag
   const [printError, setPrintError] = useState<Error | null>(null);
   const [updateOpen, setUpdateOpen] = useState(false);
   const [substitutesOpen, setSubstitutesOpen] = useState(false);
+  const [ignoredOpen, setIgnoredOpen] = useState(false);
   const setLanguage = useMutation({
     mutationFn: (language: string | null) => api.listSetLanguage(list.id, language),
     onSuccess: () => invalidate(),
@@ -322,7 +326,10 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (messag
                 {fulfill.isPending ? t('lists.detail.fulfill.working') : t('lists.detail.fulfill.moveAndAdd')}
               </Button>
               <Typography variant="caption" color="text.secondary" sx={{ flexBasis: '100%' }}>
-                {t('lists.detail.fulfill.hint')}
+                {t('lists.detail.fulfill.hint')}{' '}
+                <Link component="button" variant="caption" onClick={() => setIgnoredOpen(true)}>
+                  {t('lists.detail.ignoredLocations')}
+                </Link>
               </Typography>
             </Stack>
           </Stack>
@@ -368,6 +375,7 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (messag
         onDone={invalidate}
       />
 
+      <IgnoredLocationsDialog open={ignoredOpen} onClose={() => setIgnoredOpen(false)} onSaved={invalidate} />
       <ListUpdateDialog open={updateOpen} list={list} onClose={() => setUpdateOpen(false)} onApplied={invalidate} />
       <ListSubstitutesDialog
         open={substitutesOpen}
@@ -475,7 +483,19 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (messag
                     sx={{ width: 70 }}
                   />
                 </TableCell>
-                <TableCell align="right">{fmt.number(Math.min(it.ownedQuantity, it.quantity))}</TableCell>
+                <TableCell align="right">
+                  <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="flex-end">
+                    {it.ignoredQuantity > 0 && (
+                      <Tooltip title={t('lists.detail.ignoredTooltip', { count: it.ignoredQuantity })}>
+                        <Stack direction="row" spacing={0.25} alignItems="center" sx={{ color: 'text.disabled' }}>
+                          <DoNotDisturbOnOutlinedIcon sx={{ fontSize: 14 }} />
+                          <Typography variant="caption">+{fmt.number(it.ignoredQuantity)}</Typography>
+                        </Stack>
+                      </Tooltip>
+                    )}
+                    <span>{fmt.number(Math.min(it.ownedQuantity, it.quantity))}</span>
+                  </Stack>
+                </TableCell>
                 <TableCell align="right">{it.isUnpriced ? '—' : fmt.money(it.marketPrice)}</TableCell>
                 <TableCell align="right">
                   <IconButton size="small" onClick={() => removeItem.mutate(it.id)}>
