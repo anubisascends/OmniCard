@@ -95,6 +95,14 @@ public sealed record LocationSummaryDto
     public int? DeckTypeId { get; init; }
     /// <summary>Assigned deck type display name, or null.</summary>
     public string? DeckTypeName { get; init; }
+
+    /// <summary>The site (major physical location — a home, a shop) this location sits in.</summary>
+    public int SiteId { get; init; }
+    /// <summary>Display name of <see cref="SiteId"/>.</summary>
+    public string? SiteName { get; init; }
+    /// <summary>True when the current user may change this location and its cards (write access to
+    /// its site). Read-only locations still list, but edit/move targets should skip them.</summary>
+    public bool CanWrite { get; init; } = true;
 }
 
 /// <summary>One row of a valuation breakdown (by game / category / location).</summary>
@@ -170,6 +178,9 @@ public sealed record CreateLocationRequest
     public string? Game { get; init; }
     /// <summary>Optional deck type (format) id for a DeckBox.</summary>
     public int? DeckTypeId { get; init; }
+    /// <summary>The site to create the location in (null = the default site). The user needs write
+    /// access to it.</summary>
+    public int? SiteId { get; init; }
 }
 
 /// <summary>Assign/reassign a deck box's game system and deck type.</summary>
@@ -1121,3 +1132,31 @@ public sealed record ResetPasswordRequest
 {
     public string NewPassword { get; init; } = "";
 }
+
+// --- Sites ---------------------------------------------------------------------------------------
+
+/// <summary>A site — a MAJOR physical location (a home, a shop) holding many storage locations — as
+/// seen by the current user. <paramref name="Access"/> is the user's level on it: "Read" or "Write".
+/// <paramref name="LocationCount"/> counts the site's locations.</summary>
+public sealed record SiteDto(int Id, string Name, string? Description, bool IsDefault, int SortOrder,
+    string Access, int LocationCount);
+
+/// <summary>Admin create/update of a site.</summary>
+public sealed record SaveSiteRequest
+{
+    public string Name { get; init; } = "";
+    public string? Description { get; init; }
+}
+
+/// <summary>One access grant on a site. <paramref name="PrincipalType"/> is "User" or "Role";
+/// <paramref name="Level"/> is "Read" or "Write" ("None" removes the grant when saving).</summary>
+public sealed record SiteGrantDto(string PrincipalType, int PrincipalId, string Level);
+
+/// <summary>Admin replace-all of a site's grants.</summary>
+public sealed record SetSiteGrantsRequest
+{
+    public IReadOnlyList<SiteGrantDto> Grants { get; init; } = [];
+}
+
+/// <summary>Move a location to another site.</summary>
+public sealed record SetLocationSiteRequest(int SiteId);

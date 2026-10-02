@@ -66,7 +66,8 @@
       "splitSinglesTooltip_one": "This card keeps 1 copy and {{count}} new single card is created in the same location (in a binder, it goes to the Unplaced pool).",
       "splitSinglesTooltip_other": "This card keeps 1 copy and {{count}} new single cards are created in the same location (in a binder, they go to the Unplaced pool).",
       "splitSinglesToast_one": "Split into {{count}} single card — the new copies are in the binder's Unplaced pool.",
-      "splitSinglesToast_other": "Split into {{count}} single cards — the new copies are in the binder's Unplaced pool."
+      "splitSinglesToast_other": "Split into {{count}} single cards — the new copies are in the binder's Unplaced pool.",
+      "readOnlySite": "This card is in {{site}}, which you can only view. Ask an administrator for write access to change it."
     },
     "locationPicker": {
       "defaultTitle": "Move to location",

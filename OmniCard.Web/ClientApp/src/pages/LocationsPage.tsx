@@ -4,10 +4,15 @@ import type { TFunction } from 'i18next';
 import { Link as RouterLink } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Alert,
   Button,
   ButtonBase,
   CircularProgress,
   Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControlLabel,
   IconButton,
   Link,
@@ -16,6 +21,7 @@ import {
   Stack,
   Switch,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
@@ -23,11 +29,15 @@ import AddIcon from '@mui/icons-material/Add';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 
 const COLLAPSED_KEY = 'omnicard.locations.collapsed';
 const HIDE_EMPTY_KEY = 'omnicard.locations.hideEmpty';
-import { api } from '../api/client';
-import type { LocationSummaryDto } from '../api/types';
+const SITE_KEY = 'omnicard.locations.site';
+import { api, ApiError } from '../api/client';
+import type { LocationSummaryDto, SiteDto } from '../api/types';
+import { useSites } from '../context/useSites';
+import { ALL_SITES, SiteSelect, type SiteFilterValue } from '../components/SiteSelect';
 import { useGame } from '../context/GameContext';
 import { useFormatters } from '../i18n/format';
 
@@ -37,8 +47,14 @@ import { DeckBoxGamePicker } from '../components/DeckBoxGamePicker';
 import { DeckBoxGameBanner } from '../components/DeckBoxGameBanner';
 import { DeckBoxGameDialog } from '../components/dialogs/DeckBoxGameDialog';
 
-function AddLocationBar({ onAdded }: { onAdded: () => void }) {
+function AddLocationBar({ onAdded, siteFilter }: { onAdded: () => void; siteFilter: SiteFilterValue }) {
   const { t } = useTranslation();
+  const { writable, defaultSite } = useSites();
+  // New locations go into the filtered site when the user can write there, else the default site.
+  const preferredSite =
+    siteFilter !== ALL_SITES && writable.some((s) => s.id === siteFilter) ? siteFilter : defaultSite?.id;
+  const [siteChoice, setSiteChoice] = useState<number | undefined>(undefined);
+  const siteId = siteChoice ?? preferredSite;
   const [name, setName] = useState('');
   const [type, setType] = useState('Box');
   const [game, setGame] = useState('');
@@ -61,6 +77,7 @@ function AddLocationBar({ onAdded }: { onAdded: () => void }) {
         type,
         game: isDeckBox ? game : null,
         deckTypeId: isDeckBox ? deckTypeId : null,
+        siteId: siteId ?? null,
       }),
     onSuccess: () => {
       setName('');
@@ -72,6 +89,15 @@ function AddLocationBar({ onAdded }: { onAdded: () => void }) {
 
   return (
     <Stack direction="row" spacing={1} alignItems="flex-start" flexWrap="wrap" useFlexGap>
+      {writable.length > 1 && (
+        <SiteSelect
+          sites={writable}
+          value={siteId ?? writable[0].id}
+          onChange={(v) => v !== ALL_SITES && setSiteChoice(v)}
+          label={t('locations.sites.createIn')}
+          sx={{ width: 220 }}
+        />
+      )}
       <TextField
         size="small"
         label={t('locations.addBar.nameLabel')}
@@ -112,14 +138,77 @@ function AddLocationBar({ onAdded }: { onAdded: () => void }) {
       >
         {t('common.actions.add')}
       </Button>
+      {create.error instanceof ApiError && (
+        <Alert severity="error" sx={{ py: 0 }}>
+          {create.error.message}
+        </Alert>
+      )}
     </Stack>
+  );
+}
+
+/** Move a location (and all its cards) to another site the user can write to. */
+function MoveToSiteDialog({
+  loc,
+  sites,
+  onClose,
+  onMoved,
+}: {
+  loc: LocationSummaryDto;
+  sites: SiteDto[];
+  onClose: () => void;
+  onMoved: () => void;
+}) {
+  const { t } = useTranslation();
+  const targets = sites.filter((s) => s.id !== loc.siteId);
+  const [target, setTarget] = useState<number | undefined>(targets[0]?.id);
+  const move = useMutation({
+    mutationFn: () => api.locationSetSite(loc.id, target!),
+    onSuccess: () => {
+      onMoved();
+      onClose();
+    },
+  });
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>{t('locations.sites.moveTitle', { name: loc.name })}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            {t('locations.sites.moveHelp', { site: loc.siteName ?? '' })}
+          </Typography>
+          {target !== undefined && (
+            <SiteSelect
+              sites={targets}
+              value={target}
+              onChange={(v) => v !== ALL_SITES && setTarget(v)}
+              label={t('locations.sites.moveTo')}
+            />
+          )}
+          {move.error instanceof ApiError && <Alert severity="error">{move.error.message}</Alert>}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
+        <Button
+          variant="contained"
+          disabled={target === undefined || move.isPending}
+          onClick={() => move.mutate()}
+        >
+          {t('locations.sites.move')}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
 function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: () => void }) {
   const { t } = useTranslation();
+  const { writable } = useSites();
   const [anchor, setAnchor] = useState<null | HTMLElement>(null);
   const [editingDeckBox, setEditingDeckBox] = useState(false);
+  const [movingSite, setMovingSite] = useState(false);
+  const canMoveSite = !loc.isSystem && writable.some((s) => s.id !== loc.siteId);
   const close = () => setAnchor(null);
   const isDeckBox = loc.type === 'Deck Box';
 
@@ -135,6 +224,14 @@ function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: 
     mutationFn: () => api.locationSetAlwaysAvailable(loc.id, !loc.isAlwaysAvailable),
     onSuccess: onChanged,
   });
+
+  // Read-only site: the location is visible but none of its actions apply.
+  if (!loc.canWrite)
+    return (
+      <Tooltip title={t('locations.sites.readOnlyTooltip', { site: loc.siteName ?? '' })}>
+        <LockOutlinedIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+      </Tooltip>
+    );
 
   return (
     <>
@@ -159,6 +256,16 @@ function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: 
             }}
           >
             {t('locations.menu.gameDeckType')}
+          </MenuItem>
+        )}
+        {canMoveSite && (
+          <MenuItem
+            onClick={() => {
+              close();
+              setMovingSite(true);
+            }}
+          >
+            {t('locations.sites.moveMenu')}
           </MenuItem>
         )}
         <MenuItem
@@ -195,6 +302,9 @@ function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: 
           onSaved={onChanged}
         />
       )}
+      {movingSite && (
+        <MoveToSiteDialog loc={loc} sites={writable} onClose={() => setMovingSite(false)} onMoved={onChanged} />
+      )}
     </>
   );
 }
@@ -207,9 +317,27 @@ function buildColumns(
   gameLabel: (id: string) => string,
   t: TFunction,
   fmt: ReturnType<typeof useFormatters>,
+  showSite: boolean,
 ): GridColDef<LocationSummaryDto>[] {
   const num = (n: number) => fmt.number(n);
   const money = (n: number) => fmt.money(n);
+  const siteColumn: GridColDef<LocationSummaryDto>[] = showSite
+    ? [
+        {
+          field: 'siteName',
+          headerName: t('locations.sites.column'),
+          width: 170,
+          renderCell: (p) => (
+            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ height: '100%' }}>
+              <Typography variant="body2" noWrap>
+                {p.row.siteName}
+              </Typography>
+              {!p.row.canWrite && <LockOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />}
+            </Stack>
+          ),
+        },
+      ]
+    : [];
   return [
     {
       field: 'name',
@@ -222,6 +350,7 @@ function buildColumns(
         </Link>
       ),
     },
+    ...siteColumn,
     {
       field: 'type',
       headerName: t('common.labels.type'),
@@ -314,9 +443,33 @@ export function LocationsPage() {
   const fmt = useFormatters();
   const { game } = useGame();
   const qc = useQueryClient();
+  const { sites, multiSite } = useSites();
+
+  // Site filter: "All Sites" (every site the user can read) or one specific site. Persisted per browser.
+  const [siteFilter, setSiteFilterState] = useState<SiteFilterValue>(() => {
+    try {
+      const raw = localStorage.getItem(SITE_KEY);
+      return raw && raw !== ALL_SITES && !Number.isNaN(Number(raw)) ? Number(raw) : ALL_SITES;
+    } catch {
+      return ALL_SITES;
+    }
+  });
+  const setSiteFilter = (v: SiteFilterValue) => {
+    setSiteFilterState(v);
+    try {
+      localStorage.setItem(SITE_KEY, String(v));
+    } catch {
+      /* storage unavailable — keep the in-memory choice */
+    }
+  };
+  // A remembered site the user can no longer see falls back to All Sites.
+  const effectiveSite: SiteFilterValue =
+    siteFilter !== ALL_SITES && sites.length > 0 && !sites.some((s) => s.id === siteFilter) ? ALL_SITES : siteFilter;
+  const siteId = effectiveSite === ALL_SITES ? undefined : effectiveSite;
+
   const { data, isLoading } = useQuery({
-    queryKey: ['locations', game],
-    queryFn: () => api.locations(game),
+    queryKey: ['locations', game, siteId],
+    queryFn: () => api.locations(game, siteId),
   });
   const games = useQuery({ queryKey: ['games'], queryFn: () => api.games() });
   const gameLabel = useMemo(() => {
@@ -324,7 +477,10 @@ export function LocationsPage() {
     return (id: string) => map.get(id) ?? id;
   }, [games.data]);
 
-  const refresh = () => qc.invalidateQueries({ queryKey: ['locations'] });
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['locations'] });
+    qc.invalidateQueries({ queryKey: ['sites'] }); // location counts per site
+  };
 
   const [hideEmpty, setHideEmpty] = useState<boolean>(
     () => localStorage.getItem(HIDE_EMPTY_KEY) === '1',
@@ -343,7 +499,11 @@ export function LocationsPage() {
       .map((g) => ({ ...g, items: g.items.filter((loc) => loc.cardCount > 0) }))
       .filter((g) => g.items.length > 0);
   }, [data, hideEmpty]);
-  const columns = useMemo(() => buildColumns(refresh, gameLabel, t, fmt), [gameLabel, t, fmt]);
+  const showSiteColumn = multiSite && effectiveSite === ALL_SITES;
+  const columns = useMemo(
+    () => buildColumns(refresh, gameLabel, t, fmt, showSiteColumn),
+    [gameLabel, t, fmt, showSiteColumn],
+  );
 
   const headingFor = (g: LocationGroup) =>
     g.key === '__always__'
@@ -370,7 +530,15 @@ export function LocationsPage() {
     <Stack spacing={3}>
       <Typography variant="h4">{t('locations.title')}</Typography>
       <DeckBoxGameBanner onResolved={refresh} />
-      <AddLocationBar onAdded={refresh} />
+      <SiteSelect
+        sites={sites}
+        value={effectiveSite}
+        onChange={setSiteFilter}
+        includeAll
+        label={t('locations.sites.filterLabel')}
+        sx={{ alignSelf: 'flex-start', width: 260 }}
+      />
+      <AddLocationBar onAdded={refresh} siteFilter={effectiveSite} />
       <FormControlLabel
         control={
           <Switch

@@ -50,6 +50,20 @@
       "viewModeLabel": "View mode",
       "tableView": "Table view",
       "stackedView": "Stacked view"
+    },
+    "sites": {
+      "label": "Site",
+      "filterLabel": "Site",
+      "all": "All Sites",
+      "column": "Site",
+      "readOnly": "view only",
+      "readOnlyTooltip": "{{site}} is view-only for you — ask an administrator for write access to change it.",
+      "createIn": "Create in site",
+      "moveMenu": "Move to site…",
+      "moveTitle": "Move \"{{name}}\" to another site",
+      "moveHelp": "A site is a major physical location (a home, a shop). Moving this location to another site moves every card in it too — it currently sits in {{site}}.",
+      "moveTo": "Destination site",
+      "move": "Move"
     }
   }
 }

@@ -25,6 +25,8 @@ import { useFormatters } from '../../i18n/format';
 import { groupLocations } from '../../lib/locationGroups';
 import { LOCATION_TYPES, isDeckBoxType } from '../../lib/locationTypes';
 import { DeckBoxGamePicker } from '../DeckBoxGamePicker';
+import { useSites } from '../../context/useSites';
+import { ALL_SITES, SiteSelect } from '../SiteSelect';
 
 /** Inline "create a new location" section, revealed from the picker so callers never have to leave. */
 function CreateLocationSection({
@@ -40,6 +42,9 @@ function CreateLocationSection({
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const { writable, defaultSite } = useSites();
+  const [siteChoice, setSiteChoice] = useState<number | undefined>(undefined);
+  const siteId = siteChoice ?? defaultSite?.id;
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const typeOptions = types ? LOCATION_TYPES.filter((lt) => types.includes(lt.value)) : LOCATION_TYPES;
@@ -64,9 +69,11 @@ function CreateLocationSection({
         type,
         game: isDeckBox ? game : null,
         deckTypeId: isDeckBox ? deckTypeId : null,
+        siteId: siteId ?? null,
       }),
     onSuccess: (loc) => {
       qc.invalidateQueries({ queryKey: ['locations'] });
+      qc.invalidateQueries({ queryKey: ['sites'] });
       setName('');
       setGame(defaultGame ?? '');
       setDeckTypeId(null);
@@ -93,6 +100,14 @@ function CreateLocationSection({
                 create.mutate();
             }}
           />
+          {writable.length > 1 && (
+            <SiteSelect
+              sites={writable}
+              value={siteId ?? writable[0].id}
+              onChange={(v) => v !== ALL_SITES && setSiteChoice(v)}
+              label={t('locations.sites.createIn')}
+            />
+          )}
           <TextField select size="small" label={t('common.labels.type')} value={type} onChange={(e) => setType(e.target.value)}>
             {typeOptions.map((t) => (
               <MenuItem key={t.value} value={t.value}>
@@ -168,6 +183,7 @@ export function LocationPickerDialog({
 }) {
   const { t } = useTranslation();
   const fmt = useFormatters();
+  const { multiSite } = useSites();
   // A deck box locked to a game that none of the moving cards share can't receive them.
   const gameBlocked = (locGame?: string | null) =>
     !!locGame && cardGames != null && cardGames.length > 0 && !cardGames.includes(locGame);
@@ -178,6 +194,8 @@ export function LocationPickerDialog({
     const term = search.trim().toLowerCase();
     const filtered = (data ?? [])
       .filter((l) => l.id !== excludeId)
+      // Only locations the user may change can receive cards (read-only sites are excluded).
+      .filter((l) => l.canWrite !== false)
       .filter((l) => !types || types.includes(l.type))
       .filter((l) => (term ? l.name.toLowerCase().includes(term) : true));
     return groupLocations(filtered);
@@ -232,9 +250,16 @@ export function LocationPickerDialog({
                         title={blocked ? t('dialogs.locationPicker.gameBlocked', { game: l.game }) : undefined}
                       >
                         <Stack direction="row" spacing={1} alignItems="center" sx={{ width: '100%' }}>
-                          <Typography variant="body2" sx={{ flexGrow: 1 }} noWrap>
-                            {l.name}
-                          </Typography>
+                          <Stack sx={{ flexGrow: 1, minWidth: 0 }}>
+                            <Typography variant="body2" noWrap>
+                              {l.name}
+                            </Typography>
+                            {multiSite && l.siteName && (
+                              <Typography variant="caption" color="text.secondary" noWrap>
+                                {l.siteName}
+                              </Typography>
+                            )}
+                          </Stack>
                           <Typography variant="caption" color="text.secondary">
                             {fmt.number(l.cardCount)}
                           </Typography>

@@ -301,7 +301,7 @@ function LotDialog({
               setFields((f) => ({ ...f, locationId: e.target.value === '' ? null : Number(e.target.value) }))
             }
           >
-            {locationSelectOptions(locations.data, { label: t('inventory.lotDialog.none') })}
+            {locationSelectOptions(locations.data, { label: t('inventory.lotDialog.none') }, { includeReadOnly: true })}
           </TextField>
           <TextField
             label={t('inventory.lotDialog.sourceOptional')}

@@ -17,10 +17,17 @@ public interface IStorageContainerService
     /// <summary>Creates a location. <paramref name="game"/> and <paramref name="deckTypeId"/> are
     /// applied only when <paramref name="type"/> is <see cref="ContainerType.DeckBox"/> (ignored
     /// otherwise). A deck box may be created without a game (legacy/unassigned), but callers that
-    /// require one should validate before calling.</summary>
+    /// require one should validate before calling. <paramref name="siteId"/> is the
+    /// <see cref="Sites.Site"/> the location is created in (null = the default site); callers check
+    /// the user may write to it.</summary>
     StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9,
-        CardGame? game = null, int? deckTypeId = null);
+        CardGame? game = null, int? deckTypeId = null, int? siteId = null);
     void Rename(int id, string newName);
+
+    /// <summary>Moves a location (and therefore every card in it) to another <see cref="Sites.Site"/>.
+    /// Throws <see cref="InvalidOperationException"/> for the system Bulk location (it always stays in
+    /// the default site) or an unknown location/site.</summary>
+    void SetSite(int containerId, int siteId);
 
     /// <summary>Assigns (or reassigns) a deck box's game system and deck type. Throws
     /// <see cref="InvalidOperationException"/> if the container isn't a deck box, or if the box

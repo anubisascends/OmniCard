@@ -7,6 +7,7 @@ using OmniCard.Shared.Collection;
 using OmniCard.Shared.Lists;
 using OmniCard.Shared.Matching;
 using OmniCard.Shared.Security;
+using OmniCard.Shared.Sites;
 using OmniCard.Web.Api.Infrastructure;
 
 namespace OmniCard.Web.Api.Controllers;
@@ -14,13 +15,18 @@ namespace OmniCard.Web.Api.Controllers;
 /// <summary>Saved card lists (want-lists, buy-lists, trade binders…). CRUD + item management via
 /// <see cref="IListService"/>; committing a list into a location goes through
 /// <see cref="WebBinderCardService"/> (the web-safe write path), since the desktop's
-/// <c>CommitToLocation</c> relies on a WPF-only <c>ICardService</c> method.</summary>
+/// <c>CommitToLocation</c> relies on a WPF-only <c>ICardService</c> method.
+///
+/// <para>Site rules: any owned card the user can <em>read</em> may be added to a list (the collection
+/// search already only shows readable sites); committing needs <em>write</em> access to the target
+/// location's site and to the site of every owned card it relocates.</para></summary>
 public sealed class ListsController(
     IListService lists,
     IDecklistService decklists,
     WebBinderCardService binderCards,
     ICardService cardService,
-    CardImageCacheService imageCache) : ApiControllerBase
+    CardImageCacheService imageCache,
+    RequestSiteAccess? siteAccess = null) : ApiControllerBase
 {
     [HttpGet]
     [RequirePermission(Permissions.ListsView)]
@@ -148,6 +154,7 @@ public sealed class ListsController(
     /// copies are relocated to the target location instead of being duplicated.</summary>
     [HttpPost("{id:int}/items/from-collection")]
     [RequirePermission(Permissions.ListsEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Read, Lots = "LotId")]
     public ActionResult<CardListItemDto> AddItemFromCollection(int id, [FromBody] AddListItemFromCollectionRequest request)
     {
         if (request.LotId <= 0)
@@ -193,6 +200,7 @@ public sealed class ListsController(
     /// created new, so nothing on the list is silently dropped.</summary>
     [HttpPost("{id:int}/commit")]
     [RequirePermission(Permissions.ListsCommit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "ContainerId")]
     public ActionResult<CommitListResultDto> Commit(int id, [FromBody] CommitListRequest request)
     {
         if (request.ContainerId <= 0)
@@ -205,6 +213,18 @@ public sealed class ListsController(
         var items = lists.GetItems(id);
         if (items.Count == 0)
             return BadRequest(new { error = "The list is empty" });
+
+        // Owned references are relocated, which changes the site they currently sit in.
+        if (siteAccess is not null && !siteAccess.Current.IsUnrestricted)
+        {
+            var sourceSites = siteAccess.SitesOfLots(items.Where(i => i.SourceLotId is not null).Select(i => i.SourceLotId!.Value));
+            if (sourceSites.Any(s => !siteAccess.Current.CanWrite(s)))
+                return StatusCode(403, new
+                {
+                    error = "Some cards on this list would be moved out of a site you only have read access to. " +
+                            "Remove them from the list, or ask an administrator for write access to that site.",
+                });
+        }
 
         var condition = string.IsNullOrWhiteSpace(request.Condition) ? "NM" : request.Condition;
         var moved = 0;

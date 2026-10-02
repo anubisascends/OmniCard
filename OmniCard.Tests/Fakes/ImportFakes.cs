@@ -180,7 +180,7 @@ public sealed class RecordingContainerService : IStorageContainerService
         Containers.Any(c => (excludeId == null || c.Id != excludeId)
             && string.Equals(c.Name, name?.Trim(), StringComparison.OrdinalIgnoreCase));
     public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9,
-        CardGame? game = null, int? deckTypeId = null)
+        CardGame? game = null, int? deckTypeId = null, int? siteId = null)
     {
         Created.Add((name, type));
         var c = new StorageContainer
@@ -197,6 +197,7 @@ public sealed class RecordingContainerService : IStorageContainerService
     public void SetDeckBox(int containerId, CardGame game, int? deckTypeId) => throw new NotImplementedException();
     public List<DeckBoxNeedsGame> GetDeckBoxesMissingGame() => throw new NotImplementedException();
     public void Rename(int id, string newName) => throw new NotImplementedException();
+    public void SetSite(int containerId, int siteId) => throw new NotImplementedException();
     public void Delete(int id, bool moveCardsToBulk = true) => throw new NotImplementedException();
     public int GetCardCount(int containerId) => throw new NotImplementedException();
     public void SetCoverCard(int containerId, int? cardId) => throw new NotImplementedException();
@@ -228,6 +229,6 @@ public sealed class FakeDecklistParseService : IDecklistService
     public Task<(string DeckName, List<DecklistEntry> Entries)?> FetchDecklistAsync(string url) => Task.FromResult(OnFetch(url));
 
     public (string DeckName, List<DecklistEntry> Entries) ParseDecklistText(string text) => throw new NotImplementedException();
-    public DecklistCheckResult CheckAgainstCollection(string deckName, string deckSource, List<DecklistEntry> entries, CardGame game) => throw new NotImplementedException();
+    public DecklistCheckResult CheckAgainstCollection(string deckName, string deckSource, List<DecklistEntry> entries, CardGame game, IReadOnlyCollection<int>? siteIds = null) => throw new NotImplementedException();
 }
 

@@ -6,6 +6,7 @@ using OmniCard.Shared.Matching;
 using OmniCard.Shared.Sales;
 using OmniCard.Shared.Scanning;
 using OmniCard.Shared.Settings;
+using OmniCard.Shared.Sites;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Shared.Trades;
@@ -37,6 +38,8 @@ public class OmniCardDbContext : DbContext
     public DbSet<CardListItem> CardListItems => Set<CardListItem>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Role> Roles => Set<Role>();
+    public DbSet<Site> Sites => Set<Site>();
+    public DbSet<SiteAccessGrant> SiteAccessGrants => Set<SiteAccessGrant>();
 
     public OmniCardDbContext(DbContextOptions<OmniCardDbContext> options) : base(options) { }
 
@@ -113,6 +116,14 @@ public class OmniCardDbContext : DbContext
                 .OnDelete(DeleteBehavior.SetNull);
             e.HasIndex(s => s.DeckTypeId);
 
+            // Every location belongs to a site (major physical location). The column defaults to the
+            // seeded default site so the AddSites migration backfills pre-existing rows; Restrict so a
+            // site can't be dropped out from under its locations (the API moves them first).
+            e.Property(s => s.SiteId).HasDefaultValue(Site.DefaultSiteId);
+            e.HasOne<Site>().WithMany().HasForeignKey(s => s.SiteId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(s => s.SiteId);
+
             // CollectionCard is not part of this context's model (it lives in the
             // Phase-1 CollectionDbContext shim); ignore the nav so EF doesn't try to
             // pull that unmapped type into this model.
@@ -120,6 +131,37 @@ public class OmniCardDbContext : DbContext
 
             // Derived from IsSystem/AlwaysAvailable — not a stored column.
             e.Ignore(s => s.IsAlwaysAvailable);
+        });
+
+        modelBuilder.Entity<Site>(e =>
+        {
+            e.HasKey(s => s.Id);
+            e.Property(s => s.Id).ValueGeneratedOnAdd();
+            e.Property(s => s.Name).IsRequired().HasMaxLength(200);
+            e.Property(s => s.Description).HasMaxLength(1000);
+            e.HasIndex(s => s.Name).IsUnique();
+            // The default site is part of the schema contract (StorageContainer.SiteId defaults to it),
+            // so it's seeded as model data: the migration inserts it, EnsureCreated (tests) does too.
+            e.HasData(new Site
+            {
+                Id = Site.DefaultSiteId,
+                Name = Site.DefaultSiteName,
+                IsDefault = true,
+                SortOrder = 0,
+            });
+        });
+
+        modelBuilder.Entity<SiteAccessGrant>(e =>
+        {
+            e.HasKey(g => g.Id);
+            e.Property(g => g.Id).ValueGeneratedOnAdd();
+            e.Property(g => g.PrincipalType).HasConversion<string>().HasMaxLength(16);
+            e.Property(g => g.Level).HasConversion<string>().HasMaxLength(16);
+            // One grant per (site, principal); deleting a site drops its grants.
+            e.HasIndex(g => new { g.SiteId, g.PrincipalType, g.PrincipalId }).IsUnique();
+            e.HasIndex(g => new { g.PrincipalType, g.PrincipalId });
+            e.HasOne<Site>().WithMany().HasForeignKey(g => g.SiteId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<DeckType>(e =>

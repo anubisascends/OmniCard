@@ -33,6 +33,8 @@ import type {
   InventoryValuationDto,
   ListingDetailDto,
   LocationSummaryDto,
+  SiteDto,
+  SiteGrantDto,
   OrderDetailDto,
   OrderDto,
   OrderImportPreviewDto,
@@ -281,7 +283,23 @@ export const api = {
   dashboard: () => request<DashboardDto>('/api/dashboard'),
 
   // Locations
-  locations: (game?: string) => request<LocationSummaryDto[]>(`/api/locations${qs({ game })}`),
+  /** Locations in the sites the user can read; `siteId` narrows to one site. */
+  locations: (game?: string, siteId?: number) =>
+    request<LocationSummaryDto[]>(`/api/locations${qs({ game, siteId })}`),
+  locationSetSite: (id: number, siteId: number) =>
+    request<void>(`/api/locations/${id}/site`, { method: 'PUT', body: JSON.stringify({ siteId }) }),
+
+  // Sites (major physical locations). Listing returns only the sites the user can see; the rest is admin-only.
+  sites: () => request<SiteDto[]>('/api/sites'),
+  siteCreate: (body: { name: string; description?: string | null }) =>
+    request<SiteDto>('/api/sites', { method: 'POST', body: JSON.stringify(body) }),
+  siteUpdate: (id: number, body: { name: string; description?: string | null }) =>
+    request<SiteDto>(`/api/sites/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  siteDelete: (id: number, moveToSiteId?: number) =>
+    request<void>(`/api/sites/${id}${qs({ moveToSiteId })}`, { method: 'DELETE' }),
+  siteGrants: (id: number) => request<SiteGrantDto[]>(`/api/sites/${id}/grants`),
+  siteSetGrants: (id: number, grants: SiteGrantDto[]) =>
+    request<void>(`/api/sites/${id}/grants`, { method: 'PUT', body: JSON.stringify({ grants }) }),
   location: (id: number) => request<LocationSummaryDto>(`/api/locations/${id}`),
 
   // Sets
@@ -336,6 +354,8 @@ export const api = {
     game?: string;
     q?: string;
     containerId?: number;
+    /** Narrow to one site (the server already limits results to sites the user can read). */
+    siteId?: number;
     skip?: number;
     take?: number;
     stacked?: boolean;
@@ -352,6 +372,8 @@ export const api = {
     slotsPerPage?: number;
     game?: string | null;
     deckTypeId?: number | null;
+    /** Site to create the location in (omitted = the default site). */
+    siteId?: number | null;
   }) => request<LocationSummaryDto>('/api/locations', { method: 'POST', body: JSON.stringify(body) }),
   locationRename: (id: number, name: string) =>
     request<void>(`/api/locations/${id}`, { method: 'PUT', body: JSON.stringify({ name }) }),

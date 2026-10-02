@@ -6,6 +6,7 @@ using OmniCard.Shared.Audit;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Lists;
 using OmniCard.Shared.Security;
+using OmniCard.Shared.Sites;
 using OmniCard.Shared.Storage;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Services;
@@ -19,7 +20,8 @@ public sealed class DecklistController(
     IDecklistService decklists,
     IDecklistPrintExporter printExporter,
     WebBinderCardService binderCards,
-    IDbContextFactory<OmniCardDbContext> dbFactory) : ApiControllerBase
+    IDbContextFactory<OmniCardDbContext> dbFactory,
+    RequestSiteAccess siteAccess) : ApiControllerBase
 {
     [HttpPost("check")]
     [RequirePermission(Permissions.CollectionView)]
@@ -58,10 +60,15 @@ public sealed class DecklistController(
     /// needed copies move). Rejects non-deck-box targets and deck boxes locked to another game.</summary>
     [HttpPost("move-to-deck-box")]
     [RequirePermission(Permissions.CollectionEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "ContainerId")]
     public ActionResult<DecklistMoveResultDto> MoveToDeckBox([FromBody] DecklistMoveRequest req)
     {
         if (req.Picks.Count == 0)
             return BadRequest(new { error = "No cards to move." });
+        // Pulling a pick out of its current location is a write to that location's site.
+        if (RequireSiteAccessAttribute.Check(siteAccess.Current,
+                siteAccess.SitesOfLots(req.Picks.Select(p => p.LotId)), SiteAccessLevel.Write) is { } denied)
+            return (ActionResult)denied;
 
         using (var ctx = dbFactory.CreateDbContext())
         {
@@ -111,7 +118,7 @@ public sealed class DecklistController(
             return (null, game, BadRequest(new { error = "Provide a decklist URL or pasted text." }));
         }
 
-        return (decklists.CheckAgainstCollection(deckName, source, entries, game), game, null);
+        return (decklists.CheckAgainstCollection(deckName, source, entries, game, siteAccess.Current.ReadableSiteIds), game, null);
     }
 
     private static DecklistCheckDto ToDto(DecklistCheckResult result, CardGame game) => new()

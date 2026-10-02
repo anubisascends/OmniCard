@@ -42,6 +42,7 @@ import type { ComponentDto, EbaySellingSettingsDto, RoleDto, UserDto } from '../
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import { DeckTypesCard } from '../components/settings/DeckTypesCard';
 import { RolesCard } from '../components/settings/RolesCard';
+import { SitesCard } from '../components/settings/SitesCard';
 import { PermissionChecklist } from '../components/settings/PermissionChecklist';
 import { usePermissions } from '../context/usePermissions';
 import { currencySymbol } from '../lib/scanBadges';
@@ -1710,6 +1711,7 @@ const TABS: {
     show: (g) => g.can('ebay.view'),
   },
   { key: 'roles', labelKey: 'settings.tabs.roles', render: () => <RolesCard />, show: (g) => g.isAdmin },
+  { key: 'sites', labelKey: 'settings.tabs.sites', render: () => <SitesCard />, show: (g) => g.isAdmin },
   { key: 'users', labelKey: 'settings.tabs.users', render: () => <UsersTab />, show: () => true },
   { key: 'components', labelKey: 'settings.tabs.components', render: () => <ComponentsCard />, show: () => true },
 ];

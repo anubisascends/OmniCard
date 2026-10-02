@@ -299,9 +299,12 @@ public sealed partial class DecklistService(
         _ => null,
     };
 
-    public DecklistCheckResult CheckAgainstCollection(string deckName, string deckSource, List<DecklistEntry> entries, CardGame game)
+    public DecklistCheckResult CheckAgainstCollection(string deckName, string deckSource, List<DecklistEntry> entries, CardGame game,
+        IReadOnlyCollection<int>? siteIds = null)
     {
         using var ctx = dbContextFactory.CreateDbContext();
+        var siteList = siteIds?.Distinct().ToList();
+        var defaultSiteVisible = siteList?.Contains(Shared.Sites.Site.DefaultSiteId) ?? true;
         var allCards =
             (from l in ctx.Lots.AsNoTracking()
              join p in ctx.Products.AsNoTracking() on l.ProductId equals p.Id
@@ -309,6 +312,8 @@ public sealed partial class DecklistService(
              join sc in ctx.StorageContainers.AsNoTracking() on l.LocationId equals sc.Id into containerJoin
              from sc in containerJoin.DefaultIfEmpty()
              where sc == null || !sc.ExcludeFromDeckCheck
+             where siteList == null
+                   || (sc == null ? defaultSiteVisible : siteList.Contains(sc.SiteId))
              select new { Lot = l, Product = p, Container = sc })
             .ToList()
             .Select(x =>

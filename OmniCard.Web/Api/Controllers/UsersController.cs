@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
 using OmniCard.Web.Services;
 using OmniCard.Shared.Settings;
+using OmniCard.Shared.Sites;
 using OmniCard.Web.Api.Infrastructure;
 
 namespace OmniCard.Web.Api.Controllers;
@@ -12,7 +13,8 @@ namespace OmniCard.Web.Api.Controllers;
 /// so any signed-in user can reach it.
 /// </summary>
 [ApiAuth(RequireAdmin = true)]
-public sealed class UsersController(UserService users, PermissionService permissions) : ApiControllerBase
+public sealed class UsersController(UserService users, PermissionService permissions,
+    SiteAccessService siteAccess, SiteService sites) : ApiControllerBase
 {
     private static UserDto ToDto(User u) =>
         new(u.Id, u.Username, u.IsSystem, u.IsAdmin, u.CreatedAt, u.RoleId, u.Overrides.Grant, u.Overrides.Deny);
@@ -50,6 +52,7 @@ public sealed class UsersController(UserService users, PermissionService permiss
                 return NotFound(new { error = "User not found." });
             // Apply immediately: the user's next request re-resolves their permissions from the DB.
             permissions.Invalidate(id);
+            siteAccess.Invalidate(id); // role/admin changes alter which sites they see
             return ToDto(user);
         }
         catch (InvalidOperationException ex)
@@ -65,6 +68,7 @@ public sealed class UsersController(UserService users, PermissionService permiss
         if (!ok)
             return BadRequest(new { error = "That user can't be deleted." });
         permissions.Invalidate(id);
+        sites.RemovePrincipal(SitePrincipalType.User, id);
         return NoContent();
     }
 

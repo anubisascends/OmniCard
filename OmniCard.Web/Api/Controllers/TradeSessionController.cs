@@ -8,6 +8,7 @@ using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Security;
+using OmniCard.Shared.Sites;
 using OmniCard.Shared.Settings;
 using OmniCard.Shared.Trades;
 using OmniCard.Data.Catalogs;
@@ -36,14 +37,17 @@ public sealed class TradeSessionController : ControllerBase
     private readonly ICardService _cardService;
     private readonly ITradeImportService _tradeImport;
     private readonly IDbContextFactory<ScryfallDbContext>? _scryfallFactory;
+    private readonly RequestSiteAccess? _siteAccess;
 
     public TradeSessionController(
         IDbContextFactory<OmniCardDbContext> dbFactory,
         IDataPathService paths,
         ICardService cardService,
         ITradeImportService tradeImport,
-        IDbContextFactory<ScryfallDbContext>? scryfallFactory = null)
+        IDbContextFactory<ScryfallDbContext>? scryfallFactory = null,
+        RequestSiteAccess? siteAccess = null)
     {
+        _siteAccess = siteAccess;
         _dbFactory = dbFactory;
         _paths = paths;
         _cardService = cardService;
@@ -78,6 +82,7 @@ public sealed class TradeSessionController : ControllerBase
 
     [HttpPost("add-owned")]
     [RequirePermission(Permissions.TradesCreate)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "LotId")]
     public IActionResult AddOwned([FromBody] AddOwnedRequest r)
     {
         var id = TradeSessionCookie.GetActive(HttpContext, _paths) ?? CreateDraft();
@@ -182,10 +187,18 @@ public sealed class TradeSessionController : ControllerBase
             return Ok(new { results = Array.Empty<object>() });
 
         using var db = _dbFactory.CreateDbContext();
+        // Only offer cards from sites the user can change (trading a card away writes to its site).
+        var writable = _siteAccess?.Current;
+        var visibleContainerIds = writable is null || writable.IsUnrestricted
+            ? null
+            : db.StorageContainers.AsNoTracking().Select(c => new { c.Id, c.SiteId }).AsEnumerable()
+                .Where(c => writable.CanWrite(c.SiteId)).Select(c => c.Id).ToHashSet();
         var allCards = db.Lots.AsNoTracking()
             .Include(l => l.Product)
             .Where(l => l.Product.Category == ProductCategory.Single && !l.IsTraded)
             .ToList()
+            .Where(l => visibleContainerIds is null
+                || (l.LocationId is int loc ? visibleContainerIds.Contains(loc) : writable!.CanWrite(Site.DefaultSiteId)))
             .Select(l => CollectionCardMapper.ToDto(l, l.Product, l.Product.LastMarketPrice ?? 0m))
             .ToList();
 
