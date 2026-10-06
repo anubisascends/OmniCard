@@ -39,6 +39,29 @@
       "addedNoteFiltered": "Only confirmed & checked scans are added, and only those shown by the current filter.",
       "success": "Added {{count}} card(s) to your collection."
     },
+    "export": {
+      "button": "Export ({{count}})",
+      "exporting": "Exporting…",
+      "hint": "Download the checked, matched scans without adding them to your collection. They stay in this list, so you can still add them later. Confirming isn't required.",
+      "mtgOnly": "MTG only",
+      "copyText": "Copy as text list",
+      "copied_one": "Copied {{count}} card to the clipboard.",
+      "copied_other": "Copied {{count}} cards to the clipboard.",
+      "copyFailed": "Couldn't copy to the clipboard.",
+      "zip": "Export several formats (.zip)…",
+      "zipTitle": "Export several formats",
+      "zipIntro_one": "Exports {{count}} checked scan once per chosen format, in a single .zip. Nothing is added to your collection.",
+      "zipIntro_other": "Exports {{count}} checked scans once per chosen format, in a single .zip. Nothing is added to your collection.",
+      "zipAction_one": "Download {{count}} format",
+      "zipAction_other": "Download {{count}} formats",
+      "success_one": "Exported {{count}} scan. It's still in the list.",
+      "success_other": "Exported {{count}} scans. They're still in the list."
+    },
+    "session": {
+      "restored_one": "Restored {{count}} scan from your last session.",
+      "restored_other": "Restored {{count}} scans from your last session.",
+      "discard": "Discard"
+    },
     "audit": {
       "breadcrumb": "Audit",
       "title": "Audit: {{location}}",

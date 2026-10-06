@@ -15,7 +15,11 @@
       "tcgplayer": "TCGplayer",
       "moxfield": "Moxfield",
       "manabox": "ManaBox",
-      "ticker": "Card Price Ticker"
+      "ticker": "Card Price Ticker",
+      "archidekt": "Archidekt",
+      "deckbox": "Deckbox",
+      "dragonshield": "Dragon Shield",
+      "text": "Text list (.txt)"
     },
     "stackDuplicates": "Stack duplicates",
     "selectedCount_one": "{{count}} card selected",

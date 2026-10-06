@@ -17,6 +17,9 @@ import {
   Divider,
   FormControlLabel,
   IconButton,
+  ListItemIcon,
+  ListItemText,
+  Menu,
   MenuItem,
   Paper,
   Stack,
@@ -31,6 +34,9 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import FolderZipIcon from '@mui/icons-material/FolderZip';
 import EditIcon from '@mui/icons-material/Edit';
 import LockIcon from '@mui/icons-material/Lock';
 import PlaceIcon from '@mui/icons-material/Place';
@@ -44,9 +50,19 @@ import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog
 import { WebcamScanDialog } from '../components/dialogs/WebcamScanDialog';
 import { ScanValueBadges, ListReprintChip } from '../lib/scanBadges';
 import { ENGLISH, LanguageChip, LanguageSelect, languageName } from '../lib/cardLanguages';
+import {
+  EXPORT_FORMATS,
+  copyToClipboard,
+  fileStamp,
+  formatAvailableFor,
+  textListLine,
+} from '../lib/exportFormats';
+import { ScanSessionStore } from '../lib/scanSessionStore';
+import { usePermissions } from '../context/usePermissions';
 import type {
   AuditCommitResultDto,
   ScanBadgeSettingsDto,
+  ScanCommitItem,
   ScanCommitResultDto,
   ScanMatchDto,
   ScanSearchResultDto,
@@ -129,6 +145,28 @@ function identityOf(item: ScanItem) {
     };
   }
   return null;
+}
+
+/** The server payload for one scan (commit, audit-commit and export all take this shape). Only
+ * call for an item with a resolved identity. */
+function toCommitItem(it: ScanItem, game: string): ScanCommitItem {
+  const id = identityOf(it)!;
+  return {
+    ...id,
+    game,
+    condition: it.condition,
+    language: it.language,
+    isFoil: it.isFoil,
+    foilType: it.isFoil ? it.foilType : null,
+    quantity: it.quantity,
+    purchasePrice: it.purchasePrice.trim() === '' ? null : Number(it.purchasePrice),
+    note: it.note.trim() === '' ? null : it.note.trim(),
+    tags: it.tags,
+    // Carry the scan's hash so the server records this confirmed identity for future auto-matching.
+    // Present on both auto-matches and manual corrections (it.match holds the original scan result
+    // even when the identity was overridden).
+    scanHash: it.match?.scanHash ?? null,
+  };
 }
 
 /** Sortable/filterable name for an item, falling back to the file name for unmatched scans. */
@@ -1026,6 +1064,94 @@ function BulkEditDialog({
   );
 }
 
+const ZIP_FORMATS_KEY = 'omnicard.scanExport.zipFormats';
+
+/** The formats last chosen for a multi-format export (a per-browser convenience). */
+function loadZipFormats(): string[] {
+  try {
+    const raw = localStorage.getItem(ZIP_FORMATS_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed)) {
+      return parsed.filter((f): f is string => (EXPORT_FORMATS as readonly string[]).includes(f as string));
+    }
+  } catch {
+    /* storage unavailable or corrupt — use the default */
+  }
+  return ['tcgplayer', 'ticker'];
+}
+
+/** Pick several export formats and download them together as one .zip. */
+function ExportZipDialog({
+  open,
+  game,
+  count,
+  onClose,
+  onExport,
+}: {
+  open: boolean;
+  game: string;
+  count: number;
+  onClose: () => void;
+  onExport: (formats: string[]) => void;
+}) {
+  const { t } = useTranslation();
+  const [chosen, setChosen] = useState<string[]>(loadZipFormats);
+  const selected = EXPORT_FORMATS.filter((f) => chosen.includes(f) && formatAvailableFor(f, game));
+  const toggle = (f: string, on: boolean) =>
+    setChosen((prev) => (on ? [...prev.filter((x) => x !== f), f] : prev.filter((x) => x !== f)));
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>{t('scan.export.zipTitle')}</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          {t('scan.export.zipIntro', { count })}
+        </Typography>
+        <Stack>
+          {EXPORT_FORMATS.map((f) => {
+            const available = formatAvailableFor(f, game);
+            return (
+              <FormControlLabel
+                key={f}
+                disabled={!available}
+                control={
+                  <Checkbox
+                    checked={available && chosen.includes(f)}
+                    onChange={(e) => toggle(f, e.target.checked)}
+                  />
+                }
+                label={
+                  available
+                    ? t(`collection.exportFormats.${f}`)
+                    : `${t(`collection.exportFormats.${f}`)} (${t('scan.export.mtgOnly')})`
+                }
+              />
+            );
+          })}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
+        <Button
+          variant="contained"
+          startIcon={<FolderZipIcon />}
+          disabled={selected.length === 0}
+          onClick={() => {
+            try {
+              localStorage.setItem(ZIP_FORMATS_KEY, JSON.stringify(chosen));
+            } catch {
+              /* storage unavailable — the choice just isn't remembered */
+            }
+            onExport(selected);
+          }}
+        >
+          {t('scan.export.zipAction', { count: selected.length })}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 /** When run as an audit ({@link ScanPageProps.auditMode}), the Scan view is locked to one location
  * and its commit reconciles that location against the scan instead of appending lots. */
 export interface ScanPageProps {
@@ -1160,25 +1286,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
 
   const commit = useMutation<ScanCommitResultDto | AuditCommitResultDto>({
     mutationFn: () => {
-      const payload = items.filter(isVisibleCommittable).map((it) => {
-        const id = identityOf(it)!;
-        return {
-          ...id,
-          game,
-          condition: it.condition,
-          language: it.language,
-          isFoil: it.isFoil,
-          foilType: it.isFoil ? it.foilType : null,
-          quantity: it.quantity,
-          purchasePrice: it.purchasePrice.trim() === '' ? null : Number(it.purchasePrice),
-          note: it.note.trim() === '' ? null : it.note.trim(),
-          tags: it.tags,
-          // Carry the scan's hash so the server records this confirmed identity for future auto-matching.
-          // Present on both auto-matches and manual corrections (it.match holds the original scan result
-          // even when the identity was overridden).
-          scanHash: it.match?.scanHash ?? null,
-        };
-      });
+      const payload = items.filter(isVisibleCommittable).map((it) => toCommitItem(it, game));
       // Audit mode reconciles the location against the scan; normal mode appends lots.
       return auditMode
         ? api.auditCommit(containerId as number, payload)
@@ -1260,7 +1368,10 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     setItems((prev) => [...staged, ...prev]);
     // Auto-select the first newly-added card so the detail panel has something to show.
     setSelectedKey((cur) => cur ?? staged[0]?.key ?? null);
+    await matchItems(staged);
+  }
 
+  async function matchItems(staged: ScanItem[], matchGame = game) {
     // Match with BOUNDED concurrency. Firing an entire batch at once overwhelmed the server
     // (each match is heavy CPU: hashing + OCR + rotation retries) and raced the game services'
     // shared read context — the source of the batch "internal server error"s. A small worker
@@ -1274,7 +1385,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         const staging = queue.shift();
         if (!staging) return;
         try {
-          const match = await api.scanMatch(staging.file, game, isFoil, setCodes, language);
+          const match = await api.scanMatch(staging.file, matchGame, staging.isFoil, setCodes, language);
           // TIFF uploads carry no local preview; adopt the server-rendered one when present.
           const patch: Partial<ScanItem> = { status: 'done', match, include: match.matched };
           // The server's language (printed marker > session choice > matched printing) seeds the copy.
@@ -1307,6 +1418,120 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     () => (containerId === '' ? null : locations.data?.find((l) => l.id === containerId)?.name ?? null),
     [containerId, locations.data],
   );
+
+  // --- Refresh/crash safety: mirror the scan list into IndexedDB so a reload (e.g. mid-recording)
+  // doesn't lose staged scans. Scan and each location's audit keep separate sessions. ---
+  const sessionStore = useMemo(
+    () => new ScanSessionStore<ScanItem>(auditMode ? `audit-${lockedContainerId}` : 'scan'),
+    [auditMode, lockedContainerId],
+  );
+  const restoreDone = useRef(false);
+  const [restoredKeys, setRestoredKeys] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let cancelled = false;
+    restoreDone.current = false;
+    void sessionStore.load().then((restored) => {
+      if (cancelled) return;
+      if (restored && restored.items.length > 0) {
+        // Never reuse a key the new list already holds (scans staged before the restore finished).
+        seq = Math.max(seq, ...restored.items.map((it) => Number(it.key.slice(1)) + 1).filter(Number.isFinite));
+        const taken = new Set(itemsRef.current.map((it) => it.key));
+        const revived = restored.items.map((it) => ({
+          ...it,
+          key: taken.has(it.key) ? `s${seq++}` : it.key,
+          // Blob URLs die with the tab; TIFFs never had one (their preview is the server's data URI).
+          previewUrl: isTiff(it.file) ? (it.match?.scanPreviewDataUri ?? '') : URL.createObjectURL(it.file),
+        }));
+        setGame(restored.game);
+        setItems((prev) => [...prev, ...revived]);
+        setRestoredKeys(new Set(revived.map((it) => it.key)));
+        // Scans that were still matching when the page went away get matched again.
+        const pending = revived.filter((it) => it.status === 'matching');
+        if (pending.length > 0) void matchItems(pending, restored.game);
+      }
+      restoreDone.current = true;
+    });
+    return () => {
+      cancelled = true;
+    };
+    // matchItems is a plain function re-created each render; the restore must run once per session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionStore]);
+  useEffect(() => {
+    if (!restoreDone.current) return;
+    const handle = window.setTimeout(() => void sessionStore.sync(game, items), 400);
+    return () => window.clearTimeout(handle);
+  }, [items, game, sessionStore]);
+  // Flush on unmount (e.g. the audit navigates away right after committing) — the debounce would drop it.
+  const gameRef = useRef(game);
+  gameRef.current = game;
+  useEffect(
+    () => () => {
+      if (restoreDone.current) void sessionStore.sync(gameRef.current, itemsRef.current);
+    },
+    [sessionStore],
+  );
+  const restoredStillPresent = useMemo(
+    () => items.filter((it) => restoredKeys.has(it.key)).length,
+    [items, restoredKeys],
+  );
+
+  // --- Export staged scans (CSV / text / zip) WITHOUT adding them to the collection. Scoped like
+  // Confirm/Add to the visible + checked list, but confirmation isn't required. ---
+  const { can } = usePermissions();
+  const canExport = can('export.run');
+  const exportableItems = useMemo(
+    () => visibleItems.filter((it) => it.include && identityOf(it)),
+    [visibleItems],
+  );
+  const [exportAnchor, setExportAnchor] = useState<HTMLElement | null>(null);
+  const [zipOpen, setZipOpen] = useState(false);
+  const [exportNotice, setExportNotice] = useState<{ severity: 'success' | 'error'; text: string } | null>(
+    null,
+  );
+  const exportScans = useMutation({
+    mutationFn: (formats: string[]) => {
+      const baseName = auditMode
+        ? `audit-${selectedLocationName ?? lockedContainerId}-${fileStamp()}`
+        : `scan-${fileStamp()}`;
+      return api.scanExport(
+        formats,
+        exportableItems.map((it) => toCommitItem(it, game)),
+        baseName,
+      );
+    },
+    onMutate: () => setExportNotice(null),
+    onSuccess: () =>
+      setExportNotice({ severity: 'success', text: t('scan.export.success', { count: exportableItems.length }) }),
+    onError: (e) => setExportNotice({ severity: 'error', text: (e as Error).message }),
+  });
+  const exportFormats = (formats: string[]) => {
+    setExportAnchor(null);
+    setZipOpen(false);
+    exportScans.mutate(formats);
+  };
+  const copyTextList = async () => {
+    setExportAnchor(null);
+    const text = exportableItems
+      .map((it) => {
+        const id = identityOf(it)!;
+        return textListLine({
+          quantity: it.quantity,
+          name: id.name,
+          setCode: id.setCode,
+          collectorNumber: id.collectorNumber,
+          isFoil: it.isFoil,
+          foilType: it.foilType,
+        });
+      })
+      .join('\n');
+    const ok = await copyToClipboard(text);
+    setExportNotice(
+      ok
+        ? { severity: 'success', text: t('scan.export.copied', { count: exportableItems.length }) }
+        : { severity: 'error', text: t('scan.export.copyFailed') },
+    );
+  };
 
   return (
     <Stack spacing={3}>
@@ -1433,6 +1658,20 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         </Typography>
       </Paper>
 
+      {restoredStillPresent > 0 && (
+        <Alert
+          severity="info"
+          onClose={() => setRestoredKeys(new Set())}
+          action={
+            <Button color="inherit" size="small" onClick={() => dropItems((it) => restoredKeys.has(it.key))}>
+              {t('scan.session.discard')}
+            </Button>
+          }
+        >
+          {t('scan.session.restored', { count: restoredStillPresent })}
+        </Alert>
+      )}
+
       {items.length > 0 && (
         <Paper variant="outlined" sx={{ p: 2, position: 'sticky', top: 56, zIndex: 1 }}>
           <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
@@ -1479,6 +1718,62 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                   ? t('scan.audit.commit', { count: committableCount })
                   : t('scan.commit.addConfirmed', { count: committableCount })}
             </Button>
+            {canExport && (
+              <>
+                <Tooltip title={t('scan.export.hint')}>
+                  <span>
+                    <Button
+                      variant="outlined"
+                      startIcon={<FileDownloadIcon />}
+                      disabled={exportableItems.length === 0 || exportScans.isPending}
+                      onClick={(e) => setExportAnchor(e.currentTarget)}
+                    >
+                      {exportScans.isPending
+                        ? t('scan.export.exporting')
+                        : t('scan.export.button', { count: exportableItems.length })}
+                    </Button>
+                  </span>
+                </Tooltip>
+                <Menu anchorEl={exportAnchor} open={!!exportAnchor} onClose={() => setExportAnchor(null)}>
+                  {EXPORT_FORMATS.map((f) => {
+                    const available = formatAvailableFor(f, game);
+                    return (
+                      <MenuItem key={f} disabled={!available} onClick={() => exportFormats([f])}>
+                        <ListItemText
+                          primary={t(`collection.exportFormats.${f}`)}
+                          secondary={available ? undefined : t('scan.export.mtgOnly')}
+                        />
+                      </MenuItem>
+                    );
+                  })}
+                  <Divider />
+                  <MenuItem onClick={() => void copyTextList()}>
+                    <ListItemIcon>
+                      <ContentCopyIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary={t('scan.export.copyText')} />
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => {
+                      setExportAnchor(null);
+                      setZipOpen(true);
+                    }}
+                  >
+                    <ListItemIcon>
+                      <FolderZipIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary={t('scan.export.zip')} />
+                  </MenuItem>
+                </Menu>
+                <ExportZipDialog
+                  open={zipOpen}
+                  game={game}
+                  count={exportableItems.length}
+                  onClose={() => setZipOpen(false)}
+                  onExport={exportFormats}
+                />
+              </>
+            )}
             <Typography variant="caption" color="text.secondary">
               {auditMode
                 ? t('scan.audit.commitHint')
@@ -1487,6 +1782,11 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                   : t('scan.commit.addedNote')}
             </Typography>
             {commit.error && <Alert severity="error">{(commit.error as Error).message}</Alert>}
+            {exportNotice && (
+              <Alert severity={exportNotice.severity} onClose={() => setExportNotice(null)}>
+                {exportNotice.text}
+              </Alert>
+            )}
             {!auditMode && commit.data && (
               <Alert severity="success">
                 {t('scan.commit.success', { count: (commit.data as { imported: number }).imported })}

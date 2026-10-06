@@ -394,4 +394,57 @@ public class CsvExportTests : IDisposable
         Assert.Single(lines);
         Assert.StartsWith("1 Test (TST) 1", lines[0]);
     }
+
+    [Fact]
+    public void ExportArchidekt_WritesFinishConditionAndScryfallId()
+    {
+        var path = Path.Combine(_tempDir, "archidekt.csv");
+        _service.ExportArchidekt(path, CreateTestCards());
+
+        var lines = File.ReadAllLines(path);
+        Assert.StartsWith("Quantity,Name,Finish,Condition", lines[0]);
+        Assert.StartsWith("1,Lightning Bolt,Normal,NM,2026-01-15,EN,5.99,,Alpha,lea,abc-123,161", lines[1]);
+        Assert.Contains(",Etched,LP,", lines[2]);
+    }
+
+    [Fact]
+    public void ExportDeckbox_MapsConditionAndLanguageNames()
+    {
+        var cards = CreateTestCards();
+        cards[1].Language = "ja";
+        var path = Path.Combine(_tempDir, "deckbox.csv");
+        _service.ExportDeckbox(path, cards);
+
+        var lines = File.ReadAllLines(path);
+        Assert.StartsWith("Count,Tradelist Count,Name,Edition,Card Number,Condition,Language,Foil", lines[0]);
+        Assert.StartsWith("1,0,Lightning Bolt,Alpha,161,Near Mint,English,,", lines[1]);
+        Assert.EndsWith(",5.99", lines[1]);
+        Assert.Contains("Good (Lightly Played),Japanese,foil", lines[2]);
+    }
+
+    [Fact]
+    public void ExportDragonShield_WritesSeparatorHintAndFolder()
+    {
+        var path = Path.Combine(_tempDir, "dragonshield.csv");
+        _service.ExportDragonShield(path, CreateTestCards());
+
+        var lines = File.ReadAllLines(path);
+        Assert.Equal("\"sep=,\"", lines[0]);
+        Assert.StartsWith("Folder Name,Quantity,Trade Quantity,Card Name,Set Code", lines[1]);
+        Assert.StartsWith("Red Binder,1,0,Lightning Bolt,LEA,Alpha,161,NearMint,Normal,English,5.99,2026-01-15", lines[2]);
+        Assert.Contains(",Excellent,Etched,", lines[3]);
+    }
+
+    [Fact]
+    public void ExportTextList_WritesQuantitySetNumberAndFinishMarker()
+    {
+        var cards = CreateTestCards();
+        cards[0].Quantity = 4;
+        var path = Path.Combine(_tempDir, "list.txt");
+        _service.ExportTextList(path, cards);
+
+        var lines = File.ReadAllLines(path);
+        Assert.Equal("4 Lightning Bolt (LEA) 161", lines[0]);
+        Assert.Equal("1 Ach! Hans, Run! (UNH) 116 *E*", lines[1]);
+    }
 }

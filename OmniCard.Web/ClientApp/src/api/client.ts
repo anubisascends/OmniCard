@@ -863,6 +863,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ containerId, items }),
     }),
+  // Export staged scans WITHOUT adding them to the collection. One format ⇒ that file; several ⇒ a
+  // zip with one file per format. `fileName` is the base name (no extension).
+  scanExport: (formats: string[], items: ScanCommitItem[], fileName: string) =>
+    postDownload(
+      '/api/scan/export',
+      { formats, items, fileName },
+      formats.length === 1 ? `${fileName}-${formats[0]}.csv` : `${fileName}.zip`,
+    ),
   // Location audit: the confirmed scans become the source of truth for the location (matched cards
   // kept, absent cards deleted, new cards added). Returns the per-bucket summary.
   auditCommit: (containerId: number, items: ScanCommitItem[]) =>

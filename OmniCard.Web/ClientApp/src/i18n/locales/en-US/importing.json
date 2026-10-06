@@ -9,7 +9,11 @@
         "appnative": "App-native",
         "tcgplayer": "TCGplayer",
         "moxfield": "Moxfield",
-        "manabox": "Manabox"
+        "manabox": "Manabox",
+        "archidekt": "Archidekt",
+        "deckbox": "Deckbox",
+        "dragonshield": "Dragon Shield",
+        "text": "Text list"
       }
     },
     "import": {
