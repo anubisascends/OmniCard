@@ -13,6 +13,7 @@ using OmniCard.Shared.Matching;
 using OmniCard.Shared.Settings;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
+using OmniCard.Collection.ImportExport;
 using OmniCard.Collection.Inventory;
 using OmniCard.Web.Api.Controllers;
 
@@ -49,7 +50,9 @@ public class CardScanControllerTests : IDisposable
     // Match is constructed with a null matcher for the validation cases below — they all short-circuit
     // before the matcher is ever invoked (no image / bad type / oversized / unknown game).
     private CardScanController CreateController() =>
-        new(matcher: null!, _cardService.Object, _binderCards, _tagService.Object, NullLogger<CardScanController>.Instance);
+        new(matcher: null!, _cardService.Object, _binderCards, _tagService.Object,
+            new CsvExportImportService(null, null, NullLogger<CsvExportImportService>.Instance),
+            NullLogger<CardScanController>.Instance);
 
     private static IFormFile CreateFormFile(byte[]? content = null, string contentType = "image/jpeg",
         string fileName = "test.jpg", long? overrideLength = null)
@@ -229,6 +232,91 @@ public class CardScanControllerTests : IDisposable
         Assert.IsType<OkObjectResult>(CreateController().Commit(req).Result);
         game.Verify(g => g.RecordCorrection(It.IsAny<ulong>(), It.IsAny<string>(), It.IsAny<ulong?>()), Times.Never);
     }
+
+    private static ScanCommitItem BoltItem(int quantity = 1) => new()
+    {
+        Game = "Mtg", GameCardId = "id-1", Name = "Lightning Bolt", SetCode = "2x2", SetName = "Double Masters 2022",
+        CollectorNumber = "117", Rarity = "uncommon", Condition = "LP", Quantity = quantity, Tags = ["video"],
+    };
+
+    private void SetupBoltPrice(decimal price)
+    {
+        var game = new Mock<ICardGameService>();
+        game.Setup(g => g.GetCurrentPrices(It.IsAny<IEnumerable<string>>(), It.IsAny<bool>()))
+            .Returns(new Dictionary<string, decimal> { ["id-1"] = price });
+        _cardService.Setup(c => c.GetGameService(CardGame.Mtg)).Returns(game.Object);
+    }
+
+    [Fact]
+    public void Export_Ticker_UsesLiveMarketPrice()
+    {
+        SetupBoltPrice(2.50m);
+        var req = new ScanExportRequest { Formats = ["ticker"], Items = [BoltItem()] };
+
+        var file = Assert.IsType<FileContentResult>(CreateController().Export(req));
+        Assert.Contains("Lightning Bolt,2.50", System.Text.Encoding.UTF8.GetString(file.FileContents));
+    }
+
+    [Fact]
+    public void Export_NoItems_Returns400()
+    {
+        var req = new ScanExportRequest { Formats = ["moxfield"], Items = [] };
+        Assert.IsType<BadRequestObjectResult>(CreateController().Export(req));
+    }
+
+    [Fact]
+    public void Export_UnknownGameInItem_Returns400()
+    {
+        var req = new ScanExportRequest { Formats = ["moxfield"], Items = [new ScanCommitItem { Game = "Nope", GameCardId = "x" }] };
+        Assert.IsType<BadRequestObjectResult>(CreateController().Export(req));
+    }
+
+    [Fact]
+    public void Export_SingleFormat_ReturnsCsv_OneRowPerCopy_AndWritesNothing()
+    {
+        SetupBoltPrice(2.50m);
+        var req = new ScanExportRequest { Formats = ["moxfield"], Items = [BoltItem(quantity: 3)], FileName = "scan-2026-10-06-1432" };
+
+        var file = Assert.IsType<FileContentResult>(CreateController().Export(req));
+        Assert.Equal("text/csv", file.ContentType);
+        Assert.Equal("scan-2026-10-06-1432-moxfield.csv", file.FileDownloadName);
+
+        var lines = System.Text.Encoding.UTF8.GetString(file.FileContents)
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        Assert.Equal(4, lines.Length); // header + 3 copies
+        Assert.All(lines.Skip(1), l => Assert.StartsWith("1,Lightning Bolt,2X2,117", l));
+
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.Empty(ctx.Lots); // export never touches the collection
+    }
+
+    [Fact]
+    public void Export_SeveralFormats_ReturnsZipWithOneEntryPerFormat()
+    {
+        SetupBoltPrice(2.50m);
+        var req = new ScanExportRequest
+        {
+            Formats = ["moxfield", "text", "ticker", "moxfield"], Items = [BoltItem()], FileName = "audit-Red Binder",
+        };
+
+        var file = Assert.IsType<FileContentResult>(CreateController().Export(req));
+        Assert.Equal("application/zip", file.ContentType);
+        Assert.Equal("audit-Red Binder.zip", file.FileDownloadName);
+
+        using var zip = new System.IO.Compression.ZipArchive(new MemoryStream(file.FileContents));
+        Assert.Equal(
+            ["audit-Red Binder-moxfield.csv", "audit-Red Binder-text.txt", "audit-Red Binder-ticker.csv"],
+            zip.Entries.Select(e => e.FullName).Order().ToArray());
+    }
+
+    [Theory]
+    [InlineData("scan-2026", "scan-2026")]
+    [InlineData("../../etc/passwd", "etc-passwd")]
+    [InlineData("audit-Box:1", "audit-Box-1")]
+    [InlineData("   ", null)]
+    [InlineData(null, null)]
+    public void SafeFileName_StripsPathAndInvalidCharacters(string? input, string? expected)
+        => Assert.Equal(expected, CardScanController.SafeFileName(input));
 
     private sealed class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>
     {

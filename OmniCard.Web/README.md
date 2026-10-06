@@ -241,6 +241,21 @@ condition.
   running Windows' built-in **`curl.exe`**. It must be on the server's `PATH` (it is by default on Windows
   10 1803+ / Server 2019+). The server needs outbound HTTPS to `api2.moxfield.com` and `archidekt.com`.
 
+## Export scans without adding them
+
+On **Scan** (and a location's **Audit**), **Export** downloads the checked, matched scans without
+writing anything to the collection. The scans stay in the list so they can still be added later.
+Confirming isn't required. Every collection format is offered: OmniCard, TCGplayer, Moxfield, ManaBox,
+Archidekt, Deckbox, Dragon Shield, Card Price Ticker and a plain text list. The Moxfield, ManaBox,
+Archidekt and Deckbox formats are MTG-only. The menu can also **copy the text list** to the clipboard
+("4 Lightning Bolt (2X2) 117 *F*"), or **export several formats** as one `.zip`. Each copy is written as
+its own row, and prices are live market prices.
+
+- API: `POST /api/scan/export` (`ExportRun` permission). One format returns that file; several return a zip.
+- The staged scan list (images included) is mirrored to the browser's IndexedDB, so a refresh or crash
+  restores it with a "Restored N scans" banner. Scan and each location's audit keep separate sessions. The
+  data stays in that browser and is cleared as scans are added, removed or discarded.
+
 ## Import into a location (all-or-nothing)
 
 A location's page has an **Import** button that takes a collection CSV (OmniCard, TCGplayer, Moxfield or

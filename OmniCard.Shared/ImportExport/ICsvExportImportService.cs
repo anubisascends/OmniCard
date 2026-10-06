@@ -10,6 +10,10 @@ public interface ICsvExportImportService
     void ExportMoxfield(string filePath, IEnumerable<CollectionCard> cards);
     void ExportManabox(string filePath, IEnumerable<CollectionCard> cards);
     void ExportPriceTicker(string filePath, IEnumerable<CollectionCard> cards);
+    void ExportArchidekt(string filePath, IEnumerable<CollectionCard> cards);
+    void ExportDeckbox(string filePath, IEnumerable<CollectionCard> cards);
+    void ExportDragonShield(string filePath, IEnumerable<CollectionCard> cards);
+    void ExportTextList(string filePath, IEnumerable<CollectionCard> cards);
     void ExportManaboxScans(string filePath, IEnumerable<ScannedCard> scans);
     void ExportManaboxScansCollection(string filePath, IEnumerable<ScannedCard> scans);
     void ExportManaboxScansText(string filePath, IEnumerable<ScannedCard> scans);

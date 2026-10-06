@@ -5,11 +5,13 @@ using OmniCard.Shared.Cards;
 using OmniCard.Shared.Matching;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Games;
+using OmniCard.Shared.ImportExport;
 using OmniCard.Shared.Security;
 using OmniCard.Shared.Sites;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Web.Api.Infrastructure;
+using OmniCard.Web.Helpers;
 
 namespace OmniCard.Web.Api.Controllers;
 
@@ -28,6 +30,7 @@ public sealed class CardScanController(
     ICardService cardService,
     WebBinderCardService binderCards,
     ITagService tags,
+    ICsvExportImportService csv,
     ILogger<CardScanController> logger) : ControllerBase
 {
     /// <summary>Upper bound on correction-search results. High enough to show every printing of a
@@ -234,10 +237,71 @@ public sealed class CardScanController(
         return Ok(new ScanCommitResultDto(lotIds.Count));
     }
 
+    /// <summary>Export staged scans to CSV (or a zip of several formats) WITHOUT adding them to the
+    /// collection — for scanning cards on video, or handing a list to another app, while keeping the
+    /// option to commit them later. Nothing is written to the database. Each item is expanded to one row
+    /// per copy, so formats that write a fixed quantity of 1 per row still count every copy.</summary>
+    [HttpPost("export")]
+    [RequirePermission(Permissions.ExportRun)]
+    public IActionResult Export([FromBody] ScanExportRequest request)
+    {
+        if (request.Items.Count == 0)
+            return BadRequest(new { error = "No scanned cards to export" });
+
+        var cards = new List<CollectionCard>(request.Items.Count);
+        foreach (var item in request.Items)
+        {
+            if (MapScanItem(item, containerId: null) is not { } card)
+                return BadRequest(new { error = $"Unknown game '{item.Game}'" });
+            card.Tags = item.Tags.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()).ToList();
+            var copies = card.Quantity;
+            card.Quantity = 1;
+            for (var i = 0; i < copies; i++)
+                cards.Add(i == 0 ? card : CloneCopy(card));
+        }
+
+        MarketPriceHydrator.Populate(cardService, cards);
+
+        var formats = (request.Formats.Count == 0 ? ["appnative"] : request.Formats)
+            .Select(CsvExportFormats.Resolve)
+            .DistinctBy(f => f.Key)
+            .ToList();
+        var baseName = SafeFileName(request.FileName) ?? "scan";
+
+        logger.LogInformation("Exported {Count} scanned card(s) as {Formats}", cards.Count, string.Join(", ", formats.Select(f => f.Key)));
+
+        if (formats.Count == 1)
+        {
+            var format = formats[0];
+            return File(CsvExportFormats.Produce(csv, format, cards), format.ContentType,
+                $"{baseName}-{format.Key}{format.Extension}");
+        }
+        return File(CsvExportFormats.ProduceZip(csv, formats, cards, baseName), "application/zip", $"{baseName}.zip");
+    }
+
+    private static CollectionCard CloneCopy(CollectionCard c) => new()
+    {
+        Game = c.Game, GameCardId = c.GameCardId, Name = c.Name, SetCode = c.SetCode, SetName = c.SetName,
+        Number = c.Number, Rarity = c.Rarity, ImageUri = c.ImageUri, Condition = c.Condition, Language = c.Language,
+        IsFoil = c.IsFoil, FoilType = c.FoilType, Quantity = 1, PurchasePrice = c.PurchasePrice, Note = c.Note,
+        DateAdded = c.DateAdded, Tags = [.. c.Tags],
+    };
+
+    /// <summary>The client's base file name with path/invalid characters stripped; null when nothing
+    /// usable is left.</summary>
+    internal static string? SafeFileName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        var invalid = Path.GetInvalidFileNameChars();
+        var cleaned = new string(name.Trim().Select(ch => invalid.Contains(ch) ? '-' : ch).ToArray()).Trim(' ', '.', '-');
+        if (cleaned.Length > 100) cleaned = cleaned[..100];
+        return cleaned.Length == 0 ? null : cleaned;
+    }
+
     /// <summary>Maps a confirmed scan item to a <see cref="CollectionCard"/> destined for
-    /// <paramref name="containerId"/>. Returns <c>null</c> when the item's game is unknown. Shared by
-    /// the scan-commit and audit-commit paths.</summary>
-    private static CollectionCard? MapScanItem(ScanCommitItem item, int containerId)
+    /// <paramref name="containerId"/> (null for an export, which places nothing). Returns <c>null</c>
+    /// when the item's game is unknown. Shared by the scan-commit, audit-commit and export paths.</summary>
+    private static CollectionCard? MapScanItem(ScanCommitItem item, int? containerId)
     {
         if (LocationsController.ParseGame(item.Game) is not { } game)
             return null;

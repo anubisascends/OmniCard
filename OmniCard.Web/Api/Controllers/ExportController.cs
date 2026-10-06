@@ -78,17 +78,8 @@ public sealed class ExportController(
 
     private IActionResult WriteCsv(IReadOnlyList<CollectionCard> cards, string format, string namePrefix)
     {
-        var fmt = (format ?? "appnative").ToLowerInvariant();
-        Action<string> writer = fmt switch
-        {
-            "tcgplayer" => p => csv.ExportTcgPlayer(p, cards),
-            "moxfield" => p => csv.ExportMoxfield(p, cards),
-            "manabox" => p => csv.ExportManabox(p, cards),
-            "ticker" => p => csv.ExportPriceTicker(p, cards),
-            _ => p => csv.ExportAppNative(p, cards),
-        };
-
-        var bytes = TempFile.Produce(".csv", writer);
-        return File(bytes, "text/csv", $"{namePrefix}-{fmt}.csv");
+        var fmt = CsvExportFormats.Resolve(format);
+        var bytes = CsvExportFormats.Produce(csv, fmt, cards);
+        return File(bytes, fmt.ContentType, $"{namePrefix}-{fmt.Key}{fmt.Extension}");
     }
 }

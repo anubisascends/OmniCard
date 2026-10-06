@@ -252,6 +252,219 @@ public class CsvExportImportService(
         logger.LogInformation("ManaBox CSV export complete");
     }
 
+    // ── Archidekt Export (collection CSV; Archidekt's importer maps these columns by header) ──
+
+    public void ExportArchidekt(string filePath, IEnumerable<CollectionCard> cards)
+    {
+        using var writer = new StreamWriter(filePath);
+        using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+
+        csv.WriteField("Quantity");
+        csv.WriteField("Name");
+        csv.WriteField("Finish");
+        csv.WriteField("Condition");
+        csv.WriteField("Date Added");
+        csv.WriteField("Language");
+        csv.WriteField("Purchase Price");
+        csv.WriteField("Tags");
+        csv.WriteField("Edition Name");
+        csv.WriteField("Edition Code");
+        csv.WriteField("Scryfall ID");
+        csv.WriteField("Collector Number");
+        csv.NextRecord();
+
+        var count = 0;
+        foreach (var card in cards)
+        {
+            csv.WriteField(Math.Max(1, card.Quantity));
+            csv.WriteField(card.Name);
+            csv.WriteField(!card.IsFoil ? "Normal" : IsEtched(card) ? "Etched" : "Foil");
+            csv.WriteField(ConditionCodes.TryGetValue(card.Condition ?? "", out var cond) ? (cond == "DMG" ? "D" : cond) : "NM");
+            csv.WriteField(card.DateAdded.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            csv.WriteField((CardLanguages.Normalize(card.Language) ?? CardLanguages.English).ToUpperInvariant());
+            csv.WriteField(card.PurchasePrice?.ToString(CultureInfo.InvariantCulture) ?? "");
+            csv.WriteField(string.Join(",", card.Tags));
+            csv.WriteField(card.SetName);
+            csv.WriteField(card.SetCode.ToLowerInvariant());
+            // Archidekt is MTG-only; only an MTG card's id is a Scryfall id.
+            csv.WriteField(card.Game == CardGame.Mtg ? card.GameCardId : "");
+            csv.WriteField(card.Number);
+            csv.NextRecord();
+            count++;
+        }
+
+        logger.LogInformation("Exported {Count} cards in Archidekt format to {Path}", count, filePath);
+    }
+
+    // ── Deckbox.org Export ──
+
+    private static readonly Dictionary<string, string> ConditionToDeckbox = new()
+    {
+        ["NM"] = "Near Mint",
+        ["LP"] = "Good (Lightly Played)",
+        ["MP"] = "Played",
+        ["HP"] = "Heavily Played",
+        ["D"] = "Poor",
+        ["DMG"] = "Poor",
+    };
+
+    public void ExportDeckbox(string filePath, IEnumerable<CollectionCard> cards)
+    {
+        using var writer = new StreamWriter(filePath);
+        using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+
+        csv.WriteField("Count");
+        csv.WriteField("Tradelist Count");
+        csv.WriteField("Name");
+        csv.WriteField("Edition");
+        csv.WriteField("Card Number");
+        csv.WriteField("Condition");
+        csv.WriteField("Language");
+        csv.WriteField("Foil");
+        csv.WriteField("Signed");
+        csv.WriteField("Artist Proof");
+        csv.WriteField("Altered Art");
+        csv.WriteField("Misprint");
+        csv.WriteField("Promo");
+        csv.WriteField("Textless");
+        csv.WriteField("My Price");
+        csv.NextRecord();
+
+        var count = 0;
+        foreach (var card in cards)
+        {
+            csv.WriteField(Math.Max(1, card.Quantity));
+            csv.WriteField(0);
+            csv.WriteField(card.Name);
+            csv.WriteField(card.SetName);
+            csv.WriteField(card.Number);
+            csv.WriteField(ConditionToDeckbox.GetValueOrDefault(card.Condition ?? "", "Near Mint"));
+            csv.WriteField(LanguageName(card.Language));
+            csv.WriteField(card.IsFoil ? "foil" : "");
+            csv.WriteField("");
+            csv.WriteField("");
+            csv.WriteField("");
+            csv.WriteField("");
+            csv.WriteField("");
+            csv.WriteField("");
+            csv.WriteField(card.PurchasePrice?.ToString("0.00", CultureInfo.InvariantCulture) ?? "");
+            csv.NextRecord();
+            count++;
+        }
+
+        logger.LogInformation("Exported {Count} cards in Deckbox format to {Path}", count, filePath);
+    }
+
+    // ── Dragon Shield Card Manager Export ──
+    // Dragon Shield grades on the Cardmarket scale; the app's TCGplayer-style codes map onto it.
+
+    private static readonly Dictionary<string, string> ConditionToDragonShield = new()
+    {
+        ["NM"] = "NearMint",
+        ["LP"] = "Excellent",
+        ["MP"] = "Good",
+        ["HP"] = "Played",
+        ["D"] = "Poor",
+        ["DMG"] = "Poor",
+    };
+
+    public void ExportDragonShield(string filePath, IEnumerable<CollectionCard> cards)
+    {
+        using var writer = new StreamWriter(filePath);
+        // Dragon Shield's own exports open with an Excel separator hint; its importer expects it.
+        writer.WriteLine("\"sep=,\"");
+        using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+
+        csv.WriteField("Folder Name");
+        csv.WriteField("Quantity");
+        csv.WriteField("Trade Quantity");
+        csv.WriteField("Card Name");
+        csv.WriteField("Set Code");
+        csv.WriteField("Set Name");
+        csv.WriteField("Card Number");
+        csv.WriteField("Condition");
+        csv.WriteField("Printing");
+        csv.WriteField("Language");
+        csv.WriteField("Price Bought");
+        csv.WriteField("Date Bought");
+        csv.NextRecord();
+
+        var count = 0;
+        foreach (var card in cards)
+        {
+            csv.WriteField(card.Container?.Name ?? "OmniCard");
+            csv.WriteField(Math.Max(1, card.Quantity));
+            csv.WriteField(0);
+            csv.WriteField(card.Name);
+            csv.WriteField(card.SetCode.ToUpperInvariant());
+            csv.WriteField(card.SetName);
+            csv.WriteField(card.Number);
+            csv.WriteField(ConditionToDragonShield.GetValueOrDefault(card.Condition ?? "", "NearMint"));
+            csv.WriteField(!card.IsFoil ? "Normal" : IsEtched(card) ? "Etched" : "Foil");
+            csv.WriteField(LanguageName(card.Language));
+            csv.WriteField(card.PurchasePrice?.ToString("0.00", CultureInfo.InvariantCulture) ?? "");
+            csv.WriteField(card.DateAdded.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            csv.NextRecord();
+            count++;
+        }
+
+        logger.LogInformation("Exported {Count} cards in Dragon Shield format to {Path}", count, filePath);
+    }
+
+    // ── Plain-text card list ("4 Lightning Bolt (2X2) 117 *F*") — pastes into Moxfield, Archidekt,
+    // ManaBox and most deck builders ──
+
+    public void ExportTextList(string filePath, IEnumerable<CollectionCard> cards)
+    {
+        using var writer = new StreamWriter(filePath);
+        var count = 0;
+        foreach (var card in cards)
+        {
+            writer.WriteLine(TextListLine(card));
+            count++;
+        }
+
+        logger.LogInformation("Exported {Count} cards as a text list to {Path}", count, filePath);
+    }
+
+    /// <summary>One text-list line: quantity, name, (SET) and collector number when known, then
+    /// <c>*F*</c> (foil) or <c>*E*</c> (etched).</summary>
+    public static string TextListLine(CollectionCard card)
+    {
+        var line = $"{Math.Max(1, card.Quantity)} {card.Name}";
+        if (!string.IsNullOrWhiteSpace(card.SetCode))
+        {
+            line += $" ({card.SetCode.ToUpperInvariant()})";
+            if (!string.IsNullOrWhiteSpace(card.Number))
+                line += $" {card.Number}";
+        }
+        if (card.IsFoil)
+            line += IsEtched(card) ? " *E*" : " *F*";
+        return line;
+    }
+
+    private static bool IsEtched(CollectionCard card) =>
+        card.FoilType?.Contains("etched", StringComparison.OrdinalIgnoreCase) == true;
+
+    /// <summary>English name of a card language code, as Deckbox / Dragon Shield spell it.</summary>
+    private static string LanguageName(string? language) => (CardLanguages.Normalize(language) ?? CardLanguages.English) switch
+    {
+        "ja" => "Japanese",
+        "de" => "German",
+        "fr" => "French",
+        "it" => "Italian",
+        "es" => "Spanish",
+        "pt" => "Portuguese",
+        "ko" => "Korean",
+        "ru" => "Russian",
+        "zhs" => "Chinese Simplified",
+        "zht" => "Chinese Traditional",
+        "th" => "Thai",
+        "id" => "Indonesian",
+        "ph" => "Phyrexian",
+        _ => "English",
+    };
+
     public void ExportManaboxScans(string filePath, IEnumerable<ScannedCard> scans)
     {
         logger.LogInformation("Exporting scan queue to ManaBox CSV: {FilePath}", filePath);

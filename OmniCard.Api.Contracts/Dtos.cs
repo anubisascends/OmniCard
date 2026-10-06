@@ -1120,6 +1120,17 @@ public sealed record ScanCommitRequest
 
 public sealed record ScanCommitResultDto(int Imported);
 
+/// <summary>Export staged (not-yet-committed) scans as files without writing anything to the
+/// collection. One format ⇒ that file; several ⇒ a zip with one file per format.
+/// <see cref="FileName"/> is the base name (no extension) the client wants, e.g.
+/// "scan-2026-10-06-1432"; it is sanitized server-side.</summary>
+public sealed record ScanExportRequest
+{
+    public IReadOnlyList<string> Formats { get; init; } = [];
+    public IReadOnlyList<ScanCommitItem> Items { get; init; } = [];
+    public string? FileName { get; init; }
+}
+
 /// <summary>Commit a location audit: the confirmed scans become the source of truth for the
 /// location. Reuses <see cref="ScanCommitItem"/> — each item is one confirmed physical copy.</summary>
 public sealed record AuditCommitRequest

@@ -16,11 +16,13 @@ import DownloadIcon from '@mui/icons-material/Download';
 import LinkIcon from '@mui/icons-material/Link';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { api } from '../api/client';
+import { EXPORT_FORMATS as ALL_EXPORT_FORMATS } from '../lib/exportFormats';
 import { locationSelectOptions } from '../components/LocationSelectOptions';
 import { useGame } from '../context/GameContext';
 
 // Server format identifiers — not translated. Display labels resolve via importing.export.formats.
-const EXPORT_FORMATS = ['appnative', 'tcgplayer', 'moxfield', 'manabox'];
+// The full-collection export omits the Card Price Ticker (a per-video list, not a collection format).
+const EXPORT_FORMATS = ALL_EXPORT_FORMATS.filter((f) => f !== 'ticker');
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
 function ExportSection() {

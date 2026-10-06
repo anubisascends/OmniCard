@@ -32,6 +32,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import SellIcon from '@mui/icons-material/Sell';
 import { api } from '../api/client';
+import { EXPORT_FORMATS } from '../lib/exportFormats';
 import { LanguageChip } from '../lib/cardLanguages';
 import type { CardDto } from '../api/types';
 import { CardHoverPreview, type CardHover } from './CardHoverPreview';
@@ -44,7 +45,6 @@ const STACK_KEY = 'omnicard.stackDuplicates';
 
 // CSV export formats offered for a selection, mirroring the whole-collection export options.
 // Labels are resolved from `collection.exportFormats.<value>` at render time.
-const EXPORT_FORMATS: string[] = ['appnative', 'tcgplayer', 'moxfield', 'manabox', 'ticker'];
 
 /**
  * Shared collection card list used by both the Collection page and Location detail. Server-paginated;
