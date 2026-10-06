@@ -149,8 +149,10 @@ Deploy the published output to IIS:
 4. Set config via `web.config` `environmentVariables` (or `appsettings.json`): `DataDirectory`,
    `ConnectionStrings__OmniCard`, and the `eBay__*` keys as needed.
 5. Grant the app-pool identity (`IIS AppPool\<name>`):
-   - **read/write** on the data directory (`scans/`, `card-images/`, `dataprotection-keys/`),
+   - **read/write** on the data directory (`scans/`, `scan-batches/`, `card-images/`, `dataprotection-keys/`),
+   - **Modify** on each [watched scan folder](#watched-scan-folders) (picked-up files are moved to `_processed`),
    - access to SQL Server (or use a SQL login in the connection string instead of Windows auth).
+6. If you use watched scan folders, keep the app running (see [Keep the app running](#keep-the-app-running-iis)).
 
 > **Wipe the target folder before copying a new build over it.** Neither `dotnet publish`/xcopy nor
 > Web Deploy with `SkipExtraFilesOnServer` (this project's publish profiles) delete files that no
@@ -255,6 +257,48 @@ its own row, and prices are live market prices.
 - The staged scan list (images included) is mirrored to the browser's IndexedDB, so a refresh or crash
   restores it with a "Restored N scans" banner. Scan and each location's audit keep separate sessions. The
   data stays in that browser and is cleared as scans are added, removed or discarded.
+
+## Watched scan folders
+
+A scanner can save straight into a folder on the server, and OmniCard picks the images up and matches them
+in the background. Set it up in **Administration ▸ Scan ▸ Watched scan folders** (admins only): turn on
+**Watch folders**, give each game a folder on the server, and optionally set the batch defaults (art-fallback
+sets, condition, language, foil, default location).
+
+- **Layout:** `<game folder>\<batch name>\*.jpg|png|tif`. Each top-level subfolder is one batch, named after
+  the folder; deeper subfolders belong to it. Images saved directly into the game folder go into a batch
+  named after the date. Folders starting with `_` or `.` are ignored.
+- **Pick-up:** a file is taken in once it has stopped changing for a few seconds and the scanner software has
+  released it. It's copied to `{DataDirectory}\scan-batches\{batchId}\` and the original is moved to
+  `<game folder>\_processed\<batch name>\`. Clearing out `_processed` is up to you.
+- **Quiet period:** a batch starts matching once no new file has arrived for the quiet period (default 90 s).
+  Files added to a batch's folder later are appended to it, as long as it hasn't been committed or discarded;
+  after that, they start a new batch named `Name (2)`.
+- **Review:** the **Scan** menu item shows how many batches nobody has opened yet, and the Scan page lists
+  every batch with its progress. **Open** claims a batch for you; anyone else sees "In review by …" and can
+  only look. The owner (or an admin) can **Release** it; an admin can **Take over**. Edits are saved on the
+  server, so a batch can be continued from another browser. **Add confirmed cards** commits from the
+  server's copy (site write access applies, as for normal scans); the batch closes when nothing is left.
+- **Retention:** images of committed or discarded batches are deleted after the retention period (default
+  14 days).
+- Matching runs one image at a time in the background, so it doesn't slow down interactive scanning much.
+  An unfinished batch carries on after a restart.
+- API: `GET /api/scan/batches` (+ `/count`, `/{id}`, `/{id}/items/{itemId}/image`), `POST /{id}/claim`,
+  `/release`, `/commit`, `/discard`, `/items/remove`, `/items/rematch`, `PUT /{id}/items`. Settings:
+  `GET|PUT /api/settings/scan-folders` (admin).
+- Assumes **one** app instance: a web garden or several servers would each watch the folders.
+
+### Keep the app running (IIS)
+
+Folders are only watched while the app is running. By default IIS stops an idle app and starts it on the
+next request, so scans would sit unnoticed until someone opens the site. To keep it running:
+
+1. Install the IIS **Application Initialization** feature.
+2. On the app pool: **Start Mode** = `AlwaysRunning`, **Idle Time-out** = `0`. Consider turning off the
+   periodic recycle, or schedule it for a quiet time.
+3. On the site/application: **Preload Enabled** = `True`.
+
+Folders are rescanned when the app starts, so anything saved while it was stopped is still picked up.
 
 ## Import into a location (all-or-nothing)
 
