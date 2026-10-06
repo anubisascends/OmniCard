@@ -195,6 +195,30 @@ builder.Services.AddSingleton(sp =>
 builder.Services.AddSingleton<LocationImportService>();
 // Shared scan → lots write path (interactive scan commit + watched-folder batch commits).
 builder.Services.AddSingleton<ScanCommitService>();
+
+// Watched-folder scan batches: images dropped in a per-game folder are picked up, matched in the
+// background (the app's only BackgroundService) and reviewed/committed from the Scan page.
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<OmniCard.Web.Services.ScanBatches.ScanBatchStorage>();
+builder.Services.AddSingleton(sp => new OmniCard.Web.Services.ScanBatches.ScanFolderIngestor(
+    writableFactory,
+    sp.GetRequiredService<OmniCard.Web.Services.ScanBatches.ScanBatchStorage>(),
+    sp.GetRequiredService<TimeProvider>(),
+    sp.GetRequiredService<ILogger<OmniCard.Web.Services.ScanBatches.ScanFolderIngestor>>()));
+builder.Services.AddSingleton(sp => new OmniCard.Web.Services.ScanBatches.ScanBatchProcessor(
+    writableFactory,
+    sp.GetRequiredService<IScanMatcher>(),
+    sp.GetRequiredService<WebBinderCardService>().IsNewCard,
+    sp.GetRequiredService<OmniCard.Web.Services.ScanBatches.ScanBatchStorage>(),
+    sp.GetRequiredService<TimeProvider>(),
+    sp.GetRequiredService<ILogger<OmniCard.Web.Services.ScanBatches.ScanBatchProcessor>>()));
+builder.Services.AddSingleton(sp => new OmniCard.Web.Services.ScanBatches.ScanBatchService(
+    writableFactory,
+    sp.GetRequiredService<ScanCommitService>(),
+    sp.GetRequiredService<OmniCard.Web.Services.ScanBatches.ScanBatchStorage>(),
+    sp.GetRequiredService<TimeProvider>(),
+    sp.GetRequiredService<ILogger<OmniCard.Web.Services.ScanBatches.ScanBatchService>>()));
+builder.Services.AddHostedService<OmniCard.Web.Services.ScanBatches.ScanBatchHostedService>();
 builder.Services.AddScoped<BinderStateBuilder>();
 
 // User accounts + authentication. Passwords are stored only as salted PBKDF2 hashes; the built-in
