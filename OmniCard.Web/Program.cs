@@ -182,6 +182,8 @@ builder.Services.AddSingleton<IDeckLegalityService>(sp =>
 builder.Services.AddSingleton<ITagService>(_ => new TagService(writableFactory));
 builder.Services.AddSingleton<ISalesSettingsService, SalesSettingsService>();
 builder.Services.AddSingleton<IScanBadgeSettingsService, ScanBadgeSettingsService>();
+// Watched scan folders (Settings ▸ Scan); ScanBatchHostedService reconfigures on Changed.
+builder.Services.AddSingleton<IScanFolderSettingsService, ScanFolderSettingsService>();
 // Per-game "languages to download" (Settings ▸ Catalog data); applied by CatalogRefreshService.
 builder.Services.AddSingleton<ICatalogLanguageSettingsService, CatalogLanguageSettingsService>();
 builder.Services.AddSingleton<IListingService>(sp =>
