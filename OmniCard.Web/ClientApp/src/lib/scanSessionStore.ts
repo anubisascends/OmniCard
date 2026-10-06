@@ -16,7 +16,8 @@ const DB_VERSION = 1;
  * preview URL is stored too but is dead in a new tab — the caller recreates it from `file`. */
 export interface StoredScanItem {
   key: string;
-  file: File;
+  /** Items without a local file (e.g. background-batch items) aren't persisted here. */
+  file?: File;
 }
 
 export interface RestoredSession<T> {
@@ -123,6 +124,7 @@ export class ScanSessionStore<T extends StoredScanItem> {
     const fileStore = tx.objectStore('files');
     const keys = new Set<string>();
     for (const it of items) {
+      if (!it.file) continue;
       keys.add(it.key);
       const before = prev.get(it.key);
       if (before === it) continue;

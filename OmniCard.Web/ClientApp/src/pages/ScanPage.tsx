@@ -40,10 +40,11 @@ import FolderZipIcon from '@mui/icons-material/FolderZip';
 import EditIcon from '@mui/icons-material/Edit';
 import LockIcon from '@mui/icons-material/Lock';
 import PlaceIcon from '@mui/icons-material/Place';
+import ReplayIcon from '@mui/icons-material/Replay';
 import SearchIcon from '@mui/icons-material/Search';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
-import { api } from '../api/client';
+import { api, ApiError } from '../api/client';
 import { useFormatters } from '../i18n/format';
 import { useGame } from '../context/GameContext';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
@@ -58,10 +59,16 @@ import {
   textListLine,
 } from '../lib/exportFormats';
 import { ScanSessionStore } from '../lib/scanSessionStore';
+import { BatchItemStore } from '../lib/batchItemStore';
 import { usePermissions } from '../context/usePermissions';
+import { ScanBatchesPanel } from '../components/ScanBatchesPanel';
 import type {
   AuditCommitResultDto,
   ScanBadgeSettingsDto,
+  ScanBatchCommitResultDto,
+  ScanBatchDto,
+  ScanBatchItemDto,
+  ScanBatchItemEdit,
   ScanCommitItem,
   ScanCommitResultDto,
   ScanMatchDto,
@@ -93,7 +100,10 @@ interface ScanItem extends ItemProps {
   key: string;
   fileName: string;
   previewUrl: string;
-  file: File;
+  /** The local image (uploads only; a background-batch item's image lives on the server). */
+  file?: File;
+  /** The server-side item id when this scan belongs to a background batch. */
+  batchItemId?: number;
   status: ItemStatus;
   match?: ScanMatchDto;
   /** A manual correction chosen from the catalog search; overrides `match` when committing. */
@@ -167,6 +177,90 @@ function toCommitItem(it: ScanItem, game: string): ScanCommitItem {
     // even when the identity was overridden).
     scanHash: it.match?.scanHash ?? null,
   };
+}
+
+// --- Background batches: the server's batch items ↔ the page's scan items. ---
+
+const batchItemKey = (id: number) => `b${id}`;
+
+function fromBatchItem(dto: ScanBatchItemDto): ScanItem {
+  return {
+    key: batchItemKey(dto.id),
+    batchItemId: dto.id,
+    fileName: dto.fileName,
+    previewUrl: dto.imageUrl,
+    status: dto.status === 'Pending' ? 'matching' : dto.status === 'Error' ? 'error' : 'done',
+    match: dto.match ?? undefined,
+    override: dto.override ?? undefined,
+    error: dto.error ?? undefined,
+    include: dto.include,
+    verified: dto.verified,
+    condition: dto.condition,
+    language: dto.language || ENGLISH,
+    isFoil: dto.isFoil,
+    foilType: dto.foilType ?? null,
+    quantity: dto.quantity,
+    purchasePrice: dto.purchasePrice == null ? '' : String(dto.purchasePrice),
+    tags: dto.tags,
+    note: dto.note ?? '',
+  };
+}
+
+/** The reviewer-editable fields of a batch item, as saved to the server (match results never are). */
+function toBatchEdit(it: ScanItem): ScanBatchItemEdit | null {
+  if (it.batchItemId == null) return null;
+  const price = it.purchasePrice.trim() === '' ? null : Number(it.purchasePrice);
+  return {
+    id: it.batchItemId,
+    include: it.include,
+    verified: !!it.verified,
+    override: it.override ?? null,
+    condition: it.condition,
+    language: it.language,
+    isFoil: it.isFoil,
+    foilType: it.isFoil ? it.foilType : null,
+    quantity: it.quantity,
+    purchasePrice: price != null && Number.isFinite(price) ? price : null,
+    tags: it.tags,
+    note: it.note.trim() === '' ? null : it.note.trim(),
+  };
+}
+
+/**
+ * Fold the latest server copy of a batch into the local list. When reviewing, local edits win: only
+ * items still matching locally take the server's match result, new items (late files) are added, and
+ * items gone from the server are dropped. Read-only viewers just mirror the server. Unchanged items
+ * keep their object identity. `fresh` lists the items taken wholesale from the server.
+ */
+function mergeBatchItems(
+  local: ScanItem[],
+  server: ScanBatchItemDto[],
+  readOnly: boolean,
+): { items: ScanItem[]; fresh: ScanItem[] } {
+  const byKey = new Map(local.map((it) => [it.key, it]));
+  const fresh: ScanItem[] = [];
+  const items = server.map((dto) => {
+    const mine = byKey.get(batchItemKey(dto.id));
+    if (!mine || readOnly) {
+      const next = fromBatchItem(dto);
+      fresh.push(next);
+      return next;
+    }
+    if (mine.status === 'matching' && dto.status !== 'Pending') {
+      const matched = fromBatchItem(dto);
+      return {
+        ...mine,
+        status: matched.status,
+        match: matched.match,
+        error: matched.error,
+        include: matched.include,
+        language: matched.language,
+      };
+    }
+    if (mine.status !== 'matching' && dto.status === 'Pending') return { ...mine, status: 'matching' as const };
+    return mine;
+  });
+  return { items, fresh };
 }
 
 /** Sortable/filterable name for an item, falling back to the file name for unmatched scans. */
@@ -484,12 +578,14 @@ function MasterRow({
   badgeSettings,
   onSelect,
   onToggle,
+  readOnly = false,
 }: {
   item: ScanItem;
   selected: boolean;
   badgeSettings?: ScanBadgeSettingsDto;
   onSelect: () => void;
   onToggle: (v: boolean, shiftKey: boolean) => void;
+  readOnly?: boolean;
 }) {
   const { t } = useTranslation();
   const id = identityOf(item);
@@ -517,7 +613,7 @@ function MasterRow({
     >
       <Checkbox
         checked={item.include}
-        disabled={!id}
+        disabled={!id || readOnly}
         // Suppress the browser's shift-click text selection across rows without blocking the toggle.
         onMouseDown={(e) => {
           if (e.shiftKey) e.preventDefault();
@@ -576,12 +672,14 @@ function PropertyFields({
   onChange,
   foilTypeOptions,
   tagOptions,
+  disabled = false,
 }: {
   game: string;
   props: ItemProps;
   onChange: (patch: Partial<ItemProps>) => void;
   foilTypeOptions: string[];
   tagOptions: string[];
+  disabled?: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -592,6 +690,7 @@ function PropertyFields({
           size="small"
           label={t('common.labels.condition')}
           value={props.condition}
+          disabled={disabled}
           onChange={(e) => onChange({ condition: e.target.value })}
           sx={{ minWidth: 120 }}
         >
@@ -601,12 +700,18 @@ function PropertyFields({
             </MenuItem>
           ))}
         </TextField>
-        <LanguageSelect game={game} value={props.language} onChange={(language) => onChange({ language })} />
+        <LanguageSelect
+          game={game}
+          value={props.language}
+          disabled={disabled}
+          onChange={(language) => onChange({ language })}
+        />
         <TextField
           size="small"
           type="number"
           label={t('common.labels.quantity')}
           value={props.quantity}
+          disabled={disabled}
           onChange={(e) => onChange({ quantity: Math.max(1, Number(e.target.value) || 1) })}
           inputProps={{ min: 1 }}
           sx={{ width: 110 }}
@@ -616,6 +721,7 @@ function PropertyFields({
           type="number"
           label={t('common.labels.purchasePrice')}
           value={props.purchasePrice}
+          disabled={disabled}
           onChange={(e) => onChange({ purchasePrice: e.target.value })}
           inputProps={{ step: '0.01', min: 0 }}
           sx={{ width: 140 }}
@@ -626,6 +732,7 @@ function PropertyFields({
           control={
             <Switch
               checked={props.isFoil}
+              disabled={disabled}
               onChange={(e) => onChange({ isFoil: e.target.checked })}
             />
           }
@@ -637,6 +744,7 @@ function PropertyFields({
             size="small"
             options={foilTypeOptions}
             value={props.foilType ?? ''}
+            disabled={disabled}
             onChange={(_, v) => onChange({ foilType: v || null })}
             onInputChange={(_, v) => onChange({ foilType: v || null })}
             sx={{ minWidth: 200 }}
@@ -650,6 +758,7 @@ function PropertyFields({
         size="small"
         options={tagOptions}
         value={props.tags}
+        disabled={disabled}
         onChange={(_, v) => onChange({ tags: v })}
         renderInput={(p) => <TextField {...p} label={t('common.labels.tags')} />}
       />
@@ -659,6 +768,7 @@ function PropertyFields({
         multiline
         minRows={2}
         value={props.note}
+        disabled={disabled}
         onChange={(e) => onChange({ note: e.target.value })}
         placeholder={t('scan.props.notePlaceholder')}
       />
@@ -679,6 +789,7 @@ function DetailPanel({
   onCorrect,
   onRemove,
   onProps,
+  readOnly = false,
 }: {
   item: ScanItem;
   game: string;
@@ -691,6 +802,8 @@ function DetailPanel({
   onCorrect: (r: ScanSearchResultDto) => void;
   onRemove: () => void;
   onProps: (patch: Partial<ItemProps>) => void;
+  /** Viewing someone else's background batch: hide the actions and lock the fields. */
+  readOnly?: boolean;
 }) {
   const { t } = useTranslation();
   const [correcting, setCorrecting] = useState(false);
@@ -747,7 +860,7 @@ function DetailPanel({
           <Alert severity="warning">{t('scan.detail.noConfidentMatch')}</Alert>
         )}
 
-        {correcting ? (
+        {readOnly ? null : correcting ? (
           <Box>
             <CorrectionSearch
               game={game}
@@ -803,6 +916,7 @@ function DetailPanel({
           onChange={onProps}
           foilTypeOptions={foilTypeOptions}
           tagOptions={tagOptions}
+          disabled={readOnly}
         />
 
         <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
@@ -1161,13 +1275,32 @@ export interface ScanPageProps {
   auditMode?: boolean;
   /** Called with the audit summary after a successful audit commit. */
   onAuditCommitted?: (result: AuditCommitResultDto) => void;
+  /** Review a background scan batch instead of local uploads (see ScanBatchPage). */
+  batch?: ScanBatchMode;
 }
 
-export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitted }: ScanPageProps = {}) {
+/** A watched-folder batch under review: its items come from (and edits save to) the server, the game
+ * and match settings are fixed by the batch, and nothing is matched in the browser. */
+export interface ScanBatchMode {
+  /** The latest server copy of the batch (re-polled while it's still matching). */
+  data: ScanBatchDto;
+  /** Someone else is reviewing it (or it's closed): nothing can be changed. */
+  readOnly: boolean;
+  /** A save or commit was refused with 409 — the claim was lost. */
+  onClaimLost: () => void;
+  /** Items were changed server-side (commit, remove, rematch) — refetch the batch. */
+  onChanged: () => void;
+  /** Everything in the batch has been committed or removed. */
+  onClosed: () => void;
+}
+
+export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitted, batch }: ScanPageProps = {}) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const { game: contextGame } = useGame();
-  const [game, setGame] = useState(contextGame ?? 'Mtg');
+  const batchId = batch?.data.summary.id;
+  const readOnly = !!batch?.readOnly;
+  const [game, setGame] = useState(batch?.data.summary.game ?? contextGame ?? 'Mtg');
   // Multiple art-fallback sets: matching is constrained to the union of these (empty = all sets).
   const [artSets, setArtSets] = useState<{ setCode: string; setName: string }[]>([]);
   const [isFoil, setIsFoil] = useState(false);
@@ -1175,7 +1308,10 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   // The scan session's card language; '' = auto (read off the card / taken from the matched printing).
   const [language, setLanguage] = useState('');
   // In audit mode the target location is fixed to the audited container and cannot be changed.
-  const [containerId, setContainerId] = useState<number | ''>(lockedContainerId ?? '');
+  // A batch pre-selects its folder's default location (still changeable).
+  const [containerId, setContainerId] = useState<number | ''>(
+    lockedContainerId ?? batch?.data.summary.defaultContainerId ?? '',
+  );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [webcamOpen, setWebcamOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -1278,14 +1414,28 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     setLanguage('');
   }, [game]);
 
+  // A batch's "Sets (art fallback)" are fixed; they still scope the correction search.
+  const batchSetCodes = batch?.data.setCodes;
+  useEffect(() => {
+    if (!batchSetCodes?.length || !setsQuery.data) return;
+    const wanted = new Set(batchSetCodes.map((c) => c.toLowerCase()));
+    setArtSets(setsQuery.data.filter((s) => wanted.has(s.setCode.toLowerCase())));
+  }, [batchSetCodes, setsQuery.data]);
+
   // A scan is committable only when it is BOTH confirmed (verified) AND checked (include).
   const isCommittable = (it: ScanItem) => it.include && it.verified && !!identityOf(it);
 
   // Only ever act on visible items — a filtered list confirms/commits exactly what's on screen.
   const isVisibleCommittable = (it: ScanItem) => visibleKeys.has(it.key) && isCommittable(it);
 
-  const commit = useMutation<ScanCommitResultDto | AuditCommitResultDto>({
-    mutationFn: () => {
+  const commit = useMutation<ScanCommitResultDto | AuditCommitResultDto | ScanBatchCommitResultDto>({
+    mutationFn: async () => {
+      if (batchStore && batchId != null) {
+        // The server commits its saved copy, so flush pending edits first.
+        await batchStore.sync(itemsRef.current);
+        const ids = items.filter(isVisibleCommittable).map((it) => it.batchItemId!);
+        return api.scanBatchCommit(batchId, containerId as number, ids);
+      }
       const payload = items.filter(isVisibleCommittable).map((it) => toCommitItem(it, game));
       // Audit mode reconciles the location against the scan; normal mode appends lots.
       return auditMode
@@ -1303,7 +1453,14 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         qc.invalidateQueries({ queryKey: ['location'] });
         onAuditCommitted?.(res as AuditCommitResultDto);
       }
+      if (batch) {
+        if ((res as ScanBatchCommitResultDto).batchClosed) batch.onClosed();
+        else batch.onChanged();
+      }
       return res;
+    },
+    onError: (e) => {
+      if (batch && e instanceof ApiError && e.status === 409) batch.onClaimLost();
     },
   });
 
@@ -1384,6 +1541,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
       for (;;) {
         const staging = queue.shift();
         if (!staging) return;
+        if (!staging.file) continue;
         try {
           const match = await api.scanMatch(staging.file, matchGame, staging.isFoil, setCodes, language);
           // TIFF uploads carry no local preview; adopt the server-rendered one when present.
@@ -1413,7 +1571,9 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     () => visibleItems.filter((it) => identityOf(it)).length,
     [visibleItems],
   );
-  const stillMatching = items.some((it) => it.status === 'matching');
+  // Local uploads wait for every match before committing; a background batch can commit whatever is
+  // confirmed while the rest is still matching on the server.
+  const stillMatching = !batch && items.some((it) => it.status === 'matching');
   const selectedLocationName = useMemo(
     () => (containerId === '' ? null : locations.data?.find((l) => l.id === containerId)?.name ?? null),
     [containerId, locations.data],
@@ -1421,13 +1581,16 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
 
   // --- Refresh/crash safety: mirror the scan list into IndexedDB so a reload (e.g. mid-recording)
   // doesn't lose staged scans. Scan and each location's audit keep separate sessions. ---
+  // Background batches persist on the server, not in IndexedDB.
+  const isBatch = !!batch;
   const sessionStore = useMemo(
-    () => new ScanSessionStore<ScanItem>(auditMode ? `audit-${lockedContainerId}` : 'scan'),
-    [auditMode, lockedContainerId],
+    () => (isBatch ? null : new ScanSessionStore<ScanItem>(auditMode ? `audit-${lockedContainerId}` : 'scan')),
+    [auditMode, lockedContainerId, isBatch],
   );
   const restoreDone = useRef(false);
   const [restoredKeys, setRestoredKeys] = useState<Set<string>>(new Set());
   useEffect(() => {
+    if (!sessionStore) return;
     let cancelled = false;
     restoreDone.current = false;
     void sessionStore.load().then((restored) => {
@@ -1440,7 +1603,8 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
           ...it,
           key: taken.has(it.key) ? `s${seq++}` : it.key,
           // Blob URLs die with the tab; TIFFs never had one (their preview is the server's data URI).
-          previewUrl: isTiff(it.file) ? (it.match?.scanPreviewDataUri ?? '') : URL.createObjectURL(it.file),
+          previewUrl:
+            !it.file || isTiff(it.file) ? (it.match?.scanPreviewDataUri ?? '') : URL.createObjectURL(it.file),
         }));
         setGame(restored.game);
         setItems((prev) => [...prev, ...revived]);
@@ -1458,7 +1622,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionStore]);
   useEffect(() => {
-    if (!restoreDone.current) return;
+    if (!sessionStore || !restoreDone.current) return;
     const handle = window.setTimeout(() => void sessionStore.sync(game, items), 400);
     return () => window.clearTimeout(handle);
   }, [items, game, sessionStore]);
@@ -1467,10 +1631,85 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   gameRef.current = game;
   useEffect(
     () => () => {
-      if (restoreDone.current) void sessionStore.sync(gameRef.current, itemsRef.current);
+      if (sessionStore && restoreDone.current) void sessionStore.sync(gameRef.current, itemsRef.current);
     },
     [sessionStore],
   );
+  // --- Background batch: items come from the server copy (re-polled while matching) and the
+  // reviewer's edits are saved back, debounced like the IndexedDB session. ---
+  const claimLostRef = useRef(batch?.onClaimLost);
+  claimLostRef.current = batch?.onClaimLost;
+  const batchStore = useMemo(
+    () =>
+      batchId == null
+        ? null
+        : new BatchItemStore<ScanItem>(batchId, toBatchEdit, (e) => {
+            if (e instanceof ApiError && e.status === 409) claimLostRef.current?.();
+            else console.warn('Saving batch edits failed', e);
+          }),
+    [batchId],
+  );
+  const batchItems = batch?.data.items;
+  useEffect(() => {
+    if (!batchStore || !batchItems) return;
+    const merged = mergeBatchItems(itemsRef.current, batchItems, readOnly);
+    batchStore.prime(merged.fresh);
+    setItems(merged.items);
+  }, [batchItems, batchStore, readOnly]);
+  useEffect(() => {
+    if (!batchStore || readOnly) return;
+    const handle = window.setTimeout(() => void batchStore.sync(items), 400);
+    return () => window.clearTimeout(handle);
+  }, [items, batchStore, readOnly]);
+  // Flush the last edits when leaving the page (the debounce would drop them).
+  const readOnlyRef = useRef(readOnly);
+  readOnlyRef.current = readOnly;
+  useEffect(
+    () => () => {
+      if (batchStore && !readOnlyRef.current) void batchStore.sync(itemsRef.current);
+    },
+    [batchStore],
+  );
+
+  /** Remove scans from the list — and, for a batch, from the server (deleting their stored images). */
+  const removeItems = (shouldRemove: (it: ScanItem) => boolean | undefined) => {
+    if (batch && batchId != null) {
+      const ids = itemsRef.current
+        .filter((it) => shouldRemove(it) && it.batchItemId != null)
+        .map((it) => it.batchItemId!);
+      if (ids.length > 0)
+        void api
+          .scanBatchRemove(batchId, ids)
+          .then((r) => (r.batchClosed ? batch.onClosed() : batch.onChanged()))
+          .catch((e) => {
+            if (e instanceof ApiError && e.status === 409) batch.onClaimLost();
+          });
+    }
+    dropItems(shouldRemove);
+  };
+
+  const errorItemIds = useMemo(
+    () => items.filter((it) => it.status === 'error' && it.batchItemId != null).map((it) => it.batchItemId!),
+    [items],
+  );
+  const rematch = useMutation({
+    mutationFn: () => api.scanBatchRematch(batchId!, errorItemIds),
+    onSuccess: () => {
+      const retried = new Set(errorItemIds);
+      setItems((prev) =>
+        prev.map((it) =>
+          it.batchItemId != null && retried.has(it.batchItemId)
+            ? { ...it, status: 'matching' as const, error: undefined, match: undefined, include: false, verified: false }
+            : it,
+        ),
+      );
+      batch?.onChanged();
+    },
+    onError: (e) => {
+      if (batch && e instanceof ApiError && e.status === 409) batch.onClaimLost();
+    },
+  });
+
   const restoredStillPresent = useMemo(
     () => items.filter((it) => restoredKeys.has(it.key)).length,
     [items, restoredKeys],
@@ -1535,128 +1774,160 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
 
   return (
     <Stack spacing={3}>
-      {/* In audit mode the wrapping AuditPage supplies its own header/banner. */}
-      {!auditMode && (
+      {/* In audit and batch mode the wrapping page supplies its own header/banner. */}
+      {!auditMode && !batch && (
         <>
           <Typography variant="h4">{t('scan.title')}</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: -1 }}>
             {t('scan.intro')}
           </Typography>
+          <ScanBatchesPanel />
         </>
       )}
 
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap alignItems="center">
-          <TextField
-            select
-            size="small"
-            label={t('common.labels.game')}
-            value={game}
-            onChange={(e) => setGame(e.target.value)}
-            sx={{ minWidth: 200 }}
-          >
-            {gamesQuery.data?.map((g) => (
-              <MenuItem key={g.id} value={g.id}>
-                {g.displayName}
-              </MenuItem>
-            ))}
-          </TextField>
-          <Autocomplete
-            multiple
-            size="small"
-            options={sets}
-            getOptionLabel={(s) => s.setName}
-            isOptionEqualToValue={(a, b) => a.setCode === b.setCode}
-            value={artSets}
-            onChange={(_, v) => setArtSets(v)}
-            sx={{ minWidth: 260, flex: '1 1 260px' }}
-            renderInput={(p) => (
-              <TextField
-                {...p}
-                label={t('scan.controls.artSets')}
-                placeholder={artSets.length ? '' : t('scan.controls.allSets')}
-              />
+      {batch ? (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap alignItems="center">
+            <Chip variant="outlined" label={gamesQuery.data?.find((g) => g.id === game)?.displayName ?? game} />
+            <Typography variant="body2" color="text.secondary">
+              {t('scan.batches.settingsSummary', {
+                sets: artSets.length
+                  ? artSets.map((s) => s.setName).join(', ')
+                  : batch.data.setCodes.length
+                    ? batch.data.setCodes.join(', ').toUpperCase()
+                    : t('scan.batches.allSets'),
+                condition: batch.data.condition || 'NM',
+                language: batch.data.language ? languageName(t, batch.data.language) : t('scan.batches.autoLanguage'),
+                foil: batch.data.isFoil ? t('scan.batches.yes') : t('scan.batches.no'),
+              })}
+            </Typography>
+            <Box sx={{ flexGrow: 1 }} />
+            {!readOnly && errorItemIds.length > 0 && (
+              <Button
+                variant="outlined"
+                startIcon={<ReplayIcon />}
+                disabled={rematch.isPending}
+                onClick={() => rematch.mutate()}
+              >
+                {t('scan.batches.retryErrors', { count: errorItemIds.length })}
+              </Button>
             )}
-          />
-          <TextField
-            select
-            size="small"
-            label={t('common.labels.condition')}
-            value={condition}
-            onChange={(e) => setCondition(e.target.value)}
-            sx={{ minWidth: 120 }}
-          >
-            {CONDITIONS.map((c) => (
-              <MenuItem key={c} value={c}>
-                {c}
-              </MenuItem>
-            ))}
-          </TextField>
-          <Tooltip title={t('scan.controls.languageHelp')}>
-            <Box>
-              <LanguageSelect
-                game={game}
-                allowAuto
-                label={t('scan.controls.language')}
-                value={language}
-                onChange={setLanguage}
-              />
-            </Box>
-          </Tooltip>
-          <FormControlLabel
-            control={<Checkbox checked={isFoil} onChange={(e) => setIsFoil(e.target.checked)} />}
-            label={t('common.labels.foil')}
-          />
-          <Button
-            variant="contained"
-            startIcon={<CameraAltIcon />}
-            onClick={() => cameraInput.current?.click()}
-          >
-            {t('scan.controls.takePhoto')}
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<VideocamIcon />}
-            onClick={() => setWebcamOpen(true)}
-          >
-            {t('scan.controls.useWebcam')}
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<AddPhotoAlternateIcon />}
-            onClick={() => fileInput.current?.click()}
-          >
-            {t('scan.controls.addImages')}
-          </Button>
-          {/* Camera capture: on a phone this opens the rear camera directly; on desktop the
-              `capture` hint is ignored and it falls back to a normal file picker. */}
-          <input
-            ref={cameraInput}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            hidden
-            onChange={(e) => {
-              void handleFiles(e.target.files);
-              e.target.value = '';
-            }}
-          />
-          <input
-            ref={fileInput}
-            type="file"
-            accept="image/jpeg,image/png,image/tiff,.tif,.tiff"
-            multiple
-            hidden
-            onChange={(e) => {
-              void handleFiles(e.target.files);
-              e.target.value = '';
-            }}
-          />
-        </Stack>
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-          {t('scan.controls.seedHint')}
-        </Typography>
-      </Paper>
+          </Stack>
+        </Paper>
+      ) : (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap alignItems="center">
+            <TextField
+              select
+              size="small"
+              label={t('common.labels.game')}
+              value={game}
+              onChange={(e) => setGame(e.target.value)}
+              sx={{ minWidth: 200 }}
+            >
+              {gamesQuery.data?.map((g) => (
+                <MenuItem key={g.id} value={g.id}>
+                  {g.displayName}
+                </MenuItem>
+              ))}
+            </TextField>
+            <Autocomplete
+              multiple
+              size="small"
+              options={sets}
+              getOptionLabel={(s) => s.setName}
+              isOptionEqualToValue={(a, b) => a.setCode === b.setCode}
+              value={artSets}
+              onChange={(_, v) => setArtSets(v)}
+              sx={{ minWidth: 260, flex: '1 1 260px' }}
+              renderInput={(p) => (
+                <TextField
+                  {...p}
+                  label={t('scan.controls.artSets')}
+                  placeholder={artSets.length ? '' : t('scan.controls.allSets')}
+                />
+              )}
+            />
+            <TextField
+              select
+              size="small"
+              label={t('common.labels.condition')}
+              value={condition}
+              onChange={(e) => setCondition(e.target.value)}
+              sx={{ minWidth: 120 }}
+            >
+              {CONDITIONS.map((c) => (
+                <MenuItem key={c} value={c}>
+                  {c}
+                </MenuItem>
+              ))}
+            </TextField>
+            <Tooltip title={t('scan.controls.languageHelp')}>
+              <Box>
+                <LanguageSelect
+                  game={game}
+                  allowAuto
+                  label={t('scan.controls.language')}
+                  value={language}
+                  onChange={setLanguage}
+                />
+              </Box>
+            </Tooltip>
+            <FormControlLabel
+              control={<Checkbox checked={isFoil} onChange={(e) => setIsFoil(e.target.checked)} />}
+              label={t('common.labels.foil')}
+            />
+            <Button
+              variant="contained"
+              startIcon={<CameraAltIcon />}
+              onClick={() => cameraInput.current?.click()}
+            >
+              {t('scan.controls.takePhoto')}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<VideocamIcon />}
+              onClick={() => setWebcamOpen(true)}
+            >
+              {t('scan.controls.useWebcam')}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<AddPhotoAlternateIcon />}
+              onClick={() => fileInput.current?.click()}
+            >
+              {t('scan.controls.addImages')}
+            </Button>
+            {/* Camera capture: on a phone this opens the rear camera directly; on desktop the
+                `capture` hint is ignored and it falls back to a normal file picker. */}
+            <input
+              ref={cameraInput}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+              onChange={(e) => {
+                void handleFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/jpeg,image/png,image/tiff,.tif,.tiff"
+              multiple
+              hidden
+              onChange={(e) => {
+                void handleFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
+          </Stack>
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            {t('scan.controls.seedHint')}
+          </Typography>
+        </Paper>
+      )}
 
       {restoredStillPresent > 0 && (
         <Alert
@@ -1676,7 +1947,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         <Paper variant="outlined" sx={{ p: 2, position: 'sticky', top: 56, zIndex: 1 }}>
           <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
             {/* Audit is locked to one location: show it read-only instead of the picker. */}
-            {lockedContainerId != null ? (
+            {readOnly ? null : lockedContainerId != null ? (
               <Chip
                 icon={<LockIcon />}
                 variant="outlined"
@@ -1693,31 +1964,35 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                 {selectedLocationName ?? t('scan.commit.addToLocation')}
               </Button>
             )}
-            <Button
-              variant="outlined"
-              color="success"
-              startIcon={<CheckCircleIcon />}
-              disabled={confirmableCount === 0}
-              onClick={confirmChecked}
-            >
-              {t('scan.commit.confirmChecked', { count: confirmableCount })}
-            </Button>
-            <Button
-              variant="contained"
-              color={auditMode ? 'warning' : 'primary'}
-              disabled={
-                committableCount === 0 || containerId === '' || commit.isPending || stillMatching
-              }
-              onClick={() => commit.mutate()}
-            >
-              {commit.isPending
-                ? auditMode
-                  ? t('scan.audit.committing')
-                  : t('common.states.adding')
-                : auditMode
-                  ? t('scan.audit.commit', { count: committableCount })
-                  : t('scan.commit.addConfirmed', { count: committableCount })}
-            </Button>
+            {!readOnly && (
+              <>
+                <Button
+                  variant="outlined"
+                  color="success"
+                  startIcon={<CheckCircleIcon />}
+                  disabled={confirmableCount === 0}
+                  onClick={confirmChecked}
+                >
+                  {t('scan.commit.confirmChecked', { count: confirmableCount })}
+                </Button>
+                <Button
+                  variant="contained"
+                  color={auditMode ? 'warning' : 'primary'}
+                  disabled={
+                    committableCount === 0 || containerId === '' || commit.isPending || stillMatching
+                  }
+                  onClick={() => commit.mutate()}
+                >
+                  {commit.isPending
+                    ? auditMode
+                      ? t('scan.audit.committing')
+                      : t('common.states.adding')
+                    : auditMode
+                      ? t('scan.audit.commit', { count: committableCount })
+                      : t('scan.commit.addConfirmed', { count: committableCount })}
+                </Button>
+              </>
+            )}
             {canExport && (
               <>
                 <Tooltip title={t('scan.export.hint')}>
@@ -1910,20 +2185,20 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                 <span>
                   <Checkbox
                     size="small"
-                    disabled={selectableCount === 0}
+                    disabled={selectableCount === 0 || readOnly}
                     checked={selectableCount > 0 && checkedCount === selectableCount}
                     indeterminate={checkedCount > 0 && checkedCount < selectableCount}
                     onChange={(e) => (e.target.checked ? selectAll() : selectNone())}
                   />
                 </span>
               </Tooltip>
-              <Button size="small" onClick={selectAll} disabled={selectableCount === 0}>
+              <Button size="small" onClick={selectAll} disabled={selectableCount === 0 || readOnly}>
                 {t('scan.master.all')}
               </Button>
-              <Button size="small" onClick={selectNone} disabled={checkedCount === 0}>
+              <Button size="small" onClick={selectNone} disabled={checkedCount === 0 || readOnly}>
                 {t('scan.master.none')}
               </Button>
-              <Button size="small" onClick={invertSelection} disabled={selectableCount === 0}>
+              <Button size="small" onClick={invertSelection} disabled={selectableCount === 0 || readOnly}>
                 {t('scan.master.invert')}
               </Button>
               <Box sx={{ flexGrow: 1 }} />
@@ -1934,7 +2209,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                 size="small"
                 variant="outlined"
                 startIcon={<EditIcon />}
-                disabled={checkedCount === 0}
+                disabled={checkedCount === 0 || readOnly}
                 onClick={() => setBulkOpen(true)}
               >
                 {t('common.actions.edit')}
@@ -1949,6 +2224,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                   badgeSettings={badgeSettings}
                   onSelect={() => setSelectedKey(item.key)}
                   onToggle={(v, shiftKey) => toggleInclude(item.key, v, shiftKey)}
+                  readOnly={readOnly}
                 />
               ))}
               {visibleItems.length === 0 && (
@@ -1984,8 +2260,9 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                   ...(r.language && r.language !== ENGLISH ? { language: r.language } : {}),
                 })
               }
-              onRemove={() => dropItems((it) => it.key === selectedItem.key)}
+              onRemove={() => removeItems((it) => it.key === selectedItem.key)}
               onProps={(patch) => updateItem(selectedItem.key, patch)}
+              readOnly={readOnly}
             />
           ) : (
             <Paper

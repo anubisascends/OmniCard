@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import {
   AppBar,
+  Badge,
   Box,
   Divider,
   Drawer,
@@ -44,9 +45,10 @@ const DRAWER_WIDTH = 200;
 // `labelKey` resolves against the `nav` namespace at render time. `perm` lists the view permission(s)
 // that reveal the item — a user needs at least one. Items with no `perm` are always shown
 // (Administration hosts self-service password change + the always-viewable Components tab).
-const NAV: { to: string; labelKey: string; icon: ReactNode; perm?: string[] }[] = [
+// `badge` names a live count shown on the icon.
+const NAV: { to: string; labelKey: string; icon: ReactNode; perm?: string[]; badge?: 'scanBatches' }[] = [
   { to: '/', labelKey: 'dashboard', icon: <DashboardIcon />, perm: ['dashboard.view'] },
-  { to: '/scan', labelKey: 'scan', icon: <PhotoCameraIcon />, perm: ['scan.view'] },
+  { to: '/scan', labelKey: 'scan', icon: <PhotoCameraIcon />, perm: ['scan.view'], badge: 'scanBatches' },
   { to: '/collection', labelKey: 'collection', icon: <CollectionsBookmarkIcon />, perm: ['collection.view'] },
   { to: '/locations', labelKey: 'locations', icon: <GridViewIcon />, perm: ['locations.view'] },
   { to: '/sets', labelKey: 'sets', icon: <ChecklistIcon />, perm: ['sets.view'] },
@@ -89,6 +91,16 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const visibleNav = NAV.filter((item) => !item.perm || canAny(...item.perm));
 
+  // Background scan batches nobody has opened yet (watched scan folders) — the Scan item's badge.
+  const batchCount = useQuery({
+    queryKey: ['scan-batches-count'],
+    queryFn: api.scanBatchCount,
+    enabled: canAny('scan.view'),
+    refetchInterval: 20_000,
+    refetchIntervalInBackground: false,
+  });
+  const badges = { scanBatches: batchCount.data?.unclaimed ?? 0 };
+
   const navList = (
     <List>
       {visibleNav.map((item) => {
@@ -102,7 +114,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             selected={selected}
             onClick={() => setMobileOpen(false)}
           >
-            <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
+            <ListItemIcon sx={{ minWidth: 40 }}>
+              {item.badge ? (
+                <Badge badgeContent={badges[item.badge]} color="secondary" max={99}>
+                  {item.icon}
+                </Badge>
+              ) : (
+                item.icon
+              )}
+            </ListItemIcon>
             <ListItemText primary={t(`nav.${item.labelKey}`)} />
           </ListItemButton>
         );

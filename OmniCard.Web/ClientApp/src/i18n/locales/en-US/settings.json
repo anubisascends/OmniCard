@@ -260,6 +260,28 @@
       "levelRead": "Read",
       "levelWrite": "Write",
       "adminAllSites": "Administrator — every site"
+    },
+    "scanFolders": {
+      "title": "Watched scan folders",
+      "description": "Point each game at a folder on the server. Save scans into a subfolder named after the batch; when no new file has arrived for the quiet period, the batch is matched in the background and appears on the Scan page. Picked-up files are moved to a _processed subfolder.",
+      "adminOnly": "Only an administrator can change watched folders.",
+      "enabled": "Watch folders",
+      "quietPeriod": "Quiet period (seconds)",
+      "quietPeriodHelp": "How long to wait with no new file before matching starts.",
+      "retention": "Keep images (days)",
+      "retentionHelp": "Stored scans of committed or discarded batches are deleted after this many days.",
+      "folderPath": "Folder on the server",
+      "folderPathPlaceholder": "e.g. D:\\Scans\\{{game}}",
+      "folderEnabled": "Active",
+      "defaultLocation": "Default location",
+      "noDefaultLocation": "None",
+      "chooseLocation": "Choose…",
+      "clearLocation": "Clear",
+      "statusFound": "Found",
+      "statusMissing": "Folder not found",
+      "statusNoWrite": "Can't move files",
+      "saved": "Saved.",
+      "iisHint": "On IIS, set the app pool to AlwaysRunning with preload on, or folders are only watched while someone is using the site."
     }
   }
 }

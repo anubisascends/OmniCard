@@ -39,6 +39,7 @@ export function LanguageSelect({
   fullWidth,
   sx,
   helperText,
+  disabled,
 }: {
   game: string | null | undefined;
   value: string;
@@ -50,6 +51,7 @@ export function LanguageSelect({
   fullWidth?: boolean;
   sx?: SxProps<Theme>;
   helperText?: string;
+  disabled?: boolean;
 }) {
   const { t } = useTranslation();
   const languages = useCardLanguages(game);
@@ -63,6 +65,7 @@ export function LanguageSelect({
       onChange={(e) => onChange(e.target.value)}
       fullWidth={fullWidth}
       helperText={helperText}
+      disabled={disabled}
       sx={sx ?? { minWidth: 150 }}
     >
       {allowAuto && <MenuItem value="">{emptyLabel ?? t('scan.controls.languageAuto')}</MenuItem>}
