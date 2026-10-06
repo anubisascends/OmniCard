@@ -16,7 +16,7 @@ namespace OmniCard.Web.Services;
 /// Matching stays single-game — the caller picks the game (the desktop's "never fall back across
 /// games" rule). All catalog reads go through the already-registered read-only game services.
 /// </summary>
-public sealed class WebScanMatchingService
+public sealed class WebScanMatchingService : IScanMatcher
 {
     // The concrete service (not IPerceptualHashService) for its Bitmap overloads: a scan is decoded
     // once and every hash is taken from that bitmap, instead of re-decoding the upload per hash and
@@ -539,10 +539,16 @@ public sealed class WebScanMatchingService
     }
 
     /// <summary>Render a downscaled JPEG <c>data:</c> URI so the SPA can preview an uploaded scan whose
-    /// own format a browser can't display in an <c>&lt;img&gt;</c> (TIFF). GDI+ decodes the source, so
-    /// this works for any format <see cref="System.Drawing.Bitmap"/> reads. Returns null on failure —
+    /// own format a browser can't display in an <c>&lt;img&gt;</c> (TIFF). Returns null on failure —
     /// the caller falls back to a placeholder; matching itself is unaffected.</summary>
-    public static string? RenderPreviewDataUri(byte[] imageBytes, int maxDim = 1400)
+    public static string? RenderPreviewDataUri(byte[] imageBytes, int maxDim = 1400) =>
+        RenderPreviewJpeg(imageBytes, maxDim) is { } jpeg
+            ? "data:image/jpeg;base64," + Convert.ToBase64String(jpeg)
+            : null;
+
+    /// <summary>Render a downscaled JPEG of any image <see cref="System.Drawing.Bitmap"/> can decode
+    /// (GDI+), for previewing formats a browser can't display (TIFF). Returns null on failure.</summary>
+    public static byte[]? RenderPreviewJpeg(byte[] imageBytes, int maxDim = 1400)
     {
         try
         {
@@ -563,7 +569,7 @@ public sealed class WebScanMatchingService
                 System.Drawing.Imaging.Encoder.Quality, 85L);
             using var ms = new MemoryStream();
             dst.Save(ms, encoder, ep);
-            return "data:image/jpeg;base64," + Convert.ToBase64String(ms.ToArray());
+            return ms.ToArray();
         }
         catch
         {

@@ -116,6 +116,7 @@ builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<Fina
 builder.Services.AddSingleton<ICardService, WebCardService>();
 builder.Services.AddSingleton<CollectionRepairService>();
 builder.Services.AddSingleton<WebScanMatchingService>();
+builder.Services.AddSingleton<IScanMatcher>(sp => sp.GetRequiredService<WebScanMatchingService>());
 builder.Services.AddSingleton<CardImageCacheService>();
 builder.Services.AddSingleton<CatalogRefreshService>();
 builder.Services.AddSingleton<IDecklistService, DecklistService>();
@@ -192,6 +193,8 @@ builder.Services.AddSingleton(sp =>
     new WebBinderCardService(writableFactory, sp.GetRequiredService<IDataPathService>(),
         sp.GetRequiredService<IEnumerable<ICardGameService>>().ToDictionary(s => s.Game)));
 builder.Services.AddSingleton<LocationImportService>();
+// Shared scan → lots write path (interactive scan commit + watched-folder batch commits).
+builder.Services.AddSingleton<ScanCommitService>();
 builder.Services.AddScoped<BinderStateBuilder>();
 
 // User accounts + authentication. Passwords are stored only as salted PBKDF2 hashes; the built-in
