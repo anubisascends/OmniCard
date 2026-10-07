@@ -367,6 +367,27 @@ public class ListsControllerTests : IDisposable
     }
 
     [Fact]
+    public void Export_SplitsOwnedAndToBuy_AsTextAndCsv()
+    {
+        var src = _containers.Create("Src", ContainerType.Box).Id;
+        SeedOwned("Bolt", 1, src);
+        var list = Value(_controller.Create(new CreateListRequest { Name = "Wants", Game = "Mtg" }));
+        SeedItem(list.Id, "Bolt", qty: 3);
+
+        string Text(IActionResult r) => System.Text.Encoding.UTF8.GetString(Assert.IsType<FileContentResult>(r).FileContents);
+        Assert.Equal("3x Bolt (SET) 1\n", Text(_controller.Export(list.Id, "all", "text")));
+        Assert.Equal("1x Bolt (SET) 1\n", Text(_controller.Export(list.Id, "owned", "text")));
+        Assert.Equal("2x Bolt (SET) 1\n", Text(_controller.Export(list.Id, "buy", "text")));
+
+        var csv = Assert.IsType<FileContentResult>(_controller.Export(list.Id, "buy", "csv"));
+        Assert.Equal("Wants-to-buy.csv", csv.FileDownloadName);
+        Assert.Contains("2,Bolt,SET,1,", System.Text.Encoding.UTF8.GetString(csv.FileContents));
+
+        Assert.IsType<BadRequestObjectResult>(_controller.Export(list.Id, "nope", "text"));
+        Assert.IsType<NotFoundResult>(_controller.Export(9999, "all", "text"));
+    }
+
+    [Fact]
     public void Create_BlankName_Returns400()
     {
         Assert.IsType<BadRequestObjectResult>(

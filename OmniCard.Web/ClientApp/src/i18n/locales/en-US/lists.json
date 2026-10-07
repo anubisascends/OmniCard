@@ -49,19 +49,34 @@
       "columns": {
         "card": "Card",
         "qty": "Qty",
-        "owned": "Owned"
+        "owned": "Owned",
+        "buy": "To buy",
+        "listQty": "List qty"
       },
       "ownedTooltip": "{{owned}} of {{qty}} in your collection",
       "awaitingPurchaseTooltip": "Your copies were already moved. The rest is to buy.",
       "languageLabel": "Card language",
-      "languageHelp": "Only copies in this language count as owned. New cards are added in it (English for any).",
+      "languageHelp": "Only copies in this language count as owned. Imported and new cards use this language’s printing (English for any, or when there is none).",
       "updateFromUrl": "Update from URL",
       "updateFromUrlNoSource": "Fetch the Moxfield / Archidekt deck again and review the changes",
       "findInCollection": "Find in collection",
       "substituteTooltip": "Another printing from your collection, standing in for this card",
       "ignoredTooltip_one": "{{count}} more in an ignored location or listed for sale",
       "ignoredTooltip_other": "{{count}} more in ignored locations or listed for sale",
-      "ignoredLocations": "Ignored locations…"
+      "ignoredLocations": "Ignored locations…",
+      "export": "Export",
+      "sections": {
+        "owned": "Owned",
+        "buy": "To buy",
+        "copies_one": "{{count}} copy",
+        "copies_other": "{{count}} copies",
+        "empty": {
+          "owned": "None of this list is in your collection yet.",
+          "buy": "Nothing to buy: your collection covers the whole list."
+        }
+      },
+      "notInLanguage": "No {{language}} printing",
+      "notInLanguageTooltip": "The catalog has no {{language}} printing of this card, so the {{printing}} printing is used."
     },
     "update": {
       "title": "Update “{{name}}” from URL",
@@ -109,6 +124,31 @@
       },
       "ignoredHint": "Greyed-out copies are in ignored locations or listed for sale, so they can't be used.",
       "manageIgnored": "Ignored locations…"
+    },
+    "export": {
+      "title": "Export “{{name}}”",
+      "scopes": {
+        "all": "All cards",
+        "buy": "To buy",
+        "owned": "Owned"
+      },
+      "formats": {
+        "text": "Text",
+        "csv": "CSV"
+      },
+      "hint": {
+        "text": "One line per card: 1x Card Name (SET) collector number. *F* marks foils and *E* etched foils. Moxfield and Archidekt can import this.",
+        "csv": "Columns: Qty, Card Name, Set, Collector Number, Foil."
+      },
+      "empty": {
+        "all": "This list is empty.",
+        "buy": "Nothing to buy: your collection covers the whole list.",
+        "owned": "None of this list is in your collection yet."
+      },
+      "copy": "Copy",
+      "copied": "Copied to the clipboard.",
+      "copyFailed": "Couldn’t copy. Select the text and copy it yourself.",
+      "download": "Download"
     }
   }
 }

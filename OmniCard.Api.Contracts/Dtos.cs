@@ -726,12 +726,14 @@ public sealed record CardListDto(int Id, string Name, string Game, string? Notes
 /// owned copy of another printing approved to stand in for a missing card. <see cref="IgnoredQuantity"/> counts
 /// copies of the printing that don't count because they're in a location ignored for lists or listed for
 /// sale. <see cref="ImageUri"/> is the
-/// best display art (local cache when downloaded, else catalog CDN) for hover previews.</summary>
+/// best display art (local cache when downloaded, else catalog CDN) for hover previews. <see cref="Language"/> is
+/// the printing's catalog language, set only when the list forces a language and the game's catalog serves other
+/// languages (so the page can flag a printing that isn't in the list's language).</summary>
 public sealed record CardListItemDto(
     int Id, string GameCardId, string CardName, string? SetCode, string? CollectorNumber,
     bool IsFoil, string? FoilType, int Quantity, decimal? MarketPrice, bool IsUnpriced,
     bool InCollection, string? ImageUri, int OwnedQuantity = 0, bool AwaitingPurchase = false,
-    bool IsSubstitute = false, int IgnoredQuantity = 0);
+    bool IsSubstitute = false, int IgnoredQuantity = 0, string? Language = null);
 
 public sealed record CreateListRequest
 {

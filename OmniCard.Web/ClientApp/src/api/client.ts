@@ -11,6 +11,8 @@ import type {
   AddListItemRequest,
   CardListDto,
   CardListItemDto,
+  ListExportFormat,
+  ListExportScope,
   CatalogLanguagesDto,
   CatalogStatusDto,
   FulfillListRequest,
@@ -232,6 +234,22 @@ async function download(path: string, fallbackName: string, init?: RequestInit):
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+/** GET `path` as plain text. Server errors surface as an ApiError. */
+async function requestText(path: string): Promise<string> {
+  const res = await fetch(path, { credentials: 'same-origin' });
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const b = await res.json();
+      if (b?.error) message = b.error;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(res.status, message);
+  }
+  return res.text();
 }
 
 function qs(params: Record<string, string | number | boolean | undefined | null>): string {
@@ -774,6 +792,12 @@ export const api = {
   listPickListPdf: (id: number) => download(`/api/lists/${id}/pick-list.pdf`, 'pick-list.pdf'),
   /** Download the buy list: copies not in the collection, with prices and tick-boxes. */
   listBuyListPdf: (id: number) => download(`/api/lists/${id}/buy-list.pdf`, 'buy-list.pdf'),
+  /** The list (or its to-buy / owned part) as decklist text ("1x Aragorn, the Uniter (LTR) 192") or CSV. */
+  listExportText: (id: number, scope: ListExportScope, format: ListExportFormat) =>
+    requestText(`/api/lists/${id}/export${qs({ scope, format })}`),
+  /** Download the same export as a .txt / .csv file. */
+  listExportDownload: (id: number, scope: ListExportScope, format: ListExportFormat) =>
+    download(`/api/lists/${id}/export${qs({ scope, format })}`, format === 'csv' ? 'list.csv' : 'list.txt'),
   /** Import a Moxfield/Archidekt decklist URL. Omit `listId` to create a new list named after the deck. */
   listImportUrl: (url: string, game: string, listId?: number, language?: string | null) =>
     request<ImportListResultDto>('/api/lists/import-url', {

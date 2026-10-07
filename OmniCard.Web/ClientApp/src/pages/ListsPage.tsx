@@ -7,6 +7,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Collapse,
   Divider,
   IconButton,
   Link,
@@ -30,6 +31,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DoNotDisturbOnOutlinedIcon from '@mui/icons-material/DoNotDisturbOnOutlined';
 import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import IosShareIcon from '@mui/icons-material/IosShare';
 import ManageSearchIcon from '@mui/icons-material/ManageSearch';
 import PlaceIcon from '@mui/icons-material/Place';
 import PrintIcon from '@mui/icons-material/Print';
@@ -40,13 +43,14 @@ import SyncIcon from '@mui/icons-material/Sync';
 import { api } from '../api/client';
 import { AddCardToListDialog } from '../components/dialogs/AddCardToListDialog';
 import { IgnoredLocationsDialog } from '../components/dialogs/IgnoredLocationsDialog';
+import { ListExportDialog } from '../components/dialogs/ListExportDialog';
 import { ListSubstitutesDialog } from '../components/dialogs/ListSubstitutesDialog';
 import { ListUpdateDialog } from '../components/dialogs/ListUpdateDialog';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import { useGame } from '../context/GameContext';
 import { useFormatters } from '../i18n/format';
 import { LanguageSelect } from '../lib/cardLanguages';
-import type { CardListDto } from '../api/types';
+import type { CardListDto, CardListItemDto, ListExportScope } from '../api/types';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
@@ -80,6 +84,232 @@ function PrintMenu({ listId, disabled, onError }: { listId: number; disabled: bo
   );
 }
 
+/** Copies of the item the collection already covers (exact printing, list language, readable sites). */
+const ownedPart = (it: CardListItemDto) => Math.min(it.ownedQuantity, it.quantity);
+/** Copies of the item still to buy. */
+const missingQty = (it: CardListItemDto) => Math.max(0, it.quantity - it.ownedQuantity);
+
+type ItemsSectionKind = 'owned' | 'buy';
+
+/** Whether a grid is expanded, remembered per browser (storage can be unavailable — default open). */
+function useSectionExpanded(section: ItemsSectionKind): [boolean, (open: boolean) => void] {
+  const key = `omnicard.lists.section.${section}`;
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(key) !== 'collapsed';
+    } catch {
+      return true;
+    }
+  });
+  const set = (next: boolean) => {
+    setOpen(next);
+    try {
+      localStorage.setItem(key, next ? 'expanded' : 'collapsed');
+    } catch {
+      /* storage unavailable: keep the in-memory state */
+    }
+  };
+  return [open, set];
+}
+
+/**
+ * One collapsible grid of a list: the copies already owned, or the copies still to buy. A partly owned item
+ * appears in both, each showing its share; the list quantity (editable) is the item's total.
+ */
+function ListItemsSection({
+  section,
+  list,
+  rows,
+  portion,
+  onExport,
+  onSetQuantity,
+  onRemove,
+}: {
+  section: ItemsSectionKind;
+  list: CardListDto;
+  rows: CardListItemDto[];
+  portion: (it: CardListItemDto) => number;
+  onExport: () => void;
+  onSetQuantity: (itemId: number, quantity: number) => void;
+  onRemove: (itemId: number) => void;
+}) {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
+  const [expanded, setExpanded] = useSectionExpanded(section);
+  const copies = rows.reduce((sum, it) => sum + portion(it), 0);
+  const listLanguage = list.language;
+
+  return (
+    <Box sx={{ mb: 1.5 }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        sx={{ px: 0.5, py: 0.25, borderRadius: 1, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
+        onClick={() => setExpanded(!expanded)}
+      >
+        <ExpandMoreIcon
+          fontSize="small"
+          sx={{ transition: 'transform 150ms', transform: expanded ? 'none' : 'rotate(-90deg)' }}
+        />
+        {section === 'owned' ? (
+          <CollectionsBookmarkIcon fontSize="small" color="success" />
+        ) : (
+          <ShoppingCartIcon fontSize="small" color="action" />
+        )}
+        <Typography variant="subtitle2">{t(`lists.detail.sections.${section}`)}</Typography>
+        <Chip size="small" label={t('lists.detail.sections.copies', { count: copies })} />
+        <Box sx={{ flexGrow: 1 }} />
+        <Button
+          size="small"
+          startIcon={<IosShareIcon />}
+          disabled={rows.length === 0}
+          onClick={(e) => {
+            e.stopPropagation();
+            onExport();
+          }}
+        >
+          {t('lists.detail.export')}
+        </Button>
+      </Stack>
+      <Collapse in={expanded} unmountOnExit>
+        {rows.length === 0 ? (
+          <Typography color="text.secondary" variant="body2" sx={{ px: 1, py: 1 }}>
+            {t(`lists.detail.sections.empty.${section}`)}
+          </Typography>
+        ) : (
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell padding="checkbox"></TableCell>
+                <TableCell>{t('lists.detail.columns.card')}</TableCell>
+                <TableCell>{t('common.labels.set')}</TableCell>
+                <TableCell align="right">{t(`lists.detail.columns.${section}`)}</TableCell>
+                <TableCell align="right">{t('lists.detail.columns.listQty')}</TableCell>
+                <TableCell align="right">{t('common.labels.price')}</TableCell>
+                <TableCell align="right"></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {rows.map((it) => (
+                <TableRow key={it.id} hover>
+                  <TableCell padding="checkbox">
+                    {it.awaitingPurchase ? (
+                      <Tooltip title={t('lists.detail.awaitingPurchaseTooltip')}>
+                        <ShoppingCartIcon fontSize="small" color="action" sx={{ display: 'block' }} />
+                      </Tooltip>
+                    ) : it.isSubstitute ? (
+                      <Tooltip title={t('lists.detail.substituteTooltip')}>
+                        <SwapHorizIcon
+                          fontSize="small"
+                          color={it.ownedQuantity >= it.quantity ? 'success' : 'warning'}
+                          sx={{ display: 'block' }}
+                        />
+                      </Tooltip>
+                    ) : (
+                      it.ownedQuantity > 0 && (
+                        <Tooltip
+                          title={t('lists.detail.ownedTooltip', {
+                            owned: fmt.number(ownedPart(it)),
+                            qty: fmt.number(it.quantity),
+                          })}
+                        >
+                          <CollectionsBookmarkIcon
+                            fontSize="small"
+                            color={it.ownedQuantity >= it.quantity ? 'success' : 'warning'}
+                            sx={{ display: 'block' }}
+                          />
+                        </Tooltip>
+                      )
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={0.75} alignItems="center">
+                      <Tooltip
+                        disableInteractive
+                        slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, maxWidth: 'none' } } }}
+                        title={
+                          it.imageUri ? (
+                            <Box
+                              component="img"
+                              src={it.imageUri}
+                              alt=""
+                              sx={{ width: 240, borderRadius: 2, display: 'block', boxShadow: 6 }}
+                            />
+                          ) : (
+                            ''
+                          )
+                        }
+                      >
+                        <Box component="span" sx={{ cursor: it.imageUri ? 'help' : 'default' }}>
+                          {it.cardName}
+                          {it.isFoil ? ' ✦' : ''}
+                        </Box>
+                      </Tooltip>
+                      {listLanguage && it.language && it.language !== listLanguage && (
+                        <Tooltip
+                          title={t('lists.detail.notInLanguageTooltip', {
+                            language: t(`common.languages.${listLanguage}`),
+                            printing: t(`common.languages.${it.language}`),
+                          })}
+                        >
+                          <Chip
+                            size="small"
+                            color="warning"
+                            variant="outlined"
+                            label={t('lists.detail.notInLanguage', { language: t(`common.languages.${listLanguage}`) })}
+                          />
+                        </Tooltip>
+                      )}
+                    </Stack>
+                  </TableCell>
+                  <TableCell>
+                    {it.setCode?.toUpperCase()}
+                    {it.collectorNumber ? ` #${it.collectorNumber}` : ''}
+                  </TableCell>
+                  <TableCell align="right">
+                    <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="flex-end">
+                      {section === 'buy' && it.ignoredQuantity > 0 && (
+                        <Tooltip title={t('lists.detail.ignoredTooltip', { count: it.ignoredQuantity })}>
+                          <Stack direction="row" spacing={0.25} alignItems="center" sx={{ color: 'text.disabled' }}>
+                            <DoNotDisturbOnOutlinedIcon sx={{ fontSize: 14 }} />
+                            <Typography variant="caption">+{fmt.number(it.ignoredQuantity)}</Typography>
+                          </Stack>
+                        </Tooltip>
+                      )}
+                      <Box component="span" sx={{ fontWeight: 600 }}>
+                        {fmt.number(portion(it))}
+                      </Box>
+                    </Stack>
+                  </TableCell>
+                  <TableCell align="right">
+                    <TextField
+                      type="number"
+                      size="small"
+                      value={it.quantity}
+                      onChange={(e) => {
+                        const q = Number(e.target.value);
+                        if (q >= 1) onSetQuantity(it.id, q);
+                      }}
+                      sx={{ width: 70 }}
+                    />
+                  </TableCell>
+                  <TableCell align="right">{it.isUnpriced ? '—' : fmt.money(it.marketPrice)}</TableCell>
+                  <TableCell align="right">
+                    <IconButton size="small" onClick={() => onRemove(it.id)}>
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Collapse>
+    </Box>
+  );
+}
+
 function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (message: string) => void }) {
   const { t } = useTranslation();
   const fmt = useFormatters();
@@ -96,6 +326,8 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (messag
   const [updateOpen, setUpdateOpen] = useState(false);
   const [substitutesOpen, setSubstitutesOpen] = useState(false);
   const [ignoredOpen, setIgnoredOpen] = useState(false);
+  const [exportScope, setExportScope] = useState<ListExportScope | null>(null);
+  const openExport = (scope: ListExportScope) => setExportScope(scope);
   const setLanguage = useMutation({
     mutationFn: (language: string | null) => api.listSetLanguage(list.id, language),
     onSuccess: () => invalidate(),
@@ -146,10 +378,9 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (messag
   // Market-value roll-ups: the whole list, and the copies the collection doesn't cover ("to buy").
   // Unpriced items contribute nothing (matching the "—" shown per row).
   const price = (it: (typeof items.data)[number]) => (it.isUnpriced ? 0 : (it.marketPrice ?? 0));
-  const missingQty = (it: (typeof items.data)[number]) => Math.max(0, it.quantity - it.ownedQuantity);
   const totalValue = items.data.reduce((sum, it) => sum + price(it) * it.quantity, 0);
   const missingValue = items.data.reduce((sum, it) => sum + price(it) * missingQty(it), 0);
-  const ownedCount = items.data.reduce((sum, it) => sum + Math.min(it.ownedQuantity, it.quantity), 0);
+  const ownedCount = items.data.reduce((sum, it) => sum + ownedPart(it), 0);
   const missingCount = items.data.reduce((sum, it) => sum + missingQty(it), 0);
 
   const locationName = (id: number | null) =>
@@ -211,6 +442,14 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (messag
           onClick={() => refreshPrices.mutate()}
         >
           {t('lists.detail.refreshPrices')}
+        </Button>
+        <Button
+          size="small"
+          startIcon={<IosShareIcon />}
+          disabled={items.data.length === 0}
+          onClick={() => openExport('all')}
+        >
+          {t('lists.detail.export')}
         </Button>
         <PrintMenu
           listId={list.id}
@@ -371,10 +610,17 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (messag
         open={addCardOpen}
         listId={list.id}
         defaultGame={list.game}
+        language={list.language}
         onClose={() => setAddCardOpen(false)}
         onDone={invalidate}
       />
 
+      <ListExportDialog
+        open={exportScope !== null}
+        list={list}
+        initialScope={exportScope ?? 'all'}
+        onClose={() => setExportScope(null)}
+      />
       <IgnoredLocationsDialog open={ignoredOpen} onClose={() => setIgnoredOpen(false)} onSaved={invalidate} />
       <ListUpdateDialog open={updateOpen} list={list} onClose={() => setUpdateOpen(false)} onApplied={invalidate} />
       <ListSubstitutesDialog
@@ -399,113 +645,26 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (messag
           {t('lists.detail.empty')}
         </Typography>
       ) : (
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell padding="checkbox"></TableCell>
-              <TableCell>{t('lists.detail.columns.card')}</TableCell>
-              <TableCell>{t('common.labels.set')}</TableCell>
-              <TableCell align="right">{t('lists.detail.columns.qty')}</TableCell>
-              <TableCell align="right">{t('lists.detail.columns.owned')}</TableCell>
-              <TableCell align="right">{t('common.labels.price')}</TableCell>
-              <TableCell align="right"></TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {items.data.map((it) => (
-              <TableRow key={it.id} hover>
-                <TableCell padding="checkbox">
-                  {it.awaitingPurchase ? (
-                    <Tooltip title={t('lists.detail.awaitingPurchaseTooltip')}>
-                      <ShoppingCartIcon fontSize="small" color="action" sx={{ display: 'block' }} />
-                    </Tooltip>
-                  ) : it.isSubstitute ? (
-                    <Tooltip title={t('lists.detail.substituteTooltip')}>
-                      <SwapHorizIcon
-                        fontSize="small"
-                        color={it.ownedQuantity >= it.quantity ? 'success' : 'warning'}
-                        sx={{ display: 'block' }}
-                      />
-                    </Tooltip>
-                  ) : (
-                    it.ownedQuantity > 0 && (
-                      <Tooltip
-                        title={t('lists.detail.ownedTooltip', {
-                          owned: fmt.number(Math.min(it.ownedQuantity, it.quantity)),
-                          qty: fmt.number(it.quantity),
-                        })}
-                      >
-                        <CollectionsBookmarkIcon
-                          fontSize="small"
-                          color={it.ownedQuantity >= it.quantity ? 'success' : 'warning'}
-                          sx={{ display: 'block' }}
-                        />
-                      </Tooltip>
-                    )
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Tooltip
-                    disableInteractive
-                    slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, maxWidth: 'none' } } }}
-                    title={
-                      it.imageUri ? (
-                        <Box
-                          component="img"
-                          src={it.imageUri}
-                          alt=""
-                          sx={{ width: 240, borderRadius: 2, display: 'block', boxShadow: 6 }}
-                        />
-                      ) : (
-                        ''
-                      )
-                    }
-                  >
-                    <Box component="span" sx={{ cursor: it.imageUri ? 'help' : 'default' }}>
-                      {it.cardName}
-                      {it.isFoil ? ' ✦' : ''}
-                    </Box>
-                  </Tooltip>
-                </TableCell>
-                <TableCell>
-                  {it.setCode?.toUpperCase()}
-                  {it.collectorNumber ? ` #${it.collectorNumber}` : ''}
-                </TableCell>
-                <TableCell align="right">
-                  <TextField
-                    type="number"
-                    size="small"
-                    value={it.quantity}
-                    onChange={(e) => {
-                      const q = Number(e.target.value);
-                      if (q >= 1) setQty.mutate({ itemId: it.id, quantity: q });
-                    }}
-                    sx={{ width: 70 }}
-                  />
-                </TableCell>
-                <TableCell align="right">
-                  <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="flex-end">
-                    {it.ignoredQuantity > 0 && (
-                      <Tooltip title={t('lists.detail.ignoredTooltip', { count: it.ignoredQuantity })}>
-                        <Stack direction="row" spacing={0.25} alignItems="center" sx={{ color: 'text.disabled' }}>
-                          <DoNotDisturbOnOutlinedIcon sx={{ fontSize: 14 }} />
-                          <Typography variant="caption">+{fmt.number(it.ignoredQuantity)}</Typography>
-                        </Stack>
-                      </Tooltip>
-                    )}
-                    <span>{fmt.number(Math.min(it.ownedQuantity, it.quantity))}</span>
-                  </Stack>
-                </TableCell>
-                <TableCell align="right">{it.isUnpriced ? '—' : fmt.money(it.marketPrice)}</TableCell>
-                <TableCell align="right">
-                  <IconButton size="small" onClick={() => removeItem.mutate(it.id)}>
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <>
+          <ListItemsSection
+            section="owned"
+            list={list}
+            rows={items.data.filter((it) => ownedPart(it) > 0)}
+            portion={ownedPart}
+            onExport={() => openExport('owned')}
+            onSetQuantity={(itemId, quantity) => setQty.mutate({ itemId, quantity })}
+            onRemove={(itemId) => removeItem.mutate(itemId)}
+          />
+          <ListItemsSection
+            section="buy"
+            list={list}
+            rows={items.data.filter((it) => missingQty(it) > 0)}
+            portion={missingQty}
+            onExport={() => openExport('buy')}
+            onSetQuantity={(itemId, quantity) => setQty.mutate({ itemId, quantity })}
+            onRemove={(itemId) => removeItem.mutate(itemId)}
+          />
+        </>
       )}
     </Paper>
   );

@@ -20,6 +20,16 @@ public interface ICatalogLanguageAware
     /// <summary>The catalog language of <paramref name="gameCardId"/>, or null when the id is unknown.</summary>
     string? GetCardLanguage(string gameCardId);
 
+    /// <summary>The catalog language of each of <paramref name="gameCardIds"/> that the catalog knows.</summary>
+    IReadOnlyDictionary<string, string> GetCardLanguages(IEnumerable<string> gameCardIds)
+    {
+        var result = new Dictionary<string, string>();
+        foreach (var id in gameCardIds.Where(id => !string.IsNullOrEmpty(id)).Distinct())
+            if (GetCardLanguage(id) is { } lang)
+                result[id] = lang;
+        return result;
+    }
+
     /// <summary>The same printing (set + collector number, same art variant where the source tracks
     /// it) in <paramref name="language"/>, or null when the catalog has no such row — e.g. that language
     /// wasn't downloaded, or (Pokémon Japan) the language's printings are entirely different sets.</summary>
