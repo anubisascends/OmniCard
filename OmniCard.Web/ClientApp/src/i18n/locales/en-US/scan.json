@@ -196,7 +196,11 @@
       "autoLanguage": "auto",
       "yes": "yes",
       "no": "no",
-      "breadcrumb": "Batch"
+      "breadcrumb": "Batch",
+      "summaryReady": "{{count}} ready",
+      "summaryInProgress": "{{count}} in progress",
+      "expand": "Show batches",
+      "collapse": "Hide batches"
     }
   }
 }

@@ -8,17 +8,21 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
   DialogTitle,
   Divider,
+  IconButton,
   LinearProgress,
   Paper,
   Stack,
   Typography,
 } from '@mui/material';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import { api } from '../api/client';
 import type { ScanBatchSummaryDto } from '../api/types';
@@ -26,6 +30,23 @@ import { useFormatters } from '../i18n/format';
 import { usePermissions } from '../context/usePermissions';
 
 const isOpenStatus = (b: ScanBatchSummaryDto) => b.status !== 'Committed' && b.status !== 'Discarded';
+
+// Whether the panel is expanded is a per-browser preference; storage can be unavailable (private mode).
+const EXPANDED_KEY = 'omnicard.scanBatches.expanded';
+function loadExpanded(): boolean {
+  try {
+    return localStorage.getItem(EXPANDED_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+}
+function saveExpanded(expanded: boolean) {
+  try {
+    localStorage.setItem(EXPANDED_KEY, String(expanded));
+  } catch {
+    /* not persisted */
+  }
+}
 
 /** Invalidate everything that shows batch state (this list, the nav badge, an open batch). */
 export function invalidateScanBatches(qc: QueryClient) {
@@ -47,6 +68,12 @@ export function ScanBatchesPanel() {
   const { can, isAdmin } = usePermissions();
   const [error, setError] = useState<string | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState<ScanBatchSummaryDto | null>(null);
+  const [expanded, setExpanded] = useState(loadExpanded);
+  const toggleExpanded = () =>
+    setExpanded((v) => {
+      saveExpanded(!v);
+      return !v;
+    });
 
   const gamesQuery = useQuery({ queryKey: ['games'], queryFn: api.games });
   const batchesQuery = useQuery({
@@ -90,98 +117,128 @@ export function ScanBatchesPanel() {
   if (batches.length === 0) return null;
 
   const gameName = (id: string) => gamesQuery.data?.find((g) => g.id === id)?.displayName ?? id;
+  // Shown in the header so a collapsed panel still says what's waiting.
+  const readyCount = batches.filter((b) => b.status === 'Ready').length;
+  const inProgressCount = batches.filter((b) => b.status === 'Collecting' || b.status === 'Matching').length;
 
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
-      <Stack direction="row" spacing={1} alignItems="center">
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        onClick={toggleExpanded}
+        sx={{ cursor: 'pointer', userSelect: 'none' }}
+      >
         <FolderOpenIcon color="action" />
         <Typography variant="h6">{t('scan.batches.panelTitle')}</Typography>
+        {readyCount > 0 && (
+          <Chip size="small" color="success" label={t('scan.batches.summaryReady', { count: readyCount })} />
+        )}
+        {inProgressCount > 0 && (
+          <Chip
+            size="small"
+            color="info"
+            variant="outlined"
+            label={t('scan.batches.summaryInProgress', { count: inProgressCount })}
+          />
+        )}
+        <Box sx={{ flexGrow: 1 }} />
+        <IconButton
+          size="small"
+          aria-expanded={expanded}
+          aria-label={expanded ? t('scan.batches.collapse') : t('scan.batches.expand')}
+        >
+          {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+        </IconButton>
       </Stack>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        {t('scan.batches.intro')}
-      </Typography>
       {error && (
-        <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 1 }}>
+        <Alert severity="error" onClose={() => setError(null)} sx={{ mt: 1 }}>
           {error}
         </Alert>
       )}
-      <Stack divider={<Divider />}>
-        {batches.map((b) => {
-          const open = isOpenStatus(b);
-          const claimedByOther = !!b.claimedBy && !b.claimedByMe;
-          const done = b.total - b.pending;
-          return (
-            <Stack
-              key={b.id}
-              direction={{ xs: 'column', sm: 'row' }}
-              spacing={1.5}
-              alignItems={{ sm: 'center' }}
-              sx={{ py: 1.25 }}
-            >
-              <Box sx={{ minWidth: 0, flex: 1 }}>
-                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>
-                    {b.name}
+      <Collapse in={expanded}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1 }}>
+          {t('scan.batches.intro')}
+        </Typography>
+        <Stack divider={<Divider />}>
+          {batches.map((b) => {
+            const open = isOpenStatus(b);
+            const claimedByOther = !!b.claimedBy && !b.claimedByMe;
+            const done = b.total - b.pending;
+            return (
+              <Stack
+                key={b.id}
+                direction={{ xs: 'column', sm: 'row' }}
+                spacing={1.5}
+                alignItems={{ sm: 'center' }}
+                sx={{ py: 1.25 }}
+              >
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>
+                      {b.name}
+                    </Typography>
+                    <Chip size="small" variant="outlined" label={gameName(b.game)} />
+                    <BatchStatusChip batch={b} />
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">
+                    {[
+                      t('scan.batches.counts', { count: b.total }),
+                      b.errors > 0 ? t('scan.batches.errors', { count: b.errors }) : null,
+                      b.committed > 0 ? t('scan.batches.committedCount', { count: b.committed }) : null,
+                      t('scan.batches.lastFile', { time: fmt.dateTime(b.lastFileUtc) }),
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </Typography>
-                  <Chip size="small" variant="outlined" label={gameName(b.game)} />
-                  <BatchStatusChip batch={b} />
+                  {b.claimedBy && (
+                    <Typography variant="caption" color={b.claimedByMe ? 'primary' : 'text.secondary'}>
+                      {b.claimedByMe
+                        ? t('scan.batches.reviewedByMe')
+                        : t('scan.batches.reviewedBy', { name: b.claimedBy })}
+                    </Typography>
+                  )}
+                  {b.status === 'Matching' && b.total > 0 && (
+                    <LinearProgress
+                      variant="determinate"
+                      value={(done / b.total) * 100}
+                      sx={{ mt: 0.75, maxWidth: 360 }}
+                    />
+                  )}
+                </Box>
+                <Stack direction="row" spacing={1} flexShrink={0}>
+                  {open && !claimedByOther && (
+                    <Button
+                      variant="contained"
+                      size="small"
+                      disabled={claim.isPending}
+                      onClick={() => claim.mutate(b.id)}
+                    >
+                      {b.claimedByMe ? t('scan.batches.continue') : t('scan.batches.open')}
+                    </Button>
+                  )}
+                  {open && claimedByOther && (
+                    <Button variant="outlined" size="small" onClick={() => navigate(`/scan/batch/${b.id}`)}>
+                      {t('scan.batches.view')}
+                    </Button>
+                  )}
+                  {open && b.claimedBy && (b.claimedByMe || isAdmin) && (
+                    <Button size="small" disabled={release.isPending} onClick={() => release.mutate(b.id)}>
+                      {t('scan.batches.release')}
+                    </Button>
+                  )}
+                  {open && can('scan.commit') && (!claimedByOther || isAdmin) && (
+                    <Button size="small" color="error" onClick={() => setConfirmDiscard(b)}>
+                      {t('scan.batches.discard')}
+                    </Button>
+                  )}
                 </Stack>
-                <Typography variant="body2" color="text.secondary">
-                  {[
-                    t('scan.batches.counts', { count: b.total }),
-                    b.errors > 0 ? t('scan.batches.errors', { count: b.errors }) : null,
-                    b.committed > 0 ? t('scan.batches.committedCount', { count: b.committed }) : null,
-                    t('scan.batches.lastFile', { time: fmt.dateTime(b.lastFileUtc) }),
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </Typography>
-                {b.claimedBy && (
-                  <Typography variant="caption" color={b.claimedByMe ? 'primary' : 'text.secondary'}>
-                    {b.claimedByMe
-                      ? t('scan.batches.reviewedByMe')
-                      : t('scan.batches.reviewedBy', { name: b.claimedBy })}
-                  </Typography>
-                )}
-                {b.status === 'Matching' && b.total > 0 && (
-                  <LinearProgress
-                    variant="determinate"
-                    value={(done / b.total) * 100}
-                    sx={{ mt: 0.75, maxWidth: 360 }}
-                  />
-                )}
-              </Box>
-              <Stack direction="row" spacing={1} flexShrink={0}>
-                {open && !claimedByOther && (
-                  <Button
-                    variant="contained"
-                    size="small"
-                    disabled={claim.isPending}
-                    onClick={() => claim.mutate(b.id)}
-                  >
-                    {b.claimedByMe ? t('scan.batches.continue') : t('scan.batches.open')}
-                  </Button>
-                )}
-                {open && claimedByOther && (
-                  <Button variant="outlined" size="small" onClick={() => navigate(`/scan/batch/${b.id}`)}>
-                    {t('scan.batches.view')}
-                  </Button>
-                )}
-                {open && b.claimedBy && (b.claimedByMe || isAdmin) && (
-                  <Button size="small" disabled={release.isPending} onClick={() => release.mutate(b.id)}>
-                    {t('scan.batches.release')}
-                  </Button>
-                )}
-                {open && can('scan.commit') && (!claimedByOther || isAdmin) && (
-                  <Button size="small" color="error" onClick={() => setConfirmDiscard(b)}>
-                    {t('scan.batches.discard')}
-                  </Button>
-                )}
               </Stack>
-            </Stack>
-          );
-        })}
-      </Stack>
+            );
+          })}
+        </Stack>
+      </Collapse>
 
       <Dialog open={!!confirmDiscard} onClose={() => setConfirmDiscard(null)}>
         <DialogTitle>{t('scan.batches.discardTitle')}</DialogTitle>
