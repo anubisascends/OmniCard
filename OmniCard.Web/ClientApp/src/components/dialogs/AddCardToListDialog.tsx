@@ -42,12 +42,15 @@ export function AddCardToListDialog({
   open,
   listId,
   defaultGame,
+  language,
   onClose,
   onDone,
 }: {
   open: boolean;
   listId: number;
   defaultGame: string;
+  /** The list's forced card language (null = any): searches start limited to it. */
+  language?: string | null;
   onClose: () => void;
   /** Called after each successful add so the caller can refresh the list. */
   onDone: () => void;
@@ -65,6 +68,7 @@ export function AddCardToListDialog({
   const [quantity, setQuantity] = useState('1');
   const [error, setError] = useState<string | null>(null);
   const [addedCount, setAddedCount] = useState(0);
+  const [onlyLanguage, setOnlyLanguage] = useState(true);
 
   // Reset the form each time the dialog opens.
   const [wasOpen, setWasOpen] = useState(false);
@@ -79,6 +83,7 @@ export function AddCardToListDialog({
     setQuantity('1');
     setError(null);
     setAddedCount(0);
+    setOnlyLanguage(true);
   }
   if (!open && wasOpen) setWasOpen(false);
 
@@ -90,6 +95,8 @@ export function AddCardToListDialog({
     if (cn.trim()) parts.push(`cn:${cn.trim()}`);
     return parts.join(' ');
   }, [name, set, cn]);
+  // The list's language narrows both searches (lang: works for owned copies and catalog rows alike).
+  const languageFilter = language && onlyLanguage && game === defaultGame ? ` lang:${language}` : '';
 
   const [debounced, setDebounced] = useState('');
   useEffect(() => {
@@ -100,14 +107,14 @@ export function AddCardToListDialog({
   const canSearch = open && !selected && debounced.trim().length >= 2;
 
   const owned = useQuery({
-    queryKey: ['collection', 'list-add', game, debounced],
-    queryFn: () => api.collection({ game, q: debounced, take: 25 }),
+    queryKey: ['collection', 'list-add', game, debounced, languageFilter],
+    queryFn: () => api.collection({ game, q: debounced + languageFilter, take: 25 }),
     enabled: canSearch,
   });
   const ownedItems = owned.data?.items ?? [];
   const catalog = useQuery({
-    queryKey: ['catalog-search', game, debounced],
-    queryFn: () => api.scanSearch(game, debounced),
+    queryKey: ['catalog-search', game, debounced, languageFilter],
+    queryFn: () => api.scanSearch(game, debounced + languageFilter),
     enabled: canSearch,
   });
 
@@ -209,6 +216,13 @@ export function AddCardToListDialog({
             <TextField size="small" label={t('common.labels.set')} value={set} onChange={(e) => setSet(e.target.value)} sx={{ width: 110 }} />
             <TextField size="small" label={t('common.labels.collectorNumber')} value={cn} onChange={(e) => setCn(e.target.value)} sx={{ width: 110 }} />
           </Stack>
+
+          {language && game === defaultGame && (
+            <FormControlLabel
+              control={<Switch size="small" checked={onlyLanguage} onChange={(e) => setOnlyLanguage(e.target.checked)} />}
+              label={t('dialogs.addToList.onlyLanguage', { language: t(`common.languages.${language}`) })}
+            />
+          )}
 
           {/* Search results — collection first, then catalog. */}
           {canSearch && (

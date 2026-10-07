@@ -49,7 +49,7 @@ To add a whole deck to the list that's already open, paste its address into **Ad
 ## Add cards by hand
 
 1. Open the list and click **Add card**.
-2. In the **Add card to list** dialog, check the **Game**, then search by **Name**. You can narrow the search with **Set** and **Collector #**.
+2. In the **Add card to list** dialog, check the **Game**, then search by **Name**. You can narrow the search with **Set** and **Collector #**. If the list has a card language, a switch such as **Only Japanese cards** limits both groups of results to that language. Turn it off to see every language.
 3. Results come in two groups:
    - **In your collection**: copies you already own. Each shows its set, number, condition, and location. Click one to add that copy to the list. The copy doesn't move yet. When you put the list away, that copy is the one that gets moved.
    - **In the catalog**: every printing in the game's catalog, including ones you don't own. Click one, set the **Qty** and **Foil**, then click **Add to list**.
@@ -59,15 +59,22 @@ To add a whole deck to the list that's already open, paste its address into **Ad
 
 ## Read a list
 
-The open list shows a table of its cards:
+The open list splits its cards into two grids:
+
+- **Owned**: the copies your collection already covers.
+- **To buy**: the copies you still need.
+
+A card you partly own shows up in both grids. For example, if the list needs 4 and you own 1, it shows 1 under **Owned** and 3 under **To buy**. Each grid's heading shows how many copies it holds. Click a heading to collapse or expand that grid. OmniCard remembers your choice in this browser. The **Export** button on a heading exports just that grid. See [Export a list](#export-a-list).
+
+Each grid has these columns:
 
 | Column | What it shows |
 |---|---|
 | (icon) | Whether you own the card. See the icons below. |
 | **Card** | The card name. ✦ means foil. Hover over the name to see the card image. |
 | **Set** | The set code and collector number. |
-| **Qty** | How many the list needs. Type a new number to change it. |
-| **Owned** | How many copies of this exact printing you own, up to the quantity needed. |
+| **Owned** / **To buy** | How many copies of this card are in this grid. |
+| **List qty** | How many the list needs in total. Type a new number to change it. |
 | **Price** | The current market price for one copy. A dash means no price is known. |
 
 Click the delete icon at the end of a row to take that card off the list.
@@ -78,7 +85,7 @@ Click the delete icon at the end of a row to take that card off the list.
 - **Swap icon**: a stand-in, meaning another printing from your collection is filling in for the card. See [Use other printings you own](#use-other-printings-you-own).
 - **Shopping cart**: awaiting purchase. Your copies were already moved and the rest still need to be bought. See [Awaiting purchase](#put-cards-away).
 
-A grey **+N** next to the owned count means you have N more copies, but they're in an ignored location or listed for sale, so the list doesn't count them. See [Ignored locations](#ignored-locations).
+In the **To buy** grid, a grey **+N** next to the count means you have N more copies, but they're in an ignored location or listed for sale, so the list doesn't count them. See [Ignored locations](#ignored-locations).
 
 ### What counts as owned
 
@@ -126,10 +133,15 @@ If the list has a card language set, only copies in that language are offered.
 
 Use **Card language** at the top right of an open list to make the list language-specific, for example a Japanese-only deck.
 
-- **Any language** (the default): copies in any language count as owned, and new cards are added in English.
-- A specific language: only copies in that language count as owned, and new cards are added in that language.
+- **Any language** (the default): copies in any language count as owned. Imported and new cards use the English printing.
+- A specific language: only copies in that language count as owned. Imported cards, the buy list, and new cards all use that language's printing.
 
 You can also choose the language when you import a list from a URL.
+
+When you change the language, OmniCard switches every card on the list to that language's printing of the same set and number. A card that has no printing in that language keeps its English printing and gets a tag such as **No Japanese printing**. Hover over the tag for details. Cards you added from your collection, and stand-ins, keep the exact copy you chose.
+
+> [!TIP]
+> If a list imported before this worked shows printings in the wrong language, click **Refresh prices**. It also switches the cards to the list's language.
 
 ## Ignored locations
 
@@ -151,6 +163,23 @@ Click **Print** in an open list and choose:
 - **Print buy list**: only the copies you still need to buy.
 
 Each one downloads as a PDF.
+
+## Export a list
+
+Export a list as text to paste into Moxfield or Archidekt, or as a CSV for a spreadsheet.
+
+1. Click **Export** above the list. You can also click **Export** on the **Owned** or **To buy** heading to start with that part.
+2. Choose what to export: **All cards**, **To buy**, or **Owned**.
+3. Choose **Text** or **CSV**. A preview shows exactly what you'll get.
+4. Click **Copy** to put it on the clipboard, or **Download** to save it as a file.
+
+Text has one line per card, like this:
+
+`1x Aragorn, the Uniter (LTR) 192`
+
+That's the quantity, the card name, the set code in brackets, and the collector number. Foils end in `*F*`, and etched foils in `*E*`. Copies of the same printing and finish are combined into one line.
+
+The CSV has the columns **Qty**, **Card Name**, **Set**, **Collector Number**, and **Foil**.
 
 ## Put cards away
 
@@ -180,7 +209,7 @@ If you click **Move owned** before you've bought the rest, the cards you moved c
 
 ## Tips
 
-- Lists also work as shopping lists. Import a deck, click **Print buy list**, and take the PDF to a card shop.
+- Lists also work as shopping lists. Import a deck, click **Print buy list**, and take the PDF to a card shop. To order online, export **To buy** as text and paste it into the store's mass-entry box.
 - Before you put a list away, ignore locations you never want to pull from, like a sales binder.
 - If a card shows as not owned but you're sure you have it, check its printing, foil, and language. Then try **Find in collection**.
 - To check a decklist against your collection without saving it, use **Check decklist** on the Collection page. See [Collection](help:collection).

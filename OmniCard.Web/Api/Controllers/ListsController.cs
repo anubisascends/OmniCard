@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
 using OmniCard.Collection.Lists;
@@ -370,6 +371,37 @@ public sealed class ListsController(
         return File(bytes, "application/pdf", $"buy-list-{DecklistController.SafeFileName(list.Name)}.pdf");
     }
 
+    /// <summary>The list as a decklist text file (<c>1x Aragorn, the Uniter (LTR) 192</c>, <c>*F*</c> = foil) or
+    /// a CSV (Qty, Card Name, Set, Collector Number, Foil). <c>scope</c> is <c>all</c>, <c>buy</c> (copies the
+    /// collection doesn't cover) or <c>owned</c>, split exactly like the pick / buy lists.</summary>
+    [HttpGet("{id:int}/export")]
+    [RequirePermission(Permissions.ListsView)]
+    public IActionResult Export(int id, [FromQuery] string? scope, [FromQuery] string? format)
+    {
+        ListExportScope? parsedScope = scope?.ToLowerInvariant() switch
+        {
+            null or "" or "all" => ListExportScope.All,
+            "buy" => ListExportScope.ToBuy,
+            "owned" => ListExportScope.Owned,
+            _ => null,
+        };
+        if (parsedScope is not { } exportScope)
+            return BadRequest(new { error = $"Unknown scope '{scope}'" });
+        var csv = string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase);
+        if (!csv && !string.IsNullOrEmpty(format) && !string.Equals(format, "text", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { error = $"Unknown format '{format}'" });
+        if (PlanList(id) is not var (list, plan))
+            return NotFound();
+
+        var lines = ListExportFormatter.Lines(plan, exportScope);
+        var suffix = exportScope switch { ListExportScope.ToBuy => "-to-buy", ListExportScope.Owned => "-owned", _ => "" };
+        var name = $"{DecklistController.SafeFileName(list.Name)}{suffix}";
+        return csv
+            ? File(new UTF8Encoding(true).GetPreamble().Concat(Encoding.UTF8.GetBytes(ListExportFormatter.ToCsv(lines))).ToArray(),
+                "text/csv; charset=utf-8", $"{name}.csv")
+            : File(Encoding.UTF8.GetBytes(ListExportFormatter.ToText(lines)), "text/plain; charset=utf-8", $"{name}.txt");
+    }
+
     /// <summary>Fulfil the list: copies already in the collection (exact printing, see
     /// <see cref="ListFulfillmentPlanner"/>) move to <c>MoveToContainerId</c>, splitting a larger stack as
     /// needed, and copies the collection doesn't have are created as new lots at <c>AddToContainerId</c>.
@@ -517,6 +549,10 @@ public sealed class ListsController(
         var planByItem = planner.Plan(list.Game, items, siteAccess?.Current.ReadableSiteIds, language: list.Language)
             .ToDictionary(p => p.Item.Id);
         var images = ImagesFor(list.Game, items.Select(i => i.GameCardId));
+        // Each printing's catalog language, so the page can flag rows not printed in the list's language.
+        var languages = list.Language is null
+            ? new Dictionary<string, string>()
+            : LanguageAware(list.Game)?.GetCardLanguages(items.Select(i => i.GameCardId)) ?? new Dictionary<string, string>();
 
         return items.Select(i =>
         {
@@ -529,7 +565,8 @@ public sealed class ListsController(
                 OwnedQuantity: owned,
                 AwaitingPurchase: i.AwaitingPurchase,
                 IsSubstitute: i.SubstituteForCardId is not null,
-                IgnoredQuantity: planByItem.GetValueOrDefault(i.Id)?.IgnoredQuantity ?? 0);
+                IgnoredQuantity: planByItem.GetValueOrDefault(i.Id)?.IgnoredQuantity ?? 0,
+                Language: languages.GetValueOrDefault(i.GameCardId));
         }).ToList();
     }
 

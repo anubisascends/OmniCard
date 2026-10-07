@@ -185,7 +185,60 @@ public class ListService(
         var list = ctx.CardLists.FirstOrDefault(l => l.Id == listId);
         if (list is null) return;
         list.Language = CardLanguages.Normalize(language);
+        RemapToLanguage(ctx, list);
         ctx.SaveChanges();
+    }
+
+    /// <summary>Points every item of a list with a forced language at that language's printing (same set +
+    /// collector number), so the rows, prices, buy list and newly added copies are that language. A printing
+    /// with no row in the language falls back to its English row; one with neither is left alone (the list
+    /// shows it as not printed in the language). Items referencing an owned lot (added from the collection, or
+    /// stand-ins) keep that exact printing, but a stand-in's replaced card is repointed too, so "update from
+    /// URL" still counts it toward the deck's card. Items that end up on the same printing are merged.</summary>
+    private void RemapToLanguage(OmniCardDbContext ctx, CardList list)
+    {
+        if (list.Language is not { } language) return;
+        var gs = cardService.GetGameService(list.Game);
+        if (gs is not ICatalogLanguageAware aware) return;
+
+        var items = ctx.CardListItems.Where(i => i.CardListId == list.Id).ToList();
+        var current = aware.GetCardLanguages(items.Select(i => i.GameCardId)
+            .Concat(items.Select(i => i.SubstituteForCardId).OfType<string>()));
+        CardMatch? Variant(string id, string lang) =>
+            aware.FindLanguageVariant(id, language)
+            ?? (lang == CardLanguages.English ? null : aware.FindLanguageVariant(id, CardLanguages.English));
+
+        foreach (var standIn in items.Where(i => i.SubstituteForCardId is not null))
+        {
+            if (!current.TryGetValue(standIn.SubstituteForCardId!, out var replacedLang) || replacedLang == language) continue;
+            if (Variant(standIn.SubstituteForCardId!, replacedLang) is { } replaced)
+                standIn.SubstituteForCardId = replaced.GameSpecificId;
+        }
+
+        foreach (var item in items.Where(i => i.SourceLotId is null && i.SubstituteForCardId is null).ToList())
+        {
+            if (!current.TryGetValue(item.GameCardId, out var lang) || lang == language) continue;
+            var variant = Variant(item.GameCardId, lang);
+            if (variant is null || variant.GameSpecificId == item.GameCardId) continue;
+
+            var merge = items.FirstOrDefault(i => i != item && i.GameCardId == variant.GameSpecificId
+                && i.IsFoil == item.IsFoil && i.FoilType == item.FoilType && i.AwaitingPurchase == item.AwaitingPurchase
+                && i.SourceLotId is null && i.SubstituteForCardId is null);
+            if (merge is not null)
+            {
+                merge.Quantity += item.Quantity;
+                ctx.CardListItems.Remove(item);
+                items.Remove(item);
+                continue;
+            }
+
+            item.GameCardId = variant.GameSpecificId;
+            item.CardName = variant.Name;
+            item.SetCode = string.IsNullOrEmpty(variant.SetCode) ? null : variant.SetCode;
+            item.CollectorNumber = string.IsNullOrEmpty(variant.CollectorNumber) ? null : variant.CollectorNumber;
+            item.AddedMarketPrice = gs.GetCurrentPrice(variant.GameSpecificId, item.IsFoil);
+            item.IsUnpriced = item.AddedMarketPrice is null;
+        }
     }
 
     public void SetSourceUrl(int listId, string? url)
@@ -209,7 +262,7 @@ public class ListService(
         var deck = new Dictionary<string, (CardMatch Printing, int Quantity)>();
         foreach (var entry in entries)
         {
-            var printing = ResolvePrinting(gs, entry);
+            var printing = ResolvePrinting(gs, entry, list.Language);
             if (printing is null) { unresolved.Add(entry.CardName); continue; }
             deck[printing.GameSpecificId] = deck.TryGetValue(printing.GameSpecificId, out var d)
                 ? (d.Printing, d.Quantity + entry.Quantity)
@@ -385,8 +438,8 @@ public class ListService(
     /// <summary>Honors the exact printing (set + collector number) the entry specifies — e.g. the printing a
     /// Moxfield/Archidekt URL points at — falling back to the cheapest printing by name so a card is never
     /// dropped just because its printing couldn't be located.</summary>
-    private static CardMatch? ResolvePrinting(ICardGameService gs, DecklistEntry entry) =>
-        DecklistPrintingResolver.Resolve(gs, entry) ?? ResolveCheapest(gs, entry.CardName)?.Printing;
+    private static CardMatch? ResolvePrinting(ICardGameService gs, DecklistEntry entry, string? language) =>
+        DecklistPrintingResolver.Resolve(gs, entry, language) ?? ResolveCheapest(gs, entry.CardName, language)?.Printing;
 
     public AddCardsResult AddCardsByName(int listId, IEnumerable<DecklistEntry> entries, ListItemSource source = ListItemSource.Paste)
     {
@@ -407,7 +460,7 @@ public class ListService(
             // Moxfield/Archidekt URL points at — instead of collapsing to the cheapest printing of the name.
             // Fall back to cheapest-by-name so a card is never dropped just because its printing couldn't be
             // located (a name-only line, or an exact set/collector that isn't in the catalog).
-            var printing = ResolvePrinting(gs, entry);
+            var printing = ResolvePrinting(gs, entry, list.Language);
             if (printing is null) { unresolved.Add(entry.CardName); continue; }
             var price = gs.GetCurrentPrice(printing.GameSpecificId, isFoil: false);
 
@@ -451,6 +504,9 @@ public class ListService(
         var list = ctx.CardLists.AsNoTracking().FirstOrDefault(l => l.Id == listId);
         if (list is null) return;
         var gs = cardService.GetGameService(list.Game);
+        // Repoint items at the list's language first (fixes lists imported before imports honored it).
+        RemapToLanguage(ctx, list);
+        ctx.SaveChanges();
 
         foreach (var item in ctx.CardListItems.Where(i => i.CardListId == listId).ToList())
         {
@@ -464,7 +520,7 @@ public class ListService(
             }
             else
             {
-                var resolved = ResolveCheapest(gs, item.CardName);
+                var resolved = ResolveCheapest(gs, item.CardName, list.Language);
                 if (resolved is null) continue; // leave as-is if no longer resolvable
                 var (printing, price, unpriced) = resolved.Value;
                 item.GameCardId = printing.GameSpecificId;
@@ -500,7 +556,7 @@ public class ListService(
         foreach (var item in items)
         {
             var entry = new DecklistEntry(item.Quantity, item.CardName, item.SetCode, item.CollectorNumber);
-            var match = DecklistPrintingResolver.Resolve(gs, entry);
+            var match = DecklistPrintingResolver.Resolve(gs, entry, list.Language);
             if (match is null)
             {
                 unresolved++;
@@ -524,12 +580,13 @@ public class ListService(
         return new CommitToLocationResult(added, unresolved, deleted);
     }
 
-    /// <summary>Cheapest non-foil printing of the named card. Returns null if no printing exists;
+    /// <summary>Cheapest non-foil printing of the named card, in <paramref name="language"/> when it has one
+    /// (else English). Returns null if no printing exists;
     /// on no-price, returns the first printing flagged unpriced.</summary>
     private static (CardMatch Printing, decimal? Price, bool Unpriced)? ResolveCheapest(
-        ICardGameService gs, string cardName)
+        ICardGameService gs, string cardName, string? language)
     {
-        var printings = DecklistPrintingResolver.GetPrintingsFuzzy(gs, cardName);
+        var printings = DecklistPrintingResolver.PreferLanguage(DecklistPrintingResolver.GetPrintingsFuzzy(gs, cardName), language);
         if (printings.Count == 0) return null;
 
         var prices = gs.GetCurrentPrices(printings.Select(p => p.GameSpecificId), isFoil: false);

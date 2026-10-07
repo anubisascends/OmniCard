@@ -27,7 +27,8 @@
       "noOwnedCopies": "No copies in your collection.",
       "noCatalogMatches": "No matches in the {{game}} catalog.",
       "unfiled": "Unfiled",
-      "addToList": "Add to list"
+      "addToList": "Add to list",
+      "onlyLanguage": "Only {{language}} cards"
     },
     "bulkEdit": {
       "title_one": "Edit {{count}} selected card",

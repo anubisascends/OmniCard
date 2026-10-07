@@ -127,6 +127,17 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
         return ctx.Cards.AsNoTracking().Where(c => c.Id == id).Select(c => c.Lang).FirstOrDefault();
     }
 
+    public IReadOnlyDictionary<string, string> GetCardLanguages(IEnumerable<string> gameCardIds)
+    {
+        var ids = gameCardIds.Select(s => Guid.TryParse(s, out var g) ? g : Guid.Empty)
+            .Where(g => g != Guid.Empty).Distinct().ToList();
+        if (ids.Count == 0) return new Dictionary<string, string>();
+        using var ctx = _dbContextFactory.CreateDbContext();
+        return ctx.Cards.AsNoTracking().Where(c => ids.Contains(c.Id))
+            .Select(c => new { c.Id, c.Lang }).AsEnumerable()
+            .ToDictionary(c => c.Id.ToString(), c => c.Lang);
+    }
+
     /// <summary>The (set, collector number) printing in <paramref name="language"/>. Scryfall gives every
     /// language its own card object sharing the English set + number. A non-English row whose scan is a
     /// placeholder/missing borrows the English art so the collection doesn't show a blank.</summary>

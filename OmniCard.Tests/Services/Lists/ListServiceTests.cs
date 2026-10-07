@@ -473,6 +473,124 @@ public class ListServiceTests : IDisposable
         Assert.Null(svc.GetLists(CardGame.Mtg)[0].Language);
     }
 
+    private static CardMatch Printing(string id, string name, string set, string cn, string lang) =>
+        new() { GameSpecificId = id, Name = name, SetCode = set, CollectorNumber = cn, Language = lang };
+
+    /// <summary>A catalog holding English + Japanese rows of Aragorn (LTR 192), and only an English Brainstorm.</summary>
+    private FakeCardService BilingualCatalog()
+    {
+        var cards = new FakeCardService();
+        cards.Game.Printings.AddRange([
+            Printing("aragorn-ja", "Aragorn, the Uniter", "ltr", "192", "ja"),
+            Printing("aragorn-en", "Aragorn, the Uniter", "ltr", "192", "en"),
+            Printing("brainstorm-en", "Brainstorm", "ice", "61", "en"),
+        ]);
+        cards.Game.Prices["aragorn-en"] = 1.50m;
+        cards.Game.Prices["aragorn-ja"] = 3.00m;
+        return cards;
+    }
+
+    [Theory]
+    [InlineData(null, "aragorn-en")]
+    [InlineData("en", "aragorn-en")]
+    [InlineData("ja", "aragorn-ja")]
+    public void AddCardsByName_ExactPrinting_TakesTheListLanguageRow(string? language, string expectedId)
+    {
+        var svc = CreateService(BilingualCatalog());
+        var list = svc.CreateList("Aragorn", CardGame.Mtg);
+        svc.SetLanguage(list.Id, language);
+
+        svc.AddCardsByName(list.Id, [new DecklistEntry(1, "Aragorn, the Uniter", "LTR", "192")], ListItemSource.Url);
+
+        Assert.Equal(expectedId, Assert.Single(svc.GetItems(list.Id)).GameCardId);
+    }
+
+    [Fact]
+    public void AddCardsByName_NoRowInListLanguage_KeepsEnglish()
+    {
+        var svc = CreateService(BilingualCatalog());
+        var list = svc.CreateList("Aragorn", CardGame.Mtg);
+        svc.SetLanguage(list.Id, "ja");
+
+        svc.AddCardsByName(list.Id, [new DecklistEntry(1, "Brainstorm", "ICE", "61")], ListItemSource.Url);
+
+        Assert.Equal("brainstorm-en", Assert.Single(svc.GetItems(list.Id)).GameCardId);
+    }
+
+    [Fact]
+    public void SetLanguage_RepointsItemsAtThatLanguage_AndMergesDuplicates()
+    {
+        var svc = CreateService(BilingualCatalog());
+        var list = svc.CreateList("Aragorn", CardGame.Mtg);
+        using (var ctx = _dbFactory.CreateDbContext())
+        {
+            ctx.CardListItems.AddRange(
+                new CardListItem { CardListId = list.Id, Quantity = 2, GameCardId = "aragorn-ja", CardName = "Aragorn, the Uniter", SetCode = "ltr", CollectorNumber = "192", Source = ListItemSource.Url },
+                new CardListItem { CardListId = list.Id, Quantity = 1, GameCardId = "aragorn-en", CardName = "Aragorn, the Uniter", SetCode = "ltr", CollectorNumber = "192", Source = ListItemSource.Url });
+            ctx.SaveChanges();
+        }
+
+        svc.SetLanguage(list.Id, "en");
+
+        var item = Assert.Single(svc.GetItems(list.Id));
+        Assert.Equal(("aragorn-en", 3), (item.GameCardId, item.Quantity));
+    }
+
+    [Fact]
+    public void SetLanguage_Japanese_RepricesAndLeavesEnglishOnlyPrintings()
+    {
+        var svc = CreateService(BilingualCatalog());
+        var list = svc.CreateList("Aragorn", CardGame.Mtg);
+        svc.AddCardsByName(list.Id, [new DecklistEntry(1, "Aragorn, the Uniter", "LTR", "192"),
+            new DecklistEntry(1, "Brainstorm", "ICE", "61")], ListItemSource.Url);
+
+        svc.SetLanguage(list.Id, "ja");
+
+        var items = svc.GetItems(list.Id);
+        var aragorn = items.Single(i => i.CardName == "Aragorn, the Uniter");
+        Assert.Equal(("aragorn-ja", 3.00m), (aragorn.GameCardId, aragorn.AddedMarketPrice));
+        Assert.Equal("brainstorm-en", items.Single(i => i.CardName == "Brainstorm").GameCardId);
+    }
+
+    [Fact]
+    public void SetLanguage_RepointsTheCardAStandInReplaces()
+    {
+        var cards = BilingualCatalog();
+        cards.Game.Printings.Add(Printing("aragorn-promo", "Aragorn, the Uniter", "pltr", "192p", "en"));
+        var svc = CreateService(cards);
+        var list = svc.CreateList("Aragorn", CardGame.Mtg);
+        using (var ctx = _dbFactory.CreateDbContext())
+        {
+            ctx.CardListItems.Add(new CardListItem { CardListId = list.Id, Quantity = 1, GameCardId = "aragorn-promo", CardName = "Aragorn, the Uniter", SetCode = "pltr", CollectorNumber = "192p", SourceLotId = 42, SubstituteForCardId = "aragorn-ja", Source = ListItemSource.Manual });
+            ctx.SaveChanges();
+        }
+
+        svc.SetLanguage(list.Id, "en");
+
+        var standIn = Assert.Single(svc.GetItems(list.Id));
+        Assert.Equal(("aragorn-promo", "aragorn-en"), (standIn.GameCardId, standIn.SubstituteForCardId));
+        var preview = svc.PreviewUpdate(list.Id, "Deck", [new DecklistEntry(1, "Aragorn, the Uniter", "LTR", "192")]);
+        Assert.Empty(preview.Rows);
+    }
+
+    [Fact]
+    public void RefreshPrices_RepairsItemsImportedInTheWrongLanguage()
+    {
+        var svc = CreateService(BilingualCatalog());
+        var list = svc.CreateList("Aragorn", CardGame.Mtg);
+        using (var ctx = _dbFactory.CreateDbContext())
+        {
+            ctx.CardLists.Single(l => l.Id == list.Id).Language = "en";
+            ctx.CardListItems.Add(new CardListItem { CardListId = list.Id, Quantity = 1, GameCardId = "aragorn-ja", CardName = "Aragorn, the Uniter", SetCode = "ltr", CollectorNumber = "192", Source = ListItemSource.Url });
+            ctx.SaveChanges();
+        }
+
+        svc.RefreshPrices(list.Id);
+
+        var item = Assert.Single(svc.GetItems(list.Id));
+        Assert.Equal(("aragorn-en", 1.50m), (item.GameCardId, item.AddedMarketPrice));
+    }
+
     private class FakeCardService : ICardService
     {
         public ObservableCollection<ScannedCard> ScannedCards { get; } = [];
@@ -529,10 +647,20 @@ public class ListServiceTests : IDisposable
         public (CardMatch? Match, CardGame Game) FindBestMatch(ulong hash, ulong[]? artHashes = null, OcrMatchResult? ocrResult = null, IReadOnlySet<string>? setFilter = null, IReadOnlySet<string>? preferredSets = null, ulong? scanEdgeHash = null) => (null, CardGame.Mtg);
     }
 
-    private class FakeGameService : ICardGameService
+    private class FakeGameService : ICardGameService, ICatalogLanguageAware
     {
         public List<CardMatch> Printings { get; } = [];
         public Dictionary<string, decimal> Prices { get; } = new();
+
+        public IReadOnlyList<string> DownloadableLanguages => ["en", "ja"];
+        public IReadOnlyCollection<string> CatalogLanguages { get; set; } = ["en", "ja"];
+        public string? GetCardLanguage(string gameCardId) =>
+            Printings.FirstOrDefault(p => p.GameSpecificId == gameCardId) is { } p ? p.Language ?? "en" : null;
+        public CardMatch? FindLanguageVariant(string gameCardId, string language) =>
+            Printings.FirstOrDefault(p => p.GameSpecificId == gameCardId) is not { } source
+                ? null
+                : Printings.FirstOrDefault(p => p.SetCode == source.SetCode && p.CollectorNumber == source.CollectorNumber
+                                                && (p.Language ?? "en") == language);
 
         public CardGame Game => CardGame.Mtg;
         public MatchDiagnostics? LastMatchDiagnostics => null;

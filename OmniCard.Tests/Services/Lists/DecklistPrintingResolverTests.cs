@@ -7,8 +7,8 @@ namespace OmniCard.Tests.Services.Lists;
 
 public class DecklistPrintingResolverTests
 {
-    private static CardMatch Match(string id, string set, string cn) =>
-        new() { GameSpecificId = id, Name = "Island", SetCode = set, CollectorNumber = cn };
+    private static CardMatch Match(string id, string set, string cn, string? lang = null) =>
+        new() { GameSpecificId = id, Name = "Island", SetCode = set, CollectorNumber = cn, Language = lang };
 
     [Fact]
     public void SetAndCollector_ExactHit_Returned()
@@ -19,6 +19,40 @@ public class DecklistPrintingResolverTests
         };
         var result = DecklistPrintingResolver.Resolve(gs, new DecklistEntry(4, "Island", "SCD", "337"));
         Assert.Equal("a", result!.GameSpecificId);
+    }
+
+    [Theory]
+    [InlineData(null, "en")]
+    [InlineData("ja", "ja")]
+    [InlineData("de", "en")] // no German row → English
+    public void SetAndCollector_PrefersTheRequestedLanguage(string? language, string expectedId)
+    {
+        var gs = new ConfigurableGameService
+        {
+            OnSearchCards = (_, _) =>
+            [
+                Match("ja", "SCD", "337", "ja"),
+                Match("en", "SCD", "337", "en"),
+            ],
+        };
+        var result = DecklistPrintingResolver.Resolve(gs, new DecklistEntry(1, "Island", "SCD", "337"), language);
+        Assert.Equal(expectedId, result!.GameSpecificId);
+    }
+
+    [Fact]
+    public void NameOnly_CheapestWithinTheRequestedLanguage()
+    {
+        var gs = new ConfigurableGameService
+        {
+            OnGetPrintings = _ =>
+            [
+                Match("en-cheap", "AAA", "1", "en"),
+                Match("ja-pricey", "BBB", "2", "ja"),
+            ],
+            OnGetCurrentPrices = (_, _) => new() { ["en-cheap"] = 0.10m, ["ja-pricey"] = 5m },
+        };
+        var result = DecklistPrintingResolver.Resolve(gs, new DecklistEntry(1, "Island", null, null), "ja");
+        Assert.Equal("ja-pricey", result!.GameSpecificId);
     }
 
     [Fact]

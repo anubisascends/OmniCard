@@ -980,7 +980,14 @@ export interface CardListItemDto {
   isSubstitute: boolean;
   /** Copies of this printing that don't count: in a location ignored for lists, or listed for sale. */
   ignoredQuantity: number;
+  /** The printing's catalog language; only set when the list forces a language and the game's catalog serves
+   * other languages. Differs from the list's language when the card wasn't printed (or downloaded) in it. */
+  language?: string | null;
 }
+
+/** Which part of a list an export covers: every card, the copies still to buy, or the copies already owned. */
+export type ListExportScope = 'all' | 'buy' | 'owned';
+export type ListExportFormat = 'text' | 'csv';
 
 /** One difference between a list and a fresh fetch of its deck URL. Applying it sets the printing's
  * quantity on the list to `newQuantity` (0 removes it). */
