@@ -33,6 +33,8 @@ public class OmniCardDbContext : DbContext
     public DbSet<MismatchLog> MismatchLogs => Set<MismatchLog>();
     public DbSet<FlagResolution> FlagResolutions => Set<FlagResolution>();
     public DbSet<ScanDiagnosticEvent> ScanDiagnosticEvents => Set<ScanDiagnosticEvent>();
+    public DbSet<ScanBatch> ScanBatches => Set<ScanBatch>();
+    public DbSet<ScanBatchItem> ScanBatchItems => Set<ScanBatchItem>();
     public DbSet<MigrationState> MigrationState => Set<MigrationState>();
     public DbSet<CardList> CardLists => Set<CardList>();
     public DbSet<CardListItem> CardListItems => Set<CardListItem>();
@@ -203,6 +205,44 @@ public class OmniCardDbContext : DbContext
             e.HasIndex(d => d.EventType);
         });
 
+        // Watched-folder scan batches. The ingest lookup is (Game, FolderKey) among open batches; the
+        // nav badge counts unclaimed open batches. Items go with their batch (retention purge).
+        modelBuilder.Entity<ScanBatch>(e =>
+        {
+            e.HasKey(b => b.Id);
+            e.Property(b => b.Id).ValueGeneratedOnAdd();
+            e.Property(b => b.Game).HasConversion<string>().HasMaxLength(32);
+            e.Property(b => b.Status).HasConversion<string>().HasMaxLength(16);
+            e.Property(b => b.Name).IsRequired().HasMaxLength(200);
+            e.Property(b => b.FolderKey).IsRequired().HasMaxLength(260);
+            e.Property(b => b.Condition).HasMaxLength(16);
+            e.Property(b => b.Language).HasMaxLength(16);
+            e.Property(b => b.ClaimedByName).HasMaxLength(200);
+            e.Ignore(b => b.IsOpen);
+            e.Ignore(b => b.SetCodeList);
+            e.HasIndex(b => new { b.Game, b.FolderKey, b.Status });
+            e.HasIndex(b => new { b.Status, b.ClaimedByUserId });
+            e.HasMany(b => b.Items).WithOne()
+                .HasForeignKey(i => i.ScanBatchId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ScanBatchItem>(e =>
+        {
+            e.HasKey(i => i.Id);
+            e.Property(i => i.Id).ValueGeneratedOnAdd();
+            e.Property(i => i.Status).HasConversion<string>().HasMaxLength(16);
+            e.Property(i => i.State).HasConversion<string>().HasMaxLength(16);
+            e.Property(i => i.OriginalFileName).IsRequired().HasMaxLength(260);
+            e.Property(i => i.StoredFileName).IsRequired().HasMaxLength(260);
+            e.Property(i => i.PreviewFileName).HasMaxLength(260);
+            e.Property(i => i.Condition).HasMaxLength(16);
+            e.Property(i => i.Language).HasMaxLength(16);
+            e.Property(i => i.FoilType).HasMaxLength(64);
+            e.Property(i => i.PurchasePrice).HasPrecision(18, 2);
+            e.HasIndex(i => new { i.ScanBatchId, i.State, i.Status });
+        });
+
         modelBuilder.Entity<EbayListing>(e =>
         {
             e.HasKey(l => l.Id);
@@ -353,5 +393,8 @@ public class OmniCardDbContext : DbContext
         typeof(Order),
         typeof(OrderLine),
         typeof(Customer),
+        // Batch rows are written by both the background matcher and the claiming reviewer.
+        typeof(ScanBatch),
+        typeof(ScanBatchItem),
     ];
 }

@@ -1153,6 +1153,127 @@ public sealed record AuditCommitResultDto(
     IReadOnlyList<AuditLineDto> Added,
     int UpdatedCount);
 
+// --- Scan batches (watched scan folders, matched in the background) ---
+
+/// <summary>One background scan batch as listed on the Scan page and counted by the nav badge.
+/// <see cref="Status"/> is Collecting / Matching / Ready / Committed / Discarded. Counts cover the
+/// items still open for review except <see cref="Committed"/>.</summary>
+public sealed record ScanBatchSummaryDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = "";
+    public string Game { get; init; } = "";
+    public string Status { get; init; } = "";
+    public int Total { get; init; }
+    public int Pending { get; init; }
+    public int Matched { get; init; }
+    public int Errors { get; init; }
+    public int Committed { get; init; }
+    public string? ClaimedBy { get; init; }
+    public bool ClaimedByMe { get; init; }
+    public DateTime CreatedUtc { get; init; }
+    public DateTime LastFileUtc { get; init; }
+    public DateTime? ReadyUtc { get; init; }
+    public DateTime? ClosedUtc { get; init; }
+    public int? DefaultContainerId { get; init; }
+}
+
+/// <summary>One open item in a scan batch: the stored scan, its background match, and the reviewer's
+/// per-copy properties. <see cref="Status"/> is Pending / Matched / Error.</summary>
+public sealed record ScanBatchItemDto
+{
+    public int Id { get; init; }
+    public int Sequence { get; init; }
+    public string FileName { get; init; } = "";
+    public string ImageUrl { get; init; } = "";
+    public string Status { get; init; } = "";
+    public ScanMatchDto? Match { get; init; }
+    public ScanSearchResultDto? Override { get; init; }
+    public string? Error { get; init; }
+    public bool Include { get; init; }
+    public bool Verified { get; init; }
+    public string Condition { get; init; } = "NM";
+    public string? Language { get; init; }
+    public bool IsFoil { get; init; }
+    public string? FoilType { get; init; }
+    public int Quantity { get; init; } = 1;
+    public decimal? PurchasePrice { get; init; }
+    public IReadOnlyList<string> Tags { get; init; } = [];
+    public string? Note { get; init; }
+}
+
+/// <summary>A scan batch with its open items and the match settings it was created with.</summary>
+public sealed record ScanBatchDto
+{
+    public ScanBatchSummaryDto Summary { get; init; } = new();
+    public bool IsFoil { get; init; }
+    public string? Condition { get; init; }
+    public string? Language { get; init; }
+    public IReadOnlyList<string> SetCodes { get; init; } = [];
+    public IReadOnlyList<ScanBatchItemDto> Items { get; init; } = [];
+}
+
+/// <summary>The reviewer's edits to one batch item. Match results are never written from here.</summary>
+public sealed record ScanBatchItemEdit
+{
+    public int Id { get; init; }
+    public bool Include { get; init; }
+    public bool Verified { get; init; }
+    public ScanSearchResultDto? Override { get; init; }
+    public string Condition { get; init; } = "NM";
+    public string? Language { get; init; }
+    public bool IsFoil { get; init; }
+    public string? FoilType { get; init; }
+    public int Quantity { get; init; } = 1;
+    public decimal? PurchasePrice { get; init; }
+    public IReadOnlyList<string> Tags { get; init; } = [];
+    public string? Note { get; init; }
+}
+
+public sealed record ScanBatchItemIdsRequest
+{
+    public IReadOnlyList<int> ItemIds { get; init; } = [];
+}
+
+/// <summary>Commit the listed batch items (from the server's saved copy) into a storage location.</summary>
+public sealed record ScanBatchCommitRequest
+{
+    public int ContainerId { get; init; }
+    public IReadOnlyList<int> ItemIds { get; init; } = [];
+}
+
+/// <summary>Result of a batch commit; <see cref="BatchClosed"/> is true once no open items remain.</summary>
+public sealed record ScanBatchCommitResultDto(int Imported, bool BatchClosed);
+
+public sealed record ScanBatchCountDto(int Unclaimed);
+
+/// <summary>Watched scan folder configuration (Settings ▸ Scan, admin only).</summary>
+public sealed record ScanFolderSettingsDto
+{
+    public bool Enabled { get; init; }
+    public int QuietPeriodSeconds { get; init; }
+    public int RetentionDays { get; init; }
+    public IReadOnlyList<ScanFolderConfigDto> Folders { get; init; } = [];
+}
+
+public sealed record ScanFolderConfigDto
+{
+    public string Game { get; init; } = "";
+    public string Path { get; init; } = "";
+    public bool Enabled { get; init; } = true;
+    public bool IsFoil { get; init; }
+    public string Condition { get; init; } = "NM";
+    public string? Language { get; init; }
+    public IReadOnlyList<string> SetCodes { get; init; } = [];
+    public int? DefaultContainerId { get; init; }
+}
+
+/// <summary>Live state of one game's watched folder: whether it exists, whether the app can move files
+/// out of it, and the last error the watcher hit there (null when fine).</summary>
+public sealed record ScanFolderStatusDto(string Game, bool Exists, bool Writable, string? LastError);
+
+public sealed record ScanFolderSettingsResponse(ScanFolderSettingsDto Settings, IReadOnlyList<ScanFolderStatusDto> Status);
+
 // --- Auth ---
 
 /// <summary>

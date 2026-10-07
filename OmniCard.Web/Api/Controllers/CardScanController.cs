@@ -31,6 +31,7 @@ public sealed class CardScanController(
     WebBinderCardService binderCards,
     ITagService tags,
     ICsvExportImportService csv,
+    ScanCommitService commits,
     ILogger<CardScanController> logger) : ControllerBase
 {
     /// <summary>Upper bound on correction-search results. High enough to show every printing of a
@@ -199,39 +200,19 @@ public sealed class CardScanController(
         if (request.Items.Count == 0)
             return BadRequest(new { error = "No cards to commit" });
 
-        var cards = new List<CollectionCard>(request.Items.Count);
-        var tagsPerCard = new List<IReadOnlyList<string>>(request.Items.Count);
-        foreach (var item in request.Items)
-        {
-            if (MapScanItem(item, request.ContainerId) is not { } card)
-                return BadRequest(new { error = $"Unknown game '{item.Game}'" });
-            cards.Add(card);
-            tagsPerCard.Add(item.Tags);
-        }
-
-        // A scanned card is a real physical copy — always create a new lot (never skip as a duplicate).
-        // AddScannedLots returns the created lot ids in input order so we can attach per-copy tags.
         IReadOnlyList<int> lotIds;
         try
         {
-            lotIds = binderCards.AddScannedLots(cards);
+            lotIds = commits.Commit(request.ContainerId, request.Items);
+        }
+        catch (UnknownScanGameException ex)
+        {
+            return BadRequest(new { error = ex.Message });
         }
         catch (DeckBoxGameMismatchException ex)
         {
             return Conflict(new { error = ex.Message });
         }
-        for (var i = 0; i < lotIds.Count; i++)
-        {
-            var cardTags = tagsPerCard[i].Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
-            if (cardTags.Count > 0)
-                tags.SetTagsForLot(lotIds[i], cardTags);
-        }
-
-        // Teach the matcher from confirmed identities: record each scanned item's (scan pHash → card)
-        // so future scans of the same card auto-match. The desktop did this; the web flow had dropped
-        // it entirely, so the matcher never learned from bulk entry. Best-effort — a failure to record
-        // must never fail the commit (the lots are already written).
-        RecordScanCorrections(request.Items);
 
         logger.LogInformation("Committed {Count} scanned card(s) to location {LocationId}", lotIds.Count, request.ContainerId);
         return Ok(new ScanCommitResultDto(lotIds.Count));
@@ -251,7 +232,7 @@ public sealed class CardScanController(
         var cards = new List<CollectionCard>(request.Items.Count);
         foreach (var item in request.Items)
         {
-            if (MapScanItem(item, containerId: null) is not { } card)
+            if (ScanCommitService.MapScanItem(item, containerId: null) is not { } card)
                 return BadRequest(new { error = $"Unknown game '{item.Game}'" });
             card.Tags = item.Tags.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()).ToList();
             var copies = card.Quantity;
@@ -298,42 +279,6 @@ public sealed class CardScanController(
         return cleaned.Length == 0 ? null : cleaned;
     }
 
-    /// <summary>Maps a confirmed scan item to a <see cref="CollectionCard"/> destined for
-    /// <paramref name="containerId"/> (null for an export, which places nothing). Returns <c>null</c>
-    /// when the item's game is unknown. Shared by the scan-commit, audit-commit and export paths.</summary>
-    private static CollectionCard? MapScanItem(ScanCommitItem item, int? containerId)
-    {
-        if (LocationsController.ParseGame(item.Game) is not { } game)
-            return null;
-
-        // Honor an explicit per-item foil finish; fall back to the game's basic foil when foil but
-        // no finish was chosen. Non-foil ⇒ no finish.
-        var foilType = item.IsFoil
-            ? (string.IsNullOrWhiteSpace(item.FoilType) ? FoilTypes.BasicFoilType(game) : item.FoilType.Trim())
-            : null;
-
-        return new CollectionCard
-        {
-            Game = game,
-            GameCardId = item.GameCardId,
-            Name = item.Name,
-            SetCode = item.SetCode,
-            SetName = item.SetName,
-            Number = item.CollectorNumber,
-            Rarity = item.Rarity,
-            ImageUri = item.ImageUri,
-            Condition = string.IsNullOrWhiteSpace(item.Condition) ? "NM" : item.Condition,
-            Language = CardLanguages.Normalize(item.Language) ?? CardLanguages.English,
-            IsFoil = item.IsFoil,
-            FoilType = foilType,
-            Quantity = Math.Max(1, item.Quantity),
-            PurchasePrice = item.PurchasePrice,
-            Note = string.IsNullOrWhiteSpace(item.Note) ? null : item.Note.Trim(),
-            DateAdded = DateTime.UtcNow,
-            ContainerId = containerId,
-        };
-    }
-
     /// <summary>Commit a location audit: the confirmed scans become the source of truth for the
     /// location. Matched cards are kept (condition/foil overwritten from the scan), scanned-but-absent
     /// cards are added, and expected-but-unscanned cards are deleted. Returns a summary of each bucket.
@@ -353,7 +298,7 @@ public sealed class CardScanController(
         var tagsByKey = new Dictionary<string, HashSet<string>>();
         foreach (var item in request.Items)
         {
-            if (MapScanItem(item, request.ContainerId) is not { } card)
+            if (ScanCommitService.MapScanItem(item, request.ContainerId) is not { } card)
                 return BadRequest(new { error = $"Unknown game '{item.Game}'" });
             cards.Add(card);
 
@@ -380,7 +325,7 @@ public sealed class CardScanController(
         }
 
         // Teach the matcher from every confirmed identity, matched or added (same as scan commit).
-        RecordScanCorrections(request.Items);
+        commits.RecordScanCorrections(request.Items);
 
         logger.LogInformation(
             "Audited location {LocationId}: {Matched} matched, {Added} added, {NotFound} not found ({Updated} updated)",
@@ -394,25 +339,5 @@ public sealed class CardScanController(
             result.NotFound.Select(ToDto).ToList(),
             result.Added.Select(ToDto).ToList(),
             result.UpdatedCount));
-    }
-
-    /// <summary>Record a scan-hash → confirmed-card mapping for each committed item that carries a scan
-    /// hash, so the matcher recognizes the same card next time (see <see cref="ScanCommitItem.ScanHash"/>).</summary>
-    private void RecordScanCorrections(IReadOnlyList<ScanCommitItem> items)
-    {
-        foreach (var item in items)
-        {
-            if (string.IsNullOrWhiteSpace(item.ScanHash) || string.IsNullOrWhiteSpace(item.GameCardId)) continue;
-            if (!ulong.TryParse(item.ScanHash, out var hash)) continue;
-            if (LocationsController.ParseGame(item.Game) is not { } game) continue;
-            try
-            {
-                cardService.GetGameService(game).RecordCorrection(hash, item.GameCardId);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to record scan correction for {Game} card {CardId}", item.Game, item.GameCardId);
-            }
-        }
     }
 }

@@ -43,6 +43,7 @@ import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog
 import { DeckTypesCard } from '../components/settings/DeckTypesCard';
 import { RolesCard } from '../components/settings/RolesCard';
 import { SitesCard } from '../components/settings/SitesCard';
+import { ScanFoldersCard } from '../components/settings/ScanFoldersCard';
 import { PermissionChecklist } from '../components/settings/PermissionChecklist';
 import { usePermissions } from '../context/usePermissions';
 import { currencySymbol } from '../lib/scanBadges';
@@ -1695,7 +1696,17 @@ const TABS: {
 }[] = [
   { key: 'sales', labelKey: 'settings.tabs.sales', render: () => <SalesCard />, show: (g) => g.can('settings.view') },
   { key: 'receipt', labelKey: 'settings.tabs.receipt', render: () => <ReceiptSettingsCard />, show: (g) => g.can('settings.view') },
-  { key: 'scan', labelKey: 'settings.tabs.scan', render: () => <ScanBadgesCard />, show: (g) => g.can('settings.view') },
+  {
+    key: 'scan',
+    labelKey: 'settings.tabs.scan',
+    render: () => (
+      <Stack spacing={2}>
+        <ScanBadgesCard />
+        <ScanFoldersCard />
+      </Stack>
+    ),
+    show: (g) => g.can('settings.view'),
+  },
   { key: 'deck-types', labelKey: 'settings.tabs.deckTypes', render: () => <DeckTypesCard />, show: (g) => g.can('decktypes.view') },
   { key: 'appearance', labelKey: 'settings.tabs.appearance', render: () => <AppearanceCard />, show: () => true },
   { key: 'catalog', labelKey: 'settings.tabs.catalog', render: () => <CatalogCard />, show: (g) => g.can('catalog.view') },

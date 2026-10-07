@@ -154,6 +154,53 @@
         "unresolvedLabel": "The List?",
         "unresolvedTooltip": "Detected as a The List reprint, but its plst printing wasn't found in the catalog — the printing and price shown may be the more expensive original. Check before adding."
       }
+    },
+    "batches": {
+      "panelTitle": "Scan batches",
+      "title": "Batch: {{name}}",
+      "intro": "Scans saved to a watched folder are matched in the background. Open a batch to review it and add it to a location.",
+      "empty": "No scan batches right now.",
+      "status": {
+        "Collecting": "Waiting for files",
+        "Matching": "Matching {{done}} of {{total}}",
+        "Ready": "Ready",
+        "Committed": "Committed",
+        "Discarded": "Discarded"
+      },
+      "counts_one": "{{count}} card",
+      "counts_other": "{{count}} cards",
+      "errors_one": "{{count}} error",
+      "errors_other": "{{count}} errors",
+      "committedCount": "{{count}} committed",
+      "lastFile": "Last file {{time}}",
+      "reviewedBy": "In review by {{name}}",
+      "reviewedByMe": "You're reviewing this",
+      "open": "Open",
+      "continue": "Continue",
+      "view": "View",
+      "release": "Release",
+      "discard": "Discard",
+      "takeOver": "Take over",
+      "claim": "Review this batch",
+      "retryErrors_one": "Retry {{count}} error",
+      "retryErrors_other": "Retry {{count}} errors",
+      "discardTitle": "Discard batch?",
+      "discardBody": "Discard “{{name}}”? Its {{count}} unsaved card(s) and their stored images will be deleted. The original files stay in the folder's _processed subfolder.",
+      "readOnly": "{{name}} is reviewing this batch. You can look, but changes are turned off.",
+      "readOnlyUnclaimed": "Nobody is reviewing this batch. Start reviewing it to make changes.",
+      "claimLost": "You're no longer reviewing this batch (someone else took it over, or it was closed). Your last changes may not have been saved.",
+      "closed": "This batch is closed.",
+      "settings": "Batch settings",
+      "settingsSummary": "Sets: {{sets}} · Condition: {{condition}} · Language: {{language}} · Foil: {{foil}}",
+      "allSets": "all",
+      "autoLanguage": "auto",
+      "yes": "yes",
+      "no": "no",
+      "breadcrumb": "Batch",
+      "summaryReady": "{{count}} ready",
+      "summaryInProgress": "{{count}} in progress",
+      "expand": "Show batches",
+      "collapse": "Hide batches"
     }
   }
 }

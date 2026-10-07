@@ -687,6 +687,111 @@ export interface AuditCommitResultDto {
   updatedCount: number;
 }
 
+// --- Scan batches (watched scan folders, matched in the background) ---
+
+export type ScanBatchStatus = 'Collecting' | 'Matching' | 'Ready' | 'Committed' | 'Discarded';
+
+export interface ScanBatchSummaryDto {
+  id: number;
+  name: string;
+  game: string;
+  status: ScanBatchStatus;
+  /** Items still open for review. */
+  total: number;
+  pending: number;
+  matched: number;
+  errors: number;
+  committed: number;
+  claimedBy?: string | null;
+  claimedByMe: boolean;
+  createdUtc: string;
+  lastFileUtc: string;
+  readyUtc?: string | null;
+  closedUtc?: string | null;
+  defaultContainerId?: number | null;
+}
+
+export interface ScanBatchItemDto {
+  id: number;
+  sequence: number;
+  fileName: string;
+  imageUrl: string;
+  status: 'Pending' | 'Matched' | 'Error';
+  match?: ScanMatchDto | null;
+  override?: ScanSearchResultDto | null;
+  error?: string | null;
+  include: boolean;
+  verified: boolean;
+  condition: string;
+  language?: string | null;
+  isFoil: boolean;
+  foilType?: string | null;
+  quantity: number;
+  purchasePrice?: number | null;
+  tags: string[];
+  note?: string | null;
+}
+
+export interface ScanBatchDto {
+  summary: ScanBatchSummaryDto;
+  isFoil: boolean;
+  condition?: string | null;
+  language?: string | null;
+  setCodes: string[];
+  items: ScanBatchItemDto[];
+}
+
+export interface ScanBatchItemEdit {
+  id: number;
+  include: boolean;
+  verified: boolean;
+  override?: ScanSearchResultDto | null;
+  condition: string;
+  language?: string | null;
+  isFoil: boolean;
+  foilType?: string | null;
+  quantity: number;
+  purchasePrice?: number | null;
+  tags: string[];
+  note?: string | null;
+}
+
+export interface ScanBatchCommitResultDto {
+  imported: number;
+  /** True once the batch has no open items left. */
+  batchClosed: boolean;
+}
+
+export interface ScanFolderConfigDto {
+  game: string;
+  path: string;
+  enabled: boolean;
+  isFoil: boolean;
+  condition: string;
+  language?: string | null;
+  setCodes: string[];
+  defaultContainerId?: number | null;
+}
+
+export interface ScanFolderSettingsDto {
+  enabled: boolean;
+  quietPeriodSeconds: number;
+  retentionDays: number;
+  folders: ScanFolderConfigDto[];
+}
+
+export interface ScanFolderStatusDto {
+  game: string;
+  exists: boolean;
+  writable: boolean;
+  lastError?: string | null;
+}
+
+export interface ScanFolderSettingsResponse {
+  settings: ScanFolderSettingsDto;
+  status: ScanFolderStatusDto[];
+}
+
 // --- eBay ---
 
 export interface EbayStatusDto {

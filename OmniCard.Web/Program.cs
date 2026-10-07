@@ -116,6 +116,7 @@ builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<Fina
 builder.Services.AddSingleton<ICardService, WebCardService>();
 builder.Services.AddSingleton<CollectionRepairService>();
 builder.Services.AddSingleton<WebScanMatchingService>();
+builder.Services.AddSingleton<IScanMatcher>(sp => sp.GetRequiredService<WebScanMatchingService>());
 builder.Services.AddSingleton<CardImageCacheService>();
 builder.Services.AddSingleton<CatalogRefreshService>();
 builder.Services.AddSingleton<IDecklistService, DecklistService>();
@@ -182,6 +183,8 @@ builder.Services.AddSingleton<IDeckLegalityService>(sp =>
 builder.Services.AddSingleton<ITagService>(_ => new TagService(writableFactory));
 builder.Services.AddSingleton<ISalesSettingsService, SalesSettingsService>();
 builder.Services.AddSingleton<IScanBadgeSettingsService, ScanBadgeSettingsService>();
+// Watched scan folders (Settings ▸ Scan); ScanBatchHostedService reconfigures on Changed.
+builder.Services.AddSingleton<IScanFolderSettingsService, ScanFolderSettingsService>();
 // Per-game "languages to download" (Settings ▸ Catalog data); applied by CatalogRefreshService.
 builder.Services.AddSingleton<ICatalogLanguageSettingsService, CatalogLanguageSettingsService>();
 builder.Services.AddSingleton<IListingService>(sp =>
@@ -190,6 +193,32 @@ builder.Services.AddSingleton(sp =>
     new WebBinderCardService(writableFactory, sp.GetRequiredService<IDataPathService>(),
         sp.GetRequiredService<IEnumerable<ICardGameService>>().ToDictionary(s => s.Game)));
 builder.Services.AddSingleton<LocationImportService>();
+// Shared scan → lots write path (interactive scan commit + watched-folder batch commits).
+builder.Services.AddSingleton<ScanCommitService>();
+
+// Watched-folder scan batches: images dropped in a per-game folder are picked up, matched in the
+// background (the app's only BackgroundService) and reviewed/committed from the Scan page.
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<OmniCard.Web.Services.ScanBatches.ScanBatchStorage>();
+builder.Services.AddSingleton(sp => new OmniCard.Web.Services.ScanBatches.ScanFolderIngestor(
+    writableFactory,
+    sp.GetRequiredService<OmniCard.Web.Services.ScanBatches.ScanBatchStorage>(),
+    sp.GetRequiredService<TimeProvider>(),
+    sp.GetRequiredService<ILogger<OmniCard.Web.Services.ScanBatches.ScanFolderIngestor>>()));
+builder.Services.AddSingleton(sp => new OmniCard.Web.Services.ScanBatches.ScanBatchProcessor(
+    writableFactory,
+    sp.GetRequiredService<IScanMatcher>(),
+    sp.GetRequiredService<WebBinderCardService>().IsNewCard,
+    sp.GetRequiredService<OmniCard.Web.Services.ScanBatches.ScanBatchStorage>(),
+    sp.GetRequiredService<TimeProvider>(),
+    sp.GetRequiredService<ILogger<OmniCard.Web.Services.ScanBatches.ScanBatchProcessor>>()));
+builder.Services.AddSingleton(sp => new OmniCard.Web.Services.ScanBatches.ScanBatchService(
+    writableFactory,
+    sp.GetRequiredService<ScanCommitService>(),
+    sp.GetRequiredService<OmniCard.Web.Services.ScanBatches.ScanBatchStorage>(),
+    sp.GetRequiredService<TimeProvider>(),
+    sp.GetRequiredService<ILogger<OmniCard.Web.Services.ScanBatches.ScanBatchService>>()));
+builder.Services.AddHostedService<OmniCard.Web.Services.ScanBatches.ScanBatchHostedService>();
 builder.Services.AddScoped<BinderStateBuilder>();
 
 // User accounts + authentication. Passwords are stored only as salted PBKDF2 hashes; the built-in

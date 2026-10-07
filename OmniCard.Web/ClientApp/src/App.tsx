@@ -13,6 +13,7 @@ import { InventoryPage } from './pages/InventoryPage';
 import { ImportPage } from './pages/ImportPage';
 import { ScanPage } from './pages/ScanPage';
 import { AuditPage } from './pages/AuditPage';
+import { ScanBatchPage } from './pages/ScanBatchPage';
 import { ListsPage } from './pages/ListsPage';
 import { TradesPage } from './pages/TradesPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -25,6 +26,7 @@ export function App() {
       <Routes>
         <Route path="/" element={<RequirePermission anyOf={['dashboard.view']}><DashboardPage /></RequirePermission>} />
         <Route path="/scan" element={<RequirePermission anyOf={['scan.view']}><ScanPage /></RequirePermission>} />
+        <Route path="/scan/batch/:batchId" element={<RequirePermission anyOf={['scan.view']}><ScanBatchPage /></RequirePermission>} />
         <Route path="/collection" element={<RequirePermission anyOf={['collection.view']}><CollectionPage /></RequirePermission>} />
         <Route path="/locations" element={<RequirePermission anyOf={['locations.view']}><LocationsPage /></RequirePermission>} />
         <Route path="/location/:id" element={<RequirePermission anyOf={['locations.view']}><LocationDetailPage /></RequirePermission>} />

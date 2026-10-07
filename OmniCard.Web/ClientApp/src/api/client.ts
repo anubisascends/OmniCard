@@ -56,6 +56,12 @@ import type {
   LogoUploadResultDto,
   ScanCommitItem,
   ScanCommitResultDto,
+  ScanBatchCommitResultDto,
+  ScanBatchDto,
+  ScanBatchItemEdit,
+  ScanBatchSummaryDto,
+  ScanFolderSettingsDto,
+  ScanFolderSettingsResponse,
   AuditCommitResultDto,
   ScanMatchDto,
   ScanSearchResultDto,
@@ -878,4 +884,33 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ containerId, items }),
     }),
+
+  // Scan batches: images dropped in a watched folder, matched in the background. Changing a batch's
+  // items requires holding its claim (a 409 means someone else has it, or it closed).
+  scanBatches: () => request<ScanBatchSummaryDto[]>('/api/scan/batches'),
+  scanBatchCount: () => request<{ unclaimed: number }>('/api/scan/batches/count'),
+  scanBatch: (id: number) => request<ScanBatchDto>(`/api/scan/batches/${id}`),
+  scanBatchClaim: (id: number, force = false) =>
+    request<ScanBatchSummaryDto>(`/api/scan/batches/${id}/claim${qs({ force: force || undefined })}`, {
+      method: 'POST',
+    }),
+  scanBatchRelease: (id: number) => request<void>(`/api/scan/batches/${id}/release`, { method: 'POST' }),
+  scanBatchSaveItems: (id: number, edits: ScanBatchItemEdit[]) =>
+    request<void>(`/api/scan/batches/${id}/items`, { method: 'PUT', body: JSON.stringify(edits) }),
+  scanBatchRemove: (id: number, itemIds: number[]) =>
+    request<{ batchClosed: boolean }>(`/api/scan/batches/${id}/items/remove`, {
+      method: 'POST',
+      body: JSON.stringify({ itemIds }),
+    }),
+  scanBatchRematch: (id: number, itemIds: number[]) =>
+    request<void>(`/api/scan/batches/${id}/items/rematch`, { method: 'POST', body: JSON.stringify({ itemIds }) }),
+  scanBatchCommit: (id: number, containerId: number, itemIds: number[]) =>
+    request<ScanBatchCommitResultDto>(`/api/scan/batches/${id}/commit`, {
+      method: 'POST',
+      body: JSON.stringify({ containerId, itemIds }),
+    }),
+  scanBatchDiscard: (id: number) => request<void>(`/api/scan/batches/${id}/discard`, { method: 'POST' }),
+  scanFolderSettings: () => request<ScanFolderSettingsResponse>('/api/settings/scan-folders'),
+  scanFolderSettingsUpdate: (body: ScanFolderSettingsDto) =>
+    request<void>('/api/settings/scan-folders', { method: 'PUT', body: JSON.stringify(body) }),
 };
