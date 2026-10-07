@@ -1,4 +1,6 @@
+import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
+import { LinearProgress } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { AppShell } from './components/AppShell';
 import { RequirePermission } from './components/RequirePermission';
@@ -18,6 +20,9 @@ import { ListsPage } from './pages/ListsPage';
 import { TradesPage } from './pages/TradesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
+
+// Help bundles every topic's Markdown, so it's split into its own chunk and only loaded on demand.
+const HelpPage = lazy(() => import('./pages/HelpPage').then((m) => ({ default: m.HelpPage })));
 
 export function App() {
   const { t } = useTranslation();
@@ -41,6 +46,8 @@ export function App() {
         {/* Administration is always reachable: it hosts self-service password change + the
             always-viewable Components tab. Individual tabs gate themselves. */}
         <Route path="/settings" element={<SettingsPage />} />
+        {/* Help is open to everyone (no permission gate). */}
+        <Route path="/help/:topicId?" element={<Suspense fallback={<LinearProgress />}><HelpPage /></Suspense>} />
         <Route path="*" element={<PlaceholderPage title={t('common.notFound')} />} />
       </Routes>
     </AppShell>

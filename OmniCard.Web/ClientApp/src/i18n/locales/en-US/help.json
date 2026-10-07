@@ -1,0 +1,33 @@
+{
+  "help": {
+    "title": "Help",
+    "subtitle": "Guides for getting started with OmniCard and getting the most out of every feature.",
+    "searchPlaceholder": "Search help",
+    "resultCount_one": "{{count}} matching topic",
+    "resultCount_other": "{{count}} matching topics",
+    "noResults": "No help topics match “{{query}}”.",
+    "startHere": "New to OmniCard? Start with the getting-started guide — it walks you through your first scan.",
+    "startHereAction": "Start here",
+    "allTopics": "All help topics",
+    "topicNotFound": "That help topic doesn't exist.",
+    "onThisPage": "On this page",
+    "previous": "Previous",
+    "next": "Next",
+    "screenshotComingSoon": "Screenshot coming soon",
+    "enlargeImage": "Click to enlarge",
+    "callout": {
+      "tip": "Tip",
+      "note": "Note",
+      "warning": "Warning"
+    },
+    "groups": {
+      "start": "Getting started",
+      "scanning": "Scanning",
+      "collection": "Your collection",
+      "organizing": "Organizing cards",
+      "lists": "Lists, imports & trades",
+      "selling": "Inventory & selling",
+      "admin": "Administration & support"
+    }
+  }
+}

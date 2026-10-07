@@ -34,6 +34,7 @@ import Inventory2Icon from '@mui/icons-material/Inventory2';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
@@ -101,33 +102,39 @@ export function AppShell({ children }: { children: ReactNode }) {
   });
   const badges = { scanBatches: batchCount.data?.unclaimed ?? 0 };
 
+  const navItem = (item: { to: string; labelKey: string; icon: ReactNode; badge?: 'scanBatches' }) => {
+    const selected =
+      item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to);
+    return (
+      <ListItemButton
+        key={item.to}
+        component={RouterLink}
+        to={item.to}
+        selected={selected}
+        onClick={() => setMobileOpen(false)}
+      >
+        <ListItemIcon sx={{ minWidth: 40 }}>
+          {item.badge ? (
+            <Badge badgeContent={badges[item.badge]} color="secondary" max={99}>
+              {item.icon}
+            </Badge>
+          ) : (
+            item.icon
+          )}
+        </ListItemIcon>
+        <ListItemText primary={t(`nav.${item.labelKey}`)} />
+      </ListItemButton>
+    );
+  };
+
+  // Main sections at the top; Help is pinned to the bottom of the drawer (the paper is a flex column).
   const navList = (
-    <List>
-      {visibleNav.map((item) => {
-        const selected =
-          item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to);
-        return (
-          <ListItemButton
-            key={item.to}
-            component={RouterLink}
-            to={item.to}
-            selected={selected}
-            onClick={() => setMobileOpen(false)}
-          >
-            <ListItemIcon sx={{ minWidth: 40 }}>
-              {item.badge ? (
-                <Badge badgeContent={badges[item.badge]} color="secondary" max={99}>
-                  {item.icon}
-                </Badge>
-              ) : (
-                item.icon
-              )}
-            </ListItemIcon>
-            <ListItemText primary={t(`nav.${item.labelKey}`)} />
-          </ListItemButton>
-        );
-      })}
-    </List>
+    <>
+      <List>{visibleNav.map(navItem)}</List>
+      <Box sx={{ flexGrow: 1 }} />
+      <Divider />
+      <List>{navItem({ to: '/help', labelKey: 'help', icon: <HelpOutlineIcon /> })}</List>
+    </>
   );
 
   return (
