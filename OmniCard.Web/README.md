@@ -529,8 +529,14 @@ different currency.
 - **Strings:** `ClientApp/src/i18n/locales/en-US/*.json`, one file per feature area (namespace):
   `common` (shared actions/labels/conditions/channels/statuses), `nav`, `auth`, `dashboard`,
   `collection`, `locations`, `binder`, `sets`, `scan`, `sales`, `inventory`, `importing`, `lists`,
-  `trades`, `settings`, `deckbox`, `dialogs`, `search`. Each file is keyed by its namespace object and
-  spread into the bundle in `index.ts`.
+  `trades`, `settings`, `deckbox`, `dialogs`, `search`, `help`. Each file is keyed by its namespace object
+  and spread into the bundle in `index.ts`.
+- **In-app help:** the **Help** item pinned to the bottom of the sidebar opens `/help`. Topics are
+  Markdown files, one per topic per culture, in `ClientApp/src/help/<culture>/<topic-id>.md`; each topic
+  falls back to en-US on its own. Screenshots in `ClientApp/src/help/images/` are shared by every
+  culture. `ClientApp/src/help/content.ts` sets the topic order and grouping; `help/HelpMarkdown.tsx`
+  renders the Markdown subset the topics use: headings, lists, bold/italic/code, links
+  (`help:<topic>#anchor`, `/route`), images, `> [!TIP]`/`[!NOTE]`/`[!WARNING]` callouts and pipe tables.
 
 ### Adding a language
 
@@ -538,7 +544,9 @@ different currency.
    and translate the string values (keep the keys and `{{placeholders}}` unchanged).
 2. Import the new files in `ClientApp/src/i18n/index.ts` and add them under
    `resources['<culture>'].translation`.
-3. Rebuild the SPA. No component changes are needed — browsers set to that culture pick it up
+3. Optionally translate the help: copy `ClientApp/src/help/en-US/` to `ClientApp/src/help/<culture>/`
+   and translate the topics. No registration is needed; untranslated topics stay in English.
+4. Rebuild the SPA. No component changes are needed — browsers set to that culture pick it up
    automatically, and any key you leave untranslated falls back to en-US.
 
 ### Conventions (when adding or changing UI)
@@ -548,6 +556,8 @@ different currency.
 - Format every number/currency/date through `useFormatters()` (`fmt.money` / `fmt.number` /
   `fmt.percent` / `fmt.date` / `fmt.dateTime`) — do not call `toLocaleString`/`toFixed`/`new Date().toLocale*`
   directly for display. Prefer a DTO's numeric field over a server-preformatted string.
+- When a change alters what users see or do, update the matching help topic in
+  `ClientApp/src/help/en-US/` (and its screenshot if it no longer matches).
 - Do **not** translate data returned by the server (card/set/customer names, error messages) or
   identifiers/enum values sent back to the API.
 
