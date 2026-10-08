@@ -55,6 +55,11 @@ import type {
   CompanyProfileDto,
   ReceiptConfigDto,
   ReceiptLayoutDto,
+  CreateSavedViewRequest,
+  SavedViewDto,
+  SavedViewListDto,
+  SavedViewPage,
+  SavedViewStateDto,
   LogoUploadResultDto,
   ScanCommitItem,
   ScanCommitResultDto,
@@ -322,6 +327,34 @@ export const api = {
     request<LocationSummaryDto[]>(`/api/locations${qs({ game, siteId })}`),
   locationSetSite: (id: number, siteId: number) =>
     request<void>(`/api/locations/${id}/site`, { method: 'PUT', body: JSON.stringify({ siteId }) }),
+
+  // Saved views of the Collection / Location pages. `game` is the selected game (none = All Games).
+  savedViews: (page: SavedViewPage, containerId: number | undefined, game: string | undefined) =>
+    request<SavedViewListDto>(`/api/views${qs({ page, containerId, game })}`),
+  savedView: (id: number) => request<SavedViewDto>(`/api/views/${id}`),
+  savedViewCreate: (body: CreateSavedViewRequest) =>
+    request<SavedViewDto>('/api/views', { method: 'POST', body: JSON.stringify(body) }),
+  savedViewUpdate: (id: number, body: { name?: string; state?: SavedViewStateDto }) =>
+    request<SavedViewDto>(`/api/views/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  savedViewDelete: (id: number) => request<void>(`/api/views/${id}`, { method: 'DELETE' }),
+  /** Make a view the default on the current page — the user's own, or (`everyone`, admins) everyone's.
+   * `game` is the game on screen (an any-game default replaces that game's default). */
+  savedViewSetDefault: (
+    id: number,
+    page: SavedViewPage,
+    containerId: number | undefined,
+    game: string | undefined,
+    everyone: boolean,
+    on: boolean,
+  ) =>
+    request<void>(`/api/views/${id}/default${qs({ page, containerId, game, everyone })}`, {
+      method: on ? 'PUT' : 'DELETE',
+    }),
+  savedViewCopy: (id: number, containerIds: number[], setDefault: boolean) =>
+    request<{ copied: number }>(`/api/views/${id}/copy`, {
+      method: 'POST',
+      body: JSON.stringify({ containerIds, setDefault }),
+    }),
 
   // Sites (major physical locations). Listing returns only the sites the user can see; the rest is admin-only.
   sites: () => request<SiteDto[]>('/api/sites'),

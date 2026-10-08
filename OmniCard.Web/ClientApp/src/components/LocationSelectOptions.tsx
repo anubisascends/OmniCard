@@ -7,7 +7,7 @@ import { groupLocations } from '../lib/locationGroups';
 // Localized group heading. `groupLocations` returns a stable `key` per group (`__always__`, or the
 // type display string), which we resolve to a translated heading here. This module is a plain
 // function (no React hooks), so it reads the shared i18n singleton rather than `useTranslation`.
-function headingFor(key: string, fallback: string): string {
+export function headingFor(key: string, fallback: string): string {
   if (key === '__always__') return i18n.t('locations.groups.alwaysAvailable');
   return i18n.t(`locations.groups.headings.${key}`, { defaultValue: fallback });
 }

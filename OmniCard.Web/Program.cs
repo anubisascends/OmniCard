@@ -239,6 +239,8 @@ builder.Services.AddSingleton(siteAccessService);
 builder.Services.AddSingleton(new SiteService(writableFactory, siteAccessService));
 builder.Services.AddScoped(sp => new RequestSiteAccess(
     sp.GetRequiredService<IHttpContextAccessor>(), siteAccessService, writableFactory));
+// Saved views of the Collection / Location pages (per user, plus admin-shared views and defaults).
+builder.Services.AddSingleton(sp => new SavedViewService(writableFactory, sp.GetRequiredService<TimeProvider>()));
 
 // MCP OAuth resource-server mode (Phase 2). When configured (Mcp:OAuth:Enabled + Authority/Audience/
 // PublicBaseUrl), /mcp is exposed to remote MCP clients and gated by JWTs from an external IdP;

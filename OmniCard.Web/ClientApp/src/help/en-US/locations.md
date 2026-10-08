@@ -154,7 +154,7 @@ The location page shows:
 - **Audit**, **Import** and **Add card** buttons (when you're allowed to change this location).
 - A summary line with the number of cards and their market value.
 - For deck boxes, a panel with the game, deck type and legality warnings. See [Deck boxes](help:deck-boxes).
-- A search box and the card list.
+- A search box, the view button for [saved views](help:saved-views), and the card list.
 
 ### Find cards in a location
 
@@ -162,10 +162,12 @@ Type in the search box to filter the cards. Plain text matches card names, and y
 
 ### Table view and stacked view
 
-Use the two buttons to the right of the search box to switch views. OmniCard remembers your choice.
+Use the two buttons to the right of the search box to switch views. A [saved view](help:saved-views) remembers which one you use. With **Default view**, OmniCard remembers your last choice.
 
 - **Table view** (list icon): a sortable table with name, set, number, rarity, condition, language, foil, quantity, market price and sale status. Turn on **Stack duplicates** to combine identical copies into one row.
 - **Stacked view** (columns icon): cards drawn as overlapping stacks grouped by type or tag, like a deck-building site. It works for any location but is most useful for decks. See [Deck boxes](help:deck-boxes#stacked-view).
+
+Each location keeps its own saved views, so a binder and a deck box can open with different layouts. To give several locations the same layout, use **Copy to other locations…**. See [Saved views](help:saved-views#copy-a-view-to-other-locations).
 
 Click any card to open its details, where you can edit condition, foil, quantity, purchase price, note and tags, list it for sale, add it to a trade, split a stack, move it, or delete it. See [Collection](help:collection).
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useLocation, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -29,9 +29,9 @@ import type { AuditReturnState } from './AuditPage';
 import { DeckBoxPanel } from '../components/DeckBoxPanel';
 import { DeckStackView } from '../components/deckstack/DeckStackView';
 import { SearchBox } from '../components/SearchBox';
+import { SavedViewPicker } from '../components/views/SavedViewPicker';
+import { useSavedViews } from '../components/views/useSavedViews';
 import { useFormatters } from '../i18n/format';
-
-const VIEW_KEY = 'omnicard.location.view';
 
 export function LocationDetailPage() {
   const { t } = useTranslation();
@@ -41,8 +41,10 @@ export function LocationDetailPage() {
   const { game } = useGame();
   const { can } = usePermissions();
   const qc = useQueryClient();
-  const [search, setSearch] = useState('');
-  const [q, setQ] = useState('');
+  // Search, sort, columns, table-vs-stacks and grouping all come from the location's saved view.
+  const sv = useSavedViews({ page: 'Location', containerId: locationId });
+  const [search, setSearch] = useState(sv.state.q);
+  useEffect(() => setSearch(sv.state.q), [sv.state.q]);
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   // An audit commit returns here with its summary in router state (see AuditPage).
@@ -51,14 +53,9 @@ export function LocationDetailPage() {
   const auditSummary = (location.state as AuditReturnState | null)?.auditSummary ?? null;
   // Clear the state on close so a reload or Back/Forward doesn't reopen the summary.
   const closeAuditSummary = () => navigate(location.pathname + location.search, { replace: true, state: null });
-  // Table (flat grid) vs. Stacks (Archidekt-style grouped stacks). Persisted; location-only feature.
-  const [view, setView] = useState<'table' | 'stacks'>(
-    () => (localStorage.getItem(VIEW_KEY) === 'stacks' ? 'stacks' : 'table'),
-  );
-  const setViewMode = (v: 'table' | 'stacks') => {
-    setView(v);
-    localStorage.setItem(VIEW_KEY, v);
-  };
+  // Table (flat grid) vs. Stacks (Archidekt-style grouped stacks); location-only.
+  const view = sv.state.display ?? 'table';
+  const setViewMode = (v: 'table' | 'stacks') => sv.setState({ display: v });
 
   const locQuery = useQuery({ queryKey: ['location', locationId], queryFn: () => api.location(locationId) });
   const isDeckBox = locQuery.data?.type === 'Deck Box';
@@ -131,8 +128,9 @@ export function LocationDetailPage() {
       {isDeckBox && locQuery.data && <DeckBoxPanel loc={locQuery.data} onChanged={refresh} />}
       <Stack direction="row" spacing={1} alignItems="center">
         <Box sx={{ flexGrow: 1 }}>
-          <SearchBox value={search} onChange={setSearch} onSubmit={setQ} />
+          <SearchBox value={search} onChange={setSearch} onSubmit={(q) => sv.setState({ q })} />
         </Box>
+        <SavedViewPicker sv={sv} />
         <ToggleButtonGroup
           size="small"
           exclusive
@@ -149,9 +147,15 @@ export function LocationDetailPage() {
         </ToggleButtonGroup>
       </Stack>
       {view === 'stacks' ? (
-        <DeckStackView containerId={locationId} game={game} q={q} />
+        <DeckStackView
+          containerId={locationId}
+          game={game}
+          q={sv.state.q}
+          groupMode={sv.state.groupBy ?? 'type'}
+          onGroupModeChange={(groupBy) => sv.setState({ groupBy })}
+        />
       ) : (
-        <CardTable game={game} q={q} containerId={locationId} />
+        <CardTable game={game} containerId={locationId} view={sv.state} onViewChange={sv.setState} />
       )}
 
       <AddCardDialog

@@ -123,7 +123,7 @@ Deleting a deck type removes it from any deck boxes using it. See [Administratio
 The stacked view shows a deck the way deck-building sites do: one column per group, with the cards overlapping so you can see the whole deck at once.
 
 1. Open the deck box (or any location).
-2. Click the **Stacked view** button (the columns icon) to the right of the search box. Click the **Table view** button (the list icon) to switch back. OmniCard remembers your choice.
+2. Click the **Stacked view** button (the columns icon) to the right of the search box. Click the **Table view** button (the list icon) to switch back. A [saved view](help:saved-views) remembers the choice and the **Group by** setting below.
 
 ![A deck in stacked view grouped by type](deck-boxes-stacked-view.webp)
 

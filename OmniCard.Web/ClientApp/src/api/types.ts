@@ -1109,3 +1109,51 @@ export interface OrderDetailDto {
   order: OrderDto;
   lines: OrderLineDto[];
 }
+
+// --- Saved views (Collection / Location pages) ---
+
+/** Which card list a saved view belongs to. `AllLocations` views are shared (admin-published) only. */
+export type SavedViewPage = 'Collection' | 'Location' | 'AllLocations';
+
+/** The layout a saved view restores. `display` / `groupBy` only apply on Location pages. */
+export interface SavedViewStateDto {
+  q: string;
+  sort: string;
+  dir: 'asc' | 'desc';
+  pageSize: number;
+  stacked: boolean;
+  hiddenColumns: string[];
+  columnOrder: string[];
+  display?: 'table' | 'stacks' | null;
+  groupBy?: 'type' | 'tag' | null;
+}
+
+export interface SavedViewDto {
+  id: number;
+  name: string;
+  page: SavedViewPage;
+  containerId?: number | null;
+  /** A game id, "all" (the All Games selection) or null (any game). */
+  game?: string | null;
+  /** Published by an administrator for everyone; read-only unless `canEdit`. */
+  shared: boolean;
+  canEdit: boolean;
+  isMyDefault: boolean;
+  isEveryoneDefault: boolean;
+  state: SavedViewStateDto;
+}
+
+export interface SavedViewListDto {
+  views: SavedViewDto[];
+  /** The view the page opens with; null = the built-in layout. */
+  defaultViewId?: number | null;
+}
+
+export interface CreateSavedViewRequest {
+  name: string;
+  page: SavedViewPage;
+  containerId?: number | null;
+  game?: string | null;
+  shared: boolean;
+  state: SavedViewStateDto;
+}

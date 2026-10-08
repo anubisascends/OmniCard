@@ -412,6 +412,29 @@ House, and Partner's account doesn't see the children's own site.
   `PUT /api/locations/{id}/site`; `siteId` query param on `GET /api/locations`, `GET /api/collection`
   and `GET /api/export/collection`; `siteId` on `POST /api/locations`.
 
+## Saved views
+
+The Collection page and every location page have a **view button** beside the search box that saves
+the card list's layout: search query, sort, rows per page, *Stack duplicates*, hidden columns + column
+order (the **Columns** toolbar button; the grid's community edition can't drag-reorder), and on a
+location page table/stacked display + *Group by*.
+
+- **Scope:** a view belongs to one page — the Collection page, one location, or (admin-shared only) *all
+  locations* — and to a game key: one game, the *All Games* selection (`all`), or any game. Personal
+  views are private; administrators can publish **shared** views everyone can pick (read-only to others).
+- **Defaults:** a page opens with the user's default for the selected game → their any-game default →
+  everyone's default (admin-set, shared views only; a location's own beats an *all locations* one) →
+  the built-in layout. Setting an any-game default also clears that page's default for the game on
+  screen. `?view=<id>` in the page URL opens a specific view (switching the game if it belongs to another).
+- **Copy to other locations…** copies a location's view (overwriting same-named views) and can make it
+  the default there.
+- Storage: `SavedViews` + `SavedViewDefaults` tables (migration `AddSavedViews`; layout JSON in
+  `StateJson`). Views cascade with their user/location; deleting a user or location also drops their
+  default rows (`SavedViewService.RemoveUser/RemoveLocation`).
+- API (`ViewsController`, needs `collection.view` / `locations.view` + site read access for location
+  views): `GET /api/views?page=&containerId=&game=`, `GET/PUT/DELETE /api/views/{id}`, `POST /api/views`,
+  `PUT/DELETE /api/views/{id}/default?page=&containerId=&game=&everyone=`, `POST /api/views/{id}/copy`.
+
 ## Order CSV import
 
 **Sales → Orders → Import CSV** creates orders from a CSV using a reusable column-mapping **template**.
