@@ -7,7 +7,8 @@ The Collection page lists every single card you own across all your storage loca
 Open [Collection](/collection) from the navigation menu. The page has three parts:
 
 - A **search box** at the top. Type a search and press **Enter** to filter the list.
-- A toolbar with the **Stack duplicates** switch and the **Select** button.
+- The **view button** beside the search box, for switching between saved layouts of the page. See [Saved views](help:saved-views).
+- A toolbar with the **Stack duplicates** switch and the **Columns** and **Select** buttons.
 - The card list itself, one card (or stack of identical cards) per row.
 
 The game selector in the top bar decides which game's cards you see. Choose a single game, or **All Games** to see everything at once.
@@ -35,6 +36,8 @@ The game selector in the top bar decides which game's cards you see. Choose a si
 
 Hover over a **Listed** or **Picked** badge to see a reminder that you change listings from **Sales ▸ Listings**.
 
+Click **Columns** to hide columns or change their order. See [Choose columns](help:saved-views#choose-columns).
+
 ## Search your collection
 
 1. Click in the search box.
@@ -57,9 +60,11 @@ The list is sorted by **Name** until you choose another column. The **Status** c
 
 Use the controls at the bottom of the list to move between pages and to show 25, 50 or 100 rows per page.
 
+To keep a sort, search and column layout for next time, save it as a view. See [Saved views](help:saved-views).
+
 ## Stack duplicates
 
-The **Stack duplicates** switch is on by default, and OmniCard remembers your choice.
+The **Stack duplicates** switch is on by default. A [saved view](help:saved-views) remembers the setting. With **Default view**, OmniCard remembers your last choice.
 
 - **On:** identical cards (same name, set, collector number and foil) appear as one row. **Qty** shows the total, and the name shows how many separate entries were combined, for example *· 3 printings*.
 - **Off:** every entry appears on its own row, even if it's the same printing stored in two places.

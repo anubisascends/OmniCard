@@ -1372,3 +1372,80 @@ public sealed record SetSiteGrantsRequest
 
 /// <summary>Move a location to another site.</summary>
 public sealed record SetLocationSiteRequest(int SiteId);
+
+/// <summary>
+/// The layout a saved view restores on the Collection / Location pages. <see cref="Sort"/> is a card
+/// grid field (as sent to <c>/api/collection</c>); <see cref="HiddenColumns"/> / <see cref="ColumnOrder"/>
+/// are grid column fields. <see cref="Display"/> ("table" / "stacks") and <see cref="GroupBy"/>
+/// ("type" / "tag") only apply on Location pages.
+/// </summary>
+public sealed record SavedViewStateDto
+{
+    public string Q { get; init; } = "";
+    public string Sort { get; init; } = "name";
+    public string Dir { get; init; } = "asc";
+    public int PageSize { get; init; } = 100;
+    public bool Stacked { get; init; } = true;
+    public IReadOnlyList<string> HiddenColumns { get; init; } = [];
+    public IReadOnlyList<string> ColumnOrder { get; init; } = [];
+    public string? Display { get; init; }
+    public string? GroupBy { get; init; }
+}
+
+/// <summary>
+/// A saved view as the current user sees it. <see cref="Page"/> is "Collection", "Location" or
+/// "AllLocations"; <see cref="Game"/> is a game id, "all" (the All Games selection) or null (any game).
+/// <see cref="Shared"/> views were published by an administrator for everyone; <see cref="CanEdit"/> is
+/// whether the current user may save over, rename or delete it. <see cref="IsMyDefault"/> /
+/// <see cref="IsEveryoneDefault"/> describe the page the list was requested for.
+/// </summary>
+public sealed record SavedViewDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = "";
+    public string Page { get; init; } = "";
+    public int? ContainerId { get; init; }
+    public string? Game { get; init; }
+    public bool Shared { get; init; }
+    public bool CanEdit { get; init; }
+    public bool IsMyDefault { get; init; }
+    public bool IsEveryoneDefault { get; init; }
+    public SavedViewStateDto State { get; init; } = new();
+}
+
+/// <summary>The views offered on one page for one game, plus the view that page should open with
+/// (<see cref="DefaultViewId"/>, null = the built-in layout).</summary>
+public sealed record SavedViewListDto
+{
+    public IReadOnlyList<SavedViewDto> Views { get; init; } = [];
+    public int? DefaultViewId { get; init; }
+}
+
+/// <summary>Create a view. <see cref="Shared"/> and <see cref="Page"/> = "AllLocations" are
+/// administrator-only; <see cref="ContainerId"/> is required for "Location".</summary>
+public sealed record CreateSavedViewRequest
+{
+    public string Name { get; init; } = "";
+    public string Page { get; init; } = "Collection";
+    public int? ContainerId { get; init; }
+    public string? Game { get; init; }
+    public bool Shared { get; init; }
+    public SavedViewStateDto State { get; init; } = new();
+}
+
+/// <summary>Rename a view and/or save the current layout over it (null leaves that part unchanged).</summary>
+public sealed record UpdateSavedViewRequest
+{
+    public string? Name { get; init; }
+    public SavedViewStateDto? State { get; init; }
+}
+
+/// <summary>Copy a Location view to other locations (a same-named view there is overwritten), optionally
+/// making it the default on each.</summary>
+public sealed record CopySavedViewRequest
+{
+    public IReadOnlyList<int> ContainerIds { get; init; } = [];
+    public bool SetDefault { get; init; }
+}
+
+public sealed record CopySavedViewResultDto(int Copied);

@@ -21,6 +21,7 @@ import {
 import {
   DataGrid,
   type GridColDef,
+  type GridColumnVisibilityModel,
   type GridPaginationModel,
   type GridRowSelectionModel,
   type GridSortModel,
@@ -40,35 +41,39 @@ import { CardEditDrawer } from './dialogs/CardEditDrawer';
 import { LocationPickerDialog } from './dialogs/LocationPickerDialog';
 import { BulkEditCardsDialog } from './dialogs/BulkEditCardsDialog';
 import { useFormatters } from '../i18n/format';
-
-const STACK_KEY = 'omnicard.stackDuplicates';
+import { orderColumns, PAGE_SIZES, type ViewState } from '../lib/savedViews';
+import { ColumnLayoutMenu } from './views/ColumnLayoutMenu';
 
 // CSV export formats offered for a selection, mirroring the whole-collection export options.
 // Labels are resolved from `collection.exportFormats.<value>` at render time.
 
 /**
  * Shared collection card list used by both the Collection page and Location detail. Server-paginated;
- * supports name-stacking (default on, remembered), hover artwork preview, a Select mode with bulk
- * move/delete, click-to-open detail drawer, and striped rows. Scope it with `containerId` (location)
- * and/or `q`/`game` (collection search).
+ * supports name-stacking, hover artwork preview, a Select mode with bulk move/delete, click-to-open
+ * detail drawer, and striped rows. Scope it with `containerId` (location) and/or `game`. The layout —
+ * search, sort, page size, stacking and columns — is the page's saved-view state (`view`), changed
+ * through `onViewChange`.
  */
 export function CardTable({
   game,
-  q,
   containerId,
   showLocation = false,
+  view,
+  onViewChange,
 }: {
   game?: string;
-  q?: string;
   containerId?: number;
   showLocation?: boolean;
+  view: ViewState;
+  onViewChange: (patch: Partial<ViewState>) => void;
 }) {
   const { t } = useTranslation();
   const fmt = useFormatters();
   const qc = useQueryClient();
-  const [stacked, setStacked] = useState<boolean>(() => localStorage.getItem(STACK_KEY) !== 'false');
-  const [pagination, setPagination] = useState<GridPaginationModel>({ page: 0, pageSize: 100 });
-  const [sortModel, setSortModel] = useState<GridSortModel>([{ field: 'name', sort: 'asc' }]);
+  const { q, stacked, pageSize, sort: sortField, dir: sortDir } = view;
+  const [page, setPage] = useState(0);
+  const pagination: GridPaginationModel = { page, pageSize };
+  const sortModel: GridSortModel = [{ field: sortField, sort: sortDir }];
   const [selectMode, setSelectMode] = useState(false);
   const [selection, setSelection] = useState<GridRowSelectionModel>([]);
   const [detailCardId, setDetailCardId] = useState<number | null>(null);
@@ -76,13 +81,11 @@ export function CardTable({
   const [hover, setHover] = useState<CardHover | null>(null);
 
   // Reset to the first page whenever the scope/mode changes so we never sit on an out-of-range page.
+  // A new sort or page size also starts over: the server sorts the whole result set.
   useEffect(() => {
-    setPagination((p) => ({ ...p, page: 0 }));
+    setPage(0);
     setSelection([]);
-  }, [game, q, containerId, stacked]);
-
-  const sortField = sortModel[0]?.field ?? 'name';
-  const sortDir = sortModel[0]?.sort ?? 'asc';
+  }, [game, q, containerId, stacked, sortField, sortDir, pageSize]);
 
   const query = useQuery({
     queryKey: [
@@ -163,15 +166,11 @@ export function CardTable({
     },
   });
 
-  const toggleStack = (v: boolean) => {
-    setStacked(v);
-    localStorage.setItem(STACK_KEY, String(v));
-  };
-
-  const columns: GridColDef<CardDto>[] = [
+  const allColumns: GridColDef<CardDto>[] = [
     {
       field: 'name',
       headerName: t('common.labels.name'),
+      hideable: false,
       flex: 2,
       minWidth: 200,
       renderCell: (p) => {
@@ -242,12 +241,27 @@ export function CardTable({
       : []),
   ];
 
+  // The view's column order and hidden columns. Hidden columns stay in the grid (switched off through
+  // its visibility model) so the grid's own column menu can show them again.
+  const defaultOrder = allColumns.map((c) => c.field);
+  const columnsByField = new Map(allColumns.map((c) => [c.field, c]));
+  const columns = orderColumns(defaultOrder, view.columnOrder).map((f) => columnsByField.get(f)!);
+  const columnVisibility: GridColumnVisibilityModel = Object.fromEntries(
+    view.hiddenColumns.filter((f) => f !== 'name').map((f) => [f, false]),
+  );
+
   return (
     <>
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
         <FormControlLabel
-          control={<Switch checked={stacked} onChange={(e) => toggleStack(e.target.checked)} />}
+          control={<Switch checked={stacked} onChange={(e) => onViewChange({ stacked: e.target.checked })} />}
           label={t('collection.stackDuplicates')}
+        />
+        <ColumnLayoutMenu
+          columns={columns.map((c) => ({ field: c.field, label: c.headerName ?? c.field, hideable: c.hideable !== false }))}
+          defaultOrder={defaultOrder}
+          hidden={view.hiddenColumns}
+          onChange={onViewChange}
         />
         <Button
           size="small"
@@ -312,15 +326,24 @@ export function CardTable({
           loading={query.isFetching}
           paginationMode="server"
           paginationModel={pagination}
-          onPaginationModelChange={setPagination}
-          pageSizeOptions={[25, 50, 100]}
+          onPaginationModelChange={(m) => {
+            if (m.pageSize !== pageSize) onViewChange({ pageSize: m.pageSize });
+            else setPage(m.page);
+          }}
+          pageSizeOptions={[...PAGE_SIZES]}
           sortingMode="server"
           sortModel={sortModel}
-          onSortModelChange={(model) => {
-            // Server sorts the whole result set, so jump back to page 1 for the new order.
-            setSortModel(model.length ? model : [{ field: 'name', sort: 'asc' }]);
-            setPagination((p) => ({ ...p, page: 0 }));
-          }}
+          onSortModelChange={(model) =>
+            onViewChange(
+              model[0]?.sort
+                ? { sort: model[0].field, dir: model[0].sort }
+                : { sort: 'name', dir: 'asc' },
+            )
+          }
+          columnVisibilityModel={columnVisibility}
+          onColumnVisibilityModelChange={(m) =>
+            onViewChange({ hiddenColumns: Object.keys(m).filter((f) => m[f] === false) })
+          }
           density="compact"
           checkboxSelection={selectMode}
           disableRowSelectionOnClick

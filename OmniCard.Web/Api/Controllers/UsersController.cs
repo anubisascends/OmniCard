@@ -14,7 +14,7 @@ namespace OmniCard.Web.Api.Controllers;
 /// </summary>
 [ApiAuth(RequireAdmin = true)]
 public sealed class UsersController(UserService users, PermissionService permissions,
-    SiteAccessService siteAccess, SiteService sites) : ApiControllerBase
+    SiteAccessService siteAccess, SiteService sites, SavedViewService savedViews) : ApiControllerBase
 {
     private static UserDto ToDto(User u) =>
         new(u.Id, u.Username, u.IsSystem, u.IsAdmin, u.CreatedAt, u.RoleId, u.Overrides.Grant, u.Overrides.Deny);
@@ -69,6 +69,7 @@ public sealed class UsersController(UserService users, PermissionService permiss
             return BadRequest(new { error = "That user can't be deleted." });
         permissions.Invalidate(id);
         sites.RemovePrincipal(SitePrincipalType.User, id);
+        savedViews.RemoveUser(id);
         return NoContent();
     }
 

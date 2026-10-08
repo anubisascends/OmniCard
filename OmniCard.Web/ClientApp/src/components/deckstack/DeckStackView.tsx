@@ -17,7 +17,6 @@ import { DeckStack } from './DeckStack';
 // One page big enough to hold any real deck, so the whole thing groups in a single fetch.
 const DECK_PAGE_SIZE = 500;
 const CARD_WIDTH = 170;
-const GROUP_MODE_KEY = 'omnicard.deckstack.groupmode';
 
 /**
  * Archidekt-style stacked deck view for a location: cards grouped into type columns (Commander first),
@@ -28,22 +27,20 @@ export function DeckStackView({
   containerId,
   game,
   q,
+  groupMode,
+  onGroupModeChange,
 }: {
   containerId: number;
   game?: string;
   q?: string;
+  /** How cards are grouped into columns — part of the page's saved view. */
+  groupMode: DeckGroupMode;
+  onGroupModeChange: (mode: DeckGroupMode) => void;
 }) {
   const { t } = useTranslation();
   // Selection is tied to the detail drawer: a card is "selected" (and stays expanded) exactly while
   // its drawer is open. Closing the drawer deselects it. Only ever one card at a time — no multi-select.
   const [detailId, setDetailId] = useState<number | null>(null);
-  const [groupMode, setGroupMode] = useState<DeckGroupMode>(
-    () => (localStorage.getItem(GROUP_MODE_KEY) === 'tag' ? 'tag' : 'type'),
-  );
-  const setMode = (m: DeckGroupMode) => {
-    setGroupMode(m);
-    localStorage.setItem(GROUP_MODE_KEY, m);
-  };
 
   const query = useQuery({
     queryKey: ['deck-stack', containerId, game ?? null, q ?? ''],
@@ -90,7 +87,7 @@ export function DeckStackView({
           size="small"
           label={t('deckbox.stackView.groupBy')}
           value={groupMode}
-          onChange={(e) => setMode(e.target.value as DeckGroupMode)}
+          onChange={(e) => onGroupModeChange(e.target.value as DeckGroupMode)}
           sx={{ minWidth: 130 }}
         >
           <MenuItem value="type">{t('deckbox.stackView.groupType')}</MenuItem>

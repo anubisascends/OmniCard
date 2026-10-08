@@ -10,6 +10,7 @@ using OmniCard.Shared.Sites;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Shared.Trades;
+using OmniCard.Shared.Views;
 
 namespace OmniCard.Data;
 
@@ -42,6 +43,8 @@ public class OmniCardDbContext : DbContext
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Site> Sites => Set<Site>();
     public DbSet<SiteAccessGrant> SiteAccessGrants => Set<SiteAccessGrant>();
+    public DbSet<SavedView> SavedViews => Set<SavedView>();
+    public DbSet<SavedViewDefault> SavedViewDefaults => Set<SavedViewDefault>();
 
     public OmniCardDbContext(DbContextOptions<OmniCardDbContext> options) : base(options) { }
 
@@ -369,6 +372,41 @@ public class OmniCardDbContext : DbContext
             // No hard FK to Role: a deleted role simply leaves RoleId dangling (resolver treats an
             // unresolved role as "no baseline"), which keeps role deletion cheap and safe.
             e.HasIndex(u => u.RoleId);
+        });
+
+        // Saved views of the Collection / Location pages. Personal views go with their user and
+        // location views with their location (cascade); defaults go with their view.
+        modelBuilder.Entity<SavedView>(e =>
+        {
+            e.HasKey(v => v.Id);
+            e.Property(v => v.Id).ValueGeneratedOnAdd();
+            e.Property(v => v.Page).HasConversion<string>().HasMaxLength(16);
+            e.Property(v => v.GameKey).IsRequired().HasMaxLength(32);
+            e.Property(v => v.Name).IsRequired().HasMaxLength(SavedView.MaxNameLength);
+            e.Property(v => v.StateJson).IsRequired();
+            e.Ignore(v => v.IsShared);
+            e.HasIndex(v => new { v.Page, v.ContainerId, v.GameKey });
+            e.HasIndex(v => v.UserId);
+            e.HasOne<User>().WithMany().HasForeignKey(v => v.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<StorageContainer>().WithMany().HasForeignKey(v => v.ContainerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // No FK to Users/StorageContainers here: SQL Server rejects a second cascade path to this table
+        // (it already cascades through SavedViews), so the web layer removes a deleted user's or
+        // location's default rows itself. One default per (user-or-everyone, page, game key) — the
+        // unfiltered index lets SQL Server treat the null "everyone" user as a single value.
+        modelBuilder.Entity<SavedViewDefault>(e =>
+        {
+            e.HasKey(d => d.Id);
+            e.Property(d => d.Id).ValueGeneratedOnAdd();
+            e.Property(d => d.Page).HasConversion<string>().HasMaxLength(16);
+            e.Property(d => d.GameKey).IsRequired().HasMaxLength(32);
+            e.HasIndex(d => new { d.UserId, d.Page, d.ContainerId, d.GameKey }).IsUnique().HasFilter(null);
+            e.HasIndex(d => d.SavedViewId);
+            e.HasOne<SavedView>().WithMany().HasForeignKey(d => d.SavedViewId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Optimistic-concurrency tokens for the networked (multi-user) web deployment, which runs on

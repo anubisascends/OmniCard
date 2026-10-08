@@ -27,7 +27,8 @@ public sealed class LocationsController(
     IPriceSheetService priceSheets,
     IPriceSheetPdfExporter priceSheetPdf,
     SiteService sites,
-    RequestSiteAccess siteAccess) : ApiControllerBase
+    RequestSiteAccess siteAccess,
+    SavedViewService savedViews) : ApiControllerBase
 {
     /// <summary>Printable price-sheet PDF for a location's cards.</summary>
     [HttpGet("{id:int}/pricesheet.pdf")]
@@ -225,6 +226,8 @@ public sealed class LocationsController(
     public IActionResult Delete(int id, [FromQuery] bool moveToBulk = true)
     {
         containers.Delete(id, moveToBulk);
+        // The location's own views cascade; defaults pointing at shared all-locations views don't.
+        savedViews.RemoveLocation(id);
         return NoContent();
     }
 
