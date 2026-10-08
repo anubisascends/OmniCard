@@ -22,6 +22,36 @@
       "text": "Text list (.txt)"
     },
     "stackDuplicates": "Stack duplicates",
+    "grouping": {
+      "button": "Group by",
+      "buttonActive": "Group by: {{columns}}",
+      "hint": "Tick columns to group rows by them. The top ticked column is the outermost group; use the arrows to change the nesting.",
+      "level": "Level {{level}}",
+      "moveOut": "Move out (outer group)",
+      "moveIn": "Move in (inner group)",
+      "clear": "Don't group",
+      "collapseAll": "Collapse all",
+      "collapseAllTooltip": "Collapse every group to its header",
+      "expandAll": "Expand all",
+      "expandAllTooltip": "Open every group",
+      "continued": "(continued)",
+      "summary_one": "{{count}} card · {{value}}",
+      "summary_other": "{{count}} cards · {{value}}",
+      "none": "(none)",
+      "nonFoil": "Non-foil",
+      "notListed": "Not listed",
+      "noLocation": "No location",
+      "fields": {
+        "setCode": "Set",
+        "rarity": "Rarity",
+        "condition": "Condition",
+        "language": "Language",
+        "isFoil": "Foil",
+        "game": "Game",
+        "containerName": "Location",
+        "listingStatus": "Listing status"
+      }
+    },
     "savedViews": {
       "tooltip": "Saved views: switch, save or manage this page's layout",
       "modified": "The layout has unsaved changes",

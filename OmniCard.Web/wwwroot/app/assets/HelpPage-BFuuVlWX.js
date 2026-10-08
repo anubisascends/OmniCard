@@ -1,4 +1,4 @@
-import{g as J,a as K,r as f,u as X,b as Y,c as N,j as n,d as Z,s as W,B as ce,m as ee,e as E,F as de,f as p,D as le,P as j,T as he,h as pe,i as H,k as V,l as ue,n as y,o as x,p as me,I as ge,C as ye,q as we,A as B,t as fe,L as T,v as b,w as be,x as _,S as I,y as ke,z as ve,E as Ce,G as z,H as q,J as xe,K as Te,M as Se,N as Ae,O as Ie,Q as _e}from"./index-B3Kdn6dR.js";function Oe(e){return J("MuiCardActionArea",e)}const P=K("MuiCardActionArea",["root","focusVisible","focusHighlight"]),Be=e=>{const{classes:t}=e;return Z({root:["root"],focusHighlight:["focusHighlight"]},Oe,t)},Le=W(ce,{name:"MuiCardActionArea",slot:"Root",overridesResolver:(e,t)=>t.root})(ee(({theme:e})=>({display:"block",textAlign:"inherit",borderRadius:"inherit",width:"100%",[`&:hover .${P.focusHighlight}`]:{opacity:(e.vars||e).palette.action.hoverOpacity,"@media (hover: none)":{opacity:0}},[`&.${P.focusVisible} .${P.focusHighlight}`]:{opacity:(e.vars||e).palette.action.focusOpacity}}))),Ee=W("span",{name:"MuiCardActionArea",slot:"FocusHighlight",overridesResolver:(e,t)=>t.focusHighlight})(ee(({theme:e})=>({overflow:"hidden",pointerEvents:"none",position:"absolute",top:0,right:0,bottom:0,left:0,borderRadius:"inherit",opacity:0,backgroundColor:"currentcolor",transition:e.transitions.create("opacity",{duration:e.transitions.duration.short})}))),Pe=f.forwardRef(function(t,o){const a=X({props:t,name:"MuiCardActionArea"}),{children:r,className:s,focusVisibleClassName:h,slots:i={},slotProps:l={},...d}=a,c=a,g=Be(c),u={slots:i,slotProps:l},[w,m]=Y("root",{elementType:Le,externalForwardedProps:{...u,...d},shouldForwardComponentProp:!0,ownerState:c,ref:o,className:N(g.root,s),additionalProps:{focusVisibleClassName:N(h,g.focusVisible)}}),[v,k]=Y("focusHighlight",{elementType:Ee,externalForwardedProps:u,ownerState:c,ref:o,className:g.focusHighlight});return n.jsxs(w,{...m,children:[r,n.jsx(v,{...k})]})});function Me(e){return J("MuiTableContainer",e)}K("MuiTableContainer",["root"]);const De=e=>{const{classes:t}=e;return Z({root:["root"]},Me,t)},Ne=W("div",{name:"MuiTableContainer",slot:"Root",overridesResolver:(e,t)=>t.root})({width:"100%",overflowX:"auto"}),Fe=f.forwardRef(function(t,o){const a=X({props:t,name:"MuiTableContainer"}),{className:r,component:s="div",...h}=a,i={...a,component:s},l=De(i);return n.jsx(Ne,{ref:o,as:s,className:N(l.root,r),ownerState:i,...h})}),ne=E(n.jsx("path",{d:"M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"}),"ArrowBack"),te=E(n.jsx("path",{d:"m12 4-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"}),"ArrowForward"),Ue=`# Administration\r
+import{g as J,a as K,r as f,u as X,b as Y,c as N,j as n,d as Z,s as W,B as ce,m as ee,e as E,F as de,f as p,D as le,P as j,T as he,h as pe,i as H,k as V,l as ue,n as y,o as x,p as me,I as ge,C as ye,q as we,A as B,t as fe,L as T,v as b,w as be,x as _,S as I,y as ke,z as ve,E as Ce,G as z,H as q,J as xe,K as Te,M as Se,N as Ae,O as Ie,Q as _e}from"./index-CQH14SsA.js";function Oe(e){return J("MuiCardActionArea",e)}const P=K("MuiCardActionArea",["root","focusVisible","focusHighlight"]),Be=e=>{const{classes:t}=e;return Z({root:["root"],focusHighlight:["focusHighlight"]},Oe,t)},Le=W(ce,{name:"MuiCardActionArea",slot:"Root",overridesResolver:(e,t)=>t.root})(ee(({theme:e})=>({display:"block",textAlign:"inherit",borderRadius:"inherit",width:"100%",[`&:hover .${P.focusHighlight}`]:{opacity:(e.vars||e).palette.action.hoverOpacity,"@media (hover: none)":{opacity:0}},[`&.${P.focusVisible} .${P.focusHighlight}`]:{opacity:(e.vars||e).palette.action.focusOpacity}}))),Ee=W("span",{name:"MuiCardActionArea",slot:"FocusHighlight",overridesResolver:(e,t)=>t.focusHighlight})(ee(({theme:e})=>({overflow:"hidden",pointerEvents:"none",position:"absolute",top:0,right:0,bottom:0,left:0,borderRadius:"inherit",opacity:0,backgroundColor:"currentcolor",transition:e.transitions.create("opacity",{duration:e.transitions.duration.short})}))),Pe=f.forwardRef(function(t,r){const a=X({props:t,name:"MuiCardActionArea"}),{children:o,className:s,focusVisibleClassName:h,slots:i={},slotProps:l={},...d}=a,c=a,g=Be(c),u={slots:i,slotProps:l},[w,m]=Y("root",{elementType:Le,externalForwardedProps:{...u,...d},shouldForwardComponentProp:!0,ownerState:c,ref:r,className:N(g.root,s),additionalProps:{focusVisibleClassName:N(h,g.focusVisible)}}),[v,k]=Y("focusHighlight",{elementType:Ee,externalForwardedProps:u,ownerState:c,ref:r,className:g.focusHighlight});return n.jsxs(w,{...m,children:[o,n.jsx(v,{...k})]})});function Me(e){return J("MuiTableContainer",e)}K("MuiTableContainer",["root"]);const De=e=>{const{classes:t}=e;return Z({root:["root"]},Me,t)},Ne=W("div",{name:"MuiTableContainer",slot:"Root",overridesResolver:(e,t)=>t.root})({width:"100%",overflowX:"auto"}),Fe=f.forwardRef(function(t,r){const a=X({props:t,name:"MuiTableContainer"}),{className:o,component:s="div",...h}=a,i={...a,component:s},l=De(i);return n.jsx(Ne,{ref:r,as:s,className:N(l.root,o),ownerState:i,...h})}),ne=E(n.jsx("path",{d:"M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"}),"ArrowBack"),te=E(n.jsx("path",{d:"m12 4-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"}),"ArrowForward"),Ue=`# Administration\r
 \r
 The Administration page is where you change your own password and, depending on your access, manage users, roles, sites, catalog data and OmniCard's settings. This topic explains every tab and who can see it.\r
 \r
@@ -462,260 +462,282 @@ Removing a page removes the whole physical sheet it's on. For a double-sided she
 - **Editing shows an error.** You may not have permission to edit binders. Ask an administrator.\r
 - **A card I added isn't showing in a pocket.** It's in the Unplaced pool. Click **Edit** and look in the **Unplaced cards** panel.\r
 - **A card I'm looking for isn't in the Unplaced panel.** Clear the panel's search box. If it still isn't there, it may be in another location; use **Add card to this pocket…** and look under **In your collection**.\r
-`,We=`# Collection
-
-The Collection page lists every single card you own across all your storage locations. Use it to search, sort, edit, move, list for sale, export, and check a decklist against what you have.
-
-## What the Collection page shows
-
-Open [Collection](/collection) from the navigation menu. The page has three parts:
-
-- A **search box** at the top. Type a search and press **Enter** to filter the list.
-- The **view button** beside the search box, for switching between saved layouts of the page. See [Saved views](help:saved-views).
-- A toolbar with the **Stack duplicates** switch and the **Columns** and **Select** buttons.
-- The card list itself, one card (or stack of identical cards) per row.
-
-The game selector in the top bar decides which game's cards you see. Choose a single game, or **All Games** to see everything at once.
-
-![The Collection page with the search box, toolbar and card list](collection-overview.png)
-
-> [!NOTE]
-> You only see cards in sites you have access to. If cards you expect are missing, ask an administrator whether you can view that site. See [Locations](help:locations).
-
-### Columns
-
-| Column | What it shows |
-|---|---|
-| Name | Card name. Hover over it to see the card art. |
-| Set | Set code. |
-| No. | Collector number. |
-| Rarity | Printed rarity. |
-| Cond | Condition: NM, LP, MP, HP or DMG. |
-| Lang | A language badge for non-English copies. Blank means English. |
-| Foil | A check mark for foil copies. |
-| Qty | How many copies the row holds. |
-| Market | Current market price per copy, in US dollars. |
-| Status | **Listed** or **Picked** if the card is listed for sale. |
-| Location | The storage location the card is in. |
-
-Hover over a **Listed** or **Picked** badge to see a reminder that you change listings from **Sales ▸ Listings**.
-
-Click **Columns** to hide columns or change their order. See [Choose columns](help:saved-views#choose-columns).
-
-## Search your collection
-
-1. Click in the search box.
-2. Type a card name, or a search using fields such as \`t:creature\`, \`set:dom\` or \`tag:trade\`.
-3. Press **Enter**.
-
-Plain words match the card name, so \`bolt\` finds Lightning Bolt. Combine terms with spaces, use \`or\` for alternatives, and put \`-\` in front of a term to exclude it. For example, \`t:dragon -is:foil\` finds non-foil dragons.
-
-Click the **?** icon at the right of the search box to see the fields available for the selected game, with an example for each.
-
-For the complete list of fields and operators for every game, see [Search syntax](help:search-syntax).
-
-To clear a search, delete the text and press **Enter** again.
-
-## Sort the list
-
-Click a column header to sort by that column. Click it again to reverse the order. Sorting covers your whole collection, not just the page you're looking at, so sorting by **Market** from highest to lowest shows your most valuable cards first.
-
-The list is sorted by **Name** until you choose another column. The **Status** column can't be sorted.
-
-Use the controls at the bottom of the list to move between pages and to show 25, 50 or 100 rows per page.
-
-To keep a sort, search and column layout for next time, save it as a view. See [Saved views](help:saved-views).
-
-## Stack duplicates
-
-The **Stack duplicates** switch is on by default. A [saved view](help:saved-views) remembers the setting. With **Default view**, OmniCard remembers your last choice.
-
-- **On:** identical cards (same name, set, collector number and foil) appear as one row. **Qty** shows the total, and the name shows how many separate entries were combined, for example *· 3 printings*.
-- **Off:** every entry appears on its own row, even if it's the same printing stored in two places.
-
-> [!TIP]
-> Turn **Stack duplicates** off when you want to edit or move one particular copy. Clicking a stacked row opens just one of the combined entries.
-
-## Preview card art
-
-Hover over a card's name to see a larger image of the card. Foil cards show an animated rainbow sheen so you can tell them apart at a glance.
-
-To make the preview bigger or smaller, go to **Administration ▸ Appearance** and adjust the card preview size.
-
-## View and edit a card
-
-Click any row (when you're not in Select mode) to open the card details panel on the right.
-
-![The card details panel with condition, language, foil, quantity and location](collection-card-details.png)
-
-The top of the panel shows the card name, set, collector number, rarity and art. A chip shows the current **Market** price, and another chip appears if the card is **Listed for sale** or **Picked for sale**.
-
-### Change a card's details
-
-1. Click the card to open the details panel.
-2. Change any of the fields below.
-3. Click **Save**. Click **Cancel** to close without saving.
-
-| Field | What it does |
-|---|---|
-| Condition | NM, LP, MP, HP or DMG. |
-| Language | The language of this copy. The list shows the languages available for the card's game. |
-| Foil | Turn on for a foil copy. |
-| Quantity | How many copies this entry holds (at least 1). |
-| Purchase price | What you paid per copy. Optional. |
-| Note | Free text, for example *signed, played, misprint*. |
-| Location | Where the card is stored. Click **Change** to pick another location. |
-| Tags | Your own labels. Pick an existing tag or type a new one and press Enter. |
-
-Moving a card with **Change** takes effect when you click **Save**. Tags you add here can be searched with \`tag:\`. See [Search syntax](help:search-syntax).
-
-### Pick a location
-
-When you click **Change** (or **Move to…** for several cards), the location picker opens.
-
-- Type in **Search locations…** to filter the list. Locations are grouped by type.
-- Click a location to choose it.
-- Click **New location** to create one without leaving the picker. Enter a **New location name**, choose the type (and the site, if you can add to more than one), then click **Create & select**. A new deck box also needs its game.
-
-A deck box that holds a different game is shown but can't be chosen. For more about locations and sites, see [Locations](help:locations) and [Deck boxes](help:deck-boxes).
-
-### Read-only cards
-
-If a card is in a site you can only view, the panel shows a message and every change is disabled. Ask an administrator for write access to that site if you need to edit it.
-
-### Split a stack
-
-When an entry holds more than one copy, the panel shows **Split stack**. Splitting is useful when each copy needs its own binder pocket or its own sale listing.
-
-1. Click **Split stack**.
-2. Choose one of these:
-   - Enter the number of **Copies to move to a new stack**, then click **Split stack**.
-   - Click **Split into N singles** to turn every copy into its own entry.
-3. The new entries stay in the same location. In a binder, they go to the binder's Unplaced pool. See [Binders](help:binders).
-
-You can't split a card that's listed for sale. Unlist it from **Sales ▸ Listings** first.
-
-### Add a card to a trade
-
-Click **Add to trade** to put the card into your current trade. A message confirms it was added. Finish the trade on the [Trades](/trades) page. See [Trades](help:trades).
-
-### Delete a card
-
-Click **Delete** at the bottom of the panel and confirm. This removes the card from your collection and can't be undone.
-
-## List a card for sale
-
-From the card details panel:
-
-1. Click **List for sale**.
-2. If the entry holds more than one copy, set **Quantity**. Listing fewer than you have splits those copies off into their own entry.
-3. Check the **Price**. It starts at the current market price.
-4. Choose a **Channel**: Manual, TCGplayer or eBay.
-5. Add a **Note** if you like.
-6. Click **List for sale**.
-
-![The List for sale dialog with the eBay listing section shown](collection-list-for-sale.png)
-
-If the card is already listed, the button reads **Already listed for sale** and is disabled.
-
-### List on eBay
-
-Choose **eBay** as the channel to publish the card to eBay at the same time. An **eBay listing** section appears with a **Listing title** (up to 80 characters), **Description**, **Condition**, **Listing type** (Fixed price or Auction, with an **Auction duration**), and **eBay category**. OmniCard suggests a title, description and category for you. Click **List on eBay** to publish.
-
-Your eBay account must be connected and set up first. If it isn't, the dialog shows a warning. If the card is listed in OmniCard but eBay rejects it, the error is shown and the local listing is kept so you can fix the problem and try again. See [eBay](help:ebay).
-
-For managing listings, picking and orders, see [Sales](help:sales).
-
-## Work with several cards at once
-
-1. Click **Select**. Checkboxes appear next to each row.
-2. Tick the cards you want. The header checkbox selects every card on the current page.
-3. Use the buttons that appear in the toolbar. The toolbar shows how many cards are selected.
-4. Click **Done** to leave Select mode.
-
-![Select mode with several cards ticked and the bulk action buttons showing](collection-select-actions.png)
-
-A selected stacked row counts every entry in the stack.
-
-| Button | What it does |
-|---|---|
-| **Move to…** | Moves all selected cards to one location. |
-| **Bulk edit** | Changes properties on all selected cards. |
-| **List for sale** | Lists all selected cards for sale at their market price. |
-| **Export CSV** | Downloads the selected cards as a file. |
-| **Delete** | Deletes the selected cards after you confirm. This can't be undone. |
-
-### Bulk edit
-
-In the **Bulk edit** dialog, tick each property you want to change, then set its value. Unticked properties are left alone. You can set **Condition**, **Language**, **Foil** (foil or non-foil), **Quantity**, **Purchase price**, **Note** and **Tags**.
-
-For tags, choose **Add to existing** to add tags, or **Replace all** to overwrite every selected card's tags. Replacing with no tags clears them. Click **Apply to N** to save.
-
-### Bulk list for sale
-
-Each selected card is listed as a whole entry at its current market price. Pick a **Channel**, add an optional **Note**, and click **List for sale**. Cards that are already listed are skipped, and the dialog tells you how many. Adjust individual prices afterwards on **Sales ▸ Listings**.
-
-> [!NOTE]
-> Bulk listing records the listings in OmniCard. To publish a card to eBay, list it on its own from the card details panel with the eBay channel.
-
-### Export selected cards
-
-Click **Export CSV** and choose a format:
-
-- OmniCard (full detail)
-- TCGplayer
-- Moxfield
-- ManaBox
-- Archidekt
-- Deckbox
-- Dragon Shield
-- Card Price Ticker
-- Text list (.txt)
-
-The file downloads to your computer. To bring cards in from a file instead, see [Importing](help:importing).
-
-## Check a decklist against your collection
-
-**Check decklist** shows which cards from a deck you already own, exactly where to find them, and what's missing.
-
-1. Click **Check decklist** at the top right of the page.
-2. Choose the **Game**.
-3. Paste a Moxfield or Archidekt link into **Decklist URL**, or paste the list into **Decklist text**, one card per line (for example \`4 Lightning Bolt\`).
-4. Click **Check**.
-
-![The Check a decklist dialog showing owned and missing counts and the pull list](collection-decklist-check.png)
-
-The results show the deck name and three chips: how many cards you own, how many are missing, and the estimated cost to complete the deck.
-
-### To pull
-
-The **To pull** tab lists each card you own and the copies to take, with set, collector number, condition, a ✦ for foil, and where each copy is (location, section, page and slot).
-
-OmniCard picks copies in this order of preference: copies that aren't listed for sale, then copies that aren't already in another deck box, then the exact printing the deck asks for, then the same set. Copies in locations marked to be ignored for lists are never picked. See [Lists](help:lists).
-
-Chips flag copies that are **Listed for sale** or **In a deck box**.
-
-### Missing
-
-The **Missing** tab lists cards you don't have enough of, with the cost to buy them. The most expensive cards are listed first.
-
-### Print and move
-
-- **Print pull list** downloads a PDF checklist of the cards to pull and where they are.
-- **Print missing list** downloads a PDF shopping list of the missing cards with their prices.
-- **Move to deck box…** moves every picked copy into a deck box you choose (or create). This is only available once you own every card in the deck and have permission to move cards. If some copies are listed for sale or are in another deck box, a message warns you before you move them.
-
-After a move, the check runs again so the pull list shows the cards' new location. The dialog keeps its results while you close it to look at your collection.
-
-For deck boxes and saved card lists, see [Deck boxes](help:deck-boxes) and [Lists](help:lists).
-
-## Tips and troubleshooting
-
-- **A search finds nothing.** Check the game selector in the top bar. A search only covers the selected game, unless **All Games** is selected.
-- **Market is blank.** No price is available for that printing yet. Prices come from the game's price data and update when the card catalog is refreshed.
-- **I can't click List for sale or Split stack.** The card is already listed. Unlist it from **Sales ▸ Listings** first.
-- **Buttons are greyed out or missing.** You may not have permission for that action, or the card is in a read-only site. Ask an administrator for access.
-- To view one location's cards only, open it from [Locations](help:locations). The same card list and search work there.
+`,We=`# Collection\r
+\r
+The Collection page lists every single card you own across all your storage locations. Use it to search, sort, edit, move, list for sale, export, and check a decklist against what you have.\r
+\r
+## What the Collection page shows\r
+\r
+Open [Collection](/collection) from the navigation menu. The page has three parts:\r
+\r
+- A **search box** at the top. Type a search and press **Enter** to filter the list.\r
+- The **view button** beside the search box, for switching between saved layouts of the page. See [Saved views](help:saved-views).\r
+- A toolbar with the **Stack duplicates** switch and the **Columns**, **Group by** and **Select** buttons.\r
+- The card list itself, one card (or stack of identical cards) per row.\r
+\r
+The game selector in the top bar decides which game's cards you see. Choose a single game, or **All Games** to see everything at once.\r
+\r
+![The Collection page with the search box, toolbar and card list](collection-overview.png)\r
+\r
+> [!NOTE]\r
+> You only see cards in sites you have access to. If cards you expect are missing, ask an administrator whether you can view that site. See [Locations](help:locations).\r
+\r
+### Columns\r
+\r
+| Column | What it shows |\r
+|---|---|\r
+| Name | Card name. Hover over it to see the card art. |\r
+| Set | Set code. |\r
+| No. | Collector number. |\r
+| Rarity | Printed rarity. |\r
+| Cond | Condition: NM, LP, MP, HP or DMG. |\r
+| Lang | A language badge for non-English copies. Blank means English. |\r
+| Foil | A check mark for foil copies. |\r
+| Qty | How many copies the row holds. |\r
+| Market | Current market price per copy, in US dollars. |\r
+| Status | **Listed** or **Picked** if the card is listed for sale. |\r
+| Location | The storage location the card is in. |\r
+\r
+Hover over a **Listed** or **Picked** badge to see a reminder that you change listings from **Sales ▸ Listings**.\r
+\r
+Click **Columns** to hide columns or change their order. See [Choose columns](help:saved-views#choose-columns).\r
+\r
+## Search your collection\r
+\r
+1. Click in the search box.\r
+2. Type a card name, or a search using fields such as \`t:creature\`, \`set:dom\` or \`tag:trade\`.\r
+3. Press **Enter**.\r
+\r
+Plain words match the card name, so \`bolt\` finds Lightning Bolt. Combine terms with spaces, use \`or\` for alternatives, and put \`-\` in front of a term to exclude it. For example, \`t:dragon -is:foil\` finds non-foil dragons.\r
+\r
+Click the **?** icon at the right of the search box to see the fields available for the selected game, with an example for each.\r
+\r
+For the complete list of fields and operators for every game, see [Search syntax](help:search-syntax).\r
+\r
+To clear a search, delete the text and press **Enter** again.\r
+\r
+## Sort the list\r
+\r
+Click a column header to sort by that column. Click it again to reverse the order. Sorting covers your whole collection, not just the page you're looking at, so sorting by **Market** from highest to lowest shows your most valuable cards first.\r
+\r
+The list is sorted by **Name** until you choose another column. The **Status** column can't be sorted.\r
+\r
+Use the controls at the bottom of the list to move between pages and to show 25, 50 or 100 rows per page.\r
+\r
+To keep a sort, search and column layout for next time, save it as a view. See [Saved views](help:saved-views).\r
+\r
+## Stack duplicates\r
+\r
+The **Stack duplicates** switch is on by default. A [saved view](help:saved-views) remembers the setting. With **Default view**, OmniCard remembers your last choice.\r
+\r
+- **On:** identical cards (same name, set, collector number and foil) appear as one row. **Qty** shows the total, and the name shows how many separate entries were combined, for example *· 3 printings*.\r
+- **Off:** every entry appears on its own row, even if it's the same printing stored in two places.\r
+\r
+> [!TIP]\r
+> Turn **Stack duplicates** off when you want to edit or move one particular copy. Clicking a stacked row opens just one of the combined entries.\r
+\r
+## Group rows\r
+\r
+Group the list by one or more columns to see it in collapsible sections, such as every set with its cards underneath, or each set split again by rarity.\r
+\r
+1. Click **Group by** in the toolbar.\r
+2. Tick the columns to group by. The first one you tick is the outer group (**Level 1**), the next is grouped inside it, and so on.\r
+3. Use the up and down arrows to change which group sits inside which. Click **Don't group** to go back to a plain list.\r
+\r
+You can group by **Set**, **Rarity**, **Condition**, **Language**, **Foil**, **Location** and **Listing status**. When **All Games** is selected you can also group by **Game**.\r
+\r
+![The Collection grouped by Set and then Rarity](collection-grouped.png)\r
+\r
+Each group heading shows how many cards the group holds and their total market value. Groups cover your whole collection, so the totals are right even when a group runs over more than one page. When a page starts partway through a group, the group's heading is repeated at the top, marked *(continued)*.\r
+\r
+- Click a group heading to collapse or expand it.\r
+- Click **Collapse all** to fold every group down to its heading, then click a heading to open just that group.\r
+- Click **Expand all** to open every group again.\r
+\r
+Groups always open expanded. The columns you group by are part of the [saved view](help:saved-views); which groups are collapsed is not.\r
+\r
+Sorting and **Stack duplicates** work inside each group. Sorting by the column you grouped by also reverses the order of the groups. Groups with no value, such as cards with no rarity, come last as **(none)**.\r
+\r
+## Preview card art\r
+\r
+Hover over a card's name to see a larger image of the card. Foil cards show an animated rainbow sheen so you can tell them apart at a glance.\r
+\r
+To make the preview bigger or smaller, go to **Administration ▸ Appearance** and adjust the card preview size.\r
+\r
+## View and edit a card\r
+\r
+Click any row (when you're not in Select mode) to open the card details panel on the right.\r
+\r
+![The card details panel with condition, language, foil, quantity and location](collection-card-details.png)\r
+\r
+The top of the panel shows the card name, set, collector number, rarity and art. A chip shows the current **Market** price, and another chip appears if the card is **Listed for sale** or **Picked for sale**.\r
+\r
+### Change a card's details\r
+\r
+1. Click the card to open the details panel.\r
+2. Change any of the fields below.\r
+3. Click **Save**. Click **Cancel** to close without saving.\r
+\r
+| Field | What it does |\r
+|---|---|\r
+| Condition | NM, LP, MP, HP or DMG. |\r
+| Language | The language of this copy. The list shows the languages available for the card's game. |\r
+| Foil | Turn on for a foil copy. |\r
+| Quantity | How many copies this entry holds (at least 1). |\r
+| Purchase price | What you paid per copy. Optional. |\r
+| Note | Free text, for example *signed, played, misprint*. |\r
+| Location | Where the card is stored. Click **Change** to pick another location. |\r
+| Tags | Your own labels. Pick an existing tag or type a new one and press Enter. |\r
+\r
+Moving a card with **Change** takes effect when you click **Save**. Tags you add here can be searched with \`tag:\`. See [Search syntax](help:search-syntax).\r
+\r
+### Pick a location\r
+\r
+When you click **Change** (or **Move to…** for several cards), the location picker opens.\r
+\r
+- Type in **Search locations…** to filter the list. Locations are grouped by type.\r
+- Click a location to choose it.\r
+- Click **New location** to create one without leaving the picker. Enter a **New location name**, choose the type (and the site, if you can add to more than one), then click **Create & select**. A new deck box also needs its game.\r
+\r
+A deck box that holds a different game is shown but can't be chosen. For more about locations and sites, see [Locations](help:locations) and [Deck boxes](help:deck-boxes).\r
+\r
+### Read-only cards\r
+\r
+If a card is in a site you can only view, the panel shows a message and every change is disabled. Ask an administrator for write access to that site if you need to edit it.\r
+\r
+### Split a stack\r
+\r
+When an entry holds more than one copy, the panel shows **Split stack**. Splitting is useful when each copy needs its own binder pocket or its own sale listing.\r
+\r
+1. Click **Split stack**.\r
+2. Choose one of these:\r
+   - Enter the number of **Copies to move to a new stack**, then click **Split stack**.\r
+   - Click **Split into N singles** to turn every copy into its own entry.\r
+3. The new entries stay in the same location. In a binder, they go to the binder's Unplaced pool. See [Binders](help:binders).\r
+\r
+You can't split a card that's listed for sale. Unlist it from **Sales ▸ Listings** first.\r
+\r
+### Add a card to a trade\r
+\r
+Click **Add to trade** to put the card into your current trade. A message confirms it was added. Finish the trade on the [Trades](/trades) page. See [Trades](help:trades).\r
+\r
+### Delete a card\r
+\r
+Click **Delete** at the bottom of the panel and confirm. This removes the card from your collection and can't be undone.\r
+\r
+## List a card for sale\r
+\r
+From the card details panel:\r
+\r
+1. Click **List for sale**.\r
+2. If the entry holds more than one copy, set **Quantity**. Listing fewer than you have splits those copies off into their own entry.\r
+3. Check the **Price**. It starts at the current market price.\r
+4. Choose a **Channel**: Manual, TCGplayer or eBay.\r
+5. Add a **Note** if you like.\r
+6. Click **List for sale**.\r
+\r
+![The List for sale dialog with the eBay listing section shown](collection-list-for-sale.png)\r
+\r
+If the card is already listed, the button reads **Already listed for sale** and is disabled.\r
+\r
+### List on eBay\r
+\r
+Choose **eBay** as the channel to publish the card to eBay at the same time. An **eBay listing** section appears with a **Listing title** (up to 80 characters), **Description**, **Condition**, **Listing type** (Fixed price or Auction, with an **Auction duration**), and **eBay category**. OmniCard suggests a title, description and category for you. Click **List on eBay** to publish.\r
+\r
+Your eBay account must be connected and set up first. If it isn't, the dialog shows a warning. If the card is listed in OmniCard but eBay rejects it, the error is shown and the local listing is kept so you can fix the problem and try again. See [eBay](help:ebay).\r
+\r
+For managing listings, picking and orders, see [Sales](help:sales).\r
+\r
+## Work with several cards at once\r
+\r
+1. Click **Select**. Checkboxes appear next to each row.\r
+2. Tick the cards you want. The header checkbox selects every card on the current page.\r
+3. Use the buttons that appear in the toolbar. The toolbar shows how many cards are selected.\r
+4. Click **Done** to leave Select mode.\r
+\r
+![Select mode with several cards ticked and the bulk action buttons showing](collection-select-actions.png)\r
+\r
+A selected stacked row counts every entry in the stack.\r
+\r
+| Button | What it does |\r
+|---|---|\r
+| **Move to…** | Moves all selected cards to one location. |\r
+| **Bulk edit** | Changes properties on all selected cards. |\r
+| **List for sale** | Lists all selected cards for sale at their market price. |\r
+| **Export CSV** | Downloads the selected cards as a file. |\r
+| **Delete** | Deletes the selected cards after you confirm. This can't be undone. |\r
+\r
+### Bulk edit\r
+\r
+In the **Bulk edit** dialog, tick each property you want to change, then set its value. Unticked properties are left alone. You can set **Condition**, **Language**, **Foil** (foil or non-foil), **Quantity**, **Purchase price**, **Note** and **Tags**.\r
+\r
+For tags, choose **Add to existing** to add tags, or **Replace all** to overwrite every selected card's tags. Replacing with no tags clears them. Click **Apply to N** to save.\r
+\r
+### Bulk list for sale\r
+\r
+Each selected card is listed as a whole entry at its current market price. Pick a **Channel**, add an optional **Note**, and click **List for sale**. Cards that are already listed are skipped, and the dialog tells you how many. Adjust individual prices afterwards on **Sales ▸ Listings**.\r
+\r
+> [!NOTE]\r
+> Bulk listing records the listings in OmniCard. To publish a card to eBay, list it on its own from the card details panel with the eBay channel.\r
+\r
+### Export selected cards\r
+\r
+Click **Export CSV** and choose a format:\r
+\r
+- OmniCard (full detail)\r
+- TCGplayer\r
+- Moxfield\r
+- ManaBox\r
+- Archidekt\r
+- Deckbox\r
+- Dragon Shield\r
+- Card Price Ticker\r
+- Text list (.txt)\r
+\r
+The file downloads to your computer. To bring cards in from a file instead, see [Importing](help:importing).\r
+\r
+## Check a decklist against your collection\r
+\r
+**Check decklist** shows which cards from a deck you already own, exactly where to find them, and what's missing.\r
+\r
+1. Click **Check decklist** at the top right of the page.\r
+2. Choose the **Game**.\r
+3. Paste a Moxfield or Archidekt link into **Decklist URL**, or paste the list into **Decklist text**, one card per line (for example \`4 Lightning Bolt\`).\r
+4. Click **Check**.\r
+\r
+![The Check a decklist dialog showing owned and missing counts and the pull list](collection-decklist-check.png)\r
+\r
+The results show the deck name and three chips: how many cards you own, how many are missing, and the estimated cost to complete the deck.\r
+\r
+### To pull\r
+\r
+The **To pull** tab lists each card you own and the copies to take, with set, collector number, condition, a ✦ for foil, and where each copy is (location, section, page and slot).\r
+\r
+OmniCard picks copies in this order of preference: copies that aren't listed for sale, then copies that aren't already in another deck box, then the exact printing the deck asks for, then the same set. Copies in locations marked to be ignored for lists are never picked. See [Lists](help:lists).\r
+\r
+Chips flag copies that are **Listed for sale** or **In a deck box**.\r
+\r
+### Missing\r
+\r
+The **Missing** tab lists cards you don't have enough of, with the cost to buy them. The most expensive cards are listed first.\r
+\r
+### Print and move\r
+\r
+- **Print pull list** downloads a PDF checklist of the cards to pull and where they are.\r
+- **Print missing list** downloads a PDF shopping list of the missing cards with their prices.\r
+- **Move to deck box…** moves every picked copy into a deck box you choose (or create). This is only available once you own every card in the deck and have permission to move cards. If some copies are listed for sale or are in another deck box, a message warns you before you move them.\r
+\r
+After a move, the check runs again so the pull list shows the cards' new location. The dialog keeps its results while you close it to look at your collection.\r
+\r
+For deck boxes and saved card lists, see [Deck boxes](help:deck-boxes) and [Lists](help:lists).\r
+\r
+## Tips and troubleshooting\r
+\r
+- **A search finds nothing.** Check the game selector in the top bar. A search only covers the selected game, unless **All Games** is selected.\r
+- **Market is blank.** No price is available for that printing yet. Prices come from the game's price data and update when the card catalog is refreshed.\r
+- **I can't click List for sale or Split stack.** The card is already listed. Unlist it from **Sales ▸ Listings** first.\r
+- **Buttons are greyed out or missing.** You may not have permission for that action, or the card is in a read-only site. Ask an administrator for access.\r
+- To view one location's cards only, open it from [Locations](help:locations). The same card list and search work there.\r
 `,je=`# Dashboard\r
 \r
 The Dashboard shows what your whole collection cost, what it's worth today, and how much profit your sales have made. It opens when you first sign in.\r
@@ -766,167 +788,167 @@ Below the totals, two tables split the same numbers into groups. Each row shows 
 - [Locations](help:locations): the value of each binder, box or deck\r
 - [Sales](help:sales): orders and listings that feed **Realized Profit**\r
 - [Inventory](help:inventory): sealed product and its market prices\r
-`,Ge=`# Deck boxes
-
-A deck box is a location that holds one built deck. It belongs to a single game, can be given a deck type (format) such as Commander or Standard, and warns you when the deck doesn't meet that format's rules.
-
-## What makes a deck box different
-
-Deck boxes are ordinary [locations](help:locations) with a few extras:
-
-- **One game only.** Every deck box is assigned a game, and cards from other games can't be put in it.
-- **Deck type.** You can pick a format for the deck. OmniCard then checks the deck's size, copy limits and commander against that format.
-- **Deck panel.** The deck box's page shows the game, deck type, card count and any legality warnings.
-- **Stacked view.** The deck can be shown as overlapping card stacks grouped by type, like a deck-building site.
-
-## Create a deck box
-
-1. Go to [Locations](/locations).
-2. Type a name in **New location name**.
-3. Set **Type** to **Deck Box**.
-4. Choose a **Game**. This is required for a deck box.
-5. Optionally choose a **Deck type**, or leave it as **None**. The list only shows formats for the game you picked.
-6. Click **Add**.
-
-![Creating a deck box with a game and deck type](locations-add-bar.png)
-
-You can also create a deck box from any "move to location" picker by clicking **New location**.
-
-## Set the game and deck type
-
-To change a deck box's game or format later, do either of the following:
-
-- On the [Locations](/locations) page, open the deck box row's **⋮** menu and choose **Game & deck type…**.
-- On the deck box's own page, click **Game & deck type** in the deck panel.
-
-Choose the **Game** and **Deck type**, then click **Save**.
-
-You can't switch a deck box to a game that doesn't match the cards already in it. Move those cards out first.
-
-### Deck boxes with no game
-
-Deck boxes created before games were required may not have one. When that happens, the Locations page shows a warning such as *Deck box "Pauper Elves" has no game assigned.*
-
-1. Click **Assign game** in the warning.
-2. OmniCard suggests a game based on the cards inside. Check it, pick a **Deck type** if you like, and click **Save**.
-3. Repeat for each deck box listed. The warning disappears once every deck box has a game.
-
-## One game per deck box
-
-Once a deck box has a game, OmniCard keeps other games out of it:
-
-- **Add card** on the deck box's page is locked to the deck box's game (*Locked to this deck box's game*).
-- In "move to location" pickers, deck boxes for a different game are greyed out, with the note *This deck box only holds … cards*.
-- Any other attempt to move a card from another game into the deck box is refused.
-
-The game selector at the top of the app also hides deck boxes that belong to other games on the Locations page. Choose **All Games** to see them all.
-
-## The deck panel
-
-Open a deck box from the Locations page to see its panel above the card list.
-
-![A deck box page with its deck panel and legality warnings](deck-boxes-panel.png)
-
-The panel shows:
-
-- The game. If none is assigned, you'll see **No game assigned** instead.
-- The deck type, if one is set.
-- How many commanders the deck has, when it has any.
-- The total card count, for example *100 cards (99 + commander)*.
-- The **Game & deck type** button.
-- Any legality warnings, under **Deck legality (*deck type*)**.
-
-## Legality warnings
-
-When a deck box has a deck type, OmniCard checks the cards in it against that format's rules and lists anything that doesn't fit. Warnings are advice only. They never stop you from adding, moving or removing cards.
-
-OmniCard checks:
-
-| Rule | Example warning |
-|---|---|
-| Minimum deck size | Deck has 58 cards; Standard needs at least 60. |
-| Maximum deck size | Deck has 101 cards; Commander allows at most 100. |
-| Copies per card | "Lightning Bolt" appears 5× — Modern allows at most 4. |
-| Singleton formats | "Sol Ring" appears 2× — Commander is singleton (max 1). |
-| Commander or leader | Commander needs a commander/leader — tag at least one card "commander". |
-
-### Mark commanders and sideboard cards with tags
-
-OmniCard uses two special tags to understand your deck. Add them in a card's details, in the **Tags** field (see [Collection](help:collection)):
-
-- \`commander\`: the card is a commander, leader or other command-zone card. Commanders count toward the deck size, are shown in their own **Commander** group in the stacked view, and satisfy the "needs a commander" rule. A deck can have more than one (for example partners).
-- \`sideboard\`: the card is in the sideboard. Sideboard cards are left out of the deck-size and copy-limit checks.
-
-### Built-in deck types
-
-| Game | Deck types |
-|---|---|
-| Magic: The Gathering | Commander, Standard, Pioneer, Modern, Legacy, Vintage, Pauper, Brawl, Oathbreaker, Limited / Draft, Cube |
-| One Piece | Constructed |
-| Riftbound | Constructed |
-| Pokémon | Standard, Expanded, Unlimited |
-| Yu-Gi-Oh! | Advanced, Traditional |
-| Final Fantasy TCG | Standard, Classic |
-
-A few things to know about the built-in rules:
-
-- In Commander, Brawl and Oathbreaker, basic lands are exempt from the singleton rule.
-- In One Piece, copies are counted by card number, so alternate arts of the same number count as the same card.
-- The checks cover deck size, copy limits and commanders only. They don't check banned lists or card legality in a format.
-
-### Customize deck types
-
-Administrators, and anyone given access, can edit the built-in deck types and add new ones under **Administration ▸ Deck Types**. Pick a game, then click **Add deck type** or edit an existing one. Each deck type can set:
-
-- **Deck size min** and **Deck size max**
-- **Max copies / card**, or **Singleton (max 1 of each card)**
-- **Commander/leader slots**
-- **Basic lands exempt from copy limit**
-- **Count copies by card number (all arts of a number count as one card)**
-
-Deleting a deck type removes it from any deck boxes using it. See [Administration](help:administration).
-
-## Stacked view
-
-The stacked view shows a deck the way deck-building sites do: one column per group, with the cards overlapping so you can see the whole deck at once.
-
-1. Open the deck box (or any location).
-2. Click the **Stacked view** button (the columns icon) to the right of the search box. Click the **Table view** button (the list icon) to switch back. A [saved view](help:saved-views) remembers the choice and the **Group by** setting below.
-
-![A deck in stacked view grouped by type](deck-boxes-stacked-view.webp)
-
-### Group by
-
-Use **Group by** above the stacks to choose how cards are grouped:
-
-- **Type**: a **Commander** group first (cards tagged \`commander\`), then one group per card type. Magic decks use Creature, Planeswalker, Battle, Instant, Sorcery, Artifact, Enchantment and Land, in that order. Other games use their own main types, such as Pokémon, Trainer and Energy, or Monster, Spell and Trap. A card with several types goes in its main group; an Artifact Creature is grouped with Creatures.
-- **Tags**: one group per tag, in alphabetical order, plus an **Untagged** group at the end. A card with several tags appears in each of their groups, so group counts can add up to more than the deck total.
-
-Each group heading shows its number of copies. The line above the stacks shows the deck total and number of groups, for example *60 cards · 8 groups*.
-
-### Look at cards in a stack
-
-- Hover over a card to bring it to the front. The cards below it slide down so you can see it in full.
-- Click a card to open its details. It stays expanded while the details are open.
-- Use the search box above the view to narrow the cards shown. See [Search syntax](help:search-syntax).
-
-## Build a deck box from a decklist
-
-If you own every card in a decklist, you can pull them all into a deck box in one step:
-
-1. On the [Collection](/collection) page, click **Check decklist**.
-2. Paste a Moxfield or Archidekt URL, or paste the decklist text, and check it.
-3. When you own the whole deck, click **Move to deck box…** and choose the deck box.
-
-See [Collection](help:collection) for the full decklist check. To bring a deck's cards in as new cards instead, use **Import** on the deck box's page with a deck URL. See [Locations](help:locations#import-into-a-location).
-
-## Troubleshooting
-
-- **A deck box is missing from the Locations page.** The game selector is set to a different game. Choose that game or **All Games**.
-- **I can't move a card into a deck box.** The card is from a different game than the deck box.
-- **Saving a new game for a deck box shows an error.** The deck box already holds cards from another game. Move them out first.
-- **There are no legality warnings.** Either the deck meets the format's rules, or the deck box has no deck type. Set one with **Game & deck type**.
-- **The deck says it needs a commander.** Tag your commander card \`commander\` in its details.
+`,Ge=`# Deck boxes\r
+\r
+A deck box is a location that holds one built deck. It belongs to a single game, can be given a deck type (format) such as Commander or Standard, and warns you when the deck doesn't meet that format's rules.\r
+\r
+## What makes a deck box different\r
+\r
+Deck boxes are ordinary [locations](help:locations) with a few extras:\r
+\r
+- **One game only.** Every deck box is assigned a game, and cards from other games can't be put in it.\r
+- **Deck type.** You can pick a format for the deck. OmniCard then checks the deck's size, copy limits and commander against that format.\r
+- **Deck panel.** The deck box's page shows the game, deck type, card count and any legality warnings.\r
+- **Stacked view.** The deck can be shown as overlapping card stacks grouped by type, like a deck-building site.\r
+\r
+## Create a deck box\r
+\r
+1. Go to [Locations](/locations).\r
+2. Type a name in **New location name**.\r
+3. Set **Type** to **Deck Box**.\r
+4. Choose a **Game**. This is required for a deck box.\r
+5. Optionally choose a **Deck type**, or leave it as **None**. The list only shows formats for the game you picked.\r
+6. Click **Add**.\r
+\r
+![Creating a deck box with a game and deck type](locations-add-bar.png)\r
+\r
+You can also create a deck box from any "move to location" picker by clicking **New location**.\r
+\r
+## Set the game and deck type\r
+\r
+To change a deck box's game or format later, do either of the following:\r
+\r
+- On the [Locations](/locations) page, open the deck box row's **⋮** menu and choose **Game & deck type…**.\r
+- On the deck box's own page, click **Game & deck type** in the deck panel.\r
+\r
+Choose the **Game** and **Deck type**, then click **Save**.\r
+\r
+You can't switch a deck box to a game that doesn't match the cards already in it. Move those cards out first.\r
+\r
+### Deck boxes with no game\r
+\r
+Deck boxes created before games were required may not have one. When that happens, the Locations page shows a warning such as *Deck box "Pauper Elves" has no game assigned.*\r
+\r
+1. Click **Assign game** in the warning.\r
+2. OmniCard suggests a game based on the cards inside. Check it, pick a **Deck type** if you like, and click **Save**.\r
+3. Repeat for each deck box listed. The warning disappears once every deck box has a game.\r
+\r
+## One game per deck box\r
+\r
+Once a deck box has a game, OmniCard keeps other games out of it:\r
+\r
+- **Add card** on the deck box's page is locked to the deck box's game (*Locked to this deck box's game*).\r
+- In "move to location" pickers, deck boxes for a different game are greyed out, with the note *This deck box only holds … cards*.\r
+- Any other attempt to move a card from another game into the deck box is refused.\r
+\r
+The game selector at the top of the app also hides deck boxes that belong to other games on the Locations page. Choose **All Games** to see them all.\r
+\r
+## The deck panel\r
+\r
+Open a deck box from the Locations page to see its panel above the card list.\r
+\r
+![A deck box page with its deck panel and legality warnings](deck-boxes-panel.png)\r
+\r
+The panel shows:\r
+\r
+- The game. If none is assigned, you'll see **No game assigned** instead.\r
+- The deck type, if one is set.\r
+- How many commanders the deck has, when it has any.\r
+- The total card count, for example *100 cards (99 + commander)*.\r
+- The **Game & deck type** button.\r
+- Any legality warnings, under **Deck legality (*deck type*)**.\r
+\r
+## Legality warnings\r
+\r
+When a deck box has a deck type, OmniCard checks the cards in it against that format's rules and lists anything that doesn't fit. Warnings are advice only. They never stop you from adding, moving or removing cards.\r
+\r
+OmniCard checks:\r
+\r
+| Rule | Example warning |\r
+|---|---|\r
+| Minimum deck size | Deck has 58 cards; Standard needs at least 60. |\r
+| Maximum deck size | Deck has 101 cards; Commander allows at most 100. |\r
+| Copies per card | "Lightning Bolt" appears 5× — Modern allows at most 4. |\r
+| Singleton formats | "Sol Ring" appears 2× — Commander is singleton (max 1). |\r
+| Commander or leader | Commander needs a commander/leader — tag at least one card "commander". |\r
+\r
+### Mark commanders and sideboard cards with tags\r
+\r
+OmniCard uses two special tags to understand your deck. Add them in a card's details, in the **Tags** field (see [Collection](help:collection)):\r
+\r
+- \`commander\`: the card is a commander, leader or other command-zone card. Commanders count toward the deck size, are shown in their own **Commander** group in the stacked view, and satisfy the "needs a commander" rule. A deck can have more than one (for example partners).\r
+- \`sideboard\`: the card is in the sideboard. Sideboard cards are left out of the deck-size and copy-limit checks.\r
+\r
+### Built-in deck types\r
+\r
+| Game | Deck types |\r
+|---|---|\r
+| Magic: The Gathering | Commander, Standard, Pioneer, Modern, Legacy, Vintage, Pauper, Brawl, Oathbreaker, Limited / Draft, Cube |\r
+| One Piece | Constructed |\r
+| Riftbound | Constructed |\r
+| Pokémon | Standard, Expanded, Unlimited |\r
+| Yu-Gi-Oh! | Advanced, Traditional |\r
+| Final Fantasy TCG | Standard, Classic |\r
+\r
+A few things to know about the built-in rules:\r
+\r
+- In Commander, Brawl and Oathbreaker, basic lands are exempt from the singleton rule.\r
+- In One Piece, copies are counted by card number, so alternate arts of the same number count as the same card.\r
+- The checks cover deck size, copy limits and commanders only. They don't check banned lists or card legality in a format.\r
+\r
+### Customize deck types\r
+\r
+Administrators, and anyone given access, can edit the built-in deck types and add new ones under **Administration ▸ Deck Types**. Pick a game, then click **Add deck type** or edit an existing one. Each deck type can set:\r
+\r
+- **Deck size min** and **Deck size max**\r
+- **Max copies / card**, or **Singleton (max 1 of each card)**\r
+- **Commander/leader slots**\r
+- **Basic lands exempt from copy limit**\r
+- **Count copies by card number (all arts of a number count as one card)**\r
+\r
+Deleting a deck type removes it from any deck boxes using it. See [Administration](help:administration).\r
+\r
+## Stacked view\r
+\r
+The stacked view shows a deck the way deck-building sites do: one column per group, with the cards overlapping so you can see the whole deck at once.\r
+\r
+1. Open the deck box (or any location).\r
+2. Click the **Stacked view** button (the columns icon) to the right of the search box. Click the **Table view** button (the list icon) to switch back. A [saved view](help:saved-views) remembers the choice and the **Group by** setting below.\r
+\r
+![A deck in stacked view grouped by type](deck-boxes-stacked-view.webp)\r
+\r
+### Group by\r
+\r
+Use **Group by** above the stacks to choose how cards are grouped:\r
+\r
+- **Type**: a **Commander** group first (cards tagged \`commander\`), then one group per card type. Magic decks use Creature, Planeswalker, Battle, Instant, Sorcery, Artifact, Enchantment and Land, in that order. Other games use their own main types, such as Pokémon, Trainer and Energy, or Monster, Spell and Trap. A card with several types goes in its main group; an Artifact Creature is grouped with Creatures.\r
+- **Tags**: one group per tag, in alphabetical order, plus an **Untagged** group at the end. A card with several tags appears in each of their groups, so group counts can add up to more than the deck total.\r
+\r
+Each group heading shows its number of copies. The line above the stacks shows the deck total and number of groups, for example *60 cards · 8 groups*.\r
+\r
+### Look at cards in a stack\r
+\r
+- Hover over a card to bring it to the front. The cards below it slide down so you can see it in full.\r
+- Click a card to open its details. It stays expanded while the details are open.\r
+- Use the search box above the view to narrow the cards shown. See [Search syntax](help:search-syntax).\r
+\r
+## Build a deck box from a decklist\r
+\r
+If you own every card in a decklist, you can pull them all into a deck box in one step:\r
+\r
+1. On the [Collection](/collection) page, click **Check decklist**.\r
+2. Paste a Moxfield or Archidekt URL, or paste the decklist text, and check it.\r
+3. When you own the whole deck, click **Move to deck box…** and choose the deck box.\r
+\r
+See [Collection](help:collection) for the full decklist check. To bring a deck's cards in as new cards instead, use **Import** on the deck box's page with a deck URL. See [Locations](help:locations#import-into-a-location).\r
+\r
+## Troubleshooting\r
+\r
+- **A deck box is missing from the Locations page.** The game selector is set to a different game. Choose that game or **All Games**.\r
+- **I can't move a card into a deck box.** The card is from a different game than the deck box.\r
+- **Saving a new game for a deck box shows an error.** The deck box already holds cards from another game. Move them out first.\r
+- **There are no legality warnings.** Either the deck meets the format's rules, or the deck box has no deck type. Set one with **Game & deck type**.\r
+- **The deck says it needs a commander.** Tag your commander card \`commander\` in its details.\r
 `,Ye=`# eBay\r
 \r
 Connect OmniCard to your eBay seller account and publish cards from your collection as live eBay listings, without retyping anything on eBay.\r
@@ -1795,233 +1817,233 @@ As on the Scan page, the saved scans stay in this browser on this device only, a
 - For a large location, sort by **Confidence** to review the weakest matches first.\r
 - You can **Export** an audit's scans without committing, for example to keep a record of what was in the box. See [Export scans without adding them](help:scanning#export-scans-without-adding-them).\r
 - To find where a card is stored before you audit, use [Collection](help:collection). For more on locations, see [Locations](help:locations).\r
-`,Qe=`# Locations
-
-Locations are the binders, boxes, deck boxes and display cases where your cards physically live. This topic explains sites, the Locations page, and how to view, add, import and move cards in a single location.
-
-## How cards are organized
-
-OmniCard mirrors the way you store cards in real life, in three levels:
-
-| Level | What it is | Examples |
-|---|---|---|
-| Site | A major physical place | Your home, your shop, a storage unit |
-| Location | A container inside a site | A binder, a box, a deck box, a display case |
-| Card | An owned copy (or stack of copies) in a location | 3× Lightning Bolt, NM |
-
-Every card you own sits in exactly one location, and every location belongs to exactly one site.
-
-### Sites
-
-Most people only ever use one site, called **Default**, and can ignore sites entirely. Sites matter when several people share one OmniCard collection, for example a home collection and a shop.
-
-- The **Default** site always exists, is visible to everyone, and holds **Bulk** plus any location not assigned to another site.
-- Other sites are only visible to the people an administrator has allowed to see them.
-- Your access to a site is either **Read** (you can browse and search its locations and cards) or **Write** (you can also change them).
-- A location in a site you can only read shows a lock icon and the words *view only*. You can open it and browse its cards, but buttons that change things are hidden.
-
-> [!NOTE]
-> Administrators create sites and decide who can see them under **Administration ▸ Sites**. See [Administration](help:administration). If you expect to see a site and don't, ask an administrator for access.
-
-### Location types
-
-When you create a location you choose its type. The type controls how the location looks and what it can do.
-
-| Type | Use it for |
-|---|---|
-| **Binder** | Pages of pockets. Opens in the visual binder view, where each card has a page and slot. See [Binders](help:binders). |
-| **Box** | Long boxes, storage boxes, anything without a set order. |
-| **Deck Box** | A built deck. Holds one game only and can check the deck against a format's rules. See [Deck boxes](help:deck-boxes). |
-| **Display Case** | Showcase or shop display cards. |
-
-**Bulk** is a built-in location that always exists in the Default site. You can't delete it. Cards from a deleted location can be sent there.
-
-## The Locations page
-
-Open [Locations](/locations) from the navigation menu to see every location you can access.
-
-![The Locations page with grouped location tables](locations-page-overview.png)
-
-At the top of the page you'll find:
-
-- **Site**: choose **All Sites** or one specific site. Your choice is remembered in this browser.
-- The add bar for creating a new location (see [Create a location](help:locations#create-a-location)).
-- **Hide empty locations**: hides locations that have no cards for the selected game.
-- **Ignored locations…**: opens the dialog that controls which locations lists never take cards from (see [Ignore a location for lists](help:locations#ignore-a-location-for-lists)).
-
-Below that, locations are shown in groups:
-
-- **Always Available** comes first, holding every location you've marked always available.
-- Then one group per type (**Binders**, **Boxes**, **Bulk**, **Deck Boxes**, **Display Cases**), in alphabetical order.
-
-Click a group heading to collapse or expand it. Collapsed groups stay collapsed the next time you visit.
-
-### Columns
-
-| Column | Meaning |
-|---|---|
-| **Name** | Click it to open the location. Binders open straight into the binder view. An **Ignored** chip means lists don't take cards from it. |
-| **Site** | Shown when you're viewing **All Sites** and more than one site exists. A lock icon means view only. |
-| **Type** | The location type. Deck boxes also show their deck type and game. |
-| **Cards** | Total copies in the location. |
-| **Unique** | Number of distinct printings. |
-| **Market** | Current market value of the cards. |
-| **Cost** | What you paid (from each card's purchase price). |
-| **Δ** | Market value minus cost, in dollars and percent. Green is a gain, red a loss. |
-
-Click any column header to sort by it.
-
-### The game selector and locations
-
-The game selected at the top of the app affects this page:
-
-- **Cards**, **Unique**, **Market** and **Cost** count only cards from that game. Choose **All Games** to count everything.
-- Deck boxes that belong to a different game are hidden.
-- Always-available locations are always shown, whatever game is selected.
-
-## Create a location
-
-1. On the [Locations](/locations) page, type a name in **New location name**. Names must be unique. If the name is already used, you'll see *This name is already in use*.
-2. Pick a **Type**.
-3. If you picked **Deck Box**, choose a **Game** (required) and optionally a **Deck type**. See [Deck boxes](help:deck-boxes).
-4. If you can write to more than one site, choose the site in **Create in site**. By default, new locations go into the site you're filtering by, or the Default site.
-5. Click **Add**.
-
-![Creating a new deck box from the add bar](locations-add-bar.png)
-
-> [!TIP]
-> You don't have to come to this page to make a new location. Most "move to location" pickers in OmniCard have a **New location** button that creates one and selects it in one step.
-
-## Manage a location
-
-Each row has a **⋮** menu on the right with these actions. If you see a lock icon instead, the location is in a site you can only view.
-
-![The location actions menu](locations-row-menu.png)
-
-### Rename
-
-Choose **Rename…**, type the new name, and confirm.
-
-### Change a deck box's game or deck type
-
-For deck boxes, choose **Game & deck type…**. See [Deck boxes](help:deck-boxes#set-the-game-and-deck-type).
-
-### Move to another site
-
-Choose **Move to site…**, pick the **Destination site**, and click **Move**. Every card in the location moves with it. This option only appears when you can write to at least one other site.
-
-### Always available
-
-Choose **Set always-available** to pin a location to the top of the page and of every location picker, and to keep it visible no matter which game is selected. It's handy for a "to sort" box or a trade binder you use constantly. Choose **Unset always-available** to turn it off. Bulk can't be changed.
-
-### Ignore a location for lists
-
-Choose **Ignore for lists** when a location's cards should never be pulled for a list or counted as owned: a sales binder, a deck you're playing, or a whole site. Ignored locations show an **Ignored** chip. Choose **Stop ignoring for lists** to undo it.
-
-To change many locations at once, click **Ignored locations…** above the tables:
-
-1. Use **Filter locations** to narrow the list if needed.
-2. Tick the locations to ignore. Locations are grouped by site and type; tick a group's box to tick everything in it, or tick a site's box (marked *whole site*) to ignore the entire site.
-3. Click **Save**. The button shows how many changes you've made.
-
-Ignored locations are also skipped by **Check decklist** on the Collection page. **Find in collection** on a list still shows those cards, marked as ignored. See [Lists](help:lists).
-
-### Delete
-
-1. Choose **Delete…** and confirm that you want to delete the location.
-2. A second question asks *Move its cards to Bulk?*
-   - Click **OK** to keep the cards and move them to Bulk.
-   - Click **Cancel** to delete the cards along with the location.
-
-> [!WARNING]
-> Clicking **Cancel** on the second question permanently deletes every card in the location. If you want to keep the cards, click **OK**.
-
-Bulk can't be deleted.
-
-## Open a location
-
-Click a location's name to open its page. (Binder names open the [binder view](help:binders); use the binder's name in the page path at the top to get to its card table.)
-
-![A location's page showing its card table](locations-detail-page.png)
-
-The location page shows:
-
-- The location's name, its type, and its site. A site you can only view shows *view only* next to its name.
-- **Open binder view**, for binders.
-- **Audit**, **Import** and **Add card** buttons (when you're allowed to change this location).
-- A summary line with the number of cards and their market value.
-- For deck boxes, a panel with the game, deck type and legality warnings. See [Deck boxes](help:deck-boxes).
-- A search box, the view button for [saved views](help:saved-views), and the card list.
-
-### Find cards in a location
-
-Type in the search box to filter the cards. Plain text matches card names, and you can use the full search syntax, such as \`t:creature\` or \`set:mh3\`. See [Search syntax](help:search-syntax).
-
-### Table view and stacked view
-
-Use the two buttons to the right of the search box to switch views. A [saved view](help:saved-views) remembers which one you use. With **Default view**, OmniCard remembers your last choice.
-
-- **Table view** (list icon): a sortable table with name, set, number, rarity, condition, language, foil, quantity, market price and sale status. Turn on **Stack duplicates** to combine identical copies into one row.
-- **Stacked view** (columns icon): cards drawn as overlapping stacks grouped by type or tag, like a deck-building site. It works for any location but is most useful for decks. See [Deck boxes](help:deck-boxes#stacked-view).
-
-Each location keeps its own saved views, so a binder and a deck box can open with different layouts. To give several locations the same layout, use **Copy to other locations…**. See [Saved views](help:saved-views#copy-a-view-to-other-locations).
-
-Click any card to open its details, where you can edit condition, foil, quantity, purchase price, note and tags, list it for sale, add it to a trade, split a stack, move it, or delete it. See [Collection](help:collection).
-
-## Add cards to a location
-
-1. Click **Add card**.
-2. Choose the **Game** (a deck box is locked to its own game).
-3. Search by **Name**, and optionally narrow with **Set** and **Collector #**.
-4. Click the printing you want.
-5. Set **Condition**, **Quantity**, **Purchase price** and **Foil**, then click **Add card**.
-6. The dialog stays open so you can add more. Click **Done** when you're finished.
-
-To add many cards at once, scan them (see [Scanning](help:scanning)) or import a file.
-
-## Import into a location
-
-The location's **Import** button adds a whole file or deck to this location in one go. It's stricter than the main [Import](help:importing) page: there's no location picker, and it's all or nothing.
-
-1. On the location page, click **Import**.
-2. Choose a source:
-   - **CSV file**: click **Choose CSV file** and pick an OmniCard, TCGplayer, Moxfield or ManaBox collection CSV.
-   - **Deck URL**: paste a public Moxfield or Archidekt deck link (Magic: The Gathering) and pick the **Condition** to give the cards.
-3. Click **Import**.
-
-![The Import into location dialog](locations-import-dialog.png)
-
-Every card must match a card in the catalog. If any line has a problem, **nothing is imported**. Instead, OmniCard lists each problem with its row number and card name so you can fix the file and try again.
-
-When the import succeeds, you'll see how many cards were added. If a line's exact printing isn't in the catalog but the card is, OmniCard uses another printing of the same card and lists those substitutions so you can check them.
-
-> [!TIP]
-> Need to import into several locations, skip duplicates, or import a decklist file? Use the [Import](/import) page instead. See [Importing](help:importing).
-
-## Audit a location
-
-Click **Audit** to check what's really in a location against what OmniCard thinks is there. You scan the location's cards, review the differences, and commit to fix the records. When you finish, you return to the location page and see a summary of what changed. See [Location audit](help:location-audit).
-
-## Move cards between locations
-
-There are several ways to move cards:
-
-- **Several cards from a location**: in **Table view**, click **Select**, tick the cards, then click **Move to…** and pick the destination. Click **Done** to leave selection mode.
-- **One card**: click the card to open its details, click **Change** next to **Location**, and pick the destination.
-- **A whole location to another site**: use **Move to site…** in the Locations page menu.
-- **From the collection**: the same **Select ▸ Move to…** tools work on the [Collection](/collection) page. See [Collection](help:collection).
-
-The location picker groups locations by type, with **Always Available** first. Type in **Search locations…** to filter, or click **New location** to create one on the spot with **Create & select**. Deck boxes for a different game appear greyed out (*This deck box only holds … cards*), and locations in sites you can only view aren't listed.
-
-In selection mode you can also use **Bulk edit**, **List for sale**, **Export CSV** and **Delete** on the selected cards.
-
-## Troubleshooting
-
-- **A location is missing.** Check the **Site** filter (try **All Sites**), turn off **Hide empty locations**, and check the game selector. Deck boxes for other games are hidden. If it's in a site you haven't been given access to, ask an administrator.
-- **I can't change a location.** A lock icon or *view only* means you only have read access to its site. Ask an administrator for write access.
-- **Audit or Import buttons are missing.** These need extra permissions. Ask an administrator.
-- **Import says nothing was imported.** That's expected when any line has a problem. Fix every listed row and import again.
-- **I can't move a card into a deck box.** The deck box holds a different game. See [Deck boxes](help:deck-boxes#one-game-per-deck-box).
+`,Qe=`# Locations\r
+\r
+Locations are the binders, boxes, deck boxes and display cases where your cards physically live. This topic explains sites, the Locations page, and how to view, add, import and move cards in a single location.\r
+\r
+## How cards are organized\r
+\r
+OmniCard mirrors the way you store cards in real life, in three levels:\r
+\r
+| Level | What it is | Examples |\r
+|---|---|---|\r
+| Site | A major physical place | Your home, your shop, a storage unit |\r
+| Location | A container inside a site | A binder, a box, a deck box, a display case |\r
+| Card | An owned copy (or stack of copies) in a location | 3× Lightning Bolt, NM |\r
+\r
+Every card you own sits in exactly one location, and every location belongs to exactly one site.\r
+\r
+### Sites\r
+\r
+Most people only ever use one site, called **Default**, and can ignore sites entirely. Sites matter when several people share one OmniCard collection, for example a home collection and a shop.\r
+\r
+- The **Default** site always exists, is visible to everyone, and holds **Bulk** plus any location not assigned to another site.\r
+- Other sites are only visible to the people an administrator has allowed to see them.\r
+- Your access to a site is either **Read** (you can browse and search its locations and cards) or **Write** (you can also change them).\r
+- A location in a site you can only read shows a lock icon and the words *view only*. You can open it and browse its cards, but buttons that change things are hidden.\r
+\r
+> [!NOTE]\r
+> Administrators create sites and decide who can see them under **Administration ▸ Sites**. See [Administration](help:administration). If you expect to see a site and don't, ask an administrator for access.\r
+\r
+### Location types\r
+\r
+When you create a location you choose its type. The type controls how the location looks and what it can do.\r
+\r
+| Type | Use it for |\r
+|---|---|\r
+| **Binder** | Pages of pockets. Opens in the visual binder view, where each card has a page and slot. See [Binders](help:binders). |\r
+| **Box** | Long boxes, storage boxes, anything without a set order. |\r
+| **Deck Box** | A built deck. Holds one game only and can check the deck against a format's rules. See [Deck boxes](help:deck-boxes). |\r
+| **Display Case** | Showcase or shop display cards. |\r
+\r
+**Bulk** is a built-in location that always exists in the Default site. You can't delete it. Cards from a deleted location can be sent there.\r
+\r
+## The Locations page\r
+\r
+Open [Locations](/locations) from the navigation menu to see every location you can access.\r
+\r
+![The Locations page with grouped location tables](locations-page-overview.png)\r
+\r
+At the top of the page you'll find:\r
+\r
+- **Site**: choose **All Sites** or one specific site. Your choice is remembered in this browser.\r
+- The add bar for creating a new location (see [Create a location](help:locations#create-a-location)).\r
+- **Hide empty locations**: hides locations that have no cards for the selected game.\r
+- **Ignored locations…**: opens the dialog that controls which locations lists never take cards from (see [Ignore a location for lists](help:locations#ignore-a-location-for-lists)).\r
+\r
+Below that, locations are shown in groups:\r
+\r
+- **Always Available** comes first, holding every location you've marked always available.\r
+- Then one group per type (**Binders**, **Boxes**, **Bulk**, **Deck Boxes**, **Display Cases**), in alphabetical order.\r
+\r
+Click a group heading to collapse or expand it. Collapsed groups stay collapsed the next time you visit.\r
+\r
+### Columns\r
+\r
+| Column | Meaning |\r
+|---|---|\r
+| **Name** | Click it to open the location. Binders open straight into the binder view. An **Ignored** chip means lists don't take cards from it. |\r
+| **Site** | Shown when you're viewing **All Sites** and more than one site exists. A lock icon means view only. |\r
+| **Type** | The location type. Deck boxes also show their deck type and game. |\r
+| **Cards** | Total copies in the location. |\r
+| **Unique** | Number of distinct printings. |\r
+| **Market** | Current market value of the cards. |\r
+| **Cost** | What you paid (from each card's purchase price). |\r
+| **Δ** | Market value minus cost, in dollars and percent. Green is a gain, red a loss. |\r
+\r
+Click any column header to sort by it.\r
+\r
+### The game selector and locations\r
+\r
+The game selected at the top of the app affects this page:\r
+\r
+- **Cards**, **Unique**, **Market** and **Cost** count only cards from that game. Choose **All Games** to count everything.\r
+- Deck boxes that belong to a different game are hidden.\r
+- Always-available locations are always shown, whatever game is selected.\r
+\r
+## Create a location\r
+\r
+1. On the [Locations](/locations) page, type a name in **New location name**. Names must be unique. If the name is already used, you'll see *This name is already in use*.\r
+2. Pick a **Type**.\r
+3. If you picked **Deck Box**, choose a **Game** (required) and optionally a **Deck type**. See [Deck boxes](help:deck-boxes).\r
+4. If you can write to more than one site, choose the site in **Create in site**. By default, new locations go into the site you're filtering by, or the Default site.\r
+5. Click **Add**.\r
+\r
+![Creating a new deck box from the add bar](locations-add-bar.png)\r
+\r
+> [!TIP]\r
+> You don't have to come to this page to make a new location. Most "move to location" pickers in OmniCard have a **New location** button that creates one and selects it in one step.\r
+\r
+## Manage a location\r
+\r
+Each row has a **⋮** menu on the right with these actions. If you see a lock icon instead, the location is in a site you can only view.\r
+\r
+![The location actions menu](locations-row-menu.png)\r
+\r
+### Rename\r
+\r
+Choose **Rename…**, type the new name, and confirm.\r
+\r
+### Change a deck box's game or deck type\r
+\r
+For deck boxes, choose **Game & deck type…**. See [Deck boxes](help:deck-boxes#set-the-game-and-deck-type).\r
+\r
+### Move to another site\r
+\r
+Choose **Move to site…**, pick the **Destination site**, and click **Move**. Every card in the location moves with it. This option only appears when you can write to at least one other site.\r
+\r
+### Always available\r
+\r
+Choose **Set always-available** to pin a location to the top of the page and of every location picker, and to keep it visible no matter which game is selected. It's handy for a "to sort" box or a trade binder you use constantly. Choose **Unset always-available** to turn it off. Bulk can't be changed.\r
+\r
+### Ignore a location for lists\r
+\r
+Choose **Ignore for lists** when a location's cards should never be pulled for a list or counted as owned: a sales binder, a deck you're playing, or a whole site. Ignored locations show an **Ignored** chip. Choose **Stop ignoring for lists** to undo it.\r
+\r
+To change many locations at once, click **Ignored locations…** above the tables:\r
+\r
+1. Use **Filter locations** to narrow the list if needed.\r
+2. Tick the locations to ignore. Locations are grouped by site and type; tick a group's box to tick everything in it, or tick a site's box (marked *whole site*) to ignore the entire site.\r
+3. Click **Save**. The button shows how many changes you've made.\r
+\r
+Ignored locations are also skipped by **Check decklist** on the Collection page. **Find in collection** on a list still shows those cards, marked as ignored. See [Lists](help:lists).\r
+\r
+### Delete\r
+\r
+1. Choose **Delete…** and confirm that you want to delete the location.\r
+2. A second question asks *Move its cards to Bulk?*\r
+   - Click **OK** to keep the cards and move them to Bulk.\r
+   - Click **Cancel** to delete the cards along with the location.\r
+\r
+> [!WARNING]\r
+> Clicking **Cancel** on the second question permanently deletes every card in the location. If you want to keep the cards, click **OK**.\r
+\r
+Bulk can't be deleted.\r
+\r
+## Open a location\r
+\r
+Click a location's name to open its page. (Binder names open the [binder view](help:binders); use the binder's name in the page path at the top to get to its card table.)\r
+\r
+![A location's page showing its card table](locations-detail-page.png)\r
+\r
+The location page shows:\r
+\r
+- The location's name, its type, and its site. A site you can only view shows *view only* next to its name.\r
+- **Open binder view**, for binders.\r
+- **Audit**, **Import** and **Add card** buttons (when you're allowed to change this location).\r
+- A summary line with the number of cards and their market value.\r
+- For deck boxes, a panel with the game, deck type and legality warnings. See [Deck boxes](help:deck-boxes).\r
+- A search box, the view button for [saved views](help:saved-views), and the card list.\r
+\r
+### Find cards in a location\r
+\r
+Type in the search box to filter the cards. Plain text matches card names, and you can use the full search syntax, such as \`t:creature\` or \`set:mh3\`. See [Search syntax](help:search-syntax).\r
+\r
+### Table view and stacked view\r
+\r
+Use the two buttons to the right of the search box to switch views. A [saved view](help:saved-views) remembers which one you use. With **Default view**, OmniCard remembers your last choice.\r
+\r
+- **Table view** (list icon): a sortable table with name, set, number, rarity, condition, language, foil, quantity, market price and sale status. Turn on **Stack duplicates** to combine identical copies into one row. Click **Group by** to split the table into collapsible groups, such as by set or condition. See [Group rows](help:collection#group-rows).\r
+- **Stacked view** (columns icon): cards drawn as overlapping stacks grouped by type or tag, like a deck-building site. It works for any location but is most useful for decks. See [Deck boxes](help:deck-boxes#stacked-view).\r
+\r
+Each location keeps its own saved views, so a binder and a deck box can open with different layouts. To give several locations the same layout, use **Copy to other locations…**. See [Saved views](help:saved-views#copy-a-view-to-other-locations).\r
+\r
+Click any card to open its details, where you can edit condition, foil, quantity, purchase price, note and tags, list it for sale, add it to a trade, split a stack, move it, or delete it. See [Collection](help:collection).\r
+\r
+## Add cards to a location\r
+\r
+1. Click **Add card**.\r
+2. Choose the **Game** (a deck box is locked to its own game).\r
+3. Search by **Name**, and optionally narrow with **Set** and **Collector #**.\r
+4. Click the printing you want.\r
+5. Set **Condition**, **Quantity**, **Purchase price** and **Foil**, then click **Add card**.\r
+6. The dialog stays open so you can add more. Click **Done** when you're finished.\r
+\r
+To add many cards at once, scan them (see [Scanning](help:scanning)) or import a file.\r
+\r
+## Import into a location\r
+\r
+The location's **Import** button adds a whole file or deck to this location in one go. It's stricter than the main [Import](help:importing) page: there's no location picker, and it's all or nothing.\r
+\r
+1. On the location page, click **Import**.\r
+2. Choose a source:\r
+   - **CSV file**: click **Choose CSV file** and pick an OmniCard, TCGplayer, Moxfield or ManaBox collection CSV.\r
+   - **Deck URL**: paste a public Moxfield or Archidekt deck link (Magic: The Gathering) and pick the **Condition** to give the cards.\r
+3. Click **Import**.\r
+\r
+![The Import into location dialog](locations-import-dialog.png)\r
+\r
+Every card must match a card in the catalog. If any line has a problem, **nothing is imported**. Instead, OmniCard lists each problem with its row number and card name so you can fix the file and try again.\r
+\r
+When the import succeeds, you'll see how many cards were added. If a line's exact printing isn't in the catalog but the card is, OmniCard uses another printing of the same card and lists those substitutions so you can check them.\r
+\r
+> [!TIP]\r
+> Need to import into several locations, skip duplicates, or import a decklist file? Use the [Import](/import) page instead. See [Importing](help:importing).\r
+\r
+## Audit a location\r
+\r
+Click **Audit** to check what's really in a location against what OmniCard thinks is there. You scan the location's cards, review the differences, and commit to fix the records. When you finish, you return to the location page and see a summary of what changed. See [Location audit](help:location-audit).\r
+\r
+## Move cards between locations\r
+\r
+There are several ways to move cards:\r
+\r
+- **Several cards from a location**: in **Table view**, click **Select**, tick the cards, then click **Move to…** and pick the destination. Click **Done** to leave selection mode.\r
+- **One card**: click the card to open its details, click **Change** next to **Location**, and pick the destination.\r
+- **A whole location to another site**: use **Move to site…** in the Locations page menu.\r
+- **From the collection**: the same **Select ▸ Move to…** tools work on the [Collection](/collection) page. See [Collection](help:collection).\r
+\r
+The location picker groups locations by type, with **Always Available** first. Type in **Search locations…** to filter, or click **New location** to create one on the spot with **Create & select**. Deck boxes for a different game appear greyed out (*This deck box only holds … cards*), and locations in sites you can only view aren't listed.\r
+\r
+In selection mode you can also use **Bulk edit**, **List for sale**, **Export CSV** and **Delete** on the selected cards.\r
+\r
+## Troubleshooting\r
+\r
+- **A location is missing.** Check the **Site** filter (try **All Sites**), turn off **Hide empty locations**, and check the game selector. Deck boxes for other games are hidden. If it's in a site you haven't been given access to, ask an administrator.\r
+- **I can't change a location.** A lock icon or *view only* means you only have read access to its site. Ask an administrator for write access.\r
+- **Audit or Import buttons are missing.** These need extra permissions. Ask an administrator.\r
+- **Import says nothing was imported.** That's expected when any line has a problem. Fix every listed row and import again.\r
+- **I can't move a card into a deck box.** The deck box holds a different game. See [Deck boxes](help:deck-boxes#one-game-per-deck-box).\r
 `,Je=`# Sales\r
 \r
 Sell cards from your collection: list them for sale, pull them for shipping, track orders from creation to completion, and keep a customer list.\r
@@ -2270,129 +2292,130 @@ Customers are also created automatically when you import orders from a CSV file.
 - **My search in "Add a card" finds nothing.** Type at least two letters, and check that the game selector at the top of the app is set to the card's game or **All Games**.\r
 \r
 For more help, see [Troubleshooting](help:troubleshooting).\r
-`,Ke=`# Saved views
-
-A saved view remembers how you like a card list laid out: the search, the sort, rows per page, **Stack duplicates**, which columns show and in what order, and on a location page, table or stacked view and how stacks are grouped. Save as many views as you like and choose one to open by default.
-
-## Where saved views work
-
-Saved views are on the [Collection](/collection) page and on every location's page. The view button sits to the right of the search box and shows the name of the view in use. It shows **Default view** when you haven't picked a saved view.
-
-![The saved views menu on the Collection page](saved-views-menu.png)
-
-Each view belongs to:
-
-- **One page.** A view saved on the Collection page is offered only there. A view saved on a location's page is offered only on that location. To use it on other locations too, [copy it](#copy-a-view-to-other-locations).
-- **A game.** You choose this when you save. A view can be for the game selected in the top bar only, or for **Any game**. Views saved while **All Games** is selected show only when **All Games** is selected.
-- **You.** Your views are private. Other people can't see them. Administrators can also publish [shared views](#shared-views-and-defaults-for-everyone) for everyone.
-
-## What a view remembers
-
-| Setting | Where you change it |
-|---|---|
-| Search | The search box. Press **Enter** to apply it. |
-| Sort | Click a column header. |
-| Rows per page | **Rows per page** at the bottom of the list. |
-| Stack duplicates | The **Stack duplicates** switch. |
-| Columns | The **Columns** button. See [Choose columns](#choose-columns). |
-| Table or stacked view | The two buttons beside the search box on a location page. |
-| Group by | **Group by** in stacked view. |
-
-The page you're on, the cards you've selected and any open card details aren't part of a view.
-
-## Choose columns
-
-Click **Columns** in the toolbar above the list.
-
-![The Columns menu with Rarity turned off](saved-views-columns.png)
-
-- Untick a column to hide it, and tick it to show it again. **Name** always shows.
-- Use the up and down arrows to move a column left or right in the list.
-- Click **Show all in default order** to undo your column changes.
-
-You can also hide a column from the menu on its header.
-
-## Save a view
-
-Change the layout until it looks the way you want. A dot appears on the view button when the layout has changes you haven't saved.
-
-To save it as a new view:
-
-1. Click the view button, then click **Save as new view…**.
-2. Enter a **Name**.
-3. Under **Show this view for**, choose the selected game only, or **Any game**.
-4. Tick **Use as my default here** to open this page with the view from now on.
-5. Click **Save**.
-
-![The Save as new view dialog](saved-views-save-dialog.png)
-
-To update the view you're using, click the view button, then click **Save changes**.
-
-To throw away your changes, click **Discard changes**. The layout goes back to how the view was saved.
-
-> [!TIP]
-> The page address includes the view, for example \`/collection?view=12\`. Bookmark it to come back to that view, even if another view is your default. If the view was saved for a different game, OmniCard switches the top bar to that game.
-
-## Switch views
-
-Click the view button and pick a view. The menu lists:
-
-- **Default view**: name A→Z, 100 rows per page, every column.
-- **My views**: the views you've saved for this page.
-- **Shared views**: views an administrator has published for everyone.
-
-A ★ marks your default. A people icon marks the default for everyone. Views saved for any game say *Any game* under their name.
-
-## Choose the view a page opens with
-
-Pick a view, then click the view button and click **Set as my default**. The page opens with that view from now on, for the game the view belongs to. Click **Remove as my default** to stop.
-
-You can have one default per page for each game, plus one any-game default. When you open a page, OmniCard uses the first of these that exists:
-
-1. Your default for the selected game.
-2. Your any-game default.
-3. The default for everyone set by an administrator.
-4. The **Default view**.
-
-Setting an any-game view as your default replaces your default for the game you're looking at, so it's what opens next time. Your defaults for other games don't change.
-
-## Rename or delete a view
-
-Pick the view, then click the view button and choose **Rename…** or **Delete**. If you delete a view someone uses as their default, their page opens with the next default instead.
-
-## Copy a view to other locations
-
-A view saved on a location's page can be copied to other locations.
-
-1. Open the location and pick the view.
-2. Click the view button, then click **Copy to other locations…**.
-3. Tick the locations to copy it to. Click a group heading to tick or untick the whole group, or use **Select all** and **Select none**.
-4. Tick **Use it as my default on those locations** to make the copies open by default.
-5. Click **Copy to N locations**.
-
-![Copying a location's view to other locations](saved-views-copy-dialog.png)
-
-If a location already has a view with the same name, its layout is replaced. Each copy is separate, so changing one later doesn't change the others.
-
-## Shared views and defaults for everyone
-
-Administrators can share views with everyone and choose what everyone sees first.
-
-- In **Save as new view**, tick **Share with everyone**. On a location page, choose **This location only** or **All locations**. A view shared with all locations is offered on every location's page.
-- Pick a shared view, then click **Set as default for everyone**. Everyone who hasn't chosen their own default for that page and game sees it. For a view shared with all locations, it applies on every location.
-- Tick **Make it the default for everyone** when saving to do both at once.
-
-Everyone can pick a shared view, but only administrators can save over it, rename it or delete it. To change a shared view for yourself, pick it, make your changes, and use **Save as new view…**.
-
-> [!NOTE]
-> A default for one location beats a default for all locations. If an administrator gives a location its own default, that location uses it.
-
-## Troubleshooting
-
-- **A view I saved is missing.** Check the game in the top bar. A view saved for one game only shows when that game is selected.
-- **A location view isn't on another location.** Location views stay with their location. Use **Copy to other locations…**.
-- **Save changes is greyed out.** You haven't changed anything since the view was saved, or it's a shared view and only administrators can change it.
-- **Stack duplicates keeps changing.** The setting belongs to the view in use. Save the view after changing it.
+`,Ke=`# Saved views\r
+\r
+A saved view remembers how you like a card list laid out: the search, the sort, rows per page, **Stack duplicates**, which columns show and in what order, how rows are grouped, and on a location page, table or stacked view and how stacks are grouped. Save as many views as you like and choose one to open by default.\r
+\r
+## Where saved views work\r
+\r
+Saved views are on the [Collection](/collection) page and on every location's page. The view button sits to the right of the search box and shows the name of the view in use. It shows **Default view** when you haven't picked a saved view.\r
+\r
+![The saved views menu on the Collection page](saved-views-menu.png)\r
+\r
+Each view belongs to:\r
+\r
+- **One page.** A view saved on the Collection page is offered only there. A view saved on a location's page is offered only on that location. To use it on other locations too, [copy it](#copy-a-view-to-other-locations).\r
+- **A game.** You choose this when you save. A view can be for the game selected in the top bar only, or for **Any game**. Views saved while **All Games** is selected show only when **All Games** is selected.\r
+- **You.** Your views are private. Other people can't see them. Administrators can also publish [shared views](#shared-views-and-defaults-for-everyone) for everyone.\r
+\r
+## What a view remembers\r
+\r
+| Setting | Where you change it |\r
+|---|---|\r
+| Search | The search box. Press **Enter** to apply it. |\r
+| Sort | Click a column header. |\r
+| Rows per page | **Rows per page** at the bottom of the list. |\r
+| Stack duplicates | The **Stack duplicates** switch. |\r
+| Columns | The **Columns** button. See [Choose columns](#choose-columns). |\r
+| Row grouping | The **Group by** button. See [Group rows](help:collection#group-rows). |\r
+| Table or stacked view | The two buttons beside the search box on a location page. |\r
+| Stack grouping | **Group by** in stacked view. |\r
+\r
+The page you're on, the cards you've selected, which groups are collapsed and any open card details aren't part of a view.\r
+\r
+## Choose columns\r
+\r
+Click **Columns** in the toolbar above the list.\r
+\r
+![The Columns menu with Rarity turned off](saved-views-columns.png)\r
+\r
+- Untick a column to hide it, and tick it to show it again. **Name** always shows.\r
+- Use the up and down arrows to move a column left or right in the list.\r
+- Click **Show all in default order** to undo your column changes.\r
+\r
+You can also hide a column from the menu on its header.\r
+\r
+## Save a view\r
+\r
+Change the layout until it looks the way you want. A dot appears on the view button when the layout has changes you haven't saved.\r
+\r
+To save it as a new view:\r
+\r
+1. Click the view button, then click **Save as new view…**.\r
+2. Enter a **Name**.\r
+3. Under **Show this view for**, choose the selected game only, or **Any game**.\r
+4. Tick **Use as my default here** to open this page with the view from now on.\r
+5. Click **Save**.\r
+\r
+![The Save as new view dialog](saved-views-save-dialog.png)\r
+\r
+To update the view you're using, click the view button, then click **Save changes**.\r
+\r
+To throw away your changes, click **Discard changes**. The layout goes back to how the view was saved.\r
+\r
+> [!TIP]\r
+> The page address includes the view, for example \`/collection?view=12\`. Bookmark it to come back to that view, even if another view is your default. If the view was saved for a different game, OmniCard switches the top bar to that game.\r
+\r
+## Switch views\r
+\r
+Click the view button and pick a view. The menu lists:\r
+\r
+- **Default view**: name A→Z, 100 rows per page, every column.\r
+- **My views**: the views you've saved for this page.\r
+- **Shared views**: views an administrator has published for everyone.\r
+\r
+A ★ marks your default. A people icon marks the default for everyone. Views saved for any game say *Any game* under their name.\r
+\r
+## Choose the view a page opens with\r
+\r
+Pick a view, then click the view button and click **Set as my default**. The page opens with that view from now on, for the game the view belongs to. Click **Remove as my default** to stop.\r
+\r
+You can have one default per page for each game, plus one any-game default. When you open a page, OmniCard uses the first of these that exists:\r
+\r
+1. Your default for the selected game.\r
+2. Your any-game default.\r
+3. The default for everyone set by an administrator.\r
+4. The **Default view**.\r
+\r
+Setting an any-game view as your default replaces your default for the game you're looking at, so it's what opens next time. Your defaults for other games don't change.\r
+\r
+## Rename or delete a view\r
+\r
+Pick the view, then click the view button and choose **Rename…** or **Delete**. If you delete a view someone uses as their default, their page opens with the next default instead.\r
+\r
+## Copy a view to other locations\r
+\r
+A view saved on a location's page can be copied to other locations.\r
+\r
+1. Open the location and pick the view.\r
+2. Click the view button, then click **Copy to other locations…**.\r
+3. Tick the locations to copy it to. Click a group heading to tick or untick the whole group, or use **Select all** and **Select none**.\r
+4. Tick **Use it as my default on those locations** to make the copies open by default.\r
+5. Click **Copy to N locations**.\r
+\r
+![Copying a location's view to other locations](saved-views-copy-dialog.png)\r
+\r
+If a location already has a view with the same name, its layout is replaced. Each copy is separate, so changing one later doesn't change the others.\r
+\r
+## Shared views and defaults for everyone\r
+\r
+Administrators can share views with everyone and choose what everyone sees first.\r
+\r
+- In **Save as new view**, tick **Share with everyone**. On a location page, choose **This location only** or **All locations**. A view shared with all locations is offered on every location's page.\r
+- Pick a shared view, then click **Set as default for everyone**. Everyone who hasn't chosen their own default for that page and game sees it. For a view shared with all locations, it applies on every location.\r
+- Tick **Make it the default for everyone** when saving to do both at once.\r
+\r
+Everyone can pick a shared view, but only administrators can save over it, rename it or delete it. To change a shared view for yourself, pick it, make your changes, and use **Save as new view…**.\r
+\r
+> [!NOTE]\r
+> A default for one location beats a default for all locations. If an administrator gives a location its own default, that location uses it.\r
+\r
+## Troubleshooting\r
+\r
+- **A view I saved is missing.** Check the game in the top bar. A view saved for one game only shows when that game is selected.\r
+- **A location view isn't on another location.** Location views stay with their location. Use **Copy to other locations…**.\r
+- **Save changes is greyed out.** You haven't changed anything since the view was saved, or it's a shared view and only administrators can change it.\r
+- **Stack duplicates keeps changing.** The setting belongs to the view in use. Save the view after changing it.\r
 `,Xe=`# Scan batches\r
 \r
 Scan batches let a scanner drop images into a watched folder on the server, where OmniCard matches them in the background. You then review each batch on the Scan page and add it to a location, just like an interactive scan.\r
@@ -3084,12 +3107,12 @@ See [Administration](help:administration).\r
 - Reload the page. Many temporary problems clear up after a refresh.\r
 - Check you're on the right game and site.\r
 - Ask your OmniCard administrator. If you are the administrator, check the **Recent** results on the **Catalog Data** tab, and the folder status under **Scan Badges**.\r
-`,on="/app/assets/administration-catalog-data-BjeNaI2j.png",rn="/app/assets/administration-scan-folders-CS75rQqx.png",sn="/app/assets/administration-site-access-D6UivBxH.png",cn="/app/assets/administration-tabs-BpCoGDvV.png",dn="/app/assets/administration-tabs-BpCoGDvV.png",ln="/app/assets/binders-add-to-pocket-CfrpNCbi.png",hn="/app/assets/binders-edit-mode-2WRu345_.webp",pn="/app/assets/binders-spread-view-C21YWD10.webp",un="/app/assets/collection-card-details-CEnyiCh8.png",mn="/app/assets/collection-decklist-check-DfYRH2pK.png",gn="/app/assets/collection-overview-BT8LOkQk.png",yn="/app/assets/collection-select-actions-DeNskt8b.png",wn="/app/assets/dashboard-overview-BgdtwCHP.png",fn="/app/assets/deck-boxes-panel-DX0XHQ-4.png",bn="/app/assets/deck-boxes-stacked-view-D-RtwJGJ.webp",kn="/app/assets/getting-started-layout-DXPiQzZD.png",vn="/app/assets/getting-started-phone-menu-AejRhoOH.png",Cn="/app/assets/getting-started-sign-in-DnUx9vwZ.png",xn="/app/assets/help-home-DYGYTGEX.png",Tn="/app/assets/importing-page-CLlMp9uw.png",Sn="/app/assets/inventory-new-product-wyjY3g5p.png",An="/app/assets/inventory-page-D7A7yRt0.png",In="/app/assets/inventory-product-drawer-Ceku7CC-.png",_n="/app/assets/lists-add-card-dialog-MhQSjlN6.png",On="/app/assets/lists-find-in-collection-BXe0H6i7.png",Bn="/app/assets/lists-overview-B2IW5FTm.png",Ln="/app/assets/lists-put-cards-away-DKGvHszG.png",En="/app/assets/location-audit-button-_OdyGPQm.png",Pn="/app/assets/location-audit-page-DsxC_qed.webp",Mn="/app/assets/location-audit-summary-CKlkpN6V.png",Dn="/app/assets/locations-add-bar-BLkpDoqv.png",Nn="/app/assets/locations-detail-page-CdfBmgZM.png",Fn="/app/assets/locations-import-dialog-C_NxOs9C.png",Un="/app/assets/locations-page-overview-BnNQ8JST.png",Rn="/app/assets/locations-row-menu-o6_KiRtY.png",Wn="/app/assets/sales-customers-DVrg8-v6.png",jn="/app/assets/sales-import-orders-map-BS_aWYm3.png",Gn="/app/assets/sales-list-for-sale-BfBz83FT.png",Yn="/app/assets/sales-listings-Q6MD86Iw.png",Hn="/app/assets/sales-order-detail-Dqrg7sx7.png",Vn="/app/assets/sales-orders-board-z3m97wnu.png",zn="/app/assets/sales-receipt-BKyV_jeV.png",qn="/app/assets/sales-settings-for-sale-location-BvzarQMv.png",$n="/app/assets/saved-views-columns-D7esoFxb.png",Qn="/app/assets/saved-views-copy-dialog-BWsC2JHE.png",Jn="/app/assets/saved-views-menu-Br3T19VA.png",Kn="/app/assets/saved-views-save-dialog-DQXqWDvx.png",Xn="/app/assets/scan-batches-panel-BH8rVmPX.png",Zn="/app/assets/scan-batches-review-BatFmhN3.webp",et="/app/assets/scanning-bulk-edit-D_dyVKxA.png",nt="/app/assets/scanning-detail-panel-CkbIVz1U.webp",tt="/app/assets/scanning-location-picker-Ck5QBotk.png",at="/app/assets/scanning-overview-BrL5uZH0.webp",ot="/app/assets/search-syntax-help-popover-B7d99PGs.png",rt="/app/assets/sets-checklist-Cq7lxxc_.png",st="/app/assets/trades-builder-BzkRc2Uo.png",it="/app/assets/trades-history-O80-mo8S.png",ct="/app/assets/troubleshooting-no-access-Egsybxdj.png",dt="/app/assets/troubleshooting-search-catalog-DJ707UXg.webp",F=Object.assign({"./en-US/administration.md":Ue,"./en-US/binders.md":Re,"./en-US/collection.md":We,"./en-US/dashboard.md":je,"./en-US/deck-boxes.md":Ge,"./en-US/ebay.md":Ye,"./en-US/getting-started.md":He,"./en-US/importing.md":Ve,"./en-US/inventory.md":ze,"./en-US/lists.md":qe,"./en-US/location-audit.md":$e,"./en-US/locations.md":Qe,"./en-US/sales.md":Je,"./en-US/saved-views.md":Ke,"./en-US/scan-batches.md":Xe,"./en-US/scanning.md":Ze,"./en-US/search-syntax.md":en,"./en-US/sets.md":nn,"./en-US/trades.md":tn,"./en-US/troubleshooting.md":an}),lt=Object.assign({"./images/administration-catalog-data.png":on,"./images/administration-scan-folders.png":rn,"./images/administration-site-access.png":sn,"./images/administration-tabs.png":cn,"./images/administration-users.png":dn,"./images/binders-add-to-pocket.png":ln,"./images/binders-edit-mode.webp":hn,"./images/binders-spread-view.webp":pn,"./images/collection-card-details.png":un,"./images/collection-decklist-check.png":mn,"./images/collection-overview.png":gn,"./images/collection-select-actions.png":yn,"./images/dashboard-overview.png":wn,"./images/deck-boxes-panel.png":fn,"./images/deck-boxes-stacked-view.webp":bn,"./images/getting-started-layout.png":kn,"./images/getting-started-phone-menu.png":vn,"./images/getting-started-sign-in.png":Cn,"./images/help-home.png":xn,"./images/importing-page.png":Tn,"./images/inventory-new-product.png":Sn,"./images/inventory-page.png":An,"./images/inventory-product-drawer.png":In,"./images/lists-add-card-dialog.png":_n,"./images/lists-find-in-collection.png":On,"./images/lists-overview.png":Bn,"./images/lists-put-cards-away.png":Ln,"./images/location-audit-button.png":En,"./images/location-audit-page.webp":Pn,"./images/location-audit-summary.png":Mn,"./images/locations-add-bar.png":Dn,"./images/locations-detail-page.png":Nn,"./images/locations-import-dialog.png":Fn,"./images/locations-page-overview.png":Un,"./images/locations-row-menu.png":Rn,"./images/sales-customers.png":Wn,"./images/sales-import-orders-map.png":jn,"./images/sales-list-for-sale.png":Gn,"./images/sales-listings.png":Yn,"./images/sales-order-detail.png":Hn,"./images/sales-orders-board.png":Vn,"./images/sales-receipt.png":zn,"./images/sales-settings-for-sale-location.png":qn,"./images/saved-views-columns.png":$n,"./images/saved-views-copy-dialog.png":Qn,"./images/saved-views-menu.png":Jn,"./images/saved-views-save-dialog.png":Kn,"./images/scan-batches-panel.png":Xn,"./images/scan-batches-review.webp":Zn,"./images/scanning-bulk-edit.png":et,"./images/scanning-detail-panel.webp":nt,"./images/scanning-location-picker.png":tt,"./images/scanning-overview.webp":at,"./images/search-syntax-help-popover.png":ot,"./images/sets-checklist.png":rt,"./images/trades-builder.png":st,"./images/trades-history.png":it,"./images/troubleshooting-no-access.png":ct,"./images/troubleshooting-search-catalog.webp":dt}),G=[{key:"start",topics:["getting-started","dashboard"]},{key:"scanning",topics:["scanning","scan-batches","location-audit"]},{key:"collection",topics:["collection","saved-views","search-syntax","sets"]},{key:"organizing",topics:["locations","binders","deck-boxes"]},{key:"lists",topics:["lists","importing","trades"]},{key:"selling",topics:["inventory","sales","ebay"]},{key:"admin",topics:["administration","troubleshooting"]}],ht=G.flatMap(e=>e.topics);function pt(){const e=new Set;for(const t of Object.keys(F))e.add(t.split("/")[1]);return[...e]}function ut(e){const t=pt(),o=[],a=r=>{r&&!o.includes(r)&&o.push(r)};if(e){a(t.find(s=>s.toLowerCase()===e.toLowerCase()));const r=e.split("-")[0].toLowerCase();a(t.find(s=>s.toLowerCase()===r)),a(t.find(s=>s.toLowerCase().split("-")[0]===r))}return a(de),o}function mt(e,t){var l;const o=t.replace(/\r\n?/g,`
+`,rn="/app/assets/administration-catalog-data-BjeNaI2j.png",on="/app/assets/administration-scan-folders-CS75rQqx.png",sn="/app/assets/administration-site-access-D6UivBxH.png",cn="/app/assets/administration-tabs-BpCoGDvV.png",dn="/app/assets/administration-tabs-BpCoGDvV.png",ln="/app/assets/binders-add-to-pocket-CfrpNCbi.png",hn="/app/assets/binders-edit-mode-2WRu345_.webp",pn="/app/assets/binders-spread-view-C21YWD10.webp",un="/app/assets/collection-card-details-CEnyiCh8.png",mn="/app/assets/collection-decklist-check-DfYRH2pK.png",gn="/app/assets/collection-grouped-CHFtNnR5.png",yn="/app/assets/collection-overview-BT8LOkQk.png",wn="/app/assets/collection-select-actions-DeNskt8b.png",fn="/app/assets/dashboard-overview-BgdtwCHP.png",bn="/app/assets/deck-boxes-panel-DX0XHQ-4.png",kn="/app/assets/deck-boxes-stacked-view-D-RtwJGJ.webp",vn="/app/assets/getting-started-layout-DXPiQzZD.png",Cn="/app/assets/getting-started-phone-menu-AejRhoOH.png",xn="/app/assets/getting-started-sign-in-DnUx9vwZ.png",Tn="/app/assets/help-home-DYGYTGEX.png",Sn="/app/assets/importing-page-CLlMp9uw.png",An="/app/assets/inventory-new-product-wyjY3g5p.png",In="/app/assets/inventory-page-D7A7yRt0.png",_n="/app/assets/inventory-product-drawer-Ceku7CC-.png",On="/app/assets/lists-add-card-dialog-MhQSjlN6.png",Bn="/app/assets/lists-find-in-collection-BXe0H6i7.png",Ln="/app/assets/lists-overview-B2IW5FTm.png",En="/app/assets/lists-put-cards-away-DKGvHszG.png",Pn="/app/assets/location-audit-button-_OdyGPQm.png",Mn="/app/assets/location-audit-page-DsxC_qed.webp",Dn="/app/assets/location-audit-summary-CKlkpN6V.png",Nn="/app/assets/locations-add-bar-BLkpDoqv.png",Fn="/app/assets/locations-detail-page-CdfBmgZM.png",Un="/app/assets/locations-import-dialog-C_NxOs9C.png",Rn="/app/assets/locations-page-overview-BnNQ8JST.png",Wn="/app/assets/locations-row-menu-o6_KiRtY.png",jn="/app/assets/sales-customers-DVrg8-v6.png",Gn="/app/assets/sales-import-orders-map-BS_aWYm3.png",Yn="/app/assets/sales-list-for-sale-BfBz83FT.png",Hn="/app/assets/sales-listings-Q6MD86Iw.png",Vn="/app/assets/sales-order-detail-Dqrg7sx7.png",zn="/app/assets/sales-orders-board-z3m97wnu.png",qn="/app/assets/sales-receipt-BKyV_jeV.png",$n="/app/assets/sales-settings-for-sale-location-BvzarQMv.png",Qn="/app/assets/saved-views-columns-D7esoFxb.png",Jn="/app/assets/saved-views-copy-dialog-BWsC2JHE.png",Kn="/app/assets/saved-views-menu-Br3T19VA.png",Xn="/app/assets/saved-views-save-dialog-DQXqWDvx.png",Zn="/app/assets/scan-batches-panel-BH8rVmPX.png",et="/app/assets/scan-batches-review-BatFmhN3.webp",nt="/app/assets/scanning-bulk-edit-D_dyVKxA.png",tt="/app/assets/scanning-detail-panel-CkbIVz1U.webp",at="/app/assets/scanning-location-picker-Ck5QBotk.png",rt="/app/assets/scanning-overview-BrL5uZH0.webp",ot="/app/assets/search-syntax-help-popover-B7d99PGs.png",st="/app/assets/sets-checklist-Cq7lxxc_.png",it="/app/assets/trades-builder-BzkRc2Uo.png",ct="/app/assets/trades-history-O80-mo8S.png",dt="/app/assets/troubleshooting-no-access-Egsybxdj.png",lt="/app/assets/troubleshooting-search-catalog-DJ707UXg.webp",F=Object.assign({"./en-US/administration.md":Ue,"./en-US/binders.md":Re,"./en-US/collection.md":We,"./en-US/dashboard.md":je,"./en-US/deck-boxes.md":Ge,"./en-US/ebay.md":Ye,"./en-US/getting-started.md":He,"./en-US/importing.md":Ve,"./en-US/inventory.md":ze,"./en-US/lists.md":qe,"./en-US/location-audit.md":$e,"./en-US/locations.md":Qe,"./en-US/sales.md":Je,"./en-US/saved-views.md":Ke,"./en-US/scan-batches.md":Xe,"./en-US/scanning.md":Ze,"./en-US/search-syntax.md":en,"./en-US/sets.md":nn,"./en-US/trades.md":tn,"./en-US/troubleshooting.md":an}),ht=Object.assign({"./images/administration-catalog-data.png":rn,"./images/administration-scan-folders.png":on,"./images/administration-site-access.png":sn,"./images/administration-tabs.png":cn,"./images/administration-users.png":dn,"./images/binders-add-to-pocket.png":ln,"./images/binders-edit-mode.webp":hn,"./images/binders-spread-view.webp":pn,"./images/collection-card-details.png":un,"./images/collection-decklist-check.png":mn,"./images/collection-grouped.png":gn,"./images/collection-overview.png":yn,"./images/collection-select-actions.png":wn,"./images/dashboard-overview.png":fn,"./images/deck-boxes-panel.png":bn,"./images/deck-boxes-stacked-view.webp":kn,"./images/getting-started-layout.png":vn,"./images/getting-started-phone-menu.png":Cn,"./images/getting-started-sign-in.png":xn,"./images/help-home.png":Tn,"./images/importing-page.png":Sn,"./images/inventory-new-product.png":An,"./images/inventory-page.png":In,"./images/inventory-product-drawer.png":_n,"./images/lists-add-card-dialog.png":On,"./images/lists-find-in-collection.png":Bn,"./images/lists-overview.png":Ln,"./images/lists-put-cards-away.png":En,"./images/location-audit-button.png":Pn,"./images/location-audit-page.webp":Mn,"./images/location-audit-summary.png":Dn,"./images/locations-add-bar.png":Nn,"./images/locations-detail-page.png":Fn,"./images/locations-import-dialog.png":Un,"./images/locations-page-overview.png":Rn,"./images/locations-row-menu.png":Wn,"./images/sales-customers.png":jn,"./images/sales-import-orders-map.png":Gn,"./images/sales-list-for-sale.png":Yn,"./images/sales-listings.png":Hn,"./images/sales-order-detail.png":Vn,"./images/sales-orders-board.png":zn,"./images/sales-receipt.png":qn,"./images/sales-settings-for-sale-location.png":$n,"./images/saved-views-columns.png":Qn,"./images/saved-views-copy-dialog.png":Jn,"./images/saved-views-menu.png":Kn,"./images/saved-views-save-dialog.png":Xn,"./images/scan-batches-panel.png":Zn,"./images/scan-batches-review.webp":et,"./images/scanning-bulk-edit.png":nt,"./images/scanning-detail-panel.webp":tt,"./images/scanning-location-picker.png":at,"./images/scanning-overview.webp":rt,"./images/search-syntax-help-popover.png":ot,"./images/sets-checklist.png":st,"./images/trades-builder.png":it,"./images/trades-history.png":ct,"./images/troubleshooting-no-access.png":dt,"./images/troubleshooting-search-catalog.webp":lt}),G=[{key:"start",topics:["getting-started","dashboard"]},{key:"scanning",topics:["scanning","scan-batches","location-audit"]},{key:"collection",topics:["collection","saved-views","search-syntax","sets"]},{key:"organizing",topics:["locations","binders","deck-boxes"]},{key:"lists",topics:["lists","importing","trades"]},{key:"selling",topics:["inventory","sales","ebay"]},{key:"admin",topics:["administration","troubleshooting"]}],pt=G.flatMap(e=>e.topics);function ut(){const e=new Set;for(const t of Object.keys(F))e.add(t.split("/")[1]);return[...e]}function mt(e){const t=ut(),r=[],a=o=>{o&&!r.includes(o)&&r.push(o)};if(e){a(t.find(s=>s.toLowerCase()===e.toLowerCase()));const o=e.split("-")[0].toLowerCase();a(t.find(s=>s.toLowerCase()===o)),a(t.find(s=>s.toLowerCase().split("-")[0]===o))}return a(de),r}function gt(e,t){var l;const r=t.replace(/\r\n?/g,`
 `).split(`
-`);let a=e;const r=o.findIndex(d=>/^#\s+/.test(d));r>=0&&(a=o[r].replace(/^#\s+/,"").trim(),o.splice(r,1));const s=o.join(`
+`);let a=e;const o=r.findIndex(d=>/^#\s+/.test(d));o>=0&&(a=r[o].replace(/^#\s+/,"").trim(),r.splice(o,1));const s=r.join(`
 `).trim(),h=((l=s.split(/\n\s*\n/).map(d=>d.trim()).find(d=>d&&!/^(#|!\[|>|-|\d+\.|\|)/.test(d)))==null?void 0:l.replace(/\s+/g," "))??"",i=U(`${a}
-${s}`).replace(/^\s*(#+|\||>|-|\d+\.)\s*/gm,"").replace(/\||:?-{3,}:?/g," ").replace(/\s+/g," ");return{id:e,title:a,summary:U(h),body:s,plainText:i,searchText:i.toLowerCase()}}function U(e){return e.replace(/!\[([^\]]*)\]\([^)]*\)/g,"$1").replace(/\[([^\]]+)\]\([^)]*\)/g,"$1").replace(/\*\*|`|^>\s*\[![A-Z]+\]/gm,"").replace(/(^|\s)\*([^*]+)\*/g,"$1$2")}const $=new Map;function gt(e){const t=e??"",o=$.get(t);if(o)return o;const a=ut(e),r=[];for(const s of ht){const h=a.find(i=>F[`./${i}/${s}.md`]!==void 0);h&&r.push(mt(s,F[`./${h}/${s}.md`]))}return $.set(t,r),r}function yt(e){return lt[`./images/${e.replace(/^\.?\/?(images\/)?/,"")}`]}function wt(e){return U(e).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")}function ae(e,t){const o=t.toLowerCase().split(/\s+/).filter(Boolean);return o.length===0?[]:e.filter(a=>o.every(r=>a.searchText.includes(r))).map(a=>{const r=o.every(s=>a.title.toLowerCase().includes(s));return{topic:a,snippet:ft(a,o[0]),score:r?0:1}}).sort((a,r)=>a.score-r.score).map(({topic:a,snippet:r})=>({topic:a,snippet:r}))}function ft(e,t){const o=e.plainText,a=e.searchText.indexOf(t);if(a<0)return e.summary;const r=Math.max(0,a-60),s=Math.min(o.length,a+t.length+90);return`${r>0?"…":""}${o.slice(r,s).trim()}${s<o.length?"…":""}`}const bt=E(n.jsx("path",{d:"M19 5v14H5V5zm0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m-4.86 8.86-3 3.87L9 13.14 6 17h12z"}),"ImageOutlined"),kt=E(n.jsx("path",{d:"M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7m2.85 11.1-.85.6V16h-4v-2.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1"}),"LightbulbOutlined"),oe=/^(#{1,6})\s+(.*)$/,re=/^\s*(-{3,}|\*{3,}|_{3,})\s*$/,se=/^!\[([^\]]*)\]\(([^)\s]+)\)\s*$/,O=/^(\s*)([-*+]|\d+[.)])\s+(.*)$/,M=e=>e.match(/^\s*/)[0].length;function Q(e){return oe.test(e)||re.test(e)||se.test(e)||/^\s*>/.test(e)||/^\s*\|/.test(e)||O.test(e)}function D(e){return e.trim().replace(/^\|/,"").replace(/\|$/,"").split(new RegExp("(?<!\\\\)\\|")).map(t=>t.trim().replace(/\\\|/g,"|"))}function R(e){var r;const t=e.replace(/\r\n?/g,`
+${s}`).replace(/^\s*(#+|\||>|-|\d+\.)\s*/gm,"").replace(/\||:?-{3,}:?/g," ").replace(/\s+/g," ");return{id:e,title:a,summary:U(h),body:s,plainText:i,searchText:i.toLowerCase()}}function U(e){return e.replace(/!\[([^\]]*)\]\([^)]*\)/g,"$1").replace(/\[([^\]]+)\]\([^)]*\)/g,"$1").replace(/\*\*|`|^>\s*\[![A-Z]+\]/gm,"").replace(/(^|\s)\*([^*]+)\*/g,"$1$2")}const $=new Map;function yt(e){const t=e??"",r=$.get(t);if(r)return r;const a=mt(e),o=[];for(const s of pt){const h=a.find(i=>F[`./${i}/${s}.md`]!==void 0);h&&o.push(gt(s,F[`./${h}/${s}.md`]))}return $.set(t,o),o}function wt(e){return ht[`./images/${e.replace(/^\.?\/?(images\/)?/,"")}`]}function ft(e){return U(e).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")}function ae(e,t){const r=t.toLowerCase().split(/\s+/).filter(Boolean);return r.length===0?[]:e.filter(a=>r.every(o=>a.searchText.includes(o))).map(a=>{const o=r.every(s=>a.title.toLowerCase().includes(s));return{topic:a,snippet:bt(a,r[0]),score:o?0:1}}).sort((a,o)=>a.score-o.score).map(({topic:a,snippet:o})=>({topic:a,snippet:o}))}function bt(e,t){const r=e.plainText,a=e.searchText.indexOf(t);if(a<0)return e.summary;const o=Math.max(0,a-60),s=Math.min(r.length,a+t.length+90);return`${o>0?"…":""}${r.slice(o,s).trim()}${s<r.length?"…":""}`}const kt=E(n.jsx("path",{d:"M19 5v14H5V5zm0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m-4.86 8.86-3 3.87L9 13.14 6 17h12z"}),"ImageOutlined"),vt=E(n.jsx("path",{d:"M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7m2.85 11.1-.85.6V16h-4v-2.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1"}),"LightbulbOutlined"),re=/^(#{1,6})\s+(.*)$/,oe=/^\s*(-{3,}|\*{3,}|_{3,})\s*$/,se=/^!\[([^\]]*)\]\(([^)\s]+)\)\s*$/,O=/^(\s*)([-*+]|\d+[.)])\s+(.*)$/,M=e=>e.match(/^\s*/)[0].length;function Q(e){return re.test(e)||oe.test(e)||se.test(e)||/^\s*>/.test(e)||/^\s*\|/.test(e)||O.test(e)}function D(e){return e.trim().replace(/^\|/,"").replace(/\|$/,"").split(new RegExp("(?<!\\\\)\\|")).map(t=>t.trim().replace(/\\\|/g,"|"))}function R(e){var o;const t=e.replace(/\r\n?/g,`
 `).split(`
-`),o=[];let a=0;for(;a<t.length;){const s=t[a];if(!s.trim()){a++;continue}const h=s.match(oe);if(h){const c=h[2].trim();o.push({kind:"heading",level:h[1].length,text:c,id:wt(c)}),a++;continue}if(re.test(s)){o.push({kind:"hr"}),a++;continue}const i=s.match(se);if(i){o.push({kind:"image",alt:i[1],src:i[2]}),a++;continue}if(/^\s*>/.test(s)){const c=[];for(;a<t.length&&/^\s*>/.test(t[a]);)c.push(t[a++].replace(/^\s*>\s?/,""));const g=(r=c[0])==null?void 0:r.match(/^\[!(TIP|NOTE|WARNING|IMPORTANT|CAUTION)\]\s*$/i),u=g?g[1].toUpperCase()==="TIP"?"tip":["WARNING","CAUTION"].includes(g[1].toUpperCase())?"warning":"note":"quote";o.push({kind:"callout",variant:u,blocks:R((g?c.slice(1):c).join(`
-`))});continue}if(/^\s*\|/.test(s)){const c=[];for(;a<t.length&&/^\s*\|/.test(t[a]);)c.push(t[a++]);const g=D(c[0]),u=c.length>1&&/^[\s|:-]+$/.test(c[1]),w=u?D(c[1]).map(m=>m.startsWith(":")&&m.endsWith(":")?"center":m.endsWith(":")?"right":void 0):[];o.push({kind:"table",header:g,align:w,rows:c.slice(u?2:1).map(D)});continue}const l=s.match(O);if(l){const c=l[1].length,g=/\d/.test(l[2]),u=[];for(;a<t.length;){const w=t[a],m=w.match(O);if(m&&m[1].length===c&&/\d/.test(m[2])===g){u.push([m[3]]),a++;continue}if(!w.trim()){let v=a+1;for(;v<t.length&&!t[v].trim();)v++;const k=t[v],S=k==null?void 0:k.match(O);if(!(k!==void 0&&(S&&S[1].length===c&&/\d/.test(S[2])===g||M(k)>c)))break;u[u.length-1].push(""),a++;continue}if(M(w)>c){u[u.length-1].push(w),a++;continue}if(!Q(w)){u[u.length-1].push(w),a++;continue}break}o.push({kind:"list",ordered:g,start:g&&parseInt(l[2],10)||1,items:u.map(w=>{const[m,...v]=w,k=Math.min(...v.filter(A=>A.trim()).map(M),1/0),S=v.map(A=>A.trim()?A.slice(Number.isFinite(k)?k:0):"");return R([m,...S].join(`
-`))})});continue}const d=[];for(;a<t.length&&t[a].trim()&&(d.length===0||!Q(t[a]));)d.push(t[a++].trim());o.push({kind:"paragraph",text:d.join(" ")})}return o}const vt=new RegExp("`([^`]+)`|\\*\\*(.+?)\\*\\*|\\[([^\\]]+)\\]\\(([^)\\s]+)\\)|(?<![\\w*])\\*(?![\\s*])(.+?)\\*(?![\\w*])");function C(e){const t=[];let o=e,a=0;for(;o;){const r=o.match(vt);if(!r||r.index===void 0){t.push(o);break}r.index>0&&t.push(o.slice(0,r.index)),r[1]!==void 0?t.push(n.jsx(p,{component:"code",sx:{fontFamily:"monospace",fontSize:"0.92em",bgcolor:"action.hover",px:.5,py:.1,borderRadius:.5},children:r[1]},a++)):r[2]!==void 0?t.push(n.jsx("strong",{children:C(r[2])},a++)):r[3]!==void 0?t.push(n.jsx(Ct,{href:r[4],children:C(r[3])},a++)):t.push(n.jsx("em",{children:C(r[5])},a++)),o=o.slice(r.index+r[0].length)}return t}function Ct({href:e,children:t}){if(e.startsWith("help:")){const[o,a]=e.slice(5).split("#");return n.jsx(T,{component:b,to:{pathname:`/help/${o}`,hash:a?`#${a}`:""},children:t})}return e.startsWith("#")?n.jsx(T,{component:b,to:{hash:e},children:t}):e.startsWith("/")?n.jsx(T,{component:b,to:e,children:t}):n.jsx(T,{href:e,target:"_blank",rel:"noopener noreferrer",children:t})}function xt({alt:e,src:t}){const{t:o}=x(),[a,r]=f.useState(!1),s=/^https?:/.test(t)?t:yt(t);return n.jsxs(p,{component:"figure",sx:{mx:0,my:2.5},children:[s?n.jsx(p,{component:"img",src:s,alt:e,title:o("help.enlargeImage"),onClick:()=>r(!0),sx:{display:"block",maxWidth:"100%",maxHeight:560,borderRadius:1,border:1,borderColor:"divider",boxShadow:1,cursor:"zoom-in"}}):n.jsxs(p,{sx:{display:"flex",alignItems:"center",justifyContent:"center",gap:1,minHeight:120,border:2,borderStyle:"dashed",borderColor:"divider",borderRadius:1,color:"text.secondary",px:2},children:[n.jsx(bt,{}),n.jsx(y,{variant:"body2",children:o("help.screenshotComingSoon")})]}),e&&n.jsx(y,{component:"figcaption",variant:"caption",color:"text.secondary",sx:{display:"block",mt:.75},children:e}),s&&n.jsxs(me,{open:a,onClose:()=>r(!1),maxWidth:"xl",children:[n.jsx(ge,{"aria-label":o("common.actions.close"),onClick:()=>r(!1),sx:{position:"absolute",right:8,top:8,bgcolor:"background.paper","&:hover":{bgcolor:"background.paper"}},children:n.jsx(ye,{})}),n.jsx(we,{sx:{p:1},children:n.jsx(p,{component:"img",src:s,alt:e,sx:{display:"block",maxWidth:"100%"}})})]})]})}function Tt({variant:e,blocks:t}){const{t:o}=x();if(e==="quote")return n.jsx(p,{sx:{borderLeft:4,borderColor:"divider",pl:2,my:2,color:"text.secondary"},children:n.jsx(L,{blocks:t})});const a=e==="tip"?"success":e==="warning"?"warning":"info";return n.jsxs(B,{severity:a,icon:e==="tip"?n.jsx(kt,{fontSize:"inherit"}):void 0,sx:{my:2,"& p:last-child, & ul:last-child, & ol:last-child":{mb:0}},children:[n.jsx(fe,{children:o(`help.callout.${e}`)}),n.jsx(L,{blocks:t})]})}function St({block:e}){switch(e.kind){case"heading":{const t=e.level<=1?"h4":e.level===2?"h5":e.level===3?"h6":"subtitle1";return n.jsx(y,{id:e.id,variant:t,component:`h${Math.min(e.level,6)}`,sx:{mt:e.level<=2?4:3,mb:1.25,scrollMarginTop:72,fontWeight:e.level>=4?600:void 0},children:C(e.text)})}case"paragraph":return n.jsx(y,{variant:"body1",sx:{mb:1.5,lineHeight:1.7},children:C(e.text)});case"list":return n.jsx(p,{component:e.ordered?"ol":"ul",start:e.ordered?e.start:void 0,sx:{pl:3,mt:0,mb:1.5,"& > li":{mb:.5,lineHeight:1.7},"& li > p":{mb:.5}},children:e.items.map((t,o)=>n.jsx(y,{component:"li",variant:"body1",children:t.length===1&&t[0].kind==="paragraph"?C(t[0].text):n.jsx(L,{blocks:t})},o))});case"callout":return n.jsx(Tt,{variant:e.variant,blocks:e.blocks});case"table":return n.jsx(Fe,{component:j,variant:"outlined",sx:{my:2},children:n.jsxs(he,{size:"small",children:[n.jsx(pe,{children:n.jsx(H,{children:e.header.map((t,o)=>n.jsx(V,{align:e.align[o],sx:{fontWeight:600,whiteSpace:"nowrap"},children:C(t)},o))})}),n.jsx(ue,{children:e.rows.map((t,o)=>n.jsx(H,{children:t.map((a,r)=>n.jsx(V,{align:e.align[r],children:C(a)},r))},o))})]})});case"image":return n.jsx(xt,{alt:e.alt,src:e.src});case"hr":return n.jsx(le,{sx:{my:3}})}}function L({blocks:e}){return n.jsx(n.Fragment,{children:e.map((t,o)=>n.jsx(f.Fragment,{children:n.jsx(St,{block:t})},o))})}function At({blocks:e}){return n.jsx(p,{sx:{"& > :first-child":{mt:0}},children:n.jsx(L,{blocks:e})})}function Lt(){const{t:e,i18n:t}=x(),{topicId:o}=be(),a=f.useMemo(()=>gt(t.language),[t.language]),r=f.useMemo(()=>new Map(a.map(l=>[l.id,l])),[a]),[s,h]=f.useState("");if(!o)return n.jsx(It,{topics:a,byId:r,query:s,setQuery:h});const i=r.get(o);return n.jsxs(p,{sx:{display:"flex",gap:3,alignItems:"flex-start"},children:[n.jsx(p,{sx:{display:{xs:"none",md:"block"},width:240,flexShrink:0,position:"sticky",top:64},children:n.jsx(_t,{topics:a,byId:r,current:o,query:s,setQuery:h})}),n.jsxs(p,{sx:{flex:1,minWidth:0},children:[n.jsx(_,{component:b,to:"/help",size:"small",startIcon:n.jsx(ne,{}),sx:{display:{md:"none"},mb:1},children:e("help.allTopics")}),i?n.jsx(Ot,{topic:i,topics:a}):n.jsx(B,{severity:"warning",action:n.jsx(_,{component:b,to:"/help",children:e("help.allTopics")}),children:e("help.topicNotFound")})]})]})}function ie({query:e,setQuery:t,autoFocus:o}){const{t:a}=x();return n.jsx(Ae,{size:"small",fullWidth:!0,autoFocus:o,placeholder:a("help.searchPlaceholder"),value:e,onChange:r=>t(r.target.value),slotProps:{input:{startAdornment:n.jsx(Ie,{position:"start",children:n.jsx(_e,{fontSize:"small"})})}}})}function It({topics:e,byId:t,query:o,setQuery:a}){const{t:r}=x(),s=f.useMemo(()=>ae(e,o),[e,o]),h=o.trim().length>0;return n.jsxs(I,{spacing:3,sx:{maxWidth:1100},children:[n.jsxs(p,{children:[n.jsx(y,{variant:"h4",gutterBottom:!0,children:r("help.title")}),n.jsx(y,{color:"text.secondary",children:r("help.subtitle")})]}),n.jsx(p,{sx:{maxWidth:560},children:n.jsx(ie,{query:o,setQuery:a,autoFocus:!0})}),h?n.jsxs(I,{spacing:1.5,children:[n.jsx(y,{variant:"overline",color:"text.secondary",children:r("help.resultCount",{count:s.length})}),s.length===0&&n.jsx(B,{severity:"info",children:r("help.noResults",{query:o.trim()})}),s.map(({topic:i,snippet:l})=>n.jsx(ke,{variant:"outlined",children:n.jsx(Pe,{component:b,to:`/help/${i.id}`,children:n.jsxs(ve,{children:[n.jsx(y,{variant:"h6",children:i.title}),n.jsx(y,{variant:"body2",color:"text.secondary",children:l})]})})},i.id))]}):n.jsxs(n.Fragment,{children:[t.has("getting-started")&&n.jsx(B,{severity:"info",action:n.jsx(_,{component:b,to:"/help/getting-started",endIcon:n.jsx(te,{}),children:r("help.startHereAction")}),children:r("help.startHere")}),n.jsx(p,{sx:{display:"grid",gap:2,gridTemplateColumns:{xs:"1fr",sm:"repeat(2, 1fr)",lg:"repeat(3, 1fr)"}},children:G.map(i=>{const l=i.topics.map(d=>t.get(d)).filter(d=>!!d);return l.length===0?null:n.jsxs(j,{variant:"outlined",sx:{p:2},children:[n.jsx(y,{variant:"overline",color:"primary",sx:{fontWeight:600},children:r(`help.groups.${i.key}`)}),n.jsx(I,{spacing:1.5,sx:{mt:.5},children:l.map(d=>n.jsxs(p,{children:[n.jsx(T,{component:b,to:`/help/${d.id}`,variant:"subtitle1",underline:"hover",sx:{fontWeight:600},children:d.title}),n.jsx(y,{variant:"body2",color:"text.secondary",children:d.summary})]},d.id))})]},i.key)})})]})]})}function _t({topics:e,byId:t,current:o,query:a,setQuery:r}){const{t:s}=x(),h=f.useMemo(()=>a.trim()?new Set(ae(e,a).map(i=>i.topic.id)):void 0,[e,a]);return n.jsxs(j,{variant:"outlined",sx:{maxHeight:"calc(100vh - 88px)",overflowY:"auto"},children:[n.jsx(p,{sx:{p:1.5,pb:.5},children:n.jsx(ie,{query:a,setQuery:r})}),n.jsxs(Ce,{dense:!0,disablePadding:!0,children:[n.jsx(z,{component:b,to:"/help",children:n.jsx(q,{primary:s("help.allTopics"),slotProps:{primary:{color:"primary",fontWeight:600}}})}),G.map(i=>{const l=i.topics.map(d=>t.get(d)).filter(d=>!!d&&(!h||h.has(d.id)));return l.length===0?null:n.jsx("li",{children:n.jsxs("ul",{style:{padding:0},children:[n.jsx(xe,{sx:{lineHeight:"32px",bgcolor:"background.paper"},children:s(`help.groups.${i.key}`)}),l.map(d=>n.jsx(z,{component:b,to:`/help/${d.id}`,selected:d.id===o,sx:{pl:3},children:n.jsx(q,{primary:d.title})},d.id))]})},i.key)}),h&&h.size===0&&n.jsx(y,{variant:"body2",color:"text.secondary",sx:{px:2,py:1},children:s("help.noResults",{query:a.trim()})})]})]})}function Ot({topic:e,topics:t}){const{t:o}=x(),a=Te(),r=Se(),s=f.useMemo(()=>R(e.body),[e]),h=s.filter(c=>c.kind==="heading"&&c.level===2),i=t.findIndex(c=>c.id===e.id),l=i>0?t[i-1]:void 0,d=i>=0&&i<t.length-1?t[i+1]:void 0;return f.useEffect(()=>{const c=decodeURIComponent(a.hash.replace(/^#/,""));if(!c){window.scrollTo({top:0});return}let g=!1;const u=()=>{var m;g||(m=document.getElementById(c))==null||m.scrollIntoView({behavior:"smooth",block:"start"})};u();const w=[...document.querySelectorAll("article img")].filter(m=>!m.complete);return w.length&&Promise.all(w.map(m=>m.decode().catch(()=>{}))).then(u),()=>{g=!0}},[a.hash,e.id]),n.jsxs(p,{sx:{display:"flex",gap:4,alignItems:"flex-start"},children:[n.jsxs(p,{component:"article",sx:{flex:1,minWidth:0,maxWidth:880},children:[n.jsx(y,{variant:"h4",component:"h1",gutterBottom:!0,children:e.title}),n.jsx(At,{blocks:s}),n.jsxs(I,{direction:"row",spacing:2,sx:{mt:5,pt:2,borderTop:1,borderColor:"divider"},justifyContent:"space-between",children:[l?n.jsx(_,{startIcon:n.jsx(ne,{}),onClick:()=>r(`/help/${l.id}`),sx:{textAlign:"left"},children:n.jsxs(p,{children:[n.jsx(y,{variant:"caption",display:"block",color:"text.secondary",children:o("help.previous")}),l.title]})}):n.jsx("span",{}),d&&n.jsx(_,{endIcon:n.jsx(te,{}),onClick:()=>r(`/help/${d.id}`),sx:{textAlign:"right"},children:n.jsxs(p,{children:[n.jsx(y,{variant:"caption",display:"block",color:"text.secondary",children:o("help.next")}),d.title]})})]})]}),h.length>1&&n.jsxs(p,{component:"nav",sx:{display:{xs:"none",lg:"block"},width:220,flexShrink:0,position:"sticky",top:64},children:[n.jsx(y,{variant:"overline",color:"text.secondary",children:o("help.onThisPage")}),n.jsx(I,{spacing:.75,sx:{mt:.5,borderLeft:2,borderColor:"divider",pl:1.5},children:h.map(c=>n.jsx(T,{component:b,to:{hash:`#${c.id}`},variant:"body2",underline:"hover",color:a.hash===`#${c.id}`?"primary":"text.secondary",children:c.text.replace(/\*\*|`/g,"")},c.id))})]})]})}export{Lt as HelpPage};
+`),r=[];let a=0;for(;a<t.length;){const s=t[a];if(!s.trim()){a++;continue}const h=s.match(re);if(h){const c=h[2].trim();r.push({kind:"heading",level:h[1].length,text:c,id:ft(c)}),a++;continue}if(oe.test(s)){r.push({kind:"hr"}),a++;continue}const i=s.match(se);if(i){r.push({kind:"image",alt:i[1],src:i[2]}),a++;continue}if(/^\s*>/.test(s)){const c=[];for(;a<t.length&&/^\s*>/.test(t[a]);)c.push(t[a++].replace(/^\s*>\s?/,""));const g=(o=c[0])==null?void 0:o.match(/^\[!(TIP|NOTE|WARNING|IMPORTANT|CAUTION)\]\s*$/i),u=g?g[1].toUpperCase()==="TIP"?"tip":["WARNING","CAUTION"].includes(g[1].toUpperCase())?"warning":"note":"quote";r.push({kind:"callout",variant:u,blocks:R((g?c.slice(1):c).join(`
+`))});continue}if(/^\s*\|/.test(s)){const c=[];for(;a<t.length&&/^\s*\|/.test(t[a]);)c.push(t[a++]);const g=D(c[0]),u=c.length>1&&/^[\s|:-]+$/.test(c[1]),w=u?D(c[1]).map(m=>m.startsWith(":")&&m.endsWith(":")?"center":m.endsWith(":")?"right":void 0):[];r.push({kind:"table",header:g,align:w,rows:c.slice(u?2:1).map(D)});continue}const l=s.match(O);if(l){const c=l[1].length,g=/\d/.test(l[2]),u=[];for(;a<t.length;){const w=t[a],m=w.match(O);if(m&&m[1].length===c&&/\d/.test(m[2])===g){u.push([m[3]]),a++;continue}if(!w.trim()){let v=a+1;for(;v<t.length&&!t[v].trim();)v++;const k=t[v],S=k==null?void 0:k.match(O);if(!(k!==void 0&&(S&&S[1].length===c&&/\d/.test(S[2])===g||M(k)>c)))break;u[u.length-1].push(""),a++;continue}if(M(w)>c){u[u.length-1].push(w),a++;continue}if(!Q(w)){u[u.length-1].push(w),a++;continue}break}r.push({kind:"list",ordered:g,start:g&&parseInt(l[2],10)||1,items:u.map(w=>{const[m,...v]=w,k=Math.min(...v.filter(A=>A.trim()).map(M),1/0),S=v.map(A=>A.trim()?A.slice(Number.isFinite(k)?k:0):"");return R([m,...S].join(`
+`))})});continue}const d=[];for(;a<t.length&&t[a].trim()&&(d.length===0||!Q(t[a]));)d.push(t[a++].trim());r.push({kind:"paragraph",text:d.join(" ")})}return r}const Ct=new RegExp("`([^`]+)`|\\*\\*(.+?)\\*\\*|\\[([^\\]]+)\\]\\(([^)\\s]+)\\)|(?<![\\w*])\\*(?![\\s*])(.+?)\\*(?![\\w*])");function C(e){const t=[];let r=e,a=0;for(;r;){const o=r.match(Ct);if(!o||o.index===void 0){t.push(r);break}o.index>0&&t.push(r.slice(0,o.index)),o[1]!==void 0?t.push(n.jsx(p,{component:"code",sx:{fontFamily:"monospace",fontSize:"0.92em",bgcolor:"action.hover",px:.5,py:.1,borderRadius:.5},children:o[1]},a++)):o[2]!==void 0?t.push(n.jsx("strong",{children:C(o[2])},a++)):o[3]!==void 0?t.push(n.jsx(xt,{href:o[4],children:C(o[3])},a++)):t.push(n.jsx("em",{children:C(o[5])},a++)),r=r.slice(o.index+o[0].length)}return t}function xt({href:e,children:t}){if(e.startsWith("help:")){const[r,a]=e.slice(5).split("#");return n.jsx(T,{component:b,to:{pathname:`/help/${r}`,hash:a?`#${a}`:""},children:t})}return e.startsWith("#")?n.jsx(T,{component:b,to:{hash:e},children:t}):e.startsWith("/")?n.jsx(T,{component:b,to:e,children:t}):n.jsx(T,{href:e,target:"_blank",rel:"noopener noreferrer",children:t})}function Tt({alt:e,src:t}){const{t:r}=x(),[a,o]=f.useState(!1),s=/^https?:/.test(t)?t:wt(t);return n.jsxs(p,{component:"figure",sx:{mx:0,my:2.5},children:[s?n.jsx(p,{component:"img",src:s,alt:e,title:r("help.enlargeImage"),onClick:()=>o(!0),sx:{display:"block",maxWidth:"100%",maxHeight:560,borderRadius:1,border:1,borderColor:"divider",boxShadow:1,cursor:"zoom-in"}}):n.jsxs(p,{sx:{display:"flex",alignItems:"center",justifyContent:"center",gap:1,minHeight:120,border:2,borderStyle:"dashed",borderColor:"divider",borderRadius:1,color:"text.secondary",px:2},children:[n.jsx(kt,{}),n.jsx(y,{variant:"body2",children:r("help.screenshotComingSoon")})]}),e&&n.jsx(y,{component:"figcaption",variant:"caption",color:"text.secondary",sx:{display:"block",mt:.75},children:e}),s&&n.jsxs(me,{open:a,onClose:()=>o(!1),maxWidth:"xl",children:[n.jsx(ge,{"aria-label":r("common.actions.close"),onClick:()=>o(!1),sx:{position:"absolute",right:8,top:8,bgcolor:"background.paper","&:hover":{bgcolor:"background.paper"}},children:n.jsx(ye,{})}),n.jsx(we,{sx:{p:1},children:n.jsx(p,{component:"img",src:s,alt:e,sx:{display:"block",maxWidth:"100%"}})})]})]})}function St({variant:e,blocks:t}){const{t:r}=x();if(e==="quote")return n.jsx(p,{sx:{borderLeft:4,borderColor:"divider",pl:2,my:2,color:"text.secondary"},children:n.jsx(L,{blocks:t})});const a=e==="tip"?"success":e==="warning"?"warning":"info";return n.jsxs(B,{severity:a,icon:e==="tip"?n.jsx(vt,{fontSize:"inherit"}):void 0,sx:{my:2,"& p:last-child, & ul:last-child, & ol:last-child":{mb:0}},children:[n.jsx(fe,{children:r(`help.callout.${e}`)}),n.jsx(L,{blocks:t})]})}function At({block:e}){switch(e.kind){case"heading":{const t=e.level<=1?"h4":e.level===2?"h5":e.level===3?"h6":"subtitle1";return n.jsx(y,{id:e.id,variant:t,component:`h${Math.min(e.level,6)}`,sx:{mt:e.level<=2?4:3,mb:1.25,scrollMarginTop:72,fontWeight:e.level>=4?600:void 0},children:C(e.text)})}case"paragraph":return n.jsx(y,{variant:"body1",sx:{mb:1.5,lineHeight:1.7},children:C(e.text)});case"list":return n.jsx(p,{component:e.ordered?"ol":"ul",start:e.ordered?e.start:void 0,sx:{pl:3,mt:0,mb:1.5,"& > li":{mb:.5,lineHeight:1.7},"& li > p":{mb:.5}},children:e.items.map((t,r)=>n.jsx(y,{component:"li",variant:"body1",children:t.length===1&&t[0].kind==="paragraph"?C(t[0].text):n.jsx(L,{blocks:t})},r))});case"callout":return n.jsx(St,{variant:e.variant,blocks:e.blocks});case"table":return n.jsx(Fe,{component:j,variant:"outlined",sx:{my:2},children:n.jsxs(he,{size:"small",children:[n.jsx(pe,{children:n.jsx(H,{children:e.header.map((t,r)=>n.jsx(V,{align:e.align[r],sx:{fontWeight:600,whiteSpace:"nowrap"},children:C(t)},r))})}),n.jsx(ue,{children:e.rows.map((t,r)=>n.jsx(H,{children:t.map((a,o)=>n.jsx(V,{align:e.align[o],children:C(a)},o))},r))})]})});case"image":return n.jsx(Tt,{alt:e.alt,src:e.src});case"hr":return n.jsx(le,{sx:{my:3}})}}function L({blocks:e}){return n.jsx(n.Fragment,{children:e.map((t,r)=>n.jsx(f.Fragment,{children:n.jsx(At,{block:t})},r))})}function It({blocks:e}){return n.jsx(p,{sx:{"& > :first-child":{mt:0}},children:n.jsx(L,{blocks:e})})}function Et(){const{t:e,i18n:t}=x(),{topicId:r}=be(),a=f.useMemo(()=>yt(t.language),[t.language]),o=f.useMemo(()=>new Map(a.map(l=>[l.id,l])),[a]),[s,h]=f.useState("");if(!r)return n.jsx(_t,{topics:a,byId:o,query:s,setQuery:h});const i=o.get(r);return n.jsxs(p,{sx:{display:"flex",gap:3,alignItems:"flex-start"},children:[n.jsx(p,{sx:{display:{xs:"none",md:"block"},width:240,flexShrink:0,position:"sticky",top:64},children:n.jsx(Ot,{topics:a,byId:o,current:r,query:s,setQuery:h})}),n.jsxs(p,{sx:{flex:1,minWidth:0},children:[n.jsx(_,{component:b,to:"/help",size:"small",startIcon:n.jsx(ne,{}),sx:{display:{md:"none"},mb:1},children:e("help.allTopics")}),i?n.jsx(Bt,{topic:i,topics:a}):n.jsx(B,{severity:"warning",action:n.jsx(_,{component:b,to:"/help",children:e("help.allTopics")}),children:e("help.topicNotFound")})]})]})}function ie({query:e,setQuery:t,autoFocus:r}){const{t:a}=x();return n.jsx(Ae,{size:"small",fullWidth:!0,autoFocus:r,placeholder:a("help.searchPlaceholder"),value:e,onChange:o=>t(o.target.value),slotProps:{input:{startAdornment:n.jsx(Ie,{position:"start",children:n.jsx(_e,{fontSize:"small"})})}}})}function _t({topics:e,byId:t,query:r,setQuery:a}){const{t:o}=x(),s=f.useMemo(()=>ae(e,r),[e,r]),h=r.trim().length>0;return n.jsxs(I,{spacing:3,sx:{maxWidth:1100},children:[n.jsxs(p,{children:[n.jsx(y,{variant:"h4",gutterBottom:!0,children:o("help.title")}),n.jsx(y,{color:"text.secondary",children:o("help.subtitle")})]}),n.jsx(p,{sx:{maxWidth:560},children:n.jsx(ie,{query:r,setQuery:a,autoFocus:!0})}),h?n.jsxs(I,{spacing:1.5,children:[n.jsx(y,{variant:"overline",color:"text.secondary",children:o("help.resultCount",{count:s.length})}),s.length===0&&n.jsx(B,{severity:"info",children:o("help.noResults",{query:r.trim()})}),s.map(({topic:i,snippet:l})=>n.jsx(ke,{variant:"outlined",children:n.jsx(Pe,{component:b,to:`/help/${i.id}`,children:n.jsxs(ve,{children:[n.jsx(y,{variant:"h6",children:i.title}),n.jsx(y,{variant:"body2",color:"text.secondary",children:l})]})})},i.id))]}):n.jsxs(n.Fragment,{children:[t.has("getting-started")&&n.jsx(B,{severity:"info",action:n.jsx(_,{component:b,to:"/help/getting-started",endIcon:n.jsx(te,{}),children:o("help.startHereAction")}),children:o("help.startHere")}),n.jsx(p,{sx:{display:"grid",gap:2,gridTemplateColumns:{xs:"1fr",sm:"repeat(2, 1fr)",lg:"repeat(3, 1fr)"}},children:G.map(i=>{const l=i.topics.map(d=>t.get(d)).filter(d=>!!d);return l.length===0?null:n.jsxs(j,{variant:"outlined",sx:{p:2},children:[n.jsx(y,{variant:"overline",color:"primary",sx:{fontWeight:600},children:o(`help.groups.${i.key}`)}),n.jsx(I,{spacing:1.5,sx:{mt:.5},children:l.map(d=>n.jsxs(p,{children:[n.jsx(T,{component:b,to:`/help/${d.id}`,variant:"subtitle1",underline:"hover",sx:{fontWeight:600},children:d.title}),n.jsx(y,{variant:"body2",color:"text.secondary",children:d.summary})]},d.id))})]},i.key)})})]})]})}function Ot({topics:e,byId:t,current:r,query:a,setQuery:o}){const{t:s}=x(),h=f.useMemo(()=>a.trim()?new Set(ae(e,a).map(i=>i.topic.id)):void 0,[e,a]);return n.jsxs(j,{variant:"outlined",sx:{maxHeight:"calc(100vh - 88px)",overflowY:"auto"},children:[n.jsx(p,{sx:{p:1.5,pb:.5},children:n.jsx(ie,{query:a,setQuery:o})}),n.jsxs(Ce,{dense:!0,disablePadding:!0,children:[n.jsx(z,{component:b,to:"/help",children:n.jsx(q,{primary:s("help.allTopics"),slotProps:{primary:{color:"primary",fontWeight:600}}})}),G.map(i=>{const l=i.topics.map(d=>t.get(d)).filter(d=>!!d&&(!h||h.has(d.id)));return l.length===0?null:n.jsx("li",{children:n.jsxs("ul",{style:{padding:0},children:[n.jsx(xe,{sx:{lineHeight:"32px",bgcolor:"background.paper"},children:s(`help.groups.${i.key}`)}),l.map(d=>n.jsx(z,{component:b,to:`/help/${d.id}`,selected:d.id===r,sx:{pl:3},children:n.jsx(q,{primary:d.title})},d.id))]})},i.key)}),h&&h.size===0&&n.jsx(y,{variant:"body2",color:"text.secondary",sx:{px:2,py:1},children:s("help.noResults",{query:a.trim()})})]})]})}function Bt({topic:e,topics:t}){const{t:r}=x(),a=Te(),o=Se(),s=f.useMemo(()=>R(e.body),[e]),h=s.filter(c=>c.kind==="heading"&&c.level===2),i=t.findIndex(c=>c.id===e.id),l=i>0?t[i-1]:void 0,d=i>=0&&i<t.length-1?t[i+1]:void 0;return f.useEffect(()=>{const c=decodeURIComponent(a.hash.replace(/^#/,""));if(!c){window.scrollTo({top:0});return}let g=!1;const u=()=>{var m;g||(m=document.getElementById(c))==null||m.scrollIntoView({behavior:"smooth",block:"start"})};u();const w=[...document.querySelectorAll("article img")].filter(m=>!m.complete);return w.length&&Promise.all(w.map(m=>m.decode().catch(()=>{}))).then(u),()=>{g=!0}},[a.hash,e.id]),n.jsxs(p,{sx:{display:"flex",gap:4,alignItems:"flex-start"},children:[n.jsxs(p,{component:"article",sx:{flex:1,minWidth:0,maxWidth:880},children:[n.jsx(y,{variant:"h4",component:"h1",gutterBottom:!0,children:e.title}),n.jsx(It,{blocks:s}),n.jsxs(I,{direction:"row",spacing:2,sx:{mt:5,pt:2,borderTop:1,borderColor:"divider"},justifyContent:"space-between",children:[l?n.jsx(_,{startIcon:n.jsx(ne,{}),onClick:()=>o(`/help/${l.id}`),sx:{textAlign:"left"},children:n.jsxs(p,{children:[n.jsx(y,{variant:"caption",display:"block",color:"text.secondary",children:r("help.previous")}),l.title]})}):n.jsx("span",{}),d&&n.jsx(_,{endIcon:n.jsx(te,{}),onClick:()=>o(`/help/${d.id}`),sx:{textAlign:"right"},children:n.jsxs(p,{children:[n.jsx(y,{variant:"caption",display:"block",color:"text.secondary",children:r("help.next")}),d.title]})})]})]}),h.length>1&&n.jsxs(p,{component:"nav",sx:{display:{xs:"none",lg:"block"},width:220,flexShrink:0,position:"sticky",top:64},children:[n.jsx(y,{variant:"overline",color:"text.secondary",children:r("help.onThisPage")}),n.jsx(I,{spacing:.75,sx:{mt:.5,borderLeft:2,borderColor:"divider",pl:1.5},children:h.map(c=>n.jsx(T,{component:b,to:{hash:`#${c.id}`},variant:"body2",underline:"hover",color:a.hash===`#${c.id}`?"primary":"text.secondary",children:c.text.replace(/\*\*|`/g,"")},c.id))})]})]})}export{Et as HelpPage};

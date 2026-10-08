@@ -4,6 +4,7 @@ import type {
   BinderCardDto,
   BinderStateDto,
   CardDto,
+  GroupedCardRowDto,
   ComponentDto,
   CsvImportResultDto,
   ImportUrlResultDto,
@@ -429,6 +430,21 @@ export const api = {
     sort?: string;
     dir?: 'asc' | 'desc';
   }) => request<PagedResult<CardDto>>(`/api/collection${qs(opts)}`),
+  /** The collection grouped by `groupBy` (outermost first); `toggled` groups differ from the default state. */
+  collectionGrouped: (body: {
+    game?: string;
+    q?: string;
+    containerId?: number;
+    siteId?: number;
+    skip: number;
+    take: number;
+    stacked: boolean;
+    sort?: string;
+    dir?: 'asc' | 'desc';
+    groupBy: string[];
+    collapsedByDefault: boolean;
+    toggled: string[];
+  }) => request<PagedResult<GroupedCardRowDto>>('/api/collection/grouped', { method: 'POST', body: JSON.stringify(body) }),
 
   // Location writes
   locationNameAvailable: (name: string, excludeId?: number) =>

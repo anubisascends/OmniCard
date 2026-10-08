@@ -8,7 +8,7 @@ Open [Collection](/collection) from the navigation menu. The page has three part
 
 - A **search box** at the top. Type a search and press **Enter** to filter the list.
 - The **view button** beside the search box, for switching between saved layouts of the page. See [Saved views](help:saved-views).
-- A toolbar with the **Stack duplicates** switch and the **Columns** and **Select** buttons.
+- A toolbar with the **Stack duplicates** switch and the **Columns**, **Group by** and **Select** buttons.
 - The card list itself, one card (or stack of identical cards) per row.
 
 The game selector in the top bar decides which game's cards you see. Choose a single game, or **All Games** to see everything at once.
@@ -71,6 +71,28 @@ The **Stack duplicates** switch is on by default. A [saved view](help:saved-view
 
 > [!TIP]
 > Turn **Stack duplicates** off when you want to edit or move one particular copy. Clicking a stacked row opens just one of the combined entries.
+
+## Group rows
+
+Group the list by one or more columns to see it in collapsible sections, such as every set with its cards underneath, or each set split again by rarity.
+
+1. Click **Group by** in the toolbar.
+2. Tick the columns to group by. The first one you tick is the outer group (**Level 1**), the next is grouped inside it, and so on.
+3. Use the up and down arrows to change which group sits inside which. Click **Don't group** to go back to a plain list.
+
+You can group by **Set**, **Rarity**, **Condition**, **Language**, **Foil**, **Location** and **Listing status**. When **All Games** is selected you can also group by **Game**.
+
+![The Collection grouped by Set and then Rarity](collection-grouped.png)
+
+Each group heading shows how many cards the group holds and their total market value. Groups cover your whole collection, so the totals are right even when a group runs over more than one page. When a page starts partway through a group, the group's heading is repeated at the top, marked *(continued)*.
+
+- Click a group heading to collapse or expand it.
+- Click **Collapse all** to fold every group down to its heading, then click a heading to open just that group.
+- Click **Expand all** to open every group again.
+
+Groups always open expanded. The columns you group by are part of the [saved view](help:saved-views); which groups are collapsed is not.
+
+Sorting and **Stack duplicates** work inside each group. Sorting by the column you grouped by also reverses the order of the groups. Groups with no value, such as cards with no rarity, come last as **(none)**.
 
 ## Preview card art
 

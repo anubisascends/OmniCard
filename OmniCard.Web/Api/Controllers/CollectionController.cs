@@ -129,7 +129,7 @@ public sealed class CollectionController(
         => desc ? q.OrderByDescending(key) : q.OrderBy(key);
 
     /// <summary>Global secondary ordering (in memory) so equal primary keys page deterministically.</summary>
-    private static List<CollectionCard> SortRows(IEnumerable<CollectionCard> rows, string sort, bool desc)
+    internal static List<CollectionCard> SortRows(IEnumerable<CollectionCard> rows, string sort, bool desc)
     {
         Func<CollectionCard, IComparable?> key = sort switch
         {
@@ -258,7 +258,18 @@ public sealed class CollectionController(
         IQueryable<CollectionCard> query, int skip, int take,
         string sort, bool desc, Action<IReadOnlyCollection<CollectionCard>>? hydratePrices)
     {
-        var rows = query.ToList()
+        var rows = StackRows(query.ToList());
+        var total = rows.Count;
+        if (sort == "marketprice")
+            hydratePrices?.Invoke(rows);
+        var sorted = SortRows(rows, sort, desc);
+        return (total, sorted.Skip(skip).Take(take).ToList());
+    }
+
+    /// <summary>Collapses lots into one row per printing (name + set + number + foil + language): the
+    /// lowest-id lot represents the stack, carrying the summed quantity and every lot id.</summary>
+    internal static List<CollectionCard> StackRows(IEnumerable<CollectionCard> lots) =>
+        lots
             .GroupBy(c => (c.Name, c.SetCode, c.Number, c.IsFoil, c.Language))
             .Select(g =>
             {
@@ -268,11 +279,50 @@ public sealed class CollectionController(
                 return rep;
             })
             .ToList();
-        var total = rows.Count;
-        if (sort == "marketprice")
-            hydratePrices?.Invoke(rows);
-        var sorted = SortRows(rows, sort, desc);
-        return (total, sorted.Skip(skip).Take(take).ToList());
+
+    /// <summary>Search owned singles grouped by one or more columns (nested, outermost first) — see
+    /// <see cref="CollectionGrouping"/>. Same filters and site scoping as <see cref="Get"/>; stacking and
+    /// sorting apply within each innermost group. Paging runs over the flattened header + card rows.
+    /// POST because the set of toggled (collapsed/expanded) groups can outgrow a query string.</summary>
+    [HttpPost("grouped")]
+    [RequirePermission(Permissions.CollectionView)]
+    public ActionResult<PagedResult<GroupedCardRowDto>> Grouped([FromBody] GroupedCollectionRequest req)
+    {
+        var groupBy = CollectionGrouping.Canonicalize(req.GroupBy);
+        if (groupBy.Count == 0)
+            return BadRequest(new { error = "Choose at least one column to group by." });
+        var take = Math.Clamp(req.Take, 1, 500);
+        var skip = Math.Max(0, req.Skip);
+        var sortKey = NormalizeSort(req.Sort);
+        var desc = string.Equals(req.Dir, "desc", StringComparison.OrdinalIgnoreCase);
+
+        using var ctx = dbFactory.CreateDbContext();
+        var lots = CollectionQueryBuilder.BuildFilteredQuery(ctx, req.Q ?? "", LocationsController.ParseGame(req.Game),
+            req.ContainerId, filterPreset: null, _gameServices, siteAccess.Current.ScopeTo(req.SiteId)).ToList();
+
+        // Every lot is priced up front: group headers carry their market value.
+        MarketPriceHydrator.Populate(cardService, lots);
+        if (groupBy.Contains("listingStatus"))
+        {
+            // Grouping needs each lot's own status, before stacking folds lots together.
+            var statusByLot = listings.GetActiveListingStatusByLot(lots.Select(c => c.Id));
+            foreach (var lot in lots)
+                lot.ListingStatus = statusByLot.TryGetValue(lot.Id, out var status) ? status : null;
+        }
+
+        var (total, rows) = CollectionGrouping.Page(
+            lots, groupBy,
+            leaf => SortRows(req.Stacked ? StackRows(leaf) : leaf.Select(c => { c.StackedIds = [c.Id]; return c; }), sortKey, desc),
+            req.CollapsedByDefault, req.Toggled.ToHashSet(), skip, take, sortKey, desc);
+
+        var cards = rows.Where(r => r.Card is not null).Select(r => r.Card!).ToList();
+        CardArtHydrator.HydrateMissingImageUris(cardService, cards);
+        imageCache.PreferCached(cards);
+        AnnotateListingStatus(cards);
+        PopulateTags(cards);
+
+        var items = rows.Select(r => new GroupedCardRowDto(r.Group, r.Card is null ? null : DtoMapping.ToDto(r.Card))).ToList();
+        return new PagedResult<GroupedCardRowDto>(total, skip, take, items);
     }
 
     /// <summary>Fills each row's tags in one batch query (union of tags across a stacked row's lots),
