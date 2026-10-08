@@ -15,6 +15,7 @@ import {
   DialogTitle,
   FormControlLabel,
   IconButton,
+  InputAdornment,
   LinearProgress,
   MenuItem,
   Paper,
@@ -33,6 +34,7 @@ import {
   Typography,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EditIcon from '@mui/icons-material/Edit';
 import KeyIcon from '@mui/icons-material/Key';
 import Link from '@mui/material/Link';
@@ -47,6 +49,7 @@ import { ScanFoldersCard } from '../components/settings/ScanFoldersCard';
 import { PermissionChecklist } from '../components/settings/PermissionChecklist';
 import { usePermissions } from '../context/usePermissions';
 import { currencySymbol } from '../lib/scanBadges';
+import { generateSetupKey, isValidSetupKey, SETUP_KEY_MAX, SETUP_KEY_MIN } from '../lib/setupKeys';
 import { ENGLISH, languageName } from '../lib/cardLanguages';
 import { useFormatters } from '../i18n/format';
 import {
@@ -796,12 +799,64 @@ function ChangePasswordCard() {
   );
 }
 
-/** Dialog to set a password (create user or admin reset). Requires confirmation. */
-function PasswordDialog({
+/** Setup-key input with a "Generate" button. The admin gives this key to the user, who enters it at
+ * sign-in to choose their own password (new account or required reset). Shown in clear text so it can
+ * be read out or copied. */
+function SetupKeyField({
+  value,
+  onChange,
+  autoFocus,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  autoFocus?: boolean;
+}) {
+  const { t } = useTranslation();
+  const invalid = value.length > 0 && !isValidSetupKey(value);
+  return (
+    <TextField
+      label={t('settings.users.setupKey')}
+      size="small"
+      value={value}
+      autoFocus={autoFocus}
+      autoComplete="off"
+      inputProps={{ spellCheck: false, style: { fontFamily: 'monospace', letterSpacing: 1 } }}
+      onChange={(e) => onChange(e.target.value)}
+      error={invalid}
+      helperText={
+        invalid
+          ? t('settings.users.setupKeyInvalid', { min: SETUP_KEY_MIN, max: SETUP_KEY_MAX })
+          : t('settings.users.setupKeyHelper')
+      }
+      InputProps={{
+        endAdornment: (
+          <InputAdornment position="end">
+            <Tooltip title={t('settings.users.copySetupKey')}>
+              <span>
+                <IconButton
+                  size="small"
+                  edge="end"
+                  disabled={!value}
+                  onClick={() => void navigator.clipboard?.writeText(value.trim())}
+                >
+                  <ContentCopyIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Button size="small" sx={{ ml: 1 }} onClick={() => onChange(generateSetupKey())}>
+              {t('settings.users.generateSetupKey')}
+            </Button>
+          </InputAdornment>
+        ),
+      }}
+    />
+  );
+}
+
+/** Admin creates an account: username, optional email, a setup key (no password; the user picks one at
+ * first sign-in), role, and the admin flag. */
+function CreateUserDialog({
   open,
-  title,
-  withUsername,
-  submitLabel,
   onClose,
   onSubmit,
   pending,
@@ -809,47 +864,48 @@ function PasswordDialog({
   roles,
 }: {
   open: boolean;
-  title: string;
-  withUsername: boolean;
-  submitLabel: string;
   onClose: () => void;
-  onSubmit: (v: { username: string; password: string; isAdmin: boolean; roleId: number | null }) => void;
+  onSubmit: (v: {
+    username: string;
+    email: string | null;
+    setupKey: string;
+    isAdmin: boolean;
+    roleId: number | null;
+  }) => void;
   pending: boolean;
   error?: string | null;
   roles?: RoleDto[];
 }) {
   const { t } = useTranslation();
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
+  const [email, setEmail] = useState('');
+  const [setupKey, setSetupKey] = useState(() => generateSetupKey());
   const [isAdmin, setIsAdmin] = useState(false);
   const [roleId, setRoleId] = useState<number | ''>('');
 
-  // Reset fields whenever the dialog is (re)opened.
+  // Reset fields whenever the dialog is (re)opened, with a fresh suggested key.
   const reset = () => {
     setUsername('');
-    setPassword('');
-    setConfirm('');
+    setEmail('');
+    setSetupKey(generateSetupKey());
     setIsAdmin(false);
     setRoleId('');
   };
 
   const submit = () =>
-    onSubmit({ username: username.trim(), password, isAdmin, roleId: roleId === '' ? null : roleId });
+    onSubmit({
+      username: username.trim(),
+      email: email.trim() || null,
+      setupKey: setupKey.trim(),
+      isAdmin,
+      roleId: roleId === '' ? null : roleId,
+    });
 
-  const mismatch = confirm.length > 0 && password !== confirm;
-  const canSubmit =
-    !!password && password === confirm && (!withUsername || !!username.trim()) && !pending;
+  const canSubmit = !!username.trim() && isValidSetupKey(setupKey) && !pending;
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      fullWidth
-      maxWidth="xs"
-      TransitionProps={{ onExited: reset }}
-    >
-      <DialogTitle>{title}</DialogTitle>
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs" TransitionProps={{ onExited: reset }}>
+      <DialogTitle>{t('settings.users.addUser')}</DialogTitle>
       <DialogContent>
         <Stack
           component="form"
@@ -860,35 +916,24 @@ function PasswordDialog({
             if (canSubmit) submit();
           }}
         >
-          {withUsername && (
-            <TextField
-              label={t('settings.users.username')}
-              size="small"
-              value={username}
-              autoFocus
-              onChange={(e) => setUsername(e.target.value)}
-            />
-          )}
           <TextField
-            type="password"
-            label={t('settings.users.password')}
+            label={t('settings.users.username')}
             size="small"
-            value={password}
-            autoComplete="new-password"
-            autoFocus={!withUsername}
-            onChange={(e) => setPassword(e.target.value)}
+            value={username}
+            autoFocus
+            onChange={(e) => setUsername(e.target.value)}
           />
           <TextField
-            type="password"
-            label={t('settings.users.confirmPassword')}
+            type="email"
+            label={t('settings.users.emailOptional')}
             size="small"
-            value={confirm}
-            autoComplete="new-password"
-            error={mismatch}
-            helperText={mismatch ? t('settings.users.passwordMismatch') : ' '}
-            onChange={(e) => setConfirm(e.target.value)}
+            value={email}
+            autoComplete="off"
+            onChange={(e) => setEmail(e.target.value)}
+            helperText={t('settings.users.emailHelper')}
           />
-          {withUsername && roles && !isAdmin && (
+          <SetupKeyField value={setupKey} onChange={setSetupKey} />
+          {roles && !isAdmin && (
             <TextField
               select
               label={t('settings.users.role')}
@@ -905,14 +950,10 @@ function PasswordDialog({
               ))}
             </TextField>
           )}
-          {withUsername && (
-            <FormControlLabel
-              control={
-                <Checkbox checked={isAdmin} onChange={(e) => setIsAdmin(e.target.checked)} />
-              }
-              label={t('settings.users.administratorFullAccess')}
-            />
-          )}
+          <FormControlLabel
+            control={<Checkbox checked={isAdmin} onChange={(e) => setIsAdmin(e.target.checked)} />}
+            label={t('settings.users.administratorFullAccess')}
+          />
           {error && <Alert severity="error">{error}</Alert>}
           {/* Hidden submit so Enter works. */}
           <button type="submit" style={{ display: 'none' }} />
@@ -921,7 +962,66 @@ function PasswordDialog({
       <DialogActions>
         <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
         <Button variant="contained" disabled={!canSubmit} onClick={submit}>
-          {pending ? t('common.states.saving') : submitLabel}
+          {pending ? t('common.states.saving') : t('common.actions.create')}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/** Admin requires a password reset: the user's password stops working and they must enter the setup key
+ * shown here (which the admin passes on) at their next sign-in to choose a new one. */
+function RequireResetDialog({
+  user,
+  onClose,
+  onSubmit,
+  pending,
+  error,
+}: {
+  user: UserDto | null;
+  onClose: () => void;
+  onSubmit: (setupKey: string) => void;
+  pending: boolean;
+  error?: string | null;
+}) {
+  const { t } = useTranslation();
+  const [setupKey, setSetupKey] = useState(() => generateSetupKey());
+  const canSubmit = isValidSetupKey(setupKey) && !pending;
+  const submit = () => onSubmit(setupKey.trim());
+
+  return (
+    <Dialog
+      open={!!user}
+      onClose={onClose}
+      fullWidth
+      maxWidth="xs"
+      TransitionProps={{ onExited: () => setSetupKey(generateSetupKey()) }}
+    >
+      <DialogTitle>
+        {user ? t('settings.users.requireResetTitleFor', { username: user.username }) : t('settings.users.requireResetTitle')}
+      </DialogTitle>
+      <DialogContent>
+        <Stack
+          component="form"
+          spacing={2}
+          sx={{ mt: 1 }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (canSubmit) submit();
+          }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            {t('settings.users.requireResetDescription')}
+          </Typography>
+          <SetupKeyField value={setupKey} onChange={setSetupKey} autoFocus />
+          {error && <Alert severity="error">{error}</Alert>}
+          <button type="submit" style={{ display: 'none' }} />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
+        <Button variant="contained" color="warning" disabled={!canSubmit} onClick={submit}>
+          {pending ? t('common.states.saving') : t('settings.users.requireResetButton')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -948,10 +1048,12 @@ function UserEditDialog({
   const [grant, setGrant] = useState<string[]>(user.grant ?? []);
   const [deny, setDeny] = useState<string[]>(user.deny ?? []);
   const [isAdmin, setIsAdmin] = useState(user.isAdmin);
+  const [email, setEmail] = useState(user.email ?? '');
 
   const save = useMutation({
     mutationFn: () =>
       api.userUpdate(user.id, {
+        email: email.trim() || null,
         roleId: roleId === '' ? null : roleId,
         grant,
         deny,
@@ -969,9 +1071,20 @@ function UserEditDialog({
       <DialogTitle>{t('settings.users.editAccessTitle', { username: user.username })}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField
+            type="email"
+            label={t('settings.users.emailOptional')}
+            size="small"
+            value={email}
+            autoComplete="off"
+            onChange={(e) => setEmail(e.target.value)}
+            helperText={t('settings.users.emailHelper')}
+            sx={{ maxWidth: 420 }}
+          />
           <FormControlLabel
             control={<Checkbox checked={isAdmin} onChange={(e) => setIsAdmin(e.target.checked)} />}
             label={t('settings.users.administratorFullAccess')}
+            disabled={user.isSystem}
           />
           {!isAdmin && (
             <>
@@ -1027,7 +1140,7 @@ function UserEditDialog({
   );
 }
 
-/** Admin-only management of all accounts (create / delete / reset password). */
+/** Admin-only management of all accounts (create / edit / delete / require a password reset). */
 function ManageUsersCard() {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -1042,8 +1155,13 @@ function ManageUsersCard() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ['users'] });
 
   const create = useMutation({
-    mutationFn: (v: { username: string; password: string; isAdmin: boolean; roleId: number | null }) =>
-      api.userCreate({ username: v.username, password: v.password, isAdmin: v.isAdmin, roleId: v.roleId }),
+    mutationFn: (v: {
+      username: string;
+      email: string | null;
+      setupKey: string;
+      isAdmin: boolean;
+      roleId: number | null;
+    }) => api.userCreate(v),
     onSuccess: () => {
       setCreateOpen(false);
       invalidate();
@@ -1054,8 +1172,11 @@ function ManageUsersCard() {
     onSuccess: invalidate,
   });
   const reset = useMutation({
-    mutationFn: (v: { id: number; password: string }) => api.userResetPassword(v.id, v.password),
-    onSuccess: () => setResetFor(null),
+    mutationFn: (v: { id: number; setupKey: string }) => api.userRequirePasswordReset(v.id, v.setupKey),
+    onSuccess: () => {
+      setResetFor(null);
+      invalidate();
+    },
   });
 
   return (
@@ -1095,6 +1216,22 @@ function ManageUsersCard() {
                   {u.isSystem && (
                     <Chip label={t('settings.users.systemChip')} size="small" sx={{ ml: 1 }} variant="outlined" />
                   )}
+                  {u.setupPending && (
+                    <Tooltip title={t('settings.users.setupPendingTooltip')}>
+                      <Chip
+                        label={t('settings.users.setupPendingChip')}
+                        size="small"
+                        color="warning"
+                        sx={{ ml: 1 }}
+                        variant="outlined"
+                      />
+                    </Tooltip>
+                  )}
+                  {u.email && (
+                    <Typography variant="caption" color="text.secondary" component="div">
+                      {u.email}
+                    </Typography>
+                  )}
                 </TableCell>
                 <TableCell>
                   {u.isAdmin
@@ -1107,12 +1244,12 @@ function ManageUsersCard() {
                 <TableCell align="right">
                   <Tooltip title={t('settings.users.editAccessTooltip')}>
                     <span>
-                      <IconButton size="small" disabled={u.isSystem} onClick={() => setEditFor(u)}>
+                      <IconButton size="small" onClick={() => setEditFor(u)}>
                         <EditIcon fontSize="small" />
                       </IconButton>
                     </span>
                   </Tooltip>
-                  <Tooltip title={t('settings.users.resetPasswordTooltip')}>
+                  <Tooltip title={t('settings.users.requireResetTooltip')}>
                     <IconButton size="small" onClick={() => setResetFor(u)}>
                       <KeyIcon fontSize="small" />
                     </IconButton>
@@ -1138,12 +1275,9 @@ function ManageUsersCard() {
         </Table>
       )}
 
-      <PasswordDialog
+      <CreateUserDialog
         open={createOpen}
-        title={t('settings.users.addUser')}
-        withUsername
         roles={rolesQuery.data}
-        submitLabel={t('common.actions.create')}
         pending={create.isPending}
         error={create.error instanceof ApiError ? create.error.message : null}
         onClose={() => setCreateOpen(false)}
@@ -1160,15 +1294,12 @@ function ManageUsersCard() {
           }}
         />
       )}
-      <PasswordDialog
-        open={!!resetFor}
-        title={resetFor ? t('settings.users.resetTitleFor', { username: resetFor.username }) : t('settings.users.resetTitle')}
-        withUsername={false}
-        submitLabel={t('common.actions.reset')}
+      <RequireResetDialog
+        user={resetFor}
         pending={reset.isPending}
         error={reset.error instanceof ApiError ? reset.error.message : null}
         onClose={() => setResetFor(null)}
-        onSubmit={(v) => resetFor && reset.mutate({ id: resetFor.id, password: v.password })}
+        onSubmit={(setupKey) => resetFor && reset.mutate({ id: resetFor.id, setupKey })}
       />
     </Paper>
   );

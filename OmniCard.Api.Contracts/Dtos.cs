@@ -1332,6 +1332,7 @@ public sealed record ScanFolderSettingsResponse(ScanFolderSettingsDto Settings, 
 /// </summary>
 public sealed record AuthStatusDto(bool AuthRequired, bool Authenticated, string? Username = null, bool IsAdmin = false, IReadOnlyList<string>? Permissions = null);
 
+/// <summary>Password sign-in. <see cref="Username"/> accepts the username or the account's email.</summary>
 public sealed record LoginRequest
 {
     public string Username { get; init; } = "";
@@ -1339,25 +1340,53 @@ public sealed record LoginRequest
     public bool RememberMe { get; init; }
 }
 
+/// <summary>First sign-in step: the username or email the user typed.</summary>
+public sealed record SignInStepRequest
+{
+    public string Login { get; init; } = "";
+}
+
+/// <summary>What to ask for next. <paramref name="Step"/> is "password", "setupKey" (enter the
+/// admin-issued key + choose a new password) or "locked" (the key was voided; ask an admin for a new one).
+/// Unknown accounts report "password" so the screen doesn't reveal which accounts exist.</summary>
+public sealed record SignInStepDto(string Step);
+
+/// <summary>Finish a first sign-in or an admin-required password reset with the setup key the admin gave
+/// the user, choosing a new password. Signs in on success.</summary>
+public sealed record CompleteSetupRequest
+{
+    public string Login { get; init; } = "";
+    public string SetupKey { get; init; } = "";
+    public string NewPassword { get; init; } = "";
+    public bool RememberMe { get; init; }
+}
+
 /// <summary>A user account as exposed to the Administration UI (never carries the password hash).
 /// <paramref name="RoleId"/> is the assigned role; <paramref name="Grant"/>/<paramref name="Deny"/>
-/// are the per-user overrides layered on top.</summary>
+/// are the per-user overrides layered on top. <paramref name="SetupPending"/> is true while the user still
+/// has to choose a password: a setup key is pending (new account or required reset), or the key was voided
+/// by too many wrong tries and the admin must issue another.</summary>
 public sealed record UserDto(int Id, string Username, bool IsSystem, bool IsAdmin, DateTime CreatedAt,
-    int? RoleId = null, IReadOnlyList<string>? Grant = null, IReadOnlyList<string>? Deny = null);
+    int? RoleId = null, IReadOnlyList<string>? Grant = null, IReadOnlyList<string>? Deny = null,
+    string? Email = null, bool SetupPending = false);
 
+/// <summary>Create an account. There's no password: the admin picks a <see cref="SetupKey"/> (letters and
+/// digits) and gives it to the user, who enters it at their first sign-in to choose a password.</summary>
 public sealed record CreateUserRequest
 {
     public string Username { get; init; } = "";
-    public string Password { get; init; } = "";
+    public string? Email { get; init; }
+    public string SetupKey { get; init; } = "";
     public bool IsAdmin { get; init; }
     public int? RoleId { get; init; }
     public IReadOnlyList<string>? Grant { get; init; }
     public IReadOnlyList<string>? Deny { get; init; }
 }
 
-/// <summary>Admin edit of a user's access: role, per-user overrides, and the admin flag.</summary>
+/// <summary>Admin edit of a user: email (blank clears it), role, per-user overrides, and the admin flag.</summary>
 public sealed record UpdateUserRequest
 {
+    public string? Email { get; init; }
     public int? RoleId { get; init; }
     public IReadOnlyList<string>? Grant { get; init; }
     public IReadOnlyList<string>? Deny { get; init; }
@@ -1386,10 +1415,11 @@ public sealed record ChangePasswordRequest
     public string NewPassword { get; init; } = "";
 }
 
-/// <summary>Admin password reset for another user (no current password needed).</summary>
-public sealed record ResetPasswordRequest
+/// <summary>Admin-required password reset: the user's current password stops working and they must enter
+/// <see cref="SetupKey"/> (which the admin gives them) at their next sign-in to choose a new one.</summary>
+public sealed record RequirePasswordResetRequest
 {
-    public string NewPassword { get; init; } = "";
+    public string SetupKey { get; init; } = "";
 }
 
 // --- Sites ---------------------------------------------------------------------------------------

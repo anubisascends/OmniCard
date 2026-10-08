@@ -58,7 +58,7 @@ public class PermissionServiceTests : IDisposable
     public async Task NewUser_Defaults_To_ViewOnly_ViaViewerRole()
     {
         _users.EnsureSeeded();
-        var alice = await _users.CreateAsync("alice", "pw-1234"); // no role → defaults to Viewer
+        var alice = await _users.CreateAsync("alice", "SETUP1234"); // no role → defaults to Viewer
 
         var effective = await _perms.GetEffectiveAsync(alice.Id);
         Assert.Equal(Permissions.ViewOnly.OrderBy(x => x), effective.OrderBy(x => x));
@@ -70,7 +70,7 @@ public class PermissionServiceTests : IDisposable
     public async Task Overrides_Grant_Adds_And_Deny_Removes()
     {
         _users.EnsureSeeded();
-        var bob = await _users.CreateAsync("bob", "pw-1234"); // Viewer baseline (all *.view)
+        var bob = await _users.CreateAsync("bob", "SETUP1234"); // Viewer baseline (all *.view)
 
         // Grant an edit permission; deny a view permission the role provides.
         await _users.UpdateUserAsync(bob.Id, bob.RoleId,
@@ -79,7 +79,7 @@ public class PermissionServiceTests : IDisposable
                 Grant = [Permissions.CollectionEdit],
                 Deny = [Permissions.CollectionView],
             },
-            isAdmin: false);
+            isAdmin: false, email: null);
         _perms.Invalidate(bob.Id);
 
         Assert.True(await _perms.HasPermissionAsync(bob.Id, Permissions.CollectionEdit));   // granted
@@ -91,10 +91,10 @@ public class PermissionServiceTests : IDisposable
     public async Task Making_User_Admin_Unlocks_Everything_After_Invalidate()
     {
         _users.EnsureSeeded();
-        var carol = await _users.CreateAsync("carol", "pw-1234");
+        var carol = await _users.CreateAsync("carol", "SETUP1234");
         Assert.False(await _perms.HasPermissionAsync(carol.Id, Permissions.EbayManage));
 
-        await _users.UpdateUserAsync(carol.Id, carol.RoleId, carol.Overrides, isAdmin: true);
+        await _users.UpdateUserAsync(carol.Id, carol.RoleId, carol.Overrides, isAdmin: true, email: null);
         _perms.Invalidate(carol.Id); // mirrors what UsersController does
 
         Assert.True(await _perms.HasPermissionAsync(carol.Id, Permissions.EbayManage));

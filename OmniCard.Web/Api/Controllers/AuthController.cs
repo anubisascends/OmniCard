@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
+using OmniCard.Shared.Settings;
 using OmniCard.Web.Services;
 using OmniCard.Web.Api.Infrastructure;
 
@@ -31,6 +32,20 @@ public sealed class AuthController(UserService users, PermissionService permissi
             Permissions: perms);
     }
 
+    /// <summary>Sign-in step 1: given the username or email, say whether to ask for the password or for
+    /// the admin-issued setup key (new account / required reset).</summary>
+    [HttpPost("sign-in-step")]
+    public async Task<ActionResult<SignInStepDto>> GetSignInStep([FromBody] SignInStepRequest request)
+    {
+        var step = await users.GetSignInStepAsync(request.Login);
+        return new SignInStepDto(step switch
+        {
+            SignInStep.SetupKey => "setupKey",
+            SignInStep.Locked => "locked",
+            _ => "password",
+        });
+    }
+
     [HttpPost("login")]
     public async Task<ActionResult<AuthStatusDto>> Login([FromBody] LoginRequest request)
     {
@@ -38,7 +53,45 @@ public sealed class AuthController(UserService users, PermissionService permissi
         if (user is null)
             return Unauthorized(new { error = "Incorrect username or password." });
 
-        await AppAuthGate.SignInAsync(HttpContext, user, request.RememberMe);
+        return await SignInAsync(user, request.RememberMe);
+    }
+
+    /// <summary>Sign-in step 2 for a new account or a required reset: check the setup key, set the new
+    /// password, and sign in.</summary>
+    [HttpPost("complete-setup")]
+    public async Task<ActionResult<AuthStatusDto>> CompleteSetup([FromBody] CompleteSetupRequest request)
+    {
+        SetupKeyOutcome outcome;
+        try
+        {
+            outcome = await users.CompleteSetupAsync(request.Login, request.SetupKey, request.NewPassword);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+
+        return outcome.Result switch
+        {
+            SetupKeyResult.Ok => await SignInAsync(outcome.User!, request.RememberMe),
+            SetupKeyResult.Locked => BadRequest(new
+            {
+                error = "Too many incorrect setup keys. Ask an administrator for a new one.",
+                locked = true,
+            }),
+            SetupKeyResult.NotPending => BadRequest(new { error = "This account already has a password. Sign in with it instead." }),
+            _ => BadRequest(new
+            {
+                error = outcome.AttemptsLeft > 0
+                    ? $"That setup key is incorrect. {outcome.AttemptsLeft} attempt(s) left."
+                    : "That setup key is incorrect.",
+            }),
+        };
+    }
+
+    private async Task<ActionResult<AuthStatusDto>> SignInAsync(User user, bool rememberMe)
+    {
+        await AppAuthGate.SignInAsync(HttpContext, user, rememberMe);
         var perms = (await permissions.GetEffectiveAsync(user.Id)).OrderBy(p => p).ToList();
         return new AuthStatusDto(true, true, user.Username, user.IsAdmin || user.IsSystem, perms);
     }

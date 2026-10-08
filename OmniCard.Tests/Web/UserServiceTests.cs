@@ -6,8 +6,8 @@ using OmniCard.Web.Services;
 namespace OmniCard.Tests.Web;
 
 /// <summary>
-/// Covers password hashing and the user-account service (seeding, auth, create/delete, and the
-/// password change/reset flows). Uses the same in-memory SQLite pattern as the other web tests.
+/// Covers password hashing and the user-account service (seeding, username/email auth, create/delete,
+/// setup-key first sign-in, admin-required resets, and self-service password change). Uses the same in-memory SQLite pattern as the other web tests.
 /// </summary>
 public class UserServiceTests : IDisposable
 {
@@ -79,16 +79,41 @@ public class UserServiceTests : IDisposable
 
     // --- Create / duplicate / delete ---
 
-    [Fact]
-    public async Task Create_Then_Authenticate_And_RejectsDuplicate()
+    // Creates an account and redeems its setup key, as the user would on first sign-in.
+    private async Task<OmniCard.Shared.Settings.User> CreateWithPasswordAsync(string username, string password, string? email = null)
     {
-        var u = await _users.CreateAsync("alice", "pw-1234", isAdmin: false);
+        var u = await _users.CreateAsync(username, "SETUP1234", email: email);
+        Assert.Equal(SetupKeyResult.Ok, (await _users.CompleteSetupAsync(username, "SETUP1234", password)).Result);
+        return u;
+    }
+
+    [Fact]
+    public async Task Create_RequiresSetupKey_Then_Authenticate_And_RejectsDuplicate()
+    {
+        var u = await _users.CreateAsync("alice", "Setup1234", isAdmin: false);
         Assert.True(u.Id > 0);
         Assert.False(u.IsSystem);
+        Assert.Equal(SignInStep.SetupKey, await _users.GetSignInStepAsync("alice"));
+        Assert.Null(await _users.AuthenticateAsync("alice", "Setup1234")); // the key isn't a password
+
+        // Keys are case-insensitive so they can be read aloud.
+        var outcome = await _users.CompleteSetupAsync("alice", "setup1234", "pw-1234");
+        Assert.Equal(SetupKeyResult.Ok, outcome.Result);
+        Assert.Equal(SignInStep.Password, await _users.GetSignInStepAsync("alice"));
         Assert.NotNull(await _users.AuthenticateAsync("alice", "pw-1234"));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _users.CreateAsync("alice", "other", false));
+        // A used key can't be redeemed again.
+        Assert.Equal(SetupKeyResult.NotPending, (await _users.CompleteSetupAsync("alice", "SETUP1234", "x")).Result);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _users.CreateAsync("alice", "OTHER1234", false));
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("abc12")]          // too short
+    [InlineData("has space1")]
+    [InlineData("symbol!123")]
+    public async Task Create_Rejects_InvalidSetupKey(string key) =>
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _users.CreateAsync("erin", key));
 
     [Fact]
     public async Task Delete_Blocks_SystemAccount_ButAllowsOthers()
@@ -97,17 +122,55 @@ public class UserServiceTests : IDisposable
         var admin = (await _users.ListAsync()).Single();
         Assert.False(await _users.DeleteAsync(admin.Id)); // system account protected
 
-        var bob = await _users.CreateAsync("bob", "pw-1234");
+        var bob = await _users.CreateAsync("bob", "SETUP1234");
         Assert.True(await _users.DeleteAsync(bob.Id));
         Assert.Null(await _users.FindByIdAsync(bob.Id));
     }
 
-    // --- Password change / reset ---
+    // --- Email sign-in ---
+
+    [Fact]
+    public async Task Email_IsNormalized_Unique_And_WorksAsLogin()
+    {
+        await CreateWithPasswordAsync("frank", "pw-frank", email: "  Frank@Example.COM ");
+        Assert.Equal("frank@example.com", (await _users.ListAsync()).Single().Email);
+
+        Assert.NotNull(await _users.AuthenticateAsync("FRANK@example.com", "pw-frank"));
+        Assert.NotNull(await _users.AuthenticateAsync("frank", "pw-frank"));
+        Assert.Null(await _users.AuthenticateAsync("frank@example.com", "wrong"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _users.CreateAsync("frank2", "SETUP1234", email: "frank@example.com"));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _users.CreateAsync("gina", "SETUP1234", email: "not-an-email"));
+    }
+
+    [Fact]
+    public async Task UpdateUser_SetsAndClearsEmail_RejectsTaken()
+    {
+        var a = await _users.CreateAsync("hank", "SETUP1234", email: "hank@example.com");
+        var b = await _users.CreateAsync("ivy", "SETUP1234");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _users.UpdateUserAsync(b.Id, b.RoleId, b.Overrides, false, "hank@example.com"));
+        Assert.Equal("ivy@example.com", (await _users.UpdateUserAsync(b.Id, b.RoleId, b.Overrides, false, "Ivy@example.com"))!.Email);
+        Assert.Null((await _users.UpdateUserAsync(a.Id, a.RoleId, a.Overrides, false, "  "))!.Email);
+    }
+
+    [Fact]
+    public async Task SignInStep_ReportsPassword_ForUnknownLogin()
+    {
+        Assert.Equal(SignInStep.Password, await _users.GetSignInStepAsync("nobody"));
+        Assert.Equal(SignInStep.Password, await _users.GetSignInStepAsync("nobody@example.com"));
+        Assert.Equal(SetupKeyResult.InvalidKey, (await _users.CompleteSetupAsync("nobody", "SETUP1234", "x")).Result);
+    }
+
+    // --- Password change / required reset ---
 
     [Fact]
     public async Task ChangePassword_RequiresCurrent()
     {
-        var u = await _users.CreateAsync("carol", "old-pass");
+        var u = await CreateWithPasswordAsync("carol", "old-pass");
 
         Assert.False(await _users.ChangePasswordAsync(u.Id, "wrong-current", "new-pass"));
         Assert.NotNull(await _users.AuthenticateAsync("carol", "old-pass")); // unchanged
@@ -118,11 +181,56 @@ public class UserServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ResetPassword_Sets_WithoutCurrent()
+    public async Task RequirePasswordReset_VoidsPassword_UntilKeyRedeemed()
     {
-        var u = await _users.CreateAsync("dave", "old-pass");
-        Assert.True(await _users.ResetPasswordAsync(u.Id, "reset-pass"));
-        Assert.NotNull(await _users.AuthenticateAsync("dave", "reset-pass"));
+        var u = await CreateWithPasswordAsync("dave", "old-pass");
+        Assert.True(await _users.RequirePasswordResetAsync(u.Id, "RESET5678"));
+
+        Assert.Null(await _users.AuthenticateAsync("dave", "old-pass")); // old password stops working at once
+        Assert.Equal(SignInStep.SetupKey, await _users.GetSignInStepAsync("dave"));
+        Assert.True((await _users.FindByIdAsync(u.Id))!.SetupKeyHash is not null);
+
+        Assert.Equal(SetupKeyResult.Ok, (await _users.CompleteSetupAsync("dave", "RESET5678", "new-pass")).Result);
+        Assert.NotNull(await _users.AuthenticateAsync("dave", "new-pass"));
+        Assert.Null((await _users.FindByIdAsync(u.Id))!.SetupKeyHash);
+    }
+
+    [Fact]
+    public async Task RequirePasswordReset_Rejects_InvalidKey_OrUnknownUser()
+    {
+        var u = await CreateWithPasswordAsync("jill", "pw");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _users.RequirePasswordResetAsync(u.Id, "x"));
+        Assert.NotNull(await _users.AuthenticateAsync("jill", "pw")); // untouched by the rejected request
+        Assert.False(await _users.RequirePasswordResetAsync(9999, "RESET5678"));
+    }
+
+    [Fact]
+    public async Task WrongSetupKeys_CountDown_ThenLockUntilReissued()
+    {
+        var u = await _users.CreateAsync("kim", "SETUP1234");
+
+        for (var i = 1; i < SetupKeys.MaxFailedAttempts; i++)
+        {
+            var miss = await _users.CompleteSetupAsync("kim", "WRONG0000", "pw");
+            Assert.Equal(SetupKeyResult.InvalidKey, miss.Result);
+            Assert.Equal(SetupKeys.MaxFailedAttempts - i, miss.AttemptsLeft);
+        }
+        Assert.Equal(SetupKeyResult.Locked, (await _users.CompleteSetupAsync("kim", "WRONG0000", "pw")).Result);
+
+        // The right key no longer works: the account is locked until an admin issues a new one.
+        Assert.Equal(SignInStep.Locked, await _users.GetSignInStepAsync("kim"));
+        Assert.Equal(SetupKeyResult.Locked, (await _users.CompleteSetupAsync("kim", "SETUP1234", "pw")).Result);
+
+        Assert.True(await _users.RequirePasswordResetAsync(u.Id, "AGAIN2345"));
+        Assert.Equal(SetupKeyResult.Ok, (await _users.CompleteSetupAsync("kim", "AGAIN2345", "pw")).Result);
+    }
+
+    [Fact]
+    public async Task CompleteSetup_BlankPassword_Throws_WithoutCostingAnAttempt()
+    {
+        var u = await _users.CreateAsync("lou", "SETUP1234");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _users.CompleteSetupAsync("lou", "WRONG0000", ""));
+        Assert.Equal(0, (await _users.FindByIdAsync(u.Id))!.SetupKeyFailedAttempts);
     }
 
     private sealed class MockFactory(DbContextOptions<OmniCardDbContext> options) : IDbContextFactory<OmniCardDbContext>

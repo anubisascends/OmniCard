@@ -33,41 +33,59 @@ Anyone can change their own password.
 3. Enter a **New password**, then type it again in **Confirm new password**.
 4. Click **Change password**. You'll see *Password changed.*
 
-If the two new passwords don't match, the form says *Passwords don't match.* If your current password is wrong, you'll see *Current password is incorrect.* If you've forgotten your password, ask an administrator to reset it.
+If the two new passwords don't match, the form says *Passwords don't match.* If your current password is wrong, you'll see *Current password is incorrect.* If you've forgotten your password, ask an administrator to require a password reset.
 
 ## Users
 
-Administrators see a list of every account below **Your password**, with each person's **Username** and **Role**.
+Administrators see a list of every account below **Your password**, with each person's **Username** (and email, if they have one) and **Role**.
 
-- **system** marks the built-in Admin account. It can't be deleted and always has full access, but you can reset its password.
+- **system** marks the built-in Admin account. It can't be deleted and always has full access, but you can require a password reset for it.
+- **awaiting password** means the person hasn't used their setup key yet, so they can't sign in until they do.
 - **custom** means the person has extra permissions given or taken away on top of their role.
 
 ![The Users tab with the list of accounts](administration-users.png)
 
 ### Add a user
 
+You don't choose the new person's password. You give them a **setup key**, and they choose their own password the first time they sign in.
+
 1. Click **Add user**.
-2. Enter a **Username**, a **Password** and **Confirm password**.
-3. Choose a **Role**. If you leave it as **No role**, the new user gets the *Viewer* role, which can look at everything but change nothing.
-4. Tick **Administrator (full access)** instead if this person should be able to do everything, including managing users.
-5. Click **Create**.
+2. Enter a **Username**.
+3. Optionally enter an **Email (optional)**. The person can then sign in with their email instead of their username. Each email can belong to only one account.
+4. A **Setup key** is filled in for you. Click **Generate** for a different one, or type your own: 6 to 64 letters or numbers, with no spaces or symbols. Capitals don't matter.
+5. Choose a **Role**. If you leave it as **No role**, the new user gets the *Viewer* role, which can look at everything but change nothing.
+6. Tick **Administrator (full access)** instead if this person should be able to do everything, including managing users.
+7. Click **Create**.
+8. Give the person their username and setup key, in person or by a message only they can read. Use the copy button next to the key to copy it.
+
+The new account shows **awaiting password** until the person signs in with the key and chooses a password.
 
 ### Change what a user can do
 
-1. Click the **Edit access** button (pencil) on the user's row.
-2. Tick or untick **Administrator (full access)**. Administrators skip roles and permissions entirely.
-3. For everyone else, choose a **Role**.
-4. Under **Also allow (grant)**, tick extra permissions this person should have beyond their role.
-5. Under **Never allow (deny)**, tick permissions to take away from this person even if their role includes them.
-6. Click **Save**.
+1. Click the **Edit user** button (pencil) on the user's row.
+2. Change or clear the **Email (optional)** if needed.
+3. Tick or untick **Administrator (full access)**. Administrators skip roles and permissions entirely. The built-in Admin account is always an administrator.
+4. For everyone else, choose a **Role**.
+5. Under **Also allow (grant)**, tick extra permissions this person should have beyond their role.
+6. Under **Never allow (deny)**, tick permissions to take away from this person even if their role includes them.
+7. Click **Save**.
 
 Changes take effect straight away. The person doesn't need to sign out and back in. Their sidebar updates the next time they move to another page.
 
-### Reset a password
+### Require a password reset
 
-1. Click the **Reset password** button (key) on the user's row.
-2. Enter the new **Password** and **Confirm password**.
-3. Click **Reset**, then tell the person their new password. They can change it themselves afterwards.
+Use this when someone has forgotten their password, or you think someone else knows it. You never see or set their new password.
+
+1. Click the **Require password reset** button (key) on the user's row.
+2. A **Setup key** is filled in for you. Click **Generate** for a different one, or type your own.
+3. Click **Require reset**. The person's current password stops working straight away, and their row shows **awaiting password**.
+4. Give them the setup key. The next time they sign in, they enter it and choose a new password.
+
+> [!NOTE]
+> If someone enters the wrong setup key 5 times, the key stops working. Require a password reset again to give them a new one.
+
+> [!WARNING]
+> Requiring a reset doesn't sign the person out of browsers where they're already signed in. They stay signed in there until they click **Sign out** or their session ends.
 
 ### Delete a user
 
@@ -288,6 +306,8 @@ The **Status** shows one of:
 - **Not configured**: the server is missing eBay app credentials. Whoever runs the server needs to add them first.
 
 When you're connected, **Run seller setup** creates your eBay inventory location and business policies from the seller settings below. **Disconnect** unlinks your account.
+
+![The eBay tab showing a Connected status, the Run seller setup and Disconnect buttons, and the seller settings](administration-ebay-connected.png)
 
 ### Seller settings
 

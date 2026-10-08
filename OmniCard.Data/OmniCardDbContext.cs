@@ -366,6 +366,10 @@ public class OmniCardDbContext : DbContext
             // Usernames are unique (case-insensitive matching is handled in the service; the DB index
             // enforces the hard uniqueness constraint under SQL Server's default case-insensitive collation).
             e.HasIndex(u => u.Username).IsUnique();
+            // Emails are optional but unique when set (SQL Server filters NULLs out of the unique index;
+            // the service stores them lower-cased so SQLite's case-sensitive compare agrees).
+            e.Property(u => u.Email).HasMaxLength(256);
+            e.HasIndex(u => u.Email).IsUnique();
             e.Property(u => u.Overrides)
                 .HasConversion(overridesConverter)
                 .Metadata.SetValueComparer(overridesComparer);

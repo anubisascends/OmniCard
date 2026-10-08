@@ -9,15 +9,17 @@ namespace OmniCard.Web.Api.Controllers;
 
 /// <summary>
 /// User management for the Administration ▸ Users tab. Every endpoint requires an admin (the built-in
-/// Admin account is always an admin). Self-service password change lives on <see cref="AuthController"/>
-/// so any signed-in user can reach it.
+/// Admin account is always an admin). Accounts never get an admin-chosen password: creation and
+/// "require password reset" issue a one-time setup key the user redeems at sign-in. Self-service password
+/// change lives on <see cref="AuthController"/> so any signed-in user can reach it.
 /// </summary>
 [ApiAuth(RequireAdmin = true)]
 public sealed class UsersController(UserService users, PermissionService permissions,
     SiteAccessService siteAccess, SiteService sites, SavedViewService savedViews) : ApiControllerBase
 {
     private static UserDto ToDto(User u) =>
-        new(u.Id, u.Username, u.IsSystem, u.IsAdmin, u.CreatedAt, u.RoleId, u.Overrides.Grant, u.Overrides.Deny);
+        new(u.Id, u.Username, u.IsSystem, u.IsAdmin, u.CreatedAt, u.RoleId, u.Overrides.Grant, u.Overrides.Deny,
+            u.Email, u.SetupKeyHash is not null || string.IsNullOrEmpty(u.PasswordHash));
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<UserDto>>> List()
@@ -31,8 +33,8 @@ public sealed class UsersController(UserService users, PermissionService permiss
     {
         try
         {
-            var user = await users.CreateAsync(request.Username, request.Password, request.IsAdmin,
-                request.RoleId, ToOverrides(request.Grant, request.Deny));
+            var user = await users.CreateAsync(request.Username, request.SetupKey, request.IsAdmin,
+                request.RoleId, ToOverrides(request.Grant, request.Deny), request.Email);
             return ToDto(user);
         }
         catch (InvalidOperationException ex)
@@ -47,7 +49,7 @@ public sealed class UsersController(UserService users, PermissionService permiss
         try
         {
             var user = await users.UpdateUserAsync(id, request.RoleId,
-                ToOverrides(request.Grant, request.Deny), request.IsAdmin);
+                ToOverrides(request.Grant, request.Deny), request.IsAdmin, request.Email);
             if (user is null)
                 return NotFound(new { error = "User not found." });
             // Apply immediately: the user's next request re-resolves their permissions from the DB.
@@ -76,12 +78,14 @@ public sealed class UsersController(UserService users, PermissionService permiss
     private static PermissionOverrides ToOverrides(IReadOnlyList<string>? grant, IReadOnlyList<string>? deny) =>
         new() { Grant = grant?.ToList() ?? [], Deny = deny?.ToList() ?? [] };
 
-    [HttpPost("{id:int}/reset-password")]
-    public async Task<IActionResult> ResetPassword(int id, [FromBody] ResetPasswordRequest request)
+    /// <summary>Void the user's password; they must enter <see cref="RequirePasswordResetRequest.SetupKey"/>
+    /// (given to them by the admin) at their next sign-in and choose a new one.</summary>
+    [HttpPost("{id:int}/require-password-reset")]
+    public async Task<IActionResult> RequirePasswordReset(int id, [FromBody] RequirePasswordResetRequest request)
     {
         try
         {
-            var ok = await users.ResetPasswordAsync(id, request.NewPassword);
+            var ok = await users.RequirePasswordResetAsync(id, request.SetupKey);
             if (!ok)
                 return NotFound(new { error = "User not found." });
             return NoContent();

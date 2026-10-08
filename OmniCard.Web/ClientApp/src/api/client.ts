@@ -79,6 +79,7 @@ import type {
   TradeSearchResult,
   TradeSessionState,
   TradeSummaryDto,
+  SignInStepDto,
   UserDto,
   RoleDto,
   PermissionCatalogDto,
@@ -275,6 +276,16 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ username, password, rememberMe }),
     }),
+  signInStep: (login: string) =>
+    request<SignInStepDto>('/api/auth/sign-in-step', {
+      method: 'POST',
+      body: JSON.stringify({ login }),
+    }),
+  completeSetup: (login: string, setupKey: string, newPassword: string, rememberMe: boolean) =>
+    request<AuthStatusDto>('/api/auth/complete-setup', {
+      method: 'POST',
+      body: JSON.stringify({ login, setupKey, newPassword, rememberMe }),
+    }),
   logout: () => request<AuthStatusDto>('/api/auth/logout', { method: 'POST' }),
   changePassword: (currentPassword: string, newPassword: string) =>
     request<void>('/api/auth/change-password', {
@@ -286,7 +297,8 @@ export const api = {
   users: () => request<UserDto[]>('/api/users'),
   userCreate: (body: {
     username: string;
-    password: string;
+    email?: string | null;
+    setupKey: string;
     isAdmin: boolean;
     roleId?: number | null;
     grant?: string[];
@@ -294,13 +306,13 @@ export const api = {
   }) => request<UserDto>('/api/users', { method: 'POST', body: JSON.stringify(body) }),
   userUpdate: (
     id: number,
-    body: { roleId: number | null; grant: string[]; deny: string[]; isAdmin: boolean },
+    body: { email: string | null; roleId: number | null; grant: string[]; deny: string[]; isAdmin: boolean },
   ) => request<UserDto>(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   userDelete: (id: number) => request<void>(`/api/users/${id}`, { method: 'DELETE' }),
-  userResetPassword: (id: number, newPassword: string) =>
-    request<void>(`/api/users/${id}/reset-password`, {
+  userRequirePasswordReset: (id: number, setupKey: string) =>
+    request<void>(`/api/users/${id}/require-password-reset`, {
       method: 'POST',
-      body: JSON.stringify({ newPassword }),
+      body: JSON.stringify({ setupKey }),
     }),
 
   // Roles (Administration ▸ Roles — admin only)
