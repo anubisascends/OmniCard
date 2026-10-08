@@ -416,8 +416,17 @@ House, and Partner's account doesn't see the children's own site.
 
 The Collection page and every location page have a **view button** beside the search box that saves
 the card list's layout: search query, sort, rows per page, *Stack duplicates*, hidden columns + column
-order (the **Columns** toolbar button; the grid's community edition can't drag-reorder), and on a
-location page table/stacked display + *Group by*.
+order (the **Columns** toolbar button; the grid's community edition can't drag-reorder), table row
+grouping (`groupColumns`, the **Group by** toolbar button), and on a location page table/stacked
+display + the stacks' *Group by*.
+
+**Row grouping** nests the card table by Set / Rarity / Condition / Language / Foil / Game (All Games
+only) / Location (Collection page only) / Listing status, outermost first. The grid's community edition
+has no row grouping, so the server does it: `POST /api/collection/grouped` (`CollectionGrouping`)
+groups the whole filtered set, flattens it to header + card rows and pages that sequence (headers carry
+copies + market value; a page starting mid-group repeats its headers as *continued*). It loads and prices
+the whole filtered set per request, like a market-price sort. Groups open expanded; collapse state
+(*Collapse all*, per-group toggles) is per visit and not saved.
 
 - **Scope:** a view belongs to one page — the Collection page, one location, or (admin-shared only) *all
   locations* — and to a game key: one game, the *All Games* selection (`all`), or any game. Personal

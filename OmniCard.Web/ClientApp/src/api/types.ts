@@ -71,6 +71,31 @@ export interface CardDto {
   listingStatus?: string | null;
 }
 
+/**
+ * A group header in a grouped card list. `key` is the raw value ("MH3", "true", "Listed", "" = none);
+ * `label` is display text for data values (set / location / game names) and equals `key` otherwise.
+ * `rows` counts grid rows (stacks when stacking), `quantity` copies, `value` their market value.
+ * `continued` marks a header repeated at the top of a page that starts mid-group.
+ */
+export interface CardGroupDto {
+  id: string;
+  level: number;
+  field: string;
+  key: string;
+  label: string;
+  rows: number;
+  quantity: number;
+  value: number;
+  collapsed: boolean;
+  continued: boolean;
+}
+
+/** One row of a grouped card list page: a group header or a card. */
+export interface GroupedCardRowDto {
+  group?: CardGroupDto | null;
+  card?: CardDto | null;
+}
+
 export interface LocationSummaryDto {
   id: number;
   name: string;
@@ -1126,6 +1151,8 @@ export interface SavedViewStateDto {
   columnOrder: string[];
   display?: 'table' | 'stacks' | null;
   groupBy?: 'type' | 'tag' | null;
+  /** Table row-grouping columns, outermost first (grid field names). Absent on older views. */
+  groupColumns?: string[];
 }
 
 export interface SavedViewDto {

@@ -1,6 +1,6 @@
 # Saved views
 
-A saved view remembers how you like a card list laid out: the search, the sort, rows per page, **Stack duplicates**, which columns show and in what order, and on a location page, table or stacked view and how stacks are grouped. Save as many views as you like and choose one to open by default.
+A saved view remembers how you like a card list laid out: the search, the sort, rows per page, **Stack duplicates**, which columns show and in what order, how rows are grouped, and on a location page, table or stacked view and how stacks are grouped. Save as many views as you like and choose one to open by default.
 
 ## Where saved views work
 
@@ -23,10 +23,11 @@ Each view belongs to:
 | Rows per page | **Rows per page** at the bottom of the list. |
 | Stack duplicates | The **Stack duplicates** switch. |
 | Columns | The **Columns** button. See [Choose columns](#choose-columns). |
+| Row grouping | The **Group by** button. See [Group rows](help:collection#group-rows). |
 | Table or stacked view | The two buttons beside the search box on a location page. |
-| Group by | **Group by** in stacked view. |
+| Stack grouping | **Group by** in stacked view. |
 
-The page you're on, the cards you've selected and any open card details aren't part of a view.
+The page you're on, the cards you've selected, which groups are collapsed and any open card details aren't part of a view.
 
 ## Choose columns
 

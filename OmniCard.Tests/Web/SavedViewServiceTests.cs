@@ -196,6 +196,7 @@ public class SavedViewServiceTests : IDisposable
         {
             Q = "  q  ", Sort = "", Dir = "sideways", PageSize = 7, Display = "grid", GroupBy = "tag",
             HiddenColumns = ["rarity", "rarity", "", "language"],
+            GroupColumns = ["Rarity", "name", "setCode", "rarity"],
         });
 
         Assert.Equal("q", s.Q);
@@ -205,6 +206,7 @@ public class SavedViewServiceTests : IDisposable
         Assert.Null(s.Display);
         Assert.Equal("tag", s.GroupBy);
         Assert.Equal(["rarity", "language"], s.HiddenColumns);
+        Assert.Equal(["rarity", "setCode"], s.GroupColumns); // known group columns only, canonical names
     }
 
     // --- defaults ------------------------------------------------------------------------------

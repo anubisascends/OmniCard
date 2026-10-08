@@ -274,6 +274,53 @@ public sealed record LocationsBoolRequest
 
 public sealed record NameAvailableDto(bool Available);
 
+/// <summary>
+/// A grouped collection search (POST /api/collection/grouped): the same filters as the flat search plus
+/// <see cref="GroupBy"/>, the column keys to nest by, outermost first (setCode, rarity, condition,
+/// language, isFoil, game, containerName, listingStatus). Groups open per <see cref="CollapsedByDefault"/>;
+/// <see cref="Toggled"/> lists the <see cref="CardGroupDto.Id"/>s the user flipped from that default.
+/// </summary>
+public sealed record GroupedCollectionRequest
+{
+    public string? Game { get; init; }
+    public string? Q { get; init; }
+    public int? ContainerId { get; init; }
+    public int? SiteId { get; init; }
+    public int Skip { get; init; }
+    public int Take { get; init; } = 100;
+    public bool Stacked { get; init; }
+    public string? Sort { get; init; }
+    public string? Dir { get; init; }
+    public IReadOnlyList<string> GroupBy { get; init; } = [];
+    public bool CollapsedByDefault { get; init; }
+    public IReadOnlyList<string> Toggled { get; init; } = [];
+}
+
+/// <summary>
+/// A group header in a grouped card list. <see cref="Id"/> identifies the group's path (stable while the
+/// grouping columns stay the same). <see cref="Key"/> is the raw value (e.g. "MH3", "true", "Listed", ""
+/// for none); <see cref="Label"/> is the server's display text for data values (set / location / game
+/// names) and equals <see cref="Key"/> otherwise. <see cref="Rows"/> counts the grid rows the group holds
+/// (stacks when stacking), <see cref="Quantity"/> the copies, <see cref="Value"/> their market value.
+/// <see cref="Continued"/> marks a header repeated at the top of a page that starts mid-group.
+/// </summary>
+public sealed record CardGroupDto
+{
+    public string Id { get; init; } = "";
+    public int Level { get; init; }
+    public string Field { get; init; } = "";
+    public string Key { get; init; } = "";
+    public string Label { get; init; } = "";
+    public int Rows { get; init; }
+    public int Quantity { get; init; }
+    public decimal Value { get; init; }
+    public bool Collapsed { get; init; }
+    public bool Continued { get; init; }
+}
+
+/// <summary>One row of a grouped card list page: exactly one of <see cref="Group"/> / <see cref="Card"/>.</summary>
+public sealed record GroupedCardRowDto(CardGroupDto? Group, CardDto? Card);
+
 public sealed record UpdateCardRequest
 {
     public string Condition { get; init; } = "NM";
@@ -1390,6 +1437,9 @@ public sealed record SavedViewStateDto
     public IReadOnlyList<string> ColumnOrder { get; init; } = [];
     public string? Display { get; init; }
     public string? GroupBy { get; init; }
+    /// <summary>Table row-grouping columns, outermost first (see <see cref="GroupedCollectionRequest"/>).
+    /// Not to be confused with <see cref="GroupBy"/>, the Location "stacks" display's grouping.</summary>
+    public IReadOnlyList<string> GroupColumns { get; init; } = [];
 }
 
 /// <summary>

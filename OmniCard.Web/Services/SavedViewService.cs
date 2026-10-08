@@ -446,6 +446,7 @@ public sealed class SavedViewService(IDbContextFactory<OmniCardDbContext> factor
         ColumnOrder = Fields(s.ColumnOrder),
         Display = s.Display is "table" or "stacks" ? s.Display : null,
         GroupBy = s.GroupBy is "type" or "tag" ? s.GroupBy : null,
+        GroupColumns = CollectionGrouping.Canonicalize(s.GroupColumns),
     };
 
     private static List<string> Fields(IEnumerable<string>? fields) =>

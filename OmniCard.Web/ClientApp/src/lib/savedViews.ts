@@ -45,6 +45,7 @@ export function builtInViewState(onLocation: boolean): ViewState {
     columnOrder: [],
     display: onLocation ? (read(DISPLAY_KEY) === 'stacks' ? 'stacks' : 'table') : null,
     groupBy: onLocation ? (read(GROUP_KEY) === 'tag' ? 'tag' : 'type') : null,
+    groupColumns: [],
   };
 }
 
@@ -68,6 +69,7 @@ export function normalizeViewState(state: Partial<ViewState> | undefined, onLoca
     columnOrder: state?.columnOrder ?? [],
     display: onLocation ? state?.display ?? base.display : null,
     groupBy: onLocation ? state?.groupBy ?? base.groupBy : null,
+    groupColumns: state?.groupColumns ?? [],
   };
 }
 
@@ -84,7 +86,8 @@ export function sameViewState(a: ViewState, b: ViewState): boolean {
     sameList([...a.hiddenColumns].sort(), [...b.hiddenColumns].sort()) &&
     sameList(a.columnOrder, b.columnOrder) &&
     (a.display ?? null) === (b.display ?? null) &&
-    (a.groupBy ?? null) === (b.groupBy ?? null)
+    (a.groupBy ?? null) === (b.groupBy ?? null) &&
+    sameList(a.groupColumns ?? [], b.groupColumns ?? [])
   );
 }
 

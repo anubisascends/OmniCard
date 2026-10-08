@@ -164,7 +164,7 @@ Type in the search box to filter the cards. Plain text matches card names, and y
 
 Use the two buttons to the right of the search box to switch views. A [saved view](help:saved-views) remembers which one you use. With **Default view**, OmniCard remembers your last choice.
 
-- **Table view** (list icon): a sortable table with name, set, number, rarity, condition, language, foil, quantity, market price and sale status. Turn on **Stack duplicates** to combine identical copies into one row.
+- **Table view** (list icon): a sortable table with name, set, number, rarity, condition, language, foil, quantity, market price and sale status. Turn on **Stack duplicates** to combine identical copies into one row. Click **Group by** to split the table into collapsible groups, such as by set or condition. See [Group rows](help:collection#group-rows).
 - **Stacked view** (columns icon): cards drawn as overlapping stacks grouped by type or tag, like a deck-building site. It works for any location but is most useful for decks. See [Deck boxes](help:deck-boxes#stacked-view).
 
 Each location keeps its own saved views, so a binder and a deck box can open with different layouts. To give several locations the same layout, use **Copy to other locations…**. See [Saved views](help:saved-views#copy-a-view-to-other-locations).
