@@ -8,7 +8,8 @@ namespace OmniCard.Web.Api.Infrastructure;
 
 /// <summary>
 /// Gates an API action behind a specific permission. Returns <c>401</c> when not signed in and
-/// <c>403</c> when the signed-in user lacks the permission. Admins hold every permission, so this
+/// <c>403</c> when the signed-in user lacks the permission (or, when several are given, all of them —
+/// holding any one passes). Admins hold every permission, so this
 /// always passes for them. Effective permissions are resolved per request from live DB state
 /// (via <see cref="PermissionService"/>), so an admin's grant/deny change takes effect on the
 /// affected user's next request — no re-login.
@@ -17,9 +18,9 @@ namespace OmniCard.Web.Api.Infrastructure;
 /// runs first to require authentication; this adds the per-permission check on top.</para>
 /// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false)]
-public sealed class RequirePermissionAttribute(string permission) : Attribute, IAsyncAuthorizationFilter
+public sealed class RequirePermissionAttribute(params string[] anyOf) : Attribute, IAsyncAuthorizationFilter
 {
-    public string Permission { get; } = permission;
+    public IReadOnlyList<string> AnyOf { get; } = anyOf;
 
     public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
@@ -36,7 +37,9 @@ public sealed class RequirePermissionAttribute(string permission) : Attribute, I
         }
 
         var permissions = context.HttpContext.RequestServices.GetRequiredService<PermissionService>();
-        if (!await permissions.HasPermissionAsync(userId.Value, Permission))
-            context.Result = new ObjectResult(new { error = "You don't have permission to do that." }) { StatusCode = 403 };
+        foreach (var permission in AnyOf)
+            if (await permissions.HasPermissionAsync(userId.Value, permission))
+                return;
+        context.Result = new ObjectResult(new { error = "You don't have permission to do that." }) { StatusCode = 403 };
     }
 }

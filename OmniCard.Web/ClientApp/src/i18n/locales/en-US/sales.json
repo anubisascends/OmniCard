@@ -113,6 +113,10 @@
       "locked": "This order is {{status}} — header and line edits are locked (change the lane back to Created/Packed to edit).",
       "orderNumberShort": "Order #",
       "tracking": "Tracking",
+      "carrier": "Carrier",
+      "scanLabel": "Scan label",
+      "scanLabelTitle": "Scan the shipping label",
+      "trackingInUse": "This tracking number is already on {{orders}}.",
       "shipCharged": "Ship charged",
       "shipCost": "Ship cost",
       "fees": "Fees",
@@ -149,6 +153,52 @@
         "noCategories": "No catalog matches — the default category will be used.",
         "pushFailed": "eBay listing failed.",
         "listedLocallyError": "Listed locally, but the eBay push failed: {{error}}"
+      }
+    },
+    "ship": {
+      "title": "Ship packages",
+      "intro": "Scan the barcode on each shipping label as the package goes out. The order with that tracking number is marked Shipped.",
+      "autoShip": "Auto-ship",
+      "autoShipHelp": "Mark the order shipped as soon as its label is scanned. Turn off to confirm each package.",
+      "cameraToggle": "Camera",
+      "cameraHelp": "Turn off to use a handheld barcode scanner or type tracking numbers.",
+      "manualLabel": "Tracking number",
+      "manualHelp": "Type it or use a handheld scanner, then press Enter.",
+      "lookUp": "Look up",
+      "markShipped": "Mark shipped",
+      "openOrder": "Open order",
+      "waiting": "Point the camera at the barcode on a shipping label.",
+      "trackingLine": "Tracking {{tracking}}",
+      "result": {
+        "shipped": "Shipped",
+        "ready": "Ready to ship",
+        "readyHelp": "Confirm this is the package you are sending.",
+        "alreadyShipped": "Already shipped",
+        "alreadyShippedOn": "Already shipped {{date}}",
+        "ambiguous": "{{count}} open orders use this tracking number. Pick the one you are sending.",
+        "notFound": "No open order has tracking number {{tracking}}.",
+        "notFoundHelp": "Add the tracking number to the order (Sales ▸ Orders) and scan again.",
+        "error": "Couldn’t check that label: {{message}}"
+      },
+      "outcome": {
+        "shipped": "Shipped",
+        "ready": "Waiting for confirmation",
+        "alreadyShipped": "Already shipped",
+        "ambiguous": "Several matches",
+        "notFound": "Not found",
+        "error": "Error"
+      },
+      "session": {
+        "title": "This session",
+        "shippedCount_one": "{{count}} shipped",
+        "shippedCount_other": "{{count}} shipped",
+        "empty": "Nothing scanned yet."
+      },
+      "camera": {
+        "insecure": "The camera needs a secure (https) connection. Type tracking numbers or use a handheld scanner instead.",
+        "device": "Camera",
+        "unnamed": "Camera {{n}}",
+        "torch": "Flashlight"
       }
     }
   }

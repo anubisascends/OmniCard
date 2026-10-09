@@ -404,6 +404,8 @@ public sealed record OrderDto
     public decimal ShippingCost { get; init; }
     public decimal MarketplaceFees { get; init; }
     public string? TrackingNumber { get; init; }
+    public string? Carrier { get; init; }
+    public string? ShippedAt { get; init; }
     public string? Notes { get; init; }
 }
 
@@ -439,6 +441,20 @@ public sealed record UpdateOrderRequest
     public decimal MarketplaceFees { get; init; }
     public string? Notes { get; init; }
 }
+
+/// <summary>A scanned shipping-label barcode. With <see cref="Ship"/> set, a single open (Created/Packed)
+/// match is shipped right away; otherwise the scan is only looked up.</summary>
+public sealed record ShipScanRequest
+{
+    public string Code { get; init; } = "";
+    public bool Ship { get; init; }
+}
+
+/// <summary>Result of a label scan. <see cref="Outcome"/>: <c>shipped</c> (this call shipped it),
+/// <c>ready</c> (one open match, not shipped yet), <c>alreadyShipped</c> (only shipped/completed matches),
+/// <c>ambiguous</c> (several open matches — pick one), <c>notFound</c>. <see cref="Tracking"/> is the
+/// tracking number read from the barcode (routing prefixes stripped).</summary>
+public sealed record ShipScanResultDto(string Outcome, string Tracking, IReadOnlyList<OrderDto> Orders);
 
 public sealed record AddOrderLineRequest
 {

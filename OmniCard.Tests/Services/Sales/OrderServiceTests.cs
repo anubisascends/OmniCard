@@ -628,6 +628,29 @@ public class OrderServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task FindByTracking_MatchesLabelBarcode_SkipsCancelledAndUntracked()
+    {
+        var (customerId, _) = SeedCustomerAndLot();
+        var svc = OrderSvc();
+        var open = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "A");
+        var cancelled = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "B");
+        var untracked = svc.CreateOrder(customerId, SalesChannel.TcgPlayer, "C");
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            ctx.Orders.Single(o => o.Id == open.Id).TrackingNumber = "9400 1118 9922 3456 7890 12";
+            ctx.Orders.Single(o => o.Id == cancelled.Id).TrackingNumber = "9400111899223456789012";
+            ctx.SaveChanges();
+        }
+        await svc.SetStatusAsync(cancelled.Id, OrderStatus.Cancelled);
+
+        var found = svc.FindByTracking("420902109400111899223456789012"); // USPS IMpb barcode
+
+        Assert.Equal(open.Id, Assert.Single(found).Id);
+        Assert.Empty(svc.FindByTracking("   "));
+        Assert.DoesNotContain(svc.FindByTracking("9400111899223456789012"), o => o.Id == untracked.Id);
+    }
+
+    [Fact]
     public void CreateOrder_SeedsStageKey_ToCreatedLane()
     {
         var (customerId, _) = SeedCustomerAndLot();
