@@ -106,7 +106,7 @@ Colors use the letters W (white), U (blue), B (black), R (red) and G (green), or
 | `c:colorless` or `c:c` | Colorless cards and lands. |
 | `c:multicolor` or `c:multi` | Cards with two or more colors. |
 
-In collection search, `id:` behaves the same as `c:`. Card search treats them separately (see below).
+When Magic is selected in the top bar, `id:` (also `ci:`, `identity:`, `commander:`) searches **color identity** instead, so `t:land id:multi` finds lands whose identity has two or more colors. It takes the same values as `c:`, plus a number for how many colors, for example `id>=3`. With other games or **All Games** selected, `id:` behaves the same as `c:`.
 
 > [!NOTE]
 > The **price** and **date** fields appear in the help list but don't filter your collection yet. To find your most valuable cards, sort the list by the **Market** column instead.
@@ -128,7 +128,7 @@ When Magic is selected in the top bar, collection search also understands these 
 
 For `cmc`, use `-cmc:3` rather than `cmc!=3`.
 
-Collection search for Magic also understands the card search fields below, such as `pow>=5`, `kw:flying`, `f:modern` or `usd<1`. They describe the printing you own. A few keep their collection meaning: `c` and `id` use the **Magic colors** rules above, `lang` is your copy's language, and `date` isn't available (use `year` for the printing's release year).
+Collection search for Magic also understands the card search fields below, such as `pow>=5`, `kw:flying`, `f:modern` or `usd<1`. They describe the printing you own. A few keep their collection meaning: `c` uses the **Magic colors** rules above and `id` is color identity, `lang` is your copy's language, and `date` isn't available (use `year` for the printing's release year).
 
 ### Card search (full Scryfall syntax)
 
@@ -178,7 +178,7 @@ When you look up a Magic card to add or to correct a scan, the search supports n
 | banned | | `banned:legacy` | Banned in a format. |
 | restricted | | `restricted:vintage` | Restricted in a format. |
 
-Colors in card search work like the **Magic colors** table above, and also accept `m` for multicolor and a number for how many colors a card has, for example `c>=2`.
+Colors and identity in card search work like the **Magic colors** table above, and also accept `m` for multicolor and a number for how many colors a card has, for example `c>=2`.
 
 #### is: flags in card search
 

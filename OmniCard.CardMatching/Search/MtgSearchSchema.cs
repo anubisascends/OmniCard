@@ -59,13 +59,18 @@ public static class MtgSearchSchema
         F("has", ["has"], "Presence flags: has:watermark, has:indicator.", "has:watermark"),
     ];
 
+    /// <summary>Colour identity — catalog-only (the owned Product's Color column holds the card's
+    /// colours, so a land's identity would be lost), resolved through <c>ResolveFieldCardIds</c>.</summary>
+    public static SearchFieldDefinition IdentityField { get; } =
+        new() { Canonical = "identity", Aliases = ["identity", "id", "ci", "commander"], Kind = SearchFieldKind.GameSpecific,
+                SupportedOps = AllOps, Description = "Colour identity (WUBRG, colorless, multicolor, or a count).", Example = "id<=wu" };
+
     /// <summary>Colour fields split the way the catalog stores them (Colors vs ColorIdentity).</summary>
     private static readonly SearchFieldDefinition[] SplitColorFields =
     [
         new() { Canonical = "colors", Aliases = ["colors", "color", "c"], Kind = SearchFieldKind.GameSpecific,
                 SupportedOps = AllOps, Description = "Card colours (WUBRG, colorless, multicolor, or a count).", Example = "c:rg" },
-        new() { Canonical = "identity", Aliases = ["identity", "id", "ci", "commander"], Kind = SearchFieldKind.GameSpecific,
-                SupportedOps = AllOps, Description = "Colour identity (for Commander).", Example = "id<=wu" },
+        IdentityField,
     ];
 
     /// <summary>Schema for catalog search — splits <c>c</c> (colours) from <c>id</c> (identity). The
@@ -73,9 +78,10 @@ public static class MtgSearchSchema
     public static SearchSchema Catalog { get; } =
         new(SharedSearchSchema.CoreFields.Concat(GameFields).Concat(SplitColorFields));
 
-    /// <summary>Schema for the popover + owned-collection search — core (merged colour) plus the
-    /// catalog-only game fields.</summary>
-    public static SearchSchema Public { get; } = SharedSearchSchema.WithGameFields(GameFields);
+    /// <summary>Schema for the popover + owned-collection search — core (merged colour, owned column)
+    /// plus the catalog-only game fields and <see cref="IdentityField"/>, whose <c>id</c>/<c>ci</c>
+    /// aliases override the core colour field's.</summary>
+    public static SearchSchema Public { get; } = SharedSearchSchema.WithGameFields(GameFields.Append(IdentityField));
 
     private static SearchFieldDefinition F(string canonical, string[] aliases, string desc, string example) =>
         new() { Canonical = canonical, Aliases = aliases, Kind = SearchFieldKind.GameSpecific, Description = desc, Example = example };

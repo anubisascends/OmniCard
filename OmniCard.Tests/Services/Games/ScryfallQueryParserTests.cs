@@ -354,4 +354,25 @@ public class ScryfallQueryParserTests
         Assert.False(schema.IsGameSpecific("set"));
         Assert.False(schema.IsGameSpecific("name"));
     }
+
+    [Fact]
+    public void MtgPublicSchema_IdIsColorIdentity_CIsOwnedColor()
+    {
+        var schema = MtgSearchSchema.Public;
+        Assert.Equal("identity", schema.ResolveField("id"));
+        Assert.Equal("identity", schema.ResolveField("ci"));
+        Assert.True(schema.IsGameSpecific("identity"));
+        Assert.Equal("color", schema.ResolveField("c"));
+        Assert.False(schema.IsGameSpecific("color"));
+    }
+
+    [Fact]
+    public void WithGameFields_DropsClaimedAliasesFromCoreFields()
+    {
+        var color = MtgSearchSchema.Public.Fields.Single(f => f.Canonical == "color");
+        Assert.Equal(["color", "c"], color.Aliases);
+        Assert.Single(MtgSearchSchema.Public.Fields, f => f.Canonical == "lang"); // redefined, not listed twice
+        var set = FfSchema().Fields.Single(f => f.Canonical == "set");
+        Assert.DoesNotContain("e", set.Aliases); // FFTCG's e → element
+    }
 }
