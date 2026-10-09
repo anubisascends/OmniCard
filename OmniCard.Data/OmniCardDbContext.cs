@@ -45,6 +45,7 @@ public class OmniCardDbContext : DbContext
     public DbSet<SiteAccessGrant> SiteAccessGrants => Set<SiteAccessGrant>();
     public DbSet<SavedView> SavedViews => Set<SavedView>();
     public DbSet<SavedViewDefault> SavedViewDefaults => Set<SavedViewDefault>();
+    public DbSet<TagRule> TagRules => Set<TagRule>();
 
     public OmniCardDbContext(DbContextOptions<OmniCardDbContext> options) : base(options) { }
 
@@ -411,6 +412,18 @@ public class OmniCardDbContext : DbContext
             e.HasIndex(d => d.SavedViewId);
             e.HasOne<SavedView>().WithMany().HasForeignKey(d => d.SavedViewId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Admin-defined auto-tagging rules (search query → tags), one game each.
+        modelBuilder.Entity<TagRule>(e =>
+        {
+            e.HasKey(r => r.Id);
+            e.Property(r => r.Id).ValueGeneratedOnAdd();
+            e.Property(r => r.Name).IsRequired().HasMaxLength(TagRule.MaxNameLength);
+            e.Property(r => r.Game).HasConversion<string>().HasMaxLength(32);
+            e.Property(r => r.Query).IsRequired().HasMaxLength(TagRule.MaxQueryLength);
+            e.Property(r => r.TagsJson).IsRequired();
+            e.HasIndex(r => r.Game);
         });
 
         // Optimistic-concurrency tokens for the networked (multi-user) web deployment, which runs on

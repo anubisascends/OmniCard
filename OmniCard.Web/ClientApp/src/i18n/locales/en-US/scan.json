@@ -201,6 +201,11 @@
       "summaryInProgress": "{{count}} in progress",
       "expand": "Show batches",
       "collapse": "Hide batches"
+    },
+    "tagRules": {
+      "switch": "Apply tag rules",
+      "switchHint": "Pre-fill the tags from your tag rules (Administration ▸ Tag Rules) on matching cards. Remove any you don't want before adding.",
+      "chipHint": "Added by a tag rule. Remove it to keep it off this card."
     }
   }
 }

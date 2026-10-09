@@ -13,6 +13,7 @@ Click **Administration** in the sidebar. Everyone can open this page, but you on
 | **Sales** | Where picked sale cards are moved | People with the Settings view permission |
 | **Receipts** | Store details and layout for printed receipts | People with the Settings view permission (only administrators can change it) |
 | **Scan Badges** | Value badges on the Scan page, plus watched scan folders | People with the Settings view permission (badges and folders can only be changed by administrators) |
+| **Tag Rules** | Searches that tag matching cards when they're scanned or imported | Administrators only |
 | **Deck Types** | Deck formats and their rules | People with the Deck Types view permission |
 | **Appearance** | Card preview size | Everyone |
 | **Catalog Data** | Download card catalogs, prices and artwork | People with the Catalog Data view permission |
@@ -254,6 +255,10 @@ This tab controls what happens when you mark a listing as picked on the Sales pa
 
 Changing these settings needs the Settings edit permission.
 
+## Tag Rules
+
+Only administrators see this tab. Each rule is a search for one game plus the tags to add. Matching cards get the tags when anyone scans or imports them, and **Run now** tags the matching cards you already own. Rules only ever add tags. See [Tag rules](help:tag-rules).
+
 ## Deck Types
 
 Deck types are the formats a deck box can be assigned, such as Commander or Standard. They're set up per game. Their rules only produce warnings in a deck box. They never stop you adding cards. See [Deck boxes](help:deck-boxes).
@@ -318,5 +323,6 @@ This tab lists the software and third-party components that OmniCard ships with 
 - [Getting started](help:getting-started): signing in and first-time setup
 - [Troubleshooting](help:troubleshooting): missing sections, prices and images
 - [Scan batches](help:scan-batches): reviewing scans from watched folders
+- [Tag rules](help:tag-rules): tagging cards automatically
 - [Locations](help:locations): creating locations inside sites
 - [eBay](help:ebay) and [Sales](help:sales): selling cards

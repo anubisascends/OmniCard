@@ -11,6 +11,7 @@ using OmniCard.Shared.Lists;
 using OmniCard.Shared.Security;
 using OmniCard.Shared.Sites;
 using OmniCard.Web.Api.Infrastructure;
+using OmniCard.Web.Services.TagRules;
 
 namespace OmniCard.Web.Api.Controllers;
 
@@ -23,7 +24,8 @@ public sealed class ImportController(
     WebBinderCardService binderCards,
     IDecklistService decklists,
     ICardService cardService,
-    LocationImportService locationImport) : ApiControllerBase
+    LocationImportService locationImport,
+    TagRuleService tagRules) : ApiControllerBase
 {
     [HttpPost("csv")]
     [RequirePermission(Permissions.ImportRun)]
@@ -59,10 +61,12 @@ public sealed class ImportController(
                 }
             }
 
-            var imported = binderCards.ImportCollectionCards(preview.Cards, skipDuplicates);
+            var lotIds = binderCards.ImportCollectionCardLots(preview.Cards, skipDuplicates);
+            var ruleTagged = tagRules.ApplyToNewLots(lotIds);
             return Ok(new
             {
-                imported,
+                imported = lotIds.Count,
+                ruleTagged,
                 totalRows = preview.TotalRows,
                 detectedFormat = preview.DetectedFormat.ToString(),
                 warnings = preview.Warnings,
@@ -145,6 +149,7 @@ public sealed class ImportController(
 
         var imported = 0;
         var skipped = 0;
+        var lotIds = new List<int>();
         try
         {
             if (request.SkipDuplicates)
@@ -152,13 +157,15 @@ public sealed class ImportController(
                 // One card per call so a skipped duplicate is attributable to its copy count.
                 foreach (var card in cards.Values)
                 {
-                    if (binderCards.ImportCollectionCards([card], skipDuplicates: true) > 0) imported += card.Quantity;
+                    var created = binderCards.ImportCollectionCardLots([card], skipDuplicates: true);
+                    lotIds.AddRange(created);
+                    if (created.Count > 0) imported += card.Quantity;
                     else skipped += card.Quantity;
                 }
             }
             else if (cards.Count > 0)
             {
-                binderCards.ImportCollectionCards(cards.Values.ToList(), skipDuplicates: false);
+                lotIds.AddRange(binderCards.ImportCollectionCardLots(cards.Values.ToList(), skipDuplicates: false));
                 imported = cards.Values.Sum(c => c.Quantity);
             }
         }
@@ -168,7 +175,8 @@ public sealed class ImportController(
         }
 
         return new ImportUrlResultDto(
-            deckName, imported, skipped, entries.Sum(e => e.Quantity), unresolved, substituted);
+            deckName, imported, skipped, entries.Sum(e => e.Quantity), unresolved, substituted,
+            tagRules.ApplyToNewLots(lotIds));
     }
 
     /// <summary>All-or-nothing CSV import into the location in the route (the Location view's Import).

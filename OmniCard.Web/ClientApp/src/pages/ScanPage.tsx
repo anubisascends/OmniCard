@@ -29,6 +29,7 @@ import {
   Typography,
 } from '@mui/material';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
@@ -113,6 +114,12 @@ interface ScanItem extends ItemProps {
   include: boolean;
   /** The user eyeballed the scan vs. art and confirmed the match (or corrected it). */
   verified?: boolean;
+  /** The tags in `tags` that a tag rule put there (shown with a marker; removable like any tag). */
+  ruleTags?: string[];
+  /** Rule tags the user removed from this item; the rules won't add them back. */
+  dismissedRuleTags?: string[];
+  /** The {@link ruleSignature} the item's rule tags were last worked out for. */
+  ruleSig?: string;
 }
 
 let seq = 0;
@@ -177,6 +184,89 @@ function toCommitItem(it: ScanItem, game: string): ScanCommitItem {
     // even when the identity was overridden).
     scanHash: it.match?.scanHash ?? null,
   };
+}
+
+// --- Tag rules: admin-defined searches whose tags are pre-filled on matching scans. ---
+
+const hasTag = (list: readonly string[] | undefined, tag: string) =>
+  !!list?.some((x) => x.toLowerCase() === tag.toLowerCase());
+
+/** Everything the tag rules look at for an item; when it changes, the item's rule tags are worked
+ * out again. Null while the item has no identity. */
+function ruleSignature(it: ScanItem, game: string): string | null {
+  const id = identityOf(it);
+  if (!id) return null;
+  return [game, id.gameCardId, it.isFoil ? (it.foilType ?? 'foil') : '', it.condition, it.language].join('|');
+}
+
+/** Fold freshly computed rule tags into an item: rule tags that no longer apply come off, new ones go
+ * on (except ones the user removed). Tags the user added themselves are left alone. */
+function withRuleTags(it: ScanItem, computed: string[], sig: string): ScanItem {
+  const old = it.ruleTags ?? [];
+  const wanted = computed.filter((tag) => !hasTag(it.dismissedRuleTags, tag));
+  // First look at this item (e.g. a background batch reopened): a matching tag already on it came
+  // from the rules last time, so it's marked as a rule tag again.
+  const firstLook = it.ruleSig === undefined;
+  const tags = it.tags.filter((tag) => !(hasTag(old, tag) && !hasTag(wanted, tag)));
+  const ruleTags: string[] = [];
+  for (const tag of wanted) {
+    if (!hasTag(tags, tag)) {
+      tags.push(tag);
+      ruleTags.push(tag);
+    } else if (hasTag(old, tag) || firstLook) {
+      ruleTags.push(tag);
+    }
+  }
+  return { ...it, tags, ruleTags, ruleSig: sig };
+}
+
+/** A user edit of an item's tags. A rule tag they remove is remembered so the rules don't re-add it;
+ * typing a dismissed tag back in makes it theirs. */
+function withUserTags(it: ScanItem, tags: string[]): Partial<ScanItem> {
+  const ruleTags = it.ruleTags ?? [];
+  return {
+    tags,
+    ruleTags: ruleTags.filter((tag) => hasTag(tags, tag)),
+    dismissedRuleTags: [
+      ...(it.dismissedRuleTags ?? []).filter((tag) => !hasTag(tags, tag)),
+      ...ruleTags.filter((tag) => !hasTag(tags, tag)),
+    ],
+  };
+}
+
+/** The item without its rule tags (tag rules switched off). */
+function withoutRuleTags(it: ScanItem): ScanItem {
+  if (!it.ruleTags?.length && it.ruleSig === undefined) return it;
+  return { ...it, tags: it.tags.filter((tag) => !hasTag(it.ruleTags, tag)), ruleTags: [], ruleSig: undefined };
+}
+
+const APPLY_TAG_RULES_KEY = 'omnicard.scan.applyTagRules';
+
+/** Whether this browser last had "Apply tag rules" on (default on). */
+function loadApplyTagRules(): boolean {
+  try {
+    return localStorage.getItem(APPLY_TAG_RULES_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+/** A scan's tags as chips; tags added by a tag rule carry a marker. */
+function TagChips({ tags, ruleTags }: { tags: string[]; ruleTags?: string[] }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      {tags.map((tag) =>
+        hasTag(ruleTags, tag) ? (
+          <Tooltip key={tag} title={t('scan.tagRules.chipHint')}>
+            <Chip size="small" variant="outlined" color="secondary" icon={<AutoAwesomeIcon />} label={tag} />
+          </Tooltip>
+        ) : (
+          <Chip key={tag} size="small" variant="outlined" label={tag} />
+        ),
+      )}
+    </>
+  );
 }
 
 // --- Background batches: the server's batch items ↔ the page's scan items. ---
@@ -566,7 +656,6 @@ function propsSummary(item: ScanItem, t: TFunction): string {
   if (item.isFoil)
     parts.push(item.foilType ? t('scan.props.foilWithType', { type: item.foilType }) : t('common.labels.foil'));
   if (item.quantity > 1) parts.push(`×${item.quantity}`);
-  if (item.tags.length) parts.push(item.tags.join(', '));
   if (item.note.trim()) parts.push('📝');
   return parts.join(' · ');
 }
@@ -647,9 +736,10 @@ function MasterRow({
         <Typography variant="caption" color="text.secondary" noWrap display="block">
           {propsSummary(item, t)}
         </Typography>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
           <ConfidenceChip item={item} />
           <LanguageChip language={item.language} detected={badgeMatch?.languageDetected} />
+          <TagChips tags={item.tags} ruleTags={item.ruleTags} />
           <ScanValueBadges
             isNew={badgeMatch?.isNew}
             price={badgeMatch?.marketPrice}
@@ -672,6 +762,7 @@ function PropertyFields({
   onChange,
   foilTypeOptions,
   tagOptions,
+  ruleTags,
   disabled = false,
 }: {
   game: string;
@@ -679,6 +770,8 @@ function PropertyFields({
   onChange: (patch: Partial<ItemProps>) => void;
   foilTypeOptions: string[];
   tagOptions: string[];
+  /** Tags a tag rule added (marked in the tags box). */
+  ruleTags?: string[];
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
@@ -760,6 +853,24 @@ function PropertyFields({
         value={props.tags}
         disabled={disabled}
         onChange={(_, v) => onChange({ tags: v })}
+        renderTags={(value, getTagProps) =>
+          value.map((tag, index) => {
+            const { key, ...tagProps } = getTagProps({ index });
+            const fromRule = hasTag(ruleTags, tag);
+            return (
+              <Chip
+                key={key}
+                {...tagProps}
+                size="small"
+                label={tag}
+                icon={fromRule ? <AutoAwesomeIcon /> : undefined}
+                color={fromRule ? 'secondary' : 'default'}
+                variant={fromRule ? 'outlined' : 'filled'}
+                title={fromRule ? t('scan.tagRules.chipHint') : undefined}
+              />
+            );
+          })
+        }
         renderInput={(p) => <TextField {...p} label={t('common.labels.tags')} />}
       />
       <TextField
@@ -916,6 +1027,7 @@ function DetailPanel({
           onChange={onProps}
           foilTypeOptions={foilTypeOptions}
           tagOptions={tagOptions}
+          ruleTags={item.ruleTags}
           disabled={readOnly}
         />
 
@@ -1489,12 +1601,22 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
 
   const applyBulkEdit = (state: BulkEditState) => {
     setItems((prev) =>
-      prev.map((it) =>
-        visibleKeys.has(it.key) && it.include ? { ...it, ...applyBulk(state, it) } : it,
-      ),
+      prev.map((it) => {
+        if (!visibleKeys.has(it.key) || !it.include) return it;
+        const patch = applyBulk(state, it);
+        return { ...it, ...patch, ...(patch.tags ? withUserTags(it, patch.tags) : {}) };
+      }),
     );
     setBulkOpen(false);
   };
+
+  /** A per-item property edit from the detail panel (tag edits remember removed rule tags). */
+  const updateProps = (key: string, patch: Partial<ItemProps>) =>
+    setItems((prev) =>
+      prev.map((it) =>
+        it.key === key ? { ...it, ...patch, ...(patch.tags ? withUserTags(it, patch.tags) : {}) } : it,
+      ),
+    );
 
   function handleFiles(files: FileList | null) {
     return stageFiles(Array.from(files ?? []));
@@ -1670,6 +1792,75 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     },
     [batchStore],
   );
+
+  // --- Tag rules: work out each matched scan's rule tags (re-checked whenever what the rules look at
+  // changes — identity, finish, condition, language, game) and pre-fill them, removable, for review.
+  // A reviewer can switch this off for the session; the choice is remembered per browser. ---
+  const [applyTagRules, setApplyTagRulesState] = useState(loadApplyTagRules);
+  const setApplyTagRules = (on: boolean) => {
+    setApplyTagRulesState(on);
+    try {
+      localStorage.setItem(APPLY_TAG_RULES_KEY, String(on));
+    } catch {
+      /* storage unavailable — the choice just isn't remembered */
+    }
+    if (!on) setItems((prev) => prev.map(withoutRuleTags));
+  };
+  const rulesInFlight = useRef(new Set<string>());
+  useEffect(() => {
+    if (readOnly || !applyTagRules) return;
+    const pending = items.flatMap((it) => {
+      const sig = ruleSignature(it, game);
+      return sig !== null && sig !== it.ruleSig && !rulesInFlight.current.has(`${it.key}|${sig}`) ? [{ it, sig }] : [];
+    });
+    if (pending.length === 0) return;
+    const handle = window.setTimeout(() => {
+      for (let i = 0; i < pending.length; i += 200) {
+        const chunk = pending.slice(i, i + 200);
+        const sigs = new Map(chunk.map(({ it, sig }) => [it.key, sig]));
+        chunk.forEach(({ it, sig }) => rulesInFlight.current.add(`${it.key}|${sig}`));
+        // Apply only to items still in the state the rules were checked for. A failed check leaves the
+        // tags alone but marks the item checked, so it isn't retried in a loop.
+        const settle = (results: Map<string, string[]> | null) =>
+          setItems((prev) =>
+            prev.map((it) => {
+              const sig = sigs.get(it.key);
+              if (sig === undefined || ruleSignature(it, game) !== sig) return it;
+              return results ? withRuleTags(it, results.get(it.key) ?? [], sig) : { ...it, ruleSig: sig };
+            }),
+          );
+        api
+          .scanTagRules(
+            game,
+            chunk.map(({ it }) => {
+              const id = identityOf(it)!;
+              return {
+                key: it.key,
+                gameCardId: id.gameCardId,
+                name: id.name,
+                setCode: id.setCode,
+                collectorNumber: id.collectorNumber,
+                rarity: id.rarity,
+                condition: it.condition,
+                language: it.language,
+                isFoil: it.isFoil,
+                foilType: it.isFoil ? it.foilType : null,
+              };
+            }),
+          )
+          .then((res) => settle(new Map(res.map((r) => [r.key, r.tags]))))
+          .catch((e) => {
+            console.warn('Checking tag rules failed', e);
+            settle(null);
+          })
+          .finally(() => chunk.forEach(({ it, sig }) => rulesInFlight.current.delete(`${it.key}|${sig}`)));
+      }
+    }, 300);
+    return () => window.clearTimeout(handle);
+  }, [items, game, applyTagRules, readOnly]);
+  // Hold the commit until every card about to be added has its rule tags.
+  const rulesPending =
+    applyTagRules && !readOnly && items.some((it) => isVisibleCommittable(it) && ruleSignature(it, game) !== it.ruleSig);
 
   /** Remove scans from the list — and, for a batch, from the server (deleting their stored images). */
   const removeItems = (shouldRemove: (it: ScanItem) => boolean | undefined) => {
@@ -1979,7 +2170,11 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                   variant="contained"
                   color={auditMode ? 'warning' : 'primary'}
                   disabled={
-                    committableCount === 0 || containerId === '' || commit.isPending || stillMatching
+                    committableCount === 0 ||
+                    containerId === '' ||
+                    commit.isPending ||
+                    stillMatching ||
+                    rulesPending
                   }
                   onClick={() => commit.mutate()}
                 >
@@ -1991,6 +2186,18 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                       ? t('scan.audit.commit', { count: committableCount })
                       : t('scan.commit.addConfirmed', { count: committableCount })}
                 </Button>
+                <Tooltip title={t('scan.tagRules.switchHint')}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        size="small"
+                        checked={applyTagRules}
+                        onChange={(e) => setApplyTagRules(e.target.checked)}
+                      />
+                    }
+                    label={t('scan.tagRules.switch')}
+                  />
+                </Tooltip>
               </>
             )}
             {canExport && (
@@ -2261,7 +2468,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                 })
               }
               onRemove={() => removeItems((it) => it.key === selectedItem.key)}
-              onProps={(patch) => updateItem(selectedItem.key, patch)}
+              onProps={(patch) => updateProps(selectedItem.key, patch)}
               readOnly={readOnly}
             />
           ) : (

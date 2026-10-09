@@ -24,4 +24,19 @@ public interface IGameFieldResolver
     /// excluded (reachable only via explicit <c>-field:x</c> negation), mirroring <c>tag:</c>.</para>
     /// </summary>
     IReadOnlySet<string>? ResolveFieldCardIds(string field, ComparisonOp op, string value);
+
+    /// <summary>
+    /// Candidate-restricted form of <see cref="ResolveFieldCardIds(string, ComparisonOp, string)"/>:
+    /// only the ids in <paramref name="candidateIds"/> (typically the printings the user owns, or the
+    /// handful of cards being scanned) can be returned. Same null/empty contract. Games whose fields
+    /// all translate to SQL just intersect the full answer (the default); MTG overrides it so fields
+    /// the catalog can only evaluate in memory (keyword, power, legality, <c>is:</c> flags…) are checked
+    /// against the candidates' catalog rows instead of streaming the whole catalog.
+    /// </summary>
+    IReadOnlySet<string>? ResolveFieldCardIds(string field, ComparisonOp op, string value, IReadOnlyCollection<string> candidateIds)
+    {
+        var all = ResolveFieldCardIds(field, op, value);
+        if (all is null) return null;
+        return candidateIds.Where(all.Contains).ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
 }

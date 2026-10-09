@@ -43,6 +43,7 @@ import { api, ApiError } from '../api/client';
 import type { ComponentDto, EbaySellingSettingsDto, RoleDto, UserDto } from '../api/types';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import { DeckTypesCard } from '../components/settings/DeckTypesCard';
+import { TagRulesCard } from '../components/settings/TagRulesCard';
 import { RolesCard } from '../components/settings/RolesCard';
 import { SitesCard } from '../components/settings/SitesCard';
 import { ScanFoldersCard } from '../components/settings/ScanFoldersCard';
@@ -1751,6 +1752,7 @@ const TABS: {
     ),
     show: (g) => g.can('settings.view'),
   },
+  { key: 'tag-rules', labelKey: 'settings.tabs.tagRules', render: () => <TagRulesCard />, show: (g) => g.isAdmin },
   { key: 'deck-types', labelKey: 'settings.tabs.deckTypes', render: () => <DeckTypesCard />, show: (g) => g.can('decktypes.view') },
   { key: 'appearance', labelKey: 'settings.tabs.appearance', render: () => <AppearanceCard />, show: () => true },
   { key: 'catalog', labelKey: 'settings.tabs.catalog', render: () => <CatalogCard />, show: (g) => g.can('catalog.view') },

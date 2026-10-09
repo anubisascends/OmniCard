@@ -1,4 +1,5 @@
 using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Matching;
 
@@ -18,6 +19,19 @@ public static class CardAttributeExtractor
             CardGame.FinalFantasy => (match.Source as TcgCsvCard)?.CardType,
             _ => null
         };
+    }
+
+    /// <summary>Fills <paramref name="card"/>'s empty <see cref="CollectionCard.Color"/> /
+    /// <see cref="CollectionCard.CardType"/> from its catalog printing — for paths whose payload carries
+    /// only the identity (scan commits, tag-rule checks of unsaved scans). No-op when the printing isn't
+    /// in the catalog.</summary>
+    public static void FillFromCatalog(CollectionCard card, ICardGameService gameService)
+    {
+        if (string.IsNullOrEmpty(card.GameCardId)) return;
+        if (gameService.FindCardById(card.GameCardId) is not { } source) return;
+        var match = new CardMatch { Source = source };
+        card.Color ??= ExtractColor(match, card.Game);
+        card.CardType ??= ExtractCardType(match, card.Game);
     }
 
     public static string? ExtractCardType(CardMatch match, CardGame game)

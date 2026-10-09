@@ -19,6 +19,7 @@ import { api } from '../api/client';
 import { EXPORT_FORMATS as ALL_EXPORT_FORMATS } from '../lib/exportFormats';
 import { locationSelectOptions } from '../components/LocationSelectOptions';
 import { useGame } from '../context/GameContext';
+import { useFormatters } from '../i18n/format';
 
 // Server format identifiers — not translated. Display labels resolve via importing.export.formats.
 // The full-collection export omits the Card Price Ticker (a per-video list, not a collection format).
@@ -57,6 +58,7 @@ function ExportSection() {
 
 function ImportSection() {
   const { t } = useTranslation();
+  const fmt = useFormatters();
   const qc = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [skipDuplicates, setSkipDuplicates] = useState(true);
@@ -120,6 +122,14 @@ function ImportSection() {
             })}
             {importMut.data.warnings.length > 0 &&
               t('importing.import.warnings', { count: importMut.data.warnings.length })}
+            {!!importMut.data.ruleTagged && (
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                {t('common.tagRules.tagged', {
+                  count: importMut.data.ruleTagged,
+                  formatted: fmt.number(importMut.data.ruleTagged),
+                })}
+              </Typography>
+            )}
           </Alert>
         )}
       </Stack>
@@ -130,6 +140,7 @@ function ImportSection() {
 /** Import a Moxfield/Archidekt deck URL straight into a location (both sites are MTG-only). */
 function UrlImportSection() {
   const { t } = useTranslation();
+  const fmt = useFormatters();
   const qc = useQueryClient();
   const [url, setUrl] = useState('');
   const [containerId, setContainerId] = useState<number | ''>('');
@@ -217,6 +228,11 @@ function UrlImportSection() {
               <Typography variant="body2" sx={{ mt: 1 }}>
                 {t('importing.url.unresolved', { count: data.unresolvedNames.length })}{' '}
                 {data.unresolvedNames.join(', ')}
+              </Typography>
+            )}
+            {!!data.ruleTagged && (
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                {t('common.tagRules.tagged', { count: data.ruleTagged, formatted: fmt.number(data.ruleTagged) })}
               </Typography>
             )}
           </Alert>

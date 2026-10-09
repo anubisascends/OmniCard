@@ -10,6 +10,7 @@ using OmniCard.Shared.Sites;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Web.Api.Infrastructure;
+using OmniCard.Web.Services.TagRules;
 
 namespace OmniCard.Web.Api.Controllers;
 
@@ -36,6 +37,7 @@ public sealed class BinderEditController : ControllerBase
     private readonly ICardService _cardService;
     private readonly BinderStateBuilder _state;
     private readonly RequestSiteAccess _siteAccess;
+    private readonly TagRuleService _tagRules;
 
     public BinderEditController(
         IStorageContainerService containers,
@@ -44,9 +46,11 @@ public sealed class BinderEditController : ControllerBase
         IListingService listings,
         ICardService cardService,
         BinderStateBuilder state,
-        RequestSiteAccess siteAccess)
+        RequestSiteAccess siteAccess,
+        TagRuleService tagRules)
     {
         _siteAccess = siteAccess;
+        _tagRules = tagRules;
         _containers = containers;
         _binderCards = binderCards;
         _tags = tags;
@@ -332,9 +336,10 @@ public sealed class BinderEditController : ControllerBase
             ImageUri = r.ImageUri,
         };
         var foilType = r.IsFoil ? (r.FoilType ?? FoilTypes.BasicFoilType(game)) : null;
-        _binderCards.AddMissingCardToSlot(match, game,
+        var lotId = _binderCards.AddMissingCardToSlot(match, game,
             string.IsNullOrWhiteSpace(r.Condition) ? "NM" : r.Condition,
             r.IsFoil, foilType, r.PurchasePrice, r.ContainerId, r.Page, r.Slot);
+        _tagRules.ApplyToNewLots([lotId]);
         return Ok(new { status = "ok" });
     }
 

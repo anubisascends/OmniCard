@@ -23,32 +23,57 @@ namespace OmniCard.CardMatching.Games;
 public sealed class ScryfallService : IScryfallService, ICardGameService, IGameFieldResolver, IDisposable, ICatalogLanguageAware
 {
     // MTG exposes the full Scryfall vocabulary (see MtgSearchSchema). The catalog search
-    // (SearchCards) understands every field; owned-collection search additionally resolves the
-    // catalog-backed text/mana-value fields to card ids via ResolveFieldCardIds below.
+    // (SearchCards) understands every field; owned-collection search resolves the catalog-only fields
+    // (everything not stored on the owned Product) to card ids via ResolveFieldCardIds below.
     public SearchSchema SearchSchema => MtgSearchSchema.Public;
 
-    // Fields that ResolveFieldCardIds can answer efficiently with a pure-SQL query (the sound
-    // prefilter is exact for these single-field/op combinations). Other catalog fields
-    // (power/toughness/keyword/colour-identity/price/…) would require a full in-memory catalog scan
-    // per keystroke, so owned-collection search leaves them to the name fallback; they remain fully
-    // supported in catalog search (SearchCards).
-    private static readonly HashSet<string> CollectionResolvableFields =
-        new(StringComparer.OrdinalIgnoreCase) { "oracle", "fulloracle", "flavor", "artist", "watermark", "cmc" };
+    // Every catalog-only field, plus the catalog's is: flags (is:commander, is:reprint, …). lang is
+    // excluded: on owned cards it means the copy's language, which the collection query handles itself.
+    private static readonly HashSet<string> CollectionResolvableFields = MtgSearchSchema.GameFields
+        .Select(f => f.Canonical).Where(f => f != "lang").Append("is")
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     public IReadOnlySet<string>? ResolveFieldCardIds(string field, ComparisonOp op, string value)
     {
         if (!CollectionResolvableFields.Contains(field))
             return null;
 
+        // Whole-catalog form: narrow in SQL where the sound prefilter can, then decide exactly in memory.
+        // Collection search uses the candidate-restricted overload instead (far cheaper for fields the
+        // prefilter can't narrow, which would otherwise stream the entire catalog).
         var node = new FieldFilter(field, op, value, Negated: false);
         var prefilter = ScryfallCardFilter.BuildSqlPrefilter(node);
-        if (prefilter is null)
-            return null; // e.g. cmc!= — not exactly SQL-translatable; skip rather than scan the catalog
-
         using var ctx = _dbContextFactory.CreateDbContext();
-        return ctx.Cards.AsNoTracking().Where(prefilter)
-            .Select(c => c.Id).ToList()
-            .Select(id => id.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        IQueryable<Card> cards = ctx.Cards.AsNoTracking();
+        if (prefilter is not null) cards = cards.Where(prefilter);
+        return cards.AsEnumerable()
+            .Where(c => ScryfallCardFilter.Matches(c, node))
+            .Select(c => c.Id.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    public IReadOnlySet<string>? ResolveFieldCardIds(string field, ComparisonOp op, string value, IReadOnlyCollection<string> candidateIds)
+    {
+        if (!CollectionResolvableFields.Contains(field))
+            return null;
+
+        // Keep the caller's spelling of each id so the returned set matches the owned GameCardIds verbatim.
+        var byGuid = new Dictionary<Guid, List<string>>();
+        foreach (var id in candidateIds)
+            if (Guid.TryParse(id, out var g))
+                (byGuid.TryGetValue(g, out var list) ? list : byGuid[g] = []).Add(id);
+
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (byGuid.Count == 0) return result;
+
+        var node = new FieldFilter(field, op, value, Negated: false);
+        using var ctx = _dbContextFactory.CreateDbContext();
+        foreach (var chunk in byGuid.Keys.Chunk(2000))
+        {
+            foreach (var card in ctx.Cards.AsNoTracking().Where(c => chunk.Contains(c.Id)).AsEnumerable())
+                if (ScryfallCardFilter.Matches(card, node))
+                    result.UnionWith(byGuid[card.Id]);
+        }
+        return result;
     }
 
     private static readonly JsonSerializerOptions ScryfallJsonOptions = new()

@@ -86,7 +86,7 @@ Matched cards are checked automatically; unmatched ones are not. When you confir
 
 On a wide screen the review list is on the left and the selected card's details are on the right. On a phone the details appear below the list.
 
-Each row shows the scan thumbnail next to the matched artwork, the card name, set and collector number, a one-line summary of its properties (condition, language, foil, quantity, tags, and a note icon), and its badges. A green check mark before the name means you have confirmed it.
+Each row shows the scan thumbnail next to the matched artwork, the card name, set and collector number, a one-line summary of its properties (condition, language, foil, quantity and a note icon), its badges and its tags. Tags added by a [tag rule](help:tag-rules) have a sparkle icon. A green check mark before the name means you have confirmed it.
 
 Click a row to see it in the detail panel:
 
@@ -131,7 +131,7 @@ The **Card properties** section of the detail panel sets the details for that co
 - **Quantity** — how many identical copies this scan represents.
 - **Purchase price** — what you paid, if you want to track it.
 - **Foil** — turn on for a foil copy, then optionally choose or type a **Foil type**.
-- **Tags** — pick existing tags or type new ones.
+- **Tags** — pick existing tags or type new ones. Tags with a sparkle icon were added by a [tag rule](help:tag-rules). Remove one to keep it off this card. To stop rule tags altogether, turn off **Apply tag rules** in the action bar.
 - **Note** — free text, for example *signed, played, misprint…*
 
 ### Edit several cards at once

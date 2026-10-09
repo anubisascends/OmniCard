@@ -448,6 +448,37 @@ the whole filtered set per request, like a market-price sort. Groups open expand
   views): `GET /api/views?page=&containerId=&game=`, `GET/PUT/DELETE /api/views/{id}`, `POST /api/views`,
   `PUT/DELETE /api/views/{id}/default?page=&containerId=&game=&everyone=`, `POST /api/views/{id}/copy`.
 
+## Tag rules
+
+Administrators define per-game **tag rules** under *Administration ▸ Tag Rules*: a search query plus
+the tags to add. Rules are **additive only** (they never remove a tag).
+
+- **Scans:** the Scan page (and batches/audits, which reuse it) asks `POST /api/scan/tag-rules` for each
+  matched card's rule tags and pre-fills them, marked, for review; a removed rule tag stays off that card.
+  It re-checks a card when its identity, finish, condition, language or the game changes, and holds the
+  commit until every card is checked. *Apply tag rules* in the action bar turns this off (per browser).
+  The commit itself doesn't re-apply rules (`ScanCommitRequest.ApplyTagRules` is false), so what was
+  reviewed is what's saved.
+- **Imports** (CSV, deck URL, location import, list *Add new*, location *Add card*, binder pocket add
+  from the catalog) apply the enabled rules to the new lots right after they're saved
+  (`TagRuleService.ApplyToNewLots`) and report `ruleTagged`. A rule failure is logged, never fails the
+  import.
+- **Run now** applies one rule to every owned card it matches, across every site, after a preview
+  (`POST /api/tag-rules/preview`).
+- **Validation is strict** (`TagRuleQueryValidator`): unknown fields and `is:` flags are errors (the
+  search box would treat them as a name search), and rules can't use `loc:`, `tag:`, prices or `date:`.
+- Storage: `TagRules` table (migration `AddTagRules`; tags as a JSON array of names, so a rule can name
+  a tag that doesn't exist yet). API (`TagRulesController`, admin only): `GET/POST /api/tag-rules`,
+  `PUT/DELETE /api/tag-rules/{id}`, `POST /api/tag-rules/validate`, `POST /api/tag-rules/preview`,
+  `POST /api/tag-rules/{id}/run`.
+
+Related: collection search now resolves every MTG catalog field (`kw:`, `pow`, `f:`, catalog `is:` flags…)
+against the printings you own (`IGameFieldResolver.ResolveFieldCardIds(…, candidateIds)`), and an unknown
+`is:` flag matches nothing instead of everything. The matching ids travel as one JSON parameter
+(`EF.Parameter`). A catalog field under `or`/negation is evaluated in memory instead
+(`CollectionQueryBuilder.ApplyInMemory`): SQL Server re-reads the JSON list per row there, which timed out
+on a ~50k-card collection; in memory it takes ~2 s.
+
 ## Order CSV import
 
 **Sales → Orders → Import CSV** creates orders from a CSV using a reusable column-mapping **template**.

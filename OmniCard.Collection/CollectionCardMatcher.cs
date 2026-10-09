@@ -27,29 +27,44 @@ public static class CollectionCardMatcher
     public delegate IReadOnlySet<string>? GameFieldResolve(CardGame game, string field, ComparisonOp op, string value);
 
     public static List<CollectionCard> Filter(IEnumerable<CollectionCard> cards, string? query,
-        IReadOnlyDictionary<CardGame, ICardGameService>? gameServices = null)
+        IReadOnlyDictionary<CardGame, ICardGameService>? gameServices = null, SearchSchema? schema = null)
     {
+        var list = cards as IReadOnlyList<CollectionCard> ?? cards.ToList();
         if (string.IsNullOrWhiteSpace(query))
-            return cards.ToList();
+            return list.ToList();
 
-        var filter = ScryfallQueryParser.ParseFilter(query);
-        if (filter is null) return cards.ToList();
+        var filter = ScryfallQueryParser.ParseFilter(query, schema);
+        if (filter is null) return list.ToList();
+
+        var resolve = gameServices is null ? null : CreateResolver(gameServices, list);
+        return list.Where(c => Matches(c, filter, resolve)).ToList();
+    }
+
+    /// <summary>A memoizing <see cref="GameFieldResolve"/> over <paramref name="gameServices"/> whose
+    /// answers are restricted to the printings in <paramref name="cards"/> — the only ones that can
+    /// match, so MTG checks just their catalog rows rather than the whole catalog.</summary>
+    public static GameFieldResolve CreateResolver(
+        IReadOnlyDictionary<CardGame, ICardGameService> gameServices, IEnumerable<CollectionCard> cards)
+    {
+        var candidates = cards.GroupBy(c => c.Game).ToDictionary(
+            g => g.Key,
+            g => (IReadOnlyCollection<string>)g.Select(c => c.GameCardId).Where(id => id.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList());
 
         // Memoize id-set resolution so a game-specific field isn't re-resolved per card.
         var cache = new Dictionary<(CardGame, string, ComparisonOp, string), IReadOnlySet<string>?>();
-        GameFieldResolve? resolve = gameServices is null ? null : (game, field, op, value) =>
+        return (game, field, op, value) =>
         {
             var key = (game, field, op, value);
             if (!cache.TryGetValue(key, out var set))
             {
                 set = gameServices.TryGetValue(game, out var svc) && svc is IGameFieldResolver r
-                    ? r.ResolveFieldCardIds(field, op, value) : null;
+                    ? r.ResolveFieldCardIds(field, op, value, candidates.GetValueOrDefault(game) ?? [])
+                    : null;
                 cache[key] = set;
             }
             return set;
         };
-
-        return cards.Where(c => Matches(c, filter, resolve)).ToList();
     }
 
     public static bool Matches(CollectionCard card, FilterNode node, GameFieldResolve? resolve = null) => node switch
@@ -71,7 +86,9 @@ public static class CollectionCardMatcher
             "type" => NullableStrOp(c.CardType, f.Op, f.Value),
             "rarity" => RarityMatch(c.Rarity, f.Op, f.Value),
             "color" => ColorMatch(c.Color, f.Op, f.Value),
-            "is" => IsMatch(c, f.Value),
+            // Ownership flags from the lot; any other is: is a catalog flag (is:commander, …), and one
+            // no game recognizes matches nothing — mirrors CollectionQueryBuilder.
+            "is" => IsMatch(c, f.Value) ?? GameFieldMatch(c, f, resolve) ?? false,
             "foil" => c.IsFoil == ParseFoil(f.Value),
             "condition" or "cond" => StrOp(c.Condition, f.Op, f.Value),
             "lang" or "language" => LanguageMatch(c.Language, f.Op, f.Value),
@@ -122,12 +139,13 @@ public static class CollectionCardMatcher
         return matching.Any(r => Eq(rarity, r));
     }
 
-    private static bool IsMatch(CollectionCard c, string value) => value.ToLowerInvariant() switch
+    private static bool? IsMatch(CollectionCard c, string value) => value.ToLowerInvariant() switch
     {
         "foil" => c.IsFoil,
+        "nonfoil" => !c.IsFoil,
         "missing" => c.IsMissing,
         "missingdb" => c.FlagReason == FlagReason.MissingFromDatabase,
-        _ => true,
+        _ => null,
     };
 
     private static bool ParseFoil(string value) =>

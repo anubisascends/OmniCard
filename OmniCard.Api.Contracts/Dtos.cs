@@ -800,7 +800,7 @@ public sealed record FulfillListRequest
 
 /// <summary>Copies moved and created, how many copies are still on the list, and whether the list was
 /// emptied (and so deleted).</summary>
-public sealed record FulfillListResultDto(int Moved, int Added, int Remaining, bool ListDeleted);
+public sealed record FulfillListResultDto(int Moved, int Added, int Remaining, bool ListDeleted, int RuleTagged = 0);
 
 public sealed record SetQuantityRequest
 {
@@ -1047,7 +1047,7 @@ public sealed record ImportUrlRequest
 /// collector number wasn't in the catalog, so the cheapest printing of the name was used instead.</summary>
 public sealed record ImportUrlResultDto(
     string DeckName, int Imported, int Skipped, int TotalCards,
-    IReadOnlyList<string> UnresolvedNames, IReadOnlyList<string> SubstitutedNames);
+    IReadOnlyList<string> UnresolvedNames, IReadOnlyList<string> SubstitutedNames, int RuleTagged = 0);
 
 /// <summary>Body of <c>POST /api/import/location/{id}/url</c>: a Moxfield/Archidekt deck imported
 /// all-or-nothing into the location in the route.</summary>
@@ -1066,7 +1066,8 @@ public sealed record LocationImportIssueDto(int? Row, string? Card, string Messa
 /// <see cref="Substitutions"/> lists lines whose exact printing wasn't in the catalog and were
 /// imported as another printing of the same card.</summary>
 public sealed record LocationImportResultDto(
-    string Source, string? Format, int Lines, int Copies, IReadOnlyList<LocationImportIssueDto> Substitutions);
+    string Source, string? Format, int Lines, int Copies, IReadOnlyList<LocationImportIssueDto> Substitutions,
+    int RuleTagged = 0);
 
 /// <summary>A rejected location import (HTTP 422): nothing was written. <see cref="Error"/> is the
 /// summary; <see cref="Errors"/> every problem found, so the user can fix them all in one pass.</summary>
@@ -1165,9 +1166,13 @@ public sealed record ScanCommitRequest
 {
     public int ContainerId { get; init; }
     public IReadOnlyList<ScanCommitItem> Items { get; init; } = [];
+    /// <summary>Apply the enabled tag rules to the new cards on the server. The Scan page leaves this off
+    /// (its review already shows the rule tags, and the user may have removed some); one-step adds such
+    /// as the location "Add card" dialog turn it on.</summary>
+    public bool ApplyTagRules { get; init; }
 }
 
-public sealed record ScanCommitResultDto(int Imported);
+public sealed record ScanCommitResultDto(int Imported, int RuleTagged = 0);
 
 /// <summary>Export staged (not-yet-committed) scans as files without writing anything to the
 /// collection. One format ⇒ that file; several ⇒ a zip with one file per format.
@@ -1540,3 +1545,77 @@ public sealed record CopySavedViewRequest
 }
 
 public sealed record CopySavedViewResultDto(int Copied);
+
+// ---- Tag rules (Settings ▸ Tag rules; applied on scan review + imports) ----
+
+/// <summary>An admin-defined auto-tagging rule: cards of <see cref="Game"/> matching <see cref="Query"/>
+/// get every tag in <see cref="Tags"/>. Additive only — rules never remove tags.</summary>
+public sealed record TagRuleDto(
+    int Id, string Name, string Game, string Query, IReadOnlyList<string> Tags, bool Enabled, DateTime UpdatedAt);
+
+/// <summary>Create or replace a rule.</summary>
+public sealed record TagRuleInput
+{
+    public string Name { get; init; } = "";
+    public string Game { get; init; } = "";
+    public string Query { get; init; } = "";
+    public IReadOnlyList<string> Tags { get; init; } = [];
+    public bool Enabled { get; init; } = true;
+}
+
+/// <summary>Check a draft query without saving it.</summary>
+public sealed record TagRuleValidateRequest
+{
+    public string Game { get; init; } = "";
+    public string Query { get; init; } = "";
+}
+
+/// <summary>Problems with a query (empty = valid).</summary>
+public sealed record TagRuleValidationDto(IReadOnlyList<string> Errors);
+
+/// <summary>Preview what a (possibly unsaved) rule would do to the existing collection.</summary>
+public sealed record TagRulePreviewRequest
+{
+    public string Game { get; init; } = "";
+    public string Query { get; init; } = "";
+    public IReadOnlyList<string> Tags { get; init; } = [];
+}
+
+/// <summary>One owned card in a rule preview.</summary>
+public sealed record TagRulePreviewCardDto(
+    int Id, string Name, string SetCode, string CollectorNumber, string? Location, string Condition, bool IsFoil,
+    IReadOnlyList<string> MissingTags);
+
+/// <summary><see cref="MatchCount"/> owned cards match; <see cref="ChangeCount"/> of them lack at least one
+/// of the rule's tags (what "Run now" would change). <see cref="Sample"/> lists some of those.</summary>
+public sealed record TagRulePreviewDto(
+    int MatchCount, int ChangeCount, IReadOnlyList<TagRulePreviewCardDto> Sample, IReadOnlyList<string> Errors);
+
+/// <summary>Result of running a rule against the existing collection.</summary>
+public sealed record TagRuleRunResultDto(int CardsTagged);
+
+/// <summary>One unsaved scanned card to check against the tag rules. <see cref="Key"/> is the client's
+/// item id, echoed back.</summary>
+public sealed record ScanTagRuleItem
+{
+    public string Key { get; init; } = "";
+    public string GameCardId { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string SetCode { get; init; } = "";
+    public string CollectorNumber { get; init; } = "";
+    public string Rarity { get; init; } = "";
+    public string Condition { get; init; } = "NM";
+    public string? Language { get; init; }
+    public bool IsFoil { get; init; }
+    public string? FoilType { get; init; }
+}
+
+/// <summary>Check scanned (not yet saved) cards of one game against the enabled tag rules.</summary>
+public sealed record ScanTagRulesRequest
+{
+    public string Game { get; init; } = "";
+    public IReadOnlyList<ScanTagRuleItem> Items { get; init; } = [];
+}
+
+/// <summary>The rule tags for one scanned card (empty when no rule matches).</summary>
+public sealed record ScanTagRuleResultDto(string Key, IReadOnlyList<string> Tags);

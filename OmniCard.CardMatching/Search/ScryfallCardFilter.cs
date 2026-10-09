@@ -432,6 +432,18 @@ public static class ScryfallCardFilter
 
     private static readonly string[] PermanentTypes = ["artifact", "creature", "enchantment", "land", "planeswalker", "battle"];
 
+    /// <summary>Every <c>is:</c> value <see cref="IsMatch"/> understands (anything else matches nothing).
+    /// Keep in sync with the switch below; used to reject unknown flags in saved queries.</summary>
+    public static IReadOnlySet<string> IsFlags { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "foil", "nonfoil", "etched", "glossy", "promo", "reprint", "firstprint", "firstprinting", "reserved",
+        "digital", "fullart", "full", "textless", "booster", "oversized", "spotlight", "storyspotlight",
+        "variation", "gamechanger", "hires", "highres", "contentwarning", "colorless", "multicolor",
+        "multicolored", "gold", "hybrid", "phyrexian", "split", "flip", "transform", "meld", "leveler", "dfc",
+        "doublefaced", "mdfc", "modaldfc", "adventure", "token", "permanent", "spell", "land", "creature",
+        "vanilla", "commander", "funny",
+    };
+
     private static bool IsMatch(Card c, string v)
     {
         var val = v.ToLowerInvariant();

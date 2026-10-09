@@ -25,6 +25,7 @@ public sealed class LocationImportService(
     WebBinderCardService binderCards,
     IDecklistService decklists,
     ICardService cardService,
+    TagRules.TagRuleService tagRules,
     ILogger<LocationImportService> logger)
 {
     /// <summary>Exactly one of <see cref="Result"/> / <see cref="Failure"/> is set, unless the location
@@ -237,9 +238,10 @@ public sealed class LocationImportService(
         List<LocationImportIssueDto> substitutions)
     {
         var singles = lines.SelectMany(ToSingleCopies).ToList();
+        IReadOnlyList<int> lotIds;
         try
         {
-            binderCards.ImportCollectionCards(singles, skipDuplicates: false);
+            lotIds = binderCards.ImportCollectionCardLots(singles, skipDuplicates: false);
         }
         catch (DeckBoxGameMismatchException ex)
         {
@@ -254,7 +256,8 @@ public sealed class LocationImportService(
 
         logger.LogInformation("Imported {Lines} lines ({Copies} copies) from {Source} into location {Location}",
             lines.Count, singles.Count, source, target.Name);
-        return new Outcome(new LocationImportResultDto(source, format, lines.Count, singles.Count, substitutions), null);
+        var ruleTagged = tagRules.ApplyToNewLots(lotIds);
+        return new Outcome(new LocationImportResultDto(source, format, lines.Count, singles.Count, substitutions, ruleTagged), null);
     }
 
     /// <summary>One card per physical copy: a line of quantity N becomes N cards of quantity 1, each

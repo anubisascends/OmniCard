@@ -97,6 +97,10 @@ The result message shows:
 | **Dragon Shield** | Dragon Shield card manager |
 | **Text list** | A plain list, one line per card, that you can paste into most deck builders |
 
+## Tags from tag rules
+
+If an administrator has set up [tag rules](help:tag-rules), the CSV and deck imports tag matching new cards as they're added. The result message says how many cards were tagged.
+
 ## Other ways to import
 
 - **Into one location, all or nothing**: open a location and click **Import**. You can use a CSV file or a deck URL. Every card goes into that location, and if any line has a problem, nothing is imported and each problem is listed so you can fix it. See [Locations](help:locations).

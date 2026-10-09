@@ -1,6 +1,7 @@
 using OmniCard.Api.Contracts;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
+using OmniCard.CardMatching;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Tags;
 using OmniCard.Web.Api.Controllers;
@@ -25,8 +26,20 @@ public sealed class ScanCommitService(
     public IReadOnlyList<int> Commit(int containerId, IReadOnlyList<ScanCommitItem> items)
     {
         var cards = new List<CollectionCard>(items.Count);
+        // One catalog lookup per printing, however many copies of it the commit holds.
+        var attributes = new Dictionary<(CardGame, string), (string? Color, string? CardType)>();
         foreach (var item in items)
-            cards.Add(MapScanItem(item, containerId) ?? throw new UnknownScanGameException(item.Game));
+        {
+            var card = MapScanItem(item, containerId) ?? throw new UnknownScanGameException(item.Game);
+            if (attributes.TryGetValue((card.Game, card.GameCardId), out var known))
+                (card.Color, card.CardType) = known;
+            else
+            {
+                FillCatalogAttributes(card);
+                attributes[(card.Game, card.GameCardId)] = (card.Color, card.CardType);
+            }
+            cards.Add(card);
+        }
 
         // A scanned card is a real physical copy — always create a new lot (never skip as a duplicate).
         // AddScannedLots returns the created lot ids in input order so we can attach per-copy tags.
@@ -79,6 +92,22 @@ public sealed class ScanCommitService(
             DateAdded = DateTime.UtcNow,
             ContainerId = containerId,
         };
+    }
+
+    /// <summary>Fills the card's color and full type line from its catalog printing (the scan payload
+    /// doesn't carry them). Without these, owned-collection <c>c:</c>/<c>t:</c> searches — and tag rules
+    /// built on them — can't see scanned cards. Best-effort: a missing catalog row leaves them empty.</summary>
+    public void FillCatalogAttributes(CollectionCard card)
+    {
+        try
+        {
+            if (cardService.GetGameService(card.Game) is { } gameService)
+                CardAttributeExtractor.FillFromCatalog(card, gameService);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to look up catalog attributes for {Game} card {CardId}", card.Game, card.GameCardId);
+        }
     }
 
     /// <summary>Record a scan-hash → confirmed-card mapping for each committed item that carries a scan

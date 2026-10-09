@@ -12,6 +12,7 @@ using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Helpers;
+using OmniCard.Web.Services.TagRules;
 
 namespace OmniCard.Web.Api.Controllers;
 
@@ -32,6 +33,7 @@ public sealed class CardScanController(
     ITagService tags,
     ICsvExportImportService csv,
     ScanCommitService commits,
+    TagRuleService tagRules,
     ILogger<CardScanController> logger) : ControllerBase
 {
     /// <summary>Upper bound on correction-search results. High enough to show every printing of a
@@ -214,8 +216,22 @@ public sealed class CardScanController(
             return Conflict(new { error = ex.Message });
         }
 
+        var ruleTagged = request.ApplyTagRules ? tagRules.ApplyToNewLots(lotIds) : 0;
+
         logger.LogInformation("Committed {Count} scanned card(s) to location {LocationId}", lotIds.Count, request.ContainerId);
-        return Ok(new ScanCommitResultDto(lotIds.Count));
+        return Ok(new ScanCommitResultDto(lotIds.Count, ruleTagged));
+    }
+
+    /// <summary>The enabled tag rules' tags for scanned cards that haven't been saved yet, so the Scan page
+    /// can show them (removable) during review. Open to anyone who can scan; the rules themselves are
+    /// admin-managed (<see cref="TagRulesController"/>).</summary>
+    [HttpPost("tag-rules")]
+    [RequirePermission(Permissions.ScanView)]
+    public ActionResult<IReadOnlyList<ScanTagRuleResultDto>> TagRules([FromBody] ScanTagRulesRequest request)
+    {
+        if (LocationsController.ParseGame(request.Game) is not { } game)
+            return BadRequest(new { error = $"Unknown game '{request.Game}'" });
+        return Ok(tagRules.EvaluateScanItems(game, request.Items));
     }
 
     /// <summary>Export staged scans to CSV (or a zip of several formats) WITHOUT adding them to the
@@ -300,6 +316,7 @@ public sealed class CardScanController(
         {
             if (ScanCommitService.MapScanItem(item, request.ContainerId) is not { } card)
                 return BadRequest(new { error = $"Unknown game '{item.Game}'" });
+            commits.FillCatalogAttributes(card);
             cards.Add(card);
 
             var key = WebBinderCardService.AuditIdentityKey(card.GameCardId, card.SetCode, card.Number);
