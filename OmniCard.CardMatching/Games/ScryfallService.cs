@@ -30,7 +30,7 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
     // Every catalog-only field, plus the catalog's is: flags (is:commander, is:reprint, …). lang is
     // excluded: on owned cards it means the copy's language, which the collection query handles itself.
     private static readonly HashSet<string> CollectionResolvableFields = MtgSearchSchema.GameFields
-        .Select(f => f.Canonical).Where(f => f != "lang").Append("is")
+        .Select(f => f.Canonical).Where(f => f != "lang").Append(MtgSearchSchema.IdentityField.Canonical).Append("is")
         .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     public IReadOnlySet<string>? ResolveFieldCardIds(string field, ComparisonOp op, string value)

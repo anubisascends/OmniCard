@@ -26,6 +26,7 @@ public class MtgCollectionFieldSearchTests : IDisposable
     private static readonly Guid Dragon = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
     private static readonly Guid Bear = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000002");
     private static readonly Guid Unowned = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000003");
+    private static readonly Guid Fountain = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000004");
 
     private readonly SqliteConnection _store;
     private readonly SqliteConnection _catalog;
@@ -45,13 +46,16 @@ public class MtgCollectionFieldSearchTests : IDisposable
         using var cat = new ScryfallDbContext(_catalogOptions);
         cat.Database.EnsureCreated();
         cat.Cards.AddRange(
-            Catalog(Dragon, "Shivan Dragon", "Legendary Creature — Dragon", "5", ["Flying"], "legal"),
-            Catalog(Bear, "Grizzly Bears", "Creature — Bear", "2", [], "not_legal"),
-            Catalog(Unowned, "Serra Angel", "Creature — Angel", "4", ["Flying"], "legal"));
+            Catalog(Dragon, "Shivan Dragon", "Legendary Creature — Dragon", "5", ["Flying"], "legal", ["R"]),
+            Catalog(Bear, "Grizzly Bears", "Creature — Bear", "2", [], "not_legal", ["G"]),
+            Catalog(Unowned, "Serra Angel", "Creature — Angel", "4", ["Flying"], "legal", ["W"]),
+            // A dual land: no colours (so the owned Color column holds the "Land" bucket), W/U identity.
+            Catalog(Fountain, "Hallowed Fountain", "Land — Plains Island", "", [], "not_legal", ["W", "U"], colors: []));
         cat.SaveChanges();
 
-        Own(Dragon, "Shivan Dragon");
-        Own(Bear, "Grizzly Bears");
+        Own(Dragon, "Shivan Dragon", "R", "Creature");
+        Own(Bear, "Grizzly Bears", "G", "Creature");
+        Own(Fountain, "Hallowed Fountain", "Land", "Land");
     }
 
     public void Dispose()
@@ -60,21 +64,23 @@ public class MtgCollectionFieldSearchTests : IDisposable
         _catalog.Dispose();
     }
 
-    private static Card Catalog(Guid id, string name, string type, string power, List<string> keywords, string modern) => new()
+    private static Card Catalog(Guid id, string name, string type, string power, List<string> keywords, string modern,
+        List<string> identity, List<string>? colors = null) => new()
     {
         Id = id, Name = name, Lang = "en", SetCode = "tst", SetName = "Test", CollectorNumber = "1",
         Rarity = "rare", TypeLine = type, Power = power, Toughness = "1", Keywords = keywords,
+        Colors = colors ?? identity, ColorIdentity = identity,
         Legalities = new Dictionary<string, string> { ["modern"] = modern },
         ImageUris = new ImageUris(), Prices = new Prices(),
     };
 
-    private void Own(Guid id, string name)
+    private void Own(Guid id, string name, string color, string cardType)
     {
         using var ctx = _factory.CreateDbContext();
         var product = new Product
         {
             Game = CardGame.Mtg, Category = ProductCategory.Single, GameCardId = id.ToString(),
-            Name = name, SetCode = "tst", CollectorNumber = "1", Rarity = "rare",
+            Name = name, SetCode = "tst", CollectorNumber = "1", Rarity = "rare", Color = color, CardType = cardType,
         };
         ctx.Products.Add(product);
         ctx.SaveChanges();
@@ -119,17 +125,35 @@ public class MtgCollectionFieldSearchTests : IDisposable
     [InlineData("pow>=4", new[] { "Shivan Dragon" })]
     [InlineData("f:modern", new[] { "Shivan Dragon" })]
     [InlineData("is:commander", new[] { "Shivan Dragon" })]
-    [InlineData("-is:commander", new[] { "Grizzly Bears" })]
+    [InlineData("-is:commander", new[] { "Grizzly Bears", "Hallowed Fountain" })]
     [InlineData("is:notarealflag", new string[0])]
-    [InlineData("is:nonfoil", new[] { "Grizzly Bears", "Shivan Dragon" })]
-    [InlineData("-f:modern", new[] { "Grizzly Bears" })]
-    [InlineData("-(kw:flying or pow>=4)", new[] { "Grizzly Bears" })]
-    [InlineData("-(kw:flying -is:commander)", new[] { "Grizzly Bears", "Shivan Dragon" })]
-    [InlineData("-is:notarealflag", new[] { "Grizzly Bears", "Shivan Dragon" })]
+    [InlineData("is:nonfoil", new[] { "Grizzly Bears", "Hallowed Fountain", "Shivan Dragon" })]
+    [InlineData("-f:modern", new[] { "Grizzly Bears", "Hallowed Fountain" })]
+    [InlineData("-(kw:flying or pow>=4)", new[] { "Grizzly Bears", "Hallowed Fountain" })]
+    [InlineData("-(kw:flying -is:commander)", new[] { "Grizzly Bears", "Hallowed Fountain", "Shivan Dragon" })]
+    [InlineData("-is:notarealflag", new[] { "Grizzly Bears", "Hallowed Fountain", "Shivan Dragon" })]
     public void CatalogFields_FilterOwnedCards(string query, string[] expected)
     {
         Assert.Equal(expected, Search(query));
         Assert.Equal(expected, MatchInMemory(query)); // in-memory matcher stays in lockstep
+    }
+
+    // id: is colour identity (catalog), not the owned Color column — a dual land is colourless but
+    // has a two-colour identity. c: keeps the owned-colour meaning.
+    [Theory]
+    [InlineData("t:land id:multi", new[] { "Hallowed Fountain" })]
+    [InlineData("t:land id:m", new[] { "Hallowed Fountain" })]
+    [InlineData("t:land c:multi", new string[0])]
+    [InlineData("id:wu", new[] { "Hallowed Fountain" })]
+    [InlineData("ci=r", new[] { "Shivan Dragon" })]
+    [InlineData("id<=wug", new[] { "Grizzly Bears", "Hallowed Fountain" })]
+    [InlineData("identity>=2", new[] { "Hallowed Fountain" })]
+    [InlineData("-id:multi", new[] { "Grizzly Bears", "Shivan Dragon" })]
+    [InlineData("id:multi or c:r", new[] { "Hallowed Fountain", "Shivan Dragon" })]
+    public void ColorIdentity_UsesCatalogIdentity(string query, string[] expected)
+    {
+        Assert.Equal(expected, Search(query));
+        Assert.Equal(expected, MatchInMemory(query));
     }
 
     private sealed class NoHttpFactory : IHttpClientFactory

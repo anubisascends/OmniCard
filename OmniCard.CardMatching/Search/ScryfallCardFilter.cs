@@ -359,7 +359,7 @@ public static class ScryfallCardFilter
         var lower = v.ToLowerInvariant();
         if (lower is "colorless" or "c")
             return op == ComparisonOp.NotEqual ? have.Count != 0 : have.Count == 0;
-        if (lower is "multicolor" or "multicolored" or "m")
+        if (lower is "multicolor" or "multicolored" or "multi" or "m")
             return op == ComparisonOp.NotEqual ? have.Count < 2 : have.Count >= 2;
 
         // Numeric colour-count comparison, e.g. c>=2.

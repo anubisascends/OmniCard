@@ -49,7 +49,18 @@ public static class SharedSearchSchema
 
     /// <summary>Compose a game schema: the core fields plus the game's own fields. Game fields are
     /// appended last so their aliases win any collision (e.g. FFTCG's <c>e</c>→element beats core
-    /// <c>e</c>→set) — see <see cref="SearchSchema"/>'s alias map.</summary>
-    public static SearchSchema WithGameFields(IEnumerable<SearchFieldDefinition> gameFields) =>
-        new(CoreFields.Concat(gameFields));
+    /// <c>e</c>→set) — see <see cref="SearchSchema"/>'s alias map. A claimed alias is also dropped
+    /// from the core field's list (or the core field dropped, when the game redefines it outright) so
+    /// the syntax-help popover doesn't show it twice.</summary>
+    public static SearchSchema WithGameFields(IEnumerable<SearchFieldDefinition> gameFields)
+    {
+        var games = gameFields.ToList();
+        var claimed = games.SelectMany(f => f.Aliases.Append(f.Canonical)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var core = CoreFields
+            .Where(f => !claimed.Contains(f.Canonical))
+            .Select(f => f.Aliases.Any(claimed.Contains)
+                ? f with { Aliases = f.Aliases.Where(a => !claimed.Contains(a)).ToList() }
+                : f);
+        return new(core.Concat(games));
+    }
 }
