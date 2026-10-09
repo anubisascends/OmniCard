@@ -301,7 +301,17 @@ export interface OrderDto {
   shippingCost: number;
   marketplaceFees: number;
   trackingNumber?: string | null;
+  carrier?: string | null;
+  shippedAt?: string | null;
   notes?: string | null;
+}
+
+/** Result of scanning a shipping label on the Ship page (see `ShipScanResultDto` on the server). */
+export interface ShipScanResultDto {
+  outcome: 'shipped' | 'ready' | 'alreadyShipped' | 'ambiguous' | 'notFound';
+  /** The tracking number read from the barcode (carrier routing prefixes stripped). */
+  tracking: string;
+  orders: OrderDto[];
 }
 
 // --- Order CSV import ---

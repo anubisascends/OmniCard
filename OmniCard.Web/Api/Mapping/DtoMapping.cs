@@ -190,6 +190,8 @@ public static class DtoMapping
         ShippingCost = o.ShippingCost,
         MarketplaceFees = o.MarketplaceFees,
         TrackingNumber = o.TrackingNumber,
+        Carrier = o.Carrier,
+        ShippedAt = o.ShippedAt?.ToString("o"),
         Notes = o.Notes,
     };
 

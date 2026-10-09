@@ -56,10 +56,15 @@ public sealed class OrdersController(
     [RequirePermission(Permissions.SalesOrdersView)]
     public ActionResult<IReadOnlyList<OrderDto>> Get()
     {
+        var list = orders.GetOrders();
+        return Decorate(list).Select(DtoMapping.ToDto).ToList();
+    }
+
+    /// <summary>Hydrates the display-only customer name + line count/total for card/result display.</summary>
+    private List<Order> Decorate(List<Order> list)
+    {
         var summaries = orders.GetOrderLineSummaries().ToDictionary(s => s.OrderId);
         var customerNames = customers.GetAll().ToDictionary(c => c.Id, c => c.Name);
-
-        var list = orders.GetOrders();
         foreach (var o in list)
         {
             o.CustomerNameDisplay = customerNames.GetValueOrDefault(o.CustomerId);
@@ -69,7 +74,7 @@ public sealed class OrdersController(
                 o.LineTotal = s.Total;
             }
         }
-        return list.Select(DtoMapping.ToDto).ToList();
+        return list;
     }
 
     /// <summary>Move an order to a new status/lane (kanban drag). On a transition to Shipped this
@@ -82,6 +87,62 @@ public sealed class OrdersController(
             return BadRequest(new { error = $"Invalid status '{req.Status}'." });
         await orders.SetStatusAsync(id, status, req.StageKey);
         return NoContent();
+    }
+
+    // --- Ship by scanning the label ---
+
+    /// <summary>Looks up the order(s) whose tracking number matches a scanned label barcode and, when
+    /// <see cref="ShipScanRequest.Ship"/> is set and exactly one open (Created/Packed) order matches,
+    /// ships it — the Ship page's auto-ship path. Shipping goes through the same
+    /// <see cref="IOrderService.SetStatusAsync"/> as a kanban drag into the Shipped lane.</summary>
+    [HttpPost("ship-scan")]
+    [RequirePermission(Permissions.SalesOrdersShip, Permissions.SalesOrdersEdit)]
+    public async Task<ActionResult<ShipScanResultDto>> ShipScan([FromBody] ShipScanRequest req)
+    {
+        var tracking = TrackingNumbers.Extract(req.Code);
+        if (tracking.Length == 0)
+            return BadRequest(new { error = "Scan or enter a tracking number." });
+
+        var matches = orders.FindByTracking(req.Code);
+        var open = matches.Where(IsOpen).ToList();
+
+        if (open.Count == 1)
+        {
+            if (!req.Ship)
+                return new ShipScanResultDto("ready", tracking, Decorate(open).Select(DtoMapping.ToDto).ToList());
+            await ShipAsync(open[0].Id);
+            var shipped = orders.GetOrder(open[0].Id)!;
+            return new ShipScanResultDto("shipped", tracking, Decorate([shipped]).Select(DtoMapping.ToDto).ToList());
+        }
+        if (open.Count > 1)
+            return new ShipScanResultDto("ambiguous", tracking, Decorate(open).Select(DtoMapping.ToDto).ToList());
+        if (matches.Count > 0)
+            return new ShipScanResultDto("alreadyShipped", tracking, Decorate(matches).Select(DtoMapping.ToDto).ToList());
+        return new ShipScanResultDto("notFound", tracking, []);
+    }
+
+    /// <summary>Ships one open order into the first Shipped-behavior lane (the Ship page's confirm /
+    /// pick-from-several path). 409 when the order isn't Created/Packed.</summary>
+    [HttpPost("{id:int}/ship")]
+    [RequirePermission(Permissions.SalesOrdersShip, Permissions.SalesOrdersEdit)]
+    public async Task<ActionResult<OrderDto>> Ship(int id)
+    {
+        var order = orders.GetOrder(id);
+        if (order is null)
+            return NotFound();
+        if (!IsOpen(order))
+            return Conflict(new { error = $"Order is already {order.Status.ToString().ToLowerInvariant()}." });
+
+        await ShipAsync(id);
+        return DtoMapping.ToDto(Decorate([orders.GetOrder(id)!])[0]);
+    }
+
+    private static bool IsOpen(Order o) => o.Status is OrderStatus.Created or OrderStatus.Packed;
+
+    private Task ShipAsync(int orderId)
+    {
+        var lane = settings.GetWorkflowLanes().FirstOrDefault(l => l.Behavior == OrderStatus.Shipped);
+        return orders.SetStatusAsync(orderId, OrderStatus.Shipped, lane?.Key);
     }
 
     // --- CRUD ---

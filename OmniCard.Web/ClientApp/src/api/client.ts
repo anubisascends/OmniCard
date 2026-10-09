@@ -50,6 +50,7 @@ import type {
   OrderImportRowDto,
   OrderImportTemplateDto,
   OrderLineDto,
+  ShipScanResultDto,
   PagedResult,
   ProductDto,
   SalesSettingsDto,
@@ -598,6 +599,10 @@ export const api = {
     },
   ) => request<void>(`/api/orders/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   orderDelete: (id: number) => request<void>(`/api/orders/${id}`, { method: 'DELETE' }),
+  /** Look up a scanned shipping-label barcode; with `ship`, a single open match is shipped at once. */
+  orderShipScan: (code: string, ship: boolean) =>
+    request<ShipScanResultDto>('/api/orders/ship-scan', { method: 'POST', body: JSON.stringify({ code, ship }) }),
+  orderShip: (id: number) => request<OrderDto>(`/api/orders/${id}/ship`, { method: 'POST' }),
   orderAddLine: (id: number, lotId: number, unitSalePrice: number) =>
     request<OrderLineDto>(`/api/orders/${id}/lines`, {
       method: 'POST',

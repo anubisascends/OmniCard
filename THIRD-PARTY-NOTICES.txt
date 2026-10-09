@@ -186,6 +186,18 @@ Homepage:    https://github.com/mnottale/AdysTech.CredentialManager
 Copyright (c) AdysTech and contributors.
 
 --------------------------------------------------------------------------------
+ZXing for JavaScript — @zxing/library 0.23.0 (Apache License 2.0) and
+@zxing/browser 0.2.1 (MIT License)
+--------------------------------------------------------------------------------
+Components:  @zxing/library (barcode decoding), @zxing/browser (camera/video
+             helpers). Used by the SPA's Ship page to read shipping-label
+             barcodes from a phone camera or webcam.
+Homepage:    https://github.com/zxing-js/library
+             https://github.com/zxing-js/browser
+License:     Apache License 2.0 (@zxing/library); MIT License (@zxing/browser)
+Copyright (c) ZXing authors; zxing-js contributors.
+
+--------------------------------------------------------------------------------
 MinVer 7.0.0 — MIT License (build-time tool, NOT distributed)
 --------------------------------------------------------------------------------
 Homepage:    https://github.com/adamralph/minver

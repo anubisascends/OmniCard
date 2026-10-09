@@ -70,6 +70,9 @@ public static class Permissions
     public const string SalesOrdersEdit = "sales.orders.edit";
     public const string SalesOrdersDelete = "sales.orders.delete";
     public const string SalesOrdersImport = "sales.orders.import";
+    /// <summary>Mark orders shipped by scanning their label (the Ship page) — narrower than Edit, for a
+    /// shipping desk. Edit also grants it.</summary>
+    public const string SalesOrdersShip = "sales.orders.ship";
 
     // Sales · Customers
     public const string SalesCustomersView = "sales.customers.view";
@@ -173,6 +176,7 @@ public static class Permissions
             new(SalesOrdersEdit, "edit", "Edit"),
             new(SalesOrdersDelete, "delete", "Delete"),
             new(SalesOrdersImport, "import", "Import orders"),
+            new(SalesOrdersShip, "ship", "Ship (scan labels)"),
         ]),
         new("sales.customers", "Sales · Customers",
         [

@@ -26,6 +26,20 @@ public class OrderService(
         return ctx.Orders.AsNoTracking().FirstOrDefault(o => o.Id == id);
     }
 
+    public List<Order> FindByTracking(string scanned)
+    {
+        if (TrackingNumbers.Normalize(scanned).Length == 0) return [];
+        using var ctx = dbContextFactory.CreateDbContext();
+        // Tracking numbers are free-form text, so the barcode-vs-stored comparison runs in memory;
+        // cancelled orders are never a ship target and are left out.
+        return ctx.Orders.AsNoTracking()
+            .Where(o => o.TrackingNumber != null && o.TrackingNumber != "" && o.Status != OrderStatus.Cancelled)
+            .AsEnumerable()
+            .Where(o => TrackingNumbers.Matches(o.TrackingNumber, scanned))
+            .OrderByDescending(o => o.OrderDate)
+            .ToList();
+    }
+
     public List<OrderLine> GetLines(int orderId)
     {
         using var ctx = dbContextFactory.CreateDbContext();

@@ -8,6 +8,10 @@ public interface IOrderService
     Order? GetOrder(int id);
     List<OrderLine> GetLines(int orderId);
 
+    /// <summary>Non-cancelled orders whose tracking number matches a scanned label barcode (see
+    /// <see cref="TrackingNumbers.Matches"/>), newest first. Empty for a blank code.</summary>
+    List<Order> FindByTracking(string scanned);
+
     /// <summary>Per-order line aggregates (item count + total) for kanban card display,
     /// keyed implicitly by <see cref="OrderLineSummary.OrderId"/>. Orders with no lines are absent.</summary>
     List<OrderLineSummary> GetOrderLineSummaries();

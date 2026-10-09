@@ -30,6 +30,7 @@ import ChecklistIcon from '@mui/icons-material/Checklist';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
@@ -59,6 +60,7 @@ const NAV: { to: string; labelKey: string; icon: ReactNode; perm?: string[]; bad
   { to: '/trades', labelKey: 'trades', icon: <SwapHorizIcon />, perm: ['trades.view'] },
   { to: '/import', labelKey: 'import', icon: <UploadFileIcon />, perm: ['import.run'] },
   { to: '/sales', labelKey: 'sales', icon: <PointOfSaleIcon />, perm: ['sales.orders.view', 'sales.customers.view', 'sales.listings.view'] },
+  { to: '/ship', labelKey: 'ship', icon: <LocalShippingIcon />, perm: ['sales.orders.ship', 'sales.orders.edit'] },
   { to: '/settings', labelKey: 'administration', icon: <AdminPanelSettingsIcon /> },
 ];
 

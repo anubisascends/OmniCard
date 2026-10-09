@@ -119,7 +119,7 @@ Permissions are grouped by section. Most sections have **View**, plus actions su
 | Trades | View, Create, Finalize, Cancel |
 | Import | Run import |
 | Export | Run export |
-| Sales · Orders | View, Create, Edit, Delete, Import orders |
+| Sales · Orders | View, Create, Edit, Delete, Import orders, Ship (scan labels) |
 | Sales · Customers | View, Create, Edit, Delete |
 | Sales · Listings | View, Create, Edit, Delete, Pick / mark picked |
 | Settings | View, Edit |

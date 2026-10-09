@@ -148,7 +148,9 @@ The **Items** heading shows the number of items and the order total. To remove a
 
 ### Fill in order details
 
-The top of the details panel holds the order's details: **Channel**, **Order #**, **Tracking**, **Ship charged** (what the buyer paid for shipping), **Ship cost** (what shipping cost you), **Fees** (marketplace fees) and **Notes**. Click **Save header** to keep your changes.
+The top of the details panel holds the order's details: **Channel**, **Order #**, **Tracking**, **Carrier**, **Ship charged** (what the buyer paid for shipping), **Ship cost** (what shipping cost you), **Fees** (marketplace fees) and **Notes**. Click **Save header** to keep your changes.
+
+To fill in **Tracking** from the label, click **Scan label** (the barcode button in that box) and hold the label up to your camera. With a tracking number saved, you can mark the order shipped by scanning its label on the [Ship](help:shipping) page.
 
 ### Move an order through the board
 

@@ -500,6 +500,24 @@ They are **not** backed by inventory lots, so importing does not decrement stock
 - Custom templates persist to `<DataDirectory>/order-import-templates.json`; built-ins are merged in at
   read time and can't be edited or deleted.
 
+## Ship by scanning labels
+
+The **Ship** page (`/ship`) marks orders shipped by scanning each package's shipping-label barcode (phone
+camera, desk webcam, or a keyboard-wedge handheld scanner typing into the tracking box). With **Auto-ship**
+on, a single open (Created/Packed) match ships immediately; otherwise each waits for **Mark shipped**.
+Shipping goes through the same `OrderService.SetStatusAsync` as a kanban drag, into the first lane whose
+behavior is Shipped. The order drawer's **Scan label** button fills **Tracking** the same way.
+
+- Matching (`TrackingNumbers` in `OmniCard.Shared/Sales`) compares normalized values (upper-case
+  alphanumerics) by equality or suffix (≥ 10 chars), so USPS IMpb barcodes (`420` + ZIP + tracking) and
+  FedEx's 22/34-digit barcodes match the bare tracking number. Done in memory over non-cancelled orders.
+- API: `POST /api/orders/ship-scan` `{ code, ship }` → `{ outcome, tracking, orders }`
+  (`shipped`/`ready`/`alreadyShipped`/`ambiguous`/`notFound`); `POST /api/orders/{id}/ship`.
+- Permission: **Sales · Orders ▸ Ship (scan labels)** (`sales.orders.ship`) — or **Edit**, which also grants it.
+- **The live camera needs HTTPS** (browsers only allow `getUserMedia` on a secure origin or `localhost`).
+  Over plain HTTP the page says so and falls back to typed / handheld-scanner entry. Barcodes are decoded
+  in the browser with ZXing (`@zxing/browser`); nothing is uploaded.
+
 ## MCP server (Claude, Gemini, etc.)
 
 OmniCard hosts an in-process **Model Context Protocol** server so MCP-capable apps (Claude Desktop,

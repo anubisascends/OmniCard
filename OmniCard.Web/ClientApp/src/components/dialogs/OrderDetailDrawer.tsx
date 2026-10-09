@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -7,9 +7,14 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   Drawer,
   IconButton,
+  InputAdornment,
   MenuItem,
   Stack,
   Table,
@@ -18,16 +23,21 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import { api } from '../../api/client';
 import { useGame } from '../../context/GameContext';
 import { useFormatters } from '../../i18n/format';
 
 const CHANNELS = ['Manual', 'TcgPlayer', 'Ebay'];
+
+// The barcode decoder is sizeable — only fetched when a label scan is opened.
+const BarcodeScanner = lazy(() => import('../BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })));
 
 interface HeaderForm {
   channel: string;
@@ -102,6 +112,26 @@ function AddLineRow({
   );
 }
 
+/** Camera dialog that reads a shipping-label barcode and hands back the scan. */
+function ScanLabelDialog({ open, onClose, onCode }: { open: boolean; onClose: () => void; onCode: (code: string) => void }) {
+  const { t } = useTranslation();
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{t('sales.orderDetail.scanLabelTitle')}</DialogTitle>
+      <DialogContent>
+        {open && (
+          <Suspense fallback={<CircularProgress />}>
+            <BarcodeScanner onCode={onCode} height={280} />
+          </Suspense>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{t('common.actions.cancel')}</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 export function OrderDetailDrawer({ orderId, onClose }: { orderId: number | null; onClose: () => void }) {
   const { t } = useTranslation();
   const fmt = useFormatters();
@@ -114,14 +144,17 @@ export function OrderDetailDrawer({ orderId, onClose }: { orderId: number | null
   });
 
   const [form, setForm] = useState<HeaderForm | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [trackingWarning, setTrackingWarning] = useState<string | null>(null);
   useEffect(() => {
     if (detail.data) {
       const o = detail.data.order;
+      setTrackingWarning(null);
       setForm({
         channel: o.channel,
         orderNumber: o.orderNumber ?? '',
         trackingNumber: o.trackingNumber ?? '',
-        carrier: '',
+        carrier: o.carrier ?? '',
         shippingChargedToBuyer: o.shippingChargedToBuyer,
         shippingCost: o.shippingCost,
         marketplaceFees: o.marketplaceFees,
@@ -134,6 +167,26 @@ export function OrderDetailDrawer({ orderId, onClose }: { orderId: number | null
     qc.invalidateQueries({ queryKey: ['order', orderId] });
     qc.invalidateQueries({ queryKey: ['orders'] });
     qc.invalidateQueries({ queryKey: ['dashboard'] });
+  };
+
+  // A scanned label barcode carries carrier routing data around the tracking number — let the server
+  // extract it (the same rules the Ship page matches with), and flag it if another order already has it.
+  const onLabelScanned = async (code: string) => {
+    setScanOpen(false);
+    try {
+      const result = await api.orderShipScan(code, false);
+      setForm((f) => (f ? { ...f, trackingNumber: result.tracking } : f));
+      const others = result.orders.filter((o) => o.id !== orderId);
+      setTrackingWarning(
+        others.length > 0
+          ? t('sales.orderDetail.trackingInUse', {
+              orders: others.map((o) => t('sales.orderDetail.orderTitle', { id: o.id })).join(', '),
+            })
+          : null,
+      );
+    } catch (e) {
+      setTrackingWarning((e as Error).message);
+    }
   };
 
   const save = useMutation({
@@ -162,7 +215,7 @@ export function OrderDetailDrawer({ orderId, onClose }: { orderId: number | null
 
   return (
     <Drawer anchor="right" open={open} onClose={onClose}>
-      <Box sx={{ width: 460, p: 2 }}>
+      <Box sx={{ width: { xs: '100vw', sm: 460 }, maxWidth: '100vw', p: 2 }}>
         {detail.isLoading || !detail.data || !form ? (
           <CircularProgress />
         ) : (
@@ -193,8 +246,28 @@ export function OrderDetailDrawer({ orderId, onClose }: { orderId: number | null
               <TextField size="small" label={t('sales.orderDetail.orderNumberShort')} value={form.orderNumber} onChange={set('orderNumber')} disabled={!editable} fullWidth />
             </Stack>
             <Stack direction="row" spacing={2}>
-              <TextField size="small" label={t('sales.orderDetail.tracking')} value={form.trackingNumber} onChange={set('trackingNumber')} disabled={!editable} fullWidth />
+              <TextField
+                size="small"
+                label={t('sales.orderDetail.tracking')}
+                value={form.trackingNumber}
+                onChange={set('trackingNumber')}
+                disabled={!editable}
+                fullWidth
+                InputProps={{
+                  endAdornment: editable && (
+                    <InputAdornment position="end">
+                      <Tooltip title={t('sales.orderDetail.scanLabel')}>
+                        <IconButton size="small" edge="end" onClick={() => setScanOpen(true)}>
+                          <QrCodeScannerIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <TextField size="small" label={t('sales.orderDetail.carrier')} value={form.carrier} onChange={set('carrier')} disabled={!editable} sx={{ width: 130 }} />
             </Stack>
+            {trackingWarning && <Alert severity="warning">{trackingWarning}</Alert>}
             <Stack direction="row" spacing={2}>
               <TextField size="small" type="number" label={t('sales.orderDetail.shipCharged')} value={form.shippingChargedToBuyer} onChange={setNum('shippingChargedToBuyer')} disabled={!editable} />
               <TextField size="small" type="number" label={t('sales.orderDetail.shipCost')} value={form.shippingCost} onChange={setNum('shippingCost')} disabled={!editable} />
@@ -294,6 +367,7 @@ export function OrderDetailDrawer({ orderId, onClose }: { orderId: number | null
           </Stack>
         )}
       </Box>
+      <ScanLabelDialog open={scanOpen} onClose={() => setScanOpen(false)} onCode={(code) => void onLabelScanned(code)} />
     </Drawer>
   );
 }
