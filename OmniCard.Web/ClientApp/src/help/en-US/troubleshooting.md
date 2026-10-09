@@ -105,15 +105,19 @@ Another person, or another tab or device of yours, saved a change to the same ca
 
 ## Sign-in problems
 
-**Incorrect username or password.** Check your typing. Passwords are case-sensitive, so check Caps Lock too. If it still fails, ask an administrator to reset your password under **Administration ▸ Users**.
+**Incorrect username or password.** Check your typing. Passwords are case-sensitive, so check Caps Lock too. You can sign in with your email instead of your username if an administrator has added one to your account. If it still fails, ask an administrator to reset your password.
 
 **You keep getting signed out.** If you don't tick **Remember me** when you sign in, you're signed out when you close the browser. Ticking it keeps you signed in on that device for up to 30 days. Clearing your browser's cookies also signs you out.
 
 **Not authenticated. Please sign in.** Your session ended while the page was open. Reload the page and sign in again.
 
-**You forgot your password.** Ask an administrator to reset it. After signing in with the new password, you can change it yourself under **Administration ▸ Users**.
+**You forgot your password.** Ask an administrator to require a password reset. They'll give you a setup key. Sign in with your username or email, enter the key, and choose a new password.
 
-**You're setting up a new server.** Sign in with the built-in **Admin** account (password `admin`), then change that password straight away.
+**You're asked for a setup key.** Your account is new, or an administrator has required a password reset. Enter the key they gave you and choose a password. If you don't have a key, ask them for one.
+
+**That setup key is incorrect.** Check the key with your administrator. Capitals don't matter, but every letter and number does. After 5 wrong tries the key stops working and you see *Too many incorrect setup keys*. An administrator then has to require a password reset again and give you a new key.
+
+**You're setting up a new server.** Sign in with the built-in **Admin** account (password `admin`), then change that password straight away under **Account ▸ My account**.
 
 ## Take better photos with your phone
 

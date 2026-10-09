@@ -28,16 +28,28 @@ OmniCard supports these games:
 
 OmniCard opens on a sign-in screen.
 
-1. Enter your **Username** and **Password**.
-2. Tick **Remember me** if you're on your own device and want to stay signed in for up to 30 days. Leave it unticked on a shared computer. You'll then be signed out when you close the browser.
-3. Click **Sign in**.
+1. Enter your **Username or email** and click **Continue**.
+2. Enter your **Password**. If you typed the wrong account, click **Change** to go back.
+3. Tick **Remember me** if you're on your own device and want to stay signed in for up to 30 days. Leave it unticked on a shared computer. You'll then be signed out when you close the browser.
+4. Click **Sign in**.
 
 ![The OmniCard sign-in screen](getting-started-sign-in.png)
 
-If you see *Incorrect username or password*, check your typing and try again. An administrator creates accounts and can reset your password. See [Sign-in problems](help:troubleshooting).
+If you see *Incorrect username or password*, check your typing and try again. See [Sign-in problems](help:troubleshooting).
+
+### Signing in for the first time
+
+An administrator creates your account and gives you a **setup key**, a short code made of letters and numbers. You choose your own password the first time you sign in:
+
+1. Enter your **Username or email** and click **Continue**.
+2. Type the **Setup key** your administrator gave you. Capitals don't matter.
+3. Enter a **New password**, then type it again in **Confirm new password**.
+4. Click **Set password and sign in**.
+
+From then on, sign in with your password. You see the same screen if an administrator asks you to reset your password. They give you a new setup key for that.
 
 > [!WARNING]
-> A brand-new OmniCard server comes with a built-in **Admin** account whose password is `admin`. If you're setting OmniCard up, sign in with it and change that password right away under **Administration ▸ Users**.
+> A brand-new OmniCard server comes with a built-in **Admin** account whose password is `admin`. If you're setting OmniCard up, sign in with it and change that password right away under **Account ▸ My account**.
 
 ## Find your way around
 
@@ -47,7 +59,7 @@ If you see *Incorrect username or password*, check your typing and try again. An
 
 - **OmniCard** on the left is the app name.
 - The **game selector** filters most pages to one game. Choose **All Games** to see everything at once. Your choice is remembered in this browser.
-- The **Account** button (the person icon) opens your account menu. It shows **Signed in as** with your username, and has **Sign out**. Administrators also see **Account & users**, a shortcut to user management.
+- The **Account** button (the person icon) opens your account menu. It shows **Signed in as** with your username, and has **My account** (change your email and password, see [Your account](help:account)) and **Sign out**. Administrators also see **Manage users**, a shortcut to user management.
 
 ### Sidebar
 
@@ -65,7 +77,7 @@ The sidebar on the left lists the sections you have access to. You might not see
 | **Trades** | Build and record trades | [Trades](help:trades) |
 | **Import** | Bring in cards from CSV files and deck sites, or export them | [Importing](help:importing) |
 | **Sales** | Orders, customers and listings | [Sales](help:sales) |
-| **Administration** | Your password, plus settings and user management | [Administration](help:administration) |
+| **Administration** | Settings and, for administrators, user management | [Administration](help:administration) |
 | **Help** | This help center, at the bottom of the sidebar | |
 
 A number on the **Scan** icon counts scan batches that are waiting for someone to review them. See [Scan batches](help:scan-batches).

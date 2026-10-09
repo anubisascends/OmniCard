@@ -32,7 +32,7 @@ Before you can list on eBay, an administrator sets things up once:
 4. Sign in to your eBay seller account and approve access for OmniCard.
 5. eBay sends you back to OmniCard, which shows **Connected to eBay.**
 
-![The eBay tab with the connection status and seller settings](ebay-settings.png)
+![The eBay tab with the connection status and seller settings](administration-ebay-connected.png)
 
 If you see **eBay connection failed. Please try again.**, click **Connect to eBay** again and finish signing in on eBay.
 

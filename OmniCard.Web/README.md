@@ -17,10 +17,14 @@ whole app — the original WPF desktop app has been retired.
   `OmniCard_Riftbound`, `OmniCard_Pokemon`, `OmniCard_Yugioh`, `OmniCard_FinalFantasy`). They're
   disposable reference caches (refresh wipes + reloads), so they use `EnsureCreated` at startup, not
   migrations. Refreshed in-place via the catalog "refresh" operations (Settings → Catalog data).
-- **Per-user accounts + granular permissions** — username + password sign-in (passwords stored as
-  salted PBKDF2 hashes). A built-in `Admin` account (default password `admin`) is seeded on first
-  run — change it after signing in. "Remember me" issues a persistent, encrypted auth cookie.
-  Manage accounts under **Administration → Users** and permission bundles under
+- **Per-user accounts + granular permissions** — two-step sign-in (username **or email**, then
+  password; passwords and setup keys stored as salted PBKDF2 hashes). A built-in `Admin` account
+  (default password `admin`) is seeded on first run — change it after signing in. Admins never set
+  other users' passwords: creating an account or **Require password reset** issues a one-time
+  alphanumeric **setup key** the admin hands over; the user enters it at sign-in to choose a password
+  (the old password stops working immediately; 5 wrong keys void it). No email is sent. "Remember me" issues a persistent, encrypted auth cookie.
+  Every user edits their own email + password on the **Account** page (`/account`, account menu ▸
+  **My account**; `/api/account`). Manage accounts under **Administration → Users** and permission bundles under
   **Administration → Roles** (both admin-only). Each app section has granular permissions
   (view/create/edit/delete plus a few special actions); access is granted via a **role** plus
   optional per-user **grant/deny overrides**. Admin accounts (and the built-in `Admin`) hold every
@@ -559,7 +563,7 @@ different currency.
   'en-US'`, detection order query-string → `navigator` → `<html lang>`). Imported once from
   `src/main.tsx`.
 - **Strings:** `ClientApp/src/i18n/locales/en-US/*.json`, one file per feature area (namespace):
-  `common` (shared actions/labels/conditions/channels/statuses), `nav`, `auth`, `dashboard`,
+  `common` (shared actions/labels/conditions/channels/statuses), `nav`, `auth`, `account`, `dashboard`,
   `collection`, `locations`, `binder`, `sets`, `scan`, `sales`, `inventory`, `importing`, `lists`,
   `trades`, `settings`, `deckbox`, `dialogs`, `search`, `help`. Each file is keyed by its namespace object
   and spread into the bundle in `index.ts`.

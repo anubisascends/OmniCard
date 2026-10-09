@@ -237,6 +237,23 @@ export interface UserDto {
   roleId?: number | null;
   grant?: string[] | null;
   deny?: string[] | null;
+  email?: string | null;
+  /** True while the user still has to sign in with an admin-issued setup key and choose a password. */
+  setupPending?: boolean;
+}
+
+/** The signed-in user's own account details (Account page). */
+export interface AccountDto {
+  id: number;
+  username: string;
+  email?: string | null;
+  isAdmin: boolean;
+  createdAt: string;
+}
+
+/** What the sign-in screen asks for after the username/email step. */
+export interface SignInStepDto {
+  step: 'password' | 'setupKey' | 'locked';
 }
 
 /** A reusable permission bundle. System roles can't be deleted. */

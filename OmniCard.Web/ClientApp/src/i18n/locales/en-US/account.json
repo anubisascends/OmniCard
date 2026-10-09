@@ -1,0 +1,31 @@
+{
+  "account": {
+    "title": "Account",
+    "profile": {
+      "title": "Profile",
+      "username": "Username",
+      "memberSince": "Member since",
+      "adminChip": "Administrator"
+    },
+    "email": {
+      "title": "Email",
+      "description": "You can sign in with your email instead of your username. Enter your current password to change or remove it.",
+      "email": "Email",
+      "emailHelper": "Leave blank to remove your email.",
+      "currentPassword": "Current password",
+      "saveButton": "Save email",
+      "saved": "Email saved.",
+      "removed": "Email removed."
+    },
+    "password": {
+      "title": "Password",
+      "description": "Change the password for your own account. You must enter your current password.",
+      "current": "Current password",
+      "new": "New password",
+      "confirm": "Confirm new password",
+      "mismatch": "Passwords don't match.",
+      "changed": "Password changed.",
+      "changeButton": "Change password"
+    }
+  }
+}

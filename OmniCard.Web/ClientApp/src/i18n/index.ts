@@ -9,6 +9,7 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 import common from './locales/en-US/common.json';
 import nav from './locales/en-US/nav.json';
 import auth from './locales/en-US/auth.json';
+import account from './locales/en-US/account.json';
 import dashboard from './locales/en-US/dashboard.json';
 import collection from './locales/en-US/collection.json';
 import locations from './locales/en-US/locations.json';
@@ -30,6 +31,7 @@ const enUS = {
   ...common,
   ...nav,
   ...auth,
+  ...account,
   ...dashboard,
   ...collection,
   ...locations,

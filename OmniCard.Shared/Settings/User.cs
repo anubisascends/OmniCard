@@ -1,7 +1,7 @@
 namespace OmniCard.Shared.Settings;
 
 /// <summary>
-/// An application user account. Authentication is username + password (the password is stored only
+/// An application user account. Authentication is username (or email) + password (the password is stored only
 /// as a salted PBKDF2 hash in <see cref="PasswordHash"/> — never in plaintext). One built-in
 /// <see cref="IsSystem"/> account named "Admin" is seeded on first run (default password "admin").
 ///
@@ -15,8 +15,24 @@ public class User
 
     public string Username { get; set; } = "";
 
-    /// <summary>Encoded PBKDF2 hash (algorithm$iterations$salt$hash) — see the web PasswordHasher.</summary>
+    /// <summary>Optional email address (stored trimmed + lower-case, unique when set). The user can type
+    /// it in place of <see cref="Username"/> at sign-in.</summary>
+    public string? Email { get; set; }
+
+    /// <summary>Encoded PBKDF2 hash (algorithm$iterations$salt$hash) — see the web PasswordHasher.
+    /// Empty while the account is waiting for its first password (see <see cref="SetupKeyHash"/>).</summary>
     public string PasswordHash { get; set; } = "";
+
+    /// <summary>PBKDF2 hash of the one-time setup key an admin issued (on account creation or a forced
+    /// password reset). While set, the account can't sign in with a password: the user must enter this key
+    /// and choose a new password. Cleared once used, or when too many wrong keys are tried.</summary>
+    public string? SetupKeyHash { get; set; }
+
+    /// <summary>When the current setup key was issued (null when none is pending).</summary>
+    public DateTime? SetupKeyIssuedAt { get; set; }
+
+    /// <summary>Wrong setup keys tried against the current key; reaching the limit voids the key.</summary>
+    public int SetupKeyFailedAttempts { get; set; }
 
     /// <summary>True for the built-in Admin account: it can't be deleted and is always an admin.</summary>
     public bool IsSystem { get; set; }
