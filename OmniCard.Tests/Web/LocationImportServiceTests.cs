@@ -55,6 +55,7 @@ public class LocationImportServiceTests : IDisposable
             new WebBinderCardService(_factory, new StubDataPath()),
             _decklists,
             new RecordingCardService(gs),
+            TagRuleServices.Create(_factory),
             NullLogger<LocationImportService>.Instance);
         _boxId = NewLocation("Red Box", ContainerType.Box);
     }

@@ -16,6 +16,7 @@ using OmniCard.Shared.Tags;
 using OmniCard.Collection.ImportExport;
 using OmniCard.Collection.Inventory;
 using OmniCard.Web.Api.Controllers;
+using OmniCard.Tests.Fakes;
 
 namespace OmniCard.Tests.Web;
 
@@ -53,6 +54,7 @@ public class CardScanControllerTests : IDisposable
         new(matcher: null!, _cardService.Object, _binderCards, _tagService.Object,
             new CsvExportImportService(null, null, NullLogger<CsvExportImportService>.Instance),
             new ScanCommitService(_cardService.Object, _binderCards, _tagService.Object, NullLogger<ScanCommitService>.Instance),
+            TagRuleServices.Create(new MockFactory(_opts)),
             NullLogger<CardScanController>.Instance);
 
     private static IFormFile CreateFormFile(byte[]? content = null, string contentType = "image/jpeg",

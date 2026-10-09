@@ -111,7 +111,7 @@ export function AddCardDialog({
           quantity: Math.max(1, quantity),
           purchasePrice: purchasePrice === '' ? null : Number(purchasePrice),
         },
-      ]),
+      ], true),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['location', locationId] });
       qc.invalidateQueries({ queryKey: ['collection'] });

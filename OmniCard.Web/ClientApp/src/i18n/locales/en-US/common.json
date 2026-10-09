@@ -106,6 +106,10 @@
       "adding": "Adding…",
       "noResults": "No results.",
       "error": "Something went wrong."
+    },
+    "tagRules": {
+      "tagged_one": "Tag rules tagged {{formatted}} new card.",
+      "tagged_other": "Tag rules tagged {{formatted}} new cards."
     }
   }
 }

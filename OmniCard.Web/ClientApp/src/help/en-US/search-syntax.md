@@ -9,7 +9,7 @@ The same language works in two kinds of search box:
 - **Collection search** looks through the cards you own. You'll find it on the [Collection](/collection) page, on a location's page, and in a binder's Unplaced pool. On the Collection and location pages, press **Enter** to run the search. See [Collection](help:collection).
 - **Card search** looks through the full card catalog for a game, including cards you don't own. It's used when you correct a scan match and when you add a card to a location, binder pocket or list. See [Scanning](help:scanning).
 
-Most fields work in both. Some Magic fields only work in card search, and fields about your own copies (tags, condition, location) only work in collection search. The tables below say which.
+Most fields work in both. Fields about your own copies (tags, condition, location) only work in collection search, and the `order:` and `unique:` directives only work in card search. The tables below say which.
 
 > [!TIP]
 > Click the **Search syntax help** icon (**?**) at the right of a collection search box to see the fields for the game selected in the top bar, each with an example you can copy.
@@ -86,10 +86,11 @@ These fields work in collection search for every game.
 | Flag | Finds |
 |---|---|
 | `is:foil` | Foil copies. |
+| `is:nonfoil` | Non-foil copies. |
 | `is:missing` | Copies flagged as missing, for example by an audit. |
 | `is:missingdb` | Copies flagged because the card couldn't be found in the card catalog. |
 
-Use `-is:foil` or `not:foil` for the opposite.
+Use `-is:foil` or `not:foil` for the opposite. For Magic, collection search also understands the printing flags listed under [is: flags in card search](help:search-syntax#is-flags-in-card-search), such as `is:commander` or `is:reprint`. An `is:` flag OmniCard doesn't know finds nothing.
 
 ### Magic colors
 
@@ -127,7 +128,7 @@ When Magic is selected in the top bar, collection search also understands these 
 
 For `cmc`, use `-cmc:3` rather than `cmc!=3`.
 
-Magic has more fields than these, such as `pow`, `kw` or `f:modern`. They're listed in the **?** help, but in collection search they're treated as a name search. Use them in card search instead.
+Collection search for Magic also understands the card search fields below, such as `pow>=5`, `kw:flying`, `f:modern` or `usd<1`. They describe the printing you own. A few keep their collection meaning: `c` and `id` use the **Magic colors** rules above, `lang` is your copy's language, and `date` isn't available (use `year` for the printing's release year).
 
 ### Card search (full Scryfall syntax)
 
@@ -294,6 +295,6 @@ Select a single game for the full set of short forms.
 ## Troubleshooting
 
 - **No results.** Check that the right game is selected in the top bar, and that values with spaces are in quotes.
-- **A field seems to be ignored.** It may not apply where you're searching. For example, `kw:flying` only works in card search, and `tag:` only works in collection search.
+- **A field seems to be ignored.** It may not apply where you're searching. For example, `tag:` only works in collection search, and `order:` only works in card search.
 - **`set:` finds nothing.** In collection search, `set:` needs the set code, such as `set:dom`, not the set name.
 - **Numbers compare oddly.** Only fields marked "supports < >" compare by value. Others match the text you type.

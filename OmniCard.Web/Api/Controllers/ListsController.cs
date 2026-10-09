@@ -14,6 +14,7 @@ using OmniCard.Shared.Security;
 using OmniCard.Shared.Sites;
 using OmniCard.Shared.Storage;
 using OmniCard.Web.Api.Infrastructure;
+using OmniCard.Web.Services.TagRules;
 
 namespace OmniCard.Web.Api.Controllers;
 
@@ -35,7 +36,8 @@ public sealed class ListsController(
     CardImageCacheService imageCache,
     ListFulfillmentPlanner planner,
     IDecklistPrintExporter printExporter,
-    RequestSiteAccess? siteAccess = null) : ApiControllerBase
+    RequestSiteAccess? siteAccess = null,
+    TagRuleService? tagRules = null) : ApiControllerBase
 {
     [HttpGet]
     [RequirePermission(Permissions.ListsView)]
@@ -454,6 +456,7 @@ public sealed class ListsController(
 
         var moved = 0;
         var added = 0;
+        var ruleTagged = 0;
         var listDeleted = false;
 
         if (moveTo is int moveTarget && picks.Count > 0)
@@ -494,7 +497,8 @@ public sealed class ListsController(
                     DateAdded = DateTime.UtcNow,
                 };
             }).ToList();
-            binderCards.ImportCollectionCards(cards, skipDuplicates: false);
+            var lotIds = binderCards.ImportCollectionCardLots(cards, skipDuplicates: false);
+            ruleTagged = tagRules?.ApplyToNewLots(lotIds) ?? 0;
             added = toAdd.Sum(p => p.MissingQuantity);
             listDeleted = lists.ConsumeItems(id, toAdd
                 .Select(p => new ListItemConsumption(p.Item.Id, p.MissingQuantity))
@@ -502,7 +506,7 @@ public sealed class ListsController(
         }
 
         var remaining = Math.Max(0, items.Sum(i => i.Quantity) - moved - added);
-        return new FulfillListResultDto(moved, added, remaining, listDeleted);
+        return new FulfillListResultDto(moved, added, remaining, listDeleted, ruleTagged);
     }
 
     /// <summary>The list and its owned/missing split over the sites the user can read; null when the list

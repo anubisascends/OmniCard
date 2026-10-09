@@ -48,7 +48,7 @@ public class ImportControllerUrlTests : IDisposable
         };
 
         _controller = new ImportController(null!, new WebBinderCardService(factory, new StubDataPath()), _decklists,
-            new RecordingCardService(gs), null!);
+            new RecordingCardService(gs), null!, TagRuleServices.Create(factory));
         _boxId = new StorageContainerService(factory).Create("Deck Box", ContainerType.Box).Id;
     }
 

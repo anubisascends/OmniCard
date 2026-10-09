@@ -195,6 +195,13 @@ builder.Services.AddSingleton(sp =>
 builder.Services.AddSingleton<LocationImportService>();
 // Shared scan → lots write path (interactive scan commit + watched-folder batch commits).
 builder.Services.AddSingleton<ScanCommitService>();
+// Admin-defined auto-tagging rules (Settings ▸ Tag rules): checked in scan review, applied to imports.
+builder.Services.AddSingleton(sp => new OmniCard.Web.Services.TagRules.TagRuleService(
+    writableFactory,
+    sp.GetRequiredService<IEnumerable<ICardGameService>>(),
+    sp.GetRequiredService<ITagService>(),
+    sp.GetRequiredService<TimeProvider>(),
+    sp.GetRequiredService<ILogger<OmniCard.Web.Services.TagRules.TagRuleService>>()));
 
 // Watched-folder scan batches: images dropped in a per-game folder are picked up, matched in the
 // background (the app's only BackgroundService) and reviewed/committed from the Scan page.

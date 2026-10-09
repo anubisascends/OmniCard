@@ -123,11 +123,79 @@ public static class CollectionQueryBuilder
         if (filter is null)
             return cards;
 
+        if (gameServices is not null && HasCatalogFieldUnderOrOrNot(filter, gameFilter, gameServices, under: false))
+            return ApplyInMemory(cards, filter, context, gameServices);
+
         var param = LinqExpression.Parameter(typeof(CollectionCard), "c");
         var expr = BuildFilterExpression(param, filter, context, gameFilter, gameServices);
         var lambda = LinqExpression.Lambda<Func<CollectionCard, bool>>(expr, param);
         return cards.Where(lambda);
     }
+
+    /// <summary>
+    /// A catalog field (element:, kw:, f:modern, is:commander, …) filters by a list of matching printing
+    /// ids. ANDed, that list is a cheap semi-join; under OR or NOT, SQL Server re-reads the JSON list for
+    /// every row (<c>-f:modern</c> over ~47k ids ran past the 30 s timeout). Such queries are evaluated
+    /// here instead: load the already game/location/site-filtered cards, match them with
+    /// <see cref="CollectionCardMatcher"/> (field semantics kept in lockstep with the SQL builders; its
+    /// catalog lookups are restricted to these printings), and narrow the query to the matching lot ids —
+    /// one ANDed list, so paging, sorting and counting stay in SQL.
+    /// </summary>
+    private static IQueryable<CollectionCard> ApplyInMemory(IQueryable<CollectionCard> cards, FilterNode filter,
+        OmniCardDbContext context, IReadOnlyDictionary<CardGame, ICardGameService> gameServices)
+    {
+        var loaded = cards.ToList();
+        if (UsesField(filter, "tag"))
+        {
+            var lotIds = loaded.Select(c => c.Id).ToList();
+            var tagsByLot = context.LotTags.AsNoTracking()
+                .Where(lt => EF.Parameter(lotIds).Contains(lt.LotId))
+                .Select(lt => new { lt.LotId, lt.Tag.Name })
+                .AsEnumerable()
+                .GroupBy(x => x.LotId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.Name).ToList());
+            foreach (var card in loaded)
+                card.Tags = tagsByLot.GetValueOrDefault(card.Id) ?? [];
+        }
+
+        var resolve = CollectionCardMatcher.CreateResolver(gameServices, loaded);
+        var matching = loaded.Where(c => CollectionCardMatcher.Matches(c, filter, resolve)).Select(c => c.Id).ToList();
+        return cards.Where(c => EF.Parameter(matching).Contains(c.Id));
+    }
+
+    /// <summary>The ownership <c>is:</c> flags, read from the lot (see <see cref="BuildIsExpression"/>).</summary>
+    private static readonly HashSet<string> OwnedIsFlags = new(StringComparer.OrdinalIgnoreCase)
+        { "foil", "nonfoil", "missing", "missingdb" };
+
+    /// <summary>Whether <paramref name="f"/> is answered from the game catalog rather than the collection.</summary>
+    private static bool IsCatalogField(FieldFilter f, CardGame? gameFilter, IReadOnlyDictionary<CardGame, ICardGameService> gameServices)
+    {
+        if (f.Field == "is") return !OwnedIsFlags.Contains(f.Value);
+        if (CollectionFields.Contains(f.Field)) return false;
+        IEnumerable<ICardGameService> inScope = gameFilter is { } g
+            ? gameServices.TryGetValue(g, out var one) ? [one] : []
+            : gameServices.Values;
+        return inScope.Any(svc => svc is IGameFieldResolver r && r.SearchSchema.IsGameSpecific(f.Field));
+    }
+
+    private static bool HasCatalogFieldUnderOrOrNot(FilterNode node, CardGame? gameFilter,
+        IReadOnlyDictionary<CardGame, ICardGameService> gameServices, bool under) => node switch
+    {
+        FieldFilter f => (under || f.Negated) && IsCatalogField(f, gameFilter, gameServices),
+        AndFilter a => a.Children.Any(c => HasCatalogFieldUnderOrOrNot(c, gameFilter, gameServices, under)),
+        OrFilter o => o.Children.Any(c => HasCatalogFieldUnderOrOrNot(c, gameFilter, gameServices, under: true)),
+        NotFilter n => HasCatalogFieldUnderOrOrNot(n.Inner, gameFilter, gameServices, under: true),
+        _ => false,
+    };
+
+    private static bool UsesField(FilterNode node, string field) => node switch
+    {
+        FieldFilter f => f.Field == field,
+        AndFilter a => a.Children.Any(c => UsesField(c, field)),
+        OrFilter o => o.Children.Any(c => UsesField(c, field)),
+        NotFilter n => UsesField(n.Inner, field),
+        _ => false,
+    };
 
     private static readonly System.Reflection.MethodInfo LikeMethod =
         typeof(DbFunctionsExtensions).GetMethod(
@@ -160,9 +228,27 @@ public static class CollectionQueryBuilder
         };
     }
 
+    /// <summary>Fields built from the collection's own columns (or tags); anything else is offered to the
+    /// games' field resolvers first.</summary>
+    private static readonly HashSet<string> CollectionFields =
+    [
+        "name", "set", "cn", "type", "rarity", "color", "foil", "condition", "cond", "lang", "language",
+        "location", "loc", "tag",
+    ];
+
     private static LinqExpression BuildFieldExpression(System.Linq.Expressions.ParameterExpression param, FieldFilter filter, OmniCardDbContext context,
         CardGame? gameFilter, IReadOnlyDictionary<CardGame, ICardGameService>? gameServices)
     {
+        // Catalog fields (element:, kw:, f:modern, is:commander, …) rather than the collection's own. An is:
+        // flag that's neither an ownership flag nor recognized by a game matches nothing.
+        if (filter.Field == "is" ? !OwnedIsFlags.Contains(filter.Value) : !CollectionFields.Contains(filter.Field))
+        {
+            if (BuildGameFieldExpression(param, filter, context, gameFilter, gameServices) is { } gameField)
+                return filter.Negated ? LinqExpression.Not(gameField) : gameField;
+            if (filter.Field == "is")
+                return LinqExpression.Constant(filter.Negated);
+        }
+
         var expr = filter.Field switch
         {
             "name" => BuildNameExpression(param, filter.Op, filter.Value),
@@ -171,30 +257,38 @@ public static class CollectionQueryBuilder
             "type" => BuildNullableStringExpression(param, nameof(CollectionCard.CardType), filter.Op, filter.Value),
             "rarity" => BuildRarityExpression(param, filter.Op, filter.Value),
             "color" => BuildColorExpression(param, filter.Op, filter.Value),
-            "is" => BuildIsExpression(param, filter.Value),
+            "is" => BuildIsExpression(param, filter.Value)!, // an ownership flag (catalog flags returned above)
             "foil" => BuildLegacyFoilExpression(param, filter.Value),
             "condition" or "cond" => BuildStringExpression(param, nameof(CollectionCard.Condition), filter.Op, filter.Value),
             "lang" or "language" => BuildLanguageExpression(param, filter.Op, filter.Value),
             "location" or "loc" => BuildLocationExpression(param, filter.Op, filter.Value),
             "tag" => BuildTagExpression(param, context, filter.Op, filter.Value),
-            // Unknown field: try each game's per-game field resolver (element:, cost:, might:, …),
-            // falling back to a name search when no game recognizes it. Mirrors BuildTagExpression.
-            _ => BuildGameFieldExpression(param, filter, gameFilter, gameServices)
-                 ?? BuildNameExpression(param, filter.Op, filter.Value),
+            // A field no game recognized (tried above) falls back to a name search.
+            _ => BuildNameExpression(param, filter.Op, filter.Value),
         };
 
         return filter.Negated ? LinqExpression.Not(expr) : expr;
     }
 
-    private static readonly System.Reflection.MethodInfo HashSetStringContains =
-        typeof(HashSet<string>).GetMethod(nameof(HashSet<string>.Contains), [typeof(string)])!;
+    /// <summary><c>EF.Parameter(values).Contains(member)</c>: the values travel as ONE JSON parameter
+    /// (OPENJSON on SQL Server, json_each on SQLite). Baking the set in as a constant instead inlines every
+    /// value into the SQL text — a broad MTG field (f:modern, ~47k owned printings) took ~20 s per query.</summary>
+    private static LinqExpression ParameterContains<T>(IEnumerable<T> values, LinqExpression member)
+    {
+        var parameterized = LinqExpression.Call(typeof(EF), nameof(EF.Parameter), [typeof(T[])],
+            LinqExpression.Constant(values.ToArray()));
+        return LinqExpression.Call(typeof(Enumerable), nameof(Enumerable.Contains), [typeof(T)], parameterized, member);
+    }
 
     /// <summary>Resolves a game-specific field to the set of matching catalog GameCardIds via the game
     /// service (crossing the owned-store ↔ catalog DB boundary), then bakes a
-    /// <c>HashSet&lt;string&gt;.Contains(c.GameCardId)</c> check — the same trick as
-    /// <see cref="BuildTagExpression"/>. Returns null when no wired game recognizes the field.</summary>
+    /// <c>Contains(c.GameCardId)</c> check over a parameterized id list — the same trick as
+    /// <see cref="BuildTagExpression"/>. Only owned printings can match, so they're passed as the
+    /// candidate set (lets MTG evaluate in-memory-only fields without scanning the whole catalog). Only
+    /// used for ANDed, un-negated fields — anything else goes through <see cref="ApplyInMemory"/>.
+    /// Returns null when no wired game recognizes the field.</summary>
     private static LinqExpression? BuildGameFieldExpression(System.Linq.Expressions.ParameterExpression param, FieldFilter filter,
-        CardGame? gameFilter, IReadOnlyDictionary<CardGame, ICardGameService>? gameServices)
+        OmniCardDbContext context, CardGame? gameFilter, IReadOnlyDictionary<CardGame, ICardGameService>? gameServices)
     {
         if (gameServices is null) return null;
 
@@ -205,14 +299,14 @@ public static class CollectionQueryBuilder
         foreach (var g in games)
         {
             if (!gameServices.TryGetValue(g, out var svc) || svc is not IGameFieldResolver resolver) continue;
-            var ids = resolver.ResolveFieldCardIds(filter.Field, filter.Op, filter.Value);
+            var owned = context.Products.AsNoTracking()
+                .Where(p => p.Game == g && p.Category == ProductCategory.Single && p.GameCardId != null)
+                .Select(p => p.GameCardId!).Distinct().ToList();
+            var ids = resolver.ResolveFieldCardIds(filter.Field, filter.Op, filter.Value, owned);
             if (ids is null) continue; // this game doesn't define the field
 
             recognized = true;
-            var set = ids as HashSet<string> ?? ids.ToHashSet();
-            var contains = LinqExpression.Call(
-                LinqExpression.Constant(set), HashSetStringContains,
-                LinqExpression.Property(param, nameof(CollectionCard.GameCardId)));
+            var contains = ParameterContains(ids, LinqExpression.Property(param, nameof(CollectionCard.GameCardId)));
 
             // Under "All Games", guard each game's id-set by its Game so ids can't cross-match.
             clauses.Add(gameFilter.HasValue
@@ -229,7 +323,7 @@ public static class CollectionQueryBuilder
     /// <summary>Unlike the other field builders, this one isn't pure — it resolves matching lot
     /// ids eagerly via a small subquery against LotTags (there's no scalar "tags" column on
     /// CollectionCard to filter in-place), then bakes the result into the expression tree as a
-    /// HashSet.Contains check.</summary>
+    /// Contains check over a parameterized id list.</summary>
     private static LinqExpression BuildTagExpression(System.Linq.Expressions.ParameterExpression param, OmniCardDbContext context, ComparisonOp op, string value)
     {
         var matchingLotIds = (op == ComparisonOp.Exact
@@ -237,13 +331,9 @@ public static class CollectionQueryBuilder
                 : context.LotTags.Where(lt => EF.Functions.Like(lt.Tag.Name, $"%{value}%")))
             .Select(lt => lt.LotId)
             .Distinct()
-            .ToHashSet();
+            .ToList();
 
-        var containsMethod = typeof(HashSet<int>).GetMethod(nameof(HashSet<int>.Contains), [typeof(int)])!;
-        return LinqExpression.Call(
-            LinqExpression.Constant(matchingLotIds),
-            containsMethod,
-            LinqExpression.Property(param, nameof(CollectionCard.Id)));
+        return ParameterContains(matchingLotIds, LinqExpression.Property(param, nameof(CollectionCard.Id)));
     }
 
     private static LinqExpression BuildNameExpression(System.Linq.Expressions.ParameterExpression param, ComparisonOp op, string value)
@@ -416,20 +506,25 @@ public static class CollectionQueryBuilder
         return expr;
     }
 
-    private static LinqExpression BuildIsExpression(System.Linq.Expressions.ParameterExpression param, string value)
+    /// <summary>The ownership <c>is:</c> flags, read from the lot. Null for any other value (a catalog
+    /// flag the caller hands to the game resolver).</summary>
+    private static LinqExpression? BuildIsExpression(System.Linq.Expressions.ParameterExpression param, string value)
     {
         return value.ToLowerInvariant() switch
         {
             "foil" => LinqExpression.Equal(
                 LinqExpression.Property(param, nameof(CollectionCard.IsFoil)),
                 LinqExpression.Constant(true)),
+            "nonfoil" => LinqExpression.Equal(
+                LinqExpression.Property(param, nameof(CollectionCard.IsFoil)),
+                LinqExpression.Constant(false)),
             "missing" => LinqExpression.Equal(
                 LinqExpression.Property(param, nameof(CollectionCard.IsMissing)),
                 LinqExpression.Constant(true)),
             "missingdb" => LinqExpression.Equal(
                 LinqExpression.Property(param, nameof(CollectionCard.FlagReason)),
                 LinqExpression.Constant((FlagReason?)FlagReason.MissingFromDatabase, typeof(FlagReason?))),
-            _ => LinqExpression.Constant(true),
+            _ => null,
         };
     }
 

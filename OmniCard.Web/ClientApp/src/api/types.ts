@@ -510,6 +510,8 @@ export interface CsvImportResultDto {
   totalRows: number;
   detectedFormat: string;
   warnings: string[];
+  /** New cards the tag rules tagged. */
+  ruleTagged?: number;
 }
 
 /** One problem (or note) about an import line. `row` is the CSV spreadsheet row (header = row 1);
@@ -527,6 +529,8 @@ export interface LocationImportResultDto {
   lines: number;
   copies: number;
   substitutions: LocationImportIssueDto[];
+  /** New cards the tag rules tagged. */
+  ruleTagged?: number;
 }
 
 /** A rejected location import (HTTP 422): nothing was written. */
@@ -542,6 +546,8 @@ export interface ImportUrlResultDto {
   totalCards: number;
   unresolvedNames: string[];
   substitutedNames: string[];
+  /** New cards the tag rules tagged. */
+  ruleTagged?: number;
 }
 
 export interface SetInfoDto {
@@ -708,6 +714,8 @@ export interface ScanCommitItem {
 
 export interface ScanCommitResultDto {
   imported: number;
+  /** Cards the tag rules tagged (only when the commit asked for `applyTagRules`). */
+  ruleTagged?: number;
 }
 
 /** One card line in an audit summary bucket. */
@@ -1109,6 +1117,8 @@ export interface FulfillListResultDto {
   added: number;
   remaining: number;
   listDeleted: boolean;
+  /** New cards the tag rules tagged. */
+  ruleTagged?: number;
 }
 
 /** Add a single catalog card ("a wholly new card") to a list. Records a frozen printing only — it never
@@ -1200,4 +1210,72 @@ export interface CreateSavedViewRequest {
   game?: string | null;
   shared: boolean;
   state: SavedViewStateDto;
+}
+
+// ---- Tag rules (Settings ▸ Tag rules) ----
+
+/** An admin-defined auto-tagging rule: cards of `game` matching `query` get every tag in `tags`.
+ * Additive only — rules never remove tags. */
+export interface TagRuleDto {
+  id: number;
+  name: string;
+  game: string;
+  query: string;
+  tags: string[];
+  enabled: boolean;
+  updatedAt: string;
+}
+
+export interface TagRuleInput {
+  name: string;
+  game: string;
+  query: string;
+  tags: string[];
+  enabled: boolean;
+}
+
+export interface TagRuleValidationDto {
+  errors: string[];
+}
+
+export interface TagRulePreviewCardDto {
+  id: number;
+  name: string;
+  setCode: string;
+  collectorNumber: string;
+  location: string | null;
+  condition: string;
+  isFoil: boolean;
+  missingTags: string[];
+}
+
+/** `matchCount` owned cards match; `changeCount` of them lack at least one of the rule's tags. */
+export interface TagRulePreviewDto {
+  matchCount: number;
+  changeCount: number;
+  sample: TagRulePreviewCardDto[];
+  errors: string[];
+}
+
+export interface TagRuleRunResultDto {
+  cardsTagged: number;
+}
+
+/** One unsaved scanned card to check against the tag rules; `key` is echoed back. */
+export interface ScanTagRuleItem {
+  key: string;
+  gameCardId: string;
+  name: string;
+  setCode: string;
+  collectorNumber: string;
+  rarity: string;
+  condition: string;
+  language?: string | null;
+  isFoil: boolean;
+  foilType?: string | null;
+}
+
+export interface ScanTagRuleResultDto {
+  key: string;
+  tags: string[];
 }

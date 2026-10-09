@@ -240,7 +240,12 @@ public sealed class WebBinderCardService
     /// <summary>Imports parsed collection cards as new lots (find-or-create product per card).
     /// Ports <c>CardService.ImportCollectionCards</c> for the web write path. <paramref name="skipDuplicates"/>
     /// skips a card when a lot with the same product identity + condition already exists.</summary>
-    public int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates)
+    public int ImportCollectionCards(IEnumerable<CollectionCard> cards, bool skipDuplicates) =>
+        ImportCollectionCardLots(cards, skipDuplicates).Count;
+
+    /// <summary><see cref="ImportCollectionCards"/>, returning the created lot ids (in input order, skipped
+    /// duplicates omitted) so the caller can apply tag rules to them.</summary>
+    public IReadOnlyList<int> ImportCollectionCardLots(IEnumerable<CollectionCard> cards, bool skipDuplicates)
     {
         using var context = _dbFactory.CreateDbContext();
         var cardList = cards as ICollection<CollectionCard> ?? cards.ToList();
@@ -251,7 +256,7 @@ public sealed class WebBinderCardService
             DeckBoxGameGuard.ValidateIncoming(context, group.Key, group.Select(c => c.Game).Distinct());
 
         var productCache = new Dictionary<(CardGame Game, string GameCardId, bool Foil, string? FoilType), Product>();
-        var imported = 0;
+        var lots = new List<InventoryLot>(cardList.Count);
 
         foreach (var card in cardList)
         {
@@ -273,7 +278,7 @@ public sealed class WebBinderCardService
                 cardFoilType, card.Name, card.SetCode, card.SetName, card.Number, card.Rarity, card.ImageUri,
                 card.Color, card.CardType);
 
-            context.Lots.Add(new InventoryLot
+            var lot = new InventoryLot
             {
                 Product = product,
                 Condition = card.Condition,
@@ -286,12 +291,13 @@ public sealed class WebBinderCardService
                 Page = card.Page,
                 Slot = card.Slot,
                 Section = card.Section,
-            });
-            imported++;
+            };
+            context.Lots.Add(lot);
+            lots.Add(lot);
         }
 
         context.SaveChanges();
-        return imported;
+        return lots.Select(l => l.Id).ToList();
     }
 
     /// <summary>Imports confirmed scans as new lots and returns the created lot id per input card
@@ -562,8 +568,8 @@ public sealed class WebBinderCardService
 
     /// <summary>Places a card chosen from the catalog straight into a binder slot, swapping out any
     /// existing occupant (displaced to the Unplaced pool). Mirrors
-    /// <c>CardService.AddMissingCardToSlot</c>.</summary>
-    public void AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, string? foilType, decimal? purchasePrice, int containerId, int page, int slot)
+    /// <c>CardService.AddMissingCardToSlot</c>. Returns the new lot's id.</summary>
+    public int AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, string? foilType, decimal? purchasePrice, int containerId, int page, int slot)
     {
         using var context = _dbFactory.CreateDbContext();
 
@@ -600,6 +606,7 @@ public sealed class WebBinderCardService
             UnitValue = purchasePrice,
         });
         context.SaveChanges();
+        return lot.Id;
     }
 
     /// <summary>Moves one owned copy of <paramref name="lotId"/> into the binder pocket at

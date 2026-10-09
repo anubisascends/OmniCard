@@ -74,7 +74,14 @@ import type {
   AuditCommitResultDto,
   ScanMatchDto,
   ScanSearchResultDto,
+  ScanTagRuleItem,
+  ScanTagRuleResultDto,
   SearchSchemaDto,
+  TagRuleDto,
+  TagRuleInput,
+  TagRulePreviewDto,
+  TagRuleRunResultDto,
+  TagRuleValidationDto,
   SetChecklistDto,
   SetInfoDto,
   TradeSearchResult,
@@ -958,10 +965,18 @@ export const api = {
     return request<ScanSearchResultDto[]>(`/api/scan/search?${sp.toString()}`);
   },
   scanFoilTypes: (game: string) => request<string[]>(`/api/scan/foil-types${qs({ game })}`),
-  scanCommit: (containerId: number, items: ScanCommitItem[]) =>
+  // `applyTagRules` has the server apply the tag rules to the new cards — for one-step adds with no
+  // review. The Scan page leaves it off: its review already shows (and lets the user remove) rule tags.
+  scanCommit: (containerId: number, items: ScanCommitItem[], applyTagRules = false) =>
     request<ScanCommitResultDto>('/api/scan/commit', {
       method: 'POST',
-      body: JSON.stringify({ containerId, items }),
+      body: JSON.stringify({ containerId, items, applyTagRules }),
+    }),
+  /** The enabled tag rules' tags for scanned, not-yet-saved cards of one game. */
+  scanTagRules: (game: string, items: ScanTagRuleItem[]) =>
+    request<ScanTagRuleResultDto[]>('/api/scan/tag-rules', {
+      method: 'POST',
+      body: JSON.stringify({ game, items }),
     }),
   // Export staged scans WITHOUT adding them to the collection. One format ⇒ that file; several ⇒ a
   // zip with one file per format. `fileName` is the base name (no extension).
@@ -1004,6 +1019,21 @@ export const api = {
       body: JSON.stringify({ containerId, itemIds }),
     }),
   scanBatchDiscard: (id: number) => request<void>(`/api/scan/batches/${id}/discard`, { method: 'POST' }),
+  // Tag rules (admin only).
+  tagRules: (game?: string) => request<TagRuleDto[]>(`/api/tag-rules${qs({ game })}`),
+  tagRuleCreate: (body: TagRuleInput) =>
+    request<TagRuleDto>('/api/tag-rules', { method: 'POST', body: JSON.stringify(body) }),
+  tagRuleUpdate: (id: number, body: TagRuleInput) =>
+    request<TagRuleDto>(`/api/tag-rules/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  tagRuleDelete: (id: number) => request<void>(`/api/tag-rules/${id}`, { method: 'DELETE' }),
+  tagRuleValidate: (game: string, query: string) =>
+    request<TagRuleValidationDto>('/api/tag-rules/validate', { method: 'POST', body: JSON.stringify({ game, query }) }),
+  tagRulePreview: (game: string, query: string, tags: string[]) =>
+    request<TagRulePreviewDto>('/api/tag-rules/preview', {
+      method: 'POST',
+      body: JSON.stringify({ game, query, tags }),
+    }),
+  tagRuleRun: (id: number) => request<TagRuleRunResultDto>(`/api/tag-rules/${id}/run`, { method: 'POST' }),
   scanFolderSettings: () => request<ScanFolderSettingsResponse>('/api/settings/scan-folders'),
   scanFolderSettingsUpdate: (body: ScanFolderSettingsDto) =>
     request<void>('/api/settings/scan-folders', { method: 'PUT', body: JSON.stringify(body) }),

@@ -580,6 +580,11 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (messag
           {fulfill.data && !fulfill.data.listDeleted && (
             <Alert severity="success" sx={{ mt: 1 }} onClose={() => fulfill.reset()}>
               {t('lists.detail.fulfill.done', { moved: fulfill.data.moved, added: fulfill.data.added })}
+              {!!fulfill.data.ruleTagged &&
+                ` ${t('common.tagRules.tagged', {
+                  count: fulfill.data.ruleTagged,
+                  formatted: fmt.number(fulfill.data.ruleTagged),
+                })}`}
             </Alert>
           )}
         </Box>

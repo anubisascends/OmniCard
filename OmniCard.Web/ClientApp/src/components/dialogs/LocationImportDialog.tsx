@@ -149,6 +149,11 @@ export function LocationImportDialog({
                 <IssueList issues={result.substitutions} />
               </>
             )}
+            {!!result.ruleTagged && (
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                {t('common.tagRules.tagged', { count: result.ruleTagged, formatted: fmt.number(result.ruleTagged) })}
+              </Typography>
+            )}
           </Alert>
         ) : (
           <Stack spacing={2}>
