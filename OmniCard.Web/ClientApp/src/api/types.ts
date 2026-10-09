@@ -242,6 +242,15 @@ export interface UserDto {
   setupPending?: boolean;
 }
 
+/** The signed-in user's own account details (Account page). */
+export interface AccountDto {
+  id: number;
+  username: string;
+  email?: string | null;
+  isAdmin: boolean;
+  createdAt: string;
+}
+
 /** What the sign-in screen asks for after the username/email step. */
 export interface SignInStepDto {
   step: 'password' | 'setupKey' | 'locked';

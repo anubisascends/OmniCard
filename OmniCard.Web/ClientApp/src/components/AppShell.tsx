@@ -34,6 +34,7 @@ import Inventory2Icon from '@mui/icons-material/Inventory2';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -191,6 +192,12 @@ export function AppShell({ children }: { children: ReactNode }) {
               </MenuItem>
             )}
             {username && <Divider />}
+            <MenuItem component={RouterLink} to="/account" onClick={() => setAccountAnchor(null)}>
+              <ListItemIcon>
+                <ManageAccountsIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>{t('nav.myAccount')}</ListItemText>
+            </MenuItem>
             {isAdmin && (
               <MenuItem
                 component={RouterLink}
@@ -200,7 +207,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <ListItemIcon>
                   <AdminPanelSettingsIcon fontSize="small" />
                 </ListItemIcon>
-                <ListItemText>{t('nav.accountAndUsers')}</ListItemText>
+                <ListItemText>{t('nav.manageUsers')}</ListItemText>
               </MenuItem>
             )}
             <MenuItem disabled={logout.isPending} onClick={() => logout.mutate()}>

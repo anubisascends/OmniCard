@@ -158,6 +158,26 @@ public class UserServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ChangeOwnEmail_RequiresCurrentPassword_AndValidatesEmail()
+    {
+        var u = await CreateWithPasswordAsync("mia", "pw-mia");
+        await CreateWithPasswordAsync("ned", "pw-ned", email: "ned@example.com");
+
+        Assert.False(await _users.ChangeOwnEmailAsync(u.Id, "wrong", "mia@example.com"));
+        Assert.Null((await _users.FindByIdAsync(u.Id))!.Email); // unchanged
+
+        Assert.True(await _users.ChangeOwnEmailAsync(u.Id, "pw-mia", " Mia@Example.com "));
+        Assert.Equal("mia@example.com", (await _users.FindByIdAsync(u.Id))!.Email);
+        Assert.NotNull(await _users.AuthenticateAsync("mia@example.com", "pw-mia"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _users.ChangeOwnEmailAsync(u.Id, "pw-mia", "ned@example.com"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _users.ChangeOwnEmailAsync(u.Id, "pw-mia", "nope"));
+
+        Assert.True(await _users.ChangeOwnEmailAsync(u.Id, "pw-mia", ""));
+        Assert.Null((await _users.FindByIdAsync(u.Id))!.Email);
+    }
+
+    [Fact]
     public async Task SignInStep_ReportsPassword_ForUnknownLogin()
     {
         Assert.Equal(SignInStep.Password, await _users.GetSignInStepAsync("nobody"));

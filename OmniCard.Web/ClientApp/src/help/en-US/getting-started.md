@@ -49,7 +49,7 @@ An administrator creates your account and gives you a **setup key**, a short cod
 From then on, sign in with your password. You see the same screen if an administrator asks you to reset your password. They give you a new setup key for that.
 
 > [!WARNING]
-> A brand-new OmniCard server comes with a built-in **Admin** account whose password is `admin`. If you're setting OmniCard up, sign in with it and change that password right away under **Administration ▸ Users**.
+> A brand-new OmniCard server comes with a built-in **Admin** account whose password is `admin`. If you're setting OmniCard up, sign in with it and change that password right away under **Account ▸ My account**.
 
 ## Find your way around
 
@@ -59,7 +59,7 @@ From then on, sign in with your password. You see the same screen if an administ
 
 - **OmniCard** on the left is the app name.
 - The **game selector** filters most pages to one game. Choose **All Games** to see everything at once. Your choice is remembered in this browser.
-- The **Account** button (the person icon) opens your account menu. It shows **Signed in as** with your username, and has **Sign out**. Administrators also see **Account & users**, a shortcut to user management.
+- The **Account** button (the person icon) opens your account menu. It shows **Signed in as** with your username, and has **My account** (change your email and password, see [Your account](help:account)) and **Sign out**. Administrators also see **Manage users**, a shortcut to user management.
 
 ### Sidebar
 
@@ -77,7 +77,7 @@ The sidebar on the left lists the sections you have access to. You might not see
 | **Trades** | Build and record trades | [Trades](help:trades) |
 | **Import** | Bring in cards from CSV files and deck sites, or export them | [Importing](help:importing) |
 | **Sales** | Orders, customers and listings | [Sales](help:sales) |
-| **Administration** | Your password, plus settings and user management | [Administration](help:administration) |
+| **Administration** | Settings and, for administrators, user management | [Administration](help:administration) |
 | **Help** | This help center, at the bottom of the sidebar | |
 
 A number on the **Scan** icon counts scan batches that are waiting for someone to review them. See [Scan batches](help:scan-batches).

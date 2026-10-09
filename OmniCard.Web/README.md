@@ -23,7 +23,8 @@ whole app — the original WPF desktop app has been retired.
   other users' passwords: creating an account or **Require password reset** issues a one-time
   alphanumeric **setup key** the admin hands over; the user enters it at sign-in to choose a password
   (the old password stops working immediately; 5 wrong keys void it). No email is sent. "Remember me" issues a persistent, encrypted auth cookie.
-  Manage accounts under **Administration → Users** and permission bundles under
+  Every user edits their own email + password on the **Account** page (`/account`, account menu ▸
+  **My account**; `/api/account`). Manage accounts under **Administration → Users** and permission bundles under
   **Administration → Roles** (both admin-only). Each app section has granular permissions
   (view/create/edit/delete plus a few special actions); access is granted via a **role** plus
   optional per-user **grant/deny overrides**. Admin accounts (and the built-in `Admin`) hold every
@@ -562,7 +563,7 @@ different currency.
   'en-US'`, detection order query-string → `navigator` → `<html lang>`). Imported once from
   `src/main.tsx`.
 - **Strings:** `ClientApp/src/i18n/locales/en-US/*.json`, one file per feature area (namespace):
-  `common` (shared actions/labels/conditions/channels/statuses), `nav`, `auth`, `dashboard`,
+  `common` (shared actions/labels/conditions/channels/statuses), `nav`, `auth`, `account`, `dashboard`,
   `collection`, `locations`, `binder`, `sets`, `scan`, `sales`, `inventory`, `importing`, `lists`,
   `trades`, `settings`, `deckbox`, `dialogs`, `search`, `help`. Each file is keyed by its namespace object
   and spread into the bundle in `index.ts`.

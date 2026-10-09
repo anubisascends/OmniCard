@@ -1408,6 +1408,17 @@ public sealed record PermissionCatalogDto(IReadOnlyList<PermissionGroupDto> Grou
 public sealed record PermissionGroupDto(string Key, string Label, IReadOnlyList<PermissionItemDto> Permissions);
 public sealed record PermissionItemDto(string Key, string Action, string Label);
 
+/// <summary>The signed-in user's own account details, for the Account page.</summary>
+public sealed record AccountDto(int Id, string Username, string? Email, bool IsAdmin, DateTime CreatedAt);
+
+/// <summary>Self-service email change from the Account page. A blank <see cref="Email"/> removes it. The
+/// current password is required because the email can be used to sign in.</summary>
+public sealed record ChangeEmailRequest
+{
+    public string? Email { get; init; }
+    public string CurrentPassword { get; init; } = "";
+}
+
 /// <summary>Self-service password change — the current password is required to set a new one.</summary>
 public sealed record ChangePasswordRequest
 {

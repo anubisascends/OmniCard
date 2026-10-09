@@ -722,83 +722,6 @@ function AppearanceCard() {
   );
 }
 
-/** Self-service password change for the signed-in user — requires the current password + confirm. */
-function ChangePasswordCard() {
-  const { t } = useTranslation();
-  const [current, setCurrent] = useState('');
-  const [next, setNext] = useState('');
-  const [confirm, setConfirm] = useState('');
-
-  const change = useMutation({
-    mutationFn: () => api.changePassword(current, next),
-    onSuccess: () => {
-      setCurrent('');
-      setNext('');
-      setConfirm('');
-    },
-  });
-
-  const mismatch = confirm.length > 0 && next !== confirm;
-  const canSubmit = !!current && !!next && next === confirm && !change.isPending;
-
-  return (
-    <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
-      <Typography variant="h6" gutterBottom>
-        {t('settings.password.title')}
-      </Typography>
-      <Typography variant="body2" color="text.secondary" gutterBottom>
-        {t('settings.password.description')}
-      </Typography>
-
-      <Stack
-        component="form"
-        spacing={2}
-        sx={{ mt: 1, maxWidth: 360 }}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (canSubmit) change.mutate();
-        }}
-      >
-        <TextField
-          type="password"
-          label={t('settings.password.current')}
-          size="small"
-          value={current}
-          autoComplete="current-password"
-          onChange={(e) => setCurrent(e.target.value)}
-        />
-        <TextField
-          type="password"
-          label={t('settings.password.new')}
-          size="small"
-          value={next}
-          autoComplete="new-password"
-          onChange={(e) => setNext(e.target.value)}
-        />
-        <TextField
-          type="password"
-          label={t('settings.password.confirm')}
-          size="small"
-          value={confirm}
-          autoComplete="new-password"
-          error={mismatch}
-          helperText={mismatch ? t('settings.password.mismatch') : ' '}
-          onChange={(e) => setConfirm(e.target.value)}
-        />
-        {change.error instanceof ApiError && (
-          <Alert severity="error">{change.error.message}</Alert>
-        )}
-        {change.isSuccess && <Alert severity="success">{t('settings.password.changed')}</Alert>}
-        <Box>
-          <Button type="submit" variant="contained" disabled={!canSubmit}>
-            {change.isPending ? t('common.states.saving') : t('settings.password.changeButton')}
-          </Button>
-        </Box>
-      </Stack>
-    </Paper>
-  );
-}
-
 /** Setup-key input with a "Generate" button. The admin gives this key to the user, who enters it at
  * sign-in to choose their own password (new account or required reset). Shown in clear text so it can
  * be read out or copied. */
@@ -1305,16 +1228,6 @@ function ManageUsersCard() {
   );
 }
 
-function UsersTab() {
-  const authQuery = useQuery({ queryKey: ['auth-status'], queryFn: api.authStatus });
-  return (
-    <Stack spacing={3}>
-      <ChangePasswordCard />
-      {authQuery.data?.isAdmin && <ManageUsersCard />}
-    </Stack>
-  );
-}
-
 /** Read-only inventory of the software/components OmniCard ships or runs on, with versions + links. */
 function ComponentsCard() {
   const { t } = useTranslation();
@@ -1817,7 +1730,7 @@ function ReceiptSettingsCard() {
 }
 
 // `show` decides tab visibility from the signed-in user's access. The Administration hub itself is
-// always reachable so everyone can change their password (Users tab) and read Components.
+// always reachable so everyone can read Components; your own email/password live on the Account page.
 type TabGate = { isAdmin: boolean; can: (perm: string) => boolean };
 const TABS: {
   key: string;
@@ -1854,7 +1767,7 @@ const TABS: {
   },
   { key: 'roles', labelKey: 'settings.tabs.roles', render: () => <RolesCard />, show: (g) => g.isAdmin },
   { key: 'sites', labelKey: 'settings.tabs.sites', render: () => <SitesCard />, show: (g) => g.isAdmin },
-  { key: 'users', labelKey: 'settings.tabs.users', render: () => <UsersTab />, show: () => true },
+  { key: 'users', labelKey: 'settings.tabs.users', render: () => <ManageUsersCard />, show: (g) => g.isAdmin },
   { key: 'components', labelKey: 'settings.tabs.components', render: () => <ComponentsCard />, show: () => true },
 ];
 

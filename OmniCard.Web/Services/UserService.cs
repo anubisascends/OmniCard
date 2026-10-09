@@ -348,6 +348,23 @@ public sealed class UserService(IDbContextFactory<OmniCardDbContext> factory)
         return true;
     }
 
+    /// <summary>Self-service email change for the Account page. Requires the current password because the
+    /// email is a sign-in name. A blank email clears it. Returns false if the password doesn't match; throws
+    /// <see cref="InvalidOperationException"/> on an invalid or taken email.</summary>
+    public async Task<bool> ChangeOwnEmailAsync(int id, string currentPassword, string? email)
+    {
+        var normalizedEmail = NormalizeEmail(email);
+        using var db = factory.CreateDbContext();
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id);
+        if (user is null || !PasswordHasher.Verify(currentPassword, user.PasswordHash))
+            return false;
+        await EnsureEmailFreeAsync(db, normalizedEmail, exceptUserId: id);
+
+        user.Email = normalizedEmail;
+        await db.SaveChangesAsync();
+        return true;
+    }
+
     /// <summary>Self-service change: requires the current password. Returns false if it doesn't match.</summary>
     public async Task<bool> ChangePasswordAsync(int id, string currentPassword, string newPassword)
     {

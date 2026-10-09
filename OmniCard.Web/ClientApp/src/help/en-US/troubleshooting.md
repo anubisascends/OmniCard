@@ -117,7 +117,7 @@ Another person, or another tab or device of yours, saved a change to the same ca
 
 **That setup key is incorrect.** Check the key with your administrator. Capitals don't matter, but every letter and number does. After 5 wrong tries the key stops working and you see *Too many incorrect setup keys*. An administrator then has to require a password reset again and give you a new key.
 
-**You're setting up a new server.** Sign in with the built-in **Admin** account (password `admin`), then change that password straight away.
+**You're setting up a new server.** Sign in with the built-in **Admin** account (password `admin`), then change that password straight away under **Account ▸ My account**.
 
 ## Take better photos with your phone
 

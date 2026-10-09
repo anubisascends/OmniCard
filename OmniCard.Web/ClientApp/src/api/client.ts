@@ -1,4 +1,5 @@
 import type {
+  AccountDto,
   ActiveListingDto,
   AuthStatusDto,
   BinderCardDto,
@@ -291,6 +292,14 @@ export const api = {
     request<void>('/api/auth/change-password', {
       method: 'POST',
       body: JSON.stringify({ currentPassword, newPassword }),
+    }),
+
+  // Account (the signed-in user's own details — any signed-in user)
+  account: () => request<AccountDto>('/api/account'),
+  accountChangeEmail: (email: string | null, currentPassword: string) =>
+    request<AccountDto>('/api/account/email', {
+      method: 'PUT',
+      body: JSON.stringify({ email, currentPassword }),
     }),
 
   // Users (Administration ▸ Users — admin only)

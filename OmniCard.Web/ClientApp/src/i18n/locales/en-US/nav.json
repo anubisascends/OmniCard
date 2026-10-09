@@ -16,7 +16,8 @@
     "openNavigation": "Open navigation",
     "account": "Account",
     "signedInAs": "Signed in as",
-    "accountAndUsers": "Account & users",
+    "myAccount": "My account",
+    "manageUsers": "Manage users",
     "signOut": "Sign out"
   }
 }

@@ -142,19 +142,9 @@
       "description": "Card preview size — how large the artwork popup grows when you hover a card in a list. 100% is the default; drag up to {{max}}%.",
       "popup": "Popup: {{width}} × {{height}} px"
     },
-    "password": {
-      "title": "Your password",
-      "description": "Change the password for your own account. You must enter your current password.",
-      "current": "Current password",
-      "new": "New password",
-      "confirm": "Confirm new password",
-      "mismatch": "Passwords don't match.",
-      "changed": "Password changed.",
-      "changeButton": "Change password"
-    },
     "users": {
       "addUser": "Add user",
-      "manageDescription": "Accounts that can sign in. The built-in Admin account can't be deleted.",
+      "manageDescription": "Accounts that can sign in. The built-in Admin account can't be deleted. People change their own email and password on their Account page.",
       "colUsername": "Username",
       "colRole": "Role",
       "colActions": "Actions",

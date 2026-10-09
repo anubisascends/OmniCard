@@ -1,10 +1,10 @@
 # Administration
 
-The Administration page is where you change your own password and, depending on your access, manage users, roles, sites, catalog data and OmniCard's settings. This topic explains every tab and who can see it.
+Depending on your access, the Administration page is where you manage users, roles, sites, catalog data and OmniCard's settings. To change your own email or password, use [Your account](help:account) instead. This topic explains every tab and who can see it.
 
 ## Open Administration
 
-Click **Administration** in the sidebar. Everyone can open this page, but you only see the tabs your account allows. Administrators can also open **Account ▸ Account & users** from the top bar to jump straight to the **Users** tab.
+Click **Administration** in the sidebar. Everyone can open this page, but you only see the tabs your account allows. Administrators can also open **Account ▸ Manage users** from the top bar to jump straight to the **Users** tab.
 
 ![The Administration page with its row of tabs](administration-tabs.png)
 
@@ -19,25 +19,14 @@ Click **Administration** in the sidebar. Everyone can open this page, but you on
 | **eBay** | Connect eBay and set seller details | People with the eBay view permission |
 | **Roles** | Permission bundles | Administrators only |
 | **Sites** | Major physical places and who can see them | Administrators only |
-| **Users** | Your password, and (for administrators) all accounts | Everyone |
+| **Users** | Every account: add, edit, require password resets, delete | Administrators only |
 | **Components** | Software versions and licenses | Everyone |
 
 If the page scrolls sideways on a small screen, use the arrows at either end of the tab row to see more tabs.
 
-## Change your password
-
-Anyone can change their own password.
-
-1. Go to **Administration ▸ Users**.
-2. Under **Your password**, enter your **Current password**.
-3. Enter a **New password**, then type it again in **Confirm new password**.
-4. Click **Change password**. You'll see *Password changed.*
-
-If the two new passwords don't match, the form says *Passwords don't match.* If your current password is wrong, you'll see *Current password is incorrect.* If you've forgotten your password, ask an administrator to require a password reset.
-
 ## Users
 
-Administrators see a list of every account below **Your password**, with each person's **Username** (and email, if they have one) and **Role**.
+Only administrators see this tab. It lists every account, with each person's **Username** (and email, if they have one) and **Role**.
 
 - **system** marks the built-in Admin account. It can't be deleted and always has full access, but you can require a password reset for it.
 - **awaiting password** means the person hasn't used their setup key yet, so they can't sign in until they do.
