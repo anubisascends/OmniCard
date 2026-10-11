@@ -296,20 +296,7 @@ public sealed class CollectionController(
         var sortKey = NormalizeSort(req.Sort);
         var desc = string.Equals(req.Dir, "desc", StringComparison.OrdinalIgnoreCase);
 
-        using var ctx = dbFactory.CreateDbContext();
-        var lots = CollectionQueryBuilder.BuildFilteredQuery(ctx, req.Q ?? "", LocationsController.ParseGame(req.Game),
-            req.ContainerId, filterPreset: null, _gameServices, siteAccess.Current.ScopeTo(req.SiteId)).ToList();
-
-        // Every lot is priced up front: group headers carry their market value.
-        MarketPriceHydrator.Populate(cardService, lots);
-        if (groupBy.Contains("listingStatus"))
-        {
-            // Grouping needs each lot's own status, before stacking folds lots together.
-            var statusByLot = listings.GetActiveListingStatusByLot(lots.Select(c => c.Id));
-            foreach (var lot in lots)
-                lot.ListingStatus = statusByLot.TryGetValue(lot.Id, out var status) ? status : null;
-        }
-
+        var lots = LoadGroupableLots(req.Q, req.Game, req.ContainerId, req.SiteId, groupBy);
         var (total, rows) = CollectionGrouping.Page(
             lots, groupBy,
             leaf => SortRows(req.Stacked ? StackRows(leaf) : leaf.Select(c => { c.StackedIds = [c.Id]; return c; }), sortKey, desc),
@@ -323,6 +310,45 @@ public sealed class CollectionController(
 
         var items = rows.Select(r => new GroupedCardRowDto(r.Group, r.Card is null ? null : DtoMapping.ToDto(r.Card))).ToList();
         return new PagedResult<GroupedCardRowDto>(total, skip, take, items);
+    }
+
+    /// <summary>Every row in one group of a grouped search (POST /api/collection/grouped/cards) — the cards
+    /// on every page and in collapsed subgroups — so the table's group checkbox can select the whole
+    /// group. Same filters, grouping and stacking as <see cref="Grouped"/>, so row ids match its rows.
+    /// Rows carry what bulk actions need (lot ids, game, price, listing status), not art or tags.</summary>
+    [HttpPost("grouped/cards")]
+    [RequirePermission(Permissions.CollectionView)]
+    public ActionResult<List<CardDto>> GroupCards([FromBody] GroupCardsRequest req)
+    {
+        var groupBy = CollectionGrouping.Canonicalize(req.GroupBy);
+        if (groupBy.Count == 0)
+            return BadRequest(new { error = "Choose at least one column to group by." });
+
+        var lots = LoadGroupableLots(req.Q, req.Game, req.ContainerId, req.SiteId, groupBy);
+        var cards = CollectionGrouping.CardsIn(
+            lots, groupBy, req.GroupId,
+            leaf => req.Stacked ? StackRows(leaf) : leaf.Select(c => { c.StackedIds = [c.Id]; return c; }).ToList());
+        AnnotateListingStatus(cards);
+        return cards.Select(DtoMapping.ToDto).ToList();
+    }
+
+    /// <summary>The site-scoped filtered lots of a grouped search, priced (group headers carry market
+    /// value) and, when grouping by it, carrying each lot's own listing status.</summary>
+    private List<CollectionCard> LoadGroupableLots(string? q, string? game, int? containerId, int? siteId, IReadOnlyList<string> groupBy)
+    {
+        using var ctx = dbFactory.CreateDbContext();
+        var lots = CollectionQueryBuilder.BuildFilteredQuery(ctx, q ?? "", LocationsController.ParseGame(game),
+            containerId, filterPreset: null, _gameServices, siteAccess.Current.ScopeTo(siteId)).ToList();
+
+        MarketPriceHydrator.Populate(cardService, lots);
+        if (groupBy.Contains("listingStatus"))
+        {
+            // Grouping needs each lot's own status, before stacking folds lots together.
+            var statusByLot = listings.GetActiveListingStatusByLot(lots.Select(c => c.Id));
+            foreach (var lot in lots)
+                lot.ListingStatus = statusByLot.TryGetValue(lot.Id, out var status) ? status : null;
+        }
+        return lots;
     }
 
     /// <summary>Fills each row's tags in one batch query (union of tags across a stacked row's lots),

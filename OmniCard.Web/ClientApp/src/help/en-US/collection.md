@@ -89,6 +89,7 @@ Each group heading shows how many cards the group holds and their total market v
 - Click a group heading to collapse or expand it.
 - Click **Collapse all** to fold every group down to its heading, then click a heading to open just that group.
 - Click **Expand all** to open every group again.
+- In Select mode, tick a group heading's checkbox to select every card in that group, including cards on other pages and in collapsed groups. Tick it again to clear them. A partly filled box means only some of the group's cards are selected. See [Work with several cards at once](#work-with-several-cards-at-once).
 
 Groups always open expanded. The columns you group by are part of the [saved view](help:saved-views); which groups are collapsed is not.
 
@@ -187,13 +188,13 @@ For managing listings, picking and orders, see [Sales](help:sales).
 ## Work with several cards at once
 
 1. Click **Select**. Checkboxes appear next to each row.
-2. Tick the cards you want. The header checkbox selects every card on the current page.
+2. Tick the cards you want. The header checkbox selects every card on the current page. When the list is [grouped](#group-rows), each group heading has its own checkbox that selects the whole group.
 3. Use the buttons that appear in the toolbar. The toolbar shows how many cards are selected.
 4. Click **Done** to leave Select mode.
 
 ![Select mode with several cards ticked and the bulk action buttons showing](collection-select-actions.png)
 
-A selected stacked row counts every entry in the stack.
+A selected stacked row counts every entry in the stack. Your selection stays when you move to another page, so you can tick cards on several pages before using a button. Changing the search, **Stack duplicates** or **Group by** clears it.
 
 | Button | What it does |
 |---|---|
