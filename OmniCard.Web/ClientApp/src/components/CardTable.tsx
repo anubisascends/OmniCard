@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Button,
+  Checkbox,
   Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -21,6 +23,7 @@ import {
 import {
   DataGrid,
   GRID_BOOLEAN_COL_DEF,
+  GRID_CHECKBOX_SELECTION_COL_DEF,
   type GridColDef,
   type GridColumnVisibilityModel,
   type GridPaginationModel,
@@ -79,6 +82,10 @@ const ALL_EXPANDED: CollapseState = { byDefault: false, toggled: [] };
  * Row grouping (`view.groupColumns`, outermost first) is done by the server over the whole result set
  * and paged as one sequence of group-header + card rows; headers span the row and click to collapse.
  * Which groups are collapsed is per-visit state (groups open expanded), not part of the saved view.
+ *
+ * In Select mode the selection is kept across pages (it holds each selected row, not just its id), and
+ * a group header's checkbox selects every card in that group — on every page and in collapsed
+ * subgroups — fetching the group's rows from the server when the page doesn't show them all.
  */
 export function CardTable({
   game,
@@ -101,7 +108,12 @@ export function CardTable({
   const pagination: GridPaginationModel = { page, pageSize };
   const sortModel: GridSortModel = [{ field: sortField, sort: sortDir }];
   const [selectMode, setSelectMode] = useState(false);
-  const [selection, setSelection] = useState<GridRowSelectionModel>([]);
+  // Selected rows by id, kept across pages so a selection can span them (and whole groups).
+  const [selected, setSelected] = useState<Map<number, CardDto>>(new Map());
+  // Each group's row ids, once fetched for its checkbox; dropped whenever the data may have changed.
+  const [groupMembers, setGroupMembers] = useState<Map<string, number[]>>(new Map());
+  // Bumped when the scope changes, so a group fetch that started before it is ignored.
+  const scopeVersion = useRef(0);
   const [detailCardId, setDetailCardId] = useState<number | null>(null);
   const [moveOpen, setMoveOpen] = useState(false);
   const [hover, setHover] = useState<CardHover | null>(null);
@@ -117,10 +129,14 @@ export function CardTable({
 
   // Reset to the first page whenever the scope/mode changes so we never sit on an out-of-range page.
   // A new sort or page size also starts over: the server sorts the whole result set.
+  useEffect(() => setPage(0), [game, q, containerId, stacked, sortField, sortDir, pageSize, groupKey]);
+
+  // A different scope (or stacking / grouping, which changes the row ids) starts a fresh selection.
   useEffect(() => {
-    setPage(0);
-    setSelection([]);
-  }, [game, q, containerId, stacked, sortField, sortDir, pageSize, groupKey]);
+    scopeVersion.current++;
+    setSelected(new Map());
+    setGroupMembers(new Map());
+  }, [game, q, containerId, stacked, groupKey]);
 
   // A different grouping (or scope) starts with every group open again.
   useEffect(() => setCollapse(ALL_EXPANDED), [game, containerId, groupKey]);
@@ -230,14 +246,97 @@ export function CardTable({
   );
   const lotIdsOf = (c: CardDto) => (c.stackedIds.length ? c.stackedIds : [c.id]);
   const rowsById = useMemo(() => new Map(rows.map((c) => [c.id, c])), [rows]);
-  const selectedLotIds = useMemo(
-    () => selection.flatMap((id) => (rowsById.get(Number(id)) ? lotIdsOf(rowsById.get(Number(id))!) : [])),
-    [selection, rowsById],
-  );
-  const selectedRows = useMemo(
-    () => selection.map((id) => rowsById.get(Number(id))).filter((r): r is CardDto => !!r),
-    [selection, rowsById],
-  );
+  const selectedRows = useMemo(() => [...selected.values()], [selected]);
+  const selectedLotIds = useMemo(() => selectedRows.flatMap(lotIdsOf), [selectedRows]);
+  const selectionModel: GridRowSelectionModel = useMemo(() => [...selected.keys()], [selected]);
+  const onSelectionChange = (model: GridRowSelectionModel) =>
+    setSelected((prev) => {
+      const next = new Map<number, CardDto>();
+      for (const id of model) {
+        const row = prev.get(Number(id)) ?? rowsById.get(Number(id));
+        if (row) next.set(row.id, row);
+      }
+      return next;
+    });
+
+  // The card rows under each group header on this page: a header owns the rows until the next header
+  // at its own level or above. That's the whole group only when the page holds all of its rows.
+  const pageMembers = useMemo(() => {
+    const members = new Map<string, number[]>();
+    const open: CardGroupDto[] = [];
+    for (const r of tableRows) {
+      if (r.group) {
+        while (open.length && open[open.length - 1].level >= r.group.level) open.pop();
+        open.push(r.group);
+        if (!members.has(r.group.id)) members.set(r.group.id, []);
+      } else for (const g of open) members.get(g.id)!.push(r.id);
+    }
+    return members;
+  }, [tableRows]);
+
+  /** Whether all, some or none of a group's cards are selected (a partly known group is never "all"). */
+  const groupSelection = (g: CardGroupDto): 'all' | 'some' | 'none' => {
+    const ids = groupMembers.get(g.id) ?? pageMembers.get(g.id) ?? [];
+    const count = ids.filter((id) => selected.has(id)).length;
+    const complete = groupMembers.has(g.id) || ids.length === g.rows;
+    if (complete && count > 0 && count === ids.length) return 'all';
+    return count > 0 ? 'some' : 'none';
+  };
+
+  const selectGroup = useMutation({
+    mutationFn: async (g: CardGroupDto) => {
+      const version = scopeVersion.current;
+      const onPage = pageMembers.get(g.id) ?? [];
+      const cards =
+        onPage.length === g.rows
+          ? onPage.map((id) => rowsById.get(id)!)
+          : await api.collectionGroupCards({ game, q, containerId, stacked, groupBy: groupColumns, groupId: g.id });
+      return { g, cards, version };
+    },
+    onSuccess: ({ g, cards, version }) => {
+      if (version !== scopeVersion.current) return;
+      setGroupMembers((m) => new Map(m).set(g.id, cards.map((c) => c.id)));
+      setSelected((prev) => {
+        const next = new Map(prev);
+        // Prefer the page's copy of a row: it carries the art and tags the group fetch leaves out.
+        for (const c of cards) next.set(c.id, rowsById.get(c.id) ?? c);
+        return next;
+      });
+    },
+  });
+  const toggleGroupSelection = (g: CardGroupDto) => {
+    if (groupSelection(g) !== 'all') {
+      selectGroup.mutate(g);
+      return;
+    }
+    const ids = groupMembers.get(g.id) ?? pageMembers.get(g.id) ?? [];
+    setSelected((prev) => {
+      const next = new Map(prev);
+      for (const id of ids) next.delete(id);
+      return next;
+    });
+  };
+
+  const renderGroupCheckbox = (g: CardGroupDto) => {
+    if (selectGroup.isPending && selectGroup.variables?.id === g.id) return <CircularProgress size={18} />;
+    const state = groupSelection(g);
+    const label = state === 'all' ? t('collection.grouping.deselectGroup') : t('collection.grouping.selectGroup');
+    return (
+      // Beside the box, not below it, and never hoverable: it would sit over the next row's checkbox.
+      <Tooltip title={label} placement="right" disableInteractive>
+        <Checkbox
+          size="small"
+          checked={state === 'all'}
+          indeterminate={state === 'some'}
+          disabled={selectGroup.isPending}
+          inputProps={{ 'aria-label': label }}
+          // A click on the header row collapses the group; the checkbox only selects.
+          onClick={(e) => e.stopPropagation()}
+          onChange={() => toggleGroupSelection(g)}
+        />
+      </Tooltip>
+    );
+  };
   // Bulk listing lists each selected lot as a whole at its row's market price. Rows already on the
   // market (listingStatus set) are excluded here so we never attempt to re-list them.
   const selectedListItems = useMemo(
@@ -266,7 +365,8 @@ export function CardTable({
     qc.invalidateQueries({ queryKey: ['location'] });
     qc.invalidateQueries({ queryKey: ['locations'] });
     qc.invalidateQueries({ queryKey: ['dashboard'] });
-    setSelection([]);
+    setSelected(new Map());
+    setGroupMembers(new Map());
   };
   const move = useMutation({
     mutationFn: (target: number) => api.cardMove(selectedLotIds, target),
@@ -371,10 +471,15 @@ export function CardTable({
     view.hiddenColumns.filter((f) => f !== 'name').map((f) => [f, false]),
   );
 
-  // Grouped: a header row spans the whole row from the first visible column, which draws it.
+  // Grouped: a header row spans the whole row from the first visible column, which draws it. In Select
+  // mode the checkbox column (placed explicitly) gives each header its group checkbox.
   const visibleColumns = columns.filter((c) => columnVisibility[c.field] !== false);
+  const checkboxColumn: GridColDef<TableRow> = {
+    ...GRID_CHECKBOX_SELECTION_COL_DEF,
+    renderCell: (p) => (p.row.group ? renderGroupCheckbox(p.row.group) : GRID_CHECKBOX_SELECTION_COL_DEF.renderCell!(p)),
+  };
   const gridColumns: GridColDef<TableRow>[] = grouped
-    ? columns.map((c) => {
+    ? [...(selectMode ? [checkboxColumn] : []), ...columns.map((c) => {
         if (c.field !== visibleColumns[0]?.field) return c;
         const renderCard = c.renderCell ?? (c.type === 'boolean' ? GRID_BOOLEAN_COL_DEF.renderCell : undefined);
         return {
@@ -383,7 +488,7 @@ export function CardTable({
           renderCell: (p) =>
             p.row.group ? renderGroupHeader(p.row.group) : renderCard ? renderCard(p) : p.formattedValue ?? p.value,
         } as GridColDef<TableRow>;
-      })
+      })]
     : columns;
 
   return (
@@ -420,11 +525,16 @@ export function CardTable({
           startIcon={<ChecklistIcon />}
           onClick={() => {
             setSelectMode((v) => !v);
-            setSelection([]);
+            setSelected(new Map());
           }}
         >
           {selectMode ? t('common.actions.done') : t('common.actions.select')}
         </Button>
+        {selectMode && selectGroup.isError && (
+          <Typography variant="body2" color="error">
+            {t('collection.grouping.selectGroupFailed')}
+          </Typography>
+        )}
         {selectMode && selectedLotIds.length > 0 && (
           <>
             <Typography variant="body2" color="text.secondary">
@@ -499,8 +609,9 @@ export function CardTable({
           checkboxSelection={selectMode}
           isRowSelectable={(p) => !p.row.group}
           disableRowSelectionOnClick
-          rowSelectionModel={selection}
-          onRowSelectionModelChange={setSelection}
+          keepNonExistentRowsSelected
+          rowSelectionModel={selectionModel}
+          onRowSelectionModelChange={onSelectionChange}
           onRowClick={(p) => {
             const row = p.row as TableRow;
             if (row.group) toggleGroup(row.group.id);

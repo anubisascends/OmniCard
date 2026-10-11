@@ -297,6 +297,22 @@ public sealed record GroupedCollectionRequest
 }
 
 /// <summary>
+/// Every row of one group in a grouped collection search (POST /api/collection/grouped/cards): the same
+/// filters, <see cref="GroupBy"/> and <see cref="Stacked"/> as the <see cref="GroupedCollectionRequest"/>
+/// that produced the header, plus that header's <see cref="CardGroupDto.Id"/> as <see cref="GroupId"/>.
+/// </summary>
+public sealed record GroupCardsRequest
+{
+    public string? Game { get; init; }
+    public string? Q { get; init; }
+    public int? ContainerId { get; init; }
+    public int? SiteId { get; init; }
+    public bool Stacked { get; init; }
+    public IReadOnlyList<string> GroupBy { get; init; } = [];
+    public string GroupId { get; init; } = "";
+}
+
+/// <summary>
 /// A group header in a grouped card list. <see cref="Id"/> identifies the group's path (stable while the
 /// grouping columns stay the same). <see cref="Key"/> is the raw value (e.g. "MH3", "true", "Listed", ""
 /// for none); <see cref="Label"/> is the server's display text for data values (set / location / game

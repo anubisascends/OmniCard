@@ -116,6 +116,38 @@ public static class CollectionGrouping
         return (total, [.. continued, .. page]);
     }
 
+    /// <summary>
+    /// Every grid row (card or stack) inside the group <paramref name="groupId"/> — a
+    /// <see cref="CardGroupDto.Id"/> from <see cref="Page"/> with the same <paramref name="groupBy"/> —
+    /// across all of its subgroups, regardless of paging or collapse. Rows come out exactly as
+    /// <see cref="Page"/> would show them (same <paramref name="arrangeLeaf"/> stacking), so their ids
+    /// match the grid's. An unknown id yields no rows.
+    /// </summary>
+    public static List<CollectionCard> CardsIn(
+        IReadOnlyList<CollectionCard> lots,
+        IReadOnlyList<string> groupBy,
+        string groupId,
+        Func<IEnumerable<CollectionCard>, List<CollectionCard>> arrangeLeaf)
+    {
+        if (groupBy.Count == 0)
+            throw new ArgumentException("At least one group column is required.", nameof(groupBy));
+
+        static Node? Find(List<Node> nodes, string id)
+        {
+            foreach (var n in nodes)
+            {
+                if (n.Id == id) return n;
+                if (n.Children is not null && Find(n.Children, id) is { } found) return found;
+            }
+            return null;
+        }
+        static IEnumerable<CollectionCard> Leaves(Node n) =>
+            n.Children is null ? n.Cards : n.Children.SelectMany(Leaves);
+
+        var node = Find(Build(lots, groupBy, 0, [], arrangeLeaf, null, false), groupId);
+        return node is null ? [] : Leaves(node).ToList();
+    }
+
     private static List<Node> Build(
         IEnumerable<CollectionCard> lots, IReadOnlyList<string> groupBy, int level, List<string> path,
         Func<IEnumerable<CollectionCard>, List<CollectionCard>> arrangeLeaf, string? sort, bool desc)

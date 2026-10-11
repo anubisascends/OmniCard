@@ -41,6 +41,9 @@
       "nonFoil": "Non-foil",
       "notListed": "Not listed",
       "noLocation": "No location",
+      "selectGroup": "Select every card in this group",
+      "deselectGroup": "Clear the selection in this group",
+      "selectGroupFailed": "Couldn't load this group's cards to select them.",
       "fields": {
         "setCode": "Set",
         "rarity": "Rarity",

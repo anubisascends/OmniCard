@@ -474,6 +474,16 @@ export const api = {
     collapsedByDefault: boolean;
     toggled: string[];
   }) => request<PagedResult<GroupedCardRowDto>>('/api/collection/grouped', { method: 'POST', body: JSON.stringify(body) }),
+  /** Every row of one group (`groupId` from a grouped page), across all pages and collapsed subgroups. */
+  collectionGroupCards: (body: {
+    game?: string;
+    q?: string;
+    containerId?: number;
+    siteId?: number;
+    stacked: boolean;
+    groupBy: string[];
+    groupId: string;
+  }) => request<CardDto[]>('/api/collection/grouped/cards', { method: 'POST', body: JSON.stringify(body) }),
 
   // Location writes
   locationNameAvailable: (name: string, excludeId?: number) =>

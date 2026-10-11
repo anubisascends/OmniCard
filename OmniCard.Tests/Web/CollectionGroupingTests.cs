@@ -204,6 +204,52 @@ public class CollectionGroupingTests
     }
 
     [Fact]
+    public void CardsIn_ReturnsWholeGroup_AcrossSubgroupsPagesAndCollapse()
+    {
+        var lots = new List<CollectionCard>
+        {
+            Card("A", set: "AAA", rarity: "rare"),
+            Card("B", set: "AAA", rarity: "common"),
+            Card("C", set: "AAA", rarity: "common"),
+            Card("D", set: "BBB", rarity: "rare"),
+        };
+        string[] groupBy = ["setCode", "rarity"];
+
+        // The AAA header from a page where AAA is collapsed and the rows would run past one page.
+        var (_, rows) = Page(lots, groupBy, take: 2, collapsed: true);
+        var aaa = rows[0].Group!;
+        var common = Page(lots, groupBy).Rows.First(r => r.Group is { Level: 1, Key: "common" }).Group!;
+
+        Assert.Equal(["A", "B", "C"], CollectionGrouping.CardsIn(lots, groupBy, aaa.Id, Flat).Select(c => c.Name).Order());
+        Assert.Equal(["B", "C"], CollectionGrouping.CardsIn(lots, groupBy, common.Id, Flat).Select(c => c.Name).Order());
+        Assert.Empty(CollectionGrouping.CardsIn(lots, groupBy, "[\"ZZZ\"]", Flat));
+    }
+
+    [Fact]
+    public void CardsIn_StacksLikeThePage_SoRowIdsMatch()
+    {
+        // Grouped by set then condition, a printing's NM and LP copies are separate rows on the page;
+        // selecting the whole set must yield those same rows, not one stack spanning both conditions.
+        var lots = new List<CollectionCard>
+        {
+            Card("Bolt", condition: "NM"),
+            Card("Bolt", condition: "NM"),
+            Card("Bolt", condition: "LP"),
+        };
+        string[] groupBy = ["setCode", "condition"];
+        Func<IEnumerable<CollectionCard>, List<CollectionCard>> stack =
+            leaf => CollectionController.SortRows(CollectionController.StackRows(leaf), "name", false);
+
+        var (_, rows) = Page(lots, groupBy, arrange: stack);
+        var pageIds = rows.Where(r => r.Card is not null).Select(r => r.Card!.Id).Order();
+        var set = rows[0].Group!;
+        var cards = CollectionGrouping.CardsIn(lots, groupBy, set.Id, stack);
+
+        Assert.Equal(pageIds, cards.Select(c => c.Id).Order());
+        Assert.Equal(3, cards.Sum(c => c.StackedIds!.Count));
+    }
+
+    [Fact]
     public void Canonicalize_KeepsKnownFields_InOrder_CaseInsensitive()
     {
         Assert.Equal(["rarity", "setCode"], CollectionGrouping.Canonicalize(["RARITY", "bogus", "setcode", "rarity", null]));
