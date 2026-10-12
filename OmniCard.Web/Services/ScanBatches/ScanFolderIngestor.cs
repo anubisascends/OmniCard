@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Data;
 using OmniCard.Shared.Cards;
@@ -14,6 +15,12 @@ namespace OmniCard.Web.Services.ScanBatches;
 /// date. A file is taken in only once it's finished writing — its size and timestamp held steady for a
 /// few seconds and it opens exclusively — then it's copied into the data directory and the original is
 /// moved to <c>&lt;game folder&gt;\_processed\&lt;batch&gt;\</c>, so it's never picked up twice.
+///
+/// Every file is SHA-256 hashed on the way in. A scanner can't produce the same bytes twice for two
+/// physical passes (sensor noise alone differs), so a file whose hash matches an open or committed item
+/// of the same game is a re-save of an image already taken — capture software that wrote the whole run
+/// out a second time. Those are recorded as <see cref="ScanBatchItemState.Duplicate"/> rows (no stored
+/// image, never matched) and their originals still go to <c>_processed</c>.
 ///
 /// Not thread-safe: <see cref="ScanBatchHostedService"/> calls <see cref="RunOnce"/> from its single loop.
 /// </summary>
@@ -46,12 +53,14 @@ public sealed class ScanFolderIngestor(
     /// settings page. Cleared once a run of that folder succeeds.</summary>
     public IReadOnlyDictionary<CardGame, string> FolderErrors => _folderErrors;
 
-    /// <summary>Scan every enabled folder once; returns the number of files taken in.</summary>
+    /// <summary>Scan every enabled folder once; returns the number of files taken in (duplicates set
+    /// aside included).</summary>
     public int RunOnce(ScanFolderSettings settings)
     {
         RetryPendingMoves();
 
         var ingested = 0;
+        var duplicates = 0;
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var folder in settings.Folders.Where(f => f.Enabled))
         {
@@ -74,6 +83,7 @@ public sealed class ScanFolderIngestor(
                     switch (Ingest(folder, file, folderKey ?? DateKey()))
                     {
                         case IngestResult.Ingested: ingested++; break;
+                        case IngestResult.Duplicate: ingested++; duplicates++; break;
                         case IngestResult.IngestedMoveFailed: ingested++; moveFailed = true; break;
                     }
                 }
@@ -93,6 +103,8 @@ public sealed class ScanFolderIngestor(
 
         if (ingested > 0)
             logger.LogInformation("Picked up {Count} scan image(s) from watched folders", ingested);
+        if (duplicates > 0)
+            logger.LogWarning("Set aside {Count} scan image(s) that were exact copies of images already picked up", duplicates);
         return ingested;
     }
 
@@ -181,12 +193,42 @@ public sealed class ScanFolderIngestor(
         }
     }
 
-    private enum IngestResult { Failed, Ingested, IngestedMoveFailed }
+    private enum IngestResult { Failed, Ingested, Duplicate, IngestedMoveFailed }
+
+    /// <summary>SHA-256 of a file's bytes as lowercase hex.</summary>
+    internal static string ContentHash(string file)
+    {
+        using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 16, FileOptions.SequentialScan);
+        return Convert.ToHexStringLower(SHA256.HashData(stream));
+    }
+
+    /// <summary>The first open or committed item of <paramref name="game"/> holding the same bytes, or
+    /// null. Removed and discarded items don't count, so re-dropping images whose batch was thrown
+    /// away picks them up again.</summary>
+    internal static ScanBatchItem? FindOriginal(OmniCardDbContext ctx, CardGame game, string hash) =>
+        (from i in ctx.ScanBatchItems.AsNoTracking()
+         join b in ctx.ScanBatches.AsNoTracking() on i.ScanBatchId equals b.Id
+         where i.ContentHash == hash && b.Game == game
+               && (i.State == ScanBatchItemState.Open || i.State == ScanBatchItemState.Committed)
+         orderby i.Id
+         select i).FirstOrDefault();
 
     private IngestResult Ingest(ScanFolderConfig folder, string file, string folderKey)
     {
         var now = clock.GetUtcNow().UtcDateTime;
+        string hash;
+        try
+        {
+            hash = ContentHash(file);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning(ex, "Couldn't read scan {File}", file);
+            return IngestResult.Failed; // retried next run
+        }
+
         using var ctx = dbFactory.CreateDbContext();
+        var original = FindOriginal(ctx, folder.Game, hash);
 
         // Late files join the open batch for this subfolder; once it's committed/discarded, a new one starts.
         var batch = ctx.ScanBatches
@@ -217,12 +259,16 @@ public sealed class ScanFolderIngestor(
         }
 
         var sequence = (ctx.ScanBatchItems.Where(i => i.ScanBatchId == batch.Id).Max(i => (int?)i.Sequence) ?? 0) + 1;
+        if (original is not null)
+            return SetAsideDuplicate(ctx, folder, file, folderKey, batch.Id, sequence, hash, original, now);
+
         var item = new ScanBatchItem
         {
             ScanBatchId = batch.Id,
             Sequence = sequence,
             OriginalFileName = Truncate(Path.GetFileName(file), 260),
             StoredFileName = "pending",
+            ContentHash = hash,
             Status = ScanBatchItemStatus.Pending,
             State = ScanBatchItemState.Open,
             Condition = string.IsNullOrWhiteSpace(batch.Condition) ? "NM" : batch.Condition,
@@ -260,6 +306,34 @@ public sealed class ScanFolderIngestor(
             .SetProperty(b => b.ReadyUtc, b => b.Status == ScanBatchStatus.Ready ? null : b.ReadyUtc)
             .SetProperty(b => b.Status, b => b.Status == ScanBatchStatus.Ready ? ScanBatchStatus.Matching : b.Status));
 
+        return MoveToProcessed(folder, file, folderKey, IngestResult.Ingested);
+    }
+
+    /// <summary>Record an exact copy of <paramref name="original"/> without storing or matching it. It
+    /// keeps the batch's quiet period alive (the copies usually stream in as a run) but never sends a
+    /// Ready batch back to matching.</summary>
+    private IngestResult SetAsideDuplicate(OmniCardDbContext ctx, ScanFolderConfig folder, string file, string folderKey,
+        int batchId, int sequence, string hash, ScanBatchItem original, DateTime now)
+    {
+        ctx.ScanBatchItems.Add(new ScanBatchItem
+        {
+            ScanBatchId = batchId,
+            Sequence = sequence,
+            OriginalFileName = Truncate(Path.GetFileName(file), 260),
+            StoredFileName = "",
+            ContentHash = hash,
+            DuplicateOfItemId = original.Id,
+            Status = ScanBatchItemStatus.Pending,
+            State = ScanBatchItemState.Duplicate,
+        });
+        ctx.SaveChanges();
+        ctx.ScanBatches.Where(b => b.Id == batchId).ExecuteUpdate(u => u.SetProperty(b => b.LastFileUtc, now));
+        logger.LogDebug("Scan {File} is an exact copy of batch item {Original}; set aside", file, original.Id);
+        return MoveToProcessed(folder, file, folderKey, IngestResult.Duplicate);
+    }
+
+    private IngestResult MoveToProcessed(ScanFolderConfig folder, string file, string folderKey, IngestResult success)
+    {
         var destination = ProcessedPath(folder.Path, folderKey, file);
         if (!TryMove(file, destination, out var error))
         {
@@ -267,7 +341,7 @@ public sealed class ScanFolderIngestor(
             _folderErrors[folder.Game] = $"Couldn't move {Path.GetFileName(file)} to {ProcessedFolderName}: {error}";
             return IngestResult.IngestedMoveFailed;
         }
-        return IngestResult.Ingested;
+        return success;
     }
 
     /// <summary>The folder key, or "key (n)" with the lowest n ≥ 2 not already used by this game.</summary>

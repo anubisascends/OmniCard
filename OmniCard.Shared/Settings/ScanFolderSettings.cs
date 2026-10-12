@@ -20,6 +20,11 @@ public sealed class ScanFolderSettings
     /// matching when this is off.</summary>
     public bool Enabled { get; set; }
 
+    /// <summary>Start matching a batch on its own once its quiet period passes (default on). When off,
+    /// files are still picked up — so they can be reviewed, and duplicates removed, first — but a batch
+    /// waits until someone presses Run on the Scan page.</summary>
+    public bool AutoProcess { get; set; } = true;
+
     /// <summary>Seconds with no new file before a batch starts matching.</summary>
     public int QuietPeriodSeconds { get; set; } = DefaultQuietPeriodSeconds;
 

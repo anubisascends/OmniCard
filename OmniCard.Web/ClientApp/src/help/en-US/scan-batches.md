@@ -8,18 +8,21 @@ With interactive scanning you upload pictures from your browser and wait while t
 
 1. Your scanner software saves its images into a folder that OmniCard watches. Each game has its own folder.
 2. Each subfolder becomes one **batch**, named after the subfolder. Images saved directly in the game's folder (not in a subfolder) go into a batch named after today's date.
-3. When no new file has arrived for a short while (the *quiet period*), OmniCard matches the batch's cards in the background. You don't need to have the browser open.
+3. When no new file has arrived for a short while (the *quiet period*), OmniCard matches the batch's cards in the background. You don't need to have the browser open. (If an administrator has turned off automatic processing, the batch waits for someone to press **Run** instead. See [Run batches yourself](#run-batches-yourself).)
 4. The batch appears on the [Scan](/scan) page. Someone opens it, reviews the matches, and adds the cards to a location.
 
 Unlike interactive scans, which live only in your browser, batches are stored on the server. Anyone with access to Scan can see them, and you can stop reviewing and pick up again later, even from a different device.
 
 After a file is picked up, the original is moved into a **_processed** subfolder of the game's folder, so it is never imported twice.
 
+OmniCard also skips images it has already picked up. See [Duplicate images are skipped](#duplicate-images-are-skipped).
+
 ## Set up watched folders (administrators)
 
 An administrator sets this up once in [Administration ▸ Scan Badges](/settings?tab=scan), in the **Watched scan folders** section:
 
 - **Watch folders** turns the feature on or off.
+- **Process batches automatically** decides whether a batch starts matching on its own after the quiet period. Turn it off to check each batch first and start it with **Run**.
 - **Quiet period (seconds)** is how long to wait with no new file before matching starts.
 - **Keep images (days)** is how long stored scans of committed or discarded batches are kept before they are deleted.
 - For each game, enter the **Folder on the server** and switch it **Active**. A chip shows **Found**, **Folder not found**, or **Can't move files** (OmniCard can see the folder but can't move files out of it).
@@ -45,12 +48,14 @@ Each batch shows:
 | Status | Meaning |
 |---|---|
 | **Waiting for files** | Files are still arriving. Matching starts after the quiet period. |
+| **Waiting to run** | Automatic processing is off. The batch's files are picked up, and matching starts when someone clicks **Run**. |
 | **Matching N of M** | Cards are being matched. A progress bar shows how far along it is. |
 | **Ready** | Every card has been matched and the batch is ready to review. |
 | **Committed** | The batch was added to your collection. |
 | **Discarded** | The batch was thrown away. |
 
-- How many cards it holds, how many errors and how many committed cards it has, and when its last file arrived.
+- How many cards it holds, how many errors and how many committed cards it has, how many duplicate images were skipped, and when its last file arrived.
+- A **Run** button while the batch is still collecting files (**Run now** if automatic processing is on, to start matching without waiting for the quiet period).
 - Who is reviewing it: *You're reviewing this* or *In review by* someone else.
 
 ![The Scan batches panel with one Ready batch and one batch still matching](scan-batches-panel.png)
@@ -79,11 +84,32 @@ If some cards couldn't be matched because of an error, a **Retry N errors** butt
 
 ### Removing cards
 
-Click **Remove** on a card to take it out of the batch. Its stored image is deleted from the server. The original file stays in the **_processed** subfolder.
+Click **Remove** on a card to take it out of the batch. To remove several at once, check them and click **Delete** in the list header, then confirm. Their stored images are deleted from the server. The original files stay in the **_processed** subfolder.
 
 ### When the batch is finished
 
 Once every card in a batch has been added or removed, the batch closes and you return to the Scan page. It shows as **Committed** (or **Discarded** if nothing was added) in the panel for a day, then disappears from the list.
+
+## Run batches yourself
+
+By default a batch starts matching on its own. If an administrator turns off **Process batches automatically**, new files are still picked up, but each batch waits with the status **Waiting to run**. In the meantime you can:
+
+1. Open the batch and look through the scans. They show *No match* until they're matched.
+2. Check any scans you don't want and click **Delete** in the list header.
+3. Click **Run batch** at the top of the batch page, or **Run** in the **Scan batches** panel.
+
+When several batches are waiting, the panel header shows **Run N batches** to start them all at once.
+
+## Duplicate images are skipped
+
+Sometimes scanner software saves the same run of images twice, for example *0001.png* to *1000.png* followed by the same 1,000 files again. A scanner can't produce the exact same file twice for two passes of a real card, so OmniCard treats any file that is byte-for-byte identical to one it has already picked up for that game as a duplicate.
+
+Duplicates are never matched and never added. The original file is still moved to **_processed**, so it isn't picked up again. The batch shows how many were skipped, and the batch page lists the repeated run, for example *0001.png – 1000.png repeat 0001.png – 1000.png (1,000 images)*.
+
+If a batch receives nothing but duplicates (for example because the originals were already added), it closes on its own as **Discarded** and shows the skipped count in the panel for a day.
+
+> [!NOTE]
+> Only exact copies are skipped. Scanning the same card again produces a new image, so it is never treated as a duplicate. Images from a batch you discarded or removed are picked up again if you drop them back in.
 
 ## One reviewer at a time
 
@@ -108,7 +134,8 @@ The reviewer or an administrator can discard a batch. A batch nobody is reviewin
 ## Tips and troubleshooting
 
 - **A batch never appears.** Ask an administrator to check that **Watch folders** is on, the game's folder is **Active**, and its status chip reads **Found**. Files must be JPEG, PNG or TIFF images.
-- **A batch stays on Waiting for files.** Matching starts only after no new file has arrived for the quiet period. If scanning is still going, that's expected.
+- **A batch stays on Waiting for files.** Matching starts only after no new file has arrived for the quiet period. If scanning is still going, that's expected. Click **Run now** to start it straight away.
+- **A batch stays on Waiting to run.** Automatic processing is off. Click **Run**.
 - **Batches only process while someone is using the site.** On some servers, background work pauses when the site is idle. An administrator can fix this; the settings page includes a hint about it.
 - **Start a new batch.** Save into a new subfolder. Files saved into a subfolder whose batch is still open join that batch; once that batch is closed, new files in the same subfolder start a fresh batch, and a number such as *(2)* may be added to its name to tell them apart.
 - **Wrong set or condition for the whole batch?** Use bulk **Edit** to change the cards' properties before adding them. To change the defaults for future batches, ask an administrator.

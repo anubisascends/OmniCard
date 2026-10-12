@@ -9,8 +9,11 @@ public enum ScanBatchStatus { Collecting, Matching, Ready, Committed, Discarded 
 /// <summary>Whether a batch item has been through the matcher yet.</summary>
 public enum ScanBatchItemStatus { Pending, Matched, Error }
 
-/// <summary>Whether a batch item is still under review, already written to the collection, or removed.</summary>
-public enum ScanBatchItemState { Open, Committed, Removed }
+/// <summary>Whether a batch item is still under review, already written to the collection, or removed.
+/// <see cref="Duplicate"/> marks a byte-for-byte copy of an image already picked up (scanner software
+/// that saved the same files twice): it's set aside at pickup, never matched or committed, and keeps
+/// no image of its own.</summary>
+public enum ScanBatchItemState { Open, Committed, Removed, Duplicate }
 
 /// <summary>
 /// A group of card images picked up from a watched scan folder (one per game; each subfolder is a
@@ -79,6 +82,14 @@ public class ScanBatchItem
 
     /// <summary>File name inside the batch directory (<c>{Id}{ext}</c>).</summary>
     public string StoredFileName { get; set; } = "";
+
+    /// <summary>SHA-256 of the image file (lowercase hex) — how exact duplicates are recognized. Null for
+    /// items picked up before duplicate detection existed.</summary>
+    public string? ContentHash { get; set; }
+
+    /// <summary>For a <see cref="ScanBatchItemState.Duplicate"/>: the earlier item with the same bytes
+    /// (possibly in another batch of the same game).</summary>
+    public int? DuplicateOfItemId { get; set; }
 
     /// <summary>A browser-renderable JPEG preview for TIFF scans; null when the stored file is fine.</summary>
     public string? PreviewFileName { get; set; }

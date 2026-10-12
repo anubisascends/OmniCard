@@ -3,11 +3,13 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using OmniCard.Api.Contracts;
 using OmniCard.Collection.Inventory;
+using OmniCard.Collection.Settings;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Matching;
 using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Settings;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Web.Services;
@@ -26,6 +28,7 @@ public sealed class ScanBatchServiceTests : IDisposable
     private readonly Mock<ITagService> _tags = new();
     private readonly Mock<ICardGameService> _mtg = new();
     private readonly ScanBatchService _svc;
+    private readonly ScanFolderSettingsService _folderSettings;
     private readonly int _location;
 
     public ScanBatchServiceTests()
@@ -33,7 +36,8 @@ public sealed class ScanBatchServiceTests : IDisposable
         _cardService.Setup(c => c.GetGameService(CardGame.Mtg)).Returns(_mtg.Object);
         var binder = new WebBinderCardService(_f.Factory, _f.Paths);
         var commits = new ScanCommitService(_cardService.Object, binder, _tags.Object, NullLogger<ScanCommitService>.Instance);
-        _svc = new ScanBatchService(_f.Factory, commits, _f.Storage, _f.Clock, NullLogger<ScanBatchService>.Instance);
+        _folderSettings = new ScanFolderSettingsService(_f.Paths);
+        _svc = new ScanBatchService(_f.Factory, commits, _f.Storage, _folderSettings, _f.Clock, NullLogger<ScanBatchService>.Instance);
         _location = new StorageContainerService(_f.Factory).Create("Box", ContainerType.Box).Id;
     }
 
@@ -358,5 +362,137 @@ public sealed class ScanBatchServiceTests : IDisposable
         Assert.NotNull(file);
         Assert.EndsWith("c1.preview.jpg", file.Value.Path);
         Assert.Null(_svc.ImageFile(id + 99, items[0]));
+    }
+
+    // --- run (auto-processing off) ---
+
+    [Fact]
+    public void Run_StartsCollectingBatches_AllOrListed()
+    {
+        var (a, _) = Seed(ScanBatchStatus.Collecting);
+        var (b, _) = Seed(ScanBatchStatus.Collecting);
+        var (ready, _) = Seed(ScanBatchStatus.Ready);
+
+        Assert.Equal(1, _svc.Run([b, ready]));
+        Assert.Equal(ScanBatchStatus.Collecting, Batch(a).Status);
+        Assert.Equal(ScanBatchStatus.Matching, Batch(b).Status);
+        Assert.Equal(ScanBatchStatus.Ready, Batch(ready).Status);
+
+        Assert.Equal(1, _svc.Run([]));
+        Assert.Equal(ScanBatchStatus.Matching, Batch(a).Status);
+        Assert.Equal(0, _svc.Run([]));
+    }
+
+    [Fact]
+    public void AwaitingRun_OnlyForCollectingBatches_WhenAutoProcessIsOff()
+    {
+        var (collecting, _) = Seed(ScanBatchStatus.Collecting);
+        var (matching, _) = Seed(ScanBatchStatus.Matching);
+        Assert.All(_svc.List(Alice), b => Assert.False(b.AwaitingRun));
+
+        Assert.Empty(_folderSettings.Save(new ScanFolderSettings { AutoProcess = false }));
+
+        var list = _svc.List(Alice).ToDictionary(b => b.Id);
+        Assert.True(list[collecting].AwaitingRun);
+        Assert.False(list[matching].AwaitingRun);
+        Assert.True(_svc.Get(collecting, Alice).Summary.AwaitingRun);
+    }
+
+    // --- duplicates set aside at pickup ---
+
+    /// <summary>Add set-aside duplicates of <paramref name="originals"/> (in order) to a batch.</summary>
+    private void AddDuplicates(int batchId, IEnumerable<int> originals)
+    {
+        using var db = _f.Db();
+        var seq = db.ScanBatchItems.Where(i => i.ScanBatchId == batchId).Max(i => (int?)i.Sequence) ?? 0;
+        foreach (var originalId in originals)
+        {
+            var original = db.ScanBatchItems.Single(i => i.Id == originalId);
+            db.ScanBatchItems.Add(new ScanBatchItem
+            {
+                ScanBatchId = batchId, Sequence = ++seq, OriginalFileName = original.OriginalFileName, StoredFileName = "",
+                Status = ScanBatchItemStatus.Pending, State = ScanBatchItemState.Duplicate, DuplicateOfItemId = originalId,
+            });
+        }
+        db.SaveChanges();
+    }
+
+    [Fact]
+    public void Duplicates_AreCounted_ButNeverListedOrCommitted()
+    {
+        var (id, items) = Seed(ScanBatchStatus.Ready, "c1", "c2", "c3");
+        AddDuplicates(id, items);
+
+        var dto = _svc.Get(id, Alice);
+        Assert.Equal(3, dto.Summary.Total);
+        Assert.Equal(3, dto.Summary.Duplicates);
+        Assert.Equal(items, dto.Items.Select(i => i.Id));
+
+        // Committing every listed card closes the batch; the duplicates don't hold it open.
+        _svc.Claim(id, Alice, "alice", false);
+        Assert.True(_svc.Commit(id, Alice, _location, items).BatchClosed);
+        using var db = _f.Db();
+        Assert.Equal(3, db.Lots.Count(l => l.LocationId == _location));
+    }
+
+    [Fact]
+    public void DuplicateRuns_FoldAResavedRunIntoOneLine()
+    {
+        var (id, items) = Seed(ScanBatchStatus.Ready, "0001", "0002", "0003", "0004");
+        AddDuplicates(id, items);
+
+        var run = Assert.Single(_svc.Get(id, Alice).DuplicateRuns);
+        Assert.Equal(new ScanBatchDuplicateRunDto("0001.jpg", "0004.jpg", 4, "0001.jpg", "0004.jpg", null), run);
+    }
+
+    [Fact]
+    public void DuplicateRuns_NameTheOriginalsBatch_WhenItIsAnotherOne()
+    {
+        var (first, items) = Seed(ScanBatchStatus.Committed, "0001", "0002");
+        var (second, _) = Seed(ScanBatchStatus.Collecting, "x");
+        AddDuplicates(second, items);
+
+        var run = Assert.Single(_svc.Get(second, Alice).DuplicateRuns);
+        Assert.Equal("Box 12", run.OriginalBatchName);
+        Assert.Equal(2, run.Count);
+        Assert.NotEqual(first, second);
+    }
+
+    private static ScanBatchService.DuplicatePair Pair(int seq, int originalSeq, int originalBatch = 1) =>
+        new(seq, $"{seq:0000}.png", originalBatch, originalSeq, $"{originalSeq:0000}.png");
+
+    [Fact]
+    public void FoldRuns_BreaksWhereEitherSideSkips()
+    {
+        var runs = ScanBatchService.FoldRuns(
+        [
+            Pair(11, 1), Pair(12, 2), Pair(13, 3),  // run 1
+            Pair(14, 5),                             // original skips 4
+            Pair(16, 6),                             // copy sequence skips 15
+            Pair(17, 7, originalBatch: 2),           // originals in another batch
+        ], batchId: 1, new Dictionary<int, string> { [2] = "Earlier" });
+
+        Assert.Equal([3, 1, 1, 1], runs.Select(r => r.Count));
+        Assert.Equal(("0011.png", "0013.png", "0001.png", "0003.png"),
+            (runs[0].FirstFile, runs[0].LastFile, runs[0].OriginalFirstFile, runs[0].OriginalLastFile));
+        Assert.Null(runs[0].OriginalBatchName);
+        Assert.Equal("Earlier", runs[3].OriginalBatchName);
+    }
+
+    [Fact]
+    public void FoldRuns_ReorderedCopies_StillAllReported()
+    {
+        // Copies written in reverse: no two are a consecutive pattern, but every one is reported.
+        var runs = ScanBatchService.FoldRuns([Pair(4, 3), Pair(5, 2), Pair(6, 1)], 1, new Dictionary<int, string>());
+        Assert.Equal(3, runs.Sum(r => r.Count));
+        Assert.Equal(3, runs.Count);
+    }
+
+    [Fact]
+    public void FoldRuns_IsCapped()
+    {
+        // Every other copy breaks the pattern → one run each, capped.
+        var pairs = Enumerable.Range(0, ScanBatchService.MaxDuplicateRuns + 50).Select(n => Pair(n * 2, n * 3)).ToList();
+        Assert.Equal(ScanBatchService.MaxDuplicateRuns, ScanBatchService.FoldRuns(pairs, 1, new Dictionary<int, string>()).Count);
     }
 }

@@ -63,7 +63,7 @@ public sealed class ScanBatchHostedService(
 
                 var quiet = TimeSpan.FromSeconds(settings.QuietPeriodSeconds);
                 var burstEnd = clock.GetUtcNow() + MatchBurst;
-                while (await processor.ProcessNextAsync(quiet, stoppingToken))
+                while (await processor.ProcessNextAsync(quiet, settings.AutoProcess, stoppingToken))
                 {
                     if (clock.GetUtcNow() >= burstEnd)
                     {

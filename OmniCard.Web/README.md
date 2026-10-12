@@ -278,6 +278,15 @@ sets, condition, language, foil, default location).
 - **Quiet period:** a batch starts matching once no new file has arrived for the quiet period (default 90 s).
   Files added to a batch's folder later are appended to it, as long as it hasn't been committed or discarded;
   after that, they start a new batch named `Name (2)`.
+- **Automatic processing:** on by default. Turn off **Process batches automatically** (`AutoProcess` in
+  `scan-folder-settings.json`) and files are still picked up, but each batch waits as *Waiting to run* until
+  someone clicks **Run** on the Scan page (`POST /api/scan/batches/run`), so unwanted scans can be deleted
+  before matching.
+- **Duplicates:** every picked-up file is SHA-256 hashed (`ScanBatchItems.ContentHash`). A file byte-for-byte
+  identical to an open or committed item of the same game (scanner software re-saving a run) is recorded as
+  a `Duplicate` row: no stored image, never matched or committed; the original is still moved to
+  `_processed`. The batch page folds them into repeated runs ("0001–1000 repeat 0001–1000"). A batch that
+  receives only duplicates closes itself as Discarded after the quiet period.
 - **Review:** the **Scan** menu item shows how many batches nobody has opened yet, and the Scan page lists
   every batch with its progress. **Open** claims a batch for you; anyone else sees "In review by …" and can
   only look. The owner (or an admin) can **Release** it; an admin can **Take over**. Edits are saved on the
@@ -287,7 +296,7 @@ sets, condition, language, foil, default location).
   14 days).
 - Matching runs one image at a time in the background, so it doesn't slow down interactive scanning much.
   An unfinished batch carries on after a restart.
-- API: `GET /api/scan/batches` (+ `/count`, `/{id}`, `/{id}/items/{itemId}/image`), `POST /{id}/claim`,
+- API: `GET /api/scan/batches` (+ `/count`, `/{id}`, `/{id}/items/{itemId}/image`), `POST /run`, `/{id}/claim`,
   `/release`, `/commit`, `/discard`, `/items/remove`, `/items/rematch`, `PUT /{id}/items`. Settings:
   `GET|PUT /api/settings/scan-folders` (admin).
 - Assumes **one** app instance: a web garden or several servers would each watch the folders.

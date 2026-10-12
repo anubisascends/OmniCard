@@ -4,6 +4,7 @@ using OmniCard.Api.Contracts;
 using OmniCard.Data;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Settings;
 
 namespace OmniCard.Web.Services.ScanBatches;
 
@@ -20,7 +21,8 @@ public sealed class ScanBatchException(ScanBatchErrorKind kind, string message, 
 
 /// <summary>
 /// Review-side rules for watched-folder scan batches: listing, the one-reviewer claim, saving the
-/// reviewer's edits, commit/remove/rematch/discard, and the retention purge. Every change to a batch's
+/// reviewer's edits, commit/remove/rematch/discard, starting waiting batches (Run), reporting the exact
+/// duplicates set aside at pickup, and the retention purge. Every change to a batch's
 /// items requires holding its claim. Batch-level state changes use <c>ExecuteUpdate</c> so they never
 /// trip the row version against the background matcher; item edits load-patch-save and retry on a
 /// concurrency conflict.
@@ -29,11 +31,15 @@ public sealed class ScanBatchService(
     IDbContextFactory<OmniCardDbContext> dbFactory,
     ScanCommitService commits,
     ScanBatchStorage storage,
+    IScanFolderSettingsService folderSettings,
     TimeProvider clock,
     ILogger<ScanBatchService> logger)
 {
     /// <summary>How long a committed/discarded batch stays in the list after it closes.</summary>
     public static readonly TimeSpan ClosedVisibleFor = TimeSpan.FromHours(24);
+
+    /// <summary>Cap on the duplicate runs returned with a batch (each run already covers many files).</summary>
+    internal const int MaxDuplicateRuns = 100;
 
     private DateTime Now => clock.GetUtcNow().UtcDateTime;
 
@@ -47,7 +53,24 @@ public sealed class ScanBatchService(
             .OrderByDescending(b => b.Id)
             .ToList();
         var counts = ItemCounts(ctx, batches.Select(b => b.Id).ToList());
-        return batches.Select(b => ToSummary(b, counts, userId)).ToList();
+        var autoProcess = folderSettings.Get().AutoProcess;
+        return batches.Select(b => ToSummary(b, counts, userId, autoProcess)).ToList();
+    }
+
+    /// <summary>Start matching Collecting batches now — the listed ones, or every one when
+    /// <paramref name="batchIds"/> is empty — without waiting out the quiet period. This is how batches
+    /// move on when auto-processing is off. Returns how many were started.</summary>
+    public int Run(IReadOnlyList<int> batchIds)
+    {
+        using var ctx = dbFactory.CreateDbContext();
+        var ids = batchIds.Distinct().ToList();
+        var query = ctx.ScanBatches.Where(b => b.Status == ScanBatchStatus.Collecting);
+        if (ids.Count > 0)
+            query = query.Where(b => ids.Contains(b.Id));
+        var started = query.ExecuteUpdate(u => u.SetProperty(b => b.Status, ScanBatchStatus.Matching));
+        if (started > 0)
+            logger.LogInformation("Started matching {Count} scan batch(es) on request", started);
+        return started;
     }
 
     /// <summary>Open batches nobody has claimed — the Scan nav badge.</summary>
@@ -70,13 +93,76 @@ public sealed class ScanBatchService(
         var counts = ItemCounts(ctx, [id]);
         return new ScanBatchDto
         {
-            Summary = ToSummary(batch, counts, userId),
+            Summary = ToSummary(batch, counts, userId, folderSettings.Get().AutoProcess),
             IsFoil = batch.IsFoil,
             Condition = batch.Condition,
             Language = batch.Language,
             SetCodes = batch.SetCodeList,
             Items = items.Select(ToItemDto).ToList(),
+            DuplicateRuns = DuplicateRuns(ctx, id),
         };
+    }
+
+    /// <summary>One duplicate set aside at pickup and the earlier image it copies.</summary>
+    internal sealed record DuplicatePair(
+        int Sequence, string FileName, int OriginalBatchId, int OriginalSequence, string OriginalFileName);
+
+    /// <summary>The batch's set-aside duplicates folded into runs, so a whole re-saved scan run reads
+    /// as one line ("0001.png–1000.png repeat 0001.png–1000.png").</summary>
+    private static IReadOnlyList<ScanBatchDuplicateRunDto> DuplicateRuns(OmniCardDbContext ctx, int batchId)
+    {
+        var dups = ctx.ScanBatchItems.AsNoTracking()
+            .Where(i => i.ScanBatchId == batchId && i.State == ScanBatchItemState.Duplicate)
+            .OrderBy(i => i.Sequence)
+            .Select(i => new { i.Sequence, i.OriginalFileName, i.DuplicateOfItemId })
+            .ToList();
+        if (dups.Count == 0)
+            return [];
+
+        var originalIds = dups.Where(d => d.DuplicateOfItemId != null).Select(d => d.DuplicateOfItemId!.Value).Distinct().ToList();
+        var originals = ctx.ScanBatchItems.AsNoTracking()
+            .Where(i => originalIds.Contains(i.Id))
+            .Select(i => new { i.Id, i.ScanBatchId, i.Sequence, i.OriginalFileName })
+            .ToDictionary(i => i.Id);
+        var pairs = dups
+            .Where(d => d.DuplicateOfItemId is { } o && originals.ContainsKey(o))
+            .Select(d =>
+            {
+                var o = originals[d.DuplicateOfItemId!.Value];
+                return new DuplicatePair(d.Sequence, d.OriginalFileName, o.ScanBatchId, o.Sequence, o.OriginalFileName);
+            })
+            .ToList();
+
+        var otherBatchIds = pairs.Select(p => p.OriginalBatchId).Where(b => b != batchId).Distinct().ToList();
+        var names = ctx.ScanBatches.AsNoTracking()
+            .Where(b => otherBatchIds.Contains(b.Id))
+            .ToDictionary(b => b.Id, b => b.Name);
+        return FoldRuns(pairs, batchId, names);
+    }
+
+    /// <summary>Group duplicates into runs: consecutive duplicates (by ingest order) whose originals are
+    /// also consecutive in one batch. Pure, so the pattern rules are tested directly.</summary>
+    internal static IReadOnlyList<ScanBatchDuplicateRunDto> FoldRuns(
+        IReadOnlyList<DuplicatePair> pairs, int batchId, IReadOnlyDictionary<int, string> batchNames)
+    {
+        var runs = new List<ScanBatchDuplicateRunDto>();
+        var i = 0;
+        while (i < pairs.Count && runs.Count < MaxDuplicateRuns)
+        {
+            var start = pairs[i];
+            var end = i;
+            while (end + 1 < pairs.Count
+                   && pairs[end + 1].Sequence == pairs[end].Sequence + 1
+                   && pairs[end + 1].OriginalBatchId == pairs[end].OriginalBatchId
+                   && pairs[end + 1].OriginalSequence == pairs[end].OriginalSequence + 1)
+                end++;
+            var last = pairs[end];
+            runs.Add(new ScanBatchDuplicateRunDto(
+                start.FileName, last.FileName, end - i + 1, start.OriginalFileName, last.OriginalFileName,
+                start.OriginalBatchId == batchId ? null : batchNames.GetValueOrDefault(start.OriginalBatchId)));
+            i = end + 1;
+        }
+        return runs;
     }
 
     /// <summary>Take the batch for review. Succeeds when it's unclaimed or already yours; an admin may
@@ -104,7 +190,7 @@ public sealed class ScanBatchService(
         if (force)
             logger.LogInformation("Scan batch {Id} taken over by {User}", id, userName);
         var claimed = ctx.ScanBatches.AsNoTracking().First(b => b.Id == id);
-        return ToSummary(claimed, ItemCounts(ctx, [id]), userId);
+        return ToSummary(claimed, ItemCounts(ctx, [id]), userId, folderSettings.Get().AutoProcess);
     }
 
     /// <summary>Give up the claim. The reviewer or an admin may release.</summary>
@@ -359,7 +445,7 @@ public sealed class ScanBatchService(
             .SetProperty(b => b.ClaimedUtc, (DateTime?)null));
     }
 
-    private sealed record Counts(int Total, int Pending, int Matched, int Errors, int Committed);
+    private sealed record Counts(int Total, int Pending, int Matched, int Errors, int Committed, int Duplicates);
 
     private static Dictionary<int, Counts> ItemCounts(OmniCardDbContext ctx, List<int> batchIds)
     {
@@ -376,13 +462,14 @@ public sealed class ScanBatchService(
                 open.Where(r => r.Status == ScanBatchItemStatus.Pending).Sum(r => r.Count),
                 open.Where(r => r.Status == ScanBatchItemStatus.Matched).Sum(r => r.Count),
                 open.Where(r => r.Status == ScanBatchItemStatus.Error).Sum(r => r.Count),
-                g.Where(r => r.State == ScanBatchItemState.Committed).Sum(r => r.Count));
+                g.Where(r => r.State == ScanBatchItemState.Committed).Sum(r => r.Count),
+                g.Where(r => r.State == ScanBatchItemState.Duplicate).Sum(r => r.Count));
         });
     }
 
-    private static ScanBatchSummaryDto ToSummary(ScanBatch b, Dictionary<int, Counts> counts, int? userId)
+    private static ScanBatchSummaryDto ToSummary(ScanBatch b, Dictionary<int, Counts> counts, int? userId, bool autoProcess)
     {
-        var c = counts.GetValueOrDefault(b.Id) ?? new Counts(0, 0, 0, 0, 0);
+        var c = counts.GetValueOrDefault(b.Id) ?? new Counts(0, 0, 0, 0, 0, 0);
         return new ScanBatchSummaryDto
         {
             Id = b.Id,
@@ -394,6 +481,8 @@ public sealed class ScanBatchService(
             Matched = c.Matched,
             Errors = c.Errors,
             Committed = c.Committed,
+            Duplicates = c.Duplicates,
+            AwaitingRun = !autoProcess && b.Status == ScanBatchStatus.Collecting,
             ClaimedBy = b.ClaimedByName,
             ClaimedByMe = userId is not null && b.ClaimedByUserId == userId,
             CreatedUtc = DateTime.SpecifyKind(b.CreatedUtc, DateTimeKind.Utc),

@@ -845,6 +845,13 @@ namespace OmniCard.Web.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("nvarchar(16)");
 
+                    b.Property<string>("ContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int?>("DuplicateOfItemId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Error")
                         .HasColumnType("nvarchar(max)");
 
@@ -920,6 +927,8 @@ namespace OmniCard.Web.Migrations
                         .HasColumnType("bit");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ContentHash");
 
                     b.HasIndex("ScanBatchId", "State", "Status");
 

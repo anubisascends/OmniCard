@@ -102,10 +102,11 @@ Click a row to see it in the detail panel:
 
 ### Checking cards
 
-The checkbox on each row decides whether the card is included when you add or export. Only cards with a match (or a correction) can be checked.
+The checkbox on each row decides whether the card is included when you add or export. Any scan can be checked, but only checked cards with a match (or a correction) are added or exported.
 
 - **Shift**-click a second checkbox to check or uncheck every row between it and the last one you clicked.
 - The header above the list has a check-all box plus **All**, **None** and **Invert**, and shows how many are checked.
+- **Delete** in the list header removes every checked scan from the list, including scans that didn't match or are still matching. OmniCard asks you to confirm first, because this can't be undone.
 - **Confirm N checked** in the action bar confirms every checked, matched card at once. Use it after you have eyeballed a batch of strong matches.
 
 ## Correct a wrong match
@@ -157,7 +158,7 @@ When the list is long, use the filter bar above it:
 While a filter or sort is on, you'll see *Showing X of Y* and a **Clear** button.
 
 > [!NOTE]
-> Everything in the action bar works only on the cards you can currently see. **Confirm**, **Add**, **Export**, check-all and bulk **Edit** all ignore rows hidden by a filter.
+> Everything in the action bar works only on the cards you can currently see. **Confirm**, **Add**, **Export**, check-all, bulk **Edit** and **Delete** all ignore rows hidden by a filter.
 
 ## Value badges
 

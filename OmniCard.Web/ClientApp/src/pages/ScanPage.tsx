@@ -13,6 +13,7 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
+  DialogContentText,
   DialogTitle,
   Divider,
   FormControlLabel,
@@ -35,6 +36,7 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
+import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import FolderZipIcon from '@mui/icons-material/FolderZip';
@@ -343,7 +345,8 @@ function mergeBatchItems(
         status: matched.status,
         match: matched.match,
         error: matched.error,
-        include: matched.include,
+        // A scan the reviewer already checked (e.g. to delete it) stays checked once its match lands.
+        include: mine.include || matched.include,
         language: matched.language,
       };
     }
@@ -702,7 +705,7 @@ function MasterRow({
     >
       <Checkbox
         checked={item.include}
-        disabled={!id || readOnly}
+        disabled={readOnly}
         // Suppress the browser's shift-click text selection across rows without blocking the toggle.
         onMouseDown={(e) => {
           if (e.shiftKey) e.preventDefault();
@@ -1472,12 +1475,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     if (shiftKey && anchorIdx !== -1 && idx !== -1) {
       const [lo, hi] = anchorIdx <= idx ? [anchorIdx, idx] : [idx, anchorIdx];
       const rangeKeys = new Set(visibleItems.slice(lo, hi + 1).map((it) => it.key));
-      // Only rows with a resolved identity are checkable, mirroring the single-toggle guard.
-      setItems((prev) =>
-        prev.map((it) =>
-          rangeKeys.has(it.key) && identityOf(it) ? { ...it, include: checked } : it,
-        ),
-      );
+      setItems((prev) => prev.map((it) => (rangeKeys.has(it.key) ? { ...it, include: checked } : it)));
       return; // Keep the anchor where it is so the range can be adjusted with another Shift-click.
     }
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, include: checked } : it)));
@@ -1584,20 +1582,15 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
       ),
     );
 
-  // --- Master-list selection helpers (visible cards only; only those with a resolved identity are
-  // checkable). ---
+  // --- Master-list selection helpers (visible cards only). Any scan can be checked — unmatched or
+  // still-matching ones too, so they can be deleted — but only checked + confirmed scans with a
+  // resolved identity are ever added (isCommittable). ---
   const selectAll = () =>
-    setItems((prev) =>
-      prev.map((it) => (visibleKeys.has(it.key) && identityOf(it) ? { ...it, include: true } : it)),
-    );
+    setItems((prev) => prev.map((it) => (visibleKeys.has(it.key) ? { ...it, include: true } : it)));
   const selectNone = () =>
     setItems((prev) => prev.map((it) => (visibleKeys.has(it.key) ? { ...it, include: false } : it)));
   const invertSelection = () =>
-    setItems((prev) =>
-      prev.map((it) =>
-        visibleKeys.has(it.key) && identityOf(it) ? { ...it, include: !it.include } : it,
-      ),
-    );
+    setItems((prev) => prev.map((it) => (visibleKeys.has(it.key) ? { ...it, include: !it.include } : it)));
 
   const applyBulkEdit = (state: BulkEditState) => {
     setItems((prev) =>
@@ -1689,10 +1682,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     [visibleItems],
   );
   const checkedCount = useMemo(() => visibleItems.filter((it) => it.include).length, [visibleItems]);
-  const selectableCount = useMemo(
-    () => visibleItems.filter((it) => identityOf(it)).length,
-    [visibleItems],
-  );
+  const selectableCount = visibleItems.length;
   // Local uploads wait for every match before committing; a background batch can commit whatever is
   // confirmed while the rest is still matching on the server.
   const stillMatching = !batch && items.some((it) => it.status === 'matching');
@@ -1877,6 +1867,14 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
           });
     }
     dropItems(shouldRemove);
+  };
+
+  // Delete every visible checked scan (after the confirm dialog). For a batch this also deletes the
+  // server's stored images; the originals stay in the watched folder's _processed subfolder.
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const deleteChecked = () => {
+    removeItems((it) => visibleKeys.has(it.key) && it.include);
+    setConfirmDelete(false);
   };
 
   const errorItemIds = useMemo(
@@ -2421,6 +2419,16 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
               >
                 {t('common.actions.edit')}
               </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteIcon />}
+                disabled={checkedCount === 0 || readOnly}
+                onClick={() => setConfirmDelete(true)}
+              >
+                {t('scan.master.delete')}
+              </Button>
             </Box>
             <Stack divider={<Divider />}>
               {visibleItems.map((item) => (
@@ -2481,6 +2489,21 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
           )}
         </Box>
       )}
+
+      <Dialog open={confirmDelete} onClose={() => setConfirmDelete(false)}>
+        <DialogTitle>{t('scan.master.deleteTitle', { count: checkedCount })}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {t(batch ? 'scan.master.deleteBatchBody' : 'scan.master.deleteBody', { count: checkedCount })}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDelete(false)}>{t('common.actions.cancel')}</Button>
+          <Button color="error" variant="contained" autoFocus onClick={deleteChecked}>
+            {t('scan.master.delete')}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <BulkEditDialog
         open={bulkOpen}

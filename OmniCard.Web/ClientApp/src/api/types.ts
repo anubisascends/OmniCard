@@ -776,6 +776,10 @@ export interface ScanBatchSummaryDto {
   matched: number;
   errors: number;
   committed: number;
+  /** Images set aside at pickup as exact copies of ones already scanned (not in `total`). */
+  duplicates: number;
+  /** Collecting with auto-processing off: matching waits for Run. */
+  awaitingRun: boolean;
   claimedBy?: string | null;
   claimedByMe: boolean;
   createdUtc: string;
@@ -813,6 +817,19 @@ export interface ScanBatchDto {
   language?: string | null;
   setCodes: string[];
   items: ScanBatchItemDto[];
+  /** Exact duplicates set aside at pickup, folded into repeated runs. */
+  duplicateRuns: ScanBatchDuplicateRunDto[];
+}
+
+/** Consecutive images that byte-for-byte repeat consecutive earlier ones (a re-saved scan run).
+ * `originalBatchName` is null when the originals are in the same batch. */
+export interface ScanBatchDuplicateRunDto {
+  firstFile: string;
+  lastFile: string;
+  count: number;
+  originalFirstFile: string;
+  originalLastFile: string;
+  originalBatchName?: string | null;
 }
 
 export interface ScanBatchItemEdit {
@@ -849,6 +866,8 @@ export interface ScanFolderConfigDto {
 
 export interface ScanFolderSettingsDto {
   enabled: boolean;
+  /** Match batches on their own after the quiet period; false = wait for Run on the Scan page. */
+  autoProcess: boolean;
   quietPeriodSeconds: number;
   retentionDays: number;
   folders: ScanFolderConfigDto[];

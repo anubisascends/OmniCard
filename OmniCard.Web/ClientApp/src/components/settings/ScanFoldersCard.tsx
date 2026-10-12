@@ -131,6 +131,20 @@ export function ScanFoldersCard() {
               sx={{ width: 240 }}
             />
           </Stack>
+          <Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={form.autoProcess}
+                  onChange={(e) => setForm({ ...form, autoProcess: e.target.checked })}
+                />
+              }
+              label={t('settings.scanFolders.autoProcess')}
+            />
+            <Typography variant="caption" color="text.secondary" display="block">
+              {t('settings.scanFolders.autoProcessHelp')}
+            </Typography>
+          </Box>
 
           {games.map((g) => (
             <Box key={g.id}>
