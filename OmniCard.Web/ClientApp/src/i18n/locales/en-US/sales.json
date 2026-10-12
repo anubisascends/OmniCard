@@ -108,7 +108,9 @@
     "orderDetail": {
       "printReceipt": "Print receipt",
       "receiptPdf": "PDF",
-      "addCard": "Add a card (search your collection)",
+      "addCard": "Add a card (search cards listed for sale)",
+      "noListedMatches": "No cards listed for sale match \"{{q}}\".",
+      "availableCopies": "{{n}} available",
       "orderTitle": "Order #{{id}}",
       "locked": "This order is {{status}} — header and line edits are locked (change the lane back to Created/Packed to edit).",
       "orderNumberShort": "Order #",
@@ -198,7 +200,8 @@
         "insecure": "The camera needs a secure (https) connection. Type tracking numbers or use a handheld scanner instead.",
         "device": "Camera",
         "unnamed": "Camera {{n}}",
-        "torch": "Flashlight"
+        "torch": "Flashlight",
+        "hint": "Hold the barcode flat inside the box. Code 39 (\"3 of 9\" font) barcodes must start and end with an asterisk (*1Z999...*), or no scanner can read them."
       }
     }
   }

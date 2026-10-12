@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using OmniCard.Api.Contracts;
 using OmniCard.Data;
 using OmniCard.Shared.Audit;
+using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Sales;
 using OmniCard.Shared.Security;
 using OmniCard.Web.Api.Infrastructure;
@@ -228,9 +229,84 @@ public sealed class OrdersController(
         if (req.LotId <= 0)
             return BadRequest(new { error = "A card (lot) is required" });
 
+        // Orders sell listed cards only — and never more copies than the listing has free.
+        using (var ctx = dbFactory.CreateDbContext())
+        {
+            var listed = ActiveListings(ctx)
+                .Where(x => x.Lot.Id == req.LotId)
+                .Select(x => new { x.Lot.Quantity, ListedQuantity = x.Listing.Quantity })
+                .FirstOrDefault();
+            if (listed is null)
+                return BadRequest(new { error = "Only cards listed for sale can be added to an order." });
+            var committed = CommittedCopies(ctx).GetValueOrDefault(req.LotId);
+            if (Math.Min(listed.Quantity, listed.ListedQuantity) - committed <= 0)
+                return Conflict(new { error = "Every listed copy of this card is already on an open order." });
+        }
+
         var line = orders.AddLine(id, req.LotId, req.UnitSalePrice);
         return ToLineDto(line);
     }
+
+    /// <summary>The order editor's add-card search: listed-for-sale cards whose name, set code or set
+    /// name contains every word of <paramref name="q"/> (or whose collector number is one of them),
+    /// with copies not already on an open order. The rest of the collection never shows up here.</summary>
+    [HttpGet("sellable")]
+    [RequirePermission(Permissions.SalesOrdersEdit)]
+    public ActionResult<IReadOnlyList<SellableListingDto>> Sellable(
+        [FromQuery] string? q, [FromQuery] string? game, [FromQuery] int take = 20)
+    {
+        var gameFilter = LocationsController.ParseGame(game);
+        using var ctx = dbFactory.CreateDbContext();
+        var query = ActiveListings(ctx).Where(x => gameFilter == null || x.Product.Game == gameFilter);
+        foreach (var term in (q ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var pattern = $"%{EscapeLike(term)}%";
+            query = query.Where(x => EF.Functions.Like(x.Product.Name, pattern, "\\")
+                || EF.Functions.Like(x.Product.SetCode ?? "", pattern, "\\")
+                || EF.Functions.Like(x.Product.SetName ?? "", pattern, "\\")
+                || x.Product.CollectorNumber == term);
+        }
+
+        var committed = CommittedCopies(ctx);
+        return query
+            .OrderBy(x => x.Product.Name).ThenBy(x => x.Product.SetCode)
+            .ToList()
+            .Select(x => new SellableListingDto(
+                x.Lot.Id, x.Product.Name, x.Product.SetName ?? "", x.Product.SetCode ?? "", x.Product.CollectorNumber,
+                x.Lot.Condition, x.Product.Foil, x.Listing.ListedPrice, x.Listing.Status.ToString(),
+                Math.Min(x.Lot.Quantity, x.Listing.Quantity) - committed.GetValueOrDefault(x.Lot.Id)))
+            .Where(s => s.Available > 0)
+            .Take(Math.Clamp(take, 1, 100))
+            .ToList();
+    }
+
+    private sealed class ListedLot
+    {
+        public required Listing Listing { get; init; }
+        public required InventoryLot Lot { get; init; }
+        public required Product Product { get; init; }
+    }
+
+    /// <summary>Listed/Picked listings joined to their lot and product.</summary>
+    private static IQueryable<ListedLot> ActiveListings(OmniCardDbContext ctx) =>
+        from listing in ctx.Listings.AsNoTracking()
+        where listing.Status == ListingStatus.Listed || listing.Status == ListingStatus.Picked
+        join lot in ctx.Lots.AsNoTracking() on listing.LotId equals lot.Id
+        join product in ctx.Products.AsNoTracking() on lot.ProductId equals product.Id
+        select new ListedLot { Listing = listing, Lot = lot, Product = product };
+
+    /// <summary>Copies per lot already on an open (Created/Packed) order — they leave inventory when that
+    /// order ships, so they can't be sold again.</summary>
+    private static Dictionary<int, int> CommittedCopies(OmniCardDbContext ctx) =>
+        (from line in ctx.OrderLines.AsNoTracking()
+         join order in ctx.Orders.AsNoTracking() on line.OrderId equals order.Id
+         where line.LotId != null && (order.Status == OrderStatus.Created || order.Status == OrderStatus.Packed)
+         group line by line.LotId!.Value into g
+         select new { LotId = g.Key, Quantity = g.Sum(l => l.Quantity) })
+        .ToDictionary(x => x.LotId, x => x.Quantity);
+
+    private static string EscapeLike(string term) =>
+        term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_").Replace("[", "\\[");
 
     [HttpDelete("lines/{lineId:int}")]
     [RequirePermission(Permissions.SalesOrdersEdit)]

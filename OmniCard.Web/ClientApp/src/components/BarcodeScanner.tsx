@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Box, IconButton, MenuItem, Stack, TextField, Tooltip } from '@mui/material';
+import { Alert, Box, IconButton, MenuItem, Stack, TextField, Tooltip, Typography } from '@mui/material';
 import FlashlightOnIcon from '@mui/icons-material/FlashlightOn';
 import FlashlightOffIcon from '@mui/icons-material/FlashlightOff';
 import { BrowserMultiFormatReader, type IScannerControls } from '@zxing/browser';
 import { BarcodeFormat, DecodeHintType } from '@zxing/library';
+import { EnhancedBarcodeDecoder, GUIDE } from './barcodeEnhance';
 
 const CAMERA_KEY = 'omnicard.barcode.camera';
+/** How often the sharpened 1D pass runs alongside zxing's own (raw-frame) decode loop. */
+const ENHANCED_INTERVAL_MS = 250;
 
 // Shipping labels use 1D Code 128 (USPS/UPS/FedEx), plus PDF417 / Data Matrix / QR 2D blocks on some
 // carriers; the rest cover packing slips and the odd product label.
@@ -41,7 +44,8 @@ function saveCamera(id: string) {
  * Live camera barcode reader (phone rear camera or a desk webcam). Calls `onCode` once per distinct
  * barcode — the same code is ignored for `repeatMs` so a label held in view doesn't fire repeatedly.
  * While `paused`, decoded codes are dropped but the camera keeps running (no re-permission prompt).
- * The chosen camera is remembered per browser.
+ * The chosen camera is remembered per browser. Besides zxing's raw-frame loop, a sharpened pass over the
+ * aiming band (see `EnhancedBarcodeDecoder`) reads the 1D barcodes a soft webcam image would miss.
  */
 export function BarcodeScanner({
   onCode,
@@ -90,6 +94,7 @@ export function BarcodeScanner({
       return;
     }
     let cancelled = false;
+    let enhancedTimer: number | undefined;
     const hints = new Map<DecodeHintType, unknown>([
       [DecodeHintType.POSSIBLE_FORMATS, FORMATS],
       [DecodeHintType.TRY_HARDER, true],
@@ -114,7 +119,19 @@ export function BarcodeScanner({
         controlsRef.current = controls;
         if (controls.switchTorch) setTorch(false);
         const stream = videoRef.current?.srcObject as MediaStream | null;
-        setActiveId(stream?.getVideoTracks()[0]?.getSettings().deviceId);
+        const track = stream?.getVideoTracks()[0];
+        setActiveId(track?.getSettings().deviceId);
+        // Webcams that can refocus often start fixed — a close-up label then never gets sharp.
+        const focusModes = (track?.getCapabilities?.() as { focusMode?: string[] } | undefined)?.focusMode;
+        if (track && focusModes?.includes('continuous')) {
+          track.applyConstraints({ advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] }).catch(() => {});
+        }
+        const enhanced = new EnhancedBarcodeDecoder();
+        enhancedTimer = window.setInterval(() => {
+          if (pausedRef.current || !videoRef.current) return;
+          const text = enhanced.decode(videoRef.current);
+          if (text) handleResult(text);
+        }, ENHANCED_INTERVAL_MS);
         // Device labels are only available after permission is granted.
         const cams = await BrowserMultiFormatReader.listVideoInputDevices();
         if (!cancelled) setDevices(cams);
@@ -137,6 +154,7 @@ export function BarcodeScanner({
 
     return () => {
       cancelled = true;
+      window.clearInterval(enhancedTimer);
       controlsRef.current?.stop();
       controlsRef.current = null;
     };
@@ -172,10 +190,10 @@ export function BarcodeScanner({
         <Box
           sx={{
             position: 'absolute',
-            left: '8%',
-            right: '8%',
-            top: '30%',
-            bottom: '30%',
+            left: `${GUIDE.left * 100}%`,
+            right: `${GUIDE.right * 100}%`,
+            top: `${GUIDE.top * 100}%`,
+            bottom: `${GUIDE.bottom * 100}%`,
             border: '2px solid rgba(255,255,255,0.8)',
             borderRadius: 1,
             boxShadow: '0 0 0 9999px rgba(0,0,0,0.25)',
@@ -193,6 +211,9 @@ export function BarcodeScanner({
           </Tooltip>
         )}
       </Box>
+      <Typography variant="caption" color="text.secondary">
+        {t('sales.ship.camera.hint')}
+      </Typography>
       {devices.length > 1 && (
         <TextField
           select

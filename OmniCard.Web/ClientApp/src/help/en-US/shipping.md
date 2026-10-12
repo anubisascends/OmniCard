@@ -58,5 +58,6 @@ Your **Auto-ship** and **Camera** choices are remembered on each device.
 ## Troubleshooting
 
 - **The camera doesn't start:** check that your browser is allowed to use the camera. The camera only works when you open OmniCard over a secure address (starting with `https://`). If it can't start, type the tracking number or use a handheld scanner instead.
-- **A label won't scan:** move closer so the barcode fills most of the white box, and avoid glare. Or type the number.
+- **A label won't scan:** move closer so the barcode fills most of the white box, hold it flat and steady, and avoid glare. Or type the number.
+- **A barcode you printed yourself won't scan:** if you used a Code 39 ("3 of 9") barcode font, the text must start and end with an asterisk, like `*1Z999AA10123456784*`. Without them the bars aren't a valid barcode and no scanner can read it.
 - **No open order found:** check the order's **Tracking** box against the label. If the order was moved back to **Created** or **Packed** after shipping, scanning ships it again.

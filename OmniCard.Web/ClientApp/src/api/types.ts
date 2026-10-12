@@ -352,6 +352,20 @@ export interface OrderImportPreviewDto {
   warnings: string[];
 }
 
+/** A listed-for-sale card the order editor can add; `available` = copies not on an open order. */
+export interface SellableListingDto {
+  lotId: number;
+  name: string;
+  setName: string;
+  setCode: string;
+  collectorNumber?: string | null;
+  condition?: string | null;
+  isFoil: boolean;
+  listedPrice: number;
+  status: string;
+  available: number;
+}
+
 export interface ActiveListingDto {
   lotId: number;
   name: string;

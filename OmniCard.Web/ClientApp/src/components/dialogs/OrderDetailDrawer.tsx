@@ -31,6 +31,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import { api } from '../../api/client';
+import type { SellableListingDto } from '../../api/types';
 import { useGame } from '../../context/GameContext';
 import { useFormatters } from '../../i18n/format';
 
@@ -50,19 +51,29 @@ interface HeaderForm {
   notes: string;
 }
 
-/** Add-line search: find an owned single by name, set a sale price, add it to the order. */
+/** Add-line search: find a card that's listed for sale (the rest of the collection isn't offered),
+ *  set a sale price (defaults to the listed price), add it to the order. */
 function AddLineSearch({ orderId, onAdded }: { orderId: number; onAdded: () => void }) {
   const { t } = useTranslation();
   const { game } = useGame();
+  const qc = useQueryClient();
   const [q, setQ] = useState('');
+  const [debounced, setDebounced] = useState('');
+  useEffect(() => {
+    const h = setTimeout(() => setDebounced(q.trim()), 250);
+    return () => clearTimeout(h);
+  }, [q]);
   const search = useQuery({
-    queryKey: ['order-addline-search', game, q],
-    queryFn: () => api.collection({ game, q, take: 8 }),
-    enabled: q.trim().length >= 2,
+    queryKey: ['order-sellable', game, debounced],
+    queryFn: () => api.orderSellable({ game, q: debounced, take: 20 }),
+    enabled: debounced.length >= 2,
   });
   const add = useMutation({
     mutationFn: ({ lotId, price }: { lotId: number; price: number }) => api.orderAddLine(orderId, lotId, price),
-    onSuccess: onAdded,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['order-sellable'] });
+      onAdded();
+    },
   });
 
   return (
@@ -74,10 +85,20 @@ function AddLineSearch({ orderId, onAdded }: { orderId: number; onAdded: () => v
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
-      {search.data && search.data.items.length > 0 && (
+      {add.error && (
+        <Alert severity="error" sx={{ mt: 1 }}>
+          {(add.error as Error).message}
+        </Alert>
+      )}
+      {search.data && search.data.length === 0 && (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          {t('sales.orderDetail.noListedMatches', { q: debounced })}
+        </Typography>
+      )}
+      {search.data && search.data.length > 0 && (
         <Stack spacing={0.5} sx={{ mt: 1, maxHeight: 220, overflowY: 'auto' }}>
-          {search.data.items.map((c) => (
-            <AddLineRow key={c.id} card={c} onAdd={(price) => add.mutate({ lotId: c.id, price })} />
+          {search.data.map((c) => (
+            <AddLineRow key={c.lotId} card={c} onAdd={(price) => add.mutate({ lotId: c.lotId, price })} />
           ))}
         </Stack>
       )}
@@ -85,18 +106,20 @@ function AddLineSearch({ orderId, onAdded }: { orderId: number; onAdded: () => v
   );
 }
 
-function AddLineRow({
-  card,
-  onAdd,
-}: {
-  card: { id: number; name: string; setCode: string; condition: string; marketPrice: number };
-  onAdd: (price: number) => void;
-}) {
-  const [price, setPrice] = useState(card.marketPrice || 0);
+function AddLineRow({ card, onAdd }: { card: SellableListingDto; onAdd: (price: number) => void }) {
+  const { t } = useTranslation();
+  const [price, setPrice] = useState(card.listedPrice || 0);
+  const details = [
+    card.setCode?.toUpperCase(),
+    card.collectorNumber && `#${card.collectorNumber}`,
+    card.condition,
+    card.isFoil && t('common.labels.foil'),
+    card.available > 1 && t('sales.orderDetail.availableCopies', { n: card.available }),
+  ].filter(Boolean);
   return (
     <Stack direction="row" spacing={1} alignItems="center">
       <Typography variant="body2" sx={{ flexGrow: 1 }} noWrap>
-        {card.name} · {card.setCode?.toUpperCase()} · {card.condition}
+        {[card.name, ...details].join(' · ')}
       </Typography>
       <TextField
         size="small"
