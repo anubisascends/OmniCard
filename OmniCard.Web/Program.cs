@@ -223,6 +223,7 @@ builder.Services.AddSingleton(sp => new OmniCard.Web.Services.ScanBatches.ScanBa
     writableFactory,
     sp.GetRequiredService<ScanCommitService>(),
     sp.GetRequiredService<OmniCard.Web.Services.ScanBatches.ScanBatchStorage>(),
+    sp.GetRequiredService<IScanFolderSettingsService>(),
     sp.GetRequiredService<TimeProvider>(),
     sp.GetRequiredService<ILogger<OmniCard.Web.Services.ScanBatches.ScanBatchService>>()));
 builder.Services.AddHostedService<OmniCard.Web.Services.ScanBatches.ScanBatchHostedService>();

@@ -1018,6 +1018,9 @@ export const api = {
   scanBatches: () => request<ScanBatchSummaryDto[]>('/api/scan/batches'),
   scanBatchCount: () => request<{ unclaimed: number }>('/api/scan/batches/count'),
   scanBatch: (id: number) => request<ScanBatchDto>(`/api/scan/batches/${id}`),
+  /** Start matching waiting (Collecting) batches now — the listed ones, or all when none are given. */
+  scanBatchRun: (batchIds: number[] = []) =>
+    request<{ started: number }>('/api/scan/batches/run', { method: 'POST', body: JSON.stringify({ batchIds }) }),
   scanBatchClaim: (id: number, force = false) =>
     request<ScanBatchSummaryDto>(`/api/scan/batches/${id}/claim${qs({ force: force || undefined })}`, {
       method: 'POST',

@@ -24,6 +24,7 @@ import {
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { api } from '../api/client';
 import type { ScanBatchSummaryDto } from '../api/types';
 import { useFormatters } from '../i18n/format';
@@ -57,8 +58,9 @@ export function invalidateScanBatches(qc: QueryClient) {
 
 /**
  * The Scan page's list of background batches from the watched scan folders: each batch's progress,
- * who is reviewing it, and Open / Release / Discard. Opening claims the batch and goes to its review
- * page. Hidden when there are no batches.
+ * who is reviewing it, and Open / Release / Discard / Run. Opening claims the batch and goes to its
+ * review page. Run starts matching a batch still collecting files — the only way it starts when
+ * automatic processing is off. Hidden when there are no batches.
  */
 export function ScanBatchesPanel() {
   const { t } = useTranslation();
@@ -100,6 +102,12 @@ export function ScanBatchesPanel() {
     onSuccess: () => invalidateScanBatches(qc),
     onError,
   });
+  const run = useMutation({
+    mutationFn: (ids: number[]) => api.scanBatchRun(ids),
+    onMutate: () => setError(null),
+    onSuccess: () => invalidateScanBatches(qc),
+    onError,
+  });
   const discard = useMutation({
     mutationFn: (id: number) => api.scanBatchDiscard(id),
     onMutate: () => setError(null),
@@ -119,7 +127,10 @@ export function ScanBatchesPanel() {
   const gameName = (id: string) => gamesQuery.data?.find((g) => g.id === id)?.displayName ?? id;
   // Shown in the header so a collapsed panel still says what's waiting.
   const readyCount = batches.filter((b) => b.status === 'Ready').length;
-  const inProgressCount = batches.filter((b) => b.status === 'Collecting' || b.status === 'Matching').length;
+  const inProgressCount = batches.filter(
+    (b) => (b.status === 'Collecting' && !b.awaitingRun) || b.status === 'Matching',
+  ).length;
+  const awaitingRun = batches.filter((b) => b.awaitingRun);
 
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
@@ -144,6 +155,20 @@ export function ScanBatchesPanel() {
           />
         )}
         <Box sx={{ flexGrow: 1 }} />
+        {awaitingRun.length > 0 && (
+          <Button
+            size="small"
+            variant="contained"
+            startIcon={<PlayArrowIcon />}
+            disabled={run.isPending}
+            onClick={(e) => {
+              e.stopPropagation(); // the header row toggles the panel
+              run.mutate(awaitingRun.map((b) => b.id));
+            }}
+          >
+            {t('scan.batches.runAll', { count: awaitingRun.length })}
+          </Button>
+        )}
         <IconButton
           size="small"
           aria-expanded={expanded}
@@ -161,6 +186,11 @@ export function ScanBatchesPanel() {
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1 }}>
           {t('scan.batches.intro')}
         </Typography>
+        {awaitingRun.length > 0 && (
+          <Alert severity="info" sx={{ mb: 1 }}>
+            {t('scan.batches.runHint')}
+          </Alert>
+        )}
         <Stack divider={<Divider />}>
           {batches.map((b) => {
             const open = isOpenStatus(b);
@@ -187,6 +217,7 @@ export function ScanBatchesPanel() {
                       t('scan.batches.counts', { count: b.total }),
                       b.errors > 0 ? t('scan.batches.errors', { count: b.errors }) : null,
                       b.committed > 0 ? t('scan.batches.committedCount', { count: b.committed }) : null,
+                      b.duplicates > 0 ? t('scan.batches.duplicatesCount', { count: b.duplicates }) : null,
                       t('scan.batches.lastFile', { time: fmt.dateTime(b.lastFileUtc) }),
                     ]
                       .filter(Boolean)
@@ -208,6 +239,17 @@ export function ScanBatchesPanel() {
                   )}
                 </Box>
                 <Stack direction="row" spacing={1} flexShrink={0}>
+                  {b.status === 'Collecting' && (
+                    <Button
+                      variant={b.awaitingRun ? 'contained' : 'outlined'}
+                      size="small"
+                      startIcon={<PlayArrowIcon />}
+                      disabled={run.isPending}
+                      onClick={() => run.mutate([b.id])}
+                    >
+                      {b.awaitingRun ? t('scan.batches.run') : t('scan.batches.runNow')}
+                    </Button>
+                  )}
                   {open && !claimedByOther && (
                     <Button
                       variant="contained"
@@ -264,9 +306,12 @@ export function ScanBatchesPanel() {
   );
 }
 
-/** Status chip for a batch: a spinner while collecting/matching, green when ready. */
+/** Status chip for a batch: a spinner while collecting/matching, green when ready, amber while it
+ * waits for Run (automatic processing off). */
 export function BatchStatusChip({ batch }: { batch: ScanBatchSummaryDto }) {
   const { t } = useTranslation();
+  if (batch.awaitingRun)
+    return <Chip size="small" color="warning" variant="outlined" label={t('scan.batches.status.AwaitingRun')} />;
   const label = t(`scan.batches.status.${batch.status}`, {
     done: batch.total - batch.pending,
     total: batch.total,

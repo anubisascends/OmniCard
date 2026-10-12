@@ -174,6 +174,87 @@ public sealed class ScanBatchProcessorTests : IDisposable
         Assert.Equal(ScanBatchItemStatus.Matched, Items(first).Single().Status);
     }
 
+    /// <summary>Add a set-aside duplicate row (as the ingestor records one) to a batch.</summary>
+    private void AddDuplicate(int batchId, string name)
+    {
+        using var db = _f.Db();
+        var seq = (db.ScanBatchItems.Where(i => i.ScanBatchId == batchId).Max(i => (int?)i.Sequence) ?? 0) + 1;
+        db.ScanBatchItems.Add(new ScanBatchItem
+        {
+            ScanBatchId = batchId, Sequence = seq, OriginalFileName = name, StoredFileName = "",
+            Status = ScanBatchItemStatus.Pending, State = ScanBatchItemState.Duplicate,
+        });
+        db.SaveChanges();
+    }
+
+    [Fact]
+    public async Task AutoStartOff_CollectingBatchWaitsForRun()
+    {
+        var id = SeedBatch(ScanBatchStatus.Collecting, "a.jpg");
+        var processor = NewProcessor();
+        _f.Clock.Advance(Quiet + Quiet);
+
+        Assert.False(await processor.ProcessNextAsync(Quiet, autoStart: false));
+        Assert.Equal(ScanBatchStatus.Collecting, Batch(id).Status);
+        Assert.Empty(_matcher.Calls);
+
+        // Run (ScanBatchService.Run) moves it on; from there it's matched even with auto-start off.
+        using (var db = _f.Db())
+        {
+            db.ScanBatches.Single().Status = ScanBatchStatus.Matching;
+            db.SaveChanges();
+        }
+        while (await processor.ProcessNextAsync(Quiet, autoStart: false)) { }
+        Assert.Single(_matcher.Calls);
+        Assert.Equal(ScanBatchStatus.Ready, Batch(id).Status);
+    }
+
+    [Fact]
+    public async Task Duplicates_AreNeverMatched()
+    {
+        var id = SeedBatch(ScanBatchStatus.Matching, "0001.png");
+        AddDuplicate(id, "0001.png");
+
+        while (await NewProcessor().ProcessNextAsync(Quiet)) { }
+
+        Assert.Equal(["0001.png"], _matcher.Calls.Select(c => c.File));
+        Assert.Equal(ScanBatchStatus.Ready, Batch(id).Status);
+        Assert.Equal(ScanBatchItemStatus.Pending, Items(id).Single(i => i.State == ScanBatchItemState.Duplicate).Status);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task OnlyDuplicates_BatchIsDiscardedOnceQuiet(bool autoStart)
+    {
+        var id = SeedBatch(ScanBatchStatus.Collecting);
+        AddDuplicate(id, "0001.png");
+        AddDuplicate(id, "0002.png");
+        var processor = NewProcessor();
+
+        Assert.False(await processor.ProcessNextAsync(Quiet, autoStart));
+        Assert.Equal(ScanBatchStatus.Collecting, Batch(id).Status); // copies may still be arriving
+
+        _f.Clock.Advance(Quiet);
+        Assert.False(await processor.ProcessNextAsync(Quiet, autoStart));
+        var batch = Batch(id);
+        Assert.Equal(ScanBatchStatus.Discarded, batch.Status);
+        Assert.NotNull(batch.ClosedUtc);
+        Assert.Empty(_matcher.Calls);
+    }
+
+    [Fact]
+    public async Task DuplicatesBesideRealScans_KeepTheBatchOpen()
+    {
+        var id = SeedBatch(ScanBatchStatus.Collecting, "0001.png");
+        AddDuplicate(id, "0001.png");
+        _f.Clock.Advance(Quiet);
+
+        Assert.False(await NewProcessor().ProcessNextAsync(Quiet, autoStart: false));
+
+        Assert.Equal(ScanBatchStatus.Collecting, Batch(id).Status);
+    }
+
     private sealed class FakeMatcher : IScanMatcher
     {
         public List<(string File, CardGame Game, IReadOnlyCollection<string>? Sets, string? Language)> Calls { get; } = [];

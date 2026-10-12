@@ -30,6 +30,13 @@ public sealed class ScanBatchesController(ScanBatchService batches) : Controller
     [RequirePermission(Permissions.ScanView)]
     public ActionResult<ScanBatchCountDto> Count() => new ScanBatchCountDto(batches.CountUnclaimed());
 
+    /// <summary>Start matching Collecting batches now (all of them when no ids are given) — the Scan
+    /// page's Run button, needed when auto-processing is off.</summary>
+    [HttpPost("run")]
+    [RequirePermission(Permissions.ScanView)]
+    public ActionResult<ScanBatchRunResultDto> RunBatches([FromBody] ScanBatchRunRequest? request) =>
+        new ScanBatchRunResultDto(batches.Run(request?.BatchIds ?? []));
+
     [HttpGet("{id:int}")]
     [RequirePermission(Permissions.ScanView)]
     public ActionResult<ScanBatchDto> Get(int id) => Run(() => batches.Get(id, UserId));

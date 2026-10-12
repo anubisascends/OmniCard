@@ -265,6 +265,8 @@
       "description": "Point each game at a folder on the server. Save scans into a subfolder named after the batch; when no new file has arrived for the quiet period, the batch is matched in the background and appears on the Scan page. Picked-up files are moved to a _processed subfolder.",
       "adminOnly": "Only an administrator can change watched folders.",
       "enabled": "Watch folders",
+      "autoProcess": "Process batches automatically",
+      "autoProcessHelp": "When off, new scans are still picked up, but each batch waits on the Scan page until someone presses Run. Use this to remove unwanted scans before matching starts.",
       "quietPeriod": "Quiet period (seconds)",
       "quietPeriodHelp": "How long to wait with no new file before matching starts.",
       "retention": "Keep images (days)",

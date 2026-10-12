@@ -8,8 +8,10 @@ namespace OmniCard.Web.Services.ScanBatches;
 
 /// <summary>
 /// Matches batch images in the background, one at a time. A Collecting batch starts once its quiet
-/// period passes with no new file; items are matched oldest batch first, in ingest order; a batch with
-/// nothing left pending becomes Ready. Nothing is held "in flight", so after a restart any Pending item
+/// period passes with no new file (or, with auto-processing off, only when someone presses Run — see
+/// <see cref="ScanBatchService.Run"/>); items are matched oldest batch first, in ingest order; a batch
+/// with nothing left pending becomes Ready. A batch that received nothing but exact duplicates is
+/// closed as Discarded once its quiet period passes — there's nothing in it to review. Nothing is held "in flight", so after a restart any Pending item
 /// is simply matched again.
 /// </summary>
 public sealed class ScanBatchProcessor(
@@ -21,17 +23,33 @@ public sealed class ScanBatchProcessor(
     ILogger<ScanBatchProcessor> logger)
 {
     /// <summary>Advance batch states and match the next pending item. Returns false when there was
-    /// nothing to match.</summary>
-    public async Task<bool> ProcessNextAsync(TimeSpan quietPeriod, CancellationToken ct = default)
+    /// nothing to match. <paramref name="autoStart"/> false leaves Collecting batches waiting for Run.</summary>
+    public async Task<bool> ProcessNextAsync(TimeSpan quietPeriod, bool autoStart = true, CancellationToken ct = default)
     {
         var now = clock.GetUtcNow().UtcDateTime;
         await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+        var cutoff = now - quietPeriod;
+
+        // A batch that only ever got duplicates has nothing to review: close it (it stays listed for a
+        // day, so the skipped copies are still reported).
+        await ctx.ScanBatches
+            .Where(b => (b.Status == ScanBatchStatus.Collecting || b.Status == ScanBatchStatus.Matching)
+                        && b.LastFileUtc <= cutoff
+                        && ctx.ScanBatchItems.Any(i => i.ScanBatchId == b.Id && i.State == ScanBatchItemState.Duplicate)
+                        && !ctx.ScanBatchItems.Any(i => i.ScanBatchId == b.Id
+                                                        && (i.State == ScanBatchItemState.Open || i.State == ScanBatchItemState.Committed)))
+            .ExecuteUpdateAsync(u => u
+                .SetProperty(b => b.Status, ScanBatchStatus.Discarded)
+                .SetProperty(b => b.ClosedUtc, now)
+                .SetProperty(b => b.ClaimedByUserId, (int?)null)
+                .SetProperty(b => b.ClaimedByName, (string?)null)
+                .SetProperty(b => b.ClaimedUtc, (DateTime?)null), ct);
 
         // Collecting → Matching once no file has arrived for the quiet period.
-        var cutoff = now - quietPeriod;
-        await ctx.ScanBatches
-            .Where(b => b.Status == ScanBatchStatus.Collecting && b.LastFileUtc <= cutoff)
-            .ExecuteUpdateAsync(u => u.SetProperty(b => b.Status, ScanBatchStatus.Matching), ct);
+        if (autoStart)
+            await ctx.ScanBatches
+                .Where(b => b.Status == ScanBatchStatus.Collecting && b.LastFileUtc <= cutoff)
+                .ExecuteUpdateAsync(u => u.SetProperty(b => b.Status, ScanBatchStatus.Matching), ct);
 
         // Matching → Ready once nothing open is still pending.
         await ctx.ScanBatches

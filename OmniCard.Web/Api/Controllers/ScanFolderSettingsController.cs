@@ -55,6 +55,7 @@ public sealed class ScanFolderSettingsController(
             errors.AddRange(settings.Save(new ScanFolderSettings
             {
                 Enabled = request.Enabled,
+                AutoProcess = request.AutoProcess,
                 QuietPeriodSeconds = request.QuietPeriodSeconds,
                 RetentionDays = request.RetentionDays,
                 Folders = folders,
@@ -66,6 +67,7 @@ public sealed class ScanFolderSettingsController(
     private static ScanFolderSettingsDto ToDto(ScanFolderSettings s) => new()
     {
         Enabled = s.Enabled,
+        AutoProcess = s.AutoProcess,
         QuietPeriodSeconds = s.QuietPeriodSeconds,
         RetentionDays = s.RetentionDays,
         Folders = s.Folders.Select(f => new ScanFolderConfigDto

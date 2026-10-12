@@ -4,6 +4,7 @@ import { useNavigate, useParams, Link as RouterLink } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
+  AlertTitle,
   Breadcrumbs,
   Button,
   CircularProgress,
@@ -16,7 +17,9 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { api } from '../api/client';
+import type { ScanBatchDuplicateRunDto } from '../api/types';
 import { usePermissions } from '../context/usePermissions';
 import { BatchStatusChip, invalidateScanBatches } from '../components/ScanBatchesPanel';
 import { ScanPage } from './ScanPage';
@@ -61,6 +64,12 @@ export function ScanBatchPage() {
       invalidateScanBatches(qc);
       navigate('/scan');
     },
+    onError: (e) => setNotice({ severity: 'error', text: (e as Error).message }),
+  });
+  const run = useMutation({
+    mutationFn: () => api.scanBatchRun([id]),
+    onMutate: () => setNotice(null),
+    onSuccess: () => invalidateScanBatches(qc),
     onError: (e) => setNotice({ severity: 'error', text: (e as Error).message }),
   });
   const discard = useMutation({
@@ -151,6 +160,29 @@ export function ScanBatchPage() {
         )
       )}
 
+      {!closed && summary.awaitingRun && (
+        <Alert
+          severity="warning"
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              startIcon={<PlayArrowIcon />}
+              disabled={run.isPending}
+              onClick={() => run.mutate()}
+            >
+              {t('scan.batches.runBatch')}
+            </Button>
+          }
+        >
+          {t('scan.batches.awaitingRunNotice')}
+        </Alert>
+      )}
+
+      {summary.duplicates > 0 && (
+        <DuplicatesNotice count={summary.duplicates} runs={batchQuery.data.duplicateRuns} />
+      )}
+
       <ScanPage
         key={id}
         batch={{
@@ -183,5 +215,37 @@ export function ScanBatchPage() {
         </DialogActions>
       </Dialog>
     </Stack>
+  );
+}
+
+/** The exact duplicates set aside at pickup, one line per repeated run (e.g. "0001.png – 1000.png
+ * repeat 0001.png – 1000.png"), so a re-saved scan run is recognizable at a glance. */
+function DuplicatesNotice({ count, runs }: { count: number; runs: ScanBatchDuplicateRunDto[] }) {
+  const { t } = useTranslation();
+  const shown = runs.reduce((n, r) => n + r.count, 0);
+  return (
+    <Alert severity="info">
+      <AlertTitle>{t('scan.batches.duplicatesTitle', { count })}</AlertTitle>
+      {t('scan.batches.duplicatesBody')}
+      <Stack component="ul" spacing={0.25} sx={{ m: 0, mt: 0.5, pl: 2.5 }}>
+        {runs.map((r) => (
+          <Typography component="li" variant="body2" key={`${r.firstFile}-${r.originalFirstFile}`}>
+            {t(r.originalBatchName ? 'scan.batches.duplicateRunOtherBatch' : 'scan.batches.duplicateRun', {
+              count: r.count,
+              first: r.firstFile,
+              last: r.lastFile,
+              originalFirst: r.originalFirstFile,
+              originalLast: r.originalLastFile,
+              batch: r.originalBatchName,
+            })}
+          </Typography>
+        ))}
+        {shown < count && (
+          <Typography component="li" variant="body2">
+            {t('scan.batches.duplicateRunsMore')}
+          </Typography>
+        )}
+      </Stack>
+    </Alert>
   );
 }

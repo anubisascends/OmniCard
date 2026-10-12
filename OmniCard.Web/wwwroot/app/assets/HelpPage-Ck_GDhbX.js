@@ -1,4 +1,4 @@
-import{g as J,a as K,r as f,u as X,b as Y,c as D,j as n,d as Z,s as W,B as ce,m as ee,e as L,F as de,f as p,D as le,P as G,T as he,h as pe,i as H,k as V,l as ue,n as y,o as x,p as ge,I as me,C as ye,q as we,A as B,t as fe,L as T,v as b,w as be,x as _,S as I,y as ke,z as ve,E as Ce,G as z,H as q,J as xe,K as Te,M as Se,N as Ae,O as Ie,Q as _e}from"./index-BXx1lsQP.js";function Oe(e){return J("MuiCardActionArea",e)}const M=K("MuiCardActionArea",["root","focusVisible","focusHighlight"]),Be=e=>{const{classes:t}=e;return Z({root:["root"],focusHighlight:["focusHighlight"]},Oe,t)},Ee=W(ce,{name:"MuiCardActionArea",slot:"Root",overridesResolver:(e,t)=>t.root})(ee(({theme:e})=>({display:"block",textAlign:"inherit",borderRadius:"inherit",width:"100%",[`&:hover .${M.focusHighlight}`]:{opacity:(e.vars||e).palette.action.hoverOpacity,"@media (hover: none)":{opacity:0}},[`&.${M.focusVisible} .${M.focusHighlight}`]:{opacity:(e.vars||e).palette.action.focusOpacity}}))),Le=W("span",{name:"MuiCardActionArea",slot:"FocusHighlight",overridesResolver:(e,t)=>t.focusHighlight})(ee(({theme:e})=>({overflow:"hidden",pointerEvents:"none",position:"absolute",top:0,right:0,bottom:0,left:0,borderRadius:"inherit",opacity:0,backgroundColor:"currentcolor",transition:e.transitions.create("opacity",{duration:e.transitions.duration.short})}))),Me=f.forwardRef(function(t,r){const a=X({props:t,name:"MuiCardActionArea"}),{children:o,className:s,focusVisibleClassName:h,slots:i={},slotProps:l={},...d}=a,c=a,m=Be(c),u={slots:i,slotProps:l},[w,g]=Y("root",{elementType:Ee,externalForwardedProps:{...u,...d},shouldForwardComponentProp:!0,ownerState:c,ref:r,className:D(m.root,s),additionalProps:{focusVisibleClassName:D(h,m.focusVisible)}}),[v,k]=Y("focusHighlight",{elementType:Le,externalForwardedProps:u,ownerState:c,ref:r,className:m.focusHighlight});return n.jsxs(w,{...g,children:[o,n.jsx(v,{...k})]})});function Pe(e){return J("MuiTableContainer",e)}K("MuiTableContainer",["root"]);const Ne=e=>{const{classes:t}=e;return Z({root:["root"]},Pe,t)},De=W("div",{name:"MuiTableContainer",slot:"Root",overridesResolver:(e,t)=>t.root})({width:"100%",overflowX:"auto"}),Re=f.forwardRef(function(t,r){const a=X({props:t,name:"MuiTableContainer"}),{className:o,component:s="div",...h}=a,i={...a,component:s},l=Ne(i);return n.jsx(De,{ref:r,as:s,className:D(l.root,o),ownerState:i,...h})}),ne=L(n.jsx("path",{d:"M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"}),"ArrowBack"),te=L(n.jsx("path",{d:"m12 4-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"}),"ArrowForward"),Fe=`# Your account\r
+import{g as J,a as K,r as f,u as X,b as Y,c as D,j as n,d as Z,s as W,B as ce,m as ee,e as L,F as de,f as p,D as le,P as G,T as he,h as pe,i as H,k as V,l as ue,n as y,o as x,p as ge,I as me,C as ye,q as we,A as B,t as fe,L as T,v as b,w as be,x as _,S as I,y as ke,z as ve,E as Ce,G as z,H as q,J as xe,K as Te,M as Se,N as Ae,O as Ie,Q as _e}from"./index-bwvP2-l_.js";function Oe(e){return J("MuiCardActionArea",e)}const M=K("MuiCardActionArea",["root","focusVisible","focusHighlight"]),Be=e=>{const{classes:t}=e;return Z({root:["root"],focusHighlight:["focusHighlight"]},Oe,t)},Ee=W(ce,{name:"MuiCardActionArea",slot:"Root",overridesResolver:(e,t)=>t.root})(ee(({theme:e})=>({display:"block",textAlign:"inherit",borderRadius:"inherit",width:"100%",[`&:hover .${M.focusHighlight}`]:{opacity:(e.vars||e).palette.action.hoverOpacity,"@media (hover: none)":{opacity:0}},[`&.${M.focusVisible} .${M.focusHighlight}`]:{opacity:(e.vars||e).palette.action.focusOpacity}}))),Le=W("span",{name:"MuiCardActionArea",slot:"FocusHighlight",overridesResolver:(e,t)=>t.focusHighlight})(ee(({theme:e})=>({overflow:"hidden",pointerEvents:"none",position:"absolute",top:0,right:0,bottom:0,left:0,borderRadius:"inherit",opacity:0,backgroundColor:"currentcolor",transition:e.transitions.create("opacity",{duration:e.transitions.duration.short})}))),Me=f.forwardRef(function(t,r){const a=X({props:t,name:"MuiCardActionArea"}),{children:o,className:s,focusVisibleClassName:h,slots:i={},slotProps:l={},...d}=a,c=a,m=Be(c),u={slots:i,slotProps:l},[w,g]=Y("root",{elementType:Ee,externalForwardedProps:{...u,...d},shouldForwardComponentProp:!0,ownerState:c,ref:r,className:D(m.root,s),additionalProps:{focusVisibleClassName:D(h,m.focusVisible)}}),[v,k]=Y("focusHighlight",{elementType:Le,externalForwardedProps:u,ownerState:c,ref:r,className:m.focusHighlight});return n.jsxs(w,{...g,children:[o,n.jsx(v,{...k})]})});function Pe(e){return J("MuiTableContainer",e)}K("MuiTableContainer",["root"]);const Ne=e=>{const{classes:t}=e;return Z({root:["root"]},Pe,t)},De=W("div",{name:"MuiTableContainer",slot:"Root",overridesResolver:(e,t)=>t.root})({width:"100%",overflowX:"auto"}),Re=f.forwardRef(function(t,r){const a=X({props:t,name:"MuiTableContainer"}),{className:o,component:s="div",...h}=a,i={...a,component:s},l=Ne(i);return n.jsx(De,{ref:r,as:s,className:D(l.root,o),ownerState:i,...h})}),ne=L(n.jsx("path",{d:"M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"}),"ArrowBack"),te=L(n.jsx("path",{d:"m12 4-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"}),"ArrowForward"),Fe=`# Your account\r
 \r
 The Account page is where you change your own email and password. Everyone can use it, whatever their permissions.\r
 \r
@@ -2106,258 +2106,258 @@ In selection mode you can also use **Bulk edit**, **List for sale**, **Export CS
 - **Audit or Import buttons are missing.** These need extra permissions. Ask an administrator.\r
 - **Import says nothing was imported.** That's expected when any line has a problem. Fix every listed row and import again.\r
 - **I can't move a card into a deck box.** The deck box holds a different game. See [Deck boxes](help:deck-boxes#one-game-per-deck-box).\r
-`,Ke=`# Sales
-
-Sell cards from your collection: list them for sale, pull them for shipping, track orders from creation to completion, and keep a customer list.
-
-## How selling works in OmniCard
-
-Selling usually follows these steps:
-
-1. **List** a card for sale from your collection, setting a price and a sales channel (Manual, TCGplayer or eBay).
-2. **Pick** it: pull the card from where it's stored, and optionally move it to your for-sale location.
-3. **Record the order** for the buyer and add the cards they bought.
-4. **Move the order across the board** as you pack, ship and complete it. When it reaches a shipped lane, OmniCard records the sale and removes the sold cards from your collection.
-
-The [Sales](/sales) page has three tabs: **Orders**, **Listings** and **Customers**.
-
-![The Sales page Orders board](sales-orders-board.png)
-
-> [!NOTE]
-> If you don't see **Sales** in the menu, or some buttons are missing, ask an administrator for access.
-
-## List cards for sale
-
-You list cards from wherever you view them, not from the Sales page.
-
-### List one card
-
-1. Open a card's details. For example, click a card on the [Collection](help:collection) page or in a location, or open a card's menu in a [binder](help:binders) and choose **Card details**.
-2. Click **List for sale**.
-3. If you own more than one copy, set **Quantity (you have N)**. Listing fewer than all of them splits those copies off into their own stack, so only the listed copies get picked later. Listing all of them lists the whole stack.
-4. Check the **Price**. It starts at the card's market price.
-5. Choose a **Channel**: **Manual**, **TCGplayer** or **eBay**.
-6. Optionally add a **Note**.
-7. Click **List for sale**.
-
-![The List for sale dialog](sales-list-for-sale.png)
-
-Choosing **eBay** adds an eBay section and publishes the listing on eBay. See [eBay](help:ebay).
-
-> [!TIP]
-> In a binder, you can also open a card's menu and choose **List for sale** directly.
-
-### List many cards at once
-
-1. On the Collection page or a location page, click **Select** and tick the cards you want.
-2. Click **List for sale** in the selection bar.
-3. Choose a **Channel** and optionally add a **Note**, then click **List for sale**.
-
-Each selected card is listed as a whole stack at its current market price. Cards that are already listed are skipped. Fine-tune prices afterwards on the **Listings** tab.
-
-> [!NOTE]
-> Bulk listing with the **eBay** channel only marks the cards as listed in OmniCard. It doesn't publish anything on eBay. To publish on eBay, list each card on its own. See [eBay](help:ebay).
-
-A card that's already listed shows **Already listed for sale** in its details. Unlist it from the **Listings** tab before listing it again.
-
-## Manage listings
-
-The **Listings** tab shows every active listing.
-
-![The Listings tab](sales-listings.png)
-
-| Column | Meaning |
-|---|---|
-| **Name** | The card name (✦ marks a foil) |
-| **Set** | The set code |
-| **Cond** | The card's condition |
-| **Channel** | Manual, TCGplayer or eBay |
-| **Qty** | How many copies are listed |
-| **Price** | The listed price per copy |
-| **Status** | **Listed** (waiting to be pulled) or **Picked** (pulled for sale) |
-
-The buttons at the end of each row:
-
-- **Mark picked (move to sales location)**: the check mark, shown on listings that are still **Listed**. See [Pick listed cards](help:sales#pick-listed-cards).
-- **Edit**: change the listing's price, channel, quantity or note.
-- **View on eBay**: opens the live eBay listing in a new tab. Shown only for cards published on eBay.
-- **Update on eBay**: changes the live eBay listing. Shown only for cards published on eBay. See [eBay](help:ebay).
-- **Unlist**: takes the card off the market. The card stays in your collection.
-
-### Edit a listing
-
-1. Click the **Edit** button on the listing's row.
-2. In **Edit listing**, change the **Price**, **Channel**, **Quantity** or **Note**.
-3. Click **Save**.
-
-> [!NOTE]
-> Editing a listing changes it in OmniCard only. To change a card that's live on eBay, use **Update on eBay**.
-
-## Pick listed cards
-
-Picking means pulling listed cards from storage so they're ready to sell. When you mark a listing picked, its status changes to **Picked**. If your for-sale location is turned on, the card also moves to that location, so OmniCard always knows where it is.
-
-1. On the **Listings** tab, click **Pick list (PDF)** to download a printable list of the cards to pull and where each one is stored. The list follows the game selector at the top of the app.
-2. Pull the cards.
-3. Click the check mark on each listing you pulled, or click **Mark all picked (N)** to mark every listed card at once.
-
-If picking fails because no for-sale location is set, an error appears with a link to **Settings**. Set one up as described below.
-
-### Set up the for-sale location
-
-These options are on the **Administration** page, **Sales** tab:
-
-- **For-sale location**: the location picked cards move to. Click **Change** to pick one, or **Clear** to remove it.
-- **Move picked cards to the for-sale location**: when on, marking a listing picked moves the card to the for-sale location. When off, picking only changes the status and the card stays where it is.
-
-![The Sales tab on the Administration page](sales-settings-for-sale-location.png)
-
-> [!TIP]
-> Create a location called "For Sale" on the [Locations](help:locations) page and choose it here. Your pulled cards then stay together in one place until they ship.
-
-## Work with orders
-
-The **Orders** tab is a board. Each column, or lane, is a stage of the order, and each order is a card in a lane. A card shows the customer, the channel, the order number, the item count and the order total.
-
-The standard lanes are:
-
-| Lane | What it means |
-|---|---|
-| **Created** | A new order. You can still edit everything. |
-| **Packed** | Packed and ready to ship. You can still edit everything. |
-| **Shipped** | Sent. OmniCard records the sale and removes the sold cards from your collection. |
-| **Completed** | Finished. |
-| **Cancelled** | Called off. Nothing is removed from your collection. |
-
-Each lane's dot and the colored stripe on its order cards help you scan the board at a glance. The number next to a lane's name is how many orders it holds.
-
-> [!NOTE]
-> Your board's lanes can be customized for your store, so lane names and colors may differ. Each lane still behaves like one of the stages above.
-
-### Create an order
-
-1. Click **New order**.
-2. Choose a **Customer**. If the buyer isn't listed yet, add them on the **Customers** tab first.
-3. Choose the **Channel** and optionally enter an **Order # (optional)**, such as a marketplace order number.
-4. Click **Create**. The order's details panel opens so you can add cards.
-
-### Add cards to an order
-
-1. In the order's details panel, type at least two letters in **Add a card (search cards listed for sale)**. You can search by card name, set code or set name, and add a collector number. For example, \`sol ring c21\`. Only cards listed for sale show up. The rest of your collection doesn't. Results follow the game selector at the top of the app.
-2. Each result shows the card's name, set, collector number and condition, plus a price box that starts at the listed price. Change the price if needed. When a listing has more than one copy, the result shows how many are still available.
-3. Click **+** to add the card. Each click adds one copy.
-
-Copies already on another open order (**Created** or **Packed**) aren't offered, so the same card can't be sold twice. To sell a card that isn't listed yet, list it for sale first (see [List cards for sale](help:sales#list-cards-for-sale)).
-
-The **Items** heading shows the number of items and the order total. To remove a card, click the trash button on its line.
-
-![An order's details panel](sales-order-detail.png)
-
-> [!TIP]
-> Building a big order? Leave the search text in place and click **+** on each result you need. The list stays open, so you can add several cards in a row.
-
-### Fill in order details
-
-The top of the details panel holds the order's details: **Channel**, **Order #**, **Tracking**, **Carrier**, **Ship charged** (what the buyer paid for shipping), **Ship cost** (what shipping cost you), **Fees** (marketplace fees) and **Notes**. Click **Save header** to keep your changes.
-
-To fill in **Tracking** from the label, click **Scan label** (the barcode button in that box) and hold the label up to your camera. With a tracking number saved, you can mark the order shipped by scanning its label on the [Ship](help:shipping) page.
-
-### Move an order through the board
-
-Drag an order's card and drop it on another lane. The move saves right away.
-
-When an order enters a shipped lane for the first time:
-
-- The sale is recorded, and the sold copies are removed from your collection.
-- The cards' listings are marked sold.
-- Any live eBay listing for those cards is ended, so they can't sell twice.
-
-> [!WARNING]
-> Add every card to the order before you move it to **Shipped**. Cards added afterwards aren't removed from your collection automatically.
-
-### Edit a shipped or completed order
-
-Once an order is past **Packed**, its details panel is locked. A message says that header and line edits are locked until you move the order back to Created or Packed.
-
-To correct a mistake, drag the order back to **Created** or **Packed**, make your changes, then move it forward again.
-
-> [!WARNING]
-> Moving a shipped order back doesn't return its cards to your collection, and moving it to **Shipped** again records the sale again. Only do this to fix order details, and check your collection afterwards.
-
-### Delete an order
-
-While an order is in **Created** or **Packed**, open it and click **Delete order**, then confirm. Shipped and completed orders can't be deleted. Move them to **Cancelled** instead if they didn't go through.
-
-## Print a receipt
-
-1. Click an order on the board to open its details.
-2. Click **Print receipt**. A print-ready receipt opens in a new tab, sized for your receipt printer, and your browser's print dialog appears.
-3. Or click **PDF** to download the receipt as a PDF file.
-
-An administrator sets the store name, address, logo, paper width, font size, footer text and whether prices are shown. These options are on the **Administration** page, **Receipts** tab. See [Administration](help:administration).
-
-![A printed receipt preview](sales-receipt.png)
-
-## Import orders from a CSV file
-
-Bring in orders from a marketplace export, such as a TCGplayer shipping export, instead of typing them in.
-
-1. On the **Orders** tab, click **Import CSV**.
-2. **Choose file**: click **Choose CSV file…** and pick your file.
-3. **Map columns**: tell OmniCard which column in your file holds each order field.
-   - Pick a **Template**. **TCGPlayer Shipping Export (built-in)** is selected to start, and it already matches TCGplayer's columns.
-   - Choose the **Channel** the orders came from.
-   - For each field, pick the matching column from your file, or leave it **— not mapped —**.
-   - **Order number** must be mapped. OmniCard uses it to recognize orders you've already imported.
-4. Click **Preview**.
-5. **Review & import**: check the rows. Untick any you don't want, then click **Import N orders**.
-
-![The Import orders from CSV dialog, mapping step](sales-import-orders-map.png)
-
-The fields you can map are **Full name**, **First name**, **Last name**, **Order number**, **Order date**, **Address line 1**, **Address line 2**, **City**, **State / province**, **Postal code**, **Country**, **Shipping fee paid**, **Item count**, **Value of products**, **Tracking number** and **Carrier**.
-
-In the review step, the **Status** column tells you what will happen to each row:
-
-| Status | Meaning |
-|---|---|
-| New customer · New order | Creates the order and a new customer |
-| Matched customer · New order | Creates the order for an existing customer (matched by name and postal code), and updates that customer's address |
-| Already imported | This order number already exists, so the row is skipped |
-
-Warnings, such as a date that couldn't be read, appear above the list. Imported orders start in the **Created** lane.
-
-> [!NOTE]
-> Imported orders include the buyer, order number, date, shipping and tracking, but not the individual cards. Open an imported order and add cards from your collection if you want them removed from your collection when it ships.
-
-### Save your own import template
-
-If you import from a source whose columns don't match a template:
-
-1. Map the columns as described above.
-2. Enter a **New template name** and click **Save as template**.
-
-Next time, pick your template from the **Template** list. To remove a template you saved, select it and click **Delete this template**. The built-in template can't be deleted.
-
-## Manage customers
-
-The **Customers** tab lists everyone you sell to, with their **Name**, **Email**, **Phone** and **Location** (city and state).
-
-![The Customers tab](sales-customers.png)
-
-- **Add a customer**: click **New customer**, fill in at least the **Name**, and click **Save**. You can also add email, phone and a full mailing address.
-- **Edit a customer**: click the pencil button on their row.
-- **Delete a customer**: click the trash button and confirm.
-
-Customers are also created automatically when you import orders from a CSV file.
-
-## Troubleshooting
-
-- **"Mark picked" shows an error about the for-sale location.** No for-sale location is set, or the one you chose was deleted. Set one on the **Administration** page, **Sales** tab, or turn off **Move picked cards to the for-sale location**.
-- **I can't edit an order.** It's past **Packed**. See [Edit a shipped or completed order](help:sales#edit-a-shipped-or-completed-order).
-- **A card won't list.** It's already listed. Find it on the **Listings** tab and click **Unlist** first.
-- **My search in "Add a card" finds nothing.** Type at least two letters, and check that the game selector at the top of the app is set to the card's game or **All Games**. Only cards listed for sale are offered: list the card first, and check it isn't already on another open order.
-
-For more help, see [Troubleshooting](help:troubleshooting).
+`,Ke=`# Sales\r
+\r
+Sell cards from your collection: list them for sale, pull them for shipping, track orders from creation to completion, and keep a customer list.\r
+\r
+## How selling works in OmniCard\r
+\r
+Selling usually follows these steps:\r
+\r
+1. **List** a card for sale from your collection, setting a price and a sales channel (Manual, TCGplayer or eBay).\r
+2. **Pick** it: pull the card from where it's stored, and optionally move it to your for-sale location.\r
+3. **Record the order** for the buyer and add the cards they bought.\r
+4. **Move the order across the board** as you pack, ship and complete it. When it reaches a shipped lane, OmniCard records the sale and removes the sold cards from your collection.\r
+\r
+The [Sales](/sales) page has three tabs: **Orders**, **Listings** and **Customers**.\r
+\r
+![The Sales page Orders board](sales-orders-board.png)\r
+\r
+> [!NOTE]\r
+> If you don't see **Sales** in the menu, or some buttons are missing, ask an administrator for access.\r
+\r
+## List cards for sale\r
+\r
+You list cards from wherever you view them, not from the Sales page.\r
+\r
+### List one card\r
+\r
+1. Open a card's details. For example, click a card on the [Collection](help:collection) page or in a location, or open a card's menu in a [binder](help:binders) and choose **Card details**.\r
+2. Click **List for sale**.\r
+3. If you own more than one copy, set **Quantity (you have N)**. Listing fewer than all of them splits those copies off into their own stack, so only the listed copies get picked later. Listing all of them lists the whole stack.\r
+4. Check the **Price**. It starts at the card's market price.\r
+5. Choose a **Channel**: **Manual**, **TCGplayer** or **eBay**.\r
+6. Optionally add a **Note**.\r
+7. Click **List for sale**.\r
+\r
+![The List for sale dialog](sales-list-for-sale.png)\r
+\r
+Choosing **eBay** adds an eBay section and publishes the listing on eBay. See [eBay](help:ebay).\r
+\r
+> [!TIP]\r
+> In a binder, you can also open a card's menu and choose **List for sale** directly.\r
+\r
+### List many cards at once\r
+\r
+1. On the Collection page or a location page, click **Select** and tick the cards you want.\r
+2. Click **List for sale** in the selection bar.\r
+3. Choose a **Channel** and optionally add a **Note**, then click **List for sale**.\r
+\r
+Each selected card is listed as a whole stack at its current market price. Cards that are already listed are skipped. Fine-tune prices afterwards on the **Listings** tab.\r
+\r
+> [!NOTE]\r
+> Bulk listing with the **eBay** channel only marks the cards as listed in OmniCard. It doesn't publish anything on eBay. To publish on eBay, list each card on its own. See [eBay](help:ebay).\r
+\r
+A card that's already listed shows **Already listed for sale** in its details. Unlist it from the **Listings** tab before listing it again.\r
+\r
+## Manage listings\r
+\r
+The **Listings** tab shows every active listing.\r
+\r
+![The Listings tab](sales-listings.png)\r
+\r
+| Column | Meaning |\r
+|---|---|\r
+| **Name** | The card name (✦ marks a foil) |\r
+| **Set** | The set code |\r
+| **Cond** | The card's condition |\r
+| **Channel** | Manual, TCGplayer or eBay |\r
+| **Qty** | How many copies are listed |\r
+| **Price** | The listed price per copy |\r
+| **Status** | **Listed** (waiting to be pulled) or **Picked** (pulled for sale) |\r
+\r
+The buttons at the end of each row:\r
+\r
+- **Mark picked (move to sales location)**: the check mark, shown on listings that are still **Listed**. See [Pick listed cards](help:sales#pick-listed-cards).\r
+- **Edit**: change the listing's price, channel, quantity or note.\r
+- **View on eBay**: opens the live eBay listing in a new tab. Shown only for cards published on eBay.\r
+- **Update on eBay**: changes the live eBay listing. Shown only for cards published on eBay. See [eBay](help:ebay).\r
+- **Unlist**: takes the card off the market. The card stays in your collection.\r
+\r
+### Edit a listing\r
+\r
+1. Click the **Edit** button on the listing's row.\r
+2. In **Edit listing**, change the **Price**, **Channel**, **Quantity** or **Note**.\r
+3. Click **Save**.\r
+\r
+> [!NOTE]\r
+> Editing a listing changes it in OmniCard only. To change a card that's live on eBay, use **Update on eBay**.\r
+\r
+## Pick listed cards\r
+\r
+Picking means pulling listed cards from storage so they're ready to sell. When you mark a listing picked, its status changes to **Picked**. If your for-sale location is turned on, the card also moves to that location, so OmniCard always knows where it is.\r
+\r
+1. On the **Listings** tab, click **Pick list (PDF)** to download a printable list of the cards to pull and where each one is stored. The list follows the game selector at the top of the app.\r
+2. Pull the cards.\r
+3. Click the check mark on each listing you pulled, or click **Mark all picked (N)** to mark every listed card at once.\r
+\r
+If picking fails because no for-sale location is set, an error appears with a link to **Settings**. Set one up as described below.\r
+\r
+### Set up the for-sale location\r
+\r
+These options are on the **Administration** page, **Sales** tab:\r
+\r
+- **For-sale location**: the location picked cards move to. Click **Change** to pick one, or **Clear** to remove it.\r
+- **Move picked cards to the for-sale location**: when on, marking a listing picked moves the card to the for-sale location. When off, picking only changes the status and the card stays where it is.\r
+\r
+![The Sales tab on the Administration page](sales-settings-for-sale-location.png)\r
+\r
+> [!TIP]\r
+> Create a location called "For Sale" on the [Locations](help:locations) page and choose it here. Your pulled cards then stay together in one place until they ship.\r
+\r
+## Work with orders\r
+\r
+The **Orders** tab is a board. Each column, or lane, is a stage of the order, and each order is a card in a lane. A card shows the customer, the channel, the order number, the item count and the order total.\r
+\r
+The standard lanes are:\r
+\r
+| Lane | What it means |\r
+|---|---|\r
+| **Created** | A new order. You can still edit everything. |\r
+| **Packed** | Packed and ready to ship. You can still edit everything. |\r
+| **Shipped** | Sent. OmniCard records the sale and removes the sold cards from your collection. |\r
+| **Completed** | Finished. |\r
+| **Cancelled** | Called off. Nothing is removed from your collection. |\r
+\r
+Each lane's dot and the colored stripe on its order cards help you scan the board at a glance. The number next to a lane's name is how many orders it holds.\r
+\r
+> [!NOTE]\r
+> Your board's lanes can be customized for your store, so lane names and colors may differ. Each lane still behaves like one of the stages above.\r
+\r
+### Create an order\r
+\r
+1. Click **New order**.\r
+2. Choose a **Customer**. If the buyer isn't listed yet, add them on the **Customers** tab first.\r
+3. Choose the **Channel** and optionally enter an **Order # (optional)**, such as a marketplace order number.\r
+4. Click **Create**. The order's details panel opens so you can add cards.\r
+\r
+### Add cards to an order\r
+\r
+1. In the order's details panel, type at least two letters in **Add a card (search cards listed for sale)**. You can search by card name, set code or set name, and add a collector number. For example, \`sol ring c21\`. Only cards listed for sale show up. The rest of your collection doesn't. Results follow the game selector at the top of the app.\r
+2. Each result shows the card's name, set, collector number and condition, plus a price box that starts at the listed price. Change the price if needed. When a listing has more than one copy, the result shows how many are still available.\r
+3. Click **+** to add the card. Each click adds one copy.\r
+\r
+Copies already on another open order (**Created** or **Packed**) aren't offered, so the same card can't be sold twice. To sell a card that isn't listed yet, list it for sale first (see [List cards for sale](help:sales#list-cards-for-sale)).\r
+\r
+The **Items** heading shows the number of items and the order total. To remove a card, click the trash button on its line.\r
+\r
+![An order's details panel](sales-order-detail.png)\r
+\r
+> [!TIP]\r
+> Building a big order? Leave the search text in place and click **+** on each result you need. The list stays open, so you can add several cards in a row.\r
+\r
+### Fill in order details\r
+\r
+The top of the details panel holds the order's details: **Channel**, **Order #**, **Tracking**, **Carrier**, **Ship charged** (what the buyer paid for shipping), **Ship cost** (what shipping cost you), **Fees** (marketplace fees) and **Notes**. Click **Save header** to keep your changes.\r
+\r
+To fill in **Tracking** from the label, click **Scan label** (the barcode button in that box) and hold the label up to your camera. With a tracking number saved, you can mark the order shipped by scanning its label on the [Ship](help:shipping) page.\r
+\r
+### Move an order through the board\r
+\r
+Drag an order's card and drop it on another lane. The move saves right away.\r
+\r
+When an order enters a shipped lane for the first time:\r
+\r
+- The sale is recorded, and the sold copies are removed from your collection.\r
+- The cards' listings are marked sold.\r
+- Any live eBay listing for those cards is ended, so they can't sell twice.\r
+\r
+> [!WARNING]\r
+> Add every card to the order before you move it to **Shipped**. Cards added afterwards aren't removed from your collection automatically.\r
+\r
+### Edit a shipped or completed order\r
+\r
+Once an order is past **Packed**, its details panel is locked. A message says that header and line edits are locked until you move the order back to Created or Packed.\r
+\r
+To correct a mistake, drag the order back to **Created** or **Packed**, make your changes, then move it forward again.\r
+\r
+> [!WARNING]\r
+> Moving a shipped order back doesn't return its cards to your collection, and moving it to **Shipped** again records the sale again. Only do this to fix order details, and check your collection afterwards.\r
+\r
+### Delete an order\r
+\r
+While an order is in **Created** or **Packed**, open it and click **Delete order**, then confirm. Shipped and completed orders can't be deleted. Move them to **Cancelled** instead if they didn't go through.\r
+\r
+## Print a receipt\r
+\r
+1. Click an order on the board to open its details.\r
+2. Click **Print receipt**. A print-ready receipt opens in a new tab, sized for your receipt printer, and your browser's print dialog appears.\r
+3. Or click **PDF** to download the receipt as a PDF file.\r
+\r
+An administrator sets the store name, address, logo, paper width, font size, footer text and whether prices are shown. These options are on the **Administration** page, **Receipts** tab. See [Administration](help:administration).\r
+\r
+![A printed receipt preview](sales-receipt.png)\r
+\r
+## Import orders from a CSV file\r
+\r
+Bring in orders from a marketplace export, such as a TCGplayer shipping export, instead of typing them in.\r
+\r
+1. On the **Orders** tab, click **Import CSV**.\r
+2. **Choose file**: click **Choose CSV file…** and pick your file.\r
+3. **Map columns**: tell OmniCard which column in your file holds each order field.\r
+   - Pick a **Template**. **TCGPlayer Shipping Export (built-in)** is selected to start, and it already matches TCGplayer's columns.\r
+   - Choose the **Channel** the orders came from.\r
+   - For each field, pick the matching column from your file, or leave it **— not mapped —**.\r
+   - **Order number** must be mapped. OmniCard uses it to recognize orders you've already imported.\r
+4. Click **Preview**.\r
+5. **Review & import**: check the rows. Untick any you don't want, then click **Import N orders**.\r
+\r
+![The Import orders from CSV dialog, mapping step](sales-import-orders-map.png)\r
+\r
+The fields you can map are **Full name**, **First name**, **Last name**, **Order number**, **Order date**, **Address line 1**, **Address line 2**, **City**, **State / province**, **Postal code**, **Country**, **Shipping fee paid**, **Item count**, **Value of products**, **Tracking number** and **Carrier**.\r
+\r
+In the review step, the **Status** column tells you what will happen to each row:\r
+\r
+| Status | Meaning |\r
+|---|---|\r
+| New customer · New order | Creates the order and a new customer |\r
+| Matched customer · New order | Creates the order for an existing customer (matched by name and postal code), and updates that customer's address |\r
+| Already imported | This order number already exists, so the row is skipped |\r
+\r
+Warnings, such as a date that couldn't be read, appear above the list. Imported orders start in the **Created** lane.\r
+\r
+> [!NOTE]\r
+> Imported orders include the buyer, order number, date, shipping and tracking, but not the individual cards. Open an imported order and add cards from your collection if you want them removed from your collection when it ships.\r
+\r
+### Save your own import template\r
+\r
+If you import from a source whose columns don't match a template:\r
+\r
+1. Map the columns as described above.\r
+2. Enter a **New template name** and click **Save as template**.\r
+\r
+Next time, pick your template from the **Template** list. To remove a template you saved, select it and click **Delete this template**. The built-in template can't be deleted.\r
+\r
+## Manage customers\r
+\r
+The **Customers** tab lists everyone you sell to, with their **Name**, **Email**, **Phone** and **Location** (city and state).\r
+\r
+![The Customers tab](sales-customers.png)\r
+\r
+- **Add a customer**: click **New customer**, fill in at least the **Name**, and click **Save**. You can also add email, phone and a full mailing address.\r
+- **Edit a customer**: click the pencil button on their row.\r
+- **Delete a customer**: click the trash button and confirm.\r
+\r
+Customers are also created automatically when you import orders from a CSV file.\r
+\r
+## Troubleshooting\r
+\r
+- **"Mark picked" shows an error about the for-sale location.** No for-sale location is set, or the one you chose was deleted. Set one on the **Administration** page, **Sales** tab, or turn off **Move picked cards to the for-sale location**.\r
+- **I can't edit an order.** It's past **Packed**. See [Edit a shipped or completed order](help:sales#edit-a-shipped-or-completed-order).\r
+- **A card won't list.** It's already listed. Find it on the **Listings** tab and click **Unlist** first.\r
+- **My search in "Add a card" finds nothing.** Type at least two letters, and check that the game selector at the top of the app is set to the card's game or **All Games**. Only cards listed for sale are offered: list the card first, and check it isn't already on another open order.\r
+\r
+For more help, see [Troubleshooting](help:troubleshooting).\r
 `,Xe=`# Saved views\r
 \r
 A saved view remembers how you like a card list laid out: the search, the sort, rows per page, **Stack duplicates**, which columns show and in what order, how rows are grouped, and on a location page, table or stacked view and how stacks are grouped. Save as many views as you like and choose one to open by default.\r
@@ -2492,18 +2492,21 @@ With interactive scanning you upload pictures from your browser and wait while t
 \r
 1. Your scanner software saves its images into a folder that OmniCard watches. Each game has its own folder.\r
 2. Each subfolder becomes one **batch**, named after the subfolder. Images saved directly in the game's folder (not in a subfolder) go into a batch named after today's date.\r
-3. When no new file has arrived for a short while (the *quiet period*), OmniCard matches the batch's cards in the background. You don't need to have the browser open.\r
+3. When no new file has arrived for a short while (the *quiet period*), OmniCard matches the batch's cards in the background. You don't need to have the browser open. (If an administrator has turned off automatic processing, the batch waits for someone to press **Run** instead. See [Run batches yourself](#run-batches-yourself).)\r
 4. The batch appears on the [Scan](/scan) page. Someone opens it, reviews the matches, and adds the cards to a location.\r
 \r
 Unlike interactive scans, which live only in your browser, batches are stored on the server. Anyone with access to Scan can see them, and you can stop reviewing and pick up again later, even from a different device.\r
 \r
 After a file is picked up, the original is moved into a **_processed** subfolder of the game's folder, so it is never imported twice.\r
 \r
+OmniCard also skips images it has already picked up. See [Duplicate images are skipped](#duplicate-images-are-skipped).\r
+\r
 ## Set up watched folders (administrators)\r
 \r
 An administrator sets this up once in [Administration ▸ Scan Badges](/settings?tab=scan), in the **Watched scan folders** section:\r
 \r
 - **Watch folders** turns the feature on or off.\r
+- **Process batches automatically** decides whether a batch starts matching on its own after the quiet period. Turn it off to check each batch first and start it with **Run**.\r
 - **Quiet period (seconds)** is how long to wait with no new file before matching starts.\r
 - **Keep images (days)** is how long stored scans of committed or discarded batches are kept before they are deleted.\r
 - For each game, enter the **Folder on the server** and switch it **Active**. A chip shows **Found**, **Folder not found**, or **Can't move files** (OmniCard can see the folder but can't move files out of it).\r
@@ -2529,12 +2532,14 @@ Each batch shows:\r
 | Status | Meaning |\r
 |---|---|\r
 | **Waiting for files** | Files are still arriving. Matching starts after the quiet period. |\r
+| **Waiting to run** | Automatic processing is off. The batch's files are picked up, and matching starts when someone clicks **Run**. |\r
 | **Matching N of M** | Cards are being matched. A progress bar shows how far along it is. |\r
 | **Ready** | Every card has been matched and the batch is ready to review. |\r
 | **Committed** | The batch was added to your collection. |\r
 | **Discarded** | The batch was thrown away. |\r
 \r
-- How many cards it holds, how many errors and how many committed cards it has, and when its last file arrived.\r
+- How many cards it holds, how many errors and how many committed cards it has, how many duplicate images were skipped, and when its last file arrived.\r
+- A **Run** button while the batch is still collecting files (**Run now** if automatic processing is on, to start matching without waiting for the quiet period).\r
 - Who is reviewing it: *You're reviewing this* or *In review by* someone else.\r
 \r
 ![The Scan batches panel with one Ready batch and one batch still matching](scan-batches-panel.png)\r
@@ -2563,11 +2568,32 @@ If some cards couldn't be matched because of an error, a **Retry N errors** butt
 \r
 ### Removing cards\r
 \r
-Click **Remove** on a card to take it out of the batch. Its stored image is deleted from the server. The original file stays in the **_processed** subfolder.\r
+Click **Remove** on a card to take it out of the batch. To remove several at once, check them and click **Delete** in the list header, then confirm. Their stored images are deleted from the server. The original files stay in the **_processed** subfolder.\r
 \r
 ### When the batch is finished\r
 \r
 Once every card in a batch has been added or removed, the batch closes and you return to the Scan page. It shows as **Committed** (or **Discarded** if nothing was added) in the panel for a day, then disappears from the list.\r
+\r
+## Run batches yourself\r
+\r
+By default a batch starts matching on its own. If an administrator turns off **Process batches automatically**, new files are still picked up, but each batch waits with the status **Waiting to run**. In the meantime you can:\r
+\r
+1. Open the batch and look through the scans. They show *No match* until they're matched.\r
+2. Check any scans you don't want and click **Delete** in the list header.\r
+3. Click **Run batch** at the top of the batch page, or **Run** in the **Scan batches** panel.\r
+\r
+When several batches are waiting, the panel header shows **Run N batches** to start them all at once.\r
+\r
+## Duplicate images are skipped\r
+\r
+Sometimes scanner software saves the same run of images twice, for example *0001.png* to *1000.png* followed by the same 1,000 files again. A scanner can't produce the exact same file twice for two passes of a real card, so OmniCard treats any file that is byte-for-byte identical to one it has already picked up for that game as a duplicate.\r
+\r
+Duplicates are never matched and never added. The original file is still moved to **_processed**, so it isn't picked up again. The batch shows how many were skipped, and the batch page lists the repeated run, for example *0001.png – 1000.png repeat 0001.png – 1000.png (1,000 images)*.\r
+\r
+If a batch receives nothing but duplicates (for example because the originals were already added), it closes on its own as **Discarded** and shows the skipped count in the panel for a day.\r
+\r
+> [!NOTE]\r
+> Only exact copies are skipped. Scanning the same card again produces a new image, so it is never treated as a duplicate. Images from a batch you discarded or removed are picked up again if you drop them back in.\r
 \r
 ## One reviewer at a time\r
 \r
@@ -2592,7 +2618,8 @@ The reviewer or an administrator can discard a batch. A batch nobody is reviewin
 ## Tips and troubleshooting\r
 \r
 - **A batch never appears.** Ask an administrator to check that **Watch folders** is on, the game's folder is **Active**, and its status chip reads **Found**. Files must be JPEG, PNG or TIFF images.\r
-- **A batch stays on Waiting for files.** Matching starts only after no new file has arrived for the quiet period. If scanning is still going, that's expected.\r
+- **A batch stays on Waiting for files.** Matching starts only after no new file has arrived for the quiet period. If scanning is still going, that's expected. Click **Run now** to start it straight away.\r
+- **A batch stays on Waiting to run.** Automatic processing is off. Click **Run**.\r
 - **Batches only process while someone is using the site.** On some servers, background work pauses when the site is idle. An administrator can fix this; the settings page includes a hint about it.\r
 - **Start a new batch.** Save into a new subfolder. Files saved into a subfolder whose batch is still open join that batch; once that batch is closed, new files in the same subfolder start a fresh batch, and a number such as *(2)* may be added to its name to tell them apart.\r
 - **Wrong set or condition for the whole batch?** Use bulk **Edit** to change the cards' properties before adding them. To change the defaults for future batches, ask an administrator.\r
@@ -2700,10 +2727,11 @@ Click a row to see it in the detail panel:\r
 \r
 ### Checking cards\r
 \r
-The checkbox on each row decides whether the card is included when you add or export. Only cards with a match (or a correction) can be checked.\r
+The checkbox on each row decides whether the card is included when you add or export. Any scan can be checked, but only checked cards with a match (or a correction) are added or exported.\r
 \r
 - **Shift**-click a second checkbox to check or uncheck every row between it and the last one you clicked.\r
 - The header above the list has a check-all box plus **All**, **None** and **Invert**, and shows how many are checked.\r
+- **Delete** in the list header removes every checked scan from the list, including scans that didn't match or are still matching. OmniCard asks you to confirm first, because this can't be undone.\r
 - **Confirm N checked** in the action bar confirms every checked, matched card at once. Use it after you have eyeballed a batch of strong matches.\r
 \r
 ## Correct a wrong match\r
@@ -2755,7 +2783,7 @@ When the list is long, use the filter bar above it:\r
 While a filter or sort is on, you'll see *Showing X of Y* and a **Clear** button.\r
 \r
 > [!NOTE]\r
-> Everything in the action bar works only on the cards you can currently see. **Confirm**, **Add**, **Export**, check-all and bulk **Edit** all ignore rows hidden by a filter.\r
+> Everything in the action bar works only on the cards you can currently see. **Confirm**, **Add**, **Export**, check-all, bulk **Edit** and **Delete** all ignore rows hidden by a filter.\r
 \r
 ## Value badges\r
 \r
@@ -2878,69 +2906,69 @@ To see where your copies of a card are, search for it on the [Collection](/colle
 - **The set list is empty.** The card catalog for that game hasn't been downloaded yet. An administrator can download it from **Administration ▸ Catalog Data**. See [Administration](help:administration).\r
 - **Prices are blank.** No price is available for that card yet. Prices update when the catalog is refreshed.\r
 - **A card I own shows as not owned.** Check that the card in your collection has the right set and collector number. Open it from the [Collection](/collection) page and compare it with the checklist.\r
-`,an=`# Ship packages
-
-Mark orders as shipped by scanning their shipping labels as the packages go out. Scan with your phone at the mailbox or post office, or with a webcam or handheld scanner at a shipping desk. You don't have to remember to update the board later.
-
-## Before you start
-
-The Ship page finds an order by its tracking number, so each order needs one before you scan:
-
-1. Open the order on the [Sales](/sales) page.
-2. Type the number in **Tracking**, or click **Scan label** (the barcode button in that box) and hold the label up to your camera.
-3. Click **Save header**.
-
-Scanning the label fills in the tracking number for you. If another order already has that tracking number, OmniCard warns you.
-
-> [!NOTE]
-> You need permission to ship orders. You have it if you can edit orders, or if an administrator gave you **Ship (scan labels)** under **Sales · Orders**. See [Administration](help:administration).
-
-## Scan packages as they go out
-
-1. Click **Ship** in the menu.
-2. Allow camera access when your browser asks.
-3. Point the camera at the barcode on the shipping label. Fit the barcode inside the white box.
-
-You hear a beep, your phone vibrates, and the result shows under the camera:
-
-| Result | Meaning |
-|---|---|
-| **Shipped** | The order is now in your shipped lane. |
-| **Ready to ship** | One order matches. Click **Mark shipped** to ship it. Shown when **Auto-ship** is off. |
-| **Already shipped** | That order was shipped earlier. Nothing changes. |
-| **… open orders use this tracking number** | More than one order has this tracking number. Click **Mark shipped** on the one you're sending. |
-| **No open order has tracking number …** | No order in **Created** or **Packed** has this number. Add it to the order and scan again. |
-
-Shipping an order from this page does the same as dragging it into the shipped lane on the board: OmniCard records the sale and removes the sold cards from your collection. If you've added your own lanes, the order goes into the first lane that ships orders.
-
-The **This session** list shows everything you scanned since you opened the page, with a count of shipped orders. Click **Open order** to see an order's details.
-
-> [!TIP]
-> Barcodes from USPS, UPS and FedEx all work. USPS and FedEx labels hold extra routing digits around the tracking number, and OmniCard ignores them.
-
-## Auto-ship
-
-Turn on **Auto-ship** to ship each order as soon as you scan its label, without clicking **Mark shipped**. This suits a shipping desk with a webcam, where you hold up one package after another.
-
-OmniCard still asks you to choose when more than one order has the same tracking number.
-
-> [!WARNING]
-> Shipping can't be undone from the Ship page. Moving an order back on the board doesn't return its cards to your collection. Leave **Auto-ship** off if you'd like to check each package.
-
-Your **Auto-ship** and **Camera** choices are remembered on each device.
-
-## Use a webcam or handheld scanner
-
-- **More than one camera:** choose the camera you want under the video. OmniCard remembers it on this computer.
-- **Handheld barcode scanner:** turn **Camera** off, click in **Tracking number**, and scan. Most handheld scanners press Enter for you. You can also type a number and press Enter.
-- **Dark spot:** on phones that have one, tap the flashlight button on the video.
-
-## Troubleshooting
-
-- **The camera doesn't start:** check that your browser is allowed to use the camera. The camera only works when you open OmniCard over a secure address (starting with \`https://\`). If it can't start, type the tracking number or use a handheld scanner instead.
-- **A label won't scan:** move closer so the barcode fills most of the white box, hold it flat and steady, and avoid glare. Or type the number.
-- **A barcode you printed yourself won't scan:** if you used a Code 39 ("3 of 9") barcode font, the text must start and end with an asterisk, like \`*1Z999AA10123456784*\`. Without them the bars aren't a valid barcode and no scanner can read it.
-- **No open order found:** check the order's **Tracking** box against the label. If the order was moved back to **Created** or **Packed** after shipping, scanning ships it again.
+`,an=`# Ship packages\r
+\r
+Mark orders as shipped by scanning their shipping labels as the packages go out. Scan with your phone at the mailbox or post office, or with a webcam or handheld scanner at a shipping desk. You don't have to remember to update the board later.\r
+\r
+## Before you start\r
+\r
+The Ship page finds an order by its tracking number, so each order needs one before you scan:\r
+\r
+1. Open the order on the [Sales](/sales) page.\r
+2. Type the number in **Tracking**, or click **Scan label** (the barcode button in that box) and hold the label up to your camera.\r
+3. Click **Save header**.\r
+\r
+Scanning the label fills in the tracking number for you. If another order already has that tracking number, OmniCard warns you.\r
+\r
+> [!NOTE]\r
+> You need permission to ship orders. You have it if you can edit orders, or if an administrator gave you **Ship (scan labels)** under **Sales · Orders**. See [Administration](help:administration).\r
+\r
+## Scan packages as they go out\r
+\r
+1. Click **Ship** in the menu.\r
+2. Allow camera access when your browser asks.\r
+3. Point the camera at the barcode on the shipping label. Fit the barcode inside the white box.\r
+\r
+You hear a beep, your phone vibrates, and the result shows under the camera:\r
+\r
+| Result | Meaning |\r
+|---|---|\r
+| **Shipped** | The order is now in your shipped lane. |\r
+| **Ready to ship** | One order matches. Click **Mark shipped** to ship it. Shown when **Auto-ship** is off. |\r
+| **Already shipped** | That order was shipped earlier. Nothing changes. |\r
+| **… open orders use this tracking number** | More than one order has this tracking number. Click **Mark shipped** on the one you're sending. |\r
+| **No open order has tracking number …** | No order in **Created** or **Packed** has this number. Add it to the order and scan again. |\r
+\r
+Shipping an order from this page does the same as dragging it into the shipped lane on the board: OmniCard records the sale and removes the sold cards from your collection. If you've added your own lanes, the order goes into the first lane that ships orders.\r
+\r
+The **This session** list shows everything you scanned since you opened the page, with a count of shipped orders. Click **Open order** to see an order's details.\r
+\r
+> [!TIP]\r
+> Barcodes from USPS, UPS and FedEx all work. USPS and FedEx labels hold extra routing digits around the tracking number, and OmniCard ignores them.\r
+\r
+## Auto-ship\r
+\r
+Turn on **Auto-ship** to ship each order as soon as you scan its label, without clicking **Mark shipped**. This suits a shipping desk with a webcam, where you hold up one package after another.\r
+\r
+OmniCard still asks you to choose when more than one order has the same tracking number.\r
+\r
+> [!WARNING]\r
+> Shipping can't be undone from the Ship page. Moving an order back on the board doesn't return its cards to your collection. Leave **Auto-ship** off if you'd like to check each package.\r
+\r
+Your **Auto-ship** and **Camera** choices are remembered on each device.\r
+\r
+## Use a webcam or handheld scanner\r
+\r
+- **More than one camera:** choose the camera you want under the video. OmniCard remembers it on this computer.\r
+- **Handheld barcode scanner:** turn **Camera** off, click in **Tracking number**, and scan. Most handheld scanners press Enter for you. You can also type a number and press Enter.\r
+- **Dark spot:** on phones that have one, tap the flashlight button on the video.\r
+\r
+## Troubleshooting\r
+\r
+- **The camera doesn't start:** check that your browser is allowed to use the camera. The camera only works when you open OmniCard over a secure address (starting with \`https://\`). If it can't start, type the tracking number or use a handheld scanner instead.\r
+- **A label won't scan:** move closer so the barcode fills most of the white box, hold it flat and steady, and avoid glare. Or type the number.\r
+- **A barcode you printed yourself won't scan:** if you used a Code 39 ("3 of 9") barcode font, the text must start and end with an asterisk, like \`*1Z999AA10123456784*\`. Without them the bars aren't a valid barcode and no scanner can read it.\r
+- **No open order found:** check the order's **Tracking** box against the label. If the order was moved back to **Created** or **Packed** after shipping, scanning ships it again.\r
 `,rn=`# Tag rules\r
 \r
 Tag rules tag cards for you. Each rule is a search for one game, such as \`t:creature r>=rare\` or \`is:commander\`, plus one or more tags. Cards that match get those tags when you scan or import them, and an administrator can apply a rule to the cards you already own.\r

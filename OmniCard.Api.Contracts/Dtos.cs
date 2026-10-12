@@ -1261,6 +1261,10 @@ public sealed record ScanBatchSummaryDto
     public int Matched { get; init; }
     public int Errors { get; init; }
     public int Committed { get; init; }
+    /// <summary>Images set aside at pickup as exact copies of ones already scanned (not in <see cref="Total"/>).</summary>
+    public int Duplicates { get; init; }
+    /// <summary>Collecting with auto-processing off: matching waits for someone to press Run.</summary>
+    public bool AwaitingRun { get; init; }
     public string? ClaimedBy { get; init; }
     public bool ClaimedByMe { get; init; }
     public DateTime CreatedUtc { get; init; }
@@ -1303,7 +1307,28 @@ public sealed record ScanBatchDto
     public string? Language { get; init; }
     public IReadOnlyList<string> SetCodes { get; init; } = [];
     public IReadOnlyList<ScanBatchItemDto> Items { get; init; } = [];
+    /// <summary>The exact duplicates set aside at pickup, folded into runs.</summary>
+    public IReadOnlyList<ScanBatchDuplicateRunDto> DuplicateRuns { get; init; } = [];
 }
+
+/// <summary>Consecutive images that byte-for-byte repeat consecutive earlier images — e.g. capture
+/// software that saved 0001–1000 a second time. <see cref="OriginalBatchName"/> is null when the
+/// originals are in the same batch.</summary>
+public sealed record ScanBatchDuplicateRunDto(
+    string FirstFile,
+    string LastFile,
+    int Count,
+    string OriginalFirstFile,
+    string OriginalLastFile,
+    string? OriginalBatchName);
+
+/// <summary>Start matching waiting batches: the listed ones, or all of them when empty.</summary>
+public sealed record ScanBatchRunRequest
+{
+    public IReadOnlyList<int> BatchIds { get; init; } = [];
+}
+
+public sealed record ScanBatchRunResultDto(int Started);
 
 /// <summary>The reviewer's edits to one batch item. Match results are never written from here.</summary>
 public sealed record ScanBatchItemEdit
@@ -1343,6 +1368,8 @@ public sealed record ScanBatchCountDto(int Unclaimed);
 public sealed record ScanFolderSettingsDto
 {
     public bool Enabled { get; init; }
+    /// <summary>Match batches on their own after the quiet period; off = wait for Run on the Scan page.</summary>
+    public bool AutoProcess { get; init; } = true;
     public int QuietPeriodSeconds { get; init; }
     public int RetentionDays { get; init; }
     public IReadOnlyList<ScanFolderConfigDto> Folders { get; init; } = [];

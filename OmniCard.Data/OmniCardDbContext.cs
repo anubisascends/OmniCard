@@ -244,7 +244,9 @@ public class OmniCardDbContext : DbContext
             e.Property(i => i.Language).HasMaxLength(16);
             e.Property(i => i.FoilType).HasMaxLength(64);
             e.Property(i => i.PurchasePrice).HasPrecision(18, 2);
+            e.Property(i => i.ContentHash).HasMaxLength(64);
             e.HasIndex(i => new { i.ScanBatchId, i.State, i.Status });
+            e.HasIndex(i => i.ContentHash);
         });
 
         modelBuilder.Entity<EbayListing>(e =>

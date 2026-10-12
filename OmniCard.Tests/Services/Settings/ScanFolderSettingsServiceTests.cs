@@ -37,6 +37,21 @@ public sealed class ScanFolderSettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public void AutoProcess_DefaultsOn_ForFilesSavedBeforeIt()
+    {
+        File.WriteAllText(Path.Combine(_dataDir, "scan-folder-settings.json"), """{ "Enabled": true, "Folders": [] }""");
+        Assert.True(NewService().Get().AutoProcess);
+        Assert.True(new ScanFolderSettings().AutoProcess);
+    }
+
+    [Fact]
+    public void AutoProcess_Off_RoundTrips()
+    {
+        Assert.Empty(NewService().Save(new ScanFolderSettings { Enabled = true, AutoProcess = false }));
+        Assert.False(NewService().Get().AutoProcess);
+    }
+
+    [Fact]
     public void Save_RoundTrips_AndRaisesChanged()
     {
         var svc = NewService();
