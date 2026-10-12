@@ -478,6 +478,12 @@ public sealed record AddOrderLineRequest
     public decimal UnitSalePrice { get; init; }
 }
 
+/// <summary>A listed-for-sale card the order editor can add as a line: <see cref="Available"/> is the
+/// lot's copies not already on an open (Created/Packed) order.</summary>
+public sealed record SellableListingDto(
+    int LotId, string Name, string SetName, string SetCode, string? CollectorNumber,
+    string? Condition, bool IsFoil, decimal ListedPrice, string Status, int Available);
+
 // --- Order CSV import ---
 
 /// <summary>A reusable column-mapping template for importing orders from a CSV.

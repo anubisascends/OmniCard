@@ -1,6 +1,7 @@
 import type {
   AccountDto,
   ActiveListingDto,
+  SellableListingDto,
   AuthStatusDto,
   BinderCardDto,
   BinderStateDto,
@@ -613,6 +614,9 @@ export const api = {
   orderShipScan: (code: string, ship: boolean) =>
     request<ShipScanResultDto>('/api/orders/ship-scan', { method: 'POST', body: JSON.stringify({ code, ship }) }),
   orderShip: (id: number) => request<OrderDto>(`/api/orders/${id}/ship`, { method: 'POST' }),
+  /** Listed-for-sale cards (with copies free) matching `q` — the order editor's add-card search. */
+  orderSellable: (opts: { q: string; game?: string; take?: number }) =>
+    request<SellableListingDto[]>(`/api/orders/sellable${qs(opts)}`),
   orderAddLine: (id: number, lotId: number, unitSalePrice: number) =>
     request<OrderLineDto>(`/api/orders/${id}/lines`, {
       method: 'POST',

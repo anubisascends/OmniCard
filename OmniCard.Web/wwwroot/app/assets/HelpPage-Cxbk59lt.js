@@ -1,4 +1,4 @@
-import{g as J,a as K,r as f,u as X,b as Y,c as D,j as n,d as Z,s as W,B as ce,m as ee,e as L,F as de,f as p,D as le,P as G,T as he,h as pe,i as H,k as V,l as ue,n as y,o as x,p as ge,I as me,C as ye,q as we,A as B,t as fe,L as T,v as b,w as be,x as _,S as I,y as ke,z as ve,E as Ce,G as z,H as q,J as xe,K as Te,M as Se,N as Ae,O as Ie,Q as _e}from"./index-CoEq2l2E.js";function Oe(e){return J("MuiCardActionArea",e)}const M=K("MuiCardActionArea",["root","focusVisible","focusHighlight"]),Be=e=>{const{classes:t}=e;return Z({root:["root"],focusHighlight:["focusHighlight"]},Oe,t)},Ee=W(ce,{name:"MuiCardActionArea",slot:"Root",overridesResolver:(e,t)=>t.root})(ee(({theme:e})=>({display:"block",textAlign:"inherit",borderRadius:"inherit",width:"100%",[`&:hover .${M.focusHighlight}`]:{opacity:(e.vars||e).palette.action.hoverOpacity,"@media (hover: none)":{opacity:0}},[`&.${M.focusVisible} .${M.focusHighlight}`]:{opacity:(e.vars||e).palette.action.focusOpacity}}))),Le=W("span",{name:"MuiCardActionArea",slot:"FocusHighlight",overridesResolver:(e,t)=>t.focusHighlight})(ee(({theme:e})=>({overflow:"hidden",pointerEvents:"none",position:"absolute",top:0,right:0,bottom:0,left:0,borderRadius:"inherit",opacity:0,backgroundColor:"currentcolor",transition:e.transitions.create("opacity",{duration:e.transitions.duration.short})}))),Me=f.forwardRef(function(t,r){const a=X({props:t,name:"MuiCardActionArea"}),{children:o,className:s,focusVisibleClassName:h,slots:i={},slotProps:l={},...d}=a,c=a,m=Be(c),u={slots:i,slotProps:l},[w,g]=Y("root",{elementType:Ee,externalForwardedProps:{...u,...d},shouldForwardComponentProp:!0,ownerState:c,ref:r,className:D(m.root,s),additionalProps:{focusVisibleClassName:D(h,m.focusVisible)}}),[v,k]=Y("focusHighlight",{elementType:Le,externalForwardedProps:u,ownerState:c,ref:r,className:m.focusHighlight});return n.jsxs(w,{...g,children:[o,n.jsx(v,{...k})]})});function Pe(e){return J("MuiTableContainer",e)}K("MuiTableContainer",["root"]);const Ne=e=>{const{classes:t}=e;return Z({root:["root"]},Pe,t)},De=W("div",{name:"MuiTableContainer",slot:"Root",overridesResolver:(e,t)=>t.root})({width:"100%",overflowX:"auto"}),Re=f.forwardRef(function(t,r){const a=X({props:t,name:"MuiTableContainer"}),{className:o,component:s="div",...h}=a,i={...a,component:s},l=Ne(i);return n.jsx(De,{ref:r,as:s,className:D(l.root,o),ownerState:i,...h})}),ne=L(n.jsx("path",{d:"M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"}),"ArrowBack"),te=L(n.jsx("path",{d:"m12 4-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"}),"ArrowForward"),Ue=`# Your account\r
+import{g as J,a as K,r as f,u as X,b as Y,c as D,j as n,d as Z,s as W,B as ce,m as ee,e as L,F as de,f as p,D as le,P as G,T as he,h as pe,i as H,k as V,l as ue,n as y,o as x,p as ge,I as me,C as ye,q as we,A as B,t as fe,L as T,v as b,w as be,x as _,S as I,y as ke,z as ve,E as Ce,G as z,H as q,J as xe,K as Te,M as Se,N as Ae,O as Ie,Q as _e}from"./index-BXx1lsQP.js";function Oe(e){return J("MuiCardActionArea",e)}const M=K("MuiCardActionArea",["root","focusVisible","focusHighlight"]),Be=e=>{const{classes:t}=e;return Z({root:["root"],focusHighlight:["focusHighlight"]},Oe,t)},Ee=W(ce,{name:"MuiCardActionArea",slot:"Root",overridesResolver:(e,t)=>t.root})(ee(({theme:e})=>({display:"block",textAlign:"inherit",borderRadius:"inherit",width:"100%",[`&:hover .${M.focusHighlight}`]:{opacity:(e.vars||e).palette.action.hoverOpacity,"@media (hover: none)":{opacity:0}},[`&.${M.focusVisible} .${M.focusHighlight}`]:{opacity:(e.vars||e).palette.action.focusOpacity}}))),Le=W("span",{name:"MuiCardActionArea",slot:"FocusHighlight",overridesResolver:(e,t)=>t.focusHighlight})(ee(({theme:e})=>({overflow:"hidden",pointerEvents:"none",position:"absolute",top:0,right:0,bottom:0,left:0,borderRadius:"inherit",opacity:0,backgroundColor:"currentcolor",transition:e.transitions.create("opacity",{duration:e.transitions.duration.short})}))),Me=f.forwardRef(function(t,r){const a=X({props:t,name:"MuiCardActionArea"}),{children:o,className:s,focusVisibleClassName:h,slots:i={},slotProps:l={},...d}=a,c=a,m=Be(c),u={slots:i,slotProps:l},[w,g]=Y("root",{elementType:Ee,externalForwardedProps:{...u,...d},shouldForwardComponentProp:!0,ownerState:c,ref:r,className:D(m.root,s),additionalProps:{focusVisibleClassName:D(h,m.focusVisible)}}),[v,k]=Y("focusHighlight",{elementType:Le,externalForwardedProps:u,ownerState:c,ref:r,className:m.focusHighlight});return n.jsxs(w,{...g,children:[o,n.jsx(v,{...k})]})});function Pe(e){return J("MuiTableContainer",e)}K("MuiTableContainer",["root"]);const Ne=e=>{const{classes:t}=e;return Z({root:["root"]},Pe,t)},De=W("div",{name:"MuiTableContainer",slot:"Root",overridesResolver:(e,t)=>t.root})({width:"100%",overflowX:"auto"}),Re=f.forwardRef(function(t,r){const a=X({props:t,name:"MuiTableContainer"}),{className:o,component:s="div",...h}=a,i={...a,component:s},l=Ne(i);return n.jsx(De,{ref:r,as:s,className:D(l.root,o),ownerState:i,...h})}),ne=L(n.jsx("path",{d:"M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"}),"ArrowBack"),te=L(n.jsx("path",{d:"m12 4-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"}),"ArrowForward"),Fe=`# Your account\r
 \r
 The Account page is where you change your own email and password. Everyone can use it, whatever their permissions.\r
 \r
@@ -28,7 +28,7 @@ If the two new passwords don't match, the form says *Passwords don't match.*\r
 \r
 > [!TIP]\r
 > Forgotten your password? You can't change it here without the current one. Ask an administrator to require a password reset. They'll give you a setup key to enter when you next sign in. See [Sign-in problems](help:troubleshooting).\r
-`,Fe=`# Administration\r
+`,Ue=`# Administration\r
 \r
 Depending on your access, the Administration page is where you manage users, roles, sites, catalog data and OmniCard's settings. To change your own email or password, use [Your account](help:account) instead. This topic explains every tab and who can see it.\r
 \r
@@ -2106,256 +2106,258 @@ In selection mode you can also use **Bulk edit**, **List for sale**, **Export CS
 - **Audit or Import buttons are missing.** These need extra permissions. Ask an administrator.\r
 - **Import says nothing was imported.** That's expected when any line has a problem. Fix every listed row and import again.\r
 - **I can't move a card into a deck box.** The deck box holds a different game. See [Deck boxes](help:deck-boxes#one-game-per-deck-box).\r
-`,Ke=`# Sales\r
-\r
-Sell cards from your collection: list them for sale, pull them for shipping, track orders from creation to completion, and keep a customer list.\r
-\r
-## How selling works in OmniCard\r
-\r
-Selling usually follows these steps:\r
-\r
-1. **List** a card for sale from your collection, setting a price and a sales channel (Manual, TCGplayer or eBay).\r
-2. **Pick** it: pull the card from where it's stored, and optionally move it to your for-sale location.\r
-3. **Record the order** for the buyer and add the cards they bought.\r
-4. **Move the order across the board** as you pack, ship and complete it. When it reaches a shipped lane, OmniCard records the sale and removes the sold cards from your collection.\r
-\r
-The [Sales](/sales) page has three tabs: **Orders**, **Listings** and **Customers**.\r
-\r
-![The Sales page Orders board](sales-orders-board.png)\r
-\r
-> [!NOTE]\r
-> If you don't see **Sales** in the menu, or some buttons are missing, ask an administrator for access.\r
-\r
-## List cards for sale\r
-\r
-You list cards from wherever you view them, not from the Sales page.\r
-\r
-### List one card\r
-\r
-1. Open a card's details. For example, click a card on the [Collection](help:collection) page or in a location, or open a card's menu in a [binder](help:binders) and choose **Card details**.\r
-2. Click **List for sale**.\r
-3. If you own more than one copy, set **Quantity (you have N)**. Listing fewer than all of them splits those copies off into their own stack, so only the listed copies get picked later. Listing all of them lists the whole stack.\r
-4. Check the **Price**. It starts at the card's market price.\r
-5. Choose a **Channel**: **Manual**, **TCGplayer** or **eBay**.\r
-6. Optionally add a **Note**.\r
-7. Click **List for sale**.\r
-\r
-![The List for sale dialog](sales-list-for-sale.png)\r
-\r
-Choosing **eBay** adds an eBay section and publishes the listing on eBay. See [eBay](help:ebay).\r
-\r
-> [!TIP]\r
-> In a binder, you can also open a card's menu and choose **List for sale** directly.\r
-\r
-### List many cards at once\r
-\r
-1. On the Collection page or a location page, click **Select** and tick the cards you want.\r
-2. Click **List for sale** in the selection bar.\r
-3. Choose a **Channel** and optionally add a **Note**, then click **List for sale**.\r
-\r
-Each selected card is listed as a whole stack at its current market price. Cards that are already listed are skipped. Fine-tune prices afterwards on the **Listings** tab.\r
-\r
-> [!NOTE]\r
-> Bulk listing with the **eBay** channel only marks the cards as listed in OmniCard. It doesn't publish anything on eBay. To publish on eBay, list each card on its own. See [eBay](help:ebay).\r
-\r
-A card that's already listed shows **Already listed for sale** in its details. Unlist it from the **Listings** tab before listing it again.\r
-\r
-## Manage listings\r
-\r
-The **Listings** tab shows every active listing.\r
-\r
-![The Listings tab](sales-listings.png)\r
-\r
-| Column | Meaning |\r
-|---|---|\r
-| **Name** | The card name (✦ marks a foil) |\r
-| **Set** | The set code |\r
-| **Cond** | The card's condition |\r
-| **Channel** | Manual, TCGplayer or eBay |\r
-| **Qty** | How many copies are listed |\r
-| **Price** | The listed price per copy |\r
-| **Status** | **Listed** (waiting to be pulled) or **Picked** (pulled for sale) |\r
-\r
-The buttons at the end of each row:\r
-\r
-- **Mark picked (move to sales location)**: the check mark, shown on listings that are still **Listed**. See [Pick listed cards](help:sales#pick-listed-cards).\r
-- **Edit**: change the listing's price, channel, quantity or note.\r
-- **View on eBay**: opens the live eBay listing in a new tab. Shown only for cards published on eBay.\r
-- **Update on eBay**: changes the live eBay listing. Shown only for cards published on eBay. See [eBay](help:ebay).\r
-- **Unlist**: takes the card off the market. The card stays in your collection.\r
-\r
-### Edit a listing\r
-\r
-1. Click the **Edit** button on the listing's row.\r
-2. In **Edit listing**, change the **Price**, **Channel**, **Quantity** or **Note**.\r
-3. Click **Save**.\r
-\r
-> [!NOTE]\r
-> Editing a listing changes it in OmniCard only. To change a card that's live on eBay, use **Update on eBay**.\r
-\r
-## Pick listed cards\r
-\r
-Picking means pulling listed cards from storage so they're ready to sell. When you mark a listing picked, its status changes to **Picked**. If your for-sale location is turned on, the card also moves to that location, so OmniCard always knows where it is.\r
-\r
-1. On the **Listings** tab, click **Pick list (PDF)** to download a printable list of the cards to pull and where each one is stored. The list follows the game selector at the top of the app.\r
-2. Pull the cards.\r
-3. Click the check mark on each listing you pulled, or click **Mark all picked (N)** to mark every listed card at once.\r
-\r
-If picking fails because no for-sale location is set, an error appears with a link to **Settings**. Set one up as described below.\r
-\r
-### Set up the for-sale location\r
-\r
-These options are on the **Administration** page, **Sales** tab:\r
-\r
-- **For-sale location**: the location picked cards move to. Click **Change** to pick one, or **Clear** to remove it.\r
-- **Move picked cards to the for-sale location**: when on, marking a listing picked moves the card to the for-sale location. When off, picking only changes the status and the card stays where it is.\r
-\r
-![The Sales tab on the Administration page](sales-settings-for-sale-location.png)\r
-\r
-> [!TIP]\r
-> Create a location called "For Sale" on the [Locations](help:locations) page and choose it here. Your pulled cards then stay together in one place until they ship.\r
-\r
-## Work with orders\r
-\r
-The **Orders** tab is a board. Each column, or lane, is a stage of the order, and each order is a card in a lane. A card shows the customer, the channel, the order number, the item count and the order total.\r
-\r
-The standard lanes are:\r
-\r
-| Lane | What it means |\r
-|---|---|\r
-| **Created** | A new order. You can still edit everything. |\r
-| **Packed** | Packed and ready to ship. You can still edit everything. |\r
-| **Shipped** | Sent. OmniCard records the sale and removes the sold cards from your collection. |\r
-| **Completed** | Finished. |\r
-| **Cancelled** | Called off. Nothing is removed from your collection. |\r
-\r
-Each lane's dot and the colored stripe on its order cards help you scan the board at a glance. The number next to a lane's name is how many orders it holds.\r
-\r
-> [!NOTE]\r
-> Your board's lanes can be customized for your store, so lane names and colors may differ. Each lane still behaves like one of the stages above.\r
-\r
-### Create an order\r
-\r
-1. Click **New order**.\r
-2. Choose a **Customer**. If the buyer isn't listed yet, add them on the **Customers** tab first.\r
-3. Choose the **Channel** and optionally enter an **Order # (optional)**, such as a marketplace order number.\r
-4. Click **Create**. The order's details panel opens so you can add cards.\r
-\r
-### Add cards to an order\r
-\r
-1. In the order's details panel, type at least two letters of a card name in **Add a card (search your collection)**. Results come from your collection and follow the game selector at the top of the app.\r
-2. Each result shows the card's name, set and condition, plus a price box that starts at the market price. Change the price if needed.\r
-3. Click **+** to add the card. Each click adds one copy.\r
-\r
-The **Items** heading shows the number of items and the order total. To remove a card, click the trash button on its line.\r
-\r
-![An order's details panel](sales-order-detail.png)\r
-\r
-> [!TIP]\r
-> Building a big order? Leave the search text in place and click **+** on each result you need. The list stays open, so you can add several cards in a row.\r
-\r
-### Fill in order details\r
-\r
-The top of the details panel holds the order's details: **Channel**, **Order #**, **Tracking**, **Carrier**, **Ship charged** (what the buyer paid for shipping), **Ship cost** (what shipping cost you), **Fees** (marketplace fees) and **Notes**. Click **Save header** to keep your changes.\r
-\r
-To fill in **Tracking** from the label, click **Scan label** (the barcode button in that box) and hold the label up to your camera. With a tracking number saved, you can mark the order shipped by scanning its label on the [Ship](help:shipping) page.\r
-\r
-### Move an order through the board\r
-\r
-Drag an order's card and drop it on another lane. The move saves right away.\r
-\r
-When an order enters a shipped lane for the first time:\r
-\r
-- The sale is recorded, and the sold copies are removed from your collection.\r
-- The cards' listings are marked sold.\r
-- Any live eBay listing for those cards is ended, so they can't sell twice.\r
-\r
-> [!WARNING]\r
-> Add every card to the order before you move it to **Shipped**. Cards added afterwards aren't removed from your collection automatically.\r
-\r
-### Edit a shipped or completed order\r
-\r
-Once an order is past **Packed**, its details panel is locked. A message says that header and line edits are locked until you move the order back to Created or Packed.\r
-\r
-To correct a mistake, drag the order back to **Created** or **Packed**, make your changes, then move it forward again.\r
-\r
-> [!WARNING]\r
-> Moving a shipped order back doesn't return its cards to your collection, and moving it to **Shipped** again records the sale again. Only do this to fix order details, and check your collection afterwards.\r
-\r
-### Delete an order\r
-\r
-While an order is in **Created** or **Packed**, open it and click **Delete order**, then confirm. Shipped and completed orders can't be deleted. Move them to **Cancelled** instead if they didn't go through.\r
-\r
-## Print a receipt\r
-\r
-1. Click an order on the board to open its details.\r
-2. Click **Print receipt**. A print-ready receipt opens in a new tab, sized for your receipt printer, and your browser's print dialog appears.\r
-3. Or click **PDF** to download the receipt as a PDF file.\r
-\r
-An administrator sets the store name, address, logo, paper width, font size, footer text and whether prices are shown. These options are on the **Administration** page, **Receipts** tab. See [Administration](help:administration).\r
-\r
-![A printed receipt preview](sales-receipt.png)\r
-\r
-## Import orders from a CSV file\r
-\r
-Bring in orders from a marketplace export, such as a TCGplayer shipping export, instead of typing them in.\r
-\r
-1. On the **Orders** tab, click **Import CSV**.\r
-2. **Choose file**: click **Choose CSV file…** and pick your file.\r
-3. **Map columns**: tell OmniCard which column in your file holds each order field.\r
-   - Pick a **Template**. **TCGPlayer Shipping Export (built-in)** is selected to start, and it already matches TCGplayer's columns.\r
-   - Choose the **Channel** the orders came from.\r
-   - For each field, pick the matching column from your file, or leave it **— not mapped —**.\r
-   - **Order number** must be mapped. OmniCard uses it to recognize orders you've already imported.\r
-4. Click **Preview**.\r
-5. **Review & import**: check the rows. Untick any you don't want, then click **Import N orders**.\r
-\r
-![The Import orders from CSV dialog, mapping step](sales-import-orders-map.png)\r
-\r
-The fields you can map are **Full name**, **First name**, **Last name**, **Order number**, **Order date**, **Address line 1**, **Address line 2**, **City**, **State / province**, **Postal code**, **Country**, **Shipping fee paid**, **Item count**, **Value of products**, **Tracking number** and **Carrier**.\r
-\r
-In the review step, the **Status** column tells you what will happen to each row:\r
-\r
-| Status | Meaning |\r
-|---|---|\r
-| New customer · New order | Creates the order and a new customer |\r
-| Matched customer · New order | Creates the order for an existing customer (matched by name and postal code), and updates that customer's address |\r
-| Already imported | This order number already exists, so the row is skipped |\r
-\r
-Warnings, such as a date that couldn't be read, appear above the list. Imported orders start in the **Created** lane.\r
-\r
-> [!NOTE]\r
-> Imported orders include the buyer, order number, date, shipping and tracking, but not the individual cards. Open an imported order and add cards from your collection if you want them removed from your collection when it ships.\r
-\r
-### Save your own import template\r
-\r
-If you import from a source whose columns don't match a template:\r
-\r
-1. Map the columns as described above.\r
-2. Enter a **New template name** and click **Save as template**.\r
-\r
-Next time, pick your template from the **Template** list. To remove a template you saved, select it and click **Delete this template**. The built-in template can't be deleted.\r
-\r
-## Manage customers\r
-\r
-The **Customers** tab lists everyone you sell to, with their **Name**, **Email**, **Phone** and **Location** (city and state).\r
-\r
-![The Customers tab](sales-customers.png)\r
-\r
-- **Add a customer**: click **New customer**, fill in at least the **Name**, and click **Save**. You can also add email, phone and a full mailing address.\r
-- **Edit a customer**: click the pencil button on their row.\r
-- **Delete a customer**: click the trash button and confirm.\r
-\r
-Customers are also created automatically when you import orders from a CSV file.\r
-\r
-## Troubleshooting\r
-\r
-- **"Mark picked" shows an error about the for-sale location.** No for-sale location is set, or the one you chose was deleted. Set one on the **Administration** page, **Sales** tab, or turn off **Move picked cards to the for-sale location**.\r
-- **I can't edit an order.** It's past **Packed**. See [Edit a shipped or completed order](help:sales#edit-a-shipped-or-completed-order).\r
-- **A card won't list.** It's already listed. Find it on the **Listings** tab and click **Unlist** first.\r
-- **My search in "Add a card" finds nothing.** Type at least two letters, and check that the game selector at the top of the app is set to the card's game or **All Games**.\r
-\r
-For more help, see [Troubleshooting](help:troubleshooting).\r
+`,Ke=`# Sales
+
+Sell cards from your collection: list them for sale, pull them for shipping, track orders from creation to completion, and keep a customer list.
+
+## How selling works in OmniCard
+
+Selling usually follows these steps:
+
+1. **List** a card for sale from your collection, setting a price and a sales channel (Manual, TCGplayer or eBay).
+2. **Pick** it: pull the card from where it's stored, and optionally move it to your for-sale location.
+3. **Record the order** for the buyer and add the cards they bought.
+4. **Move the order across the board** as you pack, ship and complete it. When it reaches a shipped lane, OmniCard records the sale and removes the sold cards from your collection.
+
+The [Sales](/sales) page has three tabs: **Orders**, **Listings** and **Customers**.
+
+![The Sales page Orders board](sales-orders-board.png)
+
+> [!NOTE]
+> If you don't see **Sales** in the menu, or some buttons are missing, ask an administrator for access.
+
+## List cards for sale
+
+You list cards from wherever you view them, not from the Sales page.
+
+### List one card
+
+1. Open a card's details. For example, click a card on the [Collection](help:collection) page or in a location, or open a card's menu in a [binder](help:binders) and choose **Card details**.
+2. Click **List for sale**.
+3. If you own more than one copy, set **Quantity (you have N)**. Listing fewer than all of them splits those copies off into their own stack, so only the listed copies get picked later. Listing all of them lists the whole stack.
+4. Check the **Price**. It starts at the card's market price.
+5. Choose a **Channel**: **Manual**, **TCGplayer** or **eBay**.
+6. Optionally add a **Note**.
+7. Click **List for sale**.
+
+![The List for sale dialog](sales-list-for-sale.png)
+
+Choosing **eBay** adds an eBay section and publishes the listing on eBay. See [eBay](help:ebay).
+
+> [!TIP]
+> In a binder, you can also open a card's menu and choose **List for sale** directly.
+
+### List many cards at once
+
+1. On the Collection page or a location page, click **Select** and tick the cards you want.
+2. Click **List for sale** in the selection bar.
+3. Choose a **Channel** and optionally add a **Note**, then click **List for sale**.
+
+Each selected card is listed as a whole stack at its current market price. Cards that are already listed are skipped. Fine-tune prices afterwards on the **Listings** tab.
+
+> [!NOTE]
+> Bulk listing with the **eBay** channel only marks the cards as listed in OmniCard. It doesn't publish anything on eBay. To publish on eBay, list each card on its own. See [eBay](help:ebay).
+
+A card that's already listed shows **Already listed for sale** in its details. Unlist it from the **Listings** tab before listing it again.
+
+## Manage listings
+
+The **Listings** tab shows every active listing.
+
+![The Listings tab](sales-listings.png)
+
+| Column | Meaning |
+|---|---|
+| **Name** | The card name (✦ marks a foil) |
+| **Set** | The set code |
+| **Cond** | The card's condition |
+| **Channel** | Manual, TCGplayer or eBay |
+| **Qty** | How many copies are listed |
+| **Price** | The listed price per copy |
+| **Status** | **Listed** (waiting to be pulled) or **Picked** (pulled for sale) |
+
+The buttons at the end of each row:
+
+- **Mark picked (move to sales location)**: the check mark, shown on listings that are still **Listed**. See [Pick listed cards](help:sales#pick-listed-cards).
+- **Edit**: change the listing's price, channel, quantity or note.
+- **View on eBay**: opens the live eBay listing in a new tab. Shown only for cards published on eBay.
+- **Update on eBay**: changes the live eBay listing. Shown only for cards published on eBay. See [eBay](help:ebay).
+- **Unlist**: takes the card off the market. The card stays in your collection.
+
+### Edit a listing
+
+1. Click the **Edit** button on the listing's row.
+2. In **Edit listing**, change the **Price**, **Channel**, **Quantity** or **Note**.
+3. Click **Save**.
+
+> [!NOTE]
+> Editing a listing changes it in OmniCard only. To change a card that's live on eBay, use **Update on eBay**.
+
+## Pick listed cards
+
+Picking means pulling listed cards from storage so they're ready to sell. When you mark a listing picked, its status changes to **Picked**. If your for-sale location is turned on, the card also moves to that location, so OmniCard always knows where it is.
+
+1. On the **Listings** tab, click **Pick list (PDF)** to download a printable list of the cards to pull and where each one is stored. The list follows the game selector at the top of the app.
+2. Pull the cards.
+3. Click the check mark on each listing you pulled, or click **Mark all picked (N)** to mark every listed card at once.
+
+If picking fails because no for-sale location is set, an error appears with a link to **Settings**. Set one up as described below.
+
+### Set up the for-sale location
+
+These options are on the **Administration** page, **Sales** tab:
+
+- **For-sale location**: the location picked cards move to. Click **Change** to pick one, or **Clear** to remove it.
+- **Move picked cards to the for-sale location**: when on, marking a listing picked moves the card to the for-sale location. When off, picking only changes the status and the card stays where it is.
+
+![The Sales tab on the Administration page](sales-settings-for-sale-location.png)
+
+> [!TIP]
+> Create a location called "For Sale" on the [Locations](help:locations) page and choose it here. Your pulled cards then stay together in one place until they ship.
+
+## Work with orders
+
+The **Orders** tab is a board. Each column, or lane, is a stage of the order, and each order is a card in a lane. A card shows the customer, the channel, the order number, the item count and the order total.
+
+The standard lanes are:
+
+| Lane | What it means |
+|---|---|
+| **Created** | A new order. You can still edit everything. |
+| **Packed** | Packed and ready to ship. You can still edit everything. |
+| **Shipped** | Sent. OmniCard records the sale and removes the sold cards from your collection. |
+| **Completed** | Finished. |
+| **Cancelled** | Called off. Nothing is removed from your collection. |
+
+Each lane's dot and the colored stripe on its order cards help you scan the board at a glance. The number next to a lane's name is how many orders it holds.
+
+> [!NOTE]
+> Your board's lanes can be customized for your store, so lane names and colors may differ. Each lane still behaves like one of the stages above.
+
+### Create an order
+
+1. Click **New order**.
+2. Choose a **Customer**. If the buyer isn't listed yet, add them on the **Customers** tab first.
+3. Choose the **Channel** and optionally enter an **Order # (optional)**, such as a marketplace order number.
+4. Click **Create**. The order's details panel opens so you can add cards.
+
+### Add cards to an order
+
+1. In the order's details panel, type at least two letters in **Add a card (search cards listed for sale)**. You can search by card name, set code or set name, and add a collector number. For example, \`sol ring c21\`. Only cards listed for sale show up. The rest of your collection doesn't. Results follow the game selector at the top of the app.
+2. Each result shows the card's name, set, collector number and condition, plus a price box that starts at the listed price. Change the price if needed. When a listing has more than one copy, the result shows how many are still available.
+3. Click **+** to add the card. Each click adds one copy.
+
+Copies already on another open order (**Created** or **Packed**) aren't offered, so the same card can't be sold twice. To sell a card that isn't listed yet, list it for sale first (see [List cards for sale](help:sales#list-cards-for-sale)).
+
+The **Items** heading shows the number of items and the order total. To remove a card, click the trash button on its line.
+
+![An order's details panel](sales-order-detail.png)
+
+> [!TIP]
+> Building a big order? Leave the search text in place and click **+** on each result you need. The list stays open, so you can add several cards in a row.
+
+### Fill in order details
+
+The top of the details panel holds the order's details: **Channel**, **Order #**, **Tracking**, **Carrier**, **Ship charged** (what the buyer paid for shipping), **Ship cost** (what shipping cost you), **Fees** (marketplace fees) and **Notes**. Click **Save header** to keep your changes.
+
+To fill in **Tracking** from the label, click **Scan label** (the barcode button in that box) and hold the label up to your camera. With a tracking number saved, you can mark the order shipped by scanning its label on the [Ship](help:shipping) page.
+
+### Move an order through the board
+
+Drag an order's card and drop it on another lane. The move saves right away.
+
+When an order enters a shipped lane for the first time:
+
+- The sale is recorded, and the sold copies are removed from your collection.
+- The cards' listings are marked sold.
+- Any live eBay listing for those cards is ended, so they can't sell twice.
+
+> [!WARNING]
+> Add every card to the order before you move it to **Shipped**. Cards added afterwards aren't removed from your collection automatically.
+
+### Edit a shipped or completed order
+
+Once an order is past **Packed**, its details panel is locked. A message says that header and line edits are locked until you move the order back to Created or Packed.
+
+To correct a mistake, drag the order back to **Created** or **Packed**, make your changes, then move it forward again.
+
+> [!WARNING]
+> Moving a shipped order back doesn't return its cards to your collection, and moving it to **Shipped** again records the sale again. Only do this to fix order details, and check your collection afterwards.
+
+### Delete an order
+
+While an order is in **Created** or **Packed**, open it and click **Delete order**, then confirm. Shipped and completed orders can't be deleted. Move them to **Cancelled** instead if they didn't go through.
+
+## Print a receipt
+
+1. Click an order on the board to open its details.
+2. Click **Print receipt**. A print-ready receipt opens in a new tab, sized for your receipt printer, and your browser's print dialog appears.
+3. Or click **PDF** to download the receipt as a PDF file.
+
+An administrator sets the store name, address, logo, paper width, font size, footer text and whether prices are shown. These options are on the **Administration** page, **Receipts** tab. See [Administration](help:administration).
+
+![A printed receipt preview](sales-receipt.png)
+
+## Import orders from a CSV file
+
+Bring in orders from a marketplace export, such as a TCGplayer shipping export, instead of typing them in.
+
+1. On the **Orders** tab, click **Import CSV**.
+2. **Choose file**: click **Choose CSV file…** and pick your file.
+3. **Map columns**: tell OmniCard which column in your file holds each order field.
+   - Pick a **Template**. **TCGPlayer Shipping Export (built-in)** is selected to start, and it already matches TCGplayer's columns.
+   - Choose the **Channel** the orders came from.
+   - For each field, pick the matching column from your file, or leave it **— not mapped —**.
+   - **Order number** must be mapped. OmniCard uses it to recognize orders you've already imported.
+4. Click **Preview**.
+5. **Review & import**: check the rows. Untick any you don't want, then click **Import N orders**.
+
+![The Import orders from CSV dialog, mapping step](sales-import-orders-map.png)
+
+The fields you can map are **Full name**, **First name**, **Last name**, **Order number**, **Order date**, **Address line 1**, **Address line 2**, **City**, **State / province**, **Postal code**, **Country**, **Shipping fee paid**, **Item count**, **Value of products**, **Tracking number** and **Carrier**.
+
+In the review step, the **Status** column tells you what will happen to each row:
+
+| Status | Meaning |
+|---|---|
+| New customer · New order | Creates the order and a new customer |
+| Matched customer · New order | Creates the order for an existing customer (matched by name and postal code), and updates that customer's address |
+| Already imported | This order number already exists, so the row is skipped |
+
+Warnings, such as a date that couldn't be read, appear above the list. Imported orders start in the **Created** lane.
+
+> [!NOTE]
+> Imported orders include the buyer, order number, date, shipping and tracking, but not the individual cards. Open an imported order and add cards from your collection if you want them removed from your collection when it ships.
+
+### Save your own import template
+
+If you import from a source whose columns don't match a template:
+
+1. Map the columns as described above.
+2. Enter a **New template name** and click **Save as template**.
+
+Next time, pick your template from the **Template** list. To remove a template you saved, select it and click **Delete this template**. The built-in template can't be deleted.
+
+## Manage customers
+
+The **Customers** tab lists everyone you sell to, with their **Name**, **Email**, **Phone** and **Location** (city and state).
+
+![The Customers tab](sales-customers.png)
+
+- **Add a customer**: click **New customer**, fill in at least the **Name**, and click **Save**. You can also add email, phone and a full mailing address.
+- **Edit a customer**: click the pencil button on their row.
+- **Delete a customer**: click the trash button and confirm.
+
+Customers are also created automatically when you import orders from a CSV file.
+
+## Troubleshooting
+
+- **"Mark picked" shows an error about the for-sale location.** No for-sale location is set, or the one you chose was deleted. Set one on the **Administration** page, **Sales** tab, or turn off **Move picked cards to the for-sale location**.
+- **I can't edit an order.** It's past **Packed**. See [Edit a shipped or completed order](help:sales#edit-a-shipped-or-completed-order).
+- **A card won't list.** It's already listed. Find it on the **Listings** tab and click **Unlist** first.
+- **My search in "Add a card" finds nothing.** Type at least two letters, and check that the game selector at the top of the app is set to the card's game or **All Games**. Only cards listed for sale are offered: list the card first, and check it isn't already on another open order.
+
+For more help, see [Troubleshooting](help:troubleshooting).
 `,Xe=`# Saved views\r
 \r
 A saved view remembers how you like a card list laid out: the search, the sort, rows per page, **Stack duplicates**, which columns show and in what order, how rows are grouped, and on a location page, table or stacked view and how stacks are grouped. Save as many views as you like and choose one to open by default.\r
@@ -2876,68 +2878,69 @@ To see where your copies of a card are, search for it on the [Collection](/colle
 - **The set list is empty.** The card catalog for that game hasn't been downloaded yet. An administrator can download it from **Administration ▸ Catalog Data**. See [Administration](help:administration).\r
 - **Prices are blank.** No price is available for that card yet. Prices update when the catalog is refreshed.\r
 - **A card I own shows as not owned.** Check that the card in your collection has the right set and collector number. Open it from the [Collection](/collection) page and compare it with the checklist.\r
-`,an=`# Ship packages\r
-\r
-Mark orders as shipped by scanning their shipping labels as the packages go out. Scan with your phone at the mailbox or post office, or with a webcam or handheld scanner at a shipping desk. You don't have to remember to update the board later.\r
-\r
-## Before you start\r
-\r
-The Ship page finds an order by its tracking number, so each order needs one before you scan:\r
-\r
-1. Open the order on the [Sales](/sales) page.\r
-2. Type the number in **Tracking**, or click **Scan label** (the barcode button in that box) and hold the label up to your camera.\r
-3. Click **Save header**.\r
-\r
-Scanning the label fills in the tracking number for you. If another order already has that tracking number, OmniCard warns you.\r
-\r
-> [!NOTE]\r
-> You need permission to ship orders. You have it if you can edit orders, or if an administrator gave you **Ship (scan labels)** under **Sales · Orders**. See [Administration](help:administration).\r
-\r
-## Scan packages as they go out\r
-\r
-1. Click **Ship** in the menu.\r
-2. Allow camera access when your browser asks.\r
-3. Point the camera at the barcode on the shipping label. Fit the barcode inside the white box.\r
-\r
-You hear a beep, your phone vibrates, and the result shows under the camera:\r
-\r
-| Result | Meaning |\r
-|---|---|\r
-| **Shipped** | The order is now in your shipped lane. |\r
-| **Ready to ship** | One order matches. Click **Mark shipped** to ship it. Shown when **Auto-ship** is off. |\r
-| **Already shipped** | That order was shipped earlier. Nothing changes. |\r
-| **… open orders use this tracking number** | More than one order has this tracking number. Click **Mark shipped** on the one you're sending. |\r
-| **No open order has tracking number …** | No order in **Created** or **Packed** has this number. Add it to the order and scan again. |\r
-\r
-Shipping an order from this page does the same as dragging it into the shipped lane on the board: OmniCard records the sale and removes the sold cards from your collection. If you've added your own lanes, the order goes into the first lane that ships orders.\r
-\r
-The **This session** list shows everything you scanned since you opened the page, with a count of shipped orders. Click **Open order** to see an order's details.\r
-\r
-> [!TIP]\r
-> Barcodes from USPS, UPS and FedEx all work. USPS and FedEx labels hold extra routing digits around the tracking number, and OmniCard ignores them.\r
-\r
-## Auto-ship\r
-\r
-Turn on **Auto-ship** to ship each order as soon as you scan its label, without clicking **Mark shipped**. This suits a shipping desk with a webcam, where you hold up one package after another.\r
-\r
-OmniCard still asks you to choose when more than one order has the same tracking number.\r
-\r
-> [!WARNING]\r
-> Shipping can't be undone from the Ship page. Moving an order back on the board doesn't return its cards to your collection. Leave **Auto-ship** off if you'd like to check each package.\r
-\r
-Your **Auto-ship** and **Camera** choices are remembered on each device.\r
-\r
-## Use a webcam or handheld scanner\r
-\r
-- **More than one camera:** choose the camera you want under the video. OmniCard remembers it on this computer.\r
-- **Handheld barcode scanner:** turn **Camera** off, click in **Tracking number**, and scan. Most handheld scanners press Enter for you. You can also type a number and press Enter.\r
-- **Dark spot:** on phones that have one, tap the flashlight button on the video.\r
-\r
-## Troubleshooting\r
-\r
-- **The camera doesn't start:** check that your browser is allowed to use the camera. The camera only works when you open OmniCard over a secure address (starting with \`https://\`). If it can't start, type the tracking number or use a handheld scanner instead.\r
-- **A label won't scan:** move closer so the barcode fills most of the white box, and avoid glare. Or type the number.\r
-- **No open order found:** check the order's **Tracking** box against the label. If the order was moved back to **Created** or **Packed** after shipping, scanning ships it again.\r
+`,an=`# Ship packages
+
+Mark orders as shipped by scanning their shipping labels as the packages go out. Scan with your phone at the mailbox or post office, or with a webcam or handheld scanner at a shipping desk. You don't have to remember to update the board later.
+
+## Before you start
+
+The Ship page finds an order by its tracking number, so each order needs one before you scan:
+
+1. Open the order on the [Sales](/sales) page.
+2. Type the number in **Tracking**, or click **Scan label** (the barcode button in that box) and hold the label up to your camera.
+3. Click **Save header**.
+
+Scanning the label fills in the tracking number for you. If another order already has that tracking number, OmniCard warns you.
+
+> [!NOTE]
+> You need permission to ship orders. You have it if you can edit orders, or if an administrator gave you **Ship (scan labels)** under **Sales · Orders**. See [Administration](help:administration).
+
+## Scan packages as they go out
+
+1. Click **Ship** in the menu.
+2. Allow camera access when your browser asks.
+3. Point the camera at the barcode on the shipping label. Fit the barcode inside the white box.
+
+You hear a beep, your phone vibrates, and the result shows under the camera:
+
+| Result | Meaning |
+|---|---|
+| **Shipped** | The order is now in your shipped lane. |
+| **Ready to ship** | One order matches. Click **Mark shipped** to ship it. Shown when **Auto-ship** is off. |
+| **Already shipped** | That order was shipped earlier. Nothing changes. |
+| **… open orders use this tracking number** | More than one order has this tracking number. Click **Mark shipped** on the one you're sending. |
+| **No open order has tracking number …** | No order in **Created** or **Packed** has this number. Add it to the order and scan again. |
+
+Shipping an order from this page does the same as dragging it into the shipped lane on the board: OmniCard records the sale and removes the sold cards from your collection. If you've added your own lanes, the order goes into the first lane that ships orders.
+
+The **This session** list shows everything you scanned since you opened the page, with a count of shipped orders. Click **Open order** to see an order's details.
+
+> [!TIP]
+> Barcodes from USPS, UPS and FedEx all work. USPS and FedEx labels hold extra routing digits around the tracking number, and OmniCard ignores them.
+
+## Auto-ship
+
+Turn on **Auto-ship** to ship each order as soon as you scan its label, without clicking **Mark shipped**. This suits a shipping desk with a webcam, where you hold up one package after another.
+
+OmniCard still asks you to choose when more than one order has the same tracking number.
+
+> [!WARNING]
+> Shipping can't be undone from the Ship page. Moving an order back on the board doesn't return its cards to your collection. Leave **Auto-ship** off if you'd like to check each package.
+
+Your **Auto-ship** and **Camera** choices are remembered on each device.
+
+## Use a webcam or handheld scanner
+
+- **More than one camera:** choose the camera you want under the video. OmniCard remembers it on this computer.
+- **Handheld barcode scanner:** turn **Camera** off, click in **Tracking number**, and scan. Most handheld scanners press Enter for you. You can also type a number and press Enter.
+- **Dark spot:** on phones that have one, tap the flashlight button on the video.
+
+## Troubleshooting
+
+- **The camera doesn't start:** check that your browser is allowed to use the camera. The camera only works when you open OmniCard over a secure address (starting with \`https://\`). If it can't start, type the tracking number or use a handheld scanner instead.
+- **A label won't scan:** move closer so the barcode fills most of the white box, hold it flat and steady, and avoid glare. Or type the number.
+- **A barcode you printed yourself won't scan:** if you used a Code 39 ("3 of 9") barcode font, the text must start and end with an asterisk, like \`*1Z999AA10123456784*\`. Without them the bars aren't a valid barcode and no scanner can read it.
+- **No open order found:** check the order's **Tracking** box against the label. If the order was moved back to **Created** or **Packed** after shipping, scanning ships it again.
 `,rn=`# Tag rules\r
 \r
 Tag rules tag cards for you. Each rule is a search for one game, such as \`t:creature r>=rare\` or \`is:commander\`, plus one or more tags. Cards that match get those tags when you scan or import them, and an administrator can apply a rule to the cards you already own.\r
@@ -3306,12 +3309,12 @@ See [Administration](help:administration).\r
 - Reload the page. Many temporary problems clear up after a refresh.\r
 - Check you're on the right game and site.\r
 - Ask your OmniCard administrator. If you are the administrator, check the **Recent** results on the **Catalog Data** tab, and the folder status under **Scan Badges**.\r
-`,cn="/app/assets/administration-catalog-data-BjeNaI2j.png",dn="/app/assets/administration-ebay-connected-KcM4O_Pg.png",ln="/app/assets/administration-scan-folders-CS75rQqx.png",hn="/app/assets/administration-site-access-D6UivBxH.png",pn="/app/assets/administration-tabs-BpCoGDvV.png",un="/app/assets/administration-tabs-BpCoGDvV.png",gn="/app/assets/binders-add-to-pocket-CfrpNCbi.png",mn="/app/assets/binders-edit-mode-2WRu345_.webp",yn="/app/assets/binders-spread-view-C21YWD10.webp",wn="/app/assets/collection-card-details-CEnyiCh8.png",fn="/app/assets/collection-decklist-check-DfYRH2pK.png",bn="/app/assets/collection-grouped-CHFtNnR5.png",kn="/app/assets/collection-overview-BT8LOkQk.png",vn="/app/assets/collection-select-actions-DeNskt8b.png",Cn="/app/assets/dashboard-overview-BgdtwCHP.png",xn="/app/assets/deck-boxes-panel-DX0XHQ-4.png",Tn="/app/assets/deck-boxes-stacked-view-D-RtwJGJ.webp",Sn="/app/assets/getting-started-layout-DXPiQzZD.png",An="/app/assets/getting-started-phone-menu-AejRhoOH.png",In="/app/assets/getting-started-sign-in-DnUx9vwZ.png",_n="/app/assets/help-home-DYGYTGEX.png",On="/app/assets/importing-page-CLlMp9uw.png",Bn="/app/assets/inventory-new-product-wyjY3g5p.png",En="/app/assets/inventory-page-D7A7yRt0.png",Ln="/app/assets/inventory-product-drawer-Ceku7CC-.png",Mn="/app/assets/lists-add-card-dialog-MhQSjlN6.png",Pn="/app/assets/lists-find-in-collection-BXe0H6i7.png",Nn="/app/assets/lists-overview-B2IW5FTm.png",Dn="/app/assets/lists-put-cards-away-DKGvHszG.png",Rn="/app/assets/location-audit-button-_OdyGPQm.png",Un="/app/assets/location-audit-page-DsxC_qed.webp",Fn="/app/assets/location-audit-summary-CKlkpN6V.png",Wn="/app/assets/locations-add-bar-BLkpDoqv.png",Gn="/app/assets/locations-detail-page-CdfBmgZM.png",jn="/app/assets/locations-import-dialog-C_NxOs9C.png",Yn="/app/assets/locations-page-overview-BnNQ8JST.png",Hn="/app/assets/locations-row-menu-o6_KiRtY.png",Vn="/app/assets/sales-customers-DVrg8-v6.png",zn="/app/assets/sales-import-orders-map-BS_aWYm3.png",qn="/app/assets/sales-list-for-sale-BfBz83FT.png",$n="/app/assets/sales-listings-Q6MD86Iw.png",Qn="/app/assets/sales-order-detail-Dqrg7sx7.png",Jn="/app/assets/sales-orders-board-z3m97wnu.png",Kn="/app/assets/sales-receipt-BKyV_jeV.png",Xn="/app/assets/sales-settings-for-sale-location-BvzarQMv.png",Zn="/app/assets/saved-views-columns-D7esoFxb.png",et="/app/assets/saved-views-copy-dialog-BWsC2JHE.png",nt="/app/assets/saved-views-menu-Br3T19VA.png",tt="/app/assets/saved-views-save-dialog-DQXqWDvx.png",at="/app/assets/scan-batches-panel-BH8rVmPX.png",rt="/app/assets/scan-batches-review-BatFmhN3.webp",ot="/app/assets/scanning-bulk-edit-D_dyVKxA.png",st="/app/assets/scanning-detail-panel-CkbIVz1U.webp",it="/app/assets/scanning-location-picker-Ck5QBotk.png",ct="/app/assets/scanning-overview-BrL5uZH0.webp",dt="/app/assets/search-syntax-help-popover-B7d99PGs.png",lt="/app/assets/sets-checklist-Cq7lxxc_.png",ht="/app/assets/trades-builder-BzkRc2Uo.png",pt="/app/assets/trades-history-O80-mo8S.png",ut="/app/assets/troubleshooting-no-access-Egsybxdj.png",gt="/app/assets/troubleshooting-search-catalog-DJ707UXg.webp",R=Object.assign({"./en-US/account.md":Ue,"./en-US/administration.md":Fe,"./en-US/binders.md":We,"./en-US/collection.md":Ge,"./en-US/dashboard.md":je,"./en-US/deck-boxes.md":Ye,"./en-US/ebay.md":He,"./en-US/getting-started.md":Ve,"./en-US/importing.md":ze,"./en-US/inventory.md":qe,"./en-US/lists.md":$e,"./en-US/location-audit.md":Qe,"./en-US/locations.md":Je,"./en-US/sales.md":Ke,"./en-US/saved-views.md":Xe,"./en-US/scan-batches.md":Ze,"./en-US/scanning.md":en,"./en-US/search-syntax.md":nn,"./en-US/sets.md":tn,"./en-US/shipping.md":an,"./en-US/tag-rules.md":rn,"./en-US/trades.md":on,"./en-US/troubleshooting.md":sn}),mt=Object.assign({"./images/administration-catalog-data.png":cn,"./images/administration-ebay-connected.png":dn,"./images/administration-scan-folders.png":ln,"./images/administration-site-access.png":hn,"./images/administration-tabs.png":pn,"./images/administration-users.png":un,"./images/binders-add-to-pocket.png":gn,"./images/binders-edit-mode.webp":mn,"./images/binders-spread-view.webp":yn,"./images/collection-card-details.png":wn,"./images/collection-decklist-check.png":fn,"./images/collection-grouped.png":bn,"./images/collection-overview.png":kn,"./images/collection-select-actions.png":vn,"./images/dashboard-overview.png":Cn,"./images/deck-boxes-panel.png":xn,"./images/deck-boxes-stacked-view.webp":Tn,"./images/getting-started-layout.png":Sn,"./images/getting-started-phone-menu.png":An,"./images/getting-started-sign-in.png":In,"./images/help-home.png":_n,"./images/importing-page.png":On,"./images/inventory-new-product.png":Bn,"./images/inventory-page.png":En,"./images/inventory-product-drawer.png":Ln,"./images/lists-add-card-dialog.png":Mn,"./images/lists-find-in-collection.png":Pn,"./images/lists-overview.png":Nn,"./images/lists-put-cards-away.png":Dn,"./images/location-audit-button.png":Rn,"./images/location-audit-page.webp":Un,"./images/location-audit-summary.png":Fn,"./images/locations-add-bar.png":Wn,"./images/locations-detail-page.png":Gn,"./images/locations-import-dialog.png":jn,"./images/locations-page-overview.png":Yn,"./images/locations-row-menu.png":Hn,"./images/sales-customers.png":Vn,"./images/sales-import-orders-map.png":zn,"./images/sales-list-for-sale.png":qn,"./images/sales-listings.png":$n,"./images/sales-order-detail.png":Qn,"./images/sales-orders-board.png":Jn,"./images/sales-receipt.png":Kn,"./images/sales-settings-for-sale-location.png":Xn,"./images/saved-views-columns.png":Zn,"./images/saved-views-copy-dialog.png":et,"./images/saved-views-menu.png":nt,"./images/saved-views-save-dialog.png":tt,"./images/scan-batches-panel.png":at,"./images/scan-batches-review.webp":rt,"./images/scanning-bulk-edit.png":ot,"./images/scanning-detail-panel.webp":st,"./images/scanning-location-picker.png":it,"./images/scanning-overview.webp":ct,"./images/search-syntax-help-popover.png":dt,"./images/sets-checklist.png":lt,"./images/trades-builder.png":ht,"./images/trades-history.png":pt,"./images/troubleshooting-no-access.png":ut,"./images/troubleshooting-search-catalog.webp":gt}),j=[{key:"start",topics:["getting-started","dashboard"]},{key:"scanning",topics:["scanning","scan-batches","location-audit"]},{key:"collection",topics:["collection","saved-views","search-syntax","tag-rules","sets"]},{key:"organizing",topics:["locations","binders","deck-boxes"]},{key:"lists",topics:["lists","importing","trades"]},{key:"selling",topics:["inventory","sales","shipping","ebay"]},{key:"admin",topics:["account","administration","troubleshooting"]}],yt=j.flatMap(e=>e.topics);function wt(){const e=new Set;for(const t of Object.keys(R))e.add(t.split("/")[1]);return[...e]}function ft(e){const t=wt(),r=[],a=o=>{o&&!r.includes(o)&&r.push(o)};if(e){a(t.find(s=>s.toLowerCase()===e.toLowerCase()));const o=e.split("-")[0].toLowerCase();a(t.find(s=>s.toLowerCase()===o)),a(t.find(s=>s.toLowerCase().split("-")[0]===o))}return a(de),r}function bt(e,t){var l;const r=t.replace(/\r\n?/g,`
+`,cn="/app/assets/administration-catalog-data-BjeNaI2j.png",dn="/app/assets/administration-ebay-connected-KcM4O_Pg.png",ln="/app/assets/administration-scan-folders-CS75rQqx.png",hn="/app/assets/administration-site-access-D6UivBxH.png",pn="/app/assets/administration-tabs-BpCoGDvV.png",un="/app/assets/administration-tabs-BpCoGDvV.png",gn="/app/assets/binders-add-to-pocket-CfrpNCbi.png",mn="/app/assets/binders-edit-mode-2WRu345_.webp",yn="/app/assets/binders-spread-view-C21YWD10.webp",wn="/app/assets/collection-card-details-CEnyiCh8.png",fn="/app/assets/collection-decklist-check-DfYRH2pK.png",bn="/app/assets/collection-grouped-CHFtNnR5.png",kn="/app/assets/collection-overview-BT8LOkQk.png",vn="/app/assets/collection-select-actions-DeNskt8b.png",Cn="/app/assets/dashboard-overview-BgdtwCHP.png",xn="/app/assets/deck-boxes-panel-DX0XHQ-4.png",Tn="/app/assets/deck-boxes-stacked-view-D-RtwJGJ.webp",Sn="/app/assets/getting-started-layout-DXPiQzZD.png",An="/app/assets/getting-started-phone-menu-AejRhoOH.png",In="/app/assets/getting-started-sign-in-DnUx9vwZ.png",_n="/app/assets/help-home-DYGYTGEX.png",On="/app/assets/importing-page-CLlMp9uw.png",Bn="/app/assets/inventory-new-product-wyjY3g5p.png",En="/app/assets/inventory-page-D7A7yRt0.png",Ln="/app/assets/inventory-product-drawer-Ceku7CC-.png",Mn="/app/assets/lists-add-card-dialog-MhQSjlN6.png",Pn="/app/assets/lists-find-in-collection-BXe0H6i7.png",Nn="/app/assets/lists-overview-B2IW5FTm.png",Dn="/app/assets/lists-put-cards-away-DKGvHszG.png",Rn="/app/assets/location-audit-button-_OdyGPQm.png",Fn="/app/assets/location-audit-page-DsxC_qed.webp",Un="/app/assets/location-audit-summary-CKlkpN6V.png",Wn="/app/assets/locations-add-bar-BLkpDoqv.png",Gn="/app/assets/locations-detail-page-CdfBmgZM.png",jn="/app/assets/locations-import-dialog-C_NxOs9C.png",Yn="/app/assets/locations-page-overview-BnNQ8JST.png",Hn="/app/assets/locations-row-menu-o6_KiRtY.png",Vn="/app/assets/sales-customers-DVrg8-v6.png",zn="/app/assets/sales-import-orders-map-BS_aWYm3.png",qn="/app/assets/sales-list-for-sale-BfBz83FT.png",$n="/app/assets/sales-listings-Q6MD86Iw.png",Qn="/app/assets/sales-order-detail-Dqrg7sx7.png",Jn="/app/assets/sales-orders-board-z3m97wnu.png",Kn="/app/assets/sales-receipt-BKyV_jeV.png",Xn="/app/assets/sales-settings-for-sale-location-BvzarQMv.png",Zn="/app/assets/saved-views-columns-D7esoFxb.png",et="/app/assets/saved-views-copy-dialog-BWsC2JHE.png",nt="/app/assets/saved-views-menu-Br3T19VA.png",tt="/app/assets/saved-views-save-dialog-DQXqWDvx.png",at="/app/assets/scan-batches-panel-BH8rVmPX.png",rt="/app/assets/scan-batches-review-BatFmhN3.webp",ot="/app/assets/scanning-bulk-edit-D_dyVKxA.png",st="/app/assets/scanning-detail-panel-CkbIVz1U.webp",it="/app/assets/scanning-location-picker-Ck5QBotk.png",ct="/app/assets/scanning-overview-BrL5uZH0.webp",dt="/app/assets/search-syntax-help-popover-B7d99PGs.png",lt="/app/assets/sets-checklist-Cq7lxxc_.png",ht="/app/assets/trades-builder-BzkRc2Uo.png",pt="/app/assets/trades-history-O80-mo8S.png",ut="/app/assets/troubleshooting-no-access-Egsybxdj.png",gt="/app/assets/troubleshooting-search-catalog-DJ707UXg.webp",R=Object.assign({"./en-US/account.md":Fe,"./en-US/administration.md":Ue,"./en-US/binders.md":We,"./en-US/collection.md":Ge,"./en-US/dashboard.md":je,"./en-US/deck-boxes.md":Ye,"./en-US/ebay.md":He,"./en-US/getting-started.md":Ve,"./en-US/importing.md":ze,"./en-US/inventory.md":qe,"./en-US/lists.md":$e,"./en-US/location-audit.md":Qe,"./en-US/locations.md":Je,"./en-US/sales.md":Ke,"./en-US/saved-views.md":Xe,"./en-US/scan-batches.md":Ze,"./en-US/scanning.md":en,"./en-US/search-syntax.md":nn,"./en-US/sets.md":tn,"./en-US/shipping.md":an,"./en-US/tag-rules.md":rn,"./en-US/trades.md":on,"./en-US/troubleshooting.md":sn}),mt=Object.assign({"./images/administration-catalog-data.png":cn,"./images/administration-ebay-connected.png":dn,"./images/administration-scan-folders.png":ln,"./images/administration-site-access.png":hn,"./images/administration-tabs.png":pn,"./images/administration-users.png":un,"./images/binders-add-to-pocket.png":gn,"./images/binders-edit-mode.webp":mn,"./images/binders-spread-view.webp":yn,"./images/collection-card-details.png":wn,"./images/collection-decklist-check.png":fn,"./images/collection-grouped.png":bn,"./images/collection-overview.png":kn,"./images/collection-select-actions.png":vn,"./images/dashboard-overview.png":Cn,"./images/deck-boxes-panel.png":xn,"./images/deck-boxes-stacked-view.webp":Tn,"./images/getting-started-layout.png":Sn,"./images/getting-started-phone-menu.png":An,"./images/getting-started-sign-in.png":In,"./images/help-home.png":_n,"./images/importing-page.png":On,"./images/inventory-new-product.png":Bn,"./images/inventory-page.png":En,"./images/inventory-product-drawer.png":Ln,"./images/lists-add-card-dialog.png":Mn,"./images/lists-find-in-collection.png":Pn,"./images/lists-overview.png":Nn,"./images/lists-put-cards-away.png":Dn,"./images/location-audit-button.png":Rn,"./images/location-audit-page.webp":Fn,"./images/location-audit-summary.png":Un,"./images/locations-add-bar.png":Wn,"./images/locations-detail-page.png":Gn,"./images/locations-import-dialog.png":jn,"./images/locations-page-overview.png":Yn,"./images/locations-row-menu.png":Hn,"./images/sales-customers.png":Vn,"./images/sales-import-orders-map.png":zn,"./images/sales-list-for-sale.png":qn,"./images/sales-listings.png":$n,"./images/sales-order-detail.png":Qn,"./images/sales-orders-board.png":Jn,"./images/sales-receipt.png":Kn,"./images/sales-settings-for-sale-location.png":Xn,"./images/saved-views-columns.png":Zn,"./images/saved-views-copy-dialog.png":et,"./images/saved-views-menu.png":nt,"./images/saved-views-save-dialog.png":tt,"./images/scan-batches-panel.png":at,"./images/scan-batches-review.webp":rt,"./images/scanning-bulk-edit.png":ot,"./images/scanning-detail-panel.webp":st,"./images/scanning-location-picker.png":it,"./images/scanning-overview.webp":ct,"./images/search-syntax-help-popover.png":dt,"./images/sets-checklist.png":lt,"./images/trades-builder.png":ht,"./images/trades-history.png":pt,"./images/troubleshooting-no-access.png":ut,"./images/troubleshooting-search-catalog.webp":gt}),j=[{key:"start",topics:["getting-started","dashboard"]},{key:"scanning",topics:["scanning","scan-batches","location-audit"]},{key:"collection",topics:["collection","saved-views","search-syntax","tag-rules","sets"]},{key:"organizing",topics:["locations","binders","deck-boxes"]},{key:"lists",topics:["lists","importing","trades"]},{key:"selling",topics:["inventory","sales","shipping","ebay"]},{key:"admin",topics:["account","administration","troubleshooting"]}],yt=j.flatMap(e=>e.topics);function wt(){const e=new Set;for(const t of Object.keys(R))e.add(t.split("/")[1]);return[...e]}function ft(e){const t=wt(),r=[],a=o=>{o&&!r.includes(o)&&r.push(o)};if(e){a(t.find(s=>s.toLowerCase()===e.toLowerCase()));const o=e.split("-")[0].toLowerCase();a(t.find(s=>s.toLowerCase()===o)),a(t.find(s=>s.toLowerCase().split("-")[0]===o))}return a(de),r}function bt(e,t){var l;const r=t.replace(/\r\n?/g,`
 `).split(`
 `);let a=e;const o=r.findIndex(d=>/^#\s+/.test(d));o>=0&&(a=r[o].replace(/^#\s+/,"").trim(),r.splice(o,1));const s=r.join(`
-`).trim(),h=((l=s.split(/\n\s*\n/).map(d=>d.trim()).find(d=>d&&!/^(#|!\[|>|-|\d+\.|\|)/.test(d)))==null?void 0:l.replace(/\s+/g," "))??"",i=U(`${a}
-${s}`).replace(/^\s*(#+|\||>|-|\d+\.)\s*/gm,"").replace(/\||:?-{3,}:?/g," ").replace(/\s+/g," ");return{id:e,title:a,summary:U(h),body:s,plainText:i,searchText:i.toLowerCase()}}function U(e){return e.replace(/!\[([^\]]*)\]\([^)]*\)/g,"$1").replace(/\[([^\]]+)\]\([^)]*\)/g,"$1").replace(/\*\*|`|^>\s*\[![A-Z]+\]/gm,"").replace(/(^|\s)\*([^*]+)\*/g,"$1$2")}const $=new Map;function kt(e){const t=e??"",r=$.get(t);if(r)return r;const a=ft(e),o=[];for(const s of yt){const h=a.find(i=>R[`./${i}/${s}.md`]!==void 0);h&&o.push(bt(s,R[`./${h}/${s}.md`]))}return $.set(t,o),o}function vt(e){return mt[`./images/${e.replace(/^\.?\/?(images\/)?/,"")}`]}function Ct(e){return U(e).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")}function ae(e,t){const r=t.toLowerCase().split(/\s+/).filter(Boolean);return r.length===0?[]:e.filter(a=>r.every(o=>a.searchText.includes(o))).map(a=>{const o=r.every(s=>a.title.toLowerCase().includes(s));return{topic:a,snippet:xt(a,r[0]),score:o?0:1}}).sort((a,o)=>a.score-o.score).map(({topic:a,snippet:o})=>({topic:a,snippet:o}))}function xt(e,t){const r=e.plainText,a=e.searchText.indexOf(t);if(a<0)return e.summary;const o=Math.max(0,a-60),s=Math.min(r.length,a+t.length+90);return`${o>0?"…":""}${r.slice(o,s).trim()}${s<r.length?"…":""}`}const Tt=L(n.jsx("path",{d:"M19 5v14H5V5zm0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m-4.86 8.86-3 3.87L9 13.14 6 17h12z"}),"ImageOutlined"),St=L(n.jsx("path",{d:"M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7m2.85 11.1-.85.6V16h-4v-2.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1"}),"LightbulbOutlined"),re=/^(#{1,6})\s+(.*)$/,oe=/^\s*(-{3,}|\*{3,}|_{3,})\s*$/,se=/^!\[([^\]]*)\]\(([^)\s]+)\)\s*$/,O=/^(\s*)([-*+]|\d+[.)])\s+(.*)$/,P=e=>e.match(/^\s*/)[0].length;function Q(e){return re.test(e)||oe.test(e)||se.test(e)||/^\s*>/.test(e)||/^\s*\|/.test(e)||O.test(e)}function N(e){return e.trim().replace(/^\|/,"").replace(/\|$/,"").split(new RegExp("(?<!\\\\)\\|")).map(t=>t.trim().replace(/\\\|/g,"|"))}function F(e){var o;const t=e.replace(/\r\n?/g,`
+`).trim(),h=((l=s.split(/\n\s*\n/).map(d=>d.trim()).find(d=>d&&!/^(#|!\[|>|-|\d+\.|\|)/.test(d)))==null?void 0:l.replace(/\s+/g," "))??"",i=F(`${a}
+${s}`).replace(/^\s*(#+|\||>|-|\d+\.)\s*/gm,"").replace(/\||:?-{3,}:?/g," ").replace(/\s+/g," ");return{id:e,title:a,summary:F(h),body:s,plainText:i,searchText:i.toLowerCase()}}function F(e){return e.replace(/!\[([^\]]*)\]\([^)]*\)/g,"$1").replace(/\[([^\]]+)\]\([^)]*\)/g,"$1").replace(/\*\*|`|^>\s*\[![A-Z]+\]/gm,"").replace(/(^|\s)\*([^*]+)\*/g,"$1$2")}const $=new Map;function kt(e){const t=e??"",r=$.get(t);if(r)return r;const a=ft(e),o=[];for(const s of yt){const h=a.find(i=>R[`./${i}/${s}.md`]!==void 0);h&&o.push(bt(s,R[`./${h}/${s}.md`]))}return $.set(t,o),o}function vt(e){return mt[`./images/${e.replace(/^\.?\/?(images\/)?/,"")}`]}function Ct(e){return F(e).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")}function ae(e,t){const r=t.toLowerCase().split(/\s+/).filter(Boolean);return r.length===0?[]:e.filter(a=>r.every(o=>a.searchText.includes(o))).map(a=>{const o=r.every(s=>a.title.toLowerCase().includes(s));return{topic:a,snippet:xt(a,r[0]),score:o?0:1}}).sort((a,o)=>a.score-o.score).map(({topic:a,snippet:o})=>({topic:a,snippet:o}))}function xt(e,t){const r=e.plainText,a=e.searchText.indexOf(t);if(a<0)return e.summary;const o=Math.max(0,a-60),s=Math.min(r.length,a+t.length+90);return`${o>0?"…":""}${r.slice(o,s).trim()}${s<r.length?"…":""}`}const Tt=L(n.jsx("path",{d:"M19 5v14H5V5zm0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m-4.86 8.86-3 3.87L9 13.14 6 17h12z"}),"ImageOutlined"),St=L(n.jsx("path",{d:"M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7m2.85 11.1-.85.6V16h-4v-2.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1"}),"LightbulbOutlined"),re=/^(#{1,6})\s+(.*)$/,oe=/^\s*(-{3,}|\*{3,}|_{3,})\s*$/,se=/^!\[([^\]]*)\]\(([^)\s]+)\)\s*$/,O=/^(\s*)([-*+]|\d+[.)])\s+(.*)$/,P=e=>e.match(/^\s*/)[0].length;function Q(e){return re.test(e)||oe.test(e)||se.test(e)||/^\s*>/.test(e)||/^\s*\|/.test(e)||O.test(e)}function N(e){return e.trim().replace(/^\|/,"").replace(/\|$/,"").split(new RegExp("(?<!\\\\)\\|")).map(t=>t.trim().replace(/\\\|/g,"|"))}function U(e){var o;const t=e.replace(/\r\n?/g,`
 `).split(`
-`),r=[];let a=0;for(;a<t.length;){const s=t[a];if(!s.trim()){a++;continue}const h=s.match(re);if(h){const c=h[2].trim();r.push({kind:"heading",level:h[1].length,text:c,id:Ct(c)}),a++;continue}if(oe.test(s)){r.push({kind:"hr"}),a++;continue}const i=s.match(se);if(i){r.push({kind:"image",alt:i[1],src:i[2]}),a++;continue}if(/^\s*>/.test(s)){const c=[];for(;a<t.length&&/^\s*>/.test(t[a]);)c.push(t[a++].replace(/^\s*>\s?/,""));const m=(o=c[0])==null?void 0:o.match(/^\[!(TIP|NOTE|WARNING|IMPORTANT|CAUTION)\]\s*$/i),u=m?m[1].toUpperCase()==="TIP"?"tip":["WARNING","CAUTION"].includes(m[1].toUpperCase())?"warning":"note":"quote";r.push({kind:"callout",variant:u,blocks:F((m?c.slice(1):c).join(`
-`))});continue}if(/^\s*\|/.test(s)){const c=[];for(;a<t.length&&/^\s*\|/.test(t[a]);)c.push(t[a++]);const m=N(c[0]),u=c.length>1&&/^[\s|:-]+$/.test(c[1]),w=u?N(c[1]).map(g=>g.startsWith(":")&&g.endsWith(":")?"center":g.endsWith(":")?"right":void 0):[];r.push({kind:"table",header:m,align:w,rows:c.slice(u?2:1).map(N)});continue}const l=s.match(O);if(l){const c=l[1].length,m=/\d/.test(l[2]),u=[];for(;a<t.length;){const w=t[a],g=w.match(O);if(g&&g[1].length===c&&/\d/.test(g[2])===m){u.push([g[3]]),a++;continue}if(!w.trim()){let v=a+1;for(;v<t.length&&!t[v].trim();)v++;const k=t[v],S=k==null?void 0:k.match(O);if(!(k!==void 0&&(S&&S[1].length===c&&/\d/.test(S[2])===m||P(k)>c)))break;u[u.length-1].push(""),a++;continue}if(P(w)>c){u[u.length-1].push(w),a++;continue}if(!Q(w)){u[u.length-1].push(w),a++;continue}break}r.push({kind:"list",ordered:m,start:m&&parseInt(l[2],10)||1,items:u.map(w=>{const[g,...v]=w,k=Math.min(...v.filter(A=>A.trim()).map(P),1/0),S=v.map(A=>A.trim()?A.slice(Number.isFinite(k)?k:0):"");return F([g,...S].join(`
-`))})});continue}const d=[];for(;a<t.length&&t[a].trim()&&(d.length===0||!Q(t[a]));)d.push(t[a++].trim());r.push({kind:"paragraph",text:d.join(" ")})}return r}const At=new RegExp("`([^`]+)`|\\*\\*(.+?)\\*\\*|\\[([^\\]]+)\\]\\(([^)\\s]+)\\)|(?<![\\w*])\\*(?![\\s*])(.+?)\\*(?![\\w*])");function C(e){const t=[];let r=e,a=0;for(;r;){const o=r.match(At);if(!o||o.index===void 0){t.push(r);break}o.index>0&&t.push(r.slice(0,o.index)),o[1]!==void 0?t.push(n.jsx(p,{component:"code",sx:{fontFamily:"monospace",fontSize:"0.92em",bgcolor:"action.hover",px:.5,py:.1,borderRadius:.5},children:o[1]},a++)):o[2]!==void 0?t.push(n.jsx("strong",{children:C(o[2])},a++)):o[3]!==void 0?t.push(n.jsx(It,{href:o[4],children:C(o[3])},a++)):t.push(n.jsx("em",{children:C(o[5])},a++)),r=r.slice(o.index+o[0].length)}return t}function It({href:e,children:t}){if(e.startsWith("help:")){const[r,a]=e.slice(5).split("#");return n.jsx(T,{component:b,to:{pathname:`/help/${r}`,hash:a?`#${a}`:""},children:t})}return e.startsWith("#")?n.jsx(T,{component:b,to:{hash:e},children:t}):e.startsWith("/")?n.jsx(T,{component:b,to:e,children:t}):n.jsx(T,{href:e,target:"_blank",rel:"noopener noreferrer",children:t})}function _t({alt:e,src:t}){const{t:r}=x(),[a,o]=f.useState(!1),s=/^https?:/.test(t)?t:vt(t);return n.jsxs(p,{component:"figure",sx:{mx:0,my:2.5},children:[s?n.jsx(p,{component:"img",src:s,alt:e,title:r("help.enlargeImage"),onClick:()=>o(!0),sx:{display:"block",maxWidth:"100%",maxHeight:560,borderRadius:1,border:1,borderColor:"divider",boxShadow:1,cursor:"zoom-in"}}):n.jsxs(p,{sx:{display:"flex",alignItems:"center",justifyContent:"center",gap:1,minHeight:120,border:2,borderStyle:"dashed",borderColor:"divider",borderRadius:1,color:"text.secondary",px:2},children:[n.jsx(Tt,{}),n.jsx(y,{variant:"body2",children:r("help.screenshotComingSoon")})]}),e&&n.jsx(y,{component:"figcaption",variant:"caption",color:"text.secondary",sx:{display:"block",mt:.75},children:e}),s&&n.jsxs(ge,{open:a,onClose:()=>o(!1),maxWidth:"xl",children:[n.jsx(me,{"aria-label":r("common.actions.close"),onClick:()=>o(!1),sx:{position:"absolute",right:8,top:8,bgcolor:"background.paper","&:hover":{bgcolor:"background.paper"}},children:n.jsx(ye,{})}),n.jsx(we,{sx:{p:1},children:n.jsx(p,{component:"img",src:s,alt:e,sx:{display:"block",maxWidth:"100%"}})})]})]})}function Ot({variant:e,blocks:t}){const{t:r}=x();if(e==="quote")return n.jsx(p,{sx:{borderLeft:4,borderColor:"divider",pl:2,my:2,color:"text.secondary"},children:n.jsx(E,{blocks:t})});const a=e==="tip"?"success":e==="warning"?"warning":"info";return n.jsxs(B,{severity:a,icon:e==="tip"?n.jsx(St,{fontSize:"inherit"}):void 0,sx:{my:2,"& p:last-child, & ul:last-child, & ol:last-child":{mb:0}},children:[n.jsx(fe,{children:r(`help.callout.${e}`)}),n.jsx(E,{blocks:t})]})}function Bt({block:e}){switch(e.kind){case"heading":{const t=e.level<=1?"h4":e.level===2?"h5":e.level===3?"h6":"subtitle1";return n.jsx(y,{id:e.id,variant:t,component:`h${Math.min(e.level,6)}`,sx:{mt:e.level<=2?4:3,mb:1.25,scrollMarginTop:72,fontWeight:e.level>=4?600:void 0},children:C(e.text)})}case"paragraph":return n.jsx(y,{variant:"body1",sx:{mb:1.5,lineHeight:1.7},children:C(e.text)});case"list":return n.jsx(p,{component:e.ordered?"ol":"ul",start:e.ordered?e.start:void 0,sx:{pl:3,mt:0,mb:1.5,"& > li":{mb:.5,lineHeight:1.7},"& li > p":{mb:.5}},children:e.items.map((t,r)=>n.jsx(y,{component:"li",variant:"body1",children:t.length===1&&t[0].kind==="paragraph"?C(t[0].text):n.jsx(E,{blocks:t})},r))});case"callout":return n.jsx(Ot,{variant:e.variant,blocks:e.blocks});case"table":return n.jsx(Re,{component:G,variant:"outlined",sx:{my:2},children:n.jsxs(he,{size:"small",children:[n.jsx(pe,{children:n.jsx(H,{children:e.header.map((t,r)=>n.jsx(V,{align:e.align[r],sx:{fontWeight:600,whiteSpace:"nowrap"},children:C(t)},r))})}),n.jsx(ue,{children:e.rows.map((t,r)=>n.jsx(H,{children:t.map((a,o)=>n.jsx(V,{align:e.align[o],children:C(a)},o))},r))})]})});case"image":return n.jsx(_t,{alt:e.alt,src:e.src});case"hr":return n.jsx(le,{sx:{my:3}})}}function E({blocks:e}){return n.jsx(n.Fragment,{children:e.map((t,r)=>n.jsx(f.Fragment,{children:n.jsx(Bt,{block:t})},r))})}function Et({blocks:e}){return n.jsx(p,{sx:{"& > :first-child":{mt:0}},children:n.jsx(E,{blocks:e})})}function Dt(){const{t:e,i18n:t}=x(),{topicId:r}=be(),a=f.useMemo(()=>kt(t.language),[t.language]),o=f.useMemo(()=>new Map(a.map(l=>[l.id,l])),[a]),[s,h]=f.useState("");if(!r)return n.jsx(Lt,{topics:a,byId:o,query:s,setQuery:h});const i=o.get(r);return n.jsxs(p,{sx:{display:"flex",gap:3,alignItems:"flex-start"},children:[n.jsx(p,{sx:{display:{xs:"none",md:"block"},width:240,flexShrink:0,position:"sticky",top:64},children:n.jsx(Mt,{topics:a,byId:o,current:r,query:s,setQuery:h})}),n.jsxs(p,{sx:{flex:1,minWidth:0},children:[n.jsx(_,{component:b,to:"/help",size:"small",startIcon:n.jsx(ne,{}),sx:{display:{md:"none"},mb:1},children:e("help.allTopics")}),i?n.jsx(Pt,{topic:i,topics:a}):n.jsx(B,{severity:"warning",action:n.jsx(_,{component:b,to:"/help",children:e("help.allTopics")}),children:e("help.topicNotFound")})]})]})}function ie({query:e,setQuery:t,autoFocus:r}){const{t:a}=x();return n.jsx(Ae,{size:"small",fullWidth:!0,autoFocus:r,placeholder:a("help.searchPlaceholder"),value:e,onChange:o=>t(o.target.value),slotProps:{input:{startAdornment:n.jsx(Ie,{position:"start",children:n.jsx(_e,{fontSize:"small"})})}}})}function Lt({topics:e,byId:t,query:r,setQuery:a}){const{t:o}=x(),s=f.useMemo(()=>ae(e,r),[e,r]),h=r.trim().length>0;return n.jsxs(I,{spacing:3,sx:{maxWidth:1100},children:[n.jsxs(p,{children:[n.jsx(y,{variant:"h4",gutterBottom:!0,children:o("help.title")}),n.jsx(y,{color:"text.secondary",children:o("help.subtitle")})]}),n.jsx(p,{sx:{maxWidth:560},children:n.jsx(ie,{query:r,setQuery:a,autoFocus:!0})}),h?n.jsxs(I,{spacing:1.5,children:[n.jsx(y,{variant:"overline",color:"text.secondary",children:o("help.resultCount",{count:s.length})}),s.length===0&&n.jsx(B,{severity:"info",children:o("help.noResults",{query:r.trim()})}),s.map(({topic:i,snippet:l})=>n.jsx(ke,{variant:"outlined",children:n.jsx(Me,{component:b,to:`/help/${i.id}`,children:n.jsxs(ve,{children:[n.jsx(y,{variant:"h6",children:i.title}),n.jsx(y,{variant:"body2",color:"text.secondary",children:l})]})})},i.id))]}):n.jsxs(n.Fragment,{children:[t.has("getting-started")&&n.jsx(B,{severity:"info",action:n.jsx(_,{component:b,to:"/help/getting-started",endIcon:n.jsx(te,{}),children:o("help.startHereAction")}),children:o("help.startHere")}),n.jsx(p,{sx:{display:"grid",gap:2,gridTemplateColumns:{xs:"1fr",sm:"repeat(2, 1fr)",lg:"repeat(3, 1fr)"}},children:j.map(i=>{const l=i.topics.map(d=>t.get(d)).filter(d=>!!d);return l.length===0?null:n.jsxs(G,{variant:"outlined",sx:{p:2},children:[n.jsx(y,{variant:"overline",color:"primary",sx:{fontWeight:600},children:o(`help.groups.${i.key}`)}),n.jsx(I,{spacing:1.5,sx:{mt:.5},children:l.map(d=>n.jsxs(p,{children:[n.jsx(T,{component:b,to:`/help/${d.id}`,variant:"subtitle1",underline:"hover",sx:{fontWeight:600},children:d.title}),n.jsx(y,{variant:"body2",color:"text.secondary",children:d.summary})]},d.id))})]},i.key)})})]})]})}function Mt({topics:e,byId:t,current:r,query:a,setQuery:o}){const{t:s}=x(),h=f.useMemo(()=>a.trim()?new Set(ae(e,a).map(i=>i.topic.id)):void 0,[e,a]);return n.jsxs(G,{variant:"outlined",sx:{maxHeight:"calc(100vh - 88px)",overflowY:"auto"},children:[n.jsx(p,{sx:{p:1.5,pb:.5},children:n.jsx(ie,{query:a,setQuery:o})}),n.jsxs(Ce,{dense:!0,disablePadding:!0,children:[n.jsx(z,{component:b,to:"/help",children:n.jsx(q,{primary:s("help.allTopics"),slotProps:{primary:{color:"primary",fontWeight:600}}})}),j.map(i=>{const l=i.topics.map(d=>t.get(d)).filter(d=>!!d&&(!h||h.has(d.id)));return l.length===0?null:n.jsx("li",{children:n.jsxs("ul",{style:{padding:0},children:[n.jsx(xe,{sx:{lineHeight:"32px",bgcolor:"background.paper"},children:s(`help.groups.${i.key}`)}),l.map(d=>n.jsx(z,{component:b,to:`/help/${d.id}`,selected:d.id===r,sx:{pl:3},children:n.jsx(q,{primary:d.title})},d.id))]})},i.key)}),h&&h.size===0&&n.jsx(y,{variant:"body2",color:"text.secondary",sx:{px:2,py:1},children:s("help.noResults",{query:a.trim()})})]})]})}function Pt({topic:e,topics:t}){const{t:r}=x(),a=Te(),o=Se(),s=f.useMemo(()=>F(e.body),[e]),h=s.filter(c=>c.kind==="heading"&&c.level===2),i=t.findIndex(c=>c.id===e.id),l=i>0?t[i-1]:void 0,d=i>=0&&i<t.length-1?t[i+1]:void 0;return f.useEffect(()=>{const c=decodeURIComponent(a.hash.replace(/^#/,""));if(!c){window.scrollTo({top:0});return}let m=!1;const u=()=>{var g;m||(g=document.getElementById(c))==null||g.scrollIntoView({behavior:"smooth",block:"start"})};u();const w=[...document.querySelectorAll("article img")].filter(g=>!g.complete);return w.length&&Promise.all(w.map(g=>g.decode().catch(()=>{}))).then(u),()=>{m=!0}},[a.hash,e.id]),n.jsxs(p,{sx:{display:"flex",gap:4,alignItems:"flex-start"},children:[n.jsxs(p,{component:"article",sx:{flex:1,minWidth:0,maxWidth:880},children:[n.jsx(y,{variant:"h4",component:"h1",gutterBottom:!0,children:e.title}),n.jsx(Et,{blocks:s}),n.jsxs(I,{direction:"row",spacing:2,sx:{mt:5,pt:2,borderTop:1,borderColor:"divider"},justifyContent:"space-between",children:[l?n.jsx(_,{startIcon:n.jsx(ne,{}),onClick:()=>o(`/help/${l.id}`),sx:{textAlign:"left"},children:n.jsxs(p,{children:[n.jsx(y,{variant:"caption",display:"block",color:"text.secondary",children:r("help.previous")}),l.title]})}):n.jsx("span",{}),d&&n.jsx(_,{endIcon:n.jsx(te,{}),onClick:()=>o(`/help/${d.id}`),sx:{textAlign:"right"},children:n.jsxs(p,{children:[n.jsx(y,{variant:"caption",display:"block",color:"text.secondary",children:r("help.next")}),d.title]})})]})]}),h.length>1&&n.jsxs(p,{component:"nav",sx:{display:{xs:"none",lg:"block"},width:220,flexShrink:0,position:"sticky",top:64},children:[n.jsx(y,{variant:"overline",color:"text.secondary",children:r("help.onThisPage")}),n.jsx(I,{spacing:.75,sx:{mt:.5,borderLeft:2,borderColor:"divider",pl:1.5},children:h.map(c=>n.jsx(T,{component:b,to:{hash:`#${c.id}`},variant:"body2",underline:"hover",color:a.hash===`#${c.id}`?"primary":"text.secondary",children:c.text.replace(/\*\*|`/g,"")},c.id))})]})]})}export{Dt as HelpPage};
+`),r=[];let a=0;for(;a<t.length;){const s=t[a];if(!s.trim()){a++;continue}const h=s.match(re);if(h){const c=h[2].trim();r.push({kind:"heading",level:h[1].length,text:c,id:Ct(c)}),a++;continue}if(oe.test(s)){r.push({kind:"hr"}),a++;continue}const i=s.match(se);if(i){r.push({kind:"image",alt:i[1],src:i[2]}),a++;continue}if(/^\s*>/.test(s)){const c=[];for(;a<t.length&&/^\s*>/.test(t[a]);)c.push(t[a++].replace(/^\s*>\s?/,""));const m=(o=c[0])==null?void 0:o.match(/^\[!(TIP|NOTE|WARNING|IMPORTANT|CAUTION)\]\s*$/i),u=m?m[1].toUpperCase()==="TIP"?"tip":["WARNING","CAUTION"].includes(m[1].toUpperCase())?"warning":"note":"quote";r.push({kind:"callout",variant:u,blocks:U((m?c.slice(1):c).join(`
+`))});continue}if(/^\s*\|/.test(s)){const c=[];for(;a<t.length&&/^\s*\|/.test(t[a]);)c.push(t[a++]);const m=N(c[0]),u=c.length>1&&/^[\s|:-]+$/.test(c[1]),w=u?N(c[1]).map(g=>g.startsWith(":")&&g.endsWith(":")?"center":g.endsWith(":")?"right":void 0):[];r.push({kind:"table",header:m,align:w,rows:c.slice(u?2:1).map(N)});continue}const l=s.match(O);if(l){const c=l[1].length,m=/\d/.test(l[2]),u=[];for(;a<t.length;){const w=t[a],g=w.match(O);if(g&&g[1].length===c&&/\d/.test(g[2])===m){u.push([g[3]]),a++;continue}if(!w.trim()){let v=a+1;for(;v<t.length&&!t[v].trim();)v++;const k=t[v],S=k==null?void 0:k.match(O);if(!(k!==void 0&&(S&&S[1].length===c&&/\d/.test(S[2])===m||P(k)>c)))break;u[u.length-1].push(""),a++;continue}if(P(w)>c){u[u.length-1].push(w),a++;continue}if(!Q(w)){u[u.length-1].push(w),a++;continue}break}r.push({kind:"list",ordered:m,start:m&&parseInt(l[2],10)||1,items:u.map(w=>{const[g,...v]=w,k=Math.min(...v.filter(A=>A.trim()).map(P),1/0),S=v.map(A=>A.trim()?A.slice(Number.isFinite(k)?k:0):"");return U([g,...S].join(`
+`))})});continue}const d=[];for(;a<t.length&&t[a].trim()&&(d.length===0||!Q(t[a]));)d.push(t[a++].trim());r.push({kind:"paragraph",text:d.join(" ")})}return r}const At=new RegExp("`([^`]+)`|\\*\\*(.+?)\\*\\*|\\[([^\\]]+)\\]\\(([^)\\s]+)\\)|(?<![\\w*])\\*(?![\\s*])(.+?)\\*(?![\\w*])");function C(e){const t=[];let r=e,a=0;for(;r;){const o=r.match(At);if(!o||o.index===void 0){t.push(r);break}o.index>0&&t.push(r.slice(0,o.index)),o[1]!==void 0?t.push(n.jsx(p,{component:"code",sx:{fontFamily:"monospace",fontSize:"0.92em",bgcolor:"action.hover",px:.5,py:.1,borderRadius:.5},children:o[1]},a++)):o[2]!==void 0?t.push(n.jsx("strong",{children:C(o[2])},a++)):o[3]!==void 0?t.push(n.jsx(It,{href:o[4],children:C(o[3])},a++)):t.push(n.jsx("em",{children:C(o[5])},a++)),r=r.slice(o.index+o[0].length)}return t}function It({href:e,children:t}){if(e.startsWith("help:")){const[r,a]=e.slice(5).split("#");return n.jsx(T,{component:b,to:{pathname:`/help/${r}`,hash:a?`#${a}`:""},children:t})}return e.startsWith("#")?n.jsx(T,{component:b,to:{hash:e},children:t}):e.startsWith("/")?n.jsx(T,{component:b,to:e,children:t}):n.jsx(T,{href:e,target:"_blank",rel:"noopener noreferrer",children:t})}function _t({alt:e,src:t}){const{t:r}=x(),[a,o]=f.useState(!1),s=/^https?:/.test(t)?t:vt(t);return n.jsxs(p,{component:"figure",sx:{mx:0,my:2.5},children:[s?n.jsx(p,{component:"img",src:s,alt:e,title:r("help.enlargeImage"),onClick:()=>o(!0),sx:{display:"block",maxWidth:"100%",maxHeight:560,borderRadius:1,border:1,borderColor:"divider",boxShadow:1,cursor:"zoom-in"}}):n.jsxs(p,{sx:{display:"flex",alignItems:"center",justifyContent:"center",gap:1,minHeight:120,border:2,borderStyle:"dashed",borderColor:"divider",borderRadius:1,color:"text.secondary",px:2},children:[n.jsx(Tt,{}),n.jsx(y,{variant:"body2",children:r("help.screenshotComingSoon")})]}),e&&n.jsx(y,{component:"figcaption",variant:"caption",color:"text.secondary",sx:{display:"block",mt:.75},children:e}),s&&n.jsxs(ge,{open:a,onClose:()=>o(!1),maxWidth:"xl",children:[n.jsx(me,{"aria-label":r("common.actions.close"),onClick:()=>o(!1),sx:{position:"absolute",right:8,top:8,bgcolor:"background.paper","&:hover":{bgcolor:"background.paper"}},children:n.jsx(ye,{})}),n.jsx(we,{sx:{p:1},children:n.jsx(p,{component:"img",src:s,alt:e,sx:{display:"block",maxWidth:"100%"}})})]})]})}function Ot({variant:e,blocks:t}){const{t:r}=x();if(e==="quote")return n.jsx(p,{sx:{borderLeft:4,borderColor:"divider",pl:2,my:2,color:"text.secondary"},children:n.jsx(E,{blocks:t})});const a=e==="tip"?"success":e==="warning"?"warning":"info";return n.jsxs(B,{severity:a,icon:e==="tip"?n.jsx(St,{fontSize:"inherit"}):void 0,sx:{my:2,"& p:last-child, & ul:last-child, & ol:last-child":{mb:0}},children:[n.jsx(fe,{children:r(`help.callout.${e}`)}),n.jsx(E,{blocks:t})]})}function Bt({block:e}){switch(e.kind){case"heading":{const t=e.level<=1?"h4":e.level===2?"h5":e.level===3?"h6":"subtitle1";return n.jsx(y,{id:e.id,variant:t,component:`h${Math.min(e.level,6)}`,sx:{mt:e.level<=2?4:3,mb:1.25,scrollMarginTop:72,fontWeight:e.level>=4?600:void 0},children:C(e.text)})}case"paragraph":return n.jsx(y,{variant:"body1",sx:{mb:1.5,lineHeight:1.7},children:C(e.text)});case"list":return n.jsx(p,{component:e.ordered?"ol":"ul",start:e.ordered?e.start:void 0,sx:{pl:3,mt:0,mb:1.5,"& > li":{mb:.5,lineHeight:1.7},"& li > p":{mb:.5}},children:e.items.map((t,r)=>n.jsx(y,{component:"li",variant:"body1",children:t.length===1&&t[0].kind==="paragraph"?C(t[0].text):n.jsx(E,{blocks:t})},r))});case"callout":return n.jsx(Ot,{variant:e.variant,blocks:e.blocks});case"table":return n.jsx(Re,{component:G,variant:"outlined",sx:{my:2},children:n.jsxs(he,{size:"small",children:[n.jsx(pe,{children:n.jsx(H,{children:e.header.map((t,r)=>n.jsx(V,{align:e.align[r],sx:{fontWeight:600,whiteSpace:"nowrap"},children:C(t)},r))})}),n.jsx(ue,{children:e.rows.map((t,r)=>n.jsx(H,{children:t.map((a,o)=>n.jsx(V,{align:e.align[o],children:C(a)},o))},r))})]})});case"image":return n.jsx(_t,{alt:e.alt,src:e.src});case"hr":return n.jsx(le,{sx:{my:3}})}}function E({blocks:e}){return n.jsx(n.Fragment,{children:e.map((t,r)=>n.jsx(f.Fragment,{children:n.jsx(Bt,{block:t})},r))})}function Et({blocks:e}){return n.jsx(p,{sx:{"& > :first-child":{mt:0}},children:n.jsx(E,{blocks:e})})}function Dt(){const{t:e,i18n:t}=x(),{topicId:r}=be(),a=f.useMemo(()=>kt(t.language),[t.language]),o=f.useMemo(()=>new Map(a.map(l=>[l.id,l])),[a]),[s,h]=f.useState("");if(!r)return n.jsx(Lt,{topics:a,byId:o,query:s,setQuery:h});const i=o.get(r);return n.jsxs(p,{sx:{display:"flex",gap:3,alignItems:"flex-start"},children:[n.jsx(p,{sx:{display:{xs:"none",md:"block"},width:240,flexShrink:0,position:"sticky",top:64},children:n.jsx(Mt,{topics:a,byId:o,current:r,query:s,setQuery:h})}),n.jsxs(p,{sx:{flex:1,minWidth:0},children:[n.jsx(_,{component:b,to:"/help",size:"small",startIcon:n.jsx(ne,{}),sx:{display:{md:"none"},mb:1},children:e("help.allTopics")}),i?n.jsx(Pt,{topic:i,topics:a}):n.jsx(B,{severity:"warning",action:n.jsx(_,{component:b,to:"/help",children:e("help.allTopics")}),children:e("help.topicNotFound")})]})]})}function ie({query:e,setQuery:t,autoFocus:r}){const{t:a}=x();return n.jsx(Ae,{size:"small",fullWidth:!0,autoFocus:r,placeholder:a("help.searchPlaceholder"),value:e,onChange:o=>t(o.target.value),slotProps:{input:{startAdornment:n.jsx(Ie,{position:"start",children:n.jsx(_e,{fontSize:"small"})})}}})}function Lt({topics:e,byId:t,query:r,setQuery:a}){const{t:o}=x(),s=f.useMemo(()=>ae(e,r),[e,r]),h=r.trim().length>0;return n.jsxs(I,{spacing:3,sx:{maxWidth:1100},children:[n.jsxs(p,{children:[n.jsx(y,{variant:"h4",gutterBottom:!0,children:o("help.title")}),n.jsx(y,{color:"text.secondary",children:o("help.subtitle")})]}),n.jsx(p,{sx:{maxWidth:560},children:n.jsx(ie,{query:r,setQuery:a,autoFocus:!0})}),h?n.jsxs(I,{spacing:1.5,children:[n.jsx(y,{variant:"overline",color:"text.secondary",children:o("help.resultCount",{count:s.length})}),s.length===0&&n.jsx(B,{severity:"info",children:o("help.noResults",{query:r.trim()})}),s.map(({topic:i,snippet:l})=>n.jsx(ke,{variant:"outlined",children:n.jsx(Me,{component:b,to:`/help/${i.id}`,children:n.jsxs(ve,{children:[n.jsx(y,{variant:"h6",children:i.title}),n.jsx(y,{variant:"body2",color:"text.secondary",children:l})]})})},i.id))]}):n.jsxs(n.Fragment,{children:[t.has("getting-started")&&n.jsx(B,{severity:"info",action:n.jsx(_,{component:b,to:"/help/getting-started",endIcon:n.jsx(te,{}),children:o("help.startHereAction")}),children:o("help.startHere")}),n.jsx(p,{sx:{display:"grid",gap:2,gridTemplateColumns:{xs:"1fr",sm:"repeat(2, 1fr)",lg:"repeat(3, 1fr)"}},children:j.map(i=>{const l=i.topics.map(d=>t.get(d)).filter(d=>!!d);return l.length===0?null:n.jsxs(G,{variant:"outlined",sx:{p:2},children:[n.jsx(y,{variant:"overline",color:"primary",sx:{fontWeight:600},children:o(`help.groups.${i.key}`)}),n.jsx(I,{spacing:1.5,sx:{mt:.5},children:l.map(d=>n.jsxs(p,{children:[n.jsx(T,{component:b,to:`/help/${d.id}`,variant:"subtitle1",underline:"hover",sx:{fontWeight:600},children:d.title}),n.jsx(y,{variant:"body2",color:"text.secondary",children:d.summary})]},d.id))})]},i.key)})})]})]})}function Mt({topics:e,byId:t,current:r,query:a,setQuery:o}){const{t:s}=x(),h=f.useMemo(()=>a.trim()?new Set(ae(e,a).map(i=>i.topic.id)):void 0,[e,a]);return n.jsxs(G,{variant:"outlined",sx:{maxHeight:"calc(100vh - 88px)",overflowY:"auto"},children:[n.jsx(p,{sx:{p:1.5,pb:.5},children:n.jsx(ie,{query:a,setQuery:o})}),n.jsxs(Ce,{dense:!0,disablePadding:!0,children:[n.jsx(z,{component:b,to:"/help",children:n.jsx(q,{primary:s("help.allTopics"),slotProps:{primary:{color:"primary",fontWeight:600}}})}),j.map(i=>{const l=i.topics.map(d=>t.get(d)).filter(d=>!!d&&(!h||h.has(d.id)));return l.length===0?null:n.jsx("li",{children:n.jsxs("ul",{style:{padding:0},children:[n.jsx(xe,{sx:{lineHeight:"32px",bgcolor:"background.paper"},children:s(`help.groups.${i.key}`)}),l.map(d=>n.jsx(z,{component:b,to:`/help/${d.id}`,selected:d.id===r,sx:{pl:3},children:n.jsx(q,{primary:d.title})},d.id))]})},i.key)}),h&&h.size===0&&n.jsx(y,{variant:"body2",color:"text.secondary",sx:{px:2,py:1},children:s("help.noResults",{query:a.trim()})})]})]})}function Pt({topic:e,topics:t}){const{t:r}=x(),a=Te(),o=Se(),s=f.useMemo(()=>U(e.body),[e]),h=s.filter(c=>c.kind==="heading"&&c.level===2),i=t.findIndex(c=>c.id===e.id),l=i>0?t[i-1]:void 0,d=i>=0&&i<t.length-1?t[i+1]:void 0;return f.useEffect(()=>{const c=decodeURIComponent(a.hash.replace(/^#/,""));if(!c){window.scrollTo({top:0});return}let m=!1;const u=()=>{var g;m||(g=document.getElementById(c))==null||g.scrollIntoView({behavior:"smooth",block:"start"})};u();const w=[...document.querySelectorAll("article img")].filter(g=>!g.complete);return w.length&&Promise.all(w.map(g=>g.decode().catch(()=>{}))).then(u),()=>{m=!0}},[a.hash,e.id]),n.jsxs(p,{sx:{display:"flex",gap:4,alignItems:"flex-start"},children:[n.jsxs(p,{component:"article",sx:{flex:1,minWidth:0,maxWidth:880},children:[n.jsx(y,{variant:"h4",component:"h1",gutterBottom:!0,children:e.title}),n.jsx(Et,{blocks:s}),n.jsxs(I,{direction:"row",spacing:2,sx:{mt:5,pt:2,borderTop:1,borderColor:"divider"},justifyContent:"space-between",children:[l?n.jsx(_,{startIcon:n.jsx(ne,{}),onClick:()=>o(`/help/${l.id}`),sx:{textAlign:"left"},children:n.jsxs(p,{children:[n.jsx(y,{variant:"caption",display:"block",color:"text.secondary",children:r("help.previous")}),l.title]})}):n.jsx("span",{}),d&&n.jsx(_,{endIcon:n.jsx(te,{}),onClick:()=>o(`/help/${d.id}`),sx:{textAlign:"right"},children:n.jsxs(p,{children:[n.jsx(y,{variant:"caption",display:"block",color:"text.secondary",children:r("help.next")}),d.title]})})]})]}),h.length>1&&n.jsxs(p,{component:"nav",sx:{display:{xs:"none",lg:"block"},width:220,flexShrink:0,position:"sticky",top:64},children:[n.jsx(y,{variant:"overline",color:"text.secondary",children:r("help.onThisPage")}),n.jsx(I,{spacing:.75,sx:{mt:.5,borderLeft:2,borderColor:"divider",pl:1.5},children:h.map(c=>n.jsx(T,{component:b,to:{hash:`#${c.id}`},variant:"body2",underline:"hover",color:a.hash===`#${c.id}`?"primary":"text.secondary",children:c.text.replace(/\*\*|`/g,"")},c.id))})]})]})}export{Dt as HelpPage};

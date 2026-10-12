@@ -135,9 +135,11 @@ Each lane's dot and the colored stripe on its order cards help you scan the boar
 
 ### Add cards to an order
 
-1. In the order's details panel, type at least two letters of a card name in **Add a card (search your collection)**. Results come from your collection and follow the game selector at the top of the app.
-2. Each result shows the card's name, set and condition, plus a price box that starts at the market price. Change the price if needed.
+1. In the order's details panel, type at least two letters in **Add a card (search cards listed for sale)**. You can search by card name, set code or set name, and add a collector number. For example, `sol ring c21`. Only cards listed for sale show up. The rest of your collection doesn't. Results follow the game selector at the top of the app.
+2. Each result shows the card's name, set, collector number and condition, plus a price box that starts at the listed price. Change the price if needed. When a listing has more than one copy, the result shows how many are still available.
 3. Click **+** to add the card. Each click adds one copy.
+
+Copies already on another open order (**Created** or **Packed**) aren't offered, so the same card can't be sold twice. To sell a card that isn't listed yet, list it for sale first (see [List cards for sale](help:sales#list-cards-for-sale)).
 
 The **Items** heading shows the number of items and the order total. To remove a card, click the trash button on its line.
 
@@ -245,6 +247,6 @@ Customers are also created automatically when you import orders from a CSV file.
 - **"Mark picked" shows an error about the for-sale location.** No for-sale location is set, or the one you chose was deleted. Set one on the **Administration** page, **Sales** tab, or turn off **Move picked cards to the for-sale location**.
 - **I can't edit an order.** It's past **Packed**. See [Edit a shipped or completed order](help:sales#edit-a-shipped-or-completed-order).
 - **A card won't list.** It's already listed. Find it on the **Listings** tab and click **Unlist** first.
-- **My search in "Add a card" finds nothing.** Type at least two letters, and check that the game selector at the top of the app is set to the card's game or **All Games**.
+- **My search in "Add a card" finds nothing.** Type at least two letters, and check that the game selector at the top of the app is set to the card's game or **All Games**. Only cards listed for sale are offered: list the card first, and check it isn't already on another open order.
 
 For more help, see [Troubleshooting](help:troubleshooting).
