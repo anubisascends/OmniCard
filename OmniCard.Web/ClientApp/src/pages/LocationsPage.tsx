@@ -32,6 +32,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import DoNotDisturbOnOutlinedIcon from '@mui/icons-material/DoNotDisturbOnOutlined';
+import LinkIcon from '@mui/icons-material/Link';
 
 const COLLAPSED_KEY = 'omnicard.locations.collapsed';
 const HIDE_EMPTY_KEY = 'omnicard.locations.hideEmpty';
@@ -364,6 +365,22 @@ function buildColumns(
           <Link component={RouterLink} to={locationHref(p.row)} underline="hover" noWrap>
             {p.row.name}
           </Link>
+          {p.row.sourceUrl && (
+            <Tooltip title={t('locations.deckLinkTooltip', { source: p.row.sourceName ?? p.row.sourceUrl })}>
+              <IconButton
+                size="small"
+                component="a"
+                href={p.row.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t('locations.deckLinkTooltip', { source: p.row.sourceName ?? p.row.sourceUrl })}
+                onClick={(e) => e.stopPropagation()}
+                sx={{ p: 0.25 }}
+              >
+                <LinkIcon fontSize="small" color="primary" />
+              </IconButton>
+            </Tooltip>
+          )}
           {p.row.ignoredForLists && (
             <Tooltip title={t('locations.ignored.rowTooltip')}>
               <Chip

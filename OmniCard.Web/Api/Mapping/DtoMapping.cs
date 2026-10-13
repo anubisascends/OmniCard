@@ -6,6 +6,7 @@ using OmniCard.Shared.Sales;
 using OmniCard.Shared.Sets;
 using OmniCard.Shared.Storage;
 using OmniCard.CardMatching.Search;
+using OmniCard.Collection.Lists;
 
 namespace OmniCard.Web.Api.Mapping;
 
@@ -108,6 +109,11 @@ public static class DtoMapping
         DeckTypeId = s.Container.DeckTypeId,
         DeckTypeName = s.DeckTypeName,
         IgnoredForLists = s.Container.ExcludeFromDeckCheck,
+        SourceUrl = s.Container.SourceUrl,
+        SourceName = s.Container.SourceUrl is { } url ? DecklistService.ParseUrl(url).Source : null,
+        SourceSyncedAt = s.Container.SourceSyncedAt,
+        DeckLinkSupported = s.Container.ContainerType == ContainerType.DeckBox
+            && s.Container.Game is { } game && DecklistService.AnySourceServesGame(game),
     };
 
     public static DeckTypeDto ToDto(DeckType d) => new()

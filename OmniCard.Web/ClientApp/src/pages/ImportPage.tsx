@@ -231,6 +231,11 @@ function UrlImportSection() {
                 {t('common.tagRules.tagged', { count: data.ruleTagged, formatted: fmt.number(data.ruleTagged) })}
               </Typography>
             )}
+            {data.linkedDeckBox && (
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                {t('importing.url.linkedDeckBox')}
+              </Typography>
+            )}
           </Alert>
         )}
       </Stack>

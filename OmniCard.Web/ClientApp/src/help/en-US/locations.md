@@ -63,7 +63,7 @@ Click a group heading to collapse or expand it. Collapsed groups stay collapsed 
 
 | Column | Meaning |
 |---|---|
-| **Name** | Click it to open the location. Binders open straight into the binder view. An **Ignored** chip means lists don't take cards from it. |
+| **Name** | Click it to open the location. Binders open straight into the binder view. An **Ignored** chip means lists don't take cards from it. A link icon means the deck box is linked to an online deck; click the icon to open the deck in a new tab. |
 | **Site** | Shown when you're viewing **All Sites** and more than one site exists. A lock icon means view only. |
 | **Type** | The location type. Deck boxes also show their deck type and game. |
 | **Cards** | Total copies in the location. |
@@ -153,7 +153,7 @@ The location page shows:
 - **Open binder view**, for binders.
 - **Audit**, **Import** and **Add card** buttons (when you're allowed to change this location).
 - A summary line with the number of cards and their market value.
-- For deck boxes, a panel with the game, deck type and legality warnings. See [Deck boxes](help:deck-boxes).
+- For deck boxes, a panel with the game, deck type and legality warnings, plus the deck link and **Sync from URL** for a linked deck box. See [Deck boxes](help:deck-boxes).
 - A search box, the view button for [saved views](help:saved-views), and the card list.
 
 ### Find cards in a location
@@ -197,6 +197,8 @@ The location's **Import** button adds a whole file or deck to this location in o
 Every card must match a card in the catalog. If any line has a problem, **nothing is imported**. Instead, OmniCard lists each problem with its row number and card name so you can fix the file and try again.
 
 When the import succeeds, you'll see how many cards were added. If a line's exact printing isn't in the catalog but the card is, OmniCard uses another printing of the same card and lists those substitutions so you can check them.
+
+Importing a deck URL into a deck box that has no deck link also links the deck box to that deck. See [Deck boxes](help:deck-boxes#link-a-deck-box-to-an-online-deck).
 
 > [!TIP]
 > Need to import into several locations, skip duplicates, or import a decklist file? Use the [Import](/import) page instead. See [Importing](help:importing).

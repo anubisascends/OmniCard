@@ -1145,6 +1145,44 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("SiteAccessGrants");
                 });
 
+            modelBuilder.Entity("OmniCard.Shared.Storage.DeckBoxMissingCard", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CardName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("CollectorNumber")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<int>("ContainerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("MarkedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SetCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContainerId", "CardName")
+                        .IsUnique();
+
+                    b.ToTable("DeckBoxMissingCards");
+                });
+
             modelBuilder.Entity("OmniCard.Shared.Storage.DeckType", b =>
                 {
                     b.Property<int>("Id")
@@ -1258,6 +1296,13 @@ namespace OmniCard.Web.Migrations
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");
+
+                    b.Property<DateTime?>("SourceSyncedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SourceUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<int>("TotalPages")
                         .HasColumnType("int");
@@ -1601,6 +1646,15 @@ namespace OmniCard.Web.Migrations
                     b.HasOne("OmniCard.Shared.Sites.Site", null)
                         .WithMany()
                         .HasForeignKey("SiteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OmniCard.Shared.Storage.DeckBoxMissingCard", b =>
+                {
+                    b.HasOne("OmniCard.Shared.Storage.StorageContainer", null)
+                        .WithMany()
+                        .HasForeignKey("ContainerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

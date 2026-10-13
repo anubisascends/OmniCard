@@ -25,6 +25,7 @@ public class OmniCardDbContext : DbContext
     public DbSet<LotTag> LotTags => Set<LotTag>();
     public DbSet<StorageContainer> StorageContainers => Set<StorageContainer>();
     public DbSet<DeckType> DeckTypes => Set<DeckType>();
+    public DbSet<DeckBoxMissingCard> DeckBoxMissingCards => Set<DeckBoxMissingCard>();
     public DbSet<EbayListing> EbayListings => Set<EbayListing>();
     public DbSet<Listing> Listings => Set<Listing>();
     public DbSet<Customer> Customers => Set<Customer>();
@@ -121,6 +122,7 @@ public class OmniCardDbContext : DbContext
             e.HasOne<DeckType>().WithMany().HasForeignKey(s => s.DeckTypeId)
                 .OnDelete(DeleteBehavior.SetNull);
             e.HasIndex(s => s.DeckTypeId);
+            e.Property(s => s.SourceUrl).HasMaxLength(StorageContainer.MaxSourceUrlLength);
 
             // Every location belongs to a site (major physical location). The column defaults to the
             // seeded default site so the AddSites migration backfills pre-existing rows; Restrict so a
@@ -179,6 +181,19 @@ public class OmniCardDbContext : DbContext
             // One deck-type name per game; the seed key is globally unique (only set on built-ins).
             e.HasIndex(d => new { d.Game, d.Name }).IsUnique();
             e.HasIndex(d => d.BuiltInKey).IsUnique();
+        });
+
+        // Cards a deck box's linked decklist wants that the user marked "not in collection" at sync time.
+        modelBuilder.Entity<DeckBoxMissingCard>(e =>
+        {
+            e.HasKey(m => m.Id);
+            e.Property(m => m.Id).ValueGeneratedOnAdd();
+            e.Property(m => m.CardName).IsRequired().HasMaxLength(DeckBoxMissingCard.MaxCardNameLength);
+            e.Property(m => m.SetCode).HasMaxLength(32);
+            e.Property(m => m.CollectorNumber).HasMaxLength(32);
+            e.HasIndex(m => new { m.ContainerId, m.CardName }).IsUnique();
+            e.HasOne<StorageContainer>().WithMany().HasForeignKey(m => m.ContainerId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<MismatchLog>(e =>

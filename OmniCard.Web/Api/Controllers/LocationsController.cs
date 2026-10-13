@@ -28,7 +28,8 @@ public sealed class LocationsController(
     IPriceSheetPdfExporter priceSheetPdf,
     SiteService sites,
     RequestSiteAccess siteAccess,
-    SavedViewService savedViews) : ApiControllerBase
+    SavedViewService savedViews,
+    DeckBoxSyncService deckSync) : ApiControllerBase
 {
     /// <summary>Printable price-sheet PDF for a location's cards.</summary>
     [HttpGet("{id:int}/pricesheet.pdf")]
@@ -199,6 +200,88 @@ public sealed class LocationsController(
     [RequireSiteAccess(SiteAccessLevel.Read, Location = "id")]
     public ActionResult<DeckLegalityDto> DeckLegality(int id) =>
         DtoMapping.ToDto(deckLegality.Check(id));
+
+    // --- deck box link + sync ---
+
+    /// <summary>Link a deck box to a Moxfield/Archidekt deck URL, or unlink it (blank URL). 400 when the URL
+    /// isn't a supported deck site for the box's game or the location isn't a deck box.</summary>
+    [HttpPut("{id:int}/deck-link")]
+    [RequirePermission(Permissions.LocationsEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "id")]
+    public IActionResult SetDeckLink(int id, [FromBody] SetDeckLinkRequest req) =>
+        GuardDeckSync(() =>
+        {
+            deckSync.SetLink(id, req.Url);
+            return NoContent();
+        });
+
+    /// <summary>Fetch the linked deck and diff it against the box: cards to add (with owned copies found
+    /// elsewhere), cards to remove. Changes nothing.</summary>
+    [HttpPost("{id:int}/deck-sync/preview")]
+    [RequirePermission(Permissions.CollectionEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "id")]
+    public async Task<ActionResult<DeckSyncPreviewDto>> DeckSyncPreview(int id)
+    {
+        try
+        {
+            return await deckSync.PreviewAsync(id, siteAccess.Current);
+        }
+        catch (DeckBoxSyncService.DeckSyncException ex)
+        {
+            return DeckSyncError(ex);
+        }
+    }
+
+    /// <summary>Apply the user's sync choices: move copies in, move/sideboard removed cards, and replace the
+    /// box's "not in collection" list.</summary>
+    [HttpPost("{id:int}/deck-sync/apply")]
+    [RequirePermission(Permissions.CollectionEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "id")]
+    public ActionResult<DeckSyncResultDto> DeckSyncApply(int id, [FromBody] DeckSyncApplyRequest req) =>
+        GuardDeckSync(() => Ok(deckSync.Apply(id, req, siteAccess.Current)));
+
+    /// <summary>"Find a copy": owned cards of the box's game, by name, that could be moved into it.</summary>
+    [HttpGet("{id:int}/deck-sync/search")]
+    [RequirePermission(Permissions.CollectionEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "id")]
+    public ActionResult<IReadOnlyList<DeckSyncSourceDto>> DeckSyncSearch(int id, [FromQuery] string? q) =>
+        GuardDeckSync(() => Ok(deckSync.Search(id, q, siteAccess.Current)));
+
+    /// <summary>The cards the last sync marked "not in collection".</summary>
+    [HttpGet("{id:int}/deck-sync/not-in-collection")]
+    [RequirePermission(Permissions.LocationsView)]
+    [RequireSiteAccess(SiteAccessLevel.Read, Location = "id")]
+    public ActionResult<IReadOnlyList<DeckBoxMissingCardDto>> DeckNotInCollection(int id) =>
+        Ok(deckSync.GetNotInCollection(id));
+
+    /// <summary>Drop one card from the "not in collection" list.</summary>
+    [HttpDelete("{id:int}/deck-sync/not-in-collection")]
+    [RequirePermission(Permissions.LocationsEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "id")]
+    public IActionResult RemoveDeckNotInCollection(int id, [FromQuery] string cardName)
+    {
+        deckSync.RemoveNotInCollection(id, cardName ?? "");
+        return NoContent();
+    }
+
+    private ActionResult GuardDeckSync(Func<ActionResult> action)
+    {
+        try
+        {
+            return action();
+        }
+        catch (DeckBoxSyncService.DeckSyncException ex)
+        {
+            return DeckSyncError(ex);
+        }
+        catch (DeckBoxGameMismatchException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+    }
+
+    private ActionResult DeckSyncError(DeckBoxSyncService.DeckSyncException ex) =>
+        ex.NotFound ? NotFound(new { error = ex.Message }) : BadRequest(new { error = ex.Message });
 
     private bool DeckTypeBelongsToGame(int deckTypeId, CardGame game) =>
         deckTypes.GetById(deckTypeId) is { } dt && dt.Game == game;

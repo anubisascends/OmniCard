@@ -25,7 +25,8 @@ public sealed class ImportController(
     IDecklistService decklists,
     ICardService cardService,
     LocationImportService locationImport,
-    TagRuleService tagRules) : ApiControllerBase
+    TagRuleService tagRules,
+    DeckBoxSyncService deckSync) : ApiControllerBase
 {
     [HttpPost("csv")]
     [RequirePermission(Permissions.ImportRun)]
@@ -82,7 +83,8 @@ public sealed class ImportController(
     /// <summary>Fetch a Moxfield/Archidekt deck by URL and add every card to <c>ContainerId</c> as owned
     /// lots. Each line resolves to its exact set + collector printing (falling back to the cheapest
     /// printing of the name, reported in <c>SubstitutedNames</c>) and keeps the deck's foil/etched finish.
-    /// Repeat lines of the same printing + finish merge into one lot.</summary>
+    /// Repeat lines of the same printing + finish merge into one lot. A deck box that isn't linked to a deck
+    /// URL yet gets linked to this one, so it can be synced later.</summary>
     [HttpPost("url")]
     [RequirePermission(Permissions.ImportRun)]
     [RequireSiteAccess(SiteAccessLevel.Write, Location = "ContainerId")]
@@ -176,7 +178,7 @@ public sealed class ImportController(
 
         return new ImportUrlResultDto(
             deckName, imported, skipped, entries.Sum(e => e.Quantity), unresolved, substituted,
-            tagRules.ApplyToNewLots(lotIds));
+            tagRules.ApplyToNewLots(lotIds), deckSync.LinkIfUnlinked(request.ContainerId, request.Url));
     }
 
     /// <summary>All-or-nothing CSV import into the location in the route (the Location view's Import).
@@ -205,12 +207,18 @@ public sealed class ImportController(
     }
 
     /// <summary>All-or-nothing Moxfield/Archidekt deck import into the location in the route. Every card
-    /// must resolve to a catalog printing; otherwise nothing is written (422 + every unresolved card).</summary>
+    /// must resolve to a catalog printing; otherwise nothing is written (422 + every unresolved card). A deck
+    /// box that isn't linked to a deck URL yet gets linked to this one.</summary>
     [HttpPost("location/{locationId:int}/url")]
     [RequirePermission(Permissions.ImportRun)]
     [RequireSiteAccess(SiteAccessLevel.Write, Location = "locationId")]
-    public async Task<ActionResult<LocationImportResultDto>> LocationUrl(int locationId, [FromBody] LocationUrlImportRequest request) =>
-        ToResult(await locationImport.ImportUrlAsync(locationId, request));
+    public async Task<ActionResult<LocationImportResultDto>> LocationUrl(int locationId, [FromBody] LocationUrlImportRequest request)
+    {
+        var outcome = await locationImport.ImportUrlAsync(locationId, request);
+        if (outcome.Result is { } result)
+            outcome = outcome with { Result = result with { LinkedDeckBox = deckSync.LinkIfUnlinked(locationId, request.Url) } };
+        return ToResult(outcome);
+    }
 
     private ActionResult<LocationImportResultDto> ToResult(LocationImportService.Outcome outcome) =>
         outcome.LocationNotFound ? NotFound(new { error = "That location no longer exists." })

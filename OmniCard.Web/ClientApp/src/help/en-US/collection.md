@@ -266,6 +266,8 @@ The **Missing** tab lists cards you don't have enough of, with the cost to buy t
 
 After a move, the check runs again so the pull list shows the cards' new location. The dialog keeps its results while you close it to look at your collection.
 
+To keep a deck box matched to an online deck as it changes, link the deck box to the deck and use **Sync from URL** instead. See [Link a deck box to an online deck](help:deck-boxes#link-a-deck-box-to-an-online-deck).
+
 For deck boxes and saved card lists, see [Deck boxes](help:deck-boxes) and [Lists](help:lists).
 
 ## Tips and troubleshooting

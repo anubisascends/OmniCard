@@ -75,6 +75,7 @@ The result message shows:
 - How many were skipped as duplicates, if you ticked that option.
 - Cards whose exact printing wasn't in the catalog. OmniCard used the cheapest printing of the same card instead, so check these later.
 - Cards that couldn't be found at all. Add these by hand.
+- Whether a deck box was linked to the deck. Importing into a deck box with no deck link links it, so you can keep it up to date later with **Sync from URL**. See [Deck boxes](help:deck-boxes#link-a-deck-box-to-an-online-deck).
 
 ![A finished deck URL import showing substituted and unmatched cards](importing-url-result.png)
 

@@ -83,6 +83,7 @@
       "save_other": "Save {{count}} changes",
       "chip": "Ignored",
       "rowTooltip": "Lists and decklist checks don't take cards from here"
-    }
+    },
+    "deckLinkTooltip": "Linked to {{source}}. Click to open the deck in a new tab."
   }
 }

@@ -29,6 +29,11 @@ import type {
   DashboardDto,
   DeckBoxNeedsGameDto,
   DeckLegalityDto,
+  DeckBoxMissingCardDto,
+  DeckSyncApplyRequest,
+  DeckSyncPreviewDto,
+  DeckSyncResultDto,
+  DeckSyncSourceDto,
   DeckTypeDto,
   DeckTypeUpsertRequest,
   ImportListResultDto,
@@ -531,6 +536,21 @@ export const api = {
     request<DeckBoxNeedsGameDto[]>('/api/locations/deck-boxes/needs-game'),
   locationDeckLegality: (id: number) =>
     request<DeckLegalityDto>(`/api/locations/${id}/deck-legality`),
+  /** Link a deck box to a Moxfield/Archidekt deck URL; a blank URL unlinks it. */
+  setDeckLink: (id: number, url: string | null) =>
+    request<void>(`/api/locations/${id}/deck-link`, { method: 'PUT', body: JSON.stringify({ url }) }),
+  /** Fetch the linked deck and diff it against the deck box (changes nothing). */
+  deckSyncPreview: (id: number) =>
+    request<DeckSyncPreviewDto>(`/api/locations/${id}/deck-sync/preview`, { method: 'POST' }),
+  deckSyncApply: (id: number, body: DeckSyncApplyRequest) =>
+    request<DeckSyncResultDto>(`/api/locations/${id}/deck-sync/apply`, { method: 'POST', body: JSON.stringify(body) }),
+  /** "Find a copy": owned cards of the deck box's game, by name, that could be moved into it. */
+  deckSyncSearch: (id: number, q: string) =>
+    request<DeckSyncSourceDto[]>(`/api/locations/${id}/deck-sync/search${qs({ q })}`),
+  deckNotInCollection: (id: number) =>
+    request<DeckBoxMissingCardDto[]>(`/api/locations/${id}/deck-sync/not-in-collection`),
+  removeDeckNotInCollection: (id: number, cardName: string) =>
+    request<void>(`/api/locations/${id}/deck-sync/not-in-collection${qs({ cardName })}`, { method: 'DELETE' }),
 
   // Deck types (per-game formats): built-ins + custom
   deckTypes: (game: string) => request<DeckTypeDto[]>(`/api/deck-types${qs({ game })}`),
