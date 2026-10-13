@@ -22,7 +22,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { InputAdornment } from '@mui/material';
 import { api } from '../../api/client';
 import { useFormatters } from '../../i18n/format';
-import { groupLocations } from '../../lib/locationGroups';
+import { groupLocations, headingFor } from '../../lib/locationGroups';
 import { LOCATION_TYPES, isDeckBoxType } from '../../lib/locationTypes';
 import { DeckBoxGamePicker } from '../DeckBoxGamePicker';
 import { useSites } from '../../context/useSites';
@@ -164,6 +164,7 @@ export function LocationPickerDialog({
   title,
   excludeId,
   allowCreate = true,
+  includeReadOnly = false,
   cardGames,
   types,
   onPick,
@@ -173,6 +174,9 @@ export function LocationPickerDialog({
   title?: string;
   excludeId?: number;
   allowCreate?: boolean;
+  /** Also offer locations in sites the user can only read (for values that aren't card targets,
+   * e.g. where a sealed-inventory lot is stored). */
+  includeReadOnly?: boolean;
   /** Games of the card(s) being moved. When set, deck-box targets locked to a different game are
    * disabled (the server hard-blocks the move anyway — this is the matching UX guard). */
   cardGames?: string[];
@@ -194,12 +198,12 @@ export function LocationPickerDialog({
     const term = search.trim().toLowerCase();
     const filtered = (data ?? [])
       .filter((l) => l.id !== excludeId)
-      // Only locations the user may change can receive cards (read-only sites are excluded).
-      .filter((l) => l.canWrite !== false)
+      // Only locations the user may change can receive cards (read-only sites are excluded unless asked).
+      .filter((l) => includeReadOnly || l.canWrite !== false)
       .filter((l) => !types || types.includes(l.type))
       .filter((l) => (term ? l.name.toLowerCase().includes(term) : true));
     return groupLocations(filtered);
-  }, [data, search, excludeId, types]);
+  }, [data, search, excludeId, types, includeReadOnly]);
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
@@ -237,7 +241,7 @@ export function LocationPickerDialog({
               <li key={g.key}>
                 <ul style={{ padding: 0 }}>
                   <ListSubheader disableSticky sx={{ bgcolor: 'transparent', lineHeight: '28px' }}>
-                    {g.heading}
+                    {headingFor(g.key, g.heading)}
                   </ListSubheader>
                   {g.items.map((l) => {
                     const blocked = gameBlocked(l.game);

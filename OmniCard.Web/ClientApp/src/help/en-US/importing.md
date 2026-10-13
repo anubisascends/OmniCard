@@ -22,7 +22,7 @@ Open it from **Import** in the navigation menu, or go to [Import](/import).
 1. Open [Import](/import).
 2. Under **Import collection (CSV)**, click **Choose CSV file** and pick your file. The button changes to show the file's name.
 3. Leave **Skip duplicates already in collection** ticked to avoid adding cards you already have. See **Duplicates** below.
-4. Optionally, choose a **Target location (optional)** for the cards. If you leave it on **— none —**, the cards are added without a location.
+4. Optionally, click **Target location (optional)** and pick a location for the cards. The picker groups your locations by type, has a search box, and has a **New location** button for creating one on the spot. If you leave it on **— none —**, the cards are added without a location. To go back to **— none —**, click the **×** at the end of the box.
 5. Click **Import**.
 
 When the import finishes, a message shows how many rows were imported, out of how many, and which format OmniCard detected. Rows that couldn't be read are skipped and counted as warnings.
@@ -62,7 +62,7 @@ Untick the option to add every row as new cards, even when you already own match
 This adds every card in a public Moxfield or Archidekt deck to one location, as cards you own. Use it when you've built a deck in real life and want it in your collection. These sites are for Magic: The Gathering only.
 
 1. Under **Import from Moxfield / Archidekt**, paste the deck's address into **Deck URL**.
-2. Choose a **Target location**. This is required.
+2. Click **Target location** and pick a location, or create one with **New location**. This is required.
 3. Choose the **Condition** for all the cards (NM by default).
 4. Optionally, tick **Skip duplicates already in collection**. It's unticked by default for deck imports.
 5. Click **Import**.
