@@ -137,6 +137,27 @@ export interface SiteDto {
   locationCount: number;
 }
 
+/** Admin "Reset collection": what a reset removes (preview) or removed (result), plus what it keeps. */
+export interface CollectionResetCountsDto {
+  lots: number;
+  units: number;
+  products: number;
+  movements: number;
+  locations: number;
+  sites: number;
+  lists: number;
+  trades: number;
+  tradeSessions: number;
+  tags: number;
+  tagRules: number;
+  keptListedLots: number;
+  keptLocations: number;
+  keptOrders: number;
+  keptCustomers: number;
+  /** The exact phrase the admin must type to confirm. */
+  confirmationPhrase: string;
+}
+
 /** One access grant on a site (admin). `level` "None" removes the grant when saving. */
 export interface SiteGrantDto {
   principalType: 'User' | 'Role';

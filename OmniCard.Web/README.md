@@ -527,6 +527,37 @@ behavior is Shipped. The order drawer's **Scan label** button fills **Tracking**
   Over plain HTTP the page says so and falls back to typed / handheld-scanner entry. Barcodes are decoded
   in the browser with ZXing (`@zxing/browser`); nothing is uploaded.
 
+## Reset collection (admin)
+
+**Administration ▸ Reset Collection** wipes the owned collection to start over while keeping all sales data
+(`CollectionResetService`, `GET`/`POST /api/collection-reset`, admin-only; `POST` needs
+`{ "confirmation": "RESET COLLECTION" }`). It runs in one transaction with set-based deletes:
+
+- **Removed:** every inventory lot (singles and sealed), storage location, non-default site (+ grants), card
+  list, trade/trade session, tag, tag rule, and location saved views. Also removed: movements of lots that never
+  sold, and products nothing references any more.
+- **Kept:** orders, order lines, edits, customers, listings (all statuses), and the Acquire/Sell movements and
+  products of every lot that ever sold (realized profit is computed from them). Lots still for sale (open
+  Listed/Picked listing, or any eBay listing record) are kept with their tags, location, return-to location
+  and that location's site, as are Bulk, the for-sale location and scan-folder / open-batch default
+  locations. Users, roles, settings, deck types, scan batches and the per-game catalog DBs are untouched.
+- **No files are deleted** (scan images, trade photos, card art), so restoring a database backup fully
+  reverts a reset. Back up first:
+
+```sql
+BACKUP DATABASE [OmniCard] TO DISK = N'D:\Backups\OmniCard-pre-reset.bak' WITH COPY_ONLY, INIT, CHECKSUM;
+RESTORE VERIFYONLY FROM DISK = N'D:\Backups\OmniCard-pre-reset.bak' WITH CHECKSUM;
+```
+
+To revert, stop the site (IIS app pool / `OmniCard.Web.exe`) so nothing holds a connection, then:
+
+```sql
+USE master;
+ALTER DATABASE [OmniCard] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+RESTORE DATABASE [OmniCard] FROM DISK = N'D:\Backups\OmniCard-pre-reset.bak' WITH REPLACE;
+ALTER DATABASE [OmniCard] SET MULTI_USER;
+```
+
 ## MCP server (Claude, Gemini, etc.)
 
 OmniCard hosts an in-process **Model Context Protocol** server so MCP-capable apps (Claude Desktop,

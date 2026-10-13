@@ -13,6 +13,7 @@
       "roles": "Roles",
       "sites": "Sites",
       "users": "Users",
+      "reset": "Reset Collection",
       "components": "Components"
     },
     "roles": {
@@ -316,6 +317,39 @@
       "runNothing": "Every card this rule matches already has its tags. There's nothing to do.",
       "runDone_one": "Tagged {{formatted}} card.",
       "runDone_other": "Tagged {{formatted}} cards."
+    },
+    "reset": {
+      "title": "Reset collection",
+      "description": "Removes your whole collection so you can start over: every card and sealed lot, every storage location, binder and deck box, every site except Default, every card list, all trades, and all tags and tag rules. All sales data is kept: orders, customers, listings, and the history behind your sales and profit reports. Cards that are still listed for sale are kept too, along with their locations and tags.",
+      "backupWarning": "This can't be undone in OmniCard. Back up the OmniCard database first (in SSMS: Tasks ▸ Back Up). Restoring that backup is the only way to get your collection back. Game catalogs, users, roles, settings and saved scan images aren't touched.",
+      "removedHeading": "Will be removed",
+      "keptHeading": "Will be kept",
+      "alwaysKept": "Also kept: sales listings and their history, realized profit, users and roles, all settings, deck types, scan batches, game catalogs and downloaded card art.",
+      "counts": {
+        "lots": "Card and sealed lots",
+        "units": "Copies in those lots",
+        "locations": "Storage locations (binders, boxes, deck boxes)",
+        "sites": "Sites (other than Default)",
+        "lists": "Card lists",
+        "trades": "Traded cards",
+        "tradeSessions": "Trade sessions",
+        "tags": "Tags",
+        "tagRules": "Tag rules",
+        "products": "Unused product records",
+        "movements": "Inventory history entries for unsold cards",
+        "keptListedLots": "Lots still listed for sale",
+        "keptLocations": "Locations (Bulk, plus any in use by listings or settings)",
+        "keptOrders": "Orders",
+        "keptCustomers": "Customers"
+      },
+      "confirmLabel": "Type {{phrase}} to confirm",
+      "button": "Reset collection",
+      "running": "Resetting…",
+      "done_one": "Collection reset: removed {{formatted}} lot.",
+      "done_other": "Collection reset: removed {{formatted}} lots.",
+      "failed": "The reset failed. Nothing was changed.",
+      "previewFailed": "Couldn't load the reset preview.",
+      "nothingToRemove": "There's nothing to remove: the collection is already empty."
     }
   }
 }

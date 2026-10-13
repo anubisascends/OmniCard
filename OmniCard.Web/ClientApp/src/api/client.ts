@@ -1,4 +1,5 @@
 import type {
+  CollectionResetCountsDto,
   AccountDto,
   ActiveListingDto,
   SellableListingDto,
@@ -398,6 +399,14 @@ export const api = {
   siteGrants: (id: number) => request<SiteGrantDto[]>(`/api/sites/${id}/grants`),
   siteSetGrants: (id: number, grants: SiteGrantDto[]) =>
     request<void>(`/api/sites/${id}/grants`, { method: 'PUT', body: JSON.stringify({ grants }) }),
+
+  // Admin "Reset collection": preview what would be removed, then wipe (requires the exact phrase).
+  collectionResetPreview: () => request<CollectionResetCountsDto>('/api/collection-reset'),
+  collectionReset: (confirmation: string) =>
+    request<CollectionResetCountsDto>('/api/collection-reset', {
+      method: 'POST',
+      body: JSON.stringify({ confirmation }),
+    }),
   location: (id: number) => request<LocationSummaryDto>(`/api/locations/${id}`),
 
   // Sets

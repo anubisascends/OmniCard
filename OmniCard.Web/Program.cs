@@ -245,6 +245,10 @@ builder.Services.AddHttpContextAccessor();
 var siteAccessService = new SiteAccessService(writableFactory);
 builder.Services.AddSingleton(siteAccessService);
 builder.Services.AddSingleton(new SiteService(writableFactory, siteAccessService));
+// Admin "Reset collection" (Settings ▸ Reset collection): wipes owned cards/locations, keeps sales data.
+builder.Services.AddSingleton(sp => new CollectionResetService(writableFactory,
+    sp.GetRequiredService<ISalesSettingsService>(), sp.GetRequiredService<IScanFolderSettingsService>(),
+    siteAccessService, sp.GetRequiredService<ILogger<CollectionResetService>>()));
 builder.Services.AddScoped(sp => new RequestSiteAccess(
     sp.GetRequiredService<IHttpContextAccessor>(), siteAccessService, writableFactory));
 // Saved views of the Collection / Location pages (per user, plus admin-shared views and defaults).
