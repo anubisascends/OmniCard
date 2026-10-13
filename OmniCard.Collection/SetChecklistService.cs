@@ -120,6 +120,22 @@ public class SetChecklistService : ISetChecklistService
         });
     }
 
+    public IReadOnlySet<string> GetOwnedSetCodes(CardGame game)
+    {
+        // Same ownership rules as BuildAsync: singles of this game, not traded away.
+        using var db = _dbFactory.CreateDbContext();
+        var codes = db.Lots.AsNoTracking()
+            .Where(l => l.Product.Category == ProductCategory.Single
+                        && l.Product.Game == game
+                        && l.Product.SetCode != null
+                        && l.Quantity > 0
+                        && !l.IsTraded)
+            .Select(l => l.Product.SetCode!)
+            .Distinct()
+            .ToList();
+        return codes.Select(Norm).Where(c => c.Length > 0).ToHashSet();
+    }
+
     public SetChecklistReport BuildWantListReport(SetChecklist checklist)
     {
         var rows = checklist.Cards

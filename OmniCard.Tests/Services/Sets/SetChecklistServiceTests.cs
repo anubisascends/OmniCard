@@ -133,6 +133,22 @@ public class SetChecklistServiceTests : IDisposable
     }
 
     [Fact]
+    public void GetOwnedSetCodes_ReturnsDistinctLoweredCodes_ExcludingTradedAndEmptyLots()
+    {
+        AddLot(gameCardId: "g1", setCode: "SET1", collector: "1", qty: 1);
+        AddLot(gameCardId: "g2", setCode: "set1", collector: "2", qty: 2);
+        AddLot(gameCardId: "x1", setCode: "set2", collector: "1", qty: 1, traded: true);
+        AddLot(gameCardId: "y1", setCode: "set3", collector: "1", qty: 0);
+        AddLot(gameCardId: "z1", setCode: "set4", collector: "1", qty: 1);
+
+        var svc = CreateService(Catalog());
+        var owned = svc.GetOwnedSetCodes(CardGame.Mtg);
+
+        Assert.Equal(["set1", "set4"], owned.Order().ToArray());
+        Assert.Empty(svc.GetOwnedSetCodes(CardGame.Pokemon));
+    }
+
+    [Fact]
     public async Task BuildAsync_UnknownGame_Throws()
     {
         var svc = CreateService(Catalog());

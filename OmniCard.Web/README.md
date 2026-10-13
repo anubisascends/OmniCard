@@ -109,7 +109,8 @@ dotnet build OmniCard.Web/OmniCard.Web.csproj
 ```
 
 `ClientApp/**` is excluded from the .NET globs, so `node_modules` never ends up in a publish; the
-built `wwwroot/app` output does.
+built `wwwroot/app` output does. `wwwroot/app` is build output and is git-ignored, so a fresh clone
+has no SPA until you run `npm run build` (the release/nightly workflows do this before publishing).
 
 ## Run (development)
 

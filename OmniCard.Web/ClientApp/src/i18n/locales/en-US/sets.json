@@ -2,6 +2,10 @@
   "sets": {
     "title": "Sets",
     "pickGame": "Pick a game in the top bar to browse its sets.",
+    "ownedOnly": "Owned sets only",
+    "noOwnedSets": "You don't own cards in any set for this game yet.",
+    "ownedCardsOnly": "Owned cards only",
+    "noOwnedCards": "You don't own any cards in this set yet.",
     "summary": "{{setName}} — {{owned}}/{{total}} owned ({{percent}}%)",
     "columns": {
       "no": "No.",

@@ -10,6 +10,10 @@ public interface ISetChecklistService
     /// collector number.</summary>
     Task<SetChecklist> BuildAsync(CardGame game, string setCode);
 
+    /// <summary>Lower-cased codes of the sets the user owns at least one (non-traded) single in —
+    /// backs the Sets tab's "Owned sets only" filter.</summary>
+    IReadOnlySet<string> GetOwnedSetCodes(CardGame game);
+
     /// <summary>Distills a checklist into the printable want-list (unowned cards only).</summary>
     SetChecklistReport BuildWantListReport(SetChecklist checklist);
 }
