@@ -1,0 +1,21 @@
+# Build context for the Dockerfile: only what the SPA and the web project need.
+**/bin/
+**/obj/
+**/node_modules/
+**/*.user
+.git/
+.github/
+.idea/
+.vs/
+.vscode/
+docs/
+OmniCard.Tests/
+OmniCard.DbMigrator/
+# Rebuilt from ClientApp in the node stage; the committed copy would leave stale hashed assets behind.
+OmniCard.Web/wwwroot/app/
+# Secrets / local compose files never belong in an image.
+.env
+.env.*
+Dockerfile
+.dockerignore
+docker-compose*.yml
