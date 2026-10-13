@@ -1,5 +1,3 @@
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.Net;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +7,8 @@ using OmniCard.Shared.Games;
 using OmniCard.Shared.Settings;
 using OmniCard.CardMatching.Games;
 using OmniCard.Data.Catalogs;
+using OmniCard.Tests.Fakes;
+using SkiaSharp;
 
 namespace OmniCard.Tests.Services.Games;
 
@@ -49,21 +49,12 @@ public class RiftboundHashingTests : IDisposable
         if (Directory.Exists(_dataDir)) Directory.Delete(_dataDir, recursive: true);
     }
 
-    // System.Drawing.Common is already used by EdgeHashTests.cs for PNG generation; reused
-    // here rather than pulling in a direct SkiaSharp package reference for the test project.
-    private static byte[] PngBytes()
-    {
-        using var bmp = new Bitmap(64, 90);
-        using (var g = Graphics.FromImage(bmp))
+    private static byte[] PngBytes() =>
+        TestImages.Png(64, 90, SKColors.White, g =>
         {
-            g.Clear(Color.White);
-            using var brush = new SolidBrush(Color.Black);
-            g.FillRectangle(brush, 10, 10, 30, 40);
-        }
-        using var ms = new MemoryStream();
-        bmp.Save(ms, ImageFormat.Png);
-        return ms.ToArray();
-    }
+            using var brush = TestImages.Fill(SKColors.Black);
+            g.DrawRect(SKRect.Create(10, 10, 30, 40), brush);
+        });
 
     [Fact]
     public async Task ComputeImageHashes_PopulatesHashesAndPath()

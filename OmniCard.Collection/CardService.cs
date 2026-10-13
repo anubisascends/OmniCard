@@ -1,7 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Drawing;
-using System.Drawing.Imaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OmniCard.CardMatching;
@@ -444,12 +442,10 @@ public sealed class CardService : ICardService
                     try
                     {
                         _logger.LogInformation("No match found, attempting 180° rotation for hash {Hash:X16}", scannedCard.Hash);
-                        using var bmp = new System.Drawing.Bitmap(new MemoryStream(rawBytes));
-                        bmp.RotateFlip(System.Drawing.RotateFlipType.Rotate180FlipNone);
+                        using var bmp = OmniCard.Imaging.ImageOps.Decode(rawBytes);
+                        using var rotated = OmniCard.Imaging.ImageOps.Rotate(bmp, 180);
 
-                        using var rotatedStream = new MemoryStream();
-                        bmp.Save(rotatedStream, System.Drawing.Imaging.ImageFormat.Png);
-                        rotatedStream.Position = 0;
+                        using var rotatedStream = new MemoryStream(OmniCard.Imaging.ImageOps.EncodePng(rotated));
                         var rotatedHash = _hashService.ComputeHash(rotatedStream);
                         rotatedStream.Position = 0;
                         var rotatedBytes = rotatedStream.ToArray();
@@ -1356,20 +1352,14 @@ public sealed class CardService : ICardService
         try
         {
             input.Position = 0;
-            using var bmp = new Bitmap(input);
+            using var bmp = OmniCard.Imaging.ImageOps.Decode(input);
 
             var w = bmp.Width;
             var h = bmp.Height;
 
-            // Lock pixels for fast access
-            var data = bmp.LockBits(
-                new Rectangle(0, 0, w, h),
-                ImageLockMode.ReadOnly,
-                System.Drawing.Imaging.PixelFormat.Format24bppRgb);
-            int stride = data.Stride;
-            var pixels = new byte[stride * h];
-            System.Runtime.InteropServices.Marshal.Copy(data.Scan0, pixels, 0, pixels.Length);
-            bmp.UnlockBits(data);
+            // Pixels as BGRA; the dark-pixel counters below read B, G, R at 4 bytes per pixel.
+            var pixels = OmniCard.Imaging.ImageOps.GetBgra(bmp);
+            int stride = w * 4;
 
             // A row/column counts as "card" when at least 10% of its pixels
             // are darker than the background threshold.
@@ -1444,11 +1434,10 @@ public sealed class CardService : ICardService
                 return input;
             }
 
-            var cropRect = new Rectangle(left, top, cropW, cropH);
-            using var cropped = bmp.Clone(cropRect, bmp.PixelFormat);
+            var cropRect = new System.Drawing.Rectangle(left, top, cropW, cropH);
+            using var cropped = OmniCard.Imaging.ImageOps.Crop(bmp, cropRect);
 
-            var output = new MemoryStream();
-            cropped.Save(output, System.Drawing.Imaging.ImageFormat.Png);
+            var output = new MemoryStream(OmniCard.Imaging.ImageOps.EncodePng(cropped));
             output.Position = 0;
 
             _logger.LogInformation(
@@ -1473,7 +1462,7 @@ public sealed class CardService : ICardService
         int rowStart = y * stride;
         for (int x = 0; x < w; x++)
         {
-            int offset = rowStart + x * 3;
+            int offset = rowStart + x * 4;
             int brightness = (pixels[offset] + pixels[offset + 1] + pixels[offset + 2]) / 3;
             if (brightness < threshold) count++;
         }
@@ -1485,7 +1474,7 @@ public sealed class CardService : ICardService
         int count = 0;
         for (int y = yStart; y <= yEnd; y++)
         {
-            int offset = y * stride + x * 3;
+            int offset = y * stride + x * 4;
             int brightness = (pixels[offset] + pixels[offset + 1] + pixels[offset + 2]) / 3;
             if (brightness < threshold) count++;
         }
@@ -1924,15 +1913,9 @@ public sealed class CardService : ICardService
 
     private static void ConvertToJpeg(string sourcePath, string destPath, int quality)
     {
-        // Decode from a stream we own (not Image.FromFile, which keeps the source file locked for
-        // the Image's lifetime) so the caller can delete the temp scan immediately afterwards.
-        using var source = File.OpenRead(sourcePath);
-        using var bitmap = Image.FromStream(source);
-
-        var jpegEncoder = ImageCodecInfo.GetImageEncoders().First(c => c.FormatID == ImageFormat.Jpeg.Guid);
-        using var encoderParams = new EncoderParameters(1);
-        encoderParams.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, (long)quality);
-
-        bitmap.Save(destPath, jpegEncoder, encoderParams);
+        // Decode from bytes we own (the source file isn't held open) so the caller can delete the temp
+        // scan immediately afterwards.
+        using var bitmap = OmniCard.Imaging.ImageOps.Decode(File.ReadAllBytes(sourcePath));
+        File.WriteAllBytes(destPath, OmniCard.Imaging.ImageOps.EncodeJpeg(bitmap, quality));
     }
 }

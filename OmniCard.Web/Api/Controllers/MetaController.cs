@@ -97,7 +97,7 @@ public sealed class MetaController(IEnumerable<ICardGameService> gameServices) :
             new("Imaging & OCR", "Tesseract (.NET wrapper)", "5.2.0", "Apache-2.0", "https://github.com/charlesw/tesseract", apache2),
             new("Imaging & OCR", "Tesseract OCR engine (tesseract, leptonica)", "5.x", "Apache-2.0", "https://github.com/tesseract-ocr/tesseract", apache2),
             new("Imaging & OCR", "Svg.Skia", "5.2.2", "MIT", "https://github.com/wieslawsoltes/Svg.Skia", mit),
-            new("Imaging & OCR", "System.Drawing.Common", "10.0.9", "MIT", "https://github.com/dotnet/winforms", mit),
+            new("Imaging & OCR", "BitMiracle.LibTiff.NET", "2.4.660", "BSD-3-Clause", "https://bitmiracle.com/libtiff/", "https://github.com/BitMiracle/libtiff.net/blob/master/license.txt"),
             new("Documents", "QuestPDF", "2026.7.0", "MIT (Community) / dual-licensed", "https://www.questpdf.com", "https://www.questpdf.com/license/"),
 
             // ── Frontend (SPA) ──────────────────────────────────────────────────

@@ -11,8 +11,12 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
-    <PackageReference Include="System.Drawing.Common" Version="10.0.9" />
     <PackageReference Include="SkiaSharp" Version="4.150.1" />
+    <!-- Linux native libSkiaSharp (the SkiaSharp package only ships Windows/macOS natives). The
+         NoDependencies build needs no fontconfig; the imaging pipeline never renders text. -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.150.1" />
+    <!-- TIFF decoding (scanner output); SkiaSharp has no TIFF codec. Pure managed, BSD licensed. -->
+    <PackageReference Include="BitMiracle.LibTiff.NET" Version="2.4.660" />
     <PackageReference Include="Tesseract" Version="5.2.0" />
   </ItemGroup>
   <ItemGroup>
