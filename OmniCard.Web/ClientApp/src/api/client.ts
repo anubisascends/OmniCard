@@ -411,6 +411,8 @@ export const api = {
 
   // Sets
   sets: (game: string) => request<SetInfoDto[]>(`/api/sets${qs({ game })}`),
+  /** Lower-cased codes of the sets the user owns at least one card in. */
+  ownedSetCodes: (game: string) => request<string[]>(`/api/sets/owned${qs({ game })}`),
   setChecklist: (game: string, setCode: string) =>
     request<SetChecklistDto>(`/api/sets/${encodeURIComponent(game)}/${encodeURIComponent(setCode)}`),
 

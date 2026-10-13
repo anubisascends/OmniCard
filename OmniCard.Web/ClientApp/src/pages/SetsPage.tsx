@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -7,8 +7,10 @@ import {
   Autocomplete,
   Box,
   Chip,
+  FormControlLabel,
   LinearProgress,
   Stack,
+  Switch,
   TextField,
   Typography,
 } from '@mui/material';
@@ -72,12 +74,32 @@ const buildColumns = (
   },
 ];
 
+// The "owned only" filters are per-browser preferences; storage can be unavailable (private mode).
+const OWNED_SETS_KEY = 'omnicard.sets.ownedOnly';
+const OWNED_CARDS_KEY = 'omnicard.sets.ownedCardsOnly';
+function loadFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === 'true';
+  } catch {
+    return false;
+  }
+}
+function saveFlag(key: string, value: boolean) {
+  try {
+    localStorage.setItem(key, String(value));
+  } catch {
+    /* not persisted */
+  }
+}
+
 export function SetsPage() {
   const { t } = useTranslation();
   const fmt = useFormatters();
   const { game } = useGame();
   const [set, setSet] = useState<SetInfoDto | null>(null);
   const [hover, setHover] = useState<CardHover | null>(null);
+  const [ownedOnly, setOwnedOnly] = useState(() => loadFlag(OWNED_SETS_KEY));
+  const [ownedCardsOnly, setOwnedCardsOnly] = useState(() => loadFlag(OWNED_CARDS_KEY));
   const columns = buildColumns(t, (n) => (n == null ? '' : fmt.money(n)), setHover);
 
   const setsQuery = useQuery({
@@ -85,6 +107,30 @@ export function SetsPage() {
     queryFn: () => api.sets(game!),
     enabled: !!game,
   });
+
+  const ownedQuery = useQuery({
+    queryKey: ['sets-owned', game],
+    queryFn: () => api.ownedSetCodes(game!),
+    enabled: !!game && ownedOnly,
+  });
+
+  const setOptions = useMemo(() => {
+    const all = setsQuery.data ?? [];
+    if (!ownedOnly) return all;
+    const owned = new Set(ownedQuery.data ?? []);
+    // Keep the open set pickable so switching the filter on doesn't drop the checklist you're on.
+    return all.filter((s) => owned.has(s.setCode.toLowerCase()) || s.setCode === set?.setCode);
+  }, [setsQuery.data, ownedQuery.data, ownedOnly, set]);
+
+  const toggleOwnedOnly = (checked: boolean) => {
+    setOwnedOnly(checked);
+    saveFlag(OWNED_SETS_KEY, checked);
+  };
+
+  const toggleOwnedCardsOnly = (checked: boolean) => {
+    setOwnedCardsOnly(checked);
+    saveFlag(OWNED_CARDS_KEY, checked);
+  };
 
   const checklistQuery = useQuery({
     queryKey: ['set-checklist', game, set?.setCode],
@@ -102,19 +148,41 @@ export function SetsPage() {
   }
 
   const checklist = checklistQuery.data;
+  // The summary/progress bar always reflect the whole set; this only narrows the grid.
+  const rows = (checklist?.cards ?? []).filter((c) => !ownedCardsOnly || c.ownedQuantity > 0);
 
   return (
     <Stack spacing={2} sx={{ height: 'calc(100vh - 120px)' }}>
       <Typography variant="h4">{t('sets.title')}</Typography>
-      <Autocomplete
-        options={setsQuery.data ?? []}
-        loading={setsQuery.isLoading}
-        getOptionLabel={(o) => `${o.setName} (${o.setCode})`}
-        value={set}
-        onChange={(_, v) => setSet(v)}
-        sx={{ maxWidth: 480 }}
-        renderInput={(params) => <TextField {...params} label={t('common.labels.set')} size="small" />}
-      />
+      <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+        <Autocomplete
+          options={setOptions}
+          loading={setsQuery.isLoading || (ownedOnly && ownedQuery.isLoading)}
+          getOptionLabel={(o) => `${o.setName} (${o.setCode})`}
+          isOptionEqualToValue={(o, v) => o.setCode === v.setCode}
+          value={set}
+          onChange={(_, v) => setSet(v)}
+          noOptionsText={ownedOnly ? t('sets.noOwnedSets') : undefined}
+          sx={{ flex: 1, minWidth: 260, maxWidth: 480 }}
+          renderInput={(params) => <TextField {...params} label={t('common.labels.set')} size="small" />}
+        />
+        <FormControlLabel
+          control={
+            <Switch checked={ownedOnly} onChange={(e) => toggleOwnedOnly(e.target.checked)} size="small" />
+          }
+          label={t('sets.ownedOnly')}
+        />
+        <FormControlLabel
+          control={
+            <Switch
+              checked={ownedCardsOnly}
+              onChange={(e) => toggleOwnedCardsOnly(e.target.checked)}
+              size="small"
+            />
+          }
+          label={t('sets.ownedCardsOnly')}
+        />
+      </Stack>
 
       {checklist && (
         <Box>
@@ -139,12 +207,13 @@ export function SetsPage() {
 
       {set && (
         <DataGrid
-          rows={checklist?.cards ?? []}
+          rows={rows}
           getRowId={(r) => r.gameCardId}
           columns={columns}
           loading={checklistQuery.isFetching}
           density="compact"
           disableRowSelectionOnClick
+          localeText={ownedCardsOnly ? { noRowsLabel: t('sets.noOwnedCards') } : undefined}
           getRowClassName={(p) => (p.row.ownedQuantity > 0 ? '' : 'unowned-row')}
           sx={{ '& .unowned-row': { opacity: 0.55 } }}
         />
