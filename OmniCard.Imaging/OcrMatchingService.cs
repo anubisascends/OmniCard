@@ -173,6 +173,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         LoadListSymbolReferences();
 
         _tessdataPath = Path.Combine(AppContext.BaseDirectory, "tessdata");
+        TesseractNativeSetup.EnsureConfigured(_logger);
 
         // Validate the engine can be constructed (native libs + language data present).
         // Mirror the previous behaviour: if OCR is unavailable, log a warning and degrade

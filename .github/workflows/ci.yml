@@ -36,3 +36,32 @@ jobs:
           name: coverage-report
           path: coverage/**/coverage.cobertura.xml
           retention-days: 30
+
+  # Same build + suite on Linux, the Docker deployment target. Tesseract/Leptonica come from the distro
+  # (the Tesseract NuGet package only bundles Windows binaries) and QuestPDF needs system fonts.
+  build-and-test-linux:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libtesseract5 liblept5 fonts-dejavu-core fonts-liberation
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore OmniCard.slnx
+
+      - name: Build
+        run: dotnet build OmniCard.slnx --no-restore -c Release
+
+      - name: Test
+        run: dotnet test OmniCard.Tests/OmniCard.Tests.csproj --no-build -c Release
