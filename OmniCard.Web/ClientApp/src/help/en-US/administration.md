@@ -21,6 +21,7 @@ Click **Administration** in the sidebar. Everyone can open this page, but you on
 | **Roles** | Permission bundles | Administrators only |
 | **Sites** | Major physical places and who can see them | Administrators only |
 | **Users** | Every account: add, edit, require password resets, delete | Administrators only |
+| **Reset Collection** | Remove the whole collection to start over, keeping sales data | Administrators only |
 | **Components** | Software versions and licenses | Everyone |
 
 If the page scrolls sideways on a small screen, use the arrows at either end of the tab row to see more tabs.
@@ -313,6 +314,26 @@ Fill these in before you run seller setup.
 4. Click **Save seller settings**, then click **Run seller setup** above.
 
 **Setup status** shows whether the inventory location and the three business policies have been created, and when setup last completed.
+
+## Reset Collection
+
+Only administrators see this tab. It removes your whole collection so you can start over. **All sales data is kept.**
+
+> [!WARNING]
+> You can't undo a reset in OmniCard. Back up the OmniCard database before you reset (in SQL Server Management Studio, right-click the database and choose **Tasks ▸ Back Up**). Restoring that backup is the only way to get your collection back.
+
+The tab shows two lists before you change anything:
+
+- **Will be removed**: every card and sealed lot, every storage location, binder and deck box, every site except Default, every card list, all trades, and all tags and tag rules. It also removes product records and inventory history that nothing uses any more.
+- **Will be kept**: lots that are still listed for sale, plus the locations and tags they use. The Bulk location is kept, and so is any location chosen in settings (the for-sale location and scan-folder default locations). Orders and customers are kept too.
+
+Your listings history, sales and profit reports, users, roles, settings, deck types, scan batches, game catalogs and downloaded card art are never touched. Saved scan images also stay on disk.
+
+To reset:
+
+1. Check the counts under **Will be removed** and **Will be kept**.
+2. Type the confirmation phrase exactly as shown (**RESET COLLECTION**).
+3. Click **Reset collection**. Everything is removed in one step. If something goes wrong, nothing changes.
 
 ## Components
 

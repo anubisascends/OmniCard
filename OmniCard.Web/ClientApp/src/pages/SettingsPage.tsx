@@ -46,6 +46,7 @@ import { DeckTypesCard } from '../components/settings/DeckTypesCard';
 import { TagRulesCard } from '../components/settings/TagRulesCard';
 import { RolesCard } from '../components/settings/RolesCard';
 import { SitesCard } from '../components/settings/SitesCard';
+import { ResetCollectionCard } from '../components/settings/ResetCollectionCard';
 import { ScanFoldersCard } from '../components/settings/ScanFoldersCard';
 import { PermissionChecklist } from '../components/settings/PermissionChecklist';
 import { usePermissions } from '../context/usePermissions';
@@ -1770,6 +1771,7 @@ const TABS: {
   { key: 'roles', labelKey: 'settings.tabs.roles', render: () => <RolesCard />, show: (g) => g.isAdmin },
   { key: 'sites', labelKey: 'settings.tabs.sites', render: () => <SitesCard />, show: (g) => g.isAdmin },
   { key: 'users', labelKey: 'settings.tabs.users', render: () => <ManageUsersCard />, show: (g) => g.isAdmin },
+  { key: 'reset', labelKey: 'settings.tabs.reset', render: () => <ResetCollectionCard />, show: (g) => g.isAdmin },
   { key: 'components', labelKey: 'settings.tabs.components', render: () => <ComponentsCard />, show: () => true },
 ];
 

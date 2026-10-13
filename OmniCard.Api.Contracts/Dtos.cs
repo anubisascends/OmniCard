@@ -1684,3 +1684,17 @@ public sealed record ScanTagRulesRequest
 
 /// <summary>The rule tags for one scanned card (empty when no rule matches).</summary>
 public sealed record ScanTagRuleResultDto(string Key, IReadOnlyList<string> Tags);
+
+/// <summary>Admin "Reset collection": what a reset removes (preview) or removed (result) — lots/units,
+/// orphaned products and non-sale movements, locations, sites, lists, trades, tags, tag rules — plus
+/// what it keeps (cards still listed for sale, locations, orders, customers).</summary>
+public sealed record CollectionResetCountsDto(
+    int Lots, int Units, int Products, int Movements, int Locations, int Sites, int Lists, int Trades,
+    int TradeSessions, int Tags, int TagRules, int KeptListedLots, int KeptLocations, int KeptOrders,
+    int KeptCustomers, string ConfirmationPhrase);
+
+/// <summary>Admin "Reset collection" request; <see cref="Confirmation"/> must be the exact phrase.</summary>
+public sealed record CollectionResetRequest
+{
+    public string Confirmation { get; init; } = "";
+}
