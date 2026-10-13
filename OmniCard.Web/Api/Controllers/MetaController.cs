@@ -88,6 +88,7 @@ public sealed class MetaController(IEnumerable<ICardGameService> gameServices) :
             new("Backend", "Serilog", "4.3.0", "Apache-2.0", "https://serilog.net", apache2),
             new("Backend", "Serilog.Sinks.Console", "6.1.1", "Apache-2.0", "https://github.com/serilog/serilog-sinks-console", apache2),
             new("Backend", "Serilog.Sinks.File", "6.0.0", "Apache-2.0", "https://github.com/serilog/serilog-sinks-file", apache2),
+            new("Backend", "Serilog.Extensions.Logging", "10.0.0", "Apache-2.0", "https://github.com/serilog/serilog-extensions-logging", apache2),
             new("Backend", "CommunityToolkit.Mvvm", "8.4.2", "MIT", "https://github.com/CommunityToolkit/dotnet", mit),
             new("Backend", "CsvHelper", "33.1.0", "MS-PL OR Apache-2.0", "https://github.com/JoshClose/CsvHelper", apache2),
             new("Backend", "AdysTech.CredentialManager", "3.1.0", "Apache-2.0", "https://github.com/mnottale/AdysTech.CredentialManager", apache2),

@@ -43,6 +43,9 @@
          2.0.0 has a known high-severity DoS (CVE-2026-49451 / GHSA-v5pm-xwqc-g5wc — stack overflow
          on circular schema refs), fixed in 2.7.5. -->
     <PackageReference Include="Microsoft.OpenApi" Version="2.12.2" />
+    <!-- Optional rolling log files under {DataDirectory}/logs (Logging:File:Enabled); Serilog + its file
+         sink already come in through OmniCard.Data. -->
+    <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

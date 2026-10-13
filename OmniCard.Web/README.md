@@ -65,6 +65,7 @@ loaded automatically if present). Key settings:
 | `DataDirectory` (or `--db <path>` CLI arg) | Folder holding `scans/`, `card-images/`, `symbols/`, `dataprotection-keys/`. |
 | `ConnectionStrings:OmniCard` | SQL Server unified store. Default: `Server=localhost;Database=OmniCard;Trusted_Connection=True;TrustServerCertificate=True;` The per-game catalog DBs reuse this with the database name swapped (or set `ConnectionStrings:OmniCard_<Game>` explicitly). |
 | `Binder:EditPassphrase` | Legacy binder-editor gate (separate from the per-user sign-in). |
+| `Logging:File:Enabled` | `true` adds daily rolling log files under `<DataDirectory>/logs` (`Logging:File:RetainedFileCount`, default 14). Off by default. |
 | `eBay` section | eBay app credentials — see [eBay](#ebay-setup). |
 
 DataProtection keys (used to encrypt stored eBay tokens) are persisted to
