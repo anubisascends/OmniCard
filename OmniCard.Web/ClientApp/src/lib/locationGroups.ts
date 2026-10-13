@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 import type { LocationSummaryDto } from '../api/types';
 
 // (Plural) section headings per location type. Keys match the display type string the API returns
@@ -40,4 +41,12 @@ export function groupLocations(locations: LocationSummaryDto[]): LocationGroup[]
 
   groups.push(...typeGroups);
   return groups;
+}
+
+// Localized group heading. `groupLocations` returns a stable `key` per group (`__always__`, or the
+// type display string), which we resolve to a translated heading here. This is a plain function (no
+// React hooks), so it reads the shared i18n singleton rather than `useTranslation`.
+export function headingFor(key: string, fallback: string): string {
+  if (key === '__always__') return i18n.t('locations.groups.alwaysAvailable');
+  return i18n.t(`locations.groups.headings.${key}`, { defaultValue: fallback });
 }

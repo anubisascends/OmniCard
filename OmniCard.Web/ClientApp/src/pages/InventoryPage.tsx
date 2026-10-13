@@ -30,7 +30,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { api, type LotFields, type ProductFields } from '../api/client';
 import type { InventoryLotDto, ProductDto } from '../api/types';
-import { locationSelectOptions } from '../components/LocationSelectOptions';
+import { LocationPickerField } from '../components/LocationPickerField';
 import { useGame } from '../context/GameContext';
 import { useFormatters } from '../i18n/format';
 import type { TFunction } from 'i18next';
@@ -239,7 +239,6 @@ function LotDialog({
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const locations = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations() });
   const [fields, setFields] = useState<LotFields>({ quantity: 1 });
 
   const key = initial?.id ?? 'new';
@@ -293,16 +292,14 @@ function LotDialog({
               setFields((f) => ({ ...f, unitCost: e.target.value === '' ? null : Number(e.target.value) }))
             }
           />
-          <TextField
-            select
+          <LocationPickerField
             label={t('inventory.lotDialog.locationOptional')}
-            value={fields.locationId ?? ''}
-            onChange={(e) =>
-              setFields((f) => ({ ...f, locationId: e.target.value === '' ? null : Number(e.target.value) }))
-            }
-          >
-            {locationSelectOptions(locations.data, { label: t('inventory.lotDialog.none') }, { includeReadOnly: true })}
-          </TextField>
+            value={fields.locationId ?? null}
+            onChange={(locationId) => setFields((f) => ({ ...f, locationId }))}
+            clearable
+            emptyText={t('inventory.lotDialog.none')}
+            includeReadOnly
+          />
           <TextField
             label={t('inventory.lotDialog.sourceOptional')}
             value={fields.source ?? ''}

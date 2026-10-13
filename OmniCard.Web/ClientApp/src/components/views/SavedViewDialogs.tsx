@@ -23,9 +23,8 @@ import {
   Typography,
 } from '@mui/material';
 import { api } from '../../api/client';
-import { groupLocations } from '../../lib/locationGroups';
+import { groupLocations, headingFor } from '../../lib/locationGroups';
 import { ALL_GAMES_KEY } from '../../lib/savedViews';
-import { headingFor } from '../LocationSelectOptions';
 
 export interface SaveViewChoice {
   name: string;
