@@ -105,7 +105,8 @@ public sealed class ScanFolderSettingsService : IScanFolderSettingsService
         {
             if (!Path.IsPathFullyQualified(f.Path))
             {
-                errors.Add($"{f.Game}: the folder must be a full path (e.g. D:\\Scans\\{f.Game}).");
+                var example = OperatingSystem.IsWindows() ? $@"D:\Scans\{f.Game}" : $"/scans/{f.Game}";
+                errors.Add($"{f.Game}: the folder must be a full path (e.g. {example}).");
                 continue;
             }
             string path;
