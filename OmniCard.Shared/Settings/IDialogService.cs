@@ -85,10 +85,6 @@ public interface IDialogService
     bool? OpenManualAddToSlot(int containerId, int page, int slot);
     void ShowDecklistCheck();
 
-    /// <summary>Opens the "Upgrade Deck" dialog for a Deck Box location: fetch/paste a target decklist,
-    /// review cuts/adds, and apply the moves. Returns true if the user committed changes (so the caller
-    /// can refresh the location view).</summary>
-    bool ShowDeckBoxSync(StorageContainer deckBox);
     Product? EditProduct(Product? existing);
     (int Quantity, decimal? UnitCost, int? LocationId, string? Source, DateTime AcquisitionDate)? AddLotDialog(int productId);
 

@@ -193,6 +193,8 @@ builder.Services.AddSingleton(sp =>
     new WebBinderCardService(writableFactory, sp.GetRequiredService<IDataPathService>(),
         sp.GetRequiredService<IEnumerable<ICardGameService>>().ToDictionary(s => s.Game)));
 builder.Services.AddSingleton<LocationImportService>();
+// Deck box ↔ Moxfield/Archidekt link + "Sync from URL" (LocationsController deck-link / deck-sync).
+builder.Services.AddSingleton<DeckBoxSyncService>();
 // Shared scan → lots write path (interactive scan commit + watched-folder batch commits).
 builder.Services.AddSingleton<ScanCommitService>();
 // Admin-defined auto-tagging rules (Settings ▸ Tag rules): checked in scan review, applied to imports.

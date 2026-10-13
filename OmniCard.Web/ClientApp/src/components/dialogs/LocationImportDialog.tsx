@@ -154,6 +154,11 @@ export function LocationImportDialog({
                 {t('common.tagRules.tagged', { count: result.ruleTagged, formatted: fmt.number(result.ruleTagged) })}
               </Typography>
             )}
+            {result.linkedDeckBox && (
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                {t('importing.location.linkedDeckBox', { name: locationName })}
+              </Typography>
+            )}
           </Alert>
         ) : (
           <Stack spacing={2}>

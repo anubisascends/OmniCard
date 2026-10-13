@@ -123,6 +123,95 @@ export interface LocationSummaryDto {
   /** Lists (find in collection, owned counts, putting a list away) and decklist checks ignore this
    * location's cards — e.g. a sales binder or a deck in use. */
   ignoredForLists: boolean;
+  /** The Moxfield/Archidekt deck URL a deck box is linked to. */
+  sourceUrl?: string | null;
+  /** Deck site of `sourceUrl` ("Moxfield", "Archidekt"). */
+  sourceName?: string | null;
+  /** When the deck box was last synced from `sourceUrl` (UTC ISO). */
+  sourceSyncedAt?: string | null;
+  /** A supported deck site serves this deck box's game, so it can be linked. */
+  deckLinkSupported?: boolean;
+}
+
+/** An owned copy that could go into a deck box during a sync. `ignoredReason`: "Location" (its location is
+ * ignored for lists — usable, never suggested) or "Listed" (listed for sale — not usable). */
+export interface DeckSyncSourceDto {
+  lotId: number;
+  cardName: string;
+  setCode: string | null;
+  collectorNumber: string | null;
+  isFoil: boolean;
+  language: string | null;
+  condition: string | null;
+  locationId: number;
+  locationName: string;
+  section: string | null;
+  page: number | null;
+  slot: number | null;
+  available: number;
+  suggested: number;
+  isExactPrinting: boolean;
+  ignoredReason: 'Location' | 'Listed' | null;
+  imageUri: string | null;
+}
+
+/** A card the linked deck wants more copies of than the deck box holds. */
+export interface DeckSyncAddDto {
+  cardName: string;
+  setCode: string | null;
+  collectorNumber: string | null;
+  isFoil: boolean;
+  needed: number;
+  imageUri: string | null;
+  /** The previous sync marked it "not in collection". */
+  markedNotInCollection: boolean;
+  sources: DeckSyncSourceDto[];
+}
+
+/** A deck-box lot (or part of one) the linked deck no longer wants. */
+export interface DeckSyncCutDto {
+  lotId: number;
+  cardName: string;
+  setCode: string | null;
+  collectorNumber: string | null;
+  isFoil: boolean;
+  quantity: number;
+  /** Already tagged sideboard (kept by default). */
+  isSideboard: boolean;
+  imageUri: string | null;
+}
+
+export interface DeckSyncPreviewDto {
+  deckBoxId: number;
+  deckBoxName: string;
+  sourceUrl: string;
+  deckName: string;
+  deckCardCount: number;
+  keepCount: number;
+  adds: DeckSyncAddDto[];
+  cuts: DeckSyncCutDto[];
+}
+
+export type DeckSyncCutAction = 'Move' | 'Sideboard' | 'Keep';
+
+export interface DeckBoxMissingCardDto {
+  cardName: string;
+  setCode: string | null;
+  collectorNumber: string | null;
+  quantity: number;
+}
+
+export interface DeckSyncApplyRequest {
+  picks: { lotId: number; quantity: number }[];
+  cuts: { lotId: number; quantity: number; action: DeckSyncCutAction; destinationId: number | null }[];
+  notInCollection: DeckBoxMissingCardDto[];
+}
+
+export interface DeckSyncResultDto {
+  added: number;
+  removed: number;
+  sideboarded: number;
+  notInCollection: number;
 }
 
 /** A site: a MAJOR physical location (a home, a shop) holding many storage locations. `access` is
@@ -576,6 +665,8 @@ export interface LocationImportResultDto {
   substitutions: LocationImportIssueDto[];
   /** New cards the tag rules tagged. */
   ruleTagged?: number;
+  /** The target was an unlinked deck box, and it's now linked to the imported deck URL. */
+  linkedDeckBox?: boolean;
 }
 
 /** A rejected location import (HTTP 422): nothing was written. */
@@ -593,6 +684,8 @@ export interface ImportUrlResultDto {
   substitutedNames: string[];
   /** New cards the tag rules tagged. */
   ruleTagged?: number;
+  /** The target was an unlinked deck box, and it's now linked to the imported deck URL. */
+  linkedDeckBox?: boolean;
 }
 
 export interface SetInfoDto {

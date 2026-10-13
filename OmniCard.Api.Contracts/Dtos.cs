@@ -108,6 +108,15 @@ public sealed record LocationSummaryDto
     /// ignore this location's cards: a sales binder, a deck in use… (the stored
     /// <c>StorageContainer.ExcludeFromDeckCheck</c> flag).</summary>
     public bool IgnoredForLists { get; init; }
+
+    /// <summary>The online decklist URL a deck box is linked to (Moxfield / Archidekt), or null.</summary>
+    public string? SourceUrl { get; init; }
+    /// <summary>Site name of <see cref="SourceUrl"/> ("Moxfield", "Archidekt"), or null.</summary>
+    public string? SourceName { get; init; }
+    /// <summary>When the deck box was last synced from <see cref="SourceUrl"/> (UTC), or null.</summary>
+    public DateTime? SourceSyncedAt { get; init; }
+    /// <summary>True when a supported deck site serves this deck box's game, so it can be linked.</summary>
+    public bool DeckLinkSupported { get; init; }
 }
 
 /// <summary>One row of a valuation breakdown (by game / category / location).</summary>
@@ -254,6 +263,60 @@ public sealed record DeckLegalityDto
 }
 
 public sealed record DeckLegalityWarningDto(string Code, string Message);
+
+// --- Deck box link + sync ---
+
+/// <summary>Body of <c>PUT /api/locations/{id}/deck-link</c>: the deck URL to link, or null/blank to unlink.</summary>
+public sealed record SetDeckLinkRequest(string? Url);
+
+/// <summary>An owned copy that could go into the deck box. <see cref="Suggested"/> is the pre-filled amount
+/// (shared across rows so two cards aren't both offered the same copies). <see cref="IgnoredReason"/>:
+/// <c>"Location"</c> = its location is ignored for lists (usable, but never suggested); <c>"Listed"</c> =
+/// listed for sale (not usable).</summary>
+public sealed record DeckSyncSourceDto(
+    int LotId, string CardName, string? SetCode, string? CollectorNumber, bool IsFoil, string? Language,
+    string? Condition, int LocationId, string LocationName, string? Section, int? Page, int? Slot,
+    int Available, int Suggested, bool IsExactPrinting, string? IgnoredReason, string? ImageUri);
+
+/// <summary>A card the deck wants more copies of than the box holds. <see cref="Sources"/> are owned copies
+/// of the same card name elsewhere in the collection; empty means none were found.
+/// <see cref="MarkedNotInCollection"/> is true when the previous sync marked it "not in collection".</summary>
+public sealed record DeckSyncAddDto(
+    string CardName, string? SetCode, string? CollectorNumber, bool IsFoil, int Needed, string? ImageUri,
+    bool MarkedNotInCollection, IReadOnlyList<DeckSyncSourceDto> Sources);
+
+/// <summary>A deck-box lot (or part of one) the deck no longer wants. <see cref="IsSideboard"/>: already
+/// tagged sideboard, so it's kept by default.</summary>
+public sealed record DeckSyncCutDto(
+    int LotId, string CardName, string? SetCode, string? CollectorNumber, bool IsFoil, int Quantity,
+    bool IsSideboard, string? ImageUri);
+
+/// <summary>The reconciliation between a deck box and its linked deck. <see cref="KeepCount"/> copies are
+/// already in the box; <see cref="Adds"/> are short; <see cref="Cuts"/> are surplus.</summary>
+public sealed record DeckSyncPreviewDto(
+    int DeckBoxId, string DeckBoxName, string SourceUrl, string DeckName, int DeckCardCount, int KeepCount,
+    IReadOnlyList<DeckSyncAddDto> Adds, IReadOnlyList<DeckSyncCutDto> Cuts);
+
+/// <summary>Copies of an owned lot to move into the deck box.</summary>
+public sealed record DeckSyncPickDto(int LotId, int Quantity);
+
+/// <summary>What to do with a cut lot: <c>"Move"</c> (to <see cref="DestinationId"/>), <c>"Sideboard"</c>
+/// (tag it, leave it in the box) or <c>"Keep"</c> (leave it alone).</summary>
+public sealed record DeckSyncCutDecisionDto(int LotId, int Quantity, string Action, int? DestinationId);
+
+/// <summary>A card short in the deck box that the user doesn't own.</summary>
+public sealed record DeckBoxMissingCardDto(string CardName, string? SetCode, string? CollectorNumber, int Quantity);
+
+/// <summary>Body of <c>POST /api/locations/{id}/deck-sync/apply</c>. <see cref="NotInCollection"/> replaces the
+/// box's "not in collection" list.</summary>
+public sealed record DeckSyncApplyRequest
+{
+    public IReadOnlyList<DeckSyncPickDto> Picks { get; init; } = [];
+    public IReadOnlyList<DeckSyncCutDecisionDto> Cuts { get; init; } = [];
+    public IReadOnlyList<DeckBoxMissingCardDto> NotInCollection { get; init; } = [];
+}
+
+public sealed record DeckSyncResultDto(int Added, int Removed, int Sideboarded, int NotInCollection);
 
 public sealed record RenameRequest
 {
@@ -1085,7 +1148,8 @@ public sealed record ImportUrlRequest
 /// collector number wasn't in the catalog, so the cheapest printing of the name was used instead.</summary>
 public sealed record ImportUrlResultDto(
     string DeckName, int Imported, int Skipped, int TotalCards,
-    IReadOnlyList<string> UnresolvedNames, IReadOnlyList<string> SubstitutedNames, int RuleTagged = 0);
+    IReadOnlyList<string> UnresolvedNames, IReadOnlyList<string> SubstitutedNames, int RuleTagged = 0,
+    bool LinkedDeckBox = false);
 
 /// <summary>Body of <c>POST /api/import/location/{id}/url</c>: a Moxfield/Archidekt deck imported
 /// all-or-nothing into the location in the route.</summary>
@@ -1105,7 +1169,7 @@ public sealed record LocationImportIssueDto(int? Row, string? Card, string Messa
 /// imported as another printing of the same card.</summary>
 public sealed record LocationImportResultDto(
     string Source, string? Format, int Lines, int Copies, IReadOnlyList<LocationImportIssueDto> Substitutions,
-    int RuleTagged = 0);
+    int RuleTagged = 0, bool LinkedDeckBox = false);
 
 /// <summary>A rejected location import (HTTP 422): nothing was written. <see cref="Error"/> is the
 /// summary; <see cref="Errors"/> every problem found, so the user can fix them all in one pass.</summary>

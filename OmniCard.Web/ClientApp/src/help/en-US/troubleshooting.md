@@ -183,6 +183,22 @@ A card that's listed for sale is locked against changes that would affect the li
 
 See [Importing](help:importing).
 
+## Deck box link and sync problems
+
+*That isn't a Moxfield or Archidekt deck URL.* Paste the deck's own address. It should look like `https://moxfield.com/decks/…` or `https://archidekt.com/decks/…`.
+
+*Moxfield decks are Magic: The Gathering decks, but "…" is a … deck box.* Moxfield and Archidekt only have Magic decks, so only Magic deck boxes can be linked. *Assign "…" a game before linking it to a deck* means the deck box has no game yet. Set one with **Game & deck type**.
+
+*Couldn't download the linked deck.* Open the link to check it still works, and make sure the deck is public. If the deck moved, click **Edit link** and paste the new address.
+
+*… is listed for sale — unlist it before putting it in a deck.* A sync can't use a copy that's listed for sale. Unlist it on **Sales ▸ Listings**, or choose another copy.
+
+*Sync again to refresh the list.* Your collection changed after the sync review opened, for example someone moved a card. Close the dialog and click **Sync from URL** again.
+
+**Apply sync is greyed out.** Every card that's still short needs a copy (use **Find a copy…**) or a tick in **Not in collection**. Also check for amounts shown in red and that **Move removed cards to** has a location.
+
+See [Deck boxes](help:deck-boxes#link-a-deck-box-to-an-online-deck).
+
 ## Catalog jobs won't start
 
 *A catalog refresh is already running.* Only one catalog job runs at a time. Wait for it to finish. Its progress shows on the **Catalog Data** tab.
