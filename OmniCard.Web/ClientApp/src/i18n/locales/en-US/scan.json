@@ -128,6 +128,29 @@
       "cardProperties": "Card properties",
       "selectPrompt": "Select a scanned card to review it."
     },
+    "keyboard": {
+      "progress": "Reviewed {{reviewed}} of {{total}}",
+      "hint": "Press Enter to confirm and go to the next card",
+      "waiting_one": "Waiting for {{count}} card to finish matching",
+      "waiting_other": "Waiting for {{count}} cards to finish matching",
+      "complete_one": "Review complete: {{confirmed}} of {{count}} card confirmed.",
+      "complete_other": "Review complete: {{confirmed}} of {{count}} cards confirmed.",
+      "shortcuts": "Keyboard shortcuts",
+      "title": "Keyboard shortcuts",
+      "confirmTooltip": "Confirm and go to the next card (Enter)",
+      "searchTooltip": "Search catalog (S)",
+      "footnote": "Shortcuts don't work while you're typing in a field. Click an empty part of the page first.",
+      "keys": {
+        "confirm": "Confirm the match and go to the next card to review. On a card with no match, opens Search catalog.",
+        "next": "Next card",
+        "previous": "Previous card",
+        "search": "Search catalog",
+        "cancelSearch": "Close the search",
+        "exclude": "Exclude from commit and go to the next card (press again to include it)",
+        "undo": "Undo the last confirm, correction or exclude",
+        "help": "Show this list"
+      }
+    },
     "correction": {
       "searchByNamePlaceholder": "Search {{game}} by name…",
       "searchingWithin": "Searching within: {{sets}}",
