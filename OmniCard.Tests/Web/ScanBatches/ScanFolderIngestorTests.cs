@@ -16,17 +16,23 @@ public sealed class ScanFolderIngestorTests : IDisposable
 
     public ScanFolderIngestorTests()
     {
-        _ingestor = new ScanFolderIngestor(_f.Factory, _f.Storage, _f.Clock, NullLogger<ScanFolderIngestor>.Instance);
+        _ingestor = NewIngestor();
         _mtg = Path.Combine(_f.ScanRoot, "Mtg");
         Directory.CreateDirectory(_mtg);
         _settings = new ScanFolderSettings
         {
             Enabled = true,
+            QuietPeriodSeconds = 90,
             Folders = [new() { Game = CardGame.Mtg, Path = _mtg, IsFoil = true, Condition = "LP", Language = "ja", SetCodes = ["neo", "dmu"], DefaultContainerId = 3 }],
         };
     }
 
     public void Dispose() => _f.Dispose();
+
+    private ScanFolderIngestor NewIngestor() =>
+        new(_f.Factory, _f.Storage, _f.Clock, NullLogger<ScanFolderIngestor>.Instance);
+
+    private TimeSpan Quiet => TimeSpan.FromSeconds(_settings.QuietPeriodSeconds);
 
     /// <summary>Drop a file with unique content — like a real scan, no two drops share bytes (identical
     /// bytes are what duplicate detection keys on; use <see cref="DropBytes"/> for that).</summary>
@@ -46,34 +52,84 @@ public sealed class ScanFolderIngestorTests : IDisposable
         return path;
     }
 
-    /// <summary>Two passes, the stability window apart — what it takes to pick up a finished file.</summary>
+    /// <summary>Notice what's in the folder, then let the quiet period run out and take it in.</summary>
     private int Settle()
     {
         var n = _ingestor.RunOnce(_settings);
-        _f.Clock.Advance(ScanFolderIngestor.StableFor + TimeSpan.FromSeconds(1));
+        _f.Clock.Advance(Quiet + TimeSpan.FromSeconds(1));
         return n + _ingestor.RunOnce(_settings);
     }
 
-    [Fact]
-    public void Subfolder_BecomesBatch_WithFolderSettingsSnapshot()
+    private ScanBatch SingleBatch()
     {
-        Drop(@"Box 12\a.jpg");
+        using var db = _f.Db();
+        return Assert.Single(db.ScanBatches);
+    }
+
+    private void SetStatus(int id, ScanBatchStatus status)
+    {
+        using var db = _f.Db();
+        db.ScanBatches.Single(b => b.Id == id).Status = status;
+        db.SaveChanges();
+    }
+
+    // --- waiting: hands off the files ---
+
+    [Fact]
+    public void NewFiles_WaitInTheFolder_UntilTheBatchStarts()
+    {
+        var a = Drop(@"Box 12\a.jpg");
+        var b = Drop(@"Box 12\b.png");
+
+        Assert.Equal(0, _ingestor.RunOnce(_settings));
+
+        var batch = SingleBatch();
+        Assert.Equal("Box 12", batch.Name);
+        Assert.Equal(ScanBatchStatus.Collecting, batch.Status);
+        Assert.Equal(2, batch.WaitingFiles);
+        Assert.True(File.Exists(a));
+        Assert.True(File.Exists(b));
+        Assert.False(Directory.Exists(Path.Combine(_mtg, "_processed")));
+        using var db = _f.Db();
+        Assert.Empty(db.ScanBatchItems);
+        Assert.True(_ingestor.HasWaitingBatches);
+    }
+
+    [Fact]
+    public void WaitingFiles_AreNeverOpened()
+    {
+        // The scanner software holds the file exclusively; noticing it must not need any access.
+        var path = Drop(@"Box 12\a.jpg");
+        using var locked = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+
+        _ingestor.RunOnce(_settings);
+        _f.Clock.Advance(TimeSpan.FromSeconds(30));
+        _ingestor.RunOnce(_settings);
+
+        Assert.Equal(1, SingleBatch().WaitingFiles);
+        Assert.False(_ingestor.FolderErrors.ContainsKey(CardGame.Mtg));
+    }
+
+    [Fact]
+    public void QuietPeriod_StartsTheBatch_WithFolderSettingsSnapshot()
+    {
+        var a = Drop(@"Box 12\a.jpg");
         Drop(@"Box 12\b.png");
 
         Assert.Equal(2, Settle());
 
-        using var db = _f.Db();
-        var batch = Assert.Single(db.ScanBatches);
-        Assert.Equal("Box 12", batch.Name);
+        var batch = SingleBatch();
         Assert.Equal("Box 12", batch.FolderKey);
         Assert.Equal(CardGame.Mtg, batch.Game);
-        Assert.Equal(ScanBatchStatus.Collecting, batch.Status);
+        Assert.Equal(ScanBatchStatus.Matching, batch.Status);
+        Assert.Equal(0, batch.WaitingFiles);
         Assert.True(batch.IsFoil);
         Assert.Equal("LP", batch.Condition);
         Assert.Equal("ja", batch.Language);
         Assert.Equal(["neo", "dmu"], batch.SetCodeList);
         Assert.Equal(3, batch.DefaultContainerId);
 
+        using var db = _f.Db();
         var items = db.ScanBatchItems.OrderBy(i => i.Sequence).ToList();
         Assert.Equal(2, items.Count);
         Assert.All(items, i =>
@@ -84,16 +140,171 @@ public sealed class ScanFolderIngestorTests : IDisposable
             Assert.True(File.Exists(_f.Storage.ItemPath(batch.Id, i.StoredFileName)));
         });
         Assert.Equal([1, 2], items.Select(i => i.Sequence));
+
+        // Originals moved to _processed, and each item remembers where.
+        Assert.False(File.Exists(a));
+        var processed = Path.Combine(_mtg, "_processed", "Box 12", "a.jpg");
+        Assert.True(File.Exists(processed));
+        Assert.Equal(processed, items[0].ProcessedPath);
     }
 
     [Fact]
-    public void Originals_MoveToProcessed()
+    public void AnyChange_RestartsTheBatchTimer_IncludingARename()
     {
-        var src = Drop(@"Box 12\a.jpg");
+        var path = Drop(@"Box 12\scan_tmp_0001.jpg");
+        _ingestor.RunOnce(_settings);
+        _f.Clock.Advance(TimeSpan.FromSeconds(60));
+
+        // The scanner software renames its files when it completes the run.
+        File.Move(path, Path.Combine(_mtg, "Box 12", "0001.jpg"));
+        _ingestor.RunOnce(_settings);
+        _f.Clock.Advance(TimeSpan.FromSeconds(60)); // 120s since the first file, 60s since the rename
+        _ingestor.RunOnce(_settings);
+        Assert.Equal(ScanBatchStatus.Collecting, SingleBatch().Status);
+        Assert.True(File.Exists(Path.Combine(_mtg, "Box 12", "0001.jpg")));
+
+        _f.Clock.Advance(TimeSpan.FromSeconds(31));
+        Assert.Equal(1, _ingestor.RunOnce(_settings));
+        Assert.Equal(ScanBatchStatus.Matching, SingleBatch().Status);
+    }
+
+    [Fact]
+    public void EachBatch_CountsDownOnItsOwn()
+    {
+        Drop(@"Box 1\a.jpg");
+        _ingestor.RunOnce(_settings);
+        _f.Clock.Advance(TimeSpan.FromSeconds(60));
+        Drop(@"Box 2\a.jpg");
+        _ingestor.RunOnce(_settings);
+
+        _f.Clock.Advance(TimeSpan.FromSeconds(31)); // Box 1 is due, Box 2 has 59s to go
+        _ingestor.RunOnce(_settings);
+        using (var db = _f.Db())
+        {
+            var status = db.ScanBatches.ToDictionary(b => b.Name, b => b.Status);
+            Assert.Equal(ScanBatchStatus.Matching, status["Box 1"]);
+            Assert.Equal(ScanBatchStatus.Collecting, status["Box 2"]);
+        }
+
+        _f.Clock.Advance(TimeSpan.FromSeconds(60));
+        _ingestor.RunOnce(_settings);
+        using var check = _f.Db();
+        Assert.All(check.ScanBatches, b => Assert.Equal(ScanBatchStatus.Matching, b.Status));
+    }
+
+    [Fact]
+    public void AutoProcessOff_WaitsForRun_ThenStarts()
+    {
+        _settings.AutoProcess = false;
+        var path = Drop(@"Box 12\a.jpg");
+        _ingestor.RunOnce(_settings);
+        _f.Clock.Advance(TimeSpan.FromHours(2));
+        Assert.Equal(0, _ingestor.RunOnce(_settings));
+        Assert.True(File.Exists(path));
+        Assert.True(_ingestor.HasWaitingBatches);
+
+        SetStatus(SingleBatch().Id, ScanBatchStatus.Starting); // Run pressed
+
+        Assert.Equal(1, _ingestor.RunOnce(_settings));
+        Assert.Equal(ScanBatchStatus.Matching, SingleBatch().Status);
+        Assert.False(File.Exists(path));
+        Assert.False(_ingestor.HasWaitingBatches);
+    }
+
+    [Fact]
+    public void Run_StartsTheBatchBeforeItsTimer()
+    {
+        Drop(@"Box 12\a.jpg");
+        _ingestor.RunOnce(_settings);
+        SetStatus(SingleBatch().Id, ScanBatchStatus.Starting);
+
+        Assert.Equal(1, _ingestor.RunOnce(_settings));
+        Assert.Equal(ScanBatchStatus.Matching, SingleBatch().Status);
+    }
+
+    [Fact]
+    public void FilesRemovedBeforeTheBatchStarts_DropTheBatch()
+    {
+        var path = Drop(@"Box 12\a.jpg");
+        _ingestor.RunOnce(_settings);
+        File.Delete(path);
+
+        _ingestor.RunOnce(_settings);
+
+        using var db = _f.Db();
+        Assert.Empty(db.ScanBatches);
+        Assert.False(_ingestor.HasWaitingBatches);
+    }
+
+    [Fact]
+    public void Restart_StartsTheQuietPeriodOver()
+    {
+        Drop(@"Box 12\a.jpg");
+        _ingestor.RunOnce(_settings);
+        _f.Clock.Advance(TimeSpan.FromSeconds(80));
+
+        // A fresh ingestor (app restart) can't tell whether files changed while it was down.
+        var restarted = NewIngestor();
+        restarted.RunOnce(_settings);
+        _f.Clock.Advance(TimeSpan.FromSeconds(20));
+        Assert.Equal(0, restarted.RunOnce(_settings));
+
+        _f.Clock.Advance(Quiet);
+        Assert.Equal(1, restarted.RunOnce(_settings));
+    }
+
+    // --- after a batch starts ---
+
+    [Fact]
+    public void LateFiles_StartANewBatch()
+    {
+        Drop(@"Box 12\a.jpg");
         Settle();
 
-        Assert.False(File.Exists(src));
-        Assert.True(File.Exists(Path.Combine(_mtg, "_processed", "Box 12", "a.jpg")));
+        Drop(@"Box 12\b.jpg");
+        _ingestor.RunOnce(_settings);
+
+        using var db = _f.Db();
+        var batches = db.ScanBatches.OrderBy(b => b.Id).ToList();
+        Assert.Equal(["Box 12", "Box 12 (2)"], batches.Select(b => b.Name));
+        Assert.Equal(ScanBatchStatus.Matching, batches[0].Status);
+        Assert.Equal(ScanBatchStatus.Collecting, batches[1].Status);
+        Assert.Equal(1, db.ScanBatchItems.Count());
+    }
+
+    [Fact]
+    public void LockedFileAtStart_IsLeftForTheNextBatch()
+    {
+        Drop(@"Box 12\a.jpg");
+        var b = Drop(@"Box 12\b.jpg");
+        _ingestor.RunOnce(_settings);
+        _f.Clock.Advance(Quiet + TimeSpan.FromSeconds(1));
+
+        using (new FileStream(b, FileMode.Open, FileAccess.Read, FileShare.Read))
+            Assert.Equal(1, _ingestor.RunOnce(_settings));
+        Assert.True(File.Exists(b));
+
+        _ingestor.RunOnce(_settings);
+        using var db = _f.Db();
+        var next = db.ScanBatches.OrderBy(x => x.Id).Last();
+        Assert.Equal("Box 12 (2)", next.Name);
+        Assert.Equal(ScanBatchStatus.Collecting, next.Status);
+    }
+
+    [Fact]
+    public void EveryFileLocked_BatchGoesBackToWaiting()
+    {
+        var path = Drop(@"Box 12\a.jpg");
+        _ingestor.RunOnce(_settings);
+        _f.Clock.Advance(Quiet + TimeSpan.FromSeconds(1));
+
+        using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+            Assert.Equal(0, _ingestor.RunOnce(_settings));
+
+        var batch = SingleBatch();
+        Assert.Equal(ScanBatchStatus.Collecting, batch.Status);
+        Assert.Equal(_f.Clock.GetUtcNow().UtcDateTime, batch.LastFileUtc);
+        Assert.True(File.Exists(path));
     }
 
     [Fact]
@@ -104,7 +315,10 @@ public sealed class ScanFolderIngestorTests : IDisposable
         Drop(@"Box 12\a.jpg");
         Settle();
 
-        Assert.True(File.Exists(Path.Combine(_mtg, "_processed", "Box 12", "a (2).jpg")));
+        var renamed = Path.Combine(_mtg, "_processed", "Box 12", "a (2).jpg");
+        Assert.True(File.Exists(renamed));
+        using var db = _f.Db();
+        Assert.Equal(renamed, db.ScanBatchItems.Single().ProcessedPath);
     }
 
     [Fact]
@@ -113,8 +327,10 @@ public sealed class ScanFolderIngestorTests : IDisposable
         Drop("loose.jpg");
         Settle();
 
-        using var db = _f.Db();
-        Assert.Equal("2026-10-06", Assert.Single(db.ScanBatches).Name);
+        var batch = SingleBatch();
+        Assert.Equal("2026-10-06", batch.Name);
+        Assert.Equal("", batch.FolderKey);
+        Assert.True(File.Exists(Path.Combine(_mtg, "_processed", "2026-10-06", "loose.jpg")));
     }
 
     [Fact]
@@ -124,8 +340,8 @@ public sealed class ScanFolderIngestorTests : IDisposable
         Drop(@"Box 12\page 2\b.jpg");
         Settle();
 
+        Assert.Equal("Box 12", SingleBatch().Name);
         using var db = _f.Db();
-        Assert.Equal("Box 12", Assert.Single(db.ScanBatches).Name);
         Assert.Equal(2, db.ScanBatchItems.Count());
     }
 
@@ -143,79 +359,13 @@ public sealed class ScanFolderIngestorTests : IDisposable
     }
 
     [Fact]
-    public void GrowingFile_WaitsUntilStable()
-    {
-        var path = Drop(@"Box 12\a.jpg", bytes: 10);
-        _ingestor.RunOnce(_settings);
-        _f.Clock.Advance(TimeSpan.FromSeconds(5));
-        File.AppendAllText(path, "more"); // still being written
-        Assert.Equal(0, _ingestor.RunOnce(_settings));
-        Assert.True(_ingestor.HasUnsettledFiles);
-
-        _f.Clock.Advance(TimeSpan.FromSeconds(5));
-        Assert.Equal(1, _ingestor.RunOnce(_settings));
-    }
-
-    [Fact]
-    public void LockedFile_IsSkippedUntilReleased()
-    {
-        var path = Drop(@"Box 12\a.jpg");
-        _ingestor.RunOnce(_settings);
-        _f.Clock.Advance(TimeSpan.FromSeconds(5));
-        using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
-            Assert.Equal(0, _ingestor.RunOnce(_settings));
-
-        Assert.Equal(1, _ingestor.RunOnce(_settings));
-    }
-
-    [Fact]
-    public void LateFile_AppendsToOpenBatch_AndReopensReadyBatch()
-    {
-        Drop(@"Box 12\a.jpg");
-        Settle();
-        using (var db = _f.Db())
-        {
-            var b = db.ScanBatches.Single();
-            b.Status = ScanBatchStatus.Ready;
-            b.ReadyUtc = DateTime.UtcNow;
-            db.SaveChanges();
-        }
-
-        Drop(@"Box 12\b.jpg");
-        Settle();
-
-        using var check = _f.Db();
-        var batch = Assert.Single(check.ScanBatches);
-        Assert.Equal(ScanBatchStatus.Matching, batch.Status);
-        Assert.Null(batch.ReadyUtc);
-        Assert.Equal(2, check.ScanBatchItems.Count());
-        Assert.Equal(2, check.ScanBatchItems.Max(i => i.Sequence));
-    }
-
-    [Fact]
-    public void FileAfterCommit_StartsNumberedBatch()
-    {
-        Drop(@"Box 12\a.jpg");
-        Settle();
-        using (var db = _f.Db())
-        {
-            db.ScanBatches.Single().Status = ScanBatchStatus.Committed;
-            db.SaveChanges();
-        }
-
-        Drop(@"Box 12\b.jpg");
-        Settle();
-
-        using var check = _f.Db();
-        Assert.Equal(["Box 12", "Box 12 (2)"], check.ScanBatches.OrderBy(b => b.Id).Select(b => b.Name).ToList());
-    }
-
-    [Fact]
     public void DisabledFolder_IsIgnored()
     {
         _settings.Folders[0].Enabled = false;
         Drop(@"Box 12\a.jpg");
         Assert.Equal(0, Settle());
+        using var db = _f.Db();
+        Assert.Empty(db.ScanBatches);
     }
 
     [Fact]
@@ -235,37 +385,70 @@ public sealed class ScanFolderIngestorTests : IDisposable
         return bytes;
     }
 
-    /// <summary>Drop scans 1..count as 0001.png… into <paramref name="folder"/> and pick them up.</summary>
-    private void DropRun(string folder, int count, Func<int, byte[]>? content = null)
+    /// <summary>Drop scans 1..count as 0001.png… into <paramref name="folder"/> and take them in.</summary>
+    private void DropRun(string folder, int count, Func<int, byte[]>? content = null, string suffix = "")
     {
         for (var n = 1; n <= count; n++)
-            DropBytes($@"{folder}\{n:0000}.png", (content ?? Scan)(n));
+            DropBytes($@"{folder}\{n:0000}{suffix}.png", (content ?? Scan)(n));
         Settle();
     }
 
     [Fact]
-    public void ResavedRun_IsSetAsideAsDuplicates_OfTheOriginals()
+    public void ResavedRun_InOneBatch_IsSetAsideAsDuplicatesOfTheOriginals()
     {
-        DropRun("Tray", 5);
-        DropRun("Tray", 5); // the capture software writes the same files out again
+        // The capture software writes the whole run out twice before the batch starts.
+        for (var n = 1; n <= 5; n++)
+            DropBytes($@"Tray\{n:0000}.png", Scan(n));
+        DropRun("Tray", 5, suffix: "_copy");
 
         using var db = _f.Db();
         var batch = Assert.Single(db.ScanBatches);
+        Assert.Equal(ScanBatchStatus.Matching, batch.Status);
         var items = db.ScanBatchItems.OrderBy(i => i.Sequence).ToList();
         Assert.Equal(10, items.Count);
-        var originals = items.Take(5).ToList();
-        var copies = items.Skip(5).ToList();
+        var originals = items.Where(i => !i.OriginalFileName.Contains("copy")).ToList();
+        var copies = items.Where(i => i.OriginalFileName.Contains("copy")).ToList();
         Assert.All(originals, i => Assert.Equal(ScanBatchItemState.Open, i.State));
         Assert.All(copies, i => Assert.Equal(ScanBatchItemState.Duplicate, i.State));
         Assert.Equal(originals.Select(i => i.Id), copies.Select(i => i.DuplicateOfItemId!.Value));
-        Assert.Equal(originals.Select(i => i.ContentHash), copies.Select(i => i.ContentHash));
         Assert.All(originals, i => Assert.Equal(64, i.ContentHash!.Length));
 
         // Copies keep no stored image, and their files still leave the watched folder.
         Assert.All(copies, i => Assert.Equal("", i.StoredFileName));
+        Assert.All(copies, i => Assert.NotNull(i.ProcessedPath));
         Assert.Equal(5, Directory.GetFiles(_f.Storage.BatchDirectory(batch.Id)).Length);
         Assert.Empty(Directory.GetFiles(Path.Combine(_mtg, "Tray")));
+    }
+
+    [Fact]
+    public void ResaveAfterTheBatchStarted_IsClosedStraightAway()
+    {
+        DropRun("Tray", 3);
+        DropRun("Tray", 3); // same names, same bytes, after the first run was taken in
+
+        using var db = _f.Db();
+        var batches = db.ScanBatches.OrderBy(b => b.Id).ToList();
+        Assert.Equal(2, batches.Count);
+        Assert.Equal(ScanBatchStatus.Matching, batches[0].Status);
+        Assert.Equal("Tray (2)", batches[1].Name);
+        Assert.Equal(ScanBatchStatus.Discarded, batches[1].Status);
+        Assert.NotNull(batches[1].ClosedUtc);
+        Assert.All(db.ScanBatchItems.Where(i => i.ScanBatchId == batches[1].Id),
+            i => Assert.Equal(ScanBatchItemState.Duplicate, i.State));
         Assert.True(File.Exists(Path.Combine(_mtg, "_processed", "Tray", "0001 (2).png")));
+    }
+
+    [Fact]
+    public void DuplicatesOnlyBatch_DeletesItsOriginals_WhenThatOptionIsOn()
+    {
+        _settings.DeleteOriginalsOnClose = true;
+        DropRun("Tray", 2);
+        DropRun("Tray", 2);
+
+        var processed = Path.Combine(_mtg, "_processed", "Tray");
+        Assert.True(File.Exists(Path.Combine(processed, "0001.png"))); // the open batch's originals stay
+        Assert.False(File.Exists(Path.Combine(processed, "0001 (2).png")));
+        Assert.False(File.Exists(Path.Combine(processed, "0002 (2).png")));
     }
 
     [Fact]
@@ -284,7 +467,6 @@ public sealed class ScanFolderIngestorTests : IDisposable
     {
         var bytes = Scan(1);
         DropBytes(@"Tray\a.png", bytes);
-        Settle();
         var changed = (byte[])bytes.Clone();
         changed[^1] ^= 1;
         DropBytes(@"Tray\b.png", changed);
@@ -298,54 +480,12 @@ public sealed class ScanFolderIngestorTests : IDisposable
     public void CopyUnderADifferentName_IsStillADuplicate()
     {
         DropBytes(@"Tray\0001.png", Scan(1));
-        Settle();
         DropBytes(@"Tray\IMG_9999.png", Scan(1));
         Settle();
 
         using var db = _f.Db();
         var copy = db.ScanBatchItems.Single(i => i.OriginalFileName == "IMG_9999.png");
         Assert.Equal(ScanBatchItemState.Duplicate, copy.State);
-    }
-
-    [Fact]
-    public void Duplicate_DoesNotReopenAReadyBatch()
-    {
-        DropRun("Tray", 2);
-        using (var db = _f.Db())
-        {
-            var b = db.ScanBatches.Single();
-            b.Status = ScanBatchStatus.Ready;
-            b.ReadyUtc = DateTime.UtcNow;
-            db.SaveChanges();
-        }
-
-        DropRun("Tray", 2);
-
-        using var check = _f.Db();
-        var batch = check.ScanBatches.Single();
-        Assert.Equal(ScanBatchStatus.Ready, batch.Status);
-        Assert.NotNull(batch.ReadyUtc);
-    }
-
-    [Fact]
-    public void CopyOfACommittedBatch_LandsInANewBatchOfOnlyDuplicates()
-    {
-        DropRun("Tray", 3);
-        using (var db = _f.Db())
-        {
-            db.ScanBatchItems.ToList().ForEach(i => i.State = ScanBatchItemState.Committed);
-            db.ScanBatches.Single().Status = ScanBatchStatus.Committed;
-            db.SaveChanges();
-        }
-
-        DropRun("Tray", 3);
-
-        using var check = _f.Db();
-        var second = check.ScanBatches.OrderBy(b => b.Id).Last();
-        Assert.Equal("Tray (2)", second.Name);
-        var items = check.ScanBatchItems.Where(i => i.ScanBatchId == second.Id).ToList();
-        Assert.Equal(3, items.Count);
-        Assert.All(items, i => Assert.Equal(ScanBatchItemState.Duplicate, i.State));
     }
 
     [Fact]
@@ -374,7 +514,7 @@ public sealed class ScanFolderIngestorTests : IDisposable
         var pokemon = Path.Combine(_f.ScanRoot, "Pokemon");
         Directory.CreateDirectory(Path.Combine(pokemon, "Tray"));
         _settings.Folders.Add(new() { Game = CardGame.Pokemon, Path = pokemon });
-        DropRun("Tray", 1);
+        DropBytes(@"Tray\0001.png", Scan(1));
         File.WriteAllBytes(Path.Combine(pokemon, "Tray", "0001.png"), Scan(1));
         Settle();
 

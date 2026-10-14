@@ -823,6 +823,9 @@ namespace OmniCard.Web.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("nvarchar(16)");
 
+                    b.Property<int>("WaitingFiles")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Status", "ClaimedByUserId");
@@ -886,6 +889,10 @@ namespace OmniCard.Web.Migrations
                     b.Property<string>("PreviewFileName")
                         .HasMaxLength(260)
                         .HasColumnType("nvarchar(260)");
+
+                    b.Property<string>("ProcessedPath")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
 
                     b.Property<decimal?>("PurchasePrice")
                         .HasPrecision(18, 2)

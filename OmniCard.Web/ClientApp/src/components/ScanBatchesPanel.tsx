@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
@@ -31,6 +31,8 @@ import { useFormatters } from '../i18n/format';
 import { usePermissions } from '../context/usePermissions';
 
 const isOpenStatus = (b: ScanBatchSummaryDto) => b.status !== 'Committed' && b.status !== 'Discarded';
+/** Still waiting to start: its files are in the watched folder, untouched, and there's nothing to review yet. */
+const isWaiting = (b: ScanBatchSummaryDto) => (b.status === 'Collecting' || b.status === 'Starting') && b.total === 0;
 
 // Whether the panel is expanded is a per-browser preference; storage can be unavailable (private mode).
 const EXPANDED_KEY = 'omnicard.scanBatches.expanded';
@@ -59,8 +61,9 @@ export function invalidateScanBatches(qc: QueryClient) {
 /**
  * The Scan page's list of background batches from the watched scan folders: each batch's progress,
  * who is reviewing it, and Open / Release / Discard / Run. Opening claims the batch and goes to its
- * review page. Run starts matching a batch still collecting files — the only way it starts when
- * automatic processing is off. Hidden when there are no batches.
+ * review page. A batch that hasn't started shows its file count and, with automatic processing on, a
+ * countdown to when it starts by itself; Run starts it now — the only way it starts when automatic
+ * processing is off. Hidden when there are no batches.
  */
 export function ScanBatchesPanel() {
   const { t } = useTranslation();
@@ -81,10 +84,21 @@ export function ScanBatchesPanel() {
   const batchesQuery = useQuery({
     queryKey: ['scan-batches'],
     queryFn: api.scanBatches,
-    // Poll faster while something is still being picked up or matched.
+    // Poll faster while something is waiting, starting or being matched.
     refetchInterval: (q) =>
-      q.state.data?.some((b) => b.status === 'Collecting' || b.status === 'Matching') ? 10_000 : 30_000,
+      q.state.data?.some((b) => b.status === 'Collecting' || b.status === 'Starting' || b.status === 'Matching')
+        ? 5_000
+        : 30_000,
   });
+
+  // Tick once a second while a countdown is on screen.
+  const counting = batchesQuery.data?.some((b) => b.status === 'Collecting' && b.startsUtc) ?? false;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!counting) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [counting]);
 
   const onError = (e: unknown) => setError((e as Error).message);
   const claim = useMutation({
@@ -125,10 +139,19 @@ export function ScanBatchesPanel() {
   if (batches.length === 0) return null;
 
   const gameName = (id: string) => gamesQuery.data?.find((g) => g.id === id)?.displayName ?? id;
+  const countdown = (startsUtc: string) => {
+    const left = Math.ceil((new Date(startsUtc).getTime() - now) / 1000);
+    if (left <= 0) return t('scan.batches.startingSoon');
+    const minutes = Math.floor(left / 60);
+    const seconds = left % 60;
+    return t('scan.batches.startsIn', {
+      time: `${fmt.number(minutes)}:${fmt.number(seconds, { minimumIntegerDigits: 2 })}`,
+    });
+  };
   // Shown in the header so a collapsed panel still says what's waiting.
   const readyCount = batches.filter((b) => b.status === 'Ready').length;
   const inProgressCount = batches.filter(
-    (b) => (b.status === 'Collecting' && !b.awaitingRun) || b.status === 'Matching',
+    (b) => (b.status === 'Collecting' && !b.awaitingRun) || b.status === 'Starting' || b.status === 'Matching',
   ).length;
   const awaitingRun = batches.filter((b) => b.awaitingRun);
 
@@ -193,7 +216,8 @@ export function ScanBatchesPanel() {
         )}
         <Stack divider={<Divider />}>
           {batches.map((b) => {
-            const open = isOpenStatus(b);
+            const waiting = isWaiting(b);
+            const open = isOpenStatus(b) && !waiting;
             const claimedByOther = !!b.claimedBy && !b.claimedByMe;
             const done = b.total - b.pending;
             return (
@@ -213,13 +237,20 @@ export function ScanBatchesPanel() {
                     <BatchStatusChip batch={b} />
                   </Stack>
                   <Typography variant="body2" color="text.secondary">
-                    {[
-                      t('scan.batches.counts', { count: b.total }),
-                      b.errors > 0 ? t('scan.batches.errors', { count: b.errors }) : null,
-                      b.committed > 0 ? t('scan.batches.committedCount', { count: b.committed }) : null,
-                      b.duplicates > 0 ? t('scan.batches.duplicatesCount', { count: b.duplicates }) : null,
-                      t('scan.batches.lastFile', { time: fmt.dateTime(b.lastFileUtc) }),
-                    ]
+                    {(waiting
+                      ? [
+                          t('scan.batches.waitingFiles', { count: b.waitingFiles }),
+                          b.status === 'Collecting' && b.startsUtc ? countdown(b.startsUtc) : null,
+                          t('scan.batches.lastChange', { time: fmt.dateTime(b.lastFileUtc) }),
+                        ]
+                      : [
+                          t('scan.batches.counts', { count: b.total }),
+                          b.errors > 0 ? t('scan.batches.errors', { count: b.errors }) : null,
+                          b.committed > 0 ? t('scan.batches.committedCount', { count: b.committed }) : null,
+                          b.duplicates > 0 ? t('scan.batches.duplicatesCount', { count: b.duplicates }) : null,
+                          t('scan.batches.lastFile', { time: fmt.dateTime(b.lastFileUtc) }),
+                        ]
+                    )
                       .filter(Boolean)
                       .join(' · ')}
                   </Typography>
@@ -287,7 +318,11 @@ export function ScanBatchesPanel() {
         <DialogContent>
           <DialogContentText>
             {confirmDiscard &&
-              t('scan.batches.discardBody', { name: confirmDiscard.name, count: confirmDiscard.total })}
+              `${t('scan.batches.discardBody', { name: confirmDiscard.name, count: confirmDiscard.total })} ${
+                confirmDiscard.deletesOriginalsOnClose
+                  ? t('scan.batches.discardOriginalsDeleted')
+                  : t('scan.batches.discardOriginalsKept')
+              }`}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -306,8 +341,8 @@ export function ScanBatchesPanel() {
   );
 }
 
-/** Status chip for a batch: a spinner while collecting/matching, green when ready, amber while it
- * waits for Run (automatic processing off). */
+/** Status chip for a batch: a spinner while waiting/starting/matching, green when ready, amber while
+ * it waits for Run (automatic processing off). */
 export function BatchStatusChip({ batch }: { batch: ScanBatchSummaryDto }) {
   const { t } = useTranslation();
   if (batch.awaitingRun)
@@ -316,7 +351,7 @@ export function BatchStatusChip({ batch }: { batch: ScanBatchSummaryDto }) {
     done: batch.total - batch.pending,
     total: batch.total,
   });
-  if (batch.status === 'Collecting' || batch.status === 'Matching')
+  if (batch.status === 'Collecting' || batch.status === 'Starting' || batch.status === 'Matching')
     return (
       <Chip
         size="small"

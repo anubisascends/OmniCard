@@ -1327,8 +1327,15 @@ public sealed record ScanBatchSummaryDto
     public int Committed { get; init; }
     /// <summary>Images set aside at pickup as exact copies of ones already scanned (not in <see cref="Total"/>).</summary>
     public int Duplicates { get; init; }
-    /// <summary>Collecting with auto-processing off: matching waits for someone to press Run.</summary>
+    /// <summary>Collecting with auto-processing off: the batch waits for someone to press Run.</summary>
     public bool AwaitingRun { get; init; }
+    /// <summary>While Collecting: image files still sitting untouched in the watched folder.</summary>
+    public int WaitingFiles { get; init; }
+    /// <summary>While Collecting with auto-processing on: when the batch starts on its own if its files
+    /// don't change again.</summary>
+    public DateTime? StartsUtc { get; init; }
+    /// <summary>Whether committing/discarding also deletes the originals in <c>_processed</c>.</summary>
+    public bool DeletesOriginalsOnClose { get; init; }
     public string? ClaimedBy { get; init; }
     public bool ClaimedByMe { get; init; }
     public DateTime CreatedUtc { get; init; }
@@ -1432,10 +1439,12 @@ public sealed record ScanBatchCountDto(int Unclaimed);
 public sealed record ScanFolderSettingsDto
 {
     public bool Enabled { get; init; }
-    /// <summary>Match batches on their own after the quiet period; off = wait for Run on the Scan page.</summary>
+    /// <summary>Start batches on their own after the quiet period; off = wait for Run on the Scan page.</summary>
     public bool AutoProcess { get; init; } = true;
     public int QuietPeriodSeconds { get; init; }
     public int RetentionDays { get; init; }
+    /// <summary>Delete a batch's originals from <c>_processed</c> when it's committed or discarded.</summary>
+    public bool DeleteOriginalsOnClose { get; init; }
     public IReadOnlyList<ScanFolderConfigDto> Folders { get; init; } = [];
 }
 

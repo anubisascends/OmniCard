@@ -46,7 +46,9 @@ export function ScanBatchPage() {
     // Re-poll while files are still arriving or being matched, so new matches stream in.
     refetchInterval: (q) => {
       const s = q.state.data?.summary;
-      return s && (s.pending > 0 || s.status === 'Collecting' || s.status === 'Matching') ? 3000 : false;
+      return s && (s.pending > 0 || s.status === 'Collecting' || s.status === 'Starting' || s.status === 'Matching')
+        ? 3000
+        : false;
     },
   });
   const summary = batchQuery.data?.summary;
@@ -204,7 +206,10 @@ export function ScanBatchPage() {
         <DialogTitle>{t('scan.batches.discardTitle')}</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            {t('scan.batches.discardBody', { name: summary.name, count: summary.total })}
+            {t('scan.batches.discardBody', { name: summary.name, count: summary.total })}{' '}
+            {summary.deletesOriginalsOnClose
+              ? t('scan.batches.discardOriginalsDeleted')
+              : t('scan.batches.discardOriginalsKept')}
           </DialogContentText>
         </DialogContent>
         <DialogActions>

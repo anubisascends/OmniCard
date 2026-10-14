@@ -2,9 +2,11 @@ using OmniCard.Shared.Cards;
 
 namespace OmniCard.Shared.Scanning;
 
-/// <summary>Lifecycle of a <see cref="ScanBatch"/>. Collecting → (quiet period elapses) Matching →
-/// (no pending items) Ready → Committed/Discarded. A late file sends a Ready batch back to Matching.</summary>
-public enum ScanBatchStatus { Collecting, Matching, Ready, Committed, Discarded }
+/// <summary>Lifecycle of a <see cref="ScanBatch"/>. Collecting (files still in the watched folder,
+/// untouched) → Starting (Run pressed, or the quiet period elapsed with auto-processing on) → Matching
+/// (files taken in and moved to <c>_processed</c>) → (no pending items) Ready → Committed/Discarded.
+/// Files that land after a batch has started form a new batch.</summary>
+public enum ScanBatchStatus { Collecting, Starting, Matching, Ready, Committed, Discarded }
 
 /// <summary>Whether a batch item has been through the matcher yet.</summary>
 public enum ScanBatchItemStatus { Pending, Matched, Error }
@@ -29,15 +31,19 @@ public class ScanBatch
     /// <summary>Display name: the folder key, suffixed " (n)" when an earlier closed batch used it.</summary>
     public string Name { get; set; } = "";
 
-    /// <summary>The source subfolder name (or the date, for files dropped in the game folder's root).
-    /// New files with this key are appended while the batch is open.</summary>
+    /// <summary>The source subfolder name, or empty for files dropped in the game folder's root (older
+    /// root batches hold the date). Files under this key belong to the batch until it starts.</summary>
     public string FolderKey { get; set; } = "";
 
     public ScanBatchStatus Status { get; set; }
     public DateTime CreatedUtc { get; set; }
 
-    /// <summary>When the latest file was added — the quiet-period anchor.</summary>
+    /// <summary>When the batch's files last changed (added, renamed, resized) — the quiet-period anchor.</summary>
     public DateTime LastFileUtc { get; set; }
+
+    /// <summary>Image files still sitting in the watched folder while the batch is Collecting; 0 once
+    /// they're taken in.</summary>
+    public int WaitingFiles { get; set; }
 
     public DateTime? ReadyUtc { get; set; }
 
@@ -90,6 +96,10 @@ public class ScanBatchItem
     /// <summary>For a <see cref="ScanBatchItemState.Duplicate"/>: the earlier item with the same bytes
     /// (possibly in another batch of the same game).</summary>
     public int? DuplicateOfItemId { get; set; }
+
+    /// <summary>Where the original file was moved under the watched folder's <c>_processed</c>
+    /// subfolder — deleted when the batch closes if that option is on. Null until the move succeeds.</summary>
+    public string? ProcessedPath { get; set; }
 
     /// <summary>A browser-renderable JPEG preview for TIFF scans; null when the stored file is fine.</summary>
     public string? PreviewFileName { get; set; }

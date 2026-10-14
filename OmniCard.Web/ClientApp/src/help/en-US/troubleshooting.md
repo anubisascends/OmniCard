@@ -163,7 +163,9 @@ Scans from a watched scanner folder work differently. They're stored on the serv
 
 *Nobody is reviewing this batch. Start reviewing it to make changes.* Click **Review this batch** to claim it.
 
-**A batch never appears.** Check that the scanner saves into a subfolder of the game's watched folder, and wait for the quiet period to pass. An administrator can check the folder's status under **Administration ▸ Scan Badges**. See [Administration](help:administration) and [Scan batches](help:scan-batches).
+**A batch never appears.** A batch shows up as **Waiting** within a minute of its first file. Check that the scanner saves into a subfolder of the game's watched folder. An administrator can check the folder's status under **Administration ▸ Scan Badges**. See [Administration](help:administration) and [Scan batches](help:scan-batches).
+
+**My scanner software reports errors when it finishes a run.** OmniCard doesn't touch a batch's files until the batch starts. If it starts too soon, before the software has finished renaming or moving its files, ask an administrator to raise the **Quiet period**, or turn off **Process batches automatically** and click **Run** yourself.
 
 ## A card can't be moved, split or edited
 

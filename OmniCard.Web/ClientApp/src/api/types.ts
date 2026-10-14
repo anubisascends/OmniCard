@@ -877,7 +877,8 @@ export interface AuditCommitResultDto {
 
 // --- Scan batches (watched scan folders, matched in the background) ---
 
-export type ScanBatchStatus = 'Collecting' | 'Matching' | 'Ready' | 'Committed' | 'Discarded';
+/** Collecting = files still untouched in the watched folder; Starting = Run pressed (or timer up), files being taken in. */
+export type ScanBatchStatus = 'Collecting' | 'Starting' | 'Matching' | 'Ready' | 'Committed' | 'Discarded';
 
 export interface ScanBatchSummaryDto {
   id: number;
@@ -892,8 +893,14 @@ export interface ScanBatchSummaryDto {
   committed: number;
   /** Images set aside at pickup as exact copies of ones already scanned (not in `total`). */
   duplicates: number;
-  /** Collecting with auto-processing off: matching waits for Run. */
+  /** Collecting with auto-processing off: the batch waits for Run. */
   awaitingRun: boolean;
+  /** While Collecting/Starting: image files still sitting untouched in the watched folder. */
+  waitingFiles: number;
+  /** While Collecting with auto-processing on: when the batch starts by itself if its files don't change again. */
+  startsUtc?: string | null;
+  /** Committing/discarding also deletes the originals in _processed. */
+  deletesOriginalsOnClose: boolean;
   claimedBy?: string | null;
   claimedByMe: boolean;
   createdUtc: string;
@@ -980,10 +987,12 @@ export interface ScanFolderConfigDto {
 
 export interface ScanFolderSettingsDto {
   enabled: boolean;
-  /** Match batches on their own after the quiet period; false = wait for Run on the Scan page. */
+  /** Start batches on their own after the quiet period; false = wait for Run on the Scan page. */
   autoProcess: boolean;
   quietPeriodSeconds: number;
   retentionDays: number;
+  /** Delete a batch's originals from _processed when it's committed or discarded. */
+  deleteOriginalsOnClose: boolean;
   folders: ScanFolderConfigDto[];
 }
 
