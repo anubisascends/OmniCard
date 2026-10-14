@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +19,7 @@ import {
   Divider,
   FormControlLabel,
   IconButton,
+  LinearProgress,
   ListItemIcon,
   ListItemText,
   Menu,
@@ -40,6 +42,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import FolderZipIcon from '@mui/icons-material/FolderZip';
+import KeyboardIcon from '@mui/icons-material/Keyboard';
 import EditIcon from '@mui/icons-material/Edit';
 import LockIcon from '@mui/icons-material/Lock';
 import PlaceIcon from '@mui/icons-material/Place';
@@ -475,13 +478,16 @@ function CorrectionSearch({
   setCodes,
   setNames,
   onPick,
+  onCancel,
 }: {
   game: string;
   setCodes: string[];
   setNames: string;
   onPick: (r: ScanSearchResultDto) => void;
+  onCancel: () => void;
 }) {
   const { t } = useTranslation();
+  const rootRef = useRef<HTMLDivElement>(null);
   const [q, setQ] = useState('');
   const [cn, setCn] = useState('');
   // Hovering a result's thumbnail pops the enlarged art (same preview as the location grids).
@@ -503,8 +509,26 @@ function CorrectionSearch({
     queryFn: () => api.scanSearch(game, dq, setCodes, dcn.trim() || undefined),
     enabled: active,
   });
+  // Keyboard review: Esc cancels; ↓/↑ walk from the search boxes through the results, and Enter on
+  // a focused result picks it (it's a button).
+  const onKeyDown = (e: ReactKeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      onCancel();
+      return;
+    }
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const results = Array.from(rootRef.current?.querySelectorAll<HTMLElement>('[data-scan-result]') ?? []);
+    if (results.length === 0) return;
+    e.preventDefault();
+    const at = results.indexOf(document.activeElement as HTMLElement);
+    const next = e.key === 'ArrowDown' ? Math.min(at + 1, results.length - 1) : at - 1;
+    if (next < 0) rootRef.current?.querySelector<HTMLInputElement>('input')?.focus();
+    else results[next].focus();
+  };
   return (
-    <Box sx={{ mt: 1 }}>
+    <Box ref={rootRef} sx={{ mt: 1 }} onKeyDown={onKeyDown}>
       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
         <TextField
           size="small"
@@ -544,6 +568,7 @@ function CorrectionSearch({
               {search.data.map((r) => (
                 <Button
                   key={`${r.gameCardId}-${r.setCode}-${r.collectorNumber}`}
+                  data-scan-result
                   size="small"
                   variant="text"
                   startIcon={
@@ -605,6 +630,8 @@ function ImagePane({
       >
         {src ? (
           <Box
+            // A fresh element per image, so the previous card's picture never lingers while this loads.
+            key={src}
             component="img"
             src={src}
             alt={alt}
@@ -663,8 +690,9 @@ function propsSummary(item: ScanItem, t: TFunction): string {
   return parts.join(' · ');
 }
 
-/** Master-list row: scan thumbnail beside matched-art thumbnail + identity + status. */
-function MasterRow({
+/** Master-list row: scan thumbnail beside matched-art thumbnail + identity + status. Memoized (with
+ * key-based callbacks) so moving the selection re-renders two rows, not the whole list. */
+const MasterRow = memo(function MasterRow({
   item,
   selected,
   badgeSettings,
@@ -675,8 +703,8 @@ function MasterRow({
   item: ScanItem;
   selected: boolean;
   badgeSettings?: ScanBadgeSettingsDto;
-  onSelect: () => void;
-  onToggle: (v: boolean, shiftKey: boolean) => void;
+  onSelect: (key: string) => void;
+  onToggle: (key: string, v: boolean, shiftKey: boolean) => void;
   readOnly?: boolean;
 }) {
   const { t } = useTranslation();
@@ -688,9 +716,23 @@ function MasterRow({
   // (onClick) and keyboard (onKeyDown, for Space-toggle) so range-select works either way, and never
   // goes stale between a mouse click and a later keyboard toggle.
   const shiftHeld = useRef(false);
+  // Keep the selected row on screen as the keyboard review moves through the list. Only the list
+  // scrolls (never the page), and the list's sticky header is allowed for at the top.
+  const rowRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const row = rowRef.current;
+    const list = row?.closest<HTMLElement>('[data-scan-list]');
+    if (!selected || !row || !list || list.scrollHeight <= list.clientHeight) return;
+    const r = row.getBoundingClientRect();
+    const l = list.getBoundingClientRect();
+    const top = l.top + ((list.firstElementChild as HTMLElement | null)?.offsetHeight ?? 0);
+    if (r.top < top) list.scrollTop -= top - r.top;
+    else if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom;
+  }, [selected]);
   return (
     <Box
-      onClick={onSelect}
+      ref={rowRef}
+      onClick={() => onSelect(item.key)}
       sx={{
         p: 1.5,
         display: 'flex',
@@ -717,7 +759,7 @@ function MasterRow({
         onKeyDown={(e) => {
           shiftHeld.current = e.shiftKey;
         }}
-        onChange={(e) => onToggle(e.target.checked, shiftHeld.current)}
+        onChange={(e) => onToggle(item.key, e.target.checked, shiftHeld.current)}
         sx={{ p: 0 }}
       />
       <Stack direction="row" spacing={0.75}>
@@ -756,7 +798,7 @@ function MasterRow({
       </Box>
     </Box>
   );
-}
+});
 
 /** The per-copy property editors, reused by the detail panel and (a subset) the bulk dialog. */
 function PropertyFields({
@@ -903,6 +945,8 @@ function DetailPanel({
   onCorrect,
   onRemove,
   onProps,
+  correcting,
+  onCorrectingChange,
   readOnly = false,
 }: {
   item: ScanItem;
@@ -916,11 +960,14 @@ function DetailPanel({
   onCorrect: (r: ScanSearchResultDto) => void;
   onRemove: () => void;
   onProps: (patch: Partial<ItemProps>) => void;
+  /** Whether the correction search is open (owned by the page so the S / Enter shortcuts can open it). */
+  correcting: boolean;
+  onCorrectingChange: (open: boolean) => void;
   /** Viewing someone else's background batch: hide the actions and lock the fields. */
   readOnly?: boolean;
 }) {
   const { t } = useTranslation();
-  const [correcting, setCorrecting] = useState(false);
+  const setCorrecting = onCorrectingChange;
   const [scanOpen, setScanOpen] = useState(false);
   const id = identityOf(item);
 
@@ -981,9 +1028,10 @@ function DetailPanel({
               setCodes={artSets.map((s) => s.setCode)}
               setNames={artSets.map((s) => s.setName).join(', ')}
               onPick={(r) => {
-                onCorrect(r);
                 setCorrecting(false);
+                onCorrect(r);
               }}
+              onCancel={() => setCorrecting(false)}
             />
             <Button size="small" onClick={() => setCorrecting(false)} sx={{ mt: 1 }}>
               {t('common.actions.cancel')}
@@ -991,18 +1039,24 @@ function DetailPanel({
           </Box>
         ) : (
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Button
-              variant={item.verified ? 'outlined' : 'contained'}
-              color="success"
-              startIcon={<CheckCircleIcon />}
-              disabled={!id}
-              onClick={onVerify}
-            >
-              {item.verified ? t('scan.detail.looksCorrect') : t('scan.detail.confirmMatch')}
-            </Button>
-            <Button variant="outlined" startIcon={<SearchIcon />} onClick={() => setCorrecting(true)}>
-              {t('scan.detail.searchCatalog')}
-            </Button>
+            <Tooltip title={t('scan.keyboard.confirmTooltip')}>
+              <span>
+                <Button
+                  variant={item.verified ? 'outlined' : 'contained'}
+                  color="success"
+                  startIcon={<CheckCircleIcon />}
+                  disabled={!id}
+                  onClick={onVerify}
+                >
+                  {item.verified ? t('scan.detail.looksCorrect') : t('scan.detail.confirmMatch')}
+                </Button>
+              </span>
+            </Tooltip>
+            <Tooltip title={t('scan.keyboard.searchTooltip')}>
+              <Button variant="outlined" startIcon={<SearchIcon />} onClick={() => setCorrecting(true)}>
+                {t('scan.detail.searchCatalog')}
+              </Button>
+            </Tooltip>
             {item.include ? (
               <Button variant="text" onClick={() => onToggle(false)}>
                 {t('scan.detail.excludeFromCommit')}
@@ -1057,6 +1111,71 @@ function DetailPanel({
         </DialogContent>
       </Dialog>
     </Paper>
+  );
+}
+
+/** Whether a key press on `el` is someone typing (text boxes keep their keys; checkboxes don't). */
+function isTypingTarget(el: HTMLElement): boolean {
+  if (el.isContentEditable || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
+  if (el.tagName !== 'INPUT') return false;
+  const type = (el as HTMLInputElement).type;
+  return !['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color', 'file'].includes(type);
+}
+
+/** The review keyboard shortcuts, as [keys, i18n key of what they do]. */
+const SHORTCUTS: [string[], string][] = [
+  [['Enter'], 'scan.keyboard.keys.confirm'],
+  [['↓', 'J'], 'scan.keyboard.keys.next'],
+  [['↑', 'K'], 'scan.keyboard.keys.previous'],
+  [['S', '/'], 'scan.keyboard.keys.search'],
+  [['Esc'], 'scan.keyboard.keys.cancelSearch'],
+  [['X'], 'scan.keyboard.keys.exclude'],
+  [['Ctrl', 'Z'], 'scan.keyboard.keys.undo'],
+  [['?'], 'scan.keyboard.keys.help'],
+];
+
+function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>{t('scan.keyboard.title')}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={1.25}>
+          {SHORTCUTS.map(([keys, label]) => (
+            <Stack key={label} direction="row" spacing={2} alignItems="center">
+              <Stack direction="row" spacing={0.5} sx={{ minWidth: 96 }}>
+                {keys.map((k) => (
+                  <Box
+                    key={k}
+                    component="kbd"
+                    sx={{
+                      px: 0.75,
+                      py: 0.25,
+                      border: 1,
+                      borderColor: 'divider',
+                      borderBottomWidth: 2,
+                      borderRadius: 1,
+                      fontFamily: 'inherit',
+                      fontSize: '0.8rem',
+                      bgcolor: 'action.hover',
+                    }}
+                  >
+                    {k}
+                  </Box>
+                ))}
+              </Stack>
+              <Typography variant="body2">{t(label)}</Typography>
+            </Stack>
+          ))}
+          <Typography variant="caption" color="text.secondary" sx={{ pt: 1 }}>
+            {t('scan.keyboard.footnote')}
+          </Typography>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{t('common.actions.close')}</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -1466,6 +1585,12 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   // row's new state; the anchor only moves on a plain click, so consecutive Shift-clicks re-range
   // from the same origin (standard file-explorer / Gmail behaviour).
   const anchorKeyRef = useRef<string | null>(null);
+  // Stable for the memoized master rows; always runs the latest toggleInclude.
+  const toggleIncludeRef = useRef<typeof toggleInclude>(() => {});
+  const toggleRow = useCallback(
+    (key: string, checked: boolean, shiftKey: boolean) => toggleIncludeRef.current(key, checked, shiftKey),
+    [],
+  );
   const toggleInclude = (key: string, checked: boolean, shiftKey: boolean) => {
     // Range selection walks the VISIBLE order so a Shift-click never toggles rows hidden by a filter.
     const idx = visibleItems.findIndex((it) => it.key === key);
@@ -1481,6 +1606,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, include: checked } : it)));
     anchorKeyRef.current = key;
   };
+  toggleIncludeRef.current = toggleInclude;
 
   // Remove staged scans AND free the blob URL backing each one's preview. Each scan's thumbnail is
   // an `URL.createObjectURL(file)` that pins the image in the tab's memory until explicitly revoked;
@@ -1961,6 +2087,190 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     );
   };
 
+  // --- Keyboard review: Enter confirms the selected card and moves to the next one still to review;
+  // ↑/↓ (K/J) move, S or / opens the catalog search, X excludes and moves on, Ctrl+Z undoes. ---
+  // The card whose catalog search is open. Keyed to the card (not a flag reset by an effect) so moving
+  // on closes it in the same render instead of costing a second one.
+  const [correctingKey, setCorrectingKey] = useState<string | null>(null);
+  const correcting = correctingKey !== null && correctingKey === selectedKey;
+  const setCorrecting = (open: boolean) => setCorrectingKey(open ? selectedKey : null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // Cards excluded while reviewing (X / "Exclude from commit"). They count as reviewed, so the
+  // review doesn't keep returning to them. Kept for this visit only.
+  const [skippedKeys, setSkippedKeys] = useState<ReadonlySet<string>>(() => new Set());
+  // What each confirm / correct / exclude changed, newest last, so Ctrl+Z can put it back.
+  const undoStack = useRef<{ key: string; before: Partial<ScanItem>; wasSkipped: boolean }[]>([]);
+
+
+  const isReviewed = (it: ScanItem) => !!it.verified || skippedKeys.has(it.key);
+  const needsReview = (it: ScanItem) => !isReviewed(it) && it.status !== 'matching';
+
+  /** The next visible card after `fromKey` that still needs review, wrapping round to the top. */
+  const nextToReview = (fromKey: string | null): string | null => {
+    const start = visibleItems.findIndex((it) => it.key === fromKey);
+    for (let i = 1; i <= visibleItems.length; i++) {
+      const it = visibleItems[(start + i) % visibleItems.length];
+      if (it.key !== fromKey && needsReview(it)) return it.key;
+    }
+    return null;
+  };
+
+  const setSkipped = (key: string, skipped: boolean) =>
+    setSkippedKeys((prev) => {
+      if (prev.has(key) === skipped) return prev;
+      const next = new Set(prev);
+      if (skipped) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+
+  /** Apply a review decision to a card (remembered for undo), then move on to the next card to review. */
+  const decide = (item: ScanItem, patch: Partial<ScanItem>, skip = false) => {
+    undoStack.current.push({
+      key: item.key,
+      before: { verified: item.verified, include: item.include, override: item.override, language: item.language },
+      wasSkipped: skippedKeys.has(item.key),
+    });
+    if (undoStack.current.length > 200) undoStack.current.shift();
+    const next = nextToReview(item.key);
+    updateItem(item.key, patch);
+    setSkipped(item.key, skip);
+    if (next) setSelectedKey(next);
+  };
+
+  const confirmItem = (item: ScanItem) => decide(item, { verified: true, include: true });
+  const correctItem = (item: ScanItem, r: ScanSearchResultDto) =>
+    decide(item, {
+      override: r,
+      include: true,
+      verified: true,
+      ...(r.language && r.language !== ENGLISH ? { language: r.language } : {}),
+    });
+  const excludeItem = (item: ScanItem) => decide(item, { include: false }, true);
+  const includeItem = (item: ScanItem) => {
+    if (identityOf(item)) updateItem(item.key, { include: true });
+    setSkipped(item.key, false);
+  };
+
+  /** Ctrl+Z: put back the last confirm / correct / exclude and return to that card. */
+  const undoLast = () => {
+    for (let last = undoStack.current.pop(); last; last = undoStack.current.pop()) {
+      if (!items.some((it) => it.key === last!.key)) continue; // Since committed or removed.
+      updateItem(last.key, last.before);
+      setSkipped(last.key, last.wasSkipped);
+      setSelectedKey(last.key);
+      return;
+    }
+  };
+
+  const moveSelection = (delta: number) => {
+    if (visibleItems.length === 0) return;
+    const at = visibleItems.findIndex((it) => it.key === selectedKey);
+    const to = at === -1 ? 0 : Math.max(0, Math.min(visibleItems.length - 1, at + delta));
+    setSelectedKey(visibleItems[to].key);
+  };
+
+  const reviewedCount = visibleItems.filter(isReviewed).length;
+  const confirmedCount = visibleItems.filter((it) => it.verified).length;
+  const stillMatchingCount = visibleItems.filter((it) => !isReviewed(it) && it.status === 'matching').length;
+  const reviewComplete = visibleItems.length > 0 && reviewedCount === visibleItems.length;
+
+  // Warm the browser cache with the next few cards' images so the compare panes appear instantly.
+  const preloaded = useRef(new Set<string>());
+  useEffect(() => {
+    const at = visibleItems.findIndex((it) => it.key === selectedKey);
+    const nextKey = nextToReview(selectedKey);
+    const upcoming = [
+      ...visibleItems.slice(at + 1, at + 4),
+      ...visibleItems.filter((it) => it.key === nextKey),
+    ];
+    for (const it of upcoming) {
+      for (const url of [it.previewUrl, identityOf(it)?.imageUri]) {
+        if (!url || url.startsWith('data:') || url.startsWith('blob:') || preloaded.current.has(url)) continue;
+        preloaded.current.add(url);
+        // Download and decode ahead, so showing the card doesn't wait on either.
+        const img = new Image();
+        img.src = url;
+        img.decode().catch(() => {});
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nextToReview is derived from these.
+  }, [selectedKey, visibleItems, skippedKeys]);
+
+  // One window listener that always calls the latest handler (it closes over this render's state).
+  const keyHandler = useRef<(e: KeyboardEvent) => void>(() => {});
+  keyHandler.current = (e: KeyboardEvent) => {
+    if (e.defaultPrevented || e.altKey || e.metaKey || items.length === 0) return;
+    const target = e.target instanceof HTMLElement ? e.target : null;
+    if (target && isTypingTarget(target)) return;
+    // Leave keys alone inside dialogs, menus, dropdowns and the open search.
+    if (target?.closest('[role="dialog"], [role="presentation"], [role="menu"], [role="listbox"], [role="combobox"]'))
+      return;
+    if (confirmDelete || bulkOpen || pickerOpen || webcamOpen || zipOpen || exportAnchor || shortcutsOpen) return;
+    // Holding a key repeats only the moves; holding Enter or X must not run through a string of cards.
+    const isMove = ['ArrowDown', 'ArrowUp', 'j', 'J', 'k', 'K'].includes(e.key);
+    if (e.repeat && !isMove) return;
+
+    if (e.ctrlKey) {
+      if (e.key.toLowerCase() === 'z' && !e.shiftKey && !readOnly) {
+        e.preventDefault();
+        undoLast();
+      }
+      return;
+    }
+    const item = selectedItem;
+    switch (e.key) {
+      case 'Enter':
+        // A focused button (e.g. Search catalog after a Tab) keeps its normal Enter behaviour.
+        if (target?.closest('button, a, [role="button"]') || !item || readOnly) return;
+        e.preventDefault();
+        if (identityOf(item)) confirmItem(item);
+        else if (item.status !== 'matching') setCorrecting(true);
+        return;
+      case 'ArrowDown':
+      case 'j':
+      case 'J':
+        e.preventDefault();
+        moveSelection(1);
+        return;
+      case 'ArrowUp':
+      case 'k':
+      case 'K':
+        e.preventDefault();
+        moveSelection(-1);
+        return;
+      case 's':
+      case 'S':
+      case '/':
+        if (!item || readOnly) return;
+        e.preventDefault();
+        setCorrecting(true);
+        return;
+      case 'x':
+      case 'X':
+        if (!item || readOnly) return;
+        e.preventDefault();
+        if (item.include || !skippedKeys.has(item.key)) excludeItem(item);
+        else includeItem(item);
+        return;
+      case 'Escape':
+        if (correcting) {
+          e.preventDefault();
+          setCorrecting(false);
+        }
+        return;
+      case '?':
+        e.preventDefault();
+        setShortcutsOpen(true);
+        return;
+    }
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => keyHandler.current(e);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <Stack spacing={3}>
       {/* In audit and batch mode the wrapping page supplies its own header/banner. */}
@@ -2359,6 +2669,41 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         </Paper>
       )}
 
+      {visibleItems.length > 0 &&
+        (reviewComplete ? (
+          <Alert
+            severity="success"
+            action={
+              <Button color="inherit" size="small" startIcon={<KeyboardIcon />} onClick={() => setShortcutsOpen(true)}>
+                {t('scan.keyboard.shortcuts')}
+              </Button>
+            }
+          >
+            {t('scan.keyboard.complete', { count: visibleItems.length, confirmed: confirmedCount })}
+          </Alert>
+        ) : (
+          <Paper variant="outlined" sx={{ px: 2, py: 1 }}>
+            <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {t('scan.keyboard.progress', { reviewed: reviewedCount, total: visibleItems.length })}
+              </Typography>
+              <LinearProgress
+                variant="determinate"
+                value={(reviewedCount / visibleItems.length) * 100}
+                sx={{ flex: '1 1 120px', height: 6, borderRadius: 3 }}
+              />
+              <Typography variant="caption" color="text.secondary">
+                {stillMatchingCount > 0 && !visibleItems.some(needsReview)
+                  ? t('scan.keyboard.waiting', { count: stillMatchingCount })
+                  : t('scan.keyboard.hint')}
+              </Typography>
+              <Button size="small" startIcon={<KeyboardIcon />} onClick={() => setShortcutsOpen(true)}>
+                {t('scan.keyboard.shortcuts')}
+              </Button>
+            </Stack>
+          </Paper>
+        ))}
+
       {items.length > 0 && (
         <Box
           sx={{
@@ -2369,7 +2714,11 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
           }}
         >
           {/* Master: the list of scanned cards (scan thumb + matched-art thumb per row). */}
-          <Paper variant="outlined" sx={{ overflow: 'hidden', maxHeight: { md: '75vh' }, overflowY: { md: 'auto' } }}>
+          <Paper
+            variant="outlined"
+            data-scan-list
+            sx={{ overflow: 'hidden', maxHeight: { md: '75vh' }, overflowY: { md: 'auto' } }}
+          >
             {/* Selection header: check/uncheck/invert + bulk edit. */}
             <Box
               sx={{
@@ -2437,8 +2786,8 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                   item={item}
                   selected={item.key === selectedKey}
                   badgeSettings={badgeSettings}
-                  onSelect={() => setSelectedKey(item.key)}
-                  onToggle={(v, shiftKey) => toggleInclude(item.key, v, shiftKey)}
+                  onSelect={setSelectedKey}
+                  onToggle={toggleRow}
                   readOnly={readOnly}
                 />
               ))}
@@ -2457,24 +2806,20 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
 
           {/* Detail: the selected card's full-size compare + verify/correct/remove + properties. */}
           {selectedItem ? (
+            // Not keyed by card: moving through the list updates the panel in place, which is much
+            // cheaper than rebuilding its form fields for every card.
             <DetailPanel
-              key={selectedItem.key}
               item={selectedItem}
               game={game}
               artSets={artSets}
               foilTypeOptions={foilTypeOptions}
               tagOptions={tagOptions}
               badgeSettings={badgeSettings}
-              onToggle={(v) => updateItem(selectedItem.key, { include: v })}
-              onVerify={() => updateItem(selectedItem.key, { verified: true, include: true })}
-              onCorrect={(r) =>
-                updateItem(selectedItem.key, {
-                  override: r,
-                  include: true,
-                  verified: true,
-                  ...(r.language && r.language !== ENGLISH ? { language: r.language } : {}),
-                })
-              }
+              onToggle={(v) => (v ? includeItem(selectedItem) : excludeItem(selectedItem))}
+              onVerify={() => confirmItem(selectedItem)}
+              onCorrect={(r) => correctItem(selectedItem, r)}
+              correcting={correcting}
+              onCorrectingChange={setCorrecting}
               onRemove={() => removeItems((it) => it.key === selectedItem.key)}
               onProps={(patch) => updateProps(selectedItem.key, patch)}
               readOnly={readOnly}
@@ -2504,6 +2849,8 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
 
       <BulkEditDialog
         open={bulkOpen}

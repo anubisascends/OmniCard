@@ -20,7 +20,7 @@ Nothing is added to your collection until you click the add button. Until then t
 3. Optionally set the **Condition**, **Card language** and **Foil** that most of these cards share. Each new scan starts with these values (see [Session defaults](#session-defaults)).
 4. Add pictures with **Take photo**, **Use webcam** or **Add images** (see [Ways to add pictures](#ways-to-add-pictures)).
 5. Wait for matching to finish. Each row shows a spinner while it is being matched, then a confidence percentage.
-6. Select each row and compare **Uploaded scan** with **Matched art**. Click **Confirm match** when it is right, or **Search catalog** to pick the correct card.
+6. Compare **Uploaded scan** with **Matched art** for the selected card. Click **Confirm match** (or press **Enter**) when it is right. OmniCard moves on to the next card. If the match is wrong, click **Search catalog** to pick the correct card. See [Review with the keyboard](#review-with-the-keyboard).
 7. Click **Add to location…** and choose where the cards are going.
 8. Click **Add N confirmed cards**.
 
@@ -93,12 +93,36 @@ Click a row to see it in the detail panel:
 - **Uploaded scan** and **Matched art** side by side, so you can compare them.
 - **View scan** opens a large version of your picture so you can read small print.
 - The card's name, set, collector number and rarity.
-- **Confirm match** marks the match as correct (the button then reads **Looks correct**). Confirming also checks the card.
+- **Confirm match** marks the match as correct (the button then reads **Looks correct**). Confirming also checks the card, then selects the next card that still needs review.
 - **Search catalog** opens the correction search.
-- **Exclude from commit** / **Include in commit** unchecks or checks the card.
+- **Exclude from commit** unchecks the card and moves on to the next card. **Include in commit** checks it again.
 - **Remove** deletes the scan from the list.
 
 ![The detail panel comparing the uploaded scan with the matched art, with Confirm match and Search catalog buttons](scanning-detail-panel.webp)
+
+### Review with the keyboard
+
+You can review a whole list without the mouse. The bar above the list shows **Reviewed N of M**. A card counts as reviewed once you confirm, correct or exclude it.
+
+| Key | What it does |
+| --- | --- |
+| **Enter** | Confirm the match and go to the next card that still needs review. On a card with no match, it opens **Search catalog** instead. |
+| **↓** or **J** | Next card |
+| **↑** or **K** | Previous card |
+| **S** or **/** | Open **Search catalog** |
+| **Esc** | Close the search |
+| **X** | Exclude the card from the commit and go to the next card. Press it again to include the card. |
+| **Ctrl+Z** | Undo the last confirm, correction or exclude, and go back to that card |
+| **?** | Show the list of shortcuts |
+
+"Next" follows the list's current filter and sort, skips cards you have already reviewed and cards still being matched, and starts again from the top when it reaches the end. Sorting by **Confidence**, for example, lets you confirm the strongest matches first.
+
+In the search, type a name or collector number, press **↓** to move into the results, then **Enter** to pick one. The pick confirms the card and moves on.
+
+When every card in the list has been reviewed, the bar changes to **Review complete**. Choose a location and add the cards as usual. Adding is never done from the keyboard alone.
+
+> [!NOTE]
+> Shortcuts don't work while you're typing in a field such as **Note** or **Tags**. Click an empty part of the page to use them again.
 
 ### Checking cards
 
@@ -116,7 +140,7 @@ The checkbox on each row decides whether the card is included when you add or ex
 3. Hover over a result's small picture to see it larger.
 4. Click the correct result.
 
-The card is now marked **Corrected**, and it is confirmed and checked. Click **Cancel** to close the search without changing anything.
+The card is now marked **Corrected**, and it is confirmed and checked. The next card that needs review is selected. Click **Cancel** to close the search without changing anything.
 
 The search looks only in the sets chosen in **Sets (art fallback)**; the line under the search box says which. If the right card isn't listed, clear that set selection at the top of the page and search again.
 

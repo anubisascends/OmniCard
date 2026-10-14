@@ -69,7 +69,7 @@ Each batch shows:
 
 1. In the **Scan batches** panel, click **Open** on the batch. (If you were already reviewing it, the button reads **Continue**.)
 2. The batch opens on its own page, titled *Batch: name*. You are now its reviewer, and nobody else can change it while you have it.
-3. Review the cards exactly as you would on the Scan page: compare the scan with the matched art, **Confirm match** or **Search catalog** to correct it, set condition, foil, tags and other properties, and use the filters and bulk **Edit**. See [Review the list](help:scanning#review-the-list) and [Correct a wrong match](help:scanning#correct-a-wrong-match).
+3. Review the cards exactly as you would on the Scan page: compare the scan with the matched art, **Confirm match** or **Search catalog** to correct it, set condition, foil, tags and other properties, and use the filters and bulk **Edit**. See [Review the list](help:scanning#review-the-list) and [Correct a wrong match](help:scanning#correct-a-wrong-match). To go through a large batch quickly, press **Enter** to confirm each card and move to the next one (see [Review with the keyboard](help:scanning#review-with-the-keyboard)).
 4. Check that **Add to location…** shows the right location. If the folder has a default location it is already selected; you can change it.
 5. Click **Add N confirmed cards**.
 
