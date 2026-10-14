@@ -215,7 +215,7 @@ Only administrators see this part. It points OmniCard at folders on the server w
 ![The Watched scan folders settings for each game](administration-scan-folders.png)
 
 1. Turn on **Watch folders**.
-2. Set the **Quiet period (seconds)**. This is how long OmniCard waits after the last new file arrives before it starts matching a batch.
+2. Set the **Quiet period (seconds)**. This is how long a batch's files must go without changing before the batch starts on its own. Each batch counts down separately.
 3. Set **Keep images (days)**. Stored scans of batches that were added or discarded are deleted after this many days.
 4. For each game you scan, enter the **Folder on the server**, for example `D:\Scans\Mtg`, and make sure **Active** is on.
 5. Once a folder is entered, choose the defaults for that game's batches: **Sets (art fallback)**, **Condition**, **Card language** and **Foil**.
@@ -230,7 +230,12 @@ A chip next to each folder shows its status:
 | **Folder not found** | The path is wrong, or the server can't reach it |
 | **Can't move files** | OmniCard can read the folder but can't move processed files into its `_processed` subfolder. Check the folder's permissions |
 
-Save each batch into its own subfolder, named after the batch. When OmniCard picks up a file, it moves the original into a `_processed` subfolder.
+Save each batch into its own subfolder, named after the batch. OmniCard leaves the files alone until the batch starts, then moves the originals into a `_processed` subfolder.
+
+Two more switches control batches:
+
+- **Process batches automatically**: when on, each batch starts by itself after the quiet period. When off, batches wait until someone clicks **Run** on the Scan page.
+- **Delete originals when a batch is closed**: when on, a batch's originals are deleted from `_processed` once it is committed or discarded. When off, they're kept and clearing out `_processed` is up to you.
 
 > [!NOTE]
 > Folders are only watched while the OmniCard server is running. If batches only appear after someone opens OmniCard in a browser, ask whoever runs the server to keep it always running.

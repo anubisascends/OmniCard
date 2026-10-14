@@ -255,6 +255,7 @@ public class OmniCardDbContext : DbContext
             e.Property(i => i.OriginalFileName).IsRequired().HasMaxLength(260);
             e.Property(i => i.StoredFileName).IsRequired().HasMaxLength(260);
             e.Property(i => i.PreviewFileName).HasMaxLength(260);
+            e.Property(i => i.ProcessedPath).HasMaxLength(1024);
             e.Property(i => i.Condition).HasMaxLength(16);
             e.Property(i => i.Language).HasMaxLength(16);
             e.Property(i => i.FoilType).HasMaxLength(64);

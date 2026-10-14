@@ -58,6 +58,7 @@ public sealed class ScanFolderSettingsController(
                 AutoProcess = request.AutoProcess,
                 QuietPeriodSeconds = request.QuietPeriodSeconds,
                 RetentionDays = request.RetentionDays,
+                DeleteOriginalsOnClose = request.DeleteOriginalsOnClose,
                 Folders = folders,
             }));
         }
@@ -70,6 +71,7 @@ public sealed class ScanFolderSettingsController(
         AutoProcess = s.AutoProcess,
         QuietPeriodSeconds = s.QuietPeriodSeconds,
         RetentionDays = s.RetentionDays,
+        DeleteOriginalsOnClose = s.DeleteOriginalsOnClose,
         Folders = s.Folders.Select(f => new ScanFolderConfigDto
         {
             Game = f.Game.ToString(),

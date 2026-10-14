@@ -145,6 +145,20 @@ export function ScanFoldersCard() {
               {t('settings.scanFolders.autoProcessHelp')}
             </Typography>
           </Box>
+          <Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={form.deleteOriginalsOnClose}
+                  onChange={(e) => setForm({ ...form, deleteOriginalsOnClose: e.target.checked })}
+                />
+              }
+              label={t('settings.scanFolders.deleteOriginals')}
+            />
+            <Typography variant="caption" color="text.secondary" display="block">
+              {t('settings.scanFolders.deleteOriginalsHelp')}
+            </Typography>
+          </Box>
 
           {games.map((g) => (
             <Box key={g.id}>

@@ -273,21 +273,30 @@ sets, condition, language, foil, default location).
 - **Layout:** `<game folder>\<batch name>\*.jpg|png|tif`. Each top-level subfolder is one batch, named after
   the folder; deeper subfolders belong to it. Images saved directly into the game folder go into a batch
   named after the date. Folders starting with `_` or `.` are ignored.
-- **Pick-up:** a file is taken in once it has stopped changing for a few seconds and the scanner software has
-  released it. It's copied to `{DataDirectory}\scan-batches\{batchId}\` and the original is moved to
-  `<game folder>\_processed\<batch name>\`. Clearing out `_processed` is up to you.
-- **Quiet period:** a batch starts matching once no new file has arrived for the quiet period (default 90 s).
-  Files added to a batch's folder later are appended to it, as long as it hasn't been committed or discarded;
-  after that, they start a new batch named `Name (2)`.
+- **Hands off until it starts:** a batch shows up on the Scan page (*Waiting*, with its file count) as soon as
+  files appear, but its files are left untouched in the folder: only directory entries (names, sizes,
+  timestamps) are read, never the files, so the scanner software can keep writing, renaming and completing
+  its run. The batch **starts** when someone clicks **Run** (`POST /api/scan/batches/run`, status
+  `Starting`), or by itself (see below). Only then are its files copied to
+  `{DataDirectory}\scan-batches\{batchId}\` and the originals moved to `<game folder>\_processed\<batch name>\`.
+  A file that's empty or still held open by another program at that moment is left in place.
+- **Quiet period:** with automatic processing on, a batch starts once its files have gone the quiet period
+  (default 90 s) without any change: a new, renamed, resized or removed file restarts it. Every batch counts
+  down on its own, so several batches can be waiting and starting at once; matching itself is one shared
+  queue. After a restart, waiting batches start their quiet period over. Files that land in a batch's folder
+  after it has started (or were left behind because they were locked) form a new batch named `Name (2)`.
+  If a waiting batch's files are removed before it starts, the batch disappears.
 - **Automatic processing:** on by default. Turn off **Process batches automatically** (`AutoProcess` in
-  `scan-folder-settings.json`) and files are still picked up, but each batch waits as *Waiting to run* until
-  someone clicks **Run** on the Scan page (`POST /api/scan/batches/run`), so unwanted scans can be deleted
-  before matching.
+  `scan-folder-settings.json`) and each batch waits as *Waiting to run* until someone clicks **Run** on the
+  Scan page.
+- **Originals:** kept in `_processed` by default; clearing it out is up to you. Turn on **Delete originals
+  when a batch is closed** (`DeleteOriginalsOnClose`) to delete a batch's originals (each item's
+  `ProcessedPath`) when it's committed or discarded, plus any folders under `_processed` that leaves empty.
 - **Duplicates:** every picked-up file is SHA-256 hashed (`ScanBatchItems.ContentHash`). A file byte-for-byte
   identical to an open or committed item of the same game (scanner software re-saving a run) is recorded as
   a `Duplicate` row: no stored image, never matched or committed; the original is still moved to
   `_processed`. The batch page folds them into repeated runs ("0001–1000 repeat 0001–1000"). A batch that
-  receives only duplicates closes itself as Discarded after the quiet period.
+  holds only duplicates closes itself as Discarded as soon as it starts.
 - **Review:** the **Scan** menu item shows how many batches nobody has opened yet, and the Scan page lists
   every batch with its progress. **Open** claims a batch for you; anyone else sees "In review by …" and can
   only look. The owner (or an admin) can **Release** it; an admin can **Take over**. Edits are saved on the

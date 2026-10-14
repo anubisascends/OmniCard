@@ -53,13 +53,14 @@ public sealed class ScanBatchService(
             .OrderByDescending(b => b.Id)
             .ToList();
         var counts = ItemCounts(ctx, batches.Select(b => b.Id).ToList());
-        var autoProcess = folderSettings.Get().AutoProcess;
-        return batches.Select(b => ToSummary(b, counts, userId, autoProcess)).ToList();
+        var settings = folderSettings.Get();
+        return batches.Select(b => ToSummary(b, counts, userId, settings)).ToList();
     }
 
-    /// <summary>Start matching Collecting batches now — the listed ones, or every one when
+    /// <summary>Start waiting (Collecting) batches now — the listed ones, or every one when
     /// <paramref name="batchIds"/> is empty — without waiting out the quiet period. This is how batches
-    /// move on when auto-processing is off. Returns how many were started.</summary>
+    /// move on when auto-processing is off. They become Starting; the background loop then takes their
+    /// files in from the folder and matches them. Returns how many were started.</summary>
     public int Run(IReadOnlyList<int> batchIds)
     {
         using var ctx = dbFactory.CreateDbContext();
@@ -67,9 +68,9 @@ public sealed class ScanBatchService(
         var query = ctx.ScanBatches.Where(b => b.Status == ScanBatchStatus.Collecting);
         if (ids.Count > 0)
             query = query.Where(b => ids.Contains(b.Id));
-        var started = query.ExecuteUpdate(u => u.SetProperty(b => b.Status, ScanBatchStatus.Matching));
+        var started = query.ExecuteUpdate(u => u.SetProperty(b => b.Status, ScanBatchStatus.Starting));
         if (started > 0)
-            logger.LogInformation("Started matching {Count} scan batch(es) on request", started);
+            logger.LogInformation("Started {Count} scan batch(es) on request", started);
         return started;
     }
 
@@ -93,7 +94,7 @@ public sealed class ScanBatchService(
         var counts = ItemCounts(ctx, [id]);
         return new ScanBatchDto
         {
-            Summary = ToSummary(batch, counts, userId, folderSettings.Get().AutoProcess),
+            Summary = ToSummary(batch, counts, userId, folderSettings.Get()),
             IsFoil = batch.IsFoil,
             Condition = batch.Condition,
             Language = batch.Language,
@@ -190,7 +191,7 @@ public sealed class ScanBatchService(
         if (force)
             logger.LogInformation("Scan batch {Id} taken over by {User}", id, userName);
         var claimed = ctx.ScanBatches.AsNoTracking().First(b => b.Id == id);
-        return ToSummary(claimed, ItemCounts(ctx, [id]), userId, folderSettings.Get().AutoProcess);
+        return ToSummary(claimed, ItemCounts(ctx, [id]), userId, folderSettings.Get());
     }
 
     /// <summary>Give up the claim. The reviewer or an admin may release.</summary>
@@ -338,6 +339,11 @@ public sealed class ScanBatchService(
         if (batch.ClaimedByUserId is { } owner && owner != userId && !isAdmin)
             throw new ScanBatchException(ScanBatchErrorKind.Conflict,
                 $"This batch is being reviewed by {batch.ClaimedByName}.", batch.ClaimedByName);
+        // Its files are still in the watched folder, so discarding the row would only bring it back.
+        if (batch.Status is ScanBatchStatus.Collecting or ScanBatchStatus.Starting
+            && !ctx.ScanBatchItems.Any(i => i.ScanBatchId == id))
+            throw new ScanBatchException(ScanBatchErrorKind.Conflict,
+                "This batch hasn't started yet. Remove its files from the scan folder instead.");
 
         var files = ctx.ScanBatchItems.AsNoTracking()
             .Where(i => i.ScanBatchId == id && i.State == ScanBatchItemState.Open)
@@ -434,6 +440,8 @@ public sealed class ScanBatchService(
         return true;
     }
 
+    /// <summary>Close the batch, and — when that option is on — delete its originals from the watched
+    /// folder's <c>_processed</c> subfolder.</summary>
     private void Close(OmniCardDbContext ctx, int id, ScanBatchStatus status)
     {
         var now = Now;
@@ -443,6 +451,17 @@ public sealed class ScanBatchService(
             .SetProperty(b => b.ClaimedByUserId, (int?)null)
             .SetProperty(b => b.ClaimedByName, (string?)null)
             .SetProperty(b => b.ClaimedUtc, (DateTime?)null));
+
+        if (!folderSettings.Get().DeleteOriginalsOnClose)
+            return;
+        var originals = ctx.ScanBatchItems.AsNoTracking()
+            .Where(i => i.ScanBatchId == id && i.ProcessedPath != null)
+            .Select(i => i.ProcessedPath)
+            .ToList();
+        var deleted = ScanBatchStorage.DeleteOriginals(originals, logger);
+        if (deleted > 0)
+            logger.LogInformation("Deleted {Count} original scan file(s) of batch {Id} from {Folder}",
+                deleted, id, ScanFolderIngestor.ProcessedFolderName);
     }
 
     private sealed record Counts(int Total, int Pending, int Matched, int Errors, int Committed, int Duplicates);
@@ -467,9 +486,10 @@ public sealed class ScanBatchService(
         });
     }
 
-    private static ScanBatchSummaryDto ToSummary(ScanBatch b, Dictionary<int, Counts> counts, int? userId, bool autoProcess)
+    private static ScanBatchSummaryDto ToSummary(ScanBatch b, Dictionary<int, Counts> counts, int? userId, ScanFolderSettings settings)
     {
         var c = counts.GetValueOrDefault(b.Id) ?? new Counts(0, 0, 0, 0, 0, 0);
+        var collecting = b.Status == ScanBatchStatus.Collecting;
         return new ScanBatchSummaryDto
         {
             Id = b.Id,
@@ -482,7 +502,12 @@ public sealed class ScanBatchService(
             Errors = c.Errors,
             Committed = c.Committed,
             Duplicates = c.Duplicates,
-            AwaitingRun = !autoProcess && b.Status == ScanBatchStatus.Collecting,
+            AwaitingRun = !settings.AutoProcess && collecting,
+            WaitingFiles = b.Status is ScanBatchStatus.Collecting or ScanBatchStatus.Starting ? b.WaitingFiles : 0,
+            StartsUtc = settings.AutoProcess && collecting
+                ? DateTime.SpecifyKind(b.LastFileUtc, DateTimeKind.Utc).AddSeconds(settings.QuietPeriodSeconds)
+                : null,
+            DeletesOriginalsOnClose = settings.DeleteOriginalsOnClose,
             ClaimedBy = b.ClaimedByName,
             ClaimedByMe = userId is not null && b.ClaimedByUserId == userId,
             CreatedUtc = DateTime.SpecifyKind(b.CreatedUtc, DateTimeKind.Utc),

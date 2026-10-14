@@ -65,28 +65,12 @@ public sealed class ScanBatchProcessorTests : IDisposable
     }
 
     [Fact]
-    public async Task CollectingBatch_WaitsForQuietPeriod()
-    {
-        var id = SeedBatch(ScanBatchStatus.Collecting, "a.jpg");
-        var processor = NewProcessor();
-
-        Assert.False(await processor.ProcessNextAsync(Quiet));
-        Assert.Equal(ScanBatchStatus.Collecting, Batch(id).Status);
-        Assert.Empty(_matcher.Calls);
-
-        _f.Clock.Advance(Quiet);
-        Assert.True(await processor.ProcessNextAsync(Quiet));
-        Assert.Equal(ScanBatchStatus.Matching, Batch(id).Status);
-        Assert.Single(_matcher.Calls);
-    }
-
-    [Fact]
     public async Task MatchesInSequence_ThenBatchIsReady()
     {
         var id = SeedBatch(ScanBatchStatus.Matching, "a.jpg", "b.jpg");
         var processor = NewProcessor();
 
-        while (await processor.ProcessNextAsync(Quiet)) { }
+        while (await processor.ProcessNextAsync()) { }
 
         Assert.Equal(["a.jpg", "b.jpg"], _matcher.Calls.Select(c => c.File));
         Assert.All(_matcher.Calls, c =>
@@ -107,7 +91,7 @@ public sealed class ScanBatchProcessorTests : IDisposable
         _matcher.Result = new ScanMatchDto { Matched = true, Game = "Mtg", GameCardId = "new-card", Name = "Bolt", Language = "de", ScanHash = "42" };
         var id = SeedBatch(ScanBatchStatus.Matching, "a.jpg");
 
-        await NewProcessor().ProcessNextAsync(Quiet);
+        await NewProcessor().ProcessNextAsync();
 
         var item = Assert.Single(Items(id));
         Assert.True(item.Include);
@@ -125,7 +109,7 @@ public sealed class ScanBatchProcessorTests : IDisposable
         var id = SeedBatch(ScanBatchStatus.Matching, "a.jpg");
         var processor = NewProcessor();
 
-        while (await processor.ProcessNextAsync(Quiet)) { }
+        while (await processor.ProcessNextAsync()) { }
 
         var item = Assert.Single(Items(id));
         Assert.Equal(ScanBatchItemStatus.Error, item.Status);
@@ -138,10 +122,10 @@ public sealed class ScanBatchProcessorTests : IDisposable
     {
         // Simulates a restart: nothing is held in memory, pending rows are simply matched.
         var id = SeedBatch(ScanBatchStatus.Matching, "a.jpg", "b.jpg");
-        await NewProcessor().ProcessNextAsync(Quiet);
+        await NewProcessor().ProcessNextAsync();
 
         var restarted = NewProcessor();
-        while (await restarted.ProcessNextAsync(Quiet)) { }
+        while (await restarted.ProcessNextAsync()) { }
 
         Assert.Equal(2, _matcher.Calls.Count);
         Assert.Equal(ScanBatchStatus.Ready, Batch(id).Status);
@@ -157,7 +141,7 @@ public sealed class ScanBatchProcessorTests : IDisposable
             db.SaveChanges();
         }
 
-        Assert.False(await NewProcessor().ProcessNextAsync(Quiet));
+        Assert.False(await NewProcessor().ProcessNextAsync());
         Assert.Empty(_matcher.Calls);
         Assert.Equal(ScanBatchStatus.Ready, Batch(id).Status);
     }
@@ -168,7 +152,7 @@ public sealed class ScanBatchProcessorTests : IDisposable
         var first = SeedBatch(ScanBatchStatus.Matching, "first.jpg");
         SeedBatch(ScanBatchStatus.Matching, "second.jpg");
 
-        await NewProcessor().ProcessNextAsync(Quiet);
+        await NewProcessor().ProcessNextAsync();
 
         Assert.Equal("first.jpg", Assert.Single(_matcher.Calls).File);
         Assert.Equal(ScanBatchItemStatus.Matched, Items(first).Single().Status);
@@ -188,25 +172,18 @@ public sealed class ScanBatchProcessorTests : IDisposable
     }
 
     [Fact]
-    public async Task AutoStartOff_CollectingBatchWaitsForRun()
+    public async Task WaitingBatches_AreNeverMatched()
     {
-        var id = SeedBatch(ScanBatchStatus.Collecting, "a.jpg");
-        var processor = NewProcessor();
+        // Collecting/Starting batches belong to the ingestor until it has taken their files in.
+        var collecting = SeedBatch(ScanBatchStatus.Collecting, "a.jpg");
+        var starting = SeedBatch(ScanBatchStatus.Starting, "b.jpg");
         _f.Clock.Advance(Quiet + Quiet);
 
-        Assert.False(await processor.ProcessNextAsync(Quiet, autoStart: false));
-        Assert.Equal(ScanBatchStatus.Collecting, Batch(id).Status);
-        Assert.Empty(_matcher.Calls);
+        Assert.False(await NewProcessor().ProcessNextAsync());
 
-        // Run (ScanBatchService.Run) moves it on; from there it's matched even with auto-start off.
-        using (var db = _f.Db())
-        {
-            db.ScanBatches.Single().Status = ScanBatchStatus.Matching;
-            db.SaveChanges();
-        }
-        while (await processor.ProcessNextAsync(Quiet, autoStart: false)) { }
-        Assert.Single(_matcher.Calls);
-        Assert.Equal(ScanBatchStatus.Ready, Batch(id).Status);
+        Assert.Empty(_matcher.Calls);
+        Assert.Equal(ScanBatchStatus.Collecting, Batch(collecting).Status);
+        Assert.Equal(ScanBatchStatus.Starting, Batch(starting).Status);
     }
 
     [Fact]
@@ -215,44 +192,11 @@ public sealed class ScanBatchProcessorTests : IDisposable
         var id = SeedBatch(ScanBatchStatus.Matching, "0001.png");
         AddDuplicate(id, "0001.png");
 
-        while (await NewProcessor().ProcessNextAsync(Quiet)) { }
+        while (await NewProcessor().ProcessNextAsync()) { }
 
         Assert.Equal(["0001.png"], _matcher.Calls.Select(c => c.File));
         Assert.Equal(ScanBatchStatus.Ready, Batch(id).Status);
         Assert.Equal(ScanBatchItemStatus.Pending, Items(id).Single(i => i.State == ScanBatchItemState.Duplicate).Status);
-    }
-
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task OnlyDuplicates_BatchIsDiscardedOnceQuiet(bool autoStart)
-    {
-        var id = SeedBatch(ScanBatchStatus.Collecting);
-        AddDuplicate(id, "0001.png");
-        AddDuplicate(id, "0002.png");
-        var processor = NewProcessor();
-
-        Assert.False(await processor.ProcessNextAsync(Quiet, autoStart));
-        Assert.Equal(ScanBatchStatus.Collecting, Batch(id).Status); // copies may still be arriving
-
-        _f.Clock.Advance(Quiet);
-        Assert.False(await processor.ProcessNextAsync(Quiet, autoStart));
-        var batch = Batch(id);
-        Assert.Equal(ScanBatchStatus.Discarded, batch.Status);
-        Assert.NotNull(batch.ClosedUtc);
-        Assert.Empty(_matcher.Calls);
-    }
-
-    [Fact]
-    public async Task DuplicatesBesideRealScans_KeepTheBatchOpen()
-    {
-        var id = SeedBatch(ScanBatchStatus.Collecting, "0001.png");
-        AddDuplicate(id, "0001.png");
-        _f.Clock.Advance(Quiet);
-
-        Assert.False(await NewProcessor().ProcessNextAsync(Quiet, autoStart: false));
-
-        Assert.Equal(ScanBatchStatus.Collecting, Batch(id).Status);
     }
 
     private sealed class FakeMatcher : IScanMatcher
