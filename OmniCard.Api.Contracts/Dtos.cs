@@ -1746,6 +1746,8 @@ public sealed record ScanTagRuleItem
     public string? Language { get; init; }
     public bool IsFoil { get; init; }
     public string? FoilType { get; init; }
+    /// <summary>The scan's tags. Only scan validation looks at them (tag rules can't use <c>tag:</c>).</summary>
+    public IReadOnlyList<string> Tags { get; init; } = [];
 }
 
 /// <summary>Check scanned (not yet saved) cards of one game against the enabled tag rules.</summary>
@@ -1757,6 +1759,31 @@ public sealed record ScanTagRulesRequest
 
 /// <summary>The rule tags for one scanned card (empty when no rule matches).</summary>
 public sealed record ScanTagRuleResultDto(string Key, IReadOnlyList<string> Tags);
+
+// ---- Scan validation (Scan page: flag scanned cards that don't match a search) ----
+
+/// <summary>A saved validation rule: a named search query for one game, shared by everyone who scans.</summary>
+public sealed record ScanValidationRuleDto(int Id, string Game, string Name, string Query, DateTime UpdatedAt);
+
+/// <summary>Save a validation rule. A rule with the same name (for that game) is replaced.</summary>
+public sealed record ScanValidationRuleInput
+{
+    public string Game { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string Query { get; init; } = "";
+}
+
+/// <summary>Check scanned (not yet saved) cards of one game against a validation query.</summary>
+public sealed record ScanValidateRequest
+{
+    public string Game { get; init; } = "";
+    public string Query { get; init; } = "";
+    public IReadOnlyList<ScanTagRuleItem> Items { get; init; } = [];
+}
+
+/// <summary>The keys of the cards that don't match the query. When <see cref="Errors"/> isn't empty the
+/// query is invalid and nothing was checked.</summary>
+public sealed record ScanValidationResultDto(IReadOnlyList<string> FailedKeys, IReadOnlyList<string> Errors);
 
 /// <summary>Admin "Reset collection": what a reset removes (preview) or removed (result) — lots/units,
 /// orphaned products and non-sale movements, locations, sites, lists, trades, tags, tag rules — plus

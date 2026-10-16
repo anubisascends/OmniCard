@@ -84,6 +84,8 @@ import type {
   ScanSearchResultDto,
   ScanTagRuleItem,
   ScanTagRuleResultDto,
+  ScanValidationResultDto,
+  ScanValidationRuleDto,
   SearchSchemaDto,
   TagRuleDto,
   TagRuleInput,
@@ -1028,6 +1030,22 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ game, items }),
     }),
+  /** The scanned cards of one game that DON'T match a validation query. */
+  scanValidate: (game: string, query: string, items: ScanTagRuleItem[]) =>
+    request<ScanValidationResultDto>('/api/scan/validate', {
+      method: 'POST',
+      body: JSON.stringify({ game, query, items }),
+    }),
+  scanValidationRules: (game: string) =>
+    request<ScanValidationRuleDto[]>(`/api/scan/validation-rules${qs({ game })}`),
+  /** Save a validation rule; one with the same name for the game is replaced. */
+  scanValidationRuleSave: (game: string, name: string, query: string) =>
+    request<ScanValidationRuleDto>('/api/scan/validation-rules', {
+      method: 'POST',
+      body: JSON.stringify({ game, name, query }),
+    }),
+  scanValidationRuleDelete: (id: number) =>
+    request<void>(`/api/scan/validation-rules/${id}`, { method: 'DELETE' }),
   // Export staged scans WITHOUT adding them to the collection. One format ⇒ that file; several ⇒ a
   // zip with one file per format. `fileName` is the base name (no extension).
   scanExport: (formats: string[], items: ScanCommitItem[], fileName: string) =>

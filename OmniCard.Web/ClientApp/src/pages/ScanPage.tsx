@@ -44,6 +44,7 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import FolderZipIcon from '@mui/icons-material/FolderZip';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
 import EditIcon from '@mui/icons-material/Edit';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import LockIcon from '@mui/icons-material/Lock';
 import PlaceIcon from '@mui/icons-material/Place';
 import ReplayIcon from '@mui/icons-material/Replay';
@@ -68,6 +69,7 @@ import { ScanSessionStore } from '../lib/scanSessionStore';
 import { BatchItemStore } from '../lib/batchItemStore';
 import { usePermissions } from '../context/usePermissions';
 import { ScanBatchesPanel } from '../components/ScanBatchesPanel';
+import { ScanValidationBar, type ScanValidationResult } from '../components/ScanValidationBar';
 import type {
   AuditCommitResultDto,
   ScanBadgeSettingsDto,
@@ -79,6 +81,7 @@ import type {
   ScanCommitResultDto,
   ScanMatchDto,
   ScanSearchResultDto,
+  ScanTagRuleItem,
 } from '../api/types';
 import { CardHoverPreview, type CardHover } from '../components/CardHoverPreview';
 
@@ -188,6 +191,25 @@ function toCommitItem(it: ScanItem, game: string): ScanCommitItem {
     // Present on both auto-matches and manual corrections (it.match holds the original scan result
     // even when the identity was overridden).
     scanHash: it.match?.scanHash ?? null,
+  };
+}
+
+/** What the server's search rules (tag rules, validation) look at for a scan. Only call for an item
+ * with a resolved identity. */
+function toRuleItem(it: ScanItem): ScanTagRuleItem {
+  const id = identityOf(it)!;
+  return {
+    key: it.key,
+    gameCardId: id.gameCardId,
+    name: id.name,
+    setCode: id.setCode,
+    collectorNumber: id.collectorNumber,
+    rarity: id.rarity,
+    condition: it.condition,
+    language: it.language,
+    isFoil: it.isFoil,
+    foilType: it.isFoil ? it.foilType : null,
+    tags: it.tags,
   };
 }
 
@@ -392,6 +414,8 @@ interface ScanListControls {
   minPrice: string;
   sortKey: SortKey;
   sortDir: SortDir;
+  /** Show only the scans that failed the last validation. */
+  failedOnly: boolean;
 }
 
 const DEFAULT_CONTROLS: ScanListControls = {
@@ -401,10 +425,13 @@ const DEFAULT_CONTROLS: ScanListControls = {
   minPrice: '',
   sortKey: 'none',
   sortDir: 'asc',
+  failedOnly: false,
 };
 
-/** Apply the filter half of the list controls to a single item. */
-function passesFilter(item: ScanItem, c: ScanListControls): boolean {
+/** Apply the filter half of the list controls to a single item. `failed` holds the keys that failed
+ * the last validation. */
+function passesFilter(item: ScanItem, c: ScanListControls, failed?: ReadonlySet<string>): boolean {
+  if (c.failedOnly && !failed?.has(item.key)) return false;
   if (c.checked === 'checked' && !item.include) return false;
   if (c.checked === 'unchecked' && item.include) return false;
   if (c.name.trim()) {
@@ -425,8 +452,8 @@ function passesFilter(item: ScanItem, c: ScanListControls): boolean {
 
 /** Filter then sort `items` per the list controls. Sort is stable and leaves the original scan order
  * (newest-first) intact when the sort key is 'none'; items missing a sort value sort last. */
-function applyControls(items: ScanItem[], c: ScanListControls): ScanItem[] {
-  const filtered = items.filter((it) => passesFilter(it, c));
+function applyControls(items: ScanItem[], c: ScanListControls, failed?: ReadonlySet<string>): ScanItem[] {
+  const filtered = items.filter((it) => passesFilter(it, c, failed));
   if (c.sortKey === 'none') return filtered;
   const dir = c.sortDir === 'asc' ? 1 : -1;
   const valueOf = (it: ScanItem): number | string | null => {
@@ -699,6 +726,7 @@ const MasterRow = memo(function MasterRow({
   onSelect,
   onToggle,
   readOnly = false,
+  failedValidation = false,
 }: {
   item: ScanItem;
   selected: boolean;
@@ -706,6 +734,8 @@ const MasterRow = memo(function MasterRow({
   onSelect: (key: string) => void;
   onToggle: (key: string, v: boolean, shiftKey: boolean) => void;
   readOnly?: boolean;
+  /** Failed the last validation: drawn with a red frame AND a labelled chip (never colour alone). */
+  failedValidation?: boolean;
 }) {
   const { t } = useTranslation();
   const id = identityOf(item);
@@ -741,6 +771,8 @@ const MasterRow = memo(function MasterRow({
         cursor: 'pointer',
         borderLeft: 4,
         borderColor: selected ? 'primary.main' : 'transparent',
+        // Inset so the frame doesn't shift the layout or get clipped by the list.
+        ...(failedValidation && { outline: '2px solid', outlineColor: 'error.main', outlineOffset: '-2px' }),
         bgcolor: selected ? 'action.selected' : 'transparent',
         '&:hover': { bgcolor: selected ? 'action.selected' : 'action.hover' },
       }}
@@ -782,6 +814,9 @@ const MasterRow = memo(function MasterRow({
           {propsSummary(item, t)}
         </Typography>
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+          {failedValidation && (
+            <Chip size="small" color="error" icon={<ErrorOutlineIcon />} label={t('scan.validation.failedChip')} />
+          )}
           <ConfidenceChip item={item} />
           <LanguageChip language={item.language} detected={badgeMatch?.languageDetected} />
           <TagChips tags={item.tags} ruleTags={item.ruleTags} />
@@ -948,6 +983,7 @@ function DetailPanel({
   correcting,
   onCorrectingChange,
   readOnly = false,
+  failedValidationQuery = null,
 }: {
   item: ScanItem;
   game: string;
@@ -965,6 +1001,8 @@ function DetailPanel({
   onCorrectingChange: (open: boolean) => void;
   /** Viewing someone else's background batch: hide the actions and lock the fields. */
   readOnly?: boolean;
+  /** The validation query this card failed (null = it didn't fail, or wasn't validated). */
+  failedValidationQuery?: string | null;
 }) {
   const { t } = useTranslation();
   const setCorrecting = onCorrectingChange;
@@ -1019,6 +1057,14 @@ function DetailPanel({
           </Box>
         ) : (
           <Alert severity="warning">{t('scan.detail.noConfidentMatch')}</Alert>
+        )}
+
+        {failedValidationQuery !== null && (
+          <Alert severity="error" icon={<ErrorOutlineIcon />}>
+            {id
+              ? t('scan.validation.detailFailed', { query: failedValidationQuery })
+              : t('scan.validation.detailFailedNoMatch', { query: failedValidationQuery })}
+          </Alert>
         )}
 
         {readOnly ? null : correcting ? (
@@ -1552,6 +1598,13 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   const [items, setItems] = useState<ScanItem[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [controls, setControls] = useState<ScanListControls>(DEFAULT_CONTROLS);
+  // Scan validation: the query typed (or loaded from a saved rule) and the last run's outcome. Every
+  // run replaces the outcome wholesale, so an earlier pass can never vouch for a card.
+  const [validationQuery, setValidationQuery] = useState('');
+  const [validation, setValidation] = useState<ScanValidationResult | null>(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validating, setValidating] = useState(false);
+  const validationRun = useRef(0);
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
 
@@ -1560,10 +1613,14 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   // The filtered + sorted view of the scans. Everything the toolbar acts on (Confirm / Add, the
   // select-all header, bulk edit, and the batch counts) is scoped to these visible items, so a
   // filtered list only ever confirms/commits what the user can actually see.
-  const visibleItems = useMemo(() => applyControls(items, controls), [items, controls]);
+  const visibleItems = useMemo(
+    () => applyControls(items, controls, validation?.failed),
+    [items, controls, validation],
+  );
   const visibleKeys = useMemo(() => new Set(visibleItems.map((it) => it.key)), [visibleItems]);
   const controlsActive =
     controls.checked !== 'all' ||
+    controls.failedOnly ||
     controls.name.trim() !== '' ||
     controls.minConfidence.trim() !== '' ||
     controls.minPrice.trim() !== '';
@@ -1644,10 +1701,16 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   const tagOptions = useMemo(() => (tagsQuery.data ?? []).map((t) => t.name), [tagsQuery.data]);
   const sets = setsQuery.data ?? [];
 
-  // Reset the set filter whenever the game changes (a set only belongs to one game).
+  // Reset the set filter whenever the game changes (a set only belongs to one game). Validation rules
+  // are per game too.
   useEffect(() => {
     setArtSets([]);
     setLanguage('');
+    validationRun.current++;
+    setValidationQuery('');
+    setValidation(null);
+    setValidationErrors([]);
+    setControls((c) => (c.failedOnly ? { ...c, failedOnly: false } : c));
   }, [game]);
 
   // A batch's "Sets (art fallback)" are fixed; they still scope the correction search.
@@ -1948,21 +2011,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         api
           .scanTagRules(
             game,
-            chunk.map(({ it }) => {
-              const id = identityOf(it)!;
-              return {
-                key: it.key,
-                gameCardId: id.gameCardId,
-                name: id.name,
-                setCode: id.setCode,
-                collectorNumber: id.collectorNumber,
-                rarity: id.rarity,
-                condition: it.condition,
-                language: it.language,
-                isFoil: it.isFoil,
-                foilType: it.isFoil ? it.foilType : null,
-              };
-            }),
+            chunk.map(({ it }) => toRuleItem(it)),
           )
           .then((res) => settle(new Map(res.map((r) => [r.key, r.tags]))))
           .catch((e) => {
@@ -1977,6 +2026,52 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   // Hold the commit until every card about to be added has its rule tags.
   const rulesPending =
     applyTagRules && !readOnly && items.some((it) => isVisibleCommittable(it) && ruleSignature(it, game) !== it.ruleSig);
+
+  /** Check the whole scan list (not just the filtered view) against the validation query. Cards with no
+   * identity fail; cards still matching aren't checked. */
+  const runValidation = async () => {
+    const run = ++validationRun.current;
+    const query = validationQuery.trim();
+    // Wipe the previous outcome first: nothing from an earlier run survives this one.
+    setValidation(null);
+    setValidationErrors([]);
+    if (!query) return;
+    const snapshot = itemsRef.current;
+    const checkable = snapshot.filter((it) => it.status !== 'matching');
+    const identified = checkable.filter((it) => identityOf(it));
+    const failed = new Set(checkable.filter((it) => !identityOf(it)).map((it) => it.key));
+    // Large batches go in chunks; an empty list still sends one request so the query gets checked.
+    const chunks: ScanItem[][] = [];
+    for (let i = 0; i < identified.length; i += 500) chunks.push(identified.slice(i, i + 500));
+    if (chunks.length === 0) chunks.push([]);
+    setValidating(true);
+    try {
+      for (const chunk of chunks) {
+        const res = await api.scanValidate(game, query, chunk.map(toRuleItem));
+        if (run !== validationRun.current) return;
+        if (res.errors.length > 0) {
+          setValidationErrors(res.errors);
+          return;
+        }
+        res.failedKeys.forEach((k) => failed.add(k));
+      }
+      setValidation({
+        query,
+        checked: new Set(checkable.map((it) => it.key)),
+        failed,
+        skipped: snapshot.length - checkable.length,
+      });
+      // Nothing failed: don't leave the list filtered down to nothing.
+      if (failed.size === 0) setControls((c) => (c.failedOnly ? { ...c, failedOnly: false } : c));
+    } catch (e) {
+      if (run === validationRun.current) setValidationErrors([(e as Error).message]);
+    } finally {
+      if (run === validationRun.current) setValidating(false);
+    }
+  };
+  // Counts over the scans still in the list (committed / removed ones drop out).
+  const validationFailedCount = validation ? items.filter((it) => validation.failed.has(it.key)).length : 0;
+  const validationCheckedCount = validation ? items.filter((it) => validation.checked.has(it.key)).length : 0;
 
   /** Remove scans from the list — and, for a batch, from the server (deleting their stored images). */
   const removeItems = (shouldRemove: (it: ScanItem) => boolean | undefined) => {
@@ -2428,6 +2523,24 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         </Paper>
       )}
 
+      <ScanValidationBar
+        game={game}
+        query={validationQuery}
+        onQueryChange={(q) => {
+          setValidationQuery(q);
+          setValidationErrors([]);
+        }}
+        onValidate={() => void runValidation()}
+        validating={validating}
+        canValidate={items.length > 0}
+        errors={validationErrors}
+        result={validation}
+        failedCount={validationFailedCount}
+        checkedCount={validationCheckedCount}
+        failedOnly={controls.failedOnly}
+        onFailedOnlyChange={(on) => setControls((c) => ({ ...c, failedOnly: on }))}
+      />
+
       {restoredStillPresent > 0 && (
         <Alert
           severity="info"
@@ -2789,6 +2902,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                   onSelect={setSelectedKey}
                   onToggle={toggleRow}
                   readOnly={readOnly}
+                  failedValidation={!!validation?.failed.has(item.key)}
                 />
               ))}
               {visibleItems.length === 0 && (
@@ -2823,6 +2937,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
               onRemove={() => removeItems((it) => it.key === selectedItem.key)}
               onProps={(patch) => updateProps(selectedItem.key, patch)}
               readOnly={readOnly}
+              failedValidationQuery={validation?.failed.has(selectedItem.key) ? validation.query : null}
             />
           ) : (
             <Paper

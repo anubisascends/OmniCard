@@ -1439,9 +1439,26 @@ export interface ScanTagRuleItem {
   language?: string | null;
   isFoil: boolean;
   foilType?: string | null;
+  /** The scan's tags (only scan validation looks at them). */
+  tags?: string[];
 }
 
 export interface ScanTagRuleResultDto {
   key: string;
   tags: string[];
+}
+
+/** A saved scan validation rule: a named search query for one game, shared by everyone who scans. */
+export interface ScanValidationRuleDto {
+  id: number;
+  game: string;
+  name: string;
+  query: string;
+  updatedAt: string;
+}
+
+/** The scanned cards that don't match a validation query; `errors` (invalid query) ⇒ nothing checked. */
+export interface ScanValidationResultDto {
+  failedKeys: string[];
+  errors: string[];
 }
