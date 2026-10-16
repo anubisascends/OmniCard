@@ -47,6 +47,7 @@ public class OmniCardDbContext : DbContext
     public DbSet<SavedView> SavedViews => Set<SavedView>();
     public DbSet<SavedViewDefault> SavedViewDefaults => Set<SavedViewDefault>();
     public DbSet<TagRule> TagRules => Set<TagRule>();
+    public DbSet<ScanValidationRule> ScanValidationRules => Set<ScanValidationRule>();
 
     public OmniCardDbContext(DbContextOptions<OmniCardDbContext> options) : base(options) { }
 
@@ -442,6 +443,17 @@ public class OmniCardDbContext : DbContext
             e.Property(r => r.Query).IsRequired().HasMaxLength(TagRule.MaxQueryLength);
             e.Property(r => r.TagsJson).IsRequired();
             e.HasIndex(r => r.Game);
+        });
+
+        // Saved scan validation rules (search query a scan list is checked against), unique by name per game.
+        modelBuilder.Entity<ScanValidationRule>(e =>
+        {
+            e.HasKey(r => r.Id);
+            e.Property(r => r.Id).ValueGeneratedOnAdd();
+            e.Property(r => r.Game).HasConversion<string>().HasMaxLength(32);
+            e.Property(r => r.Name).IsRequired().HasMaxLength(ScanValidationRule.MaxNameLength);
+            e.Property(r => r.Query).IsRequired().HasMaxLength(ScanValidationRule.MaxQueryLength);
+            e.HasIndex(r => new { r.Game, r.Name }).IsUnique();
         });
 
         // Optimistic-concurrency tokens for the networked (multi-user) web deployment, which runs on

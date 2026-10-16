@@ -204,6 +204,11 @@ builder.Services.AddSingleton(sp => new OmniCard.Web.Services.TagRules.TagRuleSe
     sp.GetRequiredService<ITagService>(),
     sp.GetRequiredService<TimeProvider>(),
     sp.GetRequiredService<ILogger<OmniCard.Web.Services.TagRules.TagRuleService>>()));
+// Scan validation (Scan page): flag scanned cards that don't match a search; saved per-game rules.
+builder.Services.AddSingleton(sp => new OmniCard.Web.Services.ScanValidation.ScanValidationService(
+    writableFactory,
+    sp.GetRequiredService<IEnumerable<ICardGameService>>(),
+    sp.GetRequiredService<TimeProvider>()));
 
 // Watched-folder scan batches: images dropped in a per-game folder are picked up, matched in the
 // background (the app's only BackgroundService) and reviewed/committed from the Scan page.

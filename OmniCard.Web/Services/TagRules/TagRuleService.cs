@@ -152,28 +152,7 @@ public sealed class TagRuleService(
         if (rules.Count == 0 || items.Count == 0)
             return items.Select(i => new ScanTagRuleResultDto(i.Key, [])).ToList();
 
-        var cards = items.Select(i => new CollectionCard
-        {
-            Game = game,
-            GameCardId = i.GameCardId,
-            Name = i.Name,
-            SetCode = i.SetCode,
-            Number = i.CollectorNumber,
-            Rarity = i.Rarity,
-            Condition = string.IsNullOrWhiteSpace(i.Condition) ? "NM" : i.Condition,
-            Language = CardLanguages.Normalize(i.Language) ?? CardLanguages.English,
-            IsFoil = i.IsFoil,
-            FoilType = i.IsFoil ? i.FoilType : null,
-        }).ToList();
-
-        if (_games.TryGetValue(game, out var svc))
-            foreach (var card in cards.Where(c => c.GameCardId.Length > 0).DistinctBy(c => c.GameCardId))
-            {
-                CardAttributeExtractor.FillFromCatalog(card, svc);
-                foreach (var twin in cards.Where(c => c.GameCardId == card.GameCardId && !ReferenceEquals(c, card)))
-                    (twin.Color, twin.CardType) = (card.Color, card.CardType);
-            }
-
+        var cards = ScanRuleCards.Build(game, items, _games);
         var tagsByCard = Evaluate(game, cards, rules);
         return items.Select((item, i) => new ScanTagRuleResultDto(item.Key, tagsByCard[i])).ToList();
     }

@@ -491,6 +491,20 @@ the tags to add. Rules are **additive only** (they never remove a tag).
   `PUT/DELETE /api/tag-rules/{id}`, `POST /api/tag-rules/validate`, `POST /api/tag-rules/preview`,
   `POST /api/tag-rules/{id}/run`.
 
+## Scan validation
+
+The Scan page (and batches/audits) has a **Validation rule** box: a search query every scanned card should
+match. **Validate** checks the whole list (not just the filtered view) with `POST /api/scan/validate`;
+cards that don't match — and scans with no identity — get a red frame plus a *Failed validation* chip, and
+a *N failed* button filters the list to them. Each run clears the previous results first; nothing re-checks
+automatically. Queries use the strict `TagRuleQueryValidator` with `tag:` allowed (no `loc:`, prices or
+`date:`), and are matched in memory like tag rules on unsaved scans (`ScanValidationService`).
+
+Saved rules are per game and shared: `ScanValidationRules` table (migration `AddScanValidationRules`,
+unique by game + name; saving an existing name replaces it). API (`ScanValidationController`):
+`GET /api/scan/validation-rules?game=` and `POST /api/scan/validate` need `scan.view`;
+`POST /api/scan/validation-rules` and `DELETE /api/scan/validation-rules/{id}` need `scan.commit`.
+
 Related: collection search now resolves every MTG catalog field (`kw:`, `pow`, `f:`, catalog `is:` flags…)
 against the printings you own (`IGameFieldResolver.ResolveFieldCardIds(…, candidateIds)`), and an unknown
 `is:` flag matches nothing instead of everything. The matching ids travel as one JSON parameter

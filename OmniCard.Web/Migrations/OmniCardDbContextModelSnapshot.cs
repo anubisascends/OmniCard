@@ -979,6 +979,43 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("ScanDiagnosticEvents");
                 });
 
+            modelBuilder.Entity("OmniCard.Shared.Scanning.ScanValidationRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Game")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Query")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Game", "Name")
+                        .IsUnique();
+
+                    b.ToTable("ScanValidationRules");
+                });
+
             modelBuilder.Entity("OmniCard.Shared.Settings.MigrationState", b =>
                 {
                     b.Property<string>("Key")

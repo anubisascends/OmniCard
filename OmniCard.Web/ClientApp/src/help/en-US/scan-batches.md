@@ -77,7 +77,11 @@ The bar at the top of the batch shows the game and the batch's fixed settings (*
 
 Your changes are saved to the server as you work. You don't have to finish in one sitting: leave the page and come back later with **Continue**.
 
-![A batch open for review, with the batch settings bar and the review list](scan-batches-review.webp)
+![A batch open for review: the batch settings bar, the Validation rule box with set:fdn and 1 failed, and the review list with Birds of Paradise flagged](scan-batches-review.webp)
+
+### Check the batch with a validation rule
+
+To make sure every card in the batch belongs there, type a **Validation rule** in the box above the list (or load a saved one) and click **Validate** once matching has finished. Cards that don't match get a red frame and a **Failed validation** chip, and the **N failed** button shows only those cards. In the picture above, the rule `set:fdn` flags the one card that isn't from Foundations. See [Validate the list](help:scanning#validate-the-list).
 
 ### Adding cards while matching is still running
 

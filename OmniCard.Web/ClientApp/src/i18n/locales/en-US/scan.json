@@ -262,6 +262,33 @@
       "switch": "Apply tag rules",
       "switchHint": "Pre-fill the tags from your tag rules (Administration ▸ Tag Rules) on matching cards. Remove any you don't want before adding.",
       "chipHint": "Added by a tag rule. Remove it to keep it off this card."
+    },
+    "validation": {
+      "label": "Validation rule",
+      "placeholder": "Search syntax every card should match, e.g. set:dom r>=rare",
+      "hint": "Press Validate to check every scan against the rule. Cards that don't match are flagged; each run replaces the last results.",
+      "validate": "Validate",
+      "validating": "Validating…",
+      "savedRules": "Saved validation rules",
+      "noSavedRules": "No saved rules for this game",
+      "saveRule": "Save current rule…",
+      "deleteRule": "Delete rule",
+      "saveTitle": "Save validation rule",
+      "replaces": "Replaces the saved rule \"{{name}}\".",
+      "deleteTitle": "Delete validation rule?",
+      "deleteBody": "Delete the saved rule \"{{name}}\"? Everyone who scans this game shares it.",
+      "failedCount_one": "{{count}} failed",
+      "failedCount_other": "{{count}} failed",
+      "showFailed": "Show only the cards that failed",
+      "showAll": "Show all cards again",
+      "allPassed_one": "{{count}} card passed",
+      "allPassed_other": "All {{count}} cards passed",
+      "skipped_one": "{{count}} card was still matching and wasn't checked.",
+      "skipped_other": "{{count}} cards were still matching and weren't checked.",
+      "stale": "The rule changed since the last run. Press Validate to check again.",
+      "failedChip": "Failed validation",
+      "detailFailed": "This card doesn't match the validation rule: {{query}}",
+      "detailFailedNoMatch": "This scan has no matched card, so it can't pass the validation rule: {{query}}"
     }
   }
 }
