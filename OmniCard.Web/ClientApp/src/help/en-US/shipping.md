@@ -31,6 +31,8 @@ You hear a beep, your phone vibrates, and the result shows under the camera:
 | **… open orders use this tracking number** | More than one order has this tracking number. Click **Mark shipped** on the one you're sending. |
 | **No open order has tracking number …** | No order in **Created** or **Packed** has this number. Add it to the order and scan again. |
 
+![The Ship page with Camera off, a tracking number looked up, and the order Ready to ship with a Mark shipped button](shipping-ready-to-ship.png)
+
 Shipping an order from this page does the same as dragging it into the shipped lane on the board: OmniCard records the sale and removes the sold cards from your collection. If you've added your own lanes, the order goes into the first lane that ships orders.
 
 The **This session** list shows everything you scanned since you opened the page, with a count of shipped orders. Click **Open order** to see an order's details.

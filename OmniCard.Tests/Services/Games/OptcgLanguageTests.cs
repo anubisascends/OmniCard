@@ -6,12 +6,13 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.CardMatching.Games;
 using OmniCard.Data.Catalogs;
 using OmniCard.Imaging;
+using OmniCard.Shared.Games;
 using OmniCard.Shared.Settings;
 
 namespace OmniCard.Tests.Services.Games;
 
-/// <summary>Japanese/French One Piece rows fetched via poneglyph <c>/v1/search?lang=</c>: keyed
-/// "{uid}@{lang}", English metadata overlaid, own art, English price fallback, pruned when un-ticked.</summary>
+/// <summary>Japanese/French One Piece rows (downloaded earlier from poneglyph; TCGCSV is English-only):
+/// keyed "{uid}@{lang}", English price fallback, variant lookup, English-only set views.</summary>
 public class OptcgLanguageTests : IDisposable
 {
     private readonly SqliteConnection _connection;
@@ -38,44 +39,29 @@ public class OptcgLanguageTests : IDisposable
         if (Directory.Exists(_dataDir)) Directory.Delete(_dataDir, recursive: true);
     }
 
-    private const string SetListJson = """{"data":[{"code":"OP01","name":"Romance Dawn","released_at":null,"card_count":1}]}""";
-
-    private const string SetDetailJson = """
-    {"data":{"code":"OP01","name":"Romance Dawn","card_count":1,"cards":[
-      {"card_number":"OP01-001","name":"Zoro","set":"OP01","set_name":"One Piece 1","card_type":"Leader",
-       "rarity":"L","color":["Red"],"power":5000,"life":5,"attribute":["Slash"],"types":["Straw Hat Crew"],
-       "effect":"Text.","variants":[
-         {"index":0,"label":"Standard","images":{"stock":{"full":"https://cdn/en/0.png"},"scan":{}},
-          "market":{"market_price":"6.00","low_price":"1.46"}}
-       ]}
-    ]}}
-    """;
-
-    // Japanese search page: localized name/colour (overridden by the English card), own art, no price.
-    private const string JapaneseSearchJson = """
-    {"data":[
-      {"card_number":"OP01-001","name":"ロロノア・ゾロ","language":"ja","set":"OP01","set_name":"One Piece 1",
-       "card_type":"Leader","rarity":"L","color":["赤"],"power":5000,"life":5,"types":["麦わらの一味"],
-       "variants":[
-         {"index":0,"label":"Standard","images":{"stock":{"full":"https://cdn/ja/0.png"},"scan":{}},
-          "market":{"market_price":null,"low_price":null}}
-       ]}
-    ],"pagination":{"page":1,"limit":100,"total":1,"has_more":false}}
-    """;
-
     private OptcgService CreateService()
     {
-        var handler = new RoutingHandler(uri =>
+        using (var seed = _factory.CreateDbContext())
         {
-            if (uri.EndsWith("/v1/sets")) return SetListJson;
-            if (uri.EndsWith("/v1/sets/OP01")) return SetDetailJson;
-            if (uri.Contains("/v1/search?set=OP01&lang=ja")) return JapaneseSearchJson;
-            return null;
-        });
+            seed.Cards.AddRange(
+                new OptcgCard
+                {
+                    CardSetId = "OP01-001", CardNumber = "OP01-001", CardName = "Zoro", SetId = "OP01",
+                    SetName = "Romance Dawn", Rarity = "L", CardColor = "Red", CardType = "Leader",
+                    MarketPrice = 6.00m, CardImageUri = "https://cdn/en/0.png",
+                },
+                new OptcgCard
+                {
+                    CardSetId = "OP01-001@ja", Lang = "ja", CardNumber = "OP01-001", CardName = "Zoro", SetId = "OP01",
+                    SetName = "Romance Dawn", Rarity = "L", CardColor = "Red", CardType = "Leader",
+                    CardImageUri = "https://cdn/ja/0.png",
+                });
+            seed.SaveChanges();
+        }
         var dataPath = new Moq.Mock<IDataPathService>();
         dataPath.Setup(d => d.DataDirectory).Returns(_dataDir);
         return new OptcgService(
-            new FakeHttpClientFactory(handler),
+            new FakeHttpClientFactory(new RoutingHandler(_ => null)),
             _factory,
             new PerceptualHashService(NullLogger<PerceptualHashService>.Instance),
             dataPath.Object,
@@ -83,44 +69,9 @@ public class OptcgLanguageTests : IDisposable
     }
 
     [Fact]
-    public async Task Download_WithJapanese_AddsSuffixedRowsWithEnglishMetadataAndOwnArt()
+    public void LanguageRows_PriceFromEnglish_VariantLookup_AndSetViewsStayEnglish()
     {
         var svc = CreateService();
-        svc.CatalogLanguages = ["en", "ja"];
-        await svc.DownloadBulkDataAsync();
-
-        using var ctx = _factory.CreateDbContext();
-        var ja = ctx.Cards.Single(c => c.CardSetId == "OP01-001@ja");
-        Assert.Equal("ja", ja.Lang);
-        Assert.Equal("OP01-001", ja.CardNumber);
-        Assert.Equal("Zoro", ja.CardName);
-        Assert.Equal("Red", ja.CardColor);
-        Assert.Equal("Romance Dawn", ja.SetName);
-        Assert.Equal("https://cdn/ja/0.png", ja.CardImageUri);
-        Assert.Null(ja.MarketPrice);
-        Assert.Equal("en", ctx.Cards.Single(c => c.CardSetId == "OP01-001").Lang);
-    }
-
-    [Fact]
-    public async Task Download_AfterUntickingJapanese_PrunesJapaneseRows()
-    {
-        var svc = CreateService();
-        svc.CatalogLanguages = ["en", "ja"];
-        await svc.DownloadBulkDataAsync();
-
-        svc.CatalogLanguages = ["en"];
-        await svc.DownloadBulkDataAsync();
-
-        using var ctx = _factory.CreateDbContext();
-        Assert.Equal(["OP01-001"], ctx.Cards.Select(c => c.CardSetId).ToList());
-    }
-
-    [Fact]
-    public async Task LanguageRows_PriceFromEnglish_VariantLookup_AndSetViewsStayEnglish()
-    {
-        var svc = CreateService();
-        svc.CatalogLanguages = ["en", "ja"];
-        await svc.DownloadBulkDataAsync();
 
         Assert.Equal(6.00m, svc.GetCurrentPrice("OP01-001@ja", isFoil: false));
         Assert.Equal(6.00m, svc.GetCurrentPrices(["OP01-001@ja"], isFoil: false)["OP01-001@ja"]);
@@ -136,6 +87,15 @@ public class OptcgLanguageTests : IDisposable
         Assert.Equal("OP01-001", setCard.GameCardId);
         Assert.Single(svc.GetAvailableSets());
         Assert.Contains(svc.SearchCards("lang:ja"), m => m.GameSpecificId == "OP01-001@ja");
+    }
+
+    [Fact]
+    public void CatalogLanguages_AreEnglishOnly_SinceTcgCsvHasNoOtherLanguages()
+    {
+        var svc = CreateService();
+        svc.CatalogLanguages = ["en", "ja", "fr"];
+        Assert.Equal(["en"], svc.CatalogLanguages);
+        Assert.Equal(["en"], svc.DownloadableLanguages);
     }
 
     [Theory]

@@ -97,7 +97,7 @@ The **Setup status** section shows the result:
 5. Optionally add a **Note**. It stays in OmniCard and isn't sent to eBay.
 6. Click **List on eBay**.
 
-![The List for sale dialog with the eBay listing section](ebay-list-for-sale.png)
+![The List for sale dialog with the eBay listing section filled in from the card, shown before eBay is connected so List on eBay is greyed out](collection-list-for-sale.png)
 
 When it works, the dialog closes. The card shows on the **Listings** tab with the **eBay** channel, plus a **View on eBay** button that opens the live listing. OmniCard uses the card's picture from the card catalog as the listing photo.
 

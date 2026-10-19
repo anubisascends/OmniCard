@@ -63,7 +63,7 @@ Each batch shows:
 - A **Run** button while the batch is waiting (**Run now** if automatic processing is on, to start it without waiting for the countdown).
 - Who is reviewing it: *You're reviewing this* or *In review by* someone else.
 
-![The Scan batches panel with one Ready batch and one batch still matching](scan-batches-panel.png)
+![The Scan batches panel with a Waiting batch counting down to its start, and two Ready batches](scan-batches-panel.png)
 
 ## Review a batch
 

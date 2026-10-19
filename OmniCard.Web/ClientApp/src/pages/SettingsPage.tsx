@@ -48,6 +48,7 @@ import { RolesCard } from '../components/settings/RolesCard';
 import { SitesCard } from '../components/settings/SitesCard';
 import { ResetCollectionCard } from '../components/settings/ResetCollectionCard';
 import { ScanFoldersCard } from '../components/settings/ScanFoldersCard';
+import { CatalogScheduleCard } from '../components/settings/CatalogScheduleCard';
 import { PermissionChecklist } from '../components/settings/PermissionChecklist';
 import { usePermissions } from '../context/usePermissions';
 import { currencySymbol } from '../lib/scanBadges';
@@ -157,8 +158,9 @@ function CatalogCard() {
   const status = useQuery({
     queryKey: ['catalog-status'],
     queryFn: api.catalogStatus,
-    // Poll quickly while a job is running so progress updates live; idle otherwise.
-    refetchInterval: (q) => (q.state.data?.running ? 1500 : false),
+    // Poll quickly while a job is running so progress updates live; slowly otherwise, so a job the
+    // update schedule starts in the background still shows up.
+    refetchInterval: (q) => (q.state.data?.running ? 1500 : 15000),
   });
 
   const refresh = useMutation({
@@ -214,7 +216,10 @@ function CatalogCard() {
         {running && (
           <Alert severity="info" icon={false}>
             <Typography variant="body2" fontWeight={600}>
-              {t('settings.catalog.running', { game: running.game, operation: running.operation })}
+              {t(running.scheduled ? 'settings.catalog.runningScheduled' : 'settings.catalog.running', {
+                game: running.game,
+                operation: running.operation,
+              })}
             </Typography>
             <Typography variant="caption" color="text.secondary">
               {running.message}
@@ -228,7 +233,7 @@ function CatalogCard() {
             <Typography variant="subtitle2">{t('settings.catalog.recentHeading')}</Typography>
             {recent.map((j, i) => (
               <Typography key={i} variant="caption" color="text.secondary">
-                {t('settings.catalog.recentItem', {
+                {t(j.scheduled ? 'settings.catalog.recentItemScheduled' : 'settings.catalog.recentItem', {
                   icon: j.state === 'succeeded' ? '✓' : '✗',
                   game: j.game,
                   operation: j.operation,
@@ -1756,7 +1761,17 @@ const TABS: {
   { key: 'tag-rules', labelKey: 'settings.tabs.tagRules', render: () => <TagRulesCard />, show: (g) => g.isAdmin },
   { key: 'deck-types', labelKey: 'settings.tabs.deckTypes', render: () => <DeckTypesCard />, show: (g) => g.can('decktypes.view') },
   { key: 'appearance', labelKey: 'settings.tabs.appearance', render: () => <AppearanceCard />, show: () => true },
-  { key: 'catalog', labelKey: 'settings.tabs.catalog', render: () => <CatalogCard />, show: (g) => g.can('catalog.view') },
+  {
+    key: 'catalog',
+    labelKey: 'settings.tabs.catalog',
+    render: () => (
+      <Stack spacing={2}>
+        <CatalogCard />
+        <CatalogScheduleCard />
+      </Stack>
+    ),
+    show: (g) => g.can('catalog.view'),
+  },
   {
     key: 'ebay',
     labelKey: 'settings.tabs.ebay',

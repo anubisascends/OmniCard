@@ -62,7 +62,7 @@
     },
     "catalog": {
       "title": "Catalog data",
-      "description": "Refresh the per-game card catalogs, prices, and image hashes on the server (no desktop app needed). One job runs at a time.",
+      "description": "Refresh the per-game card catalogs, prices, and image hashes on the server. Magic comes from Scryfall; every other game comes from TCGCSV (TCGplayer data, refreshed daily). One job runs at a time.",
       "operations": {
         "prices": "Update prices",
         "bulk": "Download catalog",
@@ -79,6 +79,36 @@
         "saved": "Language selection saved — run “Download catalog” to apply it.",
         "mtgSizeWarning": "Any non-English language switches MTG to Scryfall’s all-languages file (~400 MB download) and hashes each language’s art.",
         "pricesNote": "Non-English cards rarely have their own prices; they’re valued at the English printing’s price (Pokémon Japan has real prices)."
+      },
+      "runningScheduled": "{{game}} · {{operation}} · running (scheduled update)",
+      "recentItemScheduled": "{{icon}} {{game}} · {{operation}} (scheduled) · {{message}}",
+      "schedule": {
+        "title": "Automatic updates",
+        "description": "Update the catalogs on a schedule. Card data adds new sets and printings (and hashes them for scanning); prices refresh market values. TCGCSV republishes once a day, so one run a day keeps everything current.",
+        "adminOnly": "Only administrators can change the schedule.",
+        "enabled": "Update catalogs automatically",
+        "timesLabel": "Run at",
+        "addTime": "Add time",
+        "removeTime": "Remove {{time}}",
+        "timeZone": "Times are in the server's time zone: {{zone}}.",
+        "noTimes": "No times yet. Add at least one.",
+        "daysLabel": "On",
+        "gamesLabel": "Games",
+        "updateLabel": "Update",
+        "updateCards": "Card data (new sets and cards)",
+        "updatePrices": "Prices",
+        "save": "Save schedule",
+        "saved": "Schedule saved.",
+        "runNow": "Run now",
+        "runNowHelp": "Runs the selected games and updates now, even when the schedule is off.",
+        "runStarted": "Update started. Progress shows under Recent above.",
+        "running": "An update is running now.",
+        "nextRun": "Next run: {{when}}",
+        "off": "Automatic updates are off.",
+        "lastRun": "Last run: {{when}}, {{succeeded}} of {{total}} updates succeeded.",
+        "lastRunUnfinished": "Last run started {{when}} and did not finish (the server stopped).",
+        "neverRun": "No automatic update has run yet.",
+        "failuresHeading": "Failed updates"
       }
     },
     "ebay": {

@@ -94,6 +94,7 @@ public sealed class OptcgApiScanImages
 
 public sealed class OptcgApiMarket
 {
+    public string? TcgplayerUrl { get; set; }
     public string? MarketPrice { get; set; }
     public string? LowPrice { get; set; }
     public string? MidPrice { get; set; }

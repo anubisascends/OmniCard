@@ -26,6 +26,8 @@ public sealed class TcgCsvProduct
     public string Name { get; set; } = "";
     public string? CleanName { get; set; }
     public string? ImageUrl { get; set; }
+    /// <summary>0 when TCGplayer has no picture yet — <see cref="ImageUrl"/> is then a dead (403) placeholder.</summary>
+    public int? ImageCount { get; set; }
     public int GroupId { get; set; }
     public string? Url { get; set; }
     public List<TcgCsvExtendedData> ExtendedData { get; set; } = [];
@@ -47,5 +49,6 @@ public sealed class TcgCsvPrice
 {
     public int ProductId { get; set; }
     public decimal? MarketPrice { get; set; }
+    public decimal? LowPrice { get; set; }
     public string? SubTypeName { get; set; }
 }

@@ -1079,6 +1079,35 @@ export interface CatalogJobDto {
   message: string;
   startedAt: string;
   finishedAt?: string | null;
+  /** Started by the automatic update schedule. */
+  scheduled?: boolean;
+}
+
+/** The automatic catalog update schedule (Settings ▸ Catalog data). Times are "HH:mm" in the server's
+ * time zone; days are English day names (Sunday…Saturday); games are game ids. */
+export interface CatalogScheduleDto {
+  enabled: boolean;
+  times: string[];
+  days: string[];
+  games: string[];
+  updateCards: boolean;
+  updatePrices: boolean;
+}
+
+export interface CatalogScheduleResponse {
+  schedule: CatalogScheduleDto;
+  /** ISO-8601 UTC; null when the schedule is off or has no slots. */
+  nextRunAt?: string | null;
+  lastRunStartedAt?: string | null;
+  lastRunFinishedAt?: string | null;
+  lastRunJobCount: number;
+  lastRunFailedCount: number;
+  lastRunFailures: string[];
+  isRunning: boolean;
+  /** The server's time zone display name — the schedule's times are in it. */
+  timeZone: string;
+  /** Admins only. */
+  canEdit: boolean;
 }
 
 export interface CatalogStatusDto {

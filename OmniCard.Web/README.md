@@ -187,6 +187,29 @@ are created on first run, so a fresh server with an empty SQL Server instance ca
 scratch. Columns added in later versions (e.g. the catalog `Lang` column) are added to existing
 catalog DBs automatically at startup.
 
+**Sources.** MTG comes from Scryfall. Every other game — One Piece, Riftbound, Pokémon, Yu-Gi-Oh!,
+Final Fantasy TCG — comes from [TCGCSV](https://tcgcsv.com) (TCGplayer data, republished daily).
+One Piece and Riftbound used to come from poneglyph / Riftcodex. Their existing catalog rows are matched
+by TCGplayer product id and keep their ids (so owned copies are unaffected) and their own card data, which
+is more accurate than TCGplayer's listing; TCGCSV only gives them prices and fills fields they lack. Rows
+TCGCSV created are fully refreshed on every run. Printings TCGCSV doesn't list are kept, never deleted. The first One Piece refresh after upgrading links the existing rows to
+TCGplayer once, using poneglyph's `tcgplayer_url` (if poneglyph is unreachable the refresh fails without
+changing anything — retry later). New One Piece printings get `{number}` / `{number}_t{productId}` ids;
+new Riftbound ones `tcgcsv-{productId}`.
+
+### Automatic updates
+
+**Settings → Catalog data → Automatic updates** schedules the refresh: times of day (server local
+time), weekdays, games, and whether to update card data (**Download catalog**), prices, or both. At
+each time the app runs each game's jobs one after another through the same job runner (queued behind a
+manual job if one is running). Anyone with the catalog view permission sees the schedule and the last
+run's result; only **admins** can save it or click **Run now**. A slot missed while the app was down
+runs once at the next start (within a week). The schedule is stored in
+`{dataDir}/catalog-schedule.json`, the last run in `catalog-schedule-state.json`.
+API: `GET /api/catalog/schedule`, `PUT /api/catalog/schedule` and `POST /api/catalog/schedule/run`
+(admin). Under IIS the app must stay running for the schedule to fire — see
+[Keep the app running](#keep-the-app-running-iis).
+
 ### Card languages
 
 Every owned copy carries a **language** (`InventoryLot.Language`; null = English). It's set on the
@@ -203,7 +226,7 @@ also prunes rows for languages that were un-ticked. The selection is stored in
 | Game | Downloadable | Source | Notes |
 |---|---|---|---|
 | MTG | all Scryfall languages | Scryfall `all_cards` (~400 MB gz) instead of `default_cards` once any non-English language is ticked | Same set + collector number as English; prices fall back to the English printing; placeholder scans borrow English art |
-| One Piece | en, ja, fr | poneglyph `/v1/search?lang=` | Rows keyed `OP01-001@ja`; names/colours kept English, art is the language's own; English price fallback |
+| One Piece | English only | TCGCSV (English) | Japanese/French rows downloaded earlier from poneglyph (`OP01-001@ja`) are kept, with an English price fallback |
 | Pokémon | en, ja | TCGCSV category 85 "Pokemon Japan" | Separate sets (codes prefixed `JP-`), Japanese art, **real prices** |
 | Yu-Gi-Oh!, FFTCG, Riftbound | English only | — | Copies can still be tagged with any printed language |
 
@@ -313,7 +336,7 @@ sets, condition, language, foil, default location).
 
 ### Keep the app running (IIS)
 
-Folders are only watched while the app is running. By default IIS stops an idle app and starts it on the
+Folders are only watched — and scheduled catalog updates only run — while the app is running. By default IIS stops an idle app and starts it on the
 next request, so scans would sit unnoticed until someone opens the site. To keep it running:
 
 1. Install the IIS **Application Initialization** feature.

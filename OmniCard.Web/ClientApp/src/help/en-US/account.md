@@ -8,6 +8,8 @@ Click the **Account** button (the person icon) at the top right, then choose **M
 
 The **Profile** section shows your **Username** and the date you became a member. Only an administrator can change your username.
 
+![The Account page with the Profile, Email and Password sections](account-page.png)
+
 ## Change your email
 
 Your email is optional. If you have one, you can type it instead of your username when you sign in.
