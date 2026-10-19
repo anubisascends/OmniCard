@@ -18,6 +18,7 @@ public class TrackingNumbersTests
     [Theory]
     [InlineData("42090210" + UspsTracking, UspsTracking)]         // USPS IMpb, ZIP5
     [InlineData("420902101234" + UspsTracking, UspsTracking)]     // USPS IMpb, ZIP+4
+    [InlineData("4204932992349400108106244660856927", "9400108106244660856927")] // real Ground Advantage label (camera read)
     [InlineData("9612019123456789012345", "123456789012345")]      // FedEx Ground "96" barcode
     [InlineData("1001901781000001000400123456789012", "123456789012")] // FedEx Express 34-digit
     [InlineData("1Z999AA10123456784", "1Z999AA10123456784")]       // UPS: as-is
@@ -31,6 +32,7 @@ public class TrackingNumbersTests
     [InlineData("123456789012", "1001901781000001000400123456789012")]
     [InlineData("1Z999AA10123456784", "1z999aa10123456784")]
     [InlineData("9400 1118 9922 3456 7890 12", UspsTracking)]
+    [InlineData("9400 1081 0624 4660 8569 27", "4204932992349400108106244660856927")] // printed number vs camera read
     [InlineData("42090210" + UspsTracking, UspsTracking)] // stored the raw barcode, typed the bare number
     public void Matches_LabelBarcodeToStoredTrackingNumber(string stored, string scanned) =>
         Assert.True(TrackingNumbers.Matches(stored, scanned));
