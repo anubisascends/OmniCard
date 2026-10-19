@@ -318,6 +318,161 @@ public class RiftboundDownloadTests : IDisposable
         Assert.False(nonFoilPrices.ContainsKey("none"));
     }
 
+    // TCGCSV knows OGN (one product matches riftcodex card c2, which has no tcgplayer_id) and a
+    // brand-new set RAD that riftcodex hasn't published: one card, one battlefield, one sealed pack.
+    private const string FallbackGroupsJson = """
+    {"results":[{"groupId":24344,"name":"Origins","abbreviation":"OGN"},
+      {"groupId":24819,"name":"Radiance","abbreviation":"RAD"}],"success":true,"errors":[]}
+    """;
+
+    private const string OgnProductsJson = """
+    {"results":[
+      {"productId":653002,"name":"Cull the Weak","groupId":24344,"extendedData":[{"name":"Number","value":"209/298"}]},
+      {"productId":653310,"name":"Vex (Overnumbered)","groupId":24344,"extendedData":[{"name":"Number","value":"310*/298"}]}
+    ],"success":true,"errors":[]}
+    """;
+
+    private const string RadProductsJson = """
+    {"results":[
+      {"productId":711362,"name":"Radiance - Booster Pack","groupId":24819,
+        "imageUrl":"https://tcgplayer-cdn.tcgplayer.com/product/711362_200w.jpg","extendedData":[]},
+      {"productId":721337,"name":"Kai'Sa, Rebel","cleanName":"KaiSa Rebel","groupId":24819,
+        "imageUrl":"https://tcgplayer-cdn.tcgplayer.com/product/721337_200w.jpg",
+        "extendedData":[
+          {"name":"Rarity","value":"Rare"},{"name":"Number","value":"063a/167"},
+          {"name":"Description","value":"[DISARM] <em>(When I attack.)</em>\r\n<br>Your spells have [REACTION]."},
+          {"name":"Energy Cost","value":"5"},{"name":"Power Cost","value":"1"},{"name":"Might","value":"5"},
+          {"name":"Card Type","value":"Champion Unit"},{"name":"Domain","value":"Calm;Mind"}]},
+      {"productId":721400,"name":"Shimmering Grotto","groupId":24819,
+        "imageUrl":"https://tcgplayer-cdn.tcgplayer.com/product/721400_200w.jpg",
+        "extendedData":[{"name":"Number","value":"170/167"},{"name":"Card Type","value":"Battlefield"},{"name":"Domain","value":"None"},
+          {"name":"Might","value":"0"},{"name":"Rarity","value":"Uncommon"}]}
+    ],"success":true,"errors":[]}
+    """;
+
+    private RiftboundService CreateServiceWithTcgCsv(Func<string, string?>? riftcodexCards = null)
+    {
+        var handler = new RoutingHandler(uri =>
+        {
+            if (uri.Contains("/sets")) return SetListJson;
+            if (uri.Contains("/cards"))
+                return riftcodexCards?.Invoke(uri) ?? CardsPage(uri.Contains("page=2") ? 2 : 1);
+            if (uri.EndsWith("/89/groups")) return FallbackGroupsJson;
+            if (uri.EndsWith("/24344/products")) return OgnProductsJson;
+            if (uri.EndsWith("/24819/products")) return RadProductsJson;
+            return null;
+        });
+        var dataPath = new Moq.Mock<IDataPathService>();
+        dataPath.Setup(d => d.DataDirectory).Returns(_dataDir);
+        return new RiftboundService(
+            new FakeHttpClientFactory(handler),
+            _factory,
+            new PerceptualHashService(NullLogger<PerceptualHashService>.Instance),
+            dataPath.Object,
+            NullLogger<RiftboundService>.Instance);
+    }
+
+    [Fact]
+    public async Task DownloadBulkData_AddsTcgCsvOnlySets_AndBackfillsMissingTcgplayerIds()
+    {
+        var svc = CreateServiceWithTcgCsv();
+        await svc.DownloadBulkDataAsync();
+
+        using var ctx = _factory.CreateDbContext();
+        // 2 riftcodex + 2 RAD cards; the sealed booster pack is skipped and OGN isn't duplicated.
+        Assert.Equal(4, ctx.Cards.Count());
+
+        // Riftcodex card without a tcgplayer_id picks it up from the TCGCSV product with its riftbound id.
+        Assert.Equal("653310", ctx.Cards.Single(c => c.Id == "c2").TcgplayerId);
+
+        var kaisa = ctx.Cards.Single(c => c.Id == "tcgcsv-721337");
+        Assert.Equal("RAD", kaisa.SetId);
+        Assert.Equal("Radiance", kaisa.SetName);
+        Assert.Equal("rad-063a-167", kaisa.RiftboundId);
+        Assert.Equal("721337", kaisa.TcgplayerId);
+        Assert.Equal(63, kaisa.CollectorNumber);
+        Assert.Equal("Kai'Sa, Rebel", kaisa.Name);
+        Assert.Equal("Unit", kaisa.CardType);
+        Assert.Equal("Champion", kaisa.Supertype);
+        Assert.Equal("Calm/Mind", kaisa.Domain);
+        Assert.Equal(5, kaisa.Energy);
+        Assert.Equal(5, kaisa.Might);
+        Assert.Equal(1, kaisa.Power);
+        Assert.Equal("[DISARM] (When I attack.)\nYour spells have [REACTION].", kaisa.CardText);
+        Assert.True(kaisa.AlternateArt);
+        Assert.False(kaisa.Overnumbered);
+        Assert.Equal("portrait", kaisa.Orientation);
+        Assert.Equal("https://tcgplayer-cdn.tcgplayer.com/product/721337_400w.jpg", kaisa.CardImageUri);
+
+        var grotto = ctx.Cards.Single(c => c.Id == "tcgcsv-721400");
+        Assert.Equal("Battlefield", grotto.CardType);
+        Assert.Equal("landscape", grotto.Orientation);
+        Assert.Equal("", grotto.Domain);
+        Assert.Null(grotto.Might);
+        Assert.True(grotto.Overnumbered);
+
+        Assert.Contains(svc.GetAvailableSets(), s => s.SetCode == "RAD");
+    }
+
+    [Fact]
+    public async Task DownloadBulkData_RiftcodexCatchesUp_TakesOverTcgCsvRowInPlace()
+    {
+        using (var seed = _factory.CreateDbContext())
+        {
+            seed.Cards.Add(new RiftboundCard
+            {
+                Id = "tcgcsv-721337", RiftboundId = "rad-063a-167", TcgplayerId = "721337",
+                Name = "Kai'Sa, Rebel", SetId = "RAD", SetName = "Radiance", CollectorNumber = 63,
+                CardImageUri = "https://tcgplayer-cdn.tcgplayer.com/product/721337_400w.jpg",
+                ImageHash = 42UL, EdgeHash = 43UL, LocalImagePath = "riftbound-art/tcgcsv-721337.png",
+            });
+            seed.SaveChanges();
+        }
+
+        // Riftcodex now serves RAD, including Kai'Sa under its own id.
+        const string radCards = """
+        {"items":[{"id":"rc-kaisa","name":"Kai'Sa - Rebel","riftbound_id":"rad-063a-167","tcgplayer_id":"721337",
+          "collector_number":63,"attributes":{"energy":5,"might":5,"power":1},
+          "classification":{"type":"Unit","supertype":"Champion","rarity":"Rare","domain":["Calm","Mind"]},
+          "text":{"rich":null,"plain":"disarm","flavour":null},"set":{"set_id":"RAD","label":"Radiance"},
+          "media":{"image_url":"https://cdn/rc-kaisa.png","artist":"A","accessibility_text":null},
+          "tags":[],"orientation":"portrait",
+          "metadata":{"clean_name":"Kai'Sa Rebel","updated_on":null,"alternate_art":true,
+            "overnumbered":false,"signature":false},"new":false}],
+          "total":1,"page":1,"size":100,"pages":1}
+        """;
+        var svc = CreateServiceWithTcgCsv(_ => radCards);
+        await svc.DownloadBulkDataAsync();
+
+        using var ctx = _factory.CreateDbContext();
+        Assert.False(ctx.Cards.Any(c => c.Id == "rc-kaisa"));
+        var row = ctx.Cards.Single(c => c.TcgplayerId == "721337");
+        Assert.Equal("tcgcsv-721337", row.Id);          // owned copies keep resolving
+        Assert.Equal("Kai'Sa - Rebel", row.Name);        // metadata now from riftcodex
+        Assert.Equal("https://cdn/rc-kaisa.png", row.CardImageUri);
+        Assert.Null(row.EdgeHash);                       // art changed → re-hashed from riftcodex art
+                                                         // (the fake CDN 404s, so it stays unhashed)
+    }
+
+    [Theory]
+    [InlineData("020a/167", 20, "rad-020a-167")]
+    [InlineData("R01", 1, "rad-r01")]
+    [InlineData("SP2/005", 2, "rad-sp2-005")]
+    [InlineData("T1A 003/005", 3, "rad-t1a 003-005")]
+    [InlineData("190*/166", 190, "rad-190*-166")]
+    public void MapTcgCsvProduct_ParsesCollectorNumbers(string number, int expected, string riftboundId)
+    {
+        var card = RiftboundService.MapTcgCsvProduct(new TcgCsvProduct
+        {
+            ProductId = 1, Name = "X",
+            ExtendedData = [new TcgCsvExtendedData { Name = "Number", Value = number }],
+        }, "RAD", "Radiance");
+
+        Assert.NotNull(card);
+        Assert.Equal(expected, card.CollectorNumber);
+        Assert.Equal(riftboundId, card.RiftboundId);
+    }
+
     private class RoutingHandler(Func<string, string?> route) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)

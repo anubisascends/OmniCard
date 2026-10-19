@@ -1,10 +1,12 @@
 namespace OmniCard.Shared.Games;
 
 // Persistence entity for Riftbound cards. One row per printing.
-// Populated by RiftboundService from api.riftcodex.com DTOs (see RiftboundApiModels).
+// Populated by RiftboundService from api.riftcodex.com DTOs (see RiftboundApiModels), with
+// printings Riftcodex doesn't have yet filled in from TCGCSV.
 public class RiftboundCard
 {
     // Riftcodex hex id — unique per printing (alt arts are distinct rows). Primary key.
+    // TCGCSV-sourced printings use "tcgcsv-{productId}" and keep it after Riftcodex catches up.
     public string Id { get; set; } = "";
 
     // Riftbound id, e.g. "ogn-209-298"; alt arts carry a '*' (e.g. "ogn-310*-298").
