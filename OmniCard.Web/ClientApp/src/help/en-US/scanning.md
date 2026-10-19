@@ -138,7 +138,7 @@ The checkbox on each row decides whether the card is included when you add or ex
 
 1. Select the card and click **Search catalog**.
 2. Type at least two letters of the card's name, or enter its **Collector #**, or both.
-3. Hover over a result's small picture to see it larger.
+3. Each result shows the card name, set, collector number and rarity. If the game's catalog has more than one language, the result also shows the language (for example *English* or *Japanese*). Hover over a result's small picture to see it larger.
 4. Click the correct result.
 
 The card is now marked **Corrected**, and it is confirmed and checked. The next card that needs review is selected. Click **Cancel** to close the search without changing anything.

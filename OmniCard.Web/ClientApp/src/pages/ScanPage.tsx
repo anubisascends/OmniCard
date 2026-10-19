@@ -615,6 +615,8 @@ function CorrectionSearch({
                 >
                   {r.name} · {r.setCode.toUpperCase()} #{r.collectorNumber}
                   {r.rarity ? ` · ${r.rarity}` : ''}
+                  {/* Language-aware catalogs hold one row per language, so name it to tell them apart. */}
+                  {r.language ? ` · ${languageName(t, r.language)}` : ''}
                 </Button>
               ))}
             </Stack>
