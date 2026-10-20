@@ -34,6 +34,15 @@ public class SalesSettingsService : ISalesSettingsService
         Save(settings);
     }
 
+    public bool OrderSearchAllGames => Load().OrderSearchAllGames;
+
+    public void SetOrderSearchAllGames(bool allGames)
+    {
+        var settings = Load();
+        settings.OrderSearchAllGames = allGames;
+        Save(settings);
+    }
+
     public CompanyProfile GetCompany() => Load().Company;
 
     public void SaveCompany(CompanyProfile company)

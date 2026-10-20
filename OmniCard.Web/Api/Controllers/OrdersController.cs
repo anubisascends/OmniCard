@@ -249,13 +249,14 @@ public sealed class OrdersController(
 
     /// <summary>The order editor's add-card search: listed-for-sale cards whose name, set code or set
     /// name contains every word of <paramref name="q"/> (or whose collector number is one of them),
-    /// with copies not already on an open order. The rest of the collection never shows up here.</summary>
+    /// with copies not already on an open order. The rest of the collection never shows up here.
+    /// <paramref name="game"/> is ignored when the store-wide "search all games" sales setting is on.</summary>
     [HttpGet("sellable")]
     [RequirePermission(Permissions.SalesOrdersEdit)]
     public ActionResult<IReadOnlyList<SellableListingDto>> Sellable(
         [FromQuery] string? q, [FromQuery] string? game, [FromQuery] int take = 20)
     {
-        var gameFilter = LocationsController.ParseGame(game);
+        var gameFilter = settings.OrderSearchAllGames ? null : LocationsController.ParseGame(game);
         using var ctx = dbFactory.CreateDbContext();
         var query = ActiveListings(ctx).Where(x => gameFilter == null || x.Product.Game == gameFilter);
         foreach (var term in (q ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))

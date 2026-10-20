@@ -10,6 +10,11 @@ public interface ISalesSettingsService
     bool MovePickedToForSaleLocation { get; }
     void SetMovePickedToForSaleLocation(bool move);
 
+    /// <summary>Whether the order editor's add-card search ignores the game selector and offers listed
+    /// cards of every game (false, the default, follows the selector).</summary>
+    bool OrderSearchAllGames { get; }
+    void SetOrderSearchAllGames(bool allGames);
+
     CompanyProfile GetCompany();
     void SaveCompany(CompanyProfile company);
     ReceiptSettings GetReceipt();

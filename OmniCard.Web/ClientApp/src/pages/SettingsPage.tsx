@@ -590,14 +590,18 @@ function SalesCard() {
   const [pickOpen, setPickOpen] = useState(false);
 
   const save = useMutation({
-    mutationFn: (body: { forSaleLocationId: number | null; movePickedToForSaleLocation: boolean }) =>
-      api.settingsUpdate(body),
+    mutationFn: (body: {
+      forSaleLocationId: number | null;
+      movePickedToForSaleLocation: boolean;
+      orderSearchAllGames?: boolean;
+    }) => api.settingsUpdate(body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
   });
 
   const currentId = settings.data?.forSaleLocationId ?? null;
   const currentName = locations.data?.find((l) => l.id === currentId)?.name;
   const moveEnabled = settings.data?.movePickedToForSaleLocation ?? true;
+  const allGames = settings.data?.orderSearchAllGames ?? false;
 
   return (
     <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
@@ -649,6 +653,25 @@ function SalesCard() {
           />
           <Typography variant="caption" color="text.secondary">
             {moveEnabled ? t('settings.sales.moveOn') : t('settings.sales.moveOff')}
+          </Typography>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={allGames}
+                disabled={save.isPending}
+                onChange={(e) =>
+                  save.mutate({
+                    forSaleLocationId: currentId,
+                    movePickedToForSaleLocation: moveEnabled,
+                    orderSearchAllGames: e.target.checked,
+                  })
+                }
+              />
+            }
+            label={t('settings.sales.allGamesSwitch')}
+          />
+          <Typography variant="caption" color="text.secondary">
+            {allGames ? t('settings.sales.allGamesOn') : t('settings.sales.allGamesOff')}
           </Typography>
           {save.error && <Alert severity="error">{(save.error as Error).message}</Alert>}
         </Stack>
