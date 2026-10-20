@@ -1002,9 +1002,38 @@ public sealed record ImportListResultDto(
 // --- Catalog refresh ---
 
 /// <summary>One catalog-refresh job (running or recent). <see cref="State"/> is running|succeeded|failed;
-/// <see cref="Operation"/> is prices|bulk|hashes.</summary>
+/// <see cref="Operation"/> is prices|bulk|hashes|images. <see cref="Scheduled"/> marks jobs started by the
+/// automatic update schedule.</summary>
 public sealed record CatalogJobDto(
-    string Game, string Operation, string State, string Message, string StartedAt, string? FinishedAt);
+    string Game, string Operation, string State, string Message, string StartedAt, string? FinishedAt,
+    bool Scheduled = false);
+
+/// <summary>The automatic catalog update schedule. <see cref="Times"/> are "HH:mm" in the server's
+/// local time; <see cref="Days"/> are day names (Sunday…Saturday); <see cref="Games"/> are game ids.</summary>
+public sealed record CatalogScheduleDto
+{
+    public bool Enabled { get; init; }
+    public IReadOnlyList<string> Times { get; init; } = [];
+    public IReadOnlyList<string> Days { get; init; } = [];
+    public IReadOnlyList<string> Games { get; init; } = [];
+    public bool UpdateCards { get; init; } = true;
+    public bool UpdatePrices { get; init; } = true;
+}
+
+/// <summary>The schedule plus its status: the next run (ISO-8601 UTC; null when off), the last run's
+/// outcome, whether a run is in progress, the server's time zone (times are in it) and whether the
+/// caller may edit it (admins only).</summary>
+public sealed record CatalogScheduleResponse(
+    CatalogScheduleDto Schedule,
+    string? NextRunAt,
+    string? LastRunStartedAt,
+    string? LastRunFinishedAt,
+    int LastRunJobCount,
+    int LastRunFailedCount,
+    IReadOnlyList<string> LastRunFailures,
+    bool IsRunning,
+    string TimeZone,
+    bool CanEdit);
 
 public sealed record CatalogStatusDto(CatalogJobDto? Running, IReadOnlyList<CatalogJobDto> Recent);
 

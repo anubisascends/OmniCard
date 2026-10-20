@@ -180,132 +180,73 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, ICatalo
     private List<(ulong ScanHash, string CorrectCardId)>? _correctionsCache;
     private const int CorrectionTrustBonus = 5;
 
+    // === TCGCSV catalog ===
+    // The catalog and its prices come from TCGCSV (TCGplayer category 68), refreshed daily. Rows are
+    // found by TcgplayerId. Rows imported before TCGCSV became the source (poneglyph) are linked to their
+    // TCGplayer product once, from poneglyph's tcgplayer_url, so they update in place and owned copies
+    // keep their id. TCGCSV is English-only: non-English rows from earlier poneglyph downloads are kept
+    // as they are (their prices fall back to the English printing), and nothing is ever deleted.
+    private const int OnePieceCategoryId = 68;
+
     public async Task DownloadBulkDataAsync(IProgress<string>? progress = null, CancellationToken ct = default)
     {
-        _logger.LogInformation("Starting OPTCG card data download from poneglyph API");
+        _logger.LogInformation("Starting One Piece card data download from TCGCSV");
         var sw = Stopwatch.StartNew();
+        var client = CreateClient();
 
-        var client = _httpClientFactory.CreateClient();
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("OmniCard/1.0");
+        await EnsureTcgplayerLinksAsync(client, progress, ct);
 
-        var jsonOptions = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-            NumberHandling = JsonNumberHandling.AllowReadingFromString
-        };
+        progress?.Report("Fetching One Piece set list...");
+        var groups = await TcgCsvCatalogClient.FetchGroupsAsync(client, OnePieceCategoryId, ct);
+        var catalog = await TcgCsvCatalogClient.FetchProductsAsync(client, OnePieceCategoryId, groups, _logger,
+            (done, total) => progress?.Report($"Fetched {done}/{total} sets..."), ct);
+        progress?.Report("Fetching One Piece prices...");
+        var prices = MapTcgCsvPrices(await TcgCsvCatalogClient.FetchPriceRowsAsync(
+            client, OnePieceCategoryId, groups, _logger, null, ct));
 
-        progress?.Report("Fetching OPTCG set list...");
-        var languages = _catalogLanguages;
-        var allCards = await FetchAllVariantsAsync(client, jsonOptions,
-            (done, total, _) => progress?.Report($"Fetched {done}/{total} sets..."), ct, languages);
-
-        // Dedupe defensively on the variant uid (primary key).
-        var deduped = allCards
-            .GroupBy(c => c.CardSetId)
-            .Select(g => g.Last())
-            .ToList();
-        _logger.LogInformation("Fetched {Total} variant rows ({Unique} unique)", allCards.Count, deduped.Count);
-        progress?.Report($"Fetched {deduped.Count} cards, importing...");
+        var incoming = MapTcgCsvCatalog(catalog);
+        _logger.LogInformation("Fetched {Count} One Piece printings from TCGCSV", incoming.Count);
+        progress?.Report($"Fetched {incoming.Count} cards, importing...");
 
         await using var importContext = _dbContextFactory.CreateDbContext();
         importContext.Database.EnsureCreated();
 
-        var existingIds = (await importContext.Cards
-            .Select(c => c.CardSetId)
-            .ToListAsync(ct))
-            .ToHashSet();
+        var existingRows = await importContext.Cards.AsNoTracking()
+            .Select(c => new ExistingRow(c.CardSetId, c.Lang, c.TcgplayerId, c.CardNumber, c.VariantIndex, c.SetId, c.SetName))
+            .ToListAsync(ct);
+        var (updates, inserts) = PlanImport(incoming, existingRows);
+        foreach (var card in incoming)
+            if (prices.TryGetValue(card.TcgplayerId!.Value, out var price))
+                (card.MarketPrice, card.InventoryPrice) = price;
+
+        var updated = 0;
+        var gainedArt = 0;
+        foreach (var batch in updates.Chunk(500))
+        {
+            var ids = batch.Select(u => u.ExistingId).ToList();
+            var tracked = await importContext.Cards.Where(c => ids.Contains(c.CardSetId)).ToDictionaryAsync(c => c.CardSetId, ct);
+            foreach (var (existingId, card) in batch)
+                if (tracked.TryGetValue(existingId, out var existing))
+                {
+                    if (ApplyTcgCsvFields(existing, card)) gainedArt++;
+                    updated++;
+                }
+            await importContext.SaveChangesAsync(ct);
+            importContext.ChangeTracker.Clear();
+            progress?.Report($"Updated {updated} cards...");
+        }
 
         var inserted = 0;
-        var updated = 0;
-
-        foreach (var batch in deduped.Chunk(500))
+        foreach (var batch in inserts.Chunk(500))
         {
-            var newCards = new List<OptcgCard>();
-            var existingCardIds = new List<string>();
-
-            foreach (var card in batch)
-            {
-                if (existingIds.Contains(card.CardSetId))
-                    existingCardIds.Add(card.CardSetId);
-                else
-                    newCards.Add(card);
-            }
-
-            // Update all metadata (not just price) for existing rows, preserving
-            // computed ImageHash / LocalImagePath.
-            if (existingCardIds.Count > 0)
-            {
-                var tracked = await importContext.Cards
-                    .Where(c => existingCardIds.Contains(c.CardSetId))
-                    .ToDictionaryAsync(c => c.CardSetId, ct);
-
-                foreach (var card in batch)
-                {
-                    if (tracked.TryGetValue(card.CardSetId, out var existing))
-                    {
-                        existing.Lang = card.Lang;
-                        existing.CardNumber = card.CardNumber;
-                        existing.VariantIndex = card.VariantIndex;
-                        existing.VariantLabel = card.VariantLabel;
-                        existing.Artist = card.Artist;
-                        existing.CardName = card.CardName;
-                        existing.SetId = card.SetId;
-                        existing.SetName = card.SetName;
-                        existing.Rarity = card.Rarity;
-                        existing.CardColor = card.CardColor;
-                        existing.CardType = card.CardType;
-                        existing.CardCost = card.CardCost;
-                        existing.CardPower = card.CardPower;
-                        existing.Life = card.Life;
-                        existing.CardText = card.CardText;
-                        existing.SubTypes = card.SubTypes;
-                        existing.Attribute = card.Attribute;
-                        existing.CounterAmount = card.CounterAmount;
-                        existing.InventoryPrice = card.InventoryPrice;
-                        existing.MarketPrice = card.MarketPrice;
-                        existing.CardImageUri = card.CardImageUri;
-                        existing.DateScraped = card.DateScraped;
-                    }
-                }
-
-                await importContext.SaveChangesAsync(ct);
-                importContext.ChangeTracker.Clear();
-                updated += existingCardIds.Count;
-            }
-
-            if (newCards.Count > 0)
-            {
-                importContext.Cards.AddRange(newCards);
-                await importContext.SaveChangesAsync(ct);
-                importContext.ChangeTracker.Clear();
-
-                foreach (var card in newCards)
-                    existingIds.Add(card.CardSetId);
-
-                inserted += newCards.Count;
-            }
-
+            importContext.Cards.AddRange(batch);
+            await importContext.SaveChangesAsync(ct);
+            importContext.ChangeTracker.Clear();
+            inserted += batch.Length;
             progress?.Report($"Processed {inserted + updated} cards ({inserted} new, {updated} updated)...");
         }
 
-        // Languages un-ticked since the last download: drop their rows. Only non-English rows, and only
-        // when this download fetched something (a failed fetch must not wipe the catalog).
-        if (deduped.Count > 0)
-        {
-            var keep = deduped.Select(c => c.CardSetId).ToHashSet();
-            var stale = (await importContext.Cards.Where(c => c.Lang != CardLanguages.English)
-                    .Select(c => c.CardSetId).ToListAsync(ct))
-                .Where(id => !keep.Contains(id)).ToList();
-            foreach (var chunk in stale.Chunk(500))
-                await importContext.Cards.Where(c => chunk.Contains(c.CardSetId)).ExecuteDeleteAsync(ct);
-            if (stale.Count > 0)
-                _logger.LogInformation("Pruned {Count} OPTCG rows in languages no longer selected", stale.Count);
-        }
-
-        // Migration complete: stamp the version so future launches skip the wipe.
-        // Only stamp when we actually imported data, so a total per-set fetch
-        // failure leaves the DB unmigrated and eligible for re-download.
-        if (deduped.Count > 0)
+        if (incoming.Count > 0)
             importContext.MarkMigrationComplete();
 
         var oldContext = _readContext;
@@ -317,25 +258,309 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, ICatalo
         oldContext.Dispose();
 
         sw.Stop();
-        _logger.LogInformation("OPTCG download complete: {Inserted} new, {Updated} updated in {ElapsedSec:F1}s", inserted, updated, sw.Elapsed.TotalSeconds);
+        _logger.LogInformation("One Piece download complete: {Inserted} new, {Updated} updated in {ElapsedSec:F1}s", inserted, updated, sw.Elapsed.TotalSeconds);
         progress?.Report($"Download complete — {inserted} new, {updated} updated.");
 
-        if (inserted > 0)
+        if (inserted > 0 || gainedArt > 0)
         {
-            _logger.LogInformation("Auto-computing hashes for {Count} newly added cards", inserted);
+            _logger.LogInformation("Auto-computing hashes for {Count} new cards and {Art} cards with new art", inserted, gainedArt);
             await ComputeImageHashesAsync(forceAll: false, progress, ct);
         }
     }
 
-    // Fetches the full set list and, for each set, its card variants (mapped). Invokes
-    // onSetCompleted(done, total, setCode) after each set finishes. Shared by the full
-    // download and the price-only refresh.
+    public async Task UpdatePricesAsync(IProgress<PriceUpdateProgress>? progress = null, CancellationToken ct = default)
+    {
+        await using (var ctx = _dbContextFactory.CreateDbContext())
+        {
+            if (!await ctx.Cards.AnyAsync(ct))
+            {
+                _logger.LogInformation("Skipping One Piece price refresh: card database is empty (run a full data download first)");
+                return;
+            }
+        }
+
+        _logger.LogInformation("Starting One Piece price refresh via TCGCSV");
+        var client = CreateClient();
+        await EnsureTcgplayerLinksAsync(client,
+            progress is null ? null : new Progress<string>(m => progress.Report(new PriceUpdateProgress(CardGame.OnePiece, null, 0, 0, m))), ct);
+
+        var groups = await TcgCsvCatalogClient.FetchGroupsAsync(client, OnePieceCategoryId, ct);
+        var prices = MapTcgCsvPrices(await TcgCsvCatalogClient.FetchPriceRowsAsync(client, OnePieceCategoryId, groups, _logger,
+            (done, total) => progress?.Report(new PriceUpdateProgress(CardGame.OnePiece, null, done, total,
+                $"One Piece prices: {done}/{total} groups")), ct));
+
+        await using var context = _dbContextFactory.CreateDbContext();
+        var targets = (await context.Cards.Where(c => c.TcgplayerId != null)
+                .Select(c => new { c.CardSetId, c.TcgplayerId }).ToListAsync(ct))
+            .Where(c => prices.ContainsKey(c.TcgplayerId!.Value))
+            .ToList();
+
+        var updated = 0;
+        foreach (var batch in targets.Chunk(500))
+        {
+            var ids = batch.Select(c => c.CardSetId).ToList();
+            var tracked = await context.Cards.Where(c => ids.Contains(c.CardSetId)).ToListAsync(ct);
+            foreach (var card in tracked)
+            {
+                (card.MarketPrice, card.InventoryPrice) = prices[card.TcgplayerId!.Value];
+                updated++;
+            }
+            await context.SaveChangesAsync(ct);
+            context.ChangeTracker.Clear();
+        }
+
+        _logger.LogInformation("One Piece price refresh complete: {Updated} cards updated", updated);
+        progress?.Report(new PriceUpdateProgress(CardGame.OnePiece, null, 0, 0,
+            $"One Piece prices updated ({updated} cards)"));
+    }
+
+    private HttpClient CreateClient()
+    {
+        var client = _httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("OmniCard/1.0");
+        return client;
+    }
+
+    // One-time link for a catalog downloaded from poneglyph before TCGCSV became the source: poneglyph
+    // lists each variant's TCGplayer product URL, which carries the id TCGCSV keys everything by. Runs
+    // only while no row has a TcgplayerId yet; a failed fetch aborts the refresh (nothing changed) rather
+    // than letting the TCGCSV import add a second copy of every printing.
+    private async Task EnsureTcgplayerLinksAsync(HttpClient client, IProgress<string>? progress, CancellationToken ct)
+    {
+        await using (var ctx = _dbContextFactory.CreateDbContext())
+        {
+            if (!await ctx.Cards.AnyAsync(c => c.Lang == CardLanguages.English, ct)
+                || await ctx.Cards.AnyAsync(c => c.TcgplayerId != null, ct))
+                return;
+        }
+
+        _logger.LogInformation("Linking the existing One Piece catalog to TCGplayer products (one time)");
+        progress?.Report("Linking existing One Piece cards to TCGplayer (one time)...");
+        var jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            NumberHandling = JsonNumberHandling.AllowReadingFromString
+        };
+        List<OptcgCard> variants;
+        try
+        {
+            variants = await FetchAllVariantsAsync(client, jsonOptions,
+                (done, total, _) => progress?.Report($"Linking existing cards to TCGplayer: {done}/{total} sets..."), ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new InvalidOperationException(
+                "Couldn't link the existing One Piece catalog to TCGplayer (poneglyph is unavailable). Nothing was changed; try again later.", ex);
+        }
+
+        // A product listed against several variants links to the lowest-numbered one only.
+        var links = variants
+            .Where(v => v.TcgplayerId is not null)
+            .GroupBy(v => v.TcgplayerId!.Value)
+            .Select(g => g.OrderBy(v => v.VariantIndex).First())
+            .ToDictionary(v => v.CardSetId, v => v.TcgplayerId!.Value);
+        if (links.Count == 0)
+            throw new InvalidOperationException(
+                "Couldn't link the existing One Piece catalog to TCGplayer (poneglyph returned no TCGplayer links). Nothing was changed; try again later.");
+
+        await using var context = _dbContextFactory.CreateDbContext();
+        var linked = 0;
+        foreach (var batch in links.Keys.Chunk(500))
+        {
+            var tracked = await context.Cards.Where(c => batch.Contains(c.CardSetId)).ToListAsync(ct);
+            foreach (var card in tracked)
+            {
+                card.TcgplayerId = links[card.CardSetId];
+                linked++;
+            }
+            await context.SaveChangesAsync(ct);
+            context.ChangeTracker.Clear();
+        }
+        _logger.LogInformation("Linked {Linked} One Piece printings to TCGplayer products", linked);
+    }
+
+    internal sealed record ExistingRow(
+        string CardSetId, string Lang, int? TcgplayerId, string CardNumber, int VariantIndex, string SetId, string SetName);
+
+    // Splits the TCGCSV printings into updates of existing rows (by TcgplayerId) and new rows. A new
+    // printing of a number the catalog doesn't know yet takes the bare number as its id (its standard
+    // printing first); further variants get "{number}_t{productId}" and the next variant index. New rows
+    // reuse the catalog's existing name for their set, so a set keeps one name in the Sets view.
+    internal static (List<(string ExistingId, OptcgCard Card)> Updates, List<OptcgCard> Inserts) PlanImport(
+        IReadOnlyList<OptcgCard> incoming, IReadOnlyCollection<ExistingRow> existing)
+    {
+        var byTcgId = existing.Where(r => r.TcgplayerId is not null)
+            .GroupBy(r => r.TcgplayerId!.Value).ToDictionary(g => g.Key, g => g.First().CardSetId);
+        var usedIds = existing.Select(r => r.CardSetId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var maxIndex = existing.Where(r => r.Lang == CardLanguages.English && r.CardNumber.Length > 0)
+            .GroupBy(r => r.CardNumber, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Max(r => r.VariantIndex), StringComparer.OrdinalIgnoreCase);
+        var setNames = existing.Where(r => r.SetName.Length > 0)
+            .GroupBy(r => r.SetId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().SetName, StringComparer.OrdinalIgnoreCase);
+
+        var updates = new List<(string, OptcgCard)>();
+        var inserts = new List<OptcgCard>();
+        var ordered = incoming
+            .OrderBy(c => c.CardNumber, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(c => c.VariantLabel == StandardLabel ? 0 : 1)
+            .ThenBy(c => c.TcgplayerId);
+        foreach (var card in ordered)
+        {
+            if (byTcgId.TryGetValue(card.TcgplayerId!.Value, out var existingId))
+            {
+                updates.Add((existingId, card));
+                continue;
+            }
+
+            var known = maxIndex.TryGetValue(card.CardNumber, out var max);
+            card.VariantIndex = known ? max + 1 : 0;
+            maxIndex[card.CardNumber] = card.VariantIndex;
+            card.CardSetId = usedIds.Contains(card.CardNumber)
+                ? $"{card.CardNumber}_t{card.TcgplayerId}"
+                : card.CardNumber;
+            usedIds.Add(card.CardSetId);
+            if (setNames.TryGetValue(card.SetId, out var setName)) card.SetName = setName;
+            else setNames[card.SetId] = card.SetName;
+            inserts.Add(card);
+        }
+        return (updates, inserts);
+    }
+
+    // Refreshes an existing row from its TCGCSV printing: TcgplayerId and prices always. A row TCGCSV
+    // created (FromTcgCsv) also takes every catalog field TCGCSV has, so presale corrections land. A row
+    // from poneglyph keeps its own data — it is more accurate than TCGplayer's listing (printed rarity
+    // vs "PR", correct card types, cleaner rules text) — and only fills fields it lacks. Either way the id,
+    // number, set, variant index and stored art/hashes stay. Returns whether the row gained art (to hash).
+    internal static bool ApplyTcgCsvFields(OptcgCard existing, OptcgCard card)
+    {
+        existing.TcgplayerId = card.TcgplayerId;
+        if (card.MarketPrice is not null || card.InventoryPrice is not null)
+        {
+            existing.MarketPrice = card.MarketPrice;
+            existing.InventoryPrice = card.InventoryPrice;
+        }
+        existing.DateScraped = card.DateScraped;
+
+        static string? Pick(string? current, string? incoming, bool overwrite) =>
+            string.IsNullOrWhiteSpace(incoming) || (!overwrite && !string.IsNullOrWhiteSpace(current)) ? current : incoming;
+        var overwrite = existing.FromTcgCsv;
+        existing.CardName = Pick(existing.CardName, card.CardName, overwrite)!;
+        existing.VariantLabel = Pick(existing.VariantLabel, card.VariantLabel, overwrite);
+        existing.SetName = Pick(existing.SetName, card.SetName, false)!;
+        existing.Rarity = Pick(existing.Rarity, card.Rarity, overwrite)!;
+        existing.CardColor = Pick(existing.CardColor, card.CardColor, overwrite)!;
+        existing.CardType = Pick(existing.CardType, card.CardType, overwrite)!;
+        existing.CardCost = Pick(existing.CardCost, card.CardCost, overwrite);
+        existing.CardPower = Pick(existing.CardPower, card.CardPower, overwrite);
+        existing.Life = Pick(existing.Life, card.Life, overwrite);
+        existing.CardText = Pick(existing.CardText, card.CardText, overwrite);
+        existing.SubTypes = Pick(existing.SubTypes, card.SubTypes, overwrite);
+        existing.Attribute = Pick(existing.Attribute, card.Attribute, overwrite);
+        if (overwrite || existing.CounterAmount is null) existing.CounterAmount = card.CounterAmount ?? existing.CounterAmount;
+
+        if (existing.CardImageUri is not null || card.CardImageUri is null) return false;
+        existing.CardImageUri = card.CardImageUri;
+        return true;
+    }
+
+    private const string StandardLabel = "Standard";
+
+    // Every card product (sealed products and DON!! cards have no "Number"), one per TCGplayer product.
+    // A card's set name is its own set's group name ("OP01" → "Romance Dawn") even when the printing comes
+    // from another group (a release-event or reprint group).
+    internal static List<OptcgCard> MapTcgCsvCatalog(IReadOnlyList<(TcgCsvGroup Group, List<TcgCsvProduct> Products)> catalog)
+    {
+        var setNames = catalog
+            .Where(g => !string.IsNullOrWhiteSpace(g.Group.Abbreviation))
+            .GroupBy(g => g.Group.Abbreviation!.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Group.Name, StringComparer.OrdinalIgnoreCase);
+        var cards = new List<OptcgCard>();
+        var seen = new HashSet<int>();
+        foreach (var (group, products) in catalog)
+            foreach (var product in products)
+                if (seen.Add(product.ProductId) && MapTcgCsvProduct(product, group) is { } card)
+                {
+                    if (setNames.TryGetValue(card.SetId, out var setName)) card.SetName = setName;
+                    cards.Add(card);
+                }
+        return cards;
+    }
+
+    internal static OptcgCard? MapTcgCsvProduct(TcgCsvProduct p, TcgCsvGroup group)
+    {
+        string? Val(string name) => TcgCsvCatalogClient.Extended(p, name);
+
+        var number = Val("Number")?.ToUpperInvariant();
+        if (number is null) return null;
+        var dash = number.IndexOf('-');
+        var setId = dash > 0 ? number[..dash] : group.Abbreviation?.Trim().ToUpperInvariant() ?? "";
+
+        var rarity = Val("Rarity") ?? "";
+        return new OptcgCard
+        {
+            TcgplayerId = p.ProductId,
+            FromTcgCsv = true,
+            Lang = CardLanguages.English,
+            CardNumber = number,
+            VariantLabel = VariantLabelOf(p.Name, group.Name),
+            CardName = TcgCsvCatalogClient.CardName(p.Name),
+            SetId = setId,
+            SetName = group.Name,
+            // TCGplayer's promo rarity is "PR"; the catalog (and the printed card) uses "P".
+            Rarity = rarity.Equals("PR", StringComparison.OrdinalIgnoreCase) ? "P" : rarity,
+            CardColor = TcgCsvCatalogClient.JoinList(Val("Color")) ?? "",
+            CardType = Val("CardType") ?? "",
+            CardCost = Val("Cost"),
+            CardPower = Val("Power"),
+            Life = Val("Life"),
+            CardText = TcgCsvCatalogClient.StripHtml(Val("Description")),
+            SubTypes = TcgCsvCatalogClient.JoinList(Val("Subtypes")),
+            Attribute = TcgCsvCatalogClient.JoinList(Val("Attribute")),
+            CounterAmount = TcgCsvCatalogClient.LeadingInt(Val("Counterplus")),
+            CardImageUri = TcgCsvCatalogClient.ProductImage(p),
+            DateScraped = DateTime.UtcNow.ToString("o"),
+        };
+    }
+
+    // The variant label from TCGplayer's name qualifiers, in poneglyph's vocabulary where they differ:
+    // "Shanks (020) (Alternate Art)" → "Alternate Art", "(Manga)" → "Manga Art", "(Parallel)" →
+    // "Alternate Art". Number qualifiers ("(020)", "(EB04-007)") aren't variants. No qualifier → a
+    // release-event group's "Release Event", else "Standard".
+    internal static string VariantLabelOf(string productName, string groupName)
+    {
+        var qualifier = TcgCsvCatalogClient.Qualifiers(productName)
+            .LastOrDefault(q => !System.Text.RegularExpressions.Regex.IsMatch(q, @"^([A-Z]+\d*-)?\d+[A-Z]?$"));
+        return qualifier?.ToLowerInvariant() switch
+        {
+            null => groupName.Contains("Release Event", StringComparison.OrdinalIgnoreCase) ? "Release Event" : StandardLabel,
+            "alternate art" or "parallel" => "Alternate Art",
+            "manga" => "Manga Art",
+            _ => qualifier,
+        };
+    }
+
+    // productId → (market, low) from a product's price rows: its Normal row, else Foil, else the first.
+    internal static Dictionary<int, (decimal? Market, decimal? Low)> MapTcgCsvPrices(Dictionary<int, List<TcgCsvPrice>> rows)
+    {
+        var map = new Dictionary<int, (decimal?, decimal?)>(rows.Count);
+        foreach (var (productId, productRows) in rows)
+        {
+            var row = productRows.FirstOrDefault(r => string.Equals(r.SubTypeName, "Normal", StringComparison.OrdinalIgnoreCase))
+                ?? productRows.FirstOrDefault(r => string.Equals(r.SubTypeName, "Foil", StringComparison.OrdinalIgnoreCase))
+                ?? productRows[0];
+            map[productId] = (row.MarketPrice, row.LowPrice);
+        }
+        return map;
+    }
+
+    // Fetches poneglyph's set list and, for each set, its English card variants (mapped). Only used for
+    // the one-time TCGplayer link (see EnsureTcgplayerLinksAsync). Invokes onSetCompleted(done, total,
+    // setCode) after each set finishes.
     private async Task<List<OptcgCard>> FetchAllVariantsAsync(
         HttpClient client, JsonSerializerOptions jsonOptions,
-        Action<int, int, string>? onSetCompleted, CancellationToken ct,
-        IReadOnlyCollection<string>? languages = null)
+        Action<int, int, string>? onSetCompleted, CancellationToken ct)
     {
-        var extraLanguages = (languages ?? []).Where(l => l != CardLanguages.English).ToList();
         var setList = await client.GetFromJsonAsync<OptcgSetListResponse>(
             $"{ApiBaseUrl}/v1/sets", jsonOptions, ct)
             ?? throw new InvalidOperationException("Failed to fetch set list from poneglyph API.");
@@ -362,33 +587,9 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, ICatalo
                     return;
                 }
 
-                // The poneglyph per-card `set_name` is a placeholder ("One Piece 17");
-                // the real set name lives at the set level (detail.Data.Name /
-                // "The World's Strongest Warriors"). Prefer it, falling back to the
-                // set summary name and finally the per-card placeholder.
-                var setName = !string.IsNullOrWhiteSpace(detail.Data.Name) ? detail.Data.Name
-                    : !string.IsNullOrWhiteSpace(set.Name) ? set.Name
-                    : null;
-
                 var rows = detail.Data.Cards
-                    .SelectMany(card => card.Variants.Select(v => MapVariant(card, v, setName)))
+                    .SelectMany(card => card.Variants.Select(v => MapVariant(card, v, detail.Data.Name)))
                     .ToList();
-
-                // Other languages come from /v1/search (the set endpoint is English-only). Their rows
-                // borrow the English card's name + gameplay fields so search/filters stay uniform; only
-                // the art (and so the image hash) is the language's own.
-                var englishByNumber = detail.Data.Cards
-                    .GroupBy(c => c.CardNumber)
-                    .ToDictionary(g => g.Key, g => g.First());
-                foreach (var lang in extraLanguages)
-                {
-                    foreach (var card in await FetchSetInLanguageAsync(client, jsonOptions, set.Code, lang, token))
-                    {
-                        var english = englishByNumber.GetValueOrDefault(card.CardNumber);
-                        rows.AddRange(card.Variants.Select(v => MapVariant(english ?? card, v, setName, lang)));
-                    }
-                }
-
                 lock (cardsLock)
                     allCards.AddRange(rows);
             }
@@ -404,92 +605,6 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, ICatalo
         });
 
         return allCards;
-    }
-
-    // Every card of one set in `language`, paging /v1/search (100 per page).
-    private async Task<List<OptcgApiCard>> FetchSetInLanguageAsync(
-        HttpClient client, JsonSerializerOptions jsonOptions, string setCode, string language, CancellationToken ct)
-    {
-        var cards = new List<OptcgApiCard>();
-        for (var page = 1; page <= 50; page++)
-        {
-            try
-            {
-                var response = await client.GetFromJsonAsync<OptcgSearchResponse>(
-                    $"{ApiBaseUrl}/v1/search?set={Uri.EscapeDataString(setCode)}&lang={language}&limit=100&page={page}",
-                    jsonOptions, ct);
-                if (response is null) break;
-                cards.AddRange(response.Data.Where(c => string.Equals(c.Set, setCode, StringComparison.OrdinalIgnoreCase)));
-                if (!response.Pagination.HasMore || response.Data.Count == 0) break;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _logger.LogWarning(ex, "Failed to fetch OPTCG set {SetCode} in {Language} (page {Page}); skipping", setCode, language, page);
-                break;
-            }
-        }
-        return cards;
-    }
-
-    public async Task UpdatePricesAsync(IProgress<PriceUpdateProgress>? progress = null, CancellationToken ct = default)
-    {
-        await using (var ctx = _dbContextFactory.CreateDbContext())
-        {
-            if (!await ctx.Cards.AnyAsync(ct))
-            {
-                _logger.LogInformation("Skipping One Piece price refresh: card database is empty (run a full data download first)");
-                return;
-            }
-        }
-
-        _logger.LogInformation("Starting OPTCG price-only refresh");
-        var client = _httpClientFactory.CreateClient();
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("OmniCard/1.0");
-
-        var jsonOptions = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-            NumberHandling = JsonNumberHandling.AllowReadingFromString
-        };
-
-        var allCards = await FetchAllVariantsAsync(client, jsonOptions,
-            (done, total, setCode) => progress?.Report(
-                new PriceUpdateProgress(CardGame.OnePiece, setCode, done, total,
-                    $"One Piece prices: {done}/{total} sets")), ct);
-
-        var deduped = allCards
-            .GroupBy(c => c.CardSetId)
-            .Select(g => g.Last())
-            .ToList();
-
-        await using var context = _dbContextFactory.CreateDbContext();
-        context.Database.EnsureCreated();
-
-        var updated = 0;
-        foreach (var batch in deduped.Chunk(500))
-        {
-            var ids = batch.Select(c => c.CardSetId).ToList();
-            var tracked = await context.Cards
-                .Where(c => ids.Contains(c.CardSetId))
-                .ToDictionaryAsync(c => c.CardSetId, ct);
-
-            foreach (var card in batch)
-            {
-                if (tracked.TryGetValue(card.CardSetId, out var existing))
-                {
-                    existing.MarketPrice = card.MarketPrice;
-                    existing.InventoryPrice = card.InventoryPrice;
-                    updated++;
-                }
-            }
-
-            await context.SaveChangesAsync(ct);
-            context.ChangeTracker.Clear();
-        }
-
-        _logger.LogInformation("OPTCG price refresh complete: {Updated} cards updated", updated);
-        progress?.Report(new PriceUpdateProgress(CardGame.OnePiece, null, 0, 0,
-            $"One Piece prices updated ({updated} cards)"));
     }
 
     /// <param name="card">The card's metadata source — for a non-English variant, the English card of the
@@ -526,11 +641,20 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, ICatalo
             SubTypes = card.Types.Count > 0 ? string.Join("/", card.Types) : null,
             Attribute = card.Attribute is { Count: > 0 } ? string.Join("/", card.Attribute) : null,
             CounterAmount = card.Counter,
+            TcgplayerId = TcgplayerProductId(variant.Market.TcgplayerUrl),
             MarketPrice = ParsePrice(variant.Market.MarketPrice),
             InventoryPrice = ParsePrice(variant.Market.LowPrice),
             CardImageUri = imageUri,
             DateScraped = DateTime.UtcNow.ToString("o"),
         };
+    }
+
+    // "https://www.tcgplayer.com/product/454512/one-piece-…" → 454512.
+    internal static int? TcgplayerProductId(string? url)
+    {
+        if (url is null) return null;
+        var m = System.Text.RegularExpressions.Regex.Match(url, @"/product/(\d+)");
+        return m.Success && int.TryParse(m.Groups[1].Value, out var id) ? id : null;
     }
 
     private static decimal? ParsePrice(string? raw) =>

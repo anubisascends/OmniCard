@@ -166,7 +166,7 @@ A person gets the higher of their own level and their role's level. Administrato
 
 OmniCard recognizes and prices cards using a catalog for each game, stored on the server. This tab refreshes those catalogs. You need the Catalog Data view permission to see it, and the Refresh permission to run anything.
 
-![The Catalog Data tab with a download in progress](administration-catalog-data.png)
+![The Catalog Data tab with the job buttons, Languages to download, and the Automatic updates schedule](administration-catalog-data.png)
 
 ### Refresh a catalog
 
@@ -183,6 +183,29 @@ Only one job runs at a time, for all games. While a job is running, the buttons 
 > [!NOTE]
 > A job that finishes very quickly hasn't necessarily failed. If nothing has changed since the last run, there's little to do. Check the ✓ under **Recent**.
 
+Magic: The Gathering cards come from Scryfall. Every other game comes from TCGCSV, a copy of TCGplayer's data that's refreshed once a day.
+
+### Automatic updates
+
+Below the jobs, **Automatic updates** keeps the catalogs current without anyone clicking a button. Everyone who can see this tab can see the schedule and how the last run went, but only administrators can change it.
+
+1. Turn on **Update catalogs automatically**.
+2. Under **Run at**, pick a time and click **Add time**. Add more than one time if you like. Times are in the server's time zone, which is shown under the times.
+3. Under **On**, tick the days to run.
+4. Under **Games**, tick the games to update.
+5. Under **Update**, tick **Card data (new sets and cards)**, **Prices**, or both.
+6. Click **Save schedule**.
+
+At each time, OmniCard updates each ticked game in turn, card data first and then prices. These are the same jobs as **Download catalog** and **Update prices**, and they show under **Recent** marked "(scheduled)". If someone is already running a job, the update waits for it to finish. Below the buttons you can see when the next run is due and whether the last run's updates succeeded. Any update that failed is listed with its error.
+
+To run the update straight away, click **Run now**. It uses the saved games and choices, even if the schedule is turned off.
+
+> [!TIP]
+> Once a day is enough. TCGCSV only publishes new data once a day, so running more often won't find anything new.
+
+> [!NOTE]
+> The server has to be running at the scheduled time. If it was off, the missed update runs once when it starts again.
+
 ### Languages to download
 
 Under the buttons, **Languages to download** controls which non-English printings the chosen game's catalog includes. Downloading them lets scans of foreign cards match their own artwork.
@@ -191,7 +214,7 @@ Under the buttons, **Languages to download** controls which non-English printing
 - Tick or untick languages. Your choice saves straight away, but only takes effect the next time you click **Download catalog**. Unticked languages are removed from the catalog then.
 - For Magic: The Gathering, adding any non-English language switches to a much larger download (about 400 MB).
 - Non-English cards rarely have their own prices, so they're valued at the English printing's price. Japanese Pokémon cards are the exception: they have real prices.
-- Some games' sources only provide English cards. For those games you'll see a note instead of checkboxes. You can still record a foreign copy's language when you scan or edit it.
+- Some games' sources only provide English cards (every game except Magic: The Gathering and Pokémon). For those games you'll see a note instead of checkboxes. You can still record a foreign copy's language when you scan or edit it. Japanese and French One Piece cards downloaded before are kept.
 
 ## Scan Badges
 

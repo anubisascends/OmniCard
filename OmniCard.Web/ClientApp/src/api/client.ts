@@ -18,6 +18,8 @@ import type {
   ListExportFormat,
   ListExportScope,
   CatalogLanguagesDto,
+  CatalogScheduleDto,
+  CatalogScheduleResponse,
   CatalogStatusDto,
   FulfillListRequest,
   FulfillListResultDto,
@@ -968,6 +970,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ game, operation }),
     }),
+  catalogSchedule: () => request<CatalogScheduleResponse>('/api/catalog/schedule'),
+  /** Admin only. */
+  catalogSetSchedule: (schedule: CatalogScheduleDto) =>
+    request<CatalogScheduleResponse>('/api/catalog/schedule', {
+      method: 'PUT',
+      body: JSON.stringify(schedule),
+    }),
+  /** Admin only: run the saved schedule's games + updates now. */
+  catalogRunSchedule: () => request<void>('/api/catalog/schedule/run', { method: 'POST' }),
 
   // eBay
   ebayStatus: () => request<EbayStatusDto>('/api/ebay/status'),

@@ -22,6 +22,8 @@ Tag rules tag cards for you. Each rule is a search for one game, such as `t:crea
 
 If the search has a problem, such as a misspelled field or a field rules can't use, a red message explains it and **Save** stays greyed out.
 
+![The Edit tag rule dialog with the search r>=rare, the tag binder, and the cards you already own that match](tag-rules-edit-dialog.png)
+
 > [!TIP]
 > A misspelled field is an error in a rule, not a name search as it is in the search box. That stops a typo from tagging the wrong cards.
 
@@ -32,6 +34,8 @@ New rules only tag new cards. To tag the cards already in your collection:
 1. On the **Tag Rules** tab, click **Run now** (the play button) on the rule's row.
 2. Check the number of cards that will be tagged and the examples.
 3. Click **Run now**.
+
+![Run now for a rule, showing how many owned cards match and would get new tags](tag-rules-run-now.png)
 
 Cards that already have every tag are skipped, so it's safe to run a rule again. **Run now** works even when the rule is turned off, and it covers every site.
 
@@ -57,6 +61,8 @@ These imports apply your rules as the cards are added:
 Where the import shows a result message, it says how many new cards the rules tagged. Imports have no review step, so rule tags can't be removed before the cards are added. Remove them afterwards on the [Collection](help:collection) page if you need to.
 
 ## Edit, turn off or delete a rule
+
+![The Tag Rules tab listing two Magic rules with their searches, tags and Enabled switches](tag-rules-list.png)
 
 - Click the pencil on a rule's row to edit it.
 - Use the **Enabled** switch to turn a rule off or on.

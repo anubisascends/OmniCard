@@ -17,12 +17,12 @@ OmniCard supports these games:
 
 | Game | Notes |
 |---|---|
-| Magic: The Gathering | Also downloads non-English printings if an administrator turns them on |
-| One Piece TCG | English, Japanese and French printings available |
-| Pokémon | English, plus Japanese sets with their own prices |
-| Yu-Gi-Oh! | English catalog |
-| Final Fantasy TCG | English catalog |
-| Riftbound | English catalog |
+| Magic: The Gathering | Card data from Scryfall. Also downloads non-English printings if an administrator turns them on |
+| One Piece TCG | English catalog from TCGplayer |
+| Pokémon | English, plus Japanese sets with their own prices, from TCGplayer |
+| Yu-Gi-Oh! | English catalog from TCGplayer |
+| Final Fantasy TCG | English catalog from TCGplayer |
+| Riftbound | English catalog from TCGplayer |
 
 ## Sign in
 
@@ -77,6 +77,7 @@ The sidebar on the left lists the sections you have access to. You might not see
 | **Trades** | Build and record trades | [Trades](help:trades) |
 | **Import** | Bring in cards from CSV files and deck sites, or export them | [Importing](help:importing) |
 | **Sales** | Orders, customers and listings | [Sales](help:sales) |
+| **Ship** | Scan shipping labels to mark orders as shipped | [Shipping](help:shipping) |
 | **Administration** | Settings and, for administrators, user management | [Administration](help:administration) |
 | **Help** | This help center, at the bottom of the sidebar | |
 
@@ -128,7 +129,7 @@ Each card you own records:
 
 ### Prices
 
-Market prices come from each game's price source and are refreshed by an administrator. Some cards have no market price. See [Missing prices or images](help:troubleshooting).
+Market prices come from TCGplayer: through Scryfall for Magic: The Gathering, and through TCGCSV for every other game. An administrator refreshes them, either by hand or on a schedule. Some cards have no market price. See [Missing prices or images](help:troubleshooting).
 
 ### Permissions
 
@@ -155,7 +156,7 @@ OmniCard recognizes cards by comparing them with each game's card catalog. The c
 5. Optionally, click **Download artwork** so card images load from your own server.
 6. Repeat for each game you collect.
 
-Only one job runs at a time. A big catalog such as Magic: The Gathering can take a while. See [Administration](help:administration).
+Only one job runs at a time. A big catalog such as Magic: The Gathering can take a while. To keep catalogs and prices current from then on, turn on **Automatic updates** on the same tab. See [Administration](help:administration).
 
 ### Step 2: Add users (administrator)
 
@@ -194,7 +195,7 @@ Pick whichever way suits you:
 - [Scan batches](help:scan-batches): reviewing scans from a watched scanner folder
 - [Auditing a location](help:location-audit): rescan a binder or box to check it's accurate
 - [Collection](help:collection) and [Search syntax](help:search-syntax): finding and editing cards
-- [Sets](help:sets): set checklists and want lists
+- [Sets](help:sets): set checklists showing what you own and what you're missing
 - [Locations](help:locations), [Binders](help:binders) and [Deck boxes](help:deck-boxes): organizing your cards
 - [Lists](help:lists): decklists and want lists checked against what you own
 - [Importing](help:importing): CSV files and deck links

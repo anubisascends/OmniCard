@@ -12,7 +12,7 @@ What you can see and do in OmniCard depends on your role and permissions. If a s
 
 - Ask an administrator to change your role or give you the permission. See [Administration](help:administration).
 - Once they've saved the change, move to another page. Your sidebar and buttons update without signing out.
-- Some things are for administrators only, whatever their role: managing users, roles and sites, watched scan folders, and changing receipt and scan badge settings.
+- Some things are for administrators only, whatever their role: managing users, roles and sites, tag rules, watched scan folders, resetting the collection, changing the catalog update schedule, and changing receipt and scan badge settings.
 
 ![The message shown when you open a section you don't have access to](troubleshooting-no-access.png)
 
@@ -77,11 +77,12 @@ OmniCard couldn't recognize the card well enough to guess. Click **View scan** t
 
 ## Prices are missing or look wrong
 
-Market prices come from each game's price source, and an administrator refreshes them on the server.
+Market prices come from TCGplayer: through Scryfall for Magic: The Gathering, and through TCGCSV for every other game. They're refreshed on the server, by an administrator or by the automatic update schedule.
 
-- **Prices are out of date.** Ask an administrator to run **Update prices** for the game under **Administration ▸ Catalog Data**.
+- **Prices are out of date.** Ask an administrator to run **Update prices** for the game under **Administration ▸ Catalog Data**, or to turn on **Automatic updates** there so prices refresh every day.
 - **One card has no price.** Some printings, such as certain promos and older editions, simply don't have a price at the source. OmniCard can't fill those in. A card with no price shows *n/a* when you open it and counts as zero in totals.
 - **A foreign card shows the English price.** Non-English printings rarely have their own price, so they use the English printing's price. Japanese Pokémon cards have their own prices.
+- **A brand-new card has no price yet.** TCGplayer often lists a new set before it has sales to price it from. The price appears after a later update.
 - **Foil and non-foil prices differ.** Check that the card's **Foil** setting is right. Foil copies use the foil price.
 - **Sealed product** has its own market price on the Inventory page. See [Inventory](help:inventory).
 
@@ -206,6 +207,17 @@ See [Deck boxes](help:deck-boxes#link-a-deck-box-to-an-online-deck).
 *A catalog refresh is already running.* Only one catalog job runs at a time. Wait for it to finish. Its progress shows on the **Catalog Data** tab.
 
 **A job finished almost instantly.** That's usually fine. If little has changed since the last run, there's little to do. Look for the ✓ under **Recent**. A ✗ means it failed, and the message next to it says why.
+
+*Couldn't link the existing One Piece catalog to TCGplayer… Nothing was changed; try again later.* The first One Piece update after an upgrade matches the cards you already have to TCGplayer, using a site that was unavailable. Nothing was changed. Run the update again later.
+
+## Automatic updates didn't run
+
+Check **Automatic updates** on the **Catalog Data** tab:
+
+- **Automatic updates are off.** An administrator needs to turn on **Update catalogs automatically** and click **Save schedule**.
+- **The next run is later than you expected.** Times are in the server's time zone, shown under **Run at**, and only on the ticked days.
+- **The server was off at the scheduled time.** The missed update runs once when the server starts again. If OmniCard only seems to run while someone has it open, ask whoever runs the server to keep it always running.
+- **Some updates failed.** The last run lists each failed update with its error under **Failed updates**. An administrator can fix the cause and click **Run now**.
 
 See [Administration](help:administration).
 

@@ -30,14 +30,13 @@ public static class CardLanguages
 
     // The languages each game's catalog source can download (see ICatalogLanguageAware):
     //   MTG       — Scryfall all_cards, every printed language.
-    //   One Piece — api.poneglyph.one `lang=` (en/ja/fr; its zh has no data).
     //   Pokémon   — TCGCSV category 85 "Pokemon Japan" (separate sets, real TCGplayer prices).
-    // Riftbound / Yu-Gi-Oh! / FFTCG sources are English-only; owned copies can still be tagged with any
-    // printed language, and Yu-Gi-Oh! region codes are read from the scan (YugiohService).
+    // One Piece / Riftbound / Yu-Gi-Oh! / FFTCG sources (TCGCSV) are English-only; owned copies can still
+    // be tagged with any printed language, and Yu-Gi-Oh! region codes are read from the scan
+    // (YugiohService). One Piece keeps any Japanese/French rows downloaded earlier from poneglyph.
     private static readonly Dictionary<CardGame, string[]> Downloadable = new()
     {
         [CardGame.Mtg] = ["en", "ja", "de", "fr", "it", "es", "pt", "ko", "ru", "zhs", "zht", "ph"],
-        [CardGame.OnePiece] = ["en", "ja", "fr"],
         [CardGame.Pokemon] = ["en", "ja"],
     };
 

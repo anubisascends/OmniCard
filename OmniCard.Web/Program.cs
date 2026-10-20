@@ -211,7 +211,7 @@ builder.Services.AddSingleton(sp => new OmniCard.Web.Services.ScanValidation.Sca
     sp.GetRequiredService<TimeProvider>()));
 
 // Watched-folder scan batches: images dropped in a per-game folder are picked up, matched in the
-// background (the app's only BackgroundService) and reviewed/committed from the Scan page.
+// background (ScanBatchHostedService) and reviewed/committed from the Scan page.
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<OmniCard.Web.Services.ScanBatches.ScanBatchStorage>();
 builder.Services.AddSingleton(sp => new OmniCard.Web.Services.ScanBatches.ScanFolderIngestor(
@@ -234,6 +234,12 @@ builder.Services.AddSingleton(sp => new OmniCard.Web.Services.ScanBatches.ScanBa
     sp.GetRequiredService<TimeProvider>(),
     sp.GetRequiredService<ILogger<OmniCard.Web.Services.ScanBatches.ScanBatchService>>()));
 builder.Services.AddHostedService<OmniCard.Web.Services.ScanBatches.ScanBatchHostedService>();
+// Automatic catalog updates (Settings ▸ Catalog data, admin-only schedule): refreshes card data +
+// prices through CatalogRefreshService at the configured times. Resolvable directly for "Run now".
+builder.Services.AddSingleton<ICatalogScheduleSettingsService>(sp =>
+    new CatalogScheduleSettingsService(sp.GetRequiredService<IDataPathService>(), sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddSingleton<CatalogScheduleHostedService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<CatalogScheduleHostedService>());
 builder.Services.AddScoped<BinderStateBuilder>();
 
 // User accounts + authentication. Passwords are stored only as salted PBKDF2 hashes; the built-in

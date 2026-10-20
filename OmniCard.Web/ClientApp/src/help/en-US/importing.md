@@ -77,7 +77,7 @@ The result message shows:
 - Cards that couldn't be found at all. Add these by hand.
 - Whether a deck box was linked to the deck. Importing into a deck box with no deck link links it, so you can keep it up to date later with **Sync from URL**. See [Deck boxes](help:deck-boxes#link-a-deck-box-to-an-online-deck).
 
-![A finished deck URL import showing substituted and unmatched cards](importing-url-result.png)
+![A finished deck URL import with its result message](importing-url-result.png)
 
 > [!TIP]
 > If you want to track a deck without adding the cards to your collection, use [Lists](help:lists) instead. Lists show what you own and what you need to buy.

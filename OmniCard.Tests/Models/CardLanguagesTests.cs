@@ -39,7 +39,8 @@ public class CardLanguagesTests
     [Fact]
     public void SanitizeCatalogSelection_AlwaysEnglish_OnlyDownloadable_InCanonicalOrder()
     {
-        Assert.Equal(["en", "ja", "fr"], CardLanguages.SanitizeCatalogSelection(CardGame.OnePiece, ["fr", "JP", "de", "fr"]));
+        Assert.Equal(["en", "ja", "fr"], CardLanguages.SanitizeCatalogSelection(CardGame.Mtg, ["fr", "JP", "xx", "fr"]));
+        Assert.Equal(["en"], CardLanguages.SanitizeCatalogSelection(CardGame.OnePiece, ["ja", "fr"])); // TCGCSV is English-only
         Assert.Equal(["en"], CardLanguages.SanitizeCatalogSelection(CardGame.YuGiOh, ["ja", "de"]));
         Assert.Equal(["en"], CardLanguages.SanitizeCatalogSelection(CardGame.Pokemon, null));
     }

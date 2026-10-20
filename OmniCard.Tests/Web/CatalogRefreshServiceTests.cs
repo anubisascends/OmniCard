@@ -72,6 +72,38 @@ public class CatalogRefreshServiceTests
     }
 
     [Fact]
+    public async Task RunAndWait_QueuesBehindRunningJob_ThenRunsAsScheduled()
+    {
+        var stub = new GatedGameService(CardGame.Mtg);
+        var svc = new CatalogRefreshService([stub], ImageCache(), NullLogger<CatalogRefreshService>.Instance);
+
+        Assert.True(svc.TryStart(CardGame.Mtg, "prices", out _));
+        var queued = svc.RunAndWaitAsync(CardGame.Mtg, "bulk", scheduled: true, CancellationToken.None);
+        await Task.Delay(50);
+        Assert.False(queued.IsCompleted);
+        Assert.Equal("prices", svc.Status().Running!.Operation);
+
+        stub.Release();
+        var job = await queued.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal("succeeded", job.State);
+        Assert.Equal("bulk", job.Operation);
+        Assert.True(job.Scheduled);
+
+        var recent = svc.Status().Recent;
+        Assert.Equal(["bulk", "prices"], recent.Select(j => j.Operation).ToList());
+        Assert.False(recent[1].Scheduled);
+        // The finished job keeps its last progress line rather than a bare "Completed".
+        Assert.Equal("working", recent[1].Message);
+    }
+
+    [Fact]
+    public async Task RunAndWait_UnknownOperation_Throws()
+    {
+        var svc = new CatalogRefreshService([new GatedGameService(CardGame.Mtg)], ImageCache(), NullLogger<CatalogRefreshService>.Instance);
+        await Assert.ThrowsAsync<ArgumentException>(() => svc.RunAndWaitAsync(CardGame.Pokemon, "prices", true, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Job_Failure_IsRecorded()
     {
         var stub = new GatedGameService(CardGame.Mtg) { Throw = true };
