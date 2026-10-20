@@ -101,6 +101,7 @@ These options are on the **Administration** page, **Sales** tab:
 
 - **For-sale location**: the location picked cards move to. Click **Change** to pick one, or **Clear** to remove it.
 - **Move picked cards to the for-sale location**: when on, marking a listing picked moves the card to the for-sale location. When off, picking only changes the status and the card stays where it is.
+- **Order card search covers all games**: when on, the add-card search in an order finds listed cards of every game, whatever the game selector is set to. This applies to everyone who edits orders. When off, the search only finds cards of the selected game.
 
 ![The Sales tab on the Administration page](sales-settings-for-sale-location.png)
 
@@ -135,7 +136,7 @@ Each lane's dot and the colored stripe on its order cards help you scan the boar
 
 ### Add cards to an order
 
-1. In the order's details panel, type at least two letters in **Add a card (search cards listed for sale)**. You can search by card name, set code or set name, and add a collector number. For example, `sol ring c21`. Only cards listed for sale show up. The rest of your collection doesn't. Results follow the game selector at the top of the app.
+1. In the order's details panel, type at least two letters in **Add a card (search cards listed for sale)**. You can search by card name, set code or set name, and add a collector number. For example, `sol ring c21`. Only cards listed for sale show up. The rest of your collection doesn't. Results follow the game selector at the top of the app, unless an administrator turned on **Order card search covers all games** (see [Set up the for-sale location](help:sales#set-up-the-for-sale-location)).
 2. Each result shows the card's name, set, collector number and condition, plus a price box that starts at the listed price. Change the price if needed. When a listing has more than one copy, the result shows how many are still available.
 3. Click **+** to add the card. Each click adds one copy.
 

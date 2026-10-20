@@ -706,12 +706,14 @@ public sealed record LotIdsRequest
 }
 
 /// <summary>App/sales settings surfaced to the SPA.</summary>
-public sealed record SalesSettingsDto(int? ForSaleLocationId, bool MovePickedToForSaleLocation);
+public sealed record SalesSettingsDto(int? ForSaleLocationId, bool MovePickedToForSaleLocation, bool OrderSearchAllGames);
 
 public sealed record UpdateSalesSettingsRequest
 {
     public int? ForSaleLocationId { get; init; }
     public bool MovePickedToForSaleLocation { get; init; } = true;
+    /// <summary>Null leaves the stored value unchanged.</summary>
+    public bool? OrderSearchAllGames { get; init; }
 }
 
 /// <summary>Value-tier badge configuration for the scan page: the ISO currency code the thresholds are

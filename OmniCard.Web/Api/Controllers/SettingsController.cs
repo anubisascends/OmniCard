@@ -27,7 +27,7 @@ public sealed class SettingsController(
     [HttpGet]
     [RequirePermission(Permissions.SettingsView)]
     public ActionResult<SalesSettingsDto> Get() =>
-        new SalesSettingsDto(settings.ForSaleLocationId, settings.MovePickedToForSaleLocation);
+        new SalesSettingsDto(settings.ForSaleLocationId, settings.MovePickedToForSaleLocation, settings.OrderSearchAllGames);
 
     [HttpPut]
     [RequirePermission(Permissions.SettingsEdit)]
@@ -35,6 +35,8 @@ public sealed class SettingsController(
     {
         settings.SetForSaleLocationId(req.ForSaleLocationId);
         settings.SetMovePickedToForSaleLocation(req.MovePickedToForSaleLocation);
+        if (req.OrderSearchAllGames is { } allGames)
+            settings.SetOrderSearchAllGames(allGames);
         return NoContent();
     }
 

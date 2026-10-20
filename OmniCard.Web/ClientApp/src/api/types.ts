@@ -508,6 +508,8 @@ export interface ListingDetailDto {
 export interface SalesSettingsDto {
   forSaleLocationId?: number | null;
   movePickedToForSaleLocation: boolean;
+  /** Order add-card search covers every game instead of following the game selector. */
+  orderSearchAllGames: boolean;
 }
 
 /** Value-tier badge config for the scan page. `thresholds` is an ascending list of price ceilings

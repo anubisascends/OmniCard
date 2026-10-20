@@ -716,7 +716,11 @@ export const api = {
     request<EbayListingResultDto>('/api/listings/ebay/revise', { method: 'POST', body: JSON.stringify(body) }),
   pickListPdfUrl: (game?: string) => `/api/listings/picklist.pdf${qs({ game })}`,
   settings: () => request<SalesSettingsDto>('/api/settings'),
-  settingsUpdate: (body: { forSaleLocationId: number | null; movePickedToForSaleLocation: boolean }) =>
+  settingsUpdate: (body: {
+    forSaleLocationId: number | null;
+    movePickedToForSaleLocation: boolean;
+    orderSearchAllGames?: boolean;
+  }) =>
     request<void>('/api/settings', { method: 'PUT', body: JSON.stringify(body) }),
   scanBadgeSettings: () => request<ScanBadgeSettingsDto>('/api/settings/scan-badges'),
   scanBadgeSettingsUpdate: (body: ScanBadgeSettingsDto) =>

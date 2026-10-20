@@ -8,6 +8,10 @@ public class SalesSettings
     /// <see cref="ForSaleLocationId"/>. When false, picking only flips the listing's status and
     /// leaves the card in its current location. Defaults to true (the historical behavior).</summary>
     public bool MovePickedToForSaleLocation { get; set; } = true;
+
+    /// <summary>Whether the order editor's add-card search covers listings of every game instead of
+    /// following the app's game selector. Store-wide (applies to everyone who edits orders).</summary>
+    public bool OrderSearchAllGames { get; set; }
     public CompanyProfile Company { get; set; } = new();
     public ReceiptSettings Receipt { get; set; } = new();
 

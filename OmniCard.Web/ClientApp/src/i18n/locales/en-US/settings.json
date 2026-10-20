@@ -167,7 +167,10 @@
       "none": "— none —",
       "moveSwitch": "Move picked cards to the for-sale location",
       "moveOn": "Marking a listing as picked physically relocates the card to the for-sale location above.",
-      "moveOff": "Marking a listing as picked only changes its status — the card stays in its current location."
+      "moveOff": "Marking a listing as picked only changes its status — the card stays in its current location.",
+      "allGamesSwitch": "Order card search covers all games",
+      "allGamesOn": "Adding a card to an order searches listed cards of every game, whatever the game selector is set to. Applies to everyone who edits orders.",
+      "allGamesOff": "Adding a card to an order only searches listed cards of the game picked in the game selector."
     },
     "appearance": {
       "title": "Appearance",
