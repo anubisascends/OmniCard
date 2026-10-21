@@ -202,6 +202,7 @@ A selected stacked row counts every entry in the stack. Your selection stays whe
 | **Bulk edit** | Changes properties on all selected cards. |
 | **List for sale** | Lists all selected cards for sale at their market price. |
 | **Export CSV** | Downloads the selected cards as a file. |
+| **Print labels** | Prints labels for the selected cards from a label template. See [Labels](help:labels). Needs the Print labels permission. |
 | **Delete** | Deletes the selected cards after you confirm. This can't be undone. |
 
 ### Bulk edit

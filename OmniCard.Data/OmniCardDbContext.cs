@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Shared.Ebay;
 using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Labels;
 using OmniCard.Shared.Lists;
 using OmniCard.Shared.Matching;
 using OmniCard.Shared.Sales;
@@ -48,6 +49,7 @@ public class OmniCardDbContext : DbContext
     public DbSet<SavedViewDefault> SavedViewDefaults => Set<SavedViewDefault>();
     public DbSet<TagRule> TagRules => Set<TagRule>();
     public DbSet<ScanValidationRule> ScanValidationRules => Set<ScanValidationRule>();
+    public DbSet<LabelTemplate> LabelTemplates => Set<LabelTemplate>();
 
     public OmniCardDbContext(DbContextOptions<OmniCardDbContext> options) : base(options) { }
 
@@ -454,6 +456,18 @@ public class OmniCardDbContext : DbContext
             e.Property(r => r.Name).IsRequired().HasMaxLength(ScanValidationRule.MaxNameLength);
             e.Property(r => r.Query).IsRequired().HasMaxLength(ScanValidationRule.MaxQueryLength);
             e.HasIndex(r => new { r.Game, r.Name }).IsUnique();
+        });
+
+        // User-designed label templates (sheet layout + one label's pdfme design JSON), unique by name.
+        modelBuilder.Entity<LabelTemplate>(e =>
+        {
+            e.HasKey(t => t.Id);
+            e.Property(t => t.Id).ValueGeneratedOnAdd();
+            e.Property(t => t.Name).IsRequired().HasMaxLength(LabelTemplate.MaxNameLength);
+            e.Property(t => t.Design).IsRequired();
+            e.Ignore(t => t.LabelWidthMm);
+            e.Ignore(t => t.LabelHeightMm);
+            e.HasIndex(t => t.Name).IsUnique();
         });
 
         // Optimistic-concurrency tokens for the networked (multi-user) web deployment, which runs on

@@ -71,6 +71,8 @@ public sealed record CardDto
     /// market. For a stacked row it's only set when every underlying lot is listed, so partially-listed
     /// stacks stay listable. The client uses it to disable "List for sale" on cards already on the market.</summary>
     public string? ListingStatus { get; init; }
+    /// <summary>TCGplayer product (or search) link — only filled for the single-card read.</summary>
+    public string? TcgPlayerUrl { get; init; }
 }
 
 /// <summary>A storage location tile for the collection/overview screens.</summary>
@@ -1829,3 +1831,80 @@ public sealed record CollectionResetRequest
 {
     public string Confirmation { get; init; } = "";
 }
+
+// ---- Labels (user-designed label sheets for card holders) ----
+
+/// <summary>A label template: the sheet layout (page size, margins, grid, spacing — millimetres) and the
+/// pdfme design JSON of one label. <see cref="LabelWidthMm"/>/<see cref="LabelHeightMm"/> are derived.</summary>
+public sealed record LabelTemplateDto(
+    int Id,
+    string Name,
+    double PageWidthMm,
+    double PageHeightMm,
+    double MarginTopMm,
+    double MarginRightMm,
+    double MarginBottomMm,
+    double MarginLeftMm,
+    int Columns,
+    int Rows,
+    double ColumnGapMm,
+    double RowGapMm,
+    double LabelWidthMm,
+    double LabelHeightMm,
+    string Design,
+    DateTime UpdatedAt);
+
+/// <summary>Create or update a label template.</summary>
+public sealed record LabelTemplateInput
+{
+    public string Name { get; init; } = "";
+    public double PageWidthMm { get; init; }
+    public double PageHeightMm { get; init; }
+    public double MarginTopMm { get; init; }
+    public double MarginRightMm { get; init; }
+    public double MarginBottomMm { get; init; }
+    public double MarginLeftMm { get; init; }
+    public int Columns { get; init; } = 1;
+    public int Rows { get; init; } = 1;
+    public double ColumnGapMm { get; init; }
+    public double RowGapMm { get; init; }
+    public string Design { get; init; } = "";
+}
+
+/// <summary>The cards to print labels for: the given <see cref="LotIds"/> (in that order), or — when none
+/// are given — every card in <see cref="ContainerId"/>, narrowed by <see cref="Game"/> and the search
+/// <see cref="Q"/> like the Location page.</summary>
+public sealed record LabelDataRequest
+{
+    public IReadOnlyList<int>? LotIds { get; init; }
+    public int? ContainerId { get; init; }
+    public string? Game { get; init; }
+    public string? Q { get; init; }
+}
+
+/// <summary>The printable facts of one owned card (lot) — the values a label's fields are filled from.
+/// <see cref="Quantity"/> lets the client print one label per copy.</summary>
+public sealed record LabelCardDto
+{
+    public int Id { get; init; }
+    public string Game { get; init; } = "";
+    public string GameName { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string SetCode { get; init; } = "";
+    public string SetName { get; init; } = "";
+    public string CollectorNumber { get; init; } = "";
+    public string Rarity { get; init; } = "";
+    public string Condition { get; init; } = "";
+    public string Language { get; init; } = "en";
+    /// <summary>Finish name ("Foil", "Etched", …), empty for a non-foil copy.</summary>
+    public string Finish { get; init; } = "";
+    public int Quantity { get; init; } = 1;
+    public decimal MarketPrice { get; init; }
+    public string TcgPlayerUrl { get; init; } = "";
+    /// <summary>The TCGplayer product id when known (deep link), else null.</summary>
+    public int? TcgPlayerId { get; init; }
+    public string? Location { get; init; }
+}
+
+/// <summary>Label data for a print run. <see cref="Truncated"/> is set when the request hit the cap.</summary>
+public sealed record LabelDataDto(IReadOnlyList<LabelCardDto> Cards, bool Truncated);

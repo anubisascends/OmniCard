@@ -44,6 +44,7 @@ import type { ComponentDto, EbaySellingSettingsDto, RoleDto, UserDto } from '../
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import { DeckTypesCard } from '../components/settings/DeckTypesCard';
 import { TagRulesCard } from '../components/settings/TagRulesCard';
+import { LabelTemplatesCard } from '../components/settings/LabelTemplatesCard';
 import { RolesCard } from '../components/settings/RolesCard';
 import { SitesCard } from '../components/settings/SitesCard';
 import { ResetCollectionCard } from '../components/settings/ResetCollectionCard';
@@ -1782,6 +1783,12 @@ const TABS: {
     show: (g) => g.can('settings.view'),
   },
   { key: 'tag-rules', labelKey: 'settings.tabs.tagRules', render: () => <TagRulesCard />, show: (g) => g.isAdmin },
+  {
+    key: 'labels',
+    labelKey: 'settings.tabs.labels',
+    render: () => <LabelTemplatesCard />,
+    show: (g) => g.can('labels.edit') || g.can('labels.print'),
+  },
   { key: 'deck-types', labelKey: 'settings.tabs.deckTypes', render: () => <DeckTypesCard />, show: (g) => g.can('decktypes.view') },
   { key: 'appearance', labelKey: 'settings.tabs.appearance', render: () => <AppearanceCard />, show: () => true },
   {

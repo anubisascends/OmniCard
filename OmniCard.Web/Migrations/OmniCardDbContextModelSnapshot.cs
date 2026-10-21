@@ -292,6 +292,67 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("Products");
                 });
 
+            modelBuilder.Entity("OmniCard.Shared.Labels.LabelTemplate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<double>("ColumnGapMm")
+                        .HasColumnType("float");
+
+                    b.Property<int>("Columns")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Design")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<double>("MarginBottomMm")
+                        .HasColumnType("float");
+
+                    b.Property<double>("MarginLeftMm")
+                        .HasColumnType("float");
+
+                    b.Property<double>("MarginRightMm")
+                        .HasColumnType("float");
+
+                    b.Property<double>("MarginTopMm")
+                        .HasColumnType("float");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<double>("PageHeightMm")
+                        .HasColumnType("float");
+
+                    b.Property<double>("PageWidthMm")
+                        .HasColumnType("float");
+
+                    b.Property<double>("RowGapMm")
+                        .HasColumnType("float");
+
+                    b.Property<int>("Rows")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("LabelTemplates");
+                });
+
             modelBuilder.Entity("OmniCard.Shared.Lists.CardList", b =>
                 {
                     b.Property<int>("Id")

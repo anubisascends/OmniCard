@@ -88,6 +88,10 @@ import type {
   ScanTagRuleResultDto,
   ScanValidationResultDto,
   ScanValidationRuleDto,
+  LabelTemplateDto,
+  LabelTemplateInput,
+  LabelDataRequest,
+  LabelDataDto,
   SearchSchemaDto,
   TagRuleDto,
   TagRuleInput,
@@ -1061,6 +1065,16 @@ export const api = {
     }),
   scanValidationRuleDelete: (id: number) =>
     request<void>(`/api/scan/validation-rules/${id}`, { method: 'DELETE' }),
+  // ---- Labels ----
+  labelTemplates: () => request<LabelTemplateDto[]>('/api/labels/templates'),
+  labelTemplateCreate: (input: LabelTemplateInput) =>
+    request<LabelTemplateDto>('/api/labels/templates', { method: 'POST', body: JSON.stringify(input) }),
+  labelTemplateUpdate: (id: number, input: LabelTemplateInput) =>
+    request<LabelTemplateDto>(`/api/labels/templates/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+  labelTemplateDelete: (id: number) => request<void>(`/api/labels/templates/${id}`, { method: 'DELETE' }),
+  /** The label values for the selected cards, or every card in a location. */
+  labelData: (req: LabelDataRequest) =>
+    request<LabelDataDto>('/api/labels/data', { method: 'POST', body: JSON.stringify(req) }),
   // Export staged scans WITHOUT adding them to the collection. One format ⇒ that file; several ⇒ a
   // zip with one file per format. `fileName` is the base name (no extension).
   scanExport: (formats: string[], items: ScanCommitItem[], fileName: string) =>

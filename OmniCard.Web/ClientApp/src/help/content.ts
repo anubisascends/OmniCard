@@ -21,7 +21,7 @@ export const HELP_GROUPS: { key: string; topics: string[] }[] = [
   { key: 'start', topics: ['getting-started', 'dashboard'] },
   { key: 'scanning', topics: ['scanning', 'scan-batches', 'location-audit'] },
   { key: 'collection', topics: ['collection', 'saved-views', 'search-syntax', 'tag-rules', 'sets'] },
-  { key: 'organizing', topics: ['locations', 'binders', 'deck-boxes'] },
+  { key: 'organizing', topics: ['locations', 'binders', 'deck-boxes', 'labels'] },
   { key: 'lists', topics: ['lists', 'importing', 'trades'] },
   { key: 'selling', topics: ['inventory', 'sales', 'shipping', 'ebay'] },
   { key: 'admin', topics: ['account', 'administration', 'troubleshooting'] },

@@ -209,6 +209,16 @@ builder.Services.AddSingleton(sp => new OmniCard.Web.Services.ScanValidation.Sca
     writableFactory,
     sp.GetRequiredService<IEnumerable<ICardGameService>>(),
     sp.GetRequiredService<TimeProvider>()));
+// Card labels (Settings ▸ Labels): shared, user-designed label templates + the card data a print run
+// fills them with. The PDF is rendered in the browser (pdfme).
+builder.Services.AddSingleton(sp => new OmniCard.Web.Services.Labels.LabelTemplateService(
+    writableFactory,
+    sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddSingleton(sp => new OmniCard.Web.Services.Labels.LabelDataService(
+    writableFactory,
+    sp.GetRequiredService<IEnumerable<ICardGameService>>(),
+    sp.GetRequiredService<ICardService>(),
+    sp.GetService<IDbContextFactory<ScryfallDbContext>>()));
 
 // Watched-folder scan batches: images dropped in a per-game folder are picked up, matched in the
 // background (ScanBatchHostedService) and reviewed/committed from the Scan page.
