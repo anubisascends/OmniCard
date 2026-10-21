@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using OmniCard.Api.Contracts;
 using OmniCard.Collection;
 using OmniCard.Data;
+using OmniCard.Data.Catalogs;
 using OmniCard.Web.Services;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
@@ -34,7 +35,8 @@ public sealed class CollectionController(
     CardImageCacheService imageCache,
     IListingService listings,
     IEnumerable<ICardGameService> gameServices,
-    RequestSiteAccess siteAccess) : ApiControllerBase
+    RequestSiteAccess siteAccess,
+    IDbContextFactory<ScryfallDbContext>? scryfallFactory = null) : ApiControllerBase
 {
     private readonly IReadOnlyDictionary<CardGame, ICardGameService> _gameServices = gameServices.ToDictionary(s => s.Game);
 
@@ -388,9 +390,15 @@ public sealed class CollectionController(
         AnnotateListingStatus([card]);
         card.Tags = tags.GetTagsForLot(id);
         // CollectionCardMapper doesn't carry Quantity; read it straight from the lot for the editor.
+        // …nor the location, whose name the card page shows.
         using (var ctx = dbFactory.CreateDbContext())
+        {
             card.Quantity = ctx.Lots.Where(l => l.Id == id).Select(l => l.Quantity).FirstOrDefault();
-        return DtoMapping.ToDto(card);
+            if (card.ContainerId is int containerId)
+                card.Container = ctx.StorageContainers.AsNoTracking().FirstOrDefault(c => c.Id == containerId);
+        }
+        var tcgUrl = TcgPlayerLink.ForCards([card], scryfallFactory)[card.Id].Url;
+        return DtoMapping.ToDto(card) with { TcgPlayerUrl = tcgUrl };
     }
 
     /// <summary>Edit a card's condition / language / foil / quantity / cost.</summary>

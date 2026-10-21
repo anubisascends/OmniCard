@@ -574,6 +574,33 @@ behavior is Shipped. The order drawer's **Scan label** button fills **Tracking**
   Over plain HTTP the page says so and falls back to typed / handheld-scanner entry. Barcodes are decoded
   in the browser with ZXing (`@zxing/browser`); nothing is uploaded.
 
+## Card labels
+
+**Administration ▸ Labels** holds shared, user-designed **label templates** for card-holder labels; the app
+defines no layout of its own. A template (`LabelTemplate` in `OmniCardDbContext`, migration
+`AddLabelTemplates`) is the sheet the user typed in — page size, margins, columns × rows and the spacing
+between them, all in millimetres (the editor shows inches or mm) — plus the design of one label. The label
+size is derived from the sheet (`LabelTemplate.LabelWidth/LabelHeight`).
+
+- **Designer and PDFs are client-side, built on [pdfme](https://pdfme.com) (MIT).** The design is a pdfme
+  template JSON for one blank label page; the SPA's Label Designer embeds pdfme's WYSIWYG designer, and a
+  print run renders one pdfme page per distinct label and tiles them onto sheets with pdfme's pdf-lib
+  (`ClientApp/src/lib/labels/`). Barcodes (QR, Code 128/39, UPC-A/E, EAN-13/8, ITF-14, GS1 Data Matrix,
+  PDF417) come from bwip-js via pdfme. Both pdfme chunks load on demand, so the main bundle is unaffected.
+  `vite.config.ts` aliases `@pdfme/converter` to a stub: the designer only needs it for uploaded background
+  PDFs, which labels never use, and the real one adds ~20 MB of wasm/worker to the publish.
+- **Card fields:** an element named after a field (`cardName`, `setCode`, `collectorNumber`, `marketPrice`,
+  `cardUrl`, `tcgplayerUrl`, `cardId`, … — see `lib/labels/fields.ts`) is filled from the card; "Text with
+  fields" elements combine them (`{setCode} #{collectorNumber}`).
+- **Card pages:** the `cardUrl` field links to `/app/card/{lotId}`, a read-only card page (with the editor for
+  users who may edit). QR codes use the address in the print dialog's **Card links open** box — by default the
+  address the browser is using, remembered per browser — so print from (or type) an address phones on the
+  LAN can reach, not `localhost`.
+- API: `GET|POST /api/labels/templates`, `GET|PUT|DELETE /api/labels/templates/{id}`; `POST /api/labels/data`
+  `{ lotIds }` or `{ containerId, game, q }` → the label values per card (site-scoped; max 5,000 cards).
+- Permissions: **Labels ▸ Print labels** (`labels.print`) and **Labels ▸ Manage label templates**
+  (`labels.edit`). Templates are configuration and survive **Reset collection**.
+
 ## Reset collection (admin)
 
 **Administration ▸ Reset Collection** wipes the owned collection to start over while keeping all sales data
@@ -701,7 +728,7 @@ different currency.
 - **Strings:** `ClientApp/src/i18n/locales/en-US/*.json`, one file per feature area (namespace):
   `common` (shared actions/labels/conditions/channels/statuses), `nav`, `auth`, `account`, `dashboard`,
   `collection`, `locations`, `binder`, `sets`, `scan`, `sales`, `inventory`, `importing`, `lists`,
-  `trades`, `settings`, `deckbox`, `dialogs`, `search`, `help`. Each file is keyed by its namespace object
+  `trades`, `settings`, `deckbox`, `dialogs`, `search`, `help`, `labels`. Each file is keyed by its namespace object
   and spread into the bundle in `index.ts`.
 - **In-app help:** the **Help** item pinned to the bottom of the sidebar opens `/help`. Topics are
   Markdown files, one per topic per culture, in `ClientApp/src/help/<culture>/<topic-id>.md`; each topic

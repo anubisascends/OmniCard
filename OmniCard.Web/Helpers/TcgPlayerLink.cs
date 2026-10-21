@@ -1,4 +1,7 @@
+using Microsoft.EntityFrameworkCore;
+using OmniCard.Data.Catalogs;
 using OmniCard.Shared.Cards;
+using OmniCard.Shared.Collection;
 using OmniCard.Shared.Inventory;
 
 namespace OmniCard.Web.Helpers;
@@ -26,6 +29,32 @@ public static class TcgPlayerLink
 
         var query = string.IsNullOrWhiteSpace(setName) ? name : $"{name} {setName}";
         return $"https://www.tcgplayer.com/search/{LineSlug(game)}/product?q={Uri.EscapeDataString(query)}";
+    }
+
+    /// <summary>The TCGplayer product id (when known) and link for each owned card, keyed by lot id. MTG
+    /// product ids come from the Scryfall catalog (etched foils prefer the etched id); the TCGCSV games'
+    /// card id is the product id.</summary>
+    public static Dictionary<int, (string Url, int? ProductId)> ForCards(
+        IReadOnlyCollection<CollectionCard> cards, IDbContextFactory<ScryfallDbContext>? scryfallFactory)
+    {
+        var mtg = ScryfallTcgIdResolver.Resolve(scryfallFactory,
+            cards.Where(c => c.Game == CardGame.Mtg).Select(c => c.GameCardId));
+        var result = new Dictionary<int, (string, int?)>();
+        foreach (var c in cards)
+        {
+            int? productId = null;
+            if (c.Game == CardGame.Mtg)
+            {
+                var etched = c.IsFoil && (c.FoilType?.Contains("Etched", StringComparison.OrdinalIgnoreCase) ?? false);
+                productId = mtg.GetValueOrDefault(c.GameCardId).Pick(etched);
+            }
+            else if (int.TryParse(c.GameCardId, out var p))
+            {
+                productId = p;
+            }
+            result[c.Id] = (Build(c.Game, c.GameCardId, c.Name, c.SetName, productId), productId);
+        }
+        return result;
     }
 
     private static string LineSlug(CardGame game) => game switch

@@ -69,6 +69,8 @@ export interface CardDto {
   isTraded: boolean;
   /** "Listed" or "Picked" when this lot is already on the market, else null. Used to block re-listing. */
   listingStatus?: string | null;
+  /** TCGplayer product (or search) link — only on the single-card read. */
+  tcgPlayerUrl?: string | null;
 }
 
 /**
@@ -1492,4 +1494,62 @@ export interface ScanValidationRuleDto {
 export interface ScanValidationResultDto {
   failedKeys: string[];
   errors: string[];
+}
+
+// ---- Labels ----
+
+/** A label template: the sheet layout (millimetres) and the pdfme design JSON of one label. The label
+ * size is derived from the sheet. */
+export interface LabelTemplateDto {
+  id: number;
+  name: string;
+  pageWidthMm: number;
+  pageHeightMm: number;
+  marginTopMm: number;
+  marginRightMm: number;
+  marginBottomMm: number;
+  marginLeftMm: number;
+  columns: number;
+  rows: number;
+  columnGapMm: number;
+  rowGapMm: number;
+  labelWidthMm: number;
+  labelHeightMm: number;
+  design: string;
+  updatedAt: string;
+}
+
+export type LabelTemplateInput = Omit<LabelTemplateDto, 'id' | 'labelWidthMm' | 'labelHeightMm' | 'updatedAt'>;
+
+/** The cards to label: `lotIds` (in that order), or every card in `containerId` (narrowed by game + search). */
+export interface LabelDataRequest {
+  lotIds?: number[];
+  containerId?: number;
+  game?: string;
+  q?: string;
+}
+
+/** The printable facts of one owned card — what a label's fields are filled from. */
+export interface LabelCardDto {
+  id: number;
+  game: string;
+  gameName: string;
+  name: string;
+  setCode: string;
+  setName: string;
+  collectorNumber: string;
+  rarity: string;
+  condition: string;
+  language: string;
+  finish: string;
+  quantity: number;
+  marketPrice: number;
+  tcgPlayerUrl: string;
+  tcgPlayerId: number | null;
+  location: string | null;
+}
+
+export interface LabelDataDto {
+  cards: LabelCardDto[];
+  truncated: boolean;
 }

@@ -198,6 +198,59 @@ License:     Apache License 2.0 (@zxing/library); MIT License (@zxing/browser)
 Copyright (c) ZXing authors; zxing-js contributors.
 
 --------------------------------------------------------------------------------
+pdfme 6.2.6 — MIT License (@pdfme/ui, @pdfme/generator, @pdfme/schemas,
+@pdfme/common, @pdfme/pdf-lib)
+--------------------------------------------------------------------------------
+Components:  The SPA's Label Designer (Administration ▸ Labels) and label PDF
+             rendering: a WYSIWYG PDF template designer, the PDF generator,
+             text/image/shape/barcode element plugins, and pdfme's fork of
+             pdf-lib. @pdfme/converter is not shipped (stubbed at build time).
+Homepage:    https://pdfme.com
+             https://github.com/pdfme/pdfme
+License:     MIT License
+Copyright (c) hand-dot (Kyohei Fukuda) and pdfme contributors.
+pdf-lib (forked as @pdfme/pdf-lib): Copyright (c) 2019 Andrew Dillon. MIT License.
+The default label font is Roboto, embedded by @pdfme/common (Google; Apache
+License 2.0 / SIL Open Font License 1.1).
+
+--------------------------------------------------------------------------------
+bwip-js 4.11.4 — MIT License
+--------------------------------------------------------------------------------
+Components:  Barcode rendering for labels (QR code, Code 128, Code 39, UPC-A/E,
+             EAN-13/8, ITF-14, GS1 Data Matrix, PDF417), used through pdfme.
+Homepage:    https://github.com/metafloor/bwip-js
+License:     MIT License. Includes Barcode Writer in Pure PostScript (BWIPP,
+             Copyright (c) Terry Burton, MIT License) and the Inconsolata font
+             (SIL Open Font License 1.1).
+Copyright (c) 2011-2026 Mark Warren.
+
+--------------------------------------------------------------------------------
+Ant Design (antd) 6.6.7 — MIT License (bundled by the pdfme designer)
+--------------------------------------------------------------------------------
+Homepage:    https://ant.design
+             https://github.com/ant-design/ant-design
+Copyright (c) Ant UED, Alipay and contributors.
+
+--------------------------------------------------------------------------------
+Other libraries bundled with the Label Designer / label rendering (via pdfme)
+--------------------------------------------------------------------------------
+React 19.3.1 / React DOM 19.3.1 (pdfme's own copy) — MIT — Meta Platforms, Inc.
+fontkit 2.0.4 — MIT — Devon Govett
+pako 3.0.2 — MIT AND Zlib — Andrei Tuputcyn, Vitaly Puzrin
+DOMPurify 3.4.17 — MPL-2.0 OR Apache-2.0 — Cure53 and contributors
+zod 4.6.7 — MIT — Colin McDonnell
+acorn 8.19.0 — MIT — Marijn Haverbeke and contributors
+date-fns 4.4.0 — MIT — Sasha Koss and Lesha Koss
+jpeg-js 0.4.4 — BSD-3-Clause — Eugene Ware and contributors
+@pdf-lib/upng 1.0.1 — MIT — Photopea / Andrew Dillon
+lucide / lucide-react 1.60.0 — ISC — Lucide Contributors
+react-moveable 0.56.0, react-selecto 1.26.3, @scena/react-guides 0.28.2 — MIT — Daybrush
+@dnd-kit/core 6.3.1 — MIT — Claudéric Demers
+hotkeys-js 4.0.8 — MIT — Kenny Wong
+air-datepicker 3.6.0 — MIT — Timofey Marochkin
+signature_pad 5.1.4 — MIT — Szymon Nowak
+
+--------------------------------------------------------------------------------
 MinVer 7.0.0 — MIT License (build-time tool, NOT distributed)
 --------------------------------------------------------------------------------
 Homepage:    https://github.com/adamralph/minver

@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -6,6 +7,13 @@ import react from '@vitejs/plugin-react';
 // static files are served by ASP.NET Core itself (see Phase 7 deployment).
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      // The label designer (pdfme) only uses its converter for uploaded background PDFs, which labels
+      // never have; the stub keeps its ~20 MB PDF engine out of the build.
+      '@pdfme/converter': fileURLToPath(new URL('./src/lib/labels/pdfmeConverterStub.ts', import.meta.url)),
+    },
+  },
   server: {
     port: 5173,
     proxy: {

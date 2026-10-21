@@ -14,6 +14,7 @@ Click **Administration** in the sidebar. Everyone can open this page, but you on
 | **Receipts** | Store details and layout for printed receipts | People with the Settings view permission (only administrators can change it) |
 | **Scan Badges** | Value badges on the Scan page, plus watched scan folders | People with the Settings view permission (badges and folders can only be changed by administrators) |
 | **Tag Rules** | Searches that tag matching cards when they're scanned or imported | Administrators only |
+| **Labels** | Label templates for printing card-holder labels | People with the Print labels or Manage label templates permission (only Manage label templates can change them) |
 | **Deck Types** | Deck formats and their rules | People with the Deck Types view permission |
 | **Appearance** | Card preview size | Everyone |
 | **Catalog Data** | Download card catalogs, prices and artwork | People with the Catalog Data view permission |
@@ -118,6 +119,7 @@ Permissions are grouped by section. Most sections have **View**, plus actions su
 | Inventory | View, Create, Edit, Delete |
 | Lists | View, Create, Edit, Delete, Commit to collection |
 | Trades | View, Create, Finalize, Cancel |
+| Labels | Print labels, Manage label templates |
 | Import | Run import |
 | Export | Run export |
 | Sales · Orders | View, Create, Edit, Delete, Import orders, Ship (scan labels) |
@@ -287,6 +289,10 @@ Changing these settings needs the Settings edit permission.
 ## Tag Rules
 
 Only administrators see this tab. Each rule is a search for one game plus the tags to add. Matching cards get the tags when anyone scans or imports them, and **Run now** tags the matching cards you already own. Rules only ever add tags. See [Tag rules](help:tag-rules).
+
+## Labels
+
+Label templates describe a label sheet (page size, margins, columns, rows and spacing) and the design of one label: card details, QR codes and barcodes. People with the Manage label templates permission click **New template** to open the label designer, and can edit, copy or delete templates. Everyone with the Print labels permission sees the list. See [Labels](help:labels).
 
 ## Deck Types
 

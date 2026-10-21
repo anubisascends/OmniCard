@@ -151,6 +151,7 @@ The location page shows:
 
 - The location's name, its type, and its site. A site you can only view shows *view only* next to its name.
 - **Open binder view**, for binders.
+- **Print labels**, which prints a label for every card the page shows. See [Labels](help:labels).
 - **Audit**, **Import** and **Add card** buttons (when you're allowed to change this location).
 - A summary line with the number of cards and their market value.
 - For deck boxes, a panel with the game, deck type and legality warnings, plus the deck link and **Sync from URL** for a linked deck box. See [Deck boxes](help:deck-boxes).

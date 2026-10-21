@@ -60,6 +60,12 @@ public static class Permissions
     public const string TradesFinalize = "trades.finalize";
     public const string TradesCancel = "trades.cancel";
 
+    // Labels
+    /// <summary>Print card labels from a saved label template.</summary>
+    public const string LabelsPrint = "labels.print";
+    /// <summary>Create, design and delete label templates.</summary>
+    public const string LabelsEdit = "labels.edit";
+
     // Import / Export
     public const string ImportRun = "import.run";
     public const string ExportRun = "export.run";
@@ -160,6 +166,11 @@ public static class Permissions
             new(TradesCreate, "create", "Create"),
             new(TradesFinalize, "finalize", "Finalize"),
             new(TradesCancel, "cancel", "Cancel"),
+        ]),
+        new("labels", "Labels",
+        [
+            new(LabelsPrint, "print", "Print labels"),
+            new(LabelsEdit, "edit", "Manage label templates"),
         ]),
         new("import", "Import",
         [

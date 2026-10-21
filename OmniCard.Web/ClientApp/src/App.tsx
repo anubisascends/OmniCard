@@ -20,6 +20,7 @@ import { ListsPage } from './pages/ListsPage';
 import { TradesPage } from './pages/TradesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AccountPage } from './pages/AccountPage';
+import { CardDetailPage } from './pages/CardDetailPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 
 // Help bundles every topic's Markdown, so it's split into its own chunk and only loaded on demand.
@@ -36,6 +37,8 @@ export function App() {
         <Route path="/scan" element={<RequirePermission anyOf={['scan.view']}><ScanPage /></RequirePermission>} />
         <Route path="/scan/batch/:batchId" element={<RequirePermission anyOf={['scan.view']}><ScanBatchPage /></RequirePermission>} />
         <Route path="/collection" element={<RequirePermission anyOf={['collection.view']}><CollectionPage /></RequirePermission>} />
+        {/* A card's own page — where the QR code on a printed label leads. */}
+        <Route path="/card/:id" element={<RequirePermission anyOf={['collection.view']}><CardDetailPage /></RequirePermission>} />
         <Route path="/locations" element={<RequirePermission anyOf={['locations.view']}><LocationsPage /></RequirePermission>} />
         <Route path="/location/:id" element={<RequirePermission anyOf={['locations.view']}><LocationDetailPage /></RequirePermission>} />
         <Route path="/audit/:locationId" element={<RequirePermission anyOf={['collection.delete']}><AuditPage /></RequirePermission>} />
