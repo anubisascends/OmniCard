@@ -64,6 +64,7 @@ import {
   PREVIEW_BASE_WIDTH,
   PREVIEW_BASE_MAX_HEIGHT,
 } from '../lib/previewScale';
+import { KioskSettingsCard } from '../components/kiosk/KioskSettingsCard';
 
 const OPERATIONS: { key: 'prices' | 'bulk' | 'hashes' | 'images' }[] = [
   { key: 'prices' },
@@ -1815,6 +1816,7 @@ const TABS: {
   },
   { key: 'roles', labelKey: 'settings.tabs.roles', render: () => <RolesCard />, show: (g) => g.isAdmin },
   { key: 'sites', labelKey: 'settings.tabs.sites', render: () => <SitesCard />, show: (g) => g.isAdmin },
+  { key: 'kiosk', labelKey: 'settings.tabs.kiosk', render: () => <KioskSettingsCard />, show: (g) => g.isAdmin },
   { key: 'users', labelKey: 'settings.tabs.users', render: () => <ManageUsersCard />, show: (g) => g.isAdmin },
   { key: 'reset', labelKey: 'settings.tabs.reset', render: () => <ResetCollectionCard />, show: (g) => g.isAdmin },
   { key: 'components', labelKey: 'settings.tabs.components', render: () => <ComponentsCard />, show: () => true },

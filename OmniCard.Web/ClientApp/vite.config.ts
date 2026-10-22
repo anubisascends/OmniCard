@@ -27,6 +27,14 @@ export default defineConfig({
     // Emitted into the web project's wwwroot so ASP.NET Core can serve it.
     outDir: '../wwwroot/app',
     emptyOutDir: true,
+    // Two pages: the staff app (index.html) and the shell-less customer kiosk (kiosk.html, served at
+    // /kiosk by the backend).
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        kiosk: fileURLToPath(new URL('./kiosk.html', import.meta.url)),
+      },
+    },
   },
   base: '/app/',
 });

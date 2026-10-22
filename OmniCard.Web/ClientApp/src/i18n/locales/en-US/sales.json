@@ -4,7 +4,8 @@
     "tabs": {
       "orders": "Orders",
       "listings": "Listings",
-      "customers": "Customers"
+      "customers": "Customers",
+      "kiosk": "Kiosk"
     },
     "orders": {
       "newOrder": "New order",

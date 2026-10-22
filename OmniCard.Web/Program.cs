@@ -5,6 +5,8 @@ using OmniCard.CardMatching;
 using OmniCard.Collection;
 using OmniCard.Data;
 using OmniCard.Web.Services;
+using OmniCard.Web.Services.Kiosk;
+using OmniCard.Shared.Kiosk;
 using OmniCard.Shared.Audit;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
@@ -305,6 +307,11 @@ builder.Services.AddSingleton(sp => new CollectionResetService(writableFactory,
     siteAccessService, sp.GetRequiredService<ILogger<CollectionResetService>>()));
 builder.Services.AddScoped(sp => new RequestSiteAccess(
     sp.GetRequiredService<IHttpContextAccessor>(), siteAccessService, writableFactory));
+// Customer kiosk (/kiosk): admin-enrolled devices where customers browse chosen locations and hold
+// cards on a pick list for staff to pull (Sales ▸ Kiosk). One singleton so its write lock is shared.
+builder.Services.AddSingleton<IKioskSettingsService, KioskSettingsService>();
+builder.Services.AddSingleton<IKioskCardEnricher, KioskCardEnricher>();
+builder.Services.AddSingleton<KioskService>();
 // Saved views of the Collection / Location pages (per user, plus admin-shared views and defaults).
 builder.Services.AddSingleton(sp => new SavedViewService(writableFactory, sp.GetRequiredService<TimeProvider>()));
 
@@ -328,6 +335,8 @@ var authBuilder = builder.Services
         options.Events.OnRedirectToLogin = ctx => { ctx.Response.StatusCode = 401; return Task.CompletedTask; };
         options.Events.OnRedirectToAccessDenied = ctx => { ctx.Response.StatusCode = 403; return Task.CompletedTask; };
     });
+// Kiosk devices carry their own cookie (scoped to /api/kiosk), never the staff sign-in — see KioskAuth.
+authBuilder.AddCookie(KioskAuth.Scheme, KioskAuth.Configure);
 
 // Cookie stays the app-wide default scheme (above); the JWT + MCP schemes are added only as named
 // schemes scoped to the /mcp endpoint, so the SPA's cookie auth is unaffected.
@@ -552,6 +561,14 @@ app.MapFallbackToFile("/app/{*path:nonfile}", "/app/index.html", new StaticFileO
     // Always revalidate the shell, so a deploy's new content-hashed bundles are picked up at once.
     OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache",
 });
+// The customer kiosk is a separate, shell-less page of the same build (kiosk.html); /kiosk and any
+// deep link under it serve it.
+var kioskShell = new StaticFileOptions
+{
+    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache",
+};
+app.MapFallbackToFile("/kiosk", "/app/kiosk.html", kioskShell);
+app.MapFallbackToFile("/kiosk/{*path:nonfile}", "/app/kiosk.html", kioskShell);
 app.MapGet("/", () => Results.Redirect("/app/"));
 
 Console.WriteLine($"Serving collection from: {dataDir}");

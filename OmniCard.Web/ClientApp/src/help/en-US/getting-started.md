@@ -76,12 +76,12 @@ The sidebar on the left lists the sections you have access to. You might not see
 | **Lists** | Want lists and decklists checked against your collection | [Lists](help:lists) |
 | **Trades** | Build and record trades | [Trades](help:trades) |
 | **Import** | Bring in cards from CSV files and deck sites, or export them | [Importing](help:importing) |
-| **Sales** | Orders, customers and listings | [Sales](help:sales) |
+| **Sales** | Orders, customers, listings and kiosk pick lists | [Sales](help:sales) |
 | **Ship** | Scan shipping labels to mark orders as shipped | [Shipping](help:shipping) |
 | **Administration** | Settings and, for administrators, user management | [Administration](help:administration) |
 | **Help** | This help center, at the bottom of the sidebar | |
 
-A number on the **Scan** icon counts scan batches that are waiting for someone to review them. See [Scan batches](help:scan-batches).
+A number on the **Scan** icon counts scan batches that are waiting for someone to review them. See [Scan batches](help:scan-batches). A number on the **Sales** icon counts pick lists customers sent from a kiosk that nobody has started picking. See [Customer kiosk](help:kiosk).
 
 ### On a phone
 
@@ -202,6 +202,7 @@ Pick whichever way suits you:
 - [Trades](help:trades): recording trades
 - [Inventory](help:inventory): sealed product
 - [Sales](help:sales) and [eBay](help:ebay): selling cards
+- [Customer kiosk](help:kiosk): a self-service screen where customers pick cards to buy
 - [Dashboard](help:dashboard): collection value and profit
 - [Administration](help:administration): settings, users, sites and catalog data
 - [Troubleshooting](help:troubleshooting): answers to common problems

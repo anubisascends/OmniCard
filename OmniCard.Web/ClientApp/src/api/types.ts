@@ -1553,3 +1553,131 @@ export interface LabelDataDto {
   cards: LabelCardDto[];
   truncated: boolean;
 }
+
+// --- Customer kiosk (/kiosk) ---
+
+export interface KioskSessionItemDto {
+  key: string;
+  name: string;
+  setName: string;
+  setCode: string;
+  number: string;
+  condition: string;
+  language: string;
+  isFoil: boolean;
+  imageUri?: string | null;
+  quantity: number;
+  /** Null when prices are hidden. */
+  unitPrice?: number | null;
+}
+
+export interface KioskSessionDto {
+  id: number;
+  customerName: string;
+  status: string;
+  items: KioskSessionItemDto[];
+  totalQuantity: number;
+  totalPrice?: number | null;
+}
+
+export interface KioskStatusDto {
+  enrolled: boolean;
+  deviceName?: string | null;
+  enabled: boolean;
+  hasLocations: boolean;
+  showPrices: boolean;
+  idleTimeoutMinutes: number;
+  welcomeMessage?: string | null;
+  session?: KioskSessionDto | null;
+}
+
+export interface KioskGameDto {
+  id: string;
+  displayName: string;
+  cardCount: number;
+}
+
+export interface KioskCardDto {
+  key: string;
+  game: string;
+  name: string;
+  setName: string;
+  setCode: string;
+  number: string;
+  rarity: string;
+  condition: string;
+  language: string;
+  isFoil: boolean;
+  foilType?: string | null;
+  imageUri?: string | null;
+  price?: number | null;
+  available: number;
+  inMyList: number;
+}
+
+export interface KioskSubmitResultDto {
+  sessionId: number;
+  customerName: string;
+  itemCount: number;
+}
+
+export interface KioskQueueLineDto {
+  holdId: number;
+  lotId: number;
+  name: string;
+  setName: string;
+  setCode: string;
+  number: string;
+  condition: string;
+  language: string;
+  isFoil: boolean;
+  imageUri?: string | null;
+  quantity: number;
+  unitPrice: number;
+  locationId?: number | null;
+  locationName?: string | null;
+  page?: number | null;
+  slot?: number | null;
+  section?: string | null;
+}
+
+export interface KioskQueueEntryDto {
+  id: number;
+  customerName: string;
+  status: 'Browsing' | 'Queued' | 'Picking' | string;
+  deviceName?: string | null;
+  createdAt: string;
+  submittedAt?: string | null;
+  lastActivityAt: string;
+  claimedByName?: string | null;
+  lines: KioskQueueLineDto[];
+  totalQuantity: number;
+  totalPrice: number;
+}
+
+export interface KioskQueueCountDto {
+  queued: number;
+  browsing: number;
+}
+
+export interface KioskCreateOrderResultDto {
+  orderId: number;
+  customerId: number;
+}
+
+export interface KioskSettingsDto {
+  enabled: boolean;
+  locationIds: number[];
+  idleTimeoutMinutes: number;
+  showPrices: boolean;
+  welcomeMessage?: string | null;
+}
+
+export interface KioskDeviceDto {
+  id: number;
+  name: string;
+  createdAt: string;
+  createdBy?: string | null;
+  lastSeenAt?: string | null;
+  revoked: boolean;
+}

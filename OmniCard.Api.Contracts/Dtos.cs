@@ -1908,3 +1908,141 @@ public sealed record LabelCardDto
 
 /// <summary>Label data for a print run. <see cref="Truncated"/> is set when the request hit the cap.</summary>
 public sealed record LabelDataDto(IReadOnlyList<LabelCardDto> Cards, bool Truncated);
+
+// --- Customer kiosk (/kiosk) ---
+
+/// <summary>What an enrolled (or not-yet-enrolled) kiosk device needs to draw its current screen.</summary>
+public sealed record KioskStatusDto
+{
+    public bool Enrolled { get; init; }
+    public string? DeviceName { get; init; }
+    public bool Enabled { get; init; }
+    /// <summary>False when no browsable location is configured (nothing to show customers).</summary>
+    public bool HasLocations { get; init; }
+    public bool ShowPrices { get; init; }
+    public int IdleTimeoutMinutes { get; init; }
+    public string? WelcomeMessage { get; init; }
+    /// <summary>The customer currently browsing on this device, if any.</summary>
+    public KioskSessionDto? Session { get; init; }
+}
+
+/// <summary>An administrator's credentials, required to enroll a kiosk or to take a device out of kiosk mode.</summary>
+public sealed record KioskCredentialsRequest(string Login, string Password, string? DeviceName = null);
+
+public sealed record KioskStartSessionRequest(string Name);
+
+/// <summary>Add/remove copies of a card group (<see cref="KioskCardDto.Key"/>) on the customer's pick list.</summary>
+public sealed record KioskHoldRequest(string Key, int Quantity = 1);
+
+public sealed record KioskGameDto(string Id, string DisplayName, int CardCount);
+
+/// <summary>One browsable card: every available copy of a printing in one condition + language,
+/// across the kiosk's locations.</summary>
+public sealed record KioskCardDto
+{
+    /// <summary>Opaque group key (product + condition + language) used to hold copies.</summary>
+    public string Key { get; init; } = "";
+    public string Game { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string SetName { get; init; } = "";
+    public string SetCode { get; init; } = "";
+    public string Number { get; init; } = "";
+    public string Rarity { get; init; } = "";
+    public string Condition { get; init; } = "";
+    public string Language { get; init; } = "";
+    public bool IsFoil { get; init; }
+    public string? FoilType { get; init; }
+    public string? ImageUri { get; init; }
+    /// <summary>Market price per copy; null when prices are hidden or unknown.</summary>
+    public decimal? Price { get; init; }
+    /// <summary>Copies the customer can still add.</summary>
+    public int Available { get; init; }
+    /// <summary>Copies already on this customer's pick list.</summary>
+    public int InMyList { get; init; }
+}
+
+public sealed record KioskSessionItemDto
+{
+    public string Key { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string SetName { get; init; } = "";
+    public string SetCode { get; init; } = "";
+    public string Number { get; init; } = "";
+    public string Condition { get; init; } = "";
+    public string Language { get; init; } = "";
+    public bool IsFoil { get; init; }
+    public string? ImageUri { get; init; }
+    public int Quantity { get; init; }
+    /// <summary>Null when prices are hidden.</summary>
+    public decimal? UnitPrice { get; init; }
+}
+
+public sealed record KioskSessionDto
+{
+    public int Id { get; init; }
+    public string CustomerName { get; init; } = "";
+    public string Status { get; init; } = "";
+    public IReadOnlyList<KioskSessionItemDto> Items { get; init; } = [];
+    public int TotalQuantity { get; init; }
+    /// <summary>Null when prices are hidden.</summary>
+    public decimal? TotalPrice { get; init; }
+}
+
+public sealed record KioskSubmitResultDto(int SessionId, string CustomerName, int ItemCount);
+
+/// <summary>A kiosk pick list as staff see it (Sales ▸ Kiosk).</summary>
+public sealed record KioskQueueEntryDto
+{
+    public int Id { get; init; }
+    public string CustomerName { get; init; } = "";
+    public string Status { get; init; } = "";
+    public string? DeviceName { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? SubmittedAt { get; init; }
+    public DateTime LastActivityAt { get; init; }
+    public string? ClaimedByName { get; init; }
+    public IReadOnlyList<KioskQueueLineDto> Lines { get; init; } = [];
+    public int TotalQuantity { get; init; }
+    public decimal TotalPrice { get; init; }
+}
+
+/// <summary>One held lot: what to pull and where it is.</summary>
+public sealed record KioskQueueLineDto
+{
+    public int HoldId { get; init; }
+    public int LotId { get; init; }
+    public string Name { get; init; } = "";
+    public string SetName { get; init; } = "";
+    public string SetCode { get; init; } = "";
+    public string Number { get; init; } = "";
+    public string Condition { get; init; } = "";
+    public string Language { get; init; } = "";
+    public bool IsFoil { get; init; }
+    public string? ImageUri { get; init; }
+    public int Quantity { get; init; }
+    public decimal UnitPrice { get; init; }
+    public int? LocationId { get; init; }
+    public string? LocationName { get; init; }
+    public int? Page { get; init; }
+    public int? Slot { get; init; }
+    public string? Section { get; init; }
+}
+
+public sealed record KioskQueueCountDto(int Queued, int Browsing);
+
+/// <summary>Turn a pick list into an order: an existing customer, or a new one named
+/// <see cref="CustomerName"/> (defaults to the name the customer gave at the kiosk).</summary>
+public sealed record KioskCreateOrderRequest(int? CustomerId = null, string? CustomerName = null);
+
+public sealed record KioskCreateOrderResultDto(int OrderId, int CustomerId);
+
+public sealed record KioskSettingsDto
+{
+    public bool Enabled { get; init; } = true;
+    public IReadOnlyList<int> LocationIds { get; init; } = [];
+    public int IdleTimeoutMinutes { get; init; } = 15;
+    public bool ShowPrices { get; init; } = true;
+    public string? WelcomeMessage { get; init; }
+}
+
+public sealed record KioskDeviceDto(int Id, string Name, DateTime CreatedAt, string? CreatedBy, DateTime? LastSeenAt, bool Revoked);

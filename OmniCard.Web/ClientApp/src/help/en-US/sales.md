@@ -11,7 +11,7 @@ Selling usually follows these steps:
 3. **Record the order** for the buyer and add the cards they bought.
 4. **Move the order across the board** as you pack, ship and complete it. When it reaches a shipped lane, OmniCard records the sale and removes the sold cards from your collection.
 
-The [Sales](/sales) page has three tabs: **Orders**, **Listings** and **Customers**.
+The [Sales](/sales) page has three tabs: **Orders**, **Listings** and **Customers**. If you use the [customer kiosk](help:kiosk), a fourth tab, **Kiosk**, holds the pick lists customers send to the counter.
 
 ![The Sales page Orders board](sales-orders-board.png)
 

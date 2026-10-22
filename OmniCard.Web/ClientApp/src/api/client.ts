@@ -108,6 +108,11 @@ import type {
   RoleDto,
   PermissionCatalogDto,
   WorkflowLaneDto,
+  KioskCreateOrderResultDto,
+  KioskDeviceDto,
+  KioskQueueCountDto,
+  KioskQueueEntryDto,
+  KioskSettingsDto,
 } from './types';
 
 /** Write-request bodies (mirror the Contracts upsert records). */
@@ -1137,4 +1142,21 @@ export const api = {
   scanFolderSettings: () => request<ScanFolderSettingsResponse>('/api/settings/scan-folders'),
   scanFolderSettingsUpdate: (body: ScanFolderSettingsDto) =>
     request<void>('/api/settings/scan-folders', { method: 'PUT', body: JSON.stringify(body) }),
+
+  // Customer kiosk — staff queue (Sales ▸ Kiosk) and admin settings (Settings ▸ Kiosk)
+  kioskQueue: () => request<KioskQueueEntryDto[]>('/api/kiosk-queue'),
+  kioskQueueCount: () => request<KioskQueueCountDto>('/api/kiosk-queue/count'),
+  kioskClaim: (id: number) => request<void>(`/api/kiosk-queue/${id}/claim`, { method: 'POST' }),
+  kioskUnclaim: (id: number) => request<void>(`/api/kiosk-queue/${id}/unclaim`, { method: 'POST' }),
+  kioskRemoveHold: (id: number, holdId: number, quantity?: number) =>
+    request<void>(`/api/kiosk-queue/${id}/holds/${holdId}${qs({ quantity })}`, { method: 'DELETE' }),
+  kioskCancel: (id: number) => request<void>(`/api/kiosk-queue/${id}/cancel`, { method: 'POST' }),
+  kioskCreateOrder: (id: number, body: { customerId?: number | null; customerName?: string | null }) =>
+    request<KioskCreateOrderResultDto>(`/api/kiosk-queue/${id}/order`, { method: 'POST', body: JSON.stringify(body) }),
+  kioskSettings: () => request<KioskSettingsDto>('/api/kiosk-settings'),
+  kioskSettingsUpdate: (body: KioskSettingsDto) =>
+    request<KioskSettingsDto>('/api/kiosk-settings', { method: 'PUT', body: JSON.stringify(body) }),
+  kioskDevices: () => request<KioskDeviceDto[]>('/api/kiosk-settings/devices'),
+  kioskDeviceRevoke: (id: number) => request<void>(`/api/kiosk-settings/devices/${id}/revoke`, { method: 'POST' }),
+  kioskDeviceDelete: (id: number) => request<void>(`/api/kiosk-settings/devices/${id}`, { method: 'DELETE' }),
 };

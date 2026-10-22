@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Shared.Ebay;
 using OmniCard.Shared.Inventory;
+using OmniCard.Shared.Kiosk;
 using OmniCard.Shared.Labels;
 using OmniCard.Shared.Lists;
 using OmniCard.Shared.Matching;
@@ -50,6 +51,9 @@ public class OmniCardDbContext : DbContext
     public DbSet<TagRule> TagRules => Set<TagRule>();
     public DbSet<ScanValidationRule> ScanValidationRules => Set<ScanValidationRule>();
     public DbSet<LabelTemplate> LabelTemplates => Set<LabelTemplate>();
+    public DbSet<KioskDevice> KioskDevices => Set<KioskDevice>();
+    public DbSet<KioskSession> KioskSessions => Set<KioskSession>();
+    public DbSet<KioskHold> KioskHolds => Set<KioskHold>();
 
     public OmniCardDbContext(DbContextOptions<OmniCardDbContext> options) : base(options) { }
 
@@ -468,6 +472,46 @@ public class OmniCardDbContext : DbContext
             e.Ignore(t => t.LabelWidthMm);
             e.Ignore(t => t.LabelHeightMm);
             e.HasIndex(t => t.Name).IsUnique();
+        });
+
+        // Customer kiosk: enrolled devices, customer sessions and the lots they hold. All writes go
+        // through KioskService under one lock, so no concurrency tokens are needed here.
+        modelBuilder.Entity<KioskDevice>(e =>
+        {
+            e.HasKey(d => d.Id);
+            e.Property(d => d.Id).ValueGeneratedOnAdd();
+            e.Property(d => d.Name).IsRequired().HasMaxLength(KioskDevice.MaxNameLength);
+            e.Property(d => d.CreatedBy).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<KioskSession>(e =>
+        {
+            e.HasKey(s => s.Id);
+            e.Property(s => s.Id).ValueGeneratedOnAdd();
+            e.Property(s => s.CustomerName).IsRequired().HasMaxLength(KioskSession.MaxNameLength);
+            e.Property(s => s.ActiveNameKey).HasMaxLength(KioskSession.MaxNameLength);
+            e.Property(s => s.Status).HasConversion<string>().HasMaxLength(16);
+            e.Property(s => s.ClaimedByName).HasMaxLength(256);
+            e.Ignore(s => s.IsOpen);
+            // Unique among open sessions only: closed sessions null the key (SQL Server filters NULLs
+            // out of a unique index on a nullable column; SQLite allows many NULLs anyway).
+            e.HasIndex(s => s.ActiveNameKey).IsUnique();
+            e.HasIndex(s => s.Status);
+            e.HasIndex(s => s.DeviceId);
+        });
+
+        modelBuilder.Entity<KioskHold>(e =>
+        {
+            e.HasKey(h => h.Id);
+            e.Property(h => h.Id).ValueGeneratedOnAdd();
+            e.Property(h => h.UnitPrice).HasPrecision(18, 2);
+            e.HasIndex(h => h.SessionId);
+            e.HasIndex(h => h.LotId);
+            e.HasOne<KioskSession>().WithMany().HasForeignKey(h => h.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            // A sold or deleted lot takes its holds with it.
+            e.HasOne<InventoryLot>().WithMany().HasForeignKey(h => h.LotId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Optimistic-concurrency tokens for the networked (multi-user) web deployment, which runs on

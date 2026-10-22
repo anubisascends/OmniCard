@@ -49,7 +49,9 @@ const DRAWER_WIDTH = 200;
 // that reveal the item — a user needs at least one. Items with no `perm` are always shown
 // (Administration hosts self-service password change + the always-viewable Components tab).
 // `badge` names a live count shown on the icon.
-const NAV: { to: string; labelKey: string; icon: ReactNode; perm?: string[]; badge?: 'scanBatches' }[] = [
+type NavBadge = 'scanBatches' | 'kioskQueue';
+
+const NAV: { to: string; labelKey: string; icon: ReactNode; perm?: string[]; badge?: NavBadge }[] = [
   { to: '/', labelKey: 'dashboard', icon: <DashboardIcon />, perm: ['dashboard.view'] },
   { to: '/scan', labelKey: 'scan', icon: <PhotoCameraIcon />, perm: ['scan.view'], badge: 'scanBatches' },
   { to: '/collection', labelKey: 'collection', icon: <CollectionsBookmarkIcon />, perm: ['collection.view'] },
@@ -59,7 +61,7 @@ const NAV: { to: string; labelKey: string; icon: ReactNode; perm?: string[]; bad
   { to: '/lists', labelKey: 'lists', icon: <FormatListBulletedIcon />, perm: ['lists.view'] },
   { to: '/trades', labelKey: 'trades', icon: <SwapHorizIcon />, perm: ['trades.view'] },
   { to: '/import', labelKey: 'import', icon: <UploadFileIcon />, perm: ['import.run'] },
-  { to: '/sales', labelKey: 'sales', icon: <PointOfSaleIcon />, perm: ['sales.orders.view', 'sales.customers.view', 'sales.listings.view'] },
+  { to: '/sales', labelKey: 'sales', icon: <PointOfSaleIcon />, perm: ['sales.orders.view', 'sales.customers.view', 'sales.listings.view', 'sales.kiosk.view'], badge: 'kioskQueue' },
   { to: '/ship', labelKey: 'ship', icon: <LocalShippingIcon />, perm: ['sales.orders.ship', 'sales.orders.edit'] },
   { to: '/settings', labelKey: 'administration', icon: <AdminPanelSettingsIcon /> },
 ];
@@ -103,9 +105,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     refetchInterval: 20_000,
     refetchIntervalInBackground: false,
   });
-  const badges = { scanBatches: batchCount.data?.unclaimed ?? 0 };
+  // Kiosk pick lists customers sent to the counter that nobody has started picking — the Sales item's badge.
+  const kioskCount = useQuery({
+    queryKey: ['kiosk-queue-count'],
+    queryFn: api.kioskQueueCount,
+    enabled: canAny('sales.kiosk.view'),
+    refetchInterval: 20_000,
+    refetchIntervalInBackground: false,
+  });
+  const badges = { scanBatches: batchCount.data?.unclaimed ?? 0, kioskQueue: kioskCount.data?.queued ?? 0 };
 
-  const navItem = (item: { to: string; labelKey: string; icon: ReactNode; badge?: 'scanBatches' }) => {
+  const navItem = (item: { to: string; labelKey: string; icon: ReactNode; badge?: NavBadge }) => {
     const selected =
       item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to);
     return (

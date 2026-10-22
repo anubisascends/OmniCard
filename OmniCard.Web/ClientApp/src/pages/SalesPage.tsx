@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
+  Badge,
   Box,
   Button,
   Card,
@@ -48,6 +49,8 @@ import { OrderDetailDrawer } from '../components/dialogs/OrderDetailDrawer';
 import { ImportOrdersDialog } from '../components/dialogs/ImportOrdersDialog';
 import { EbayReviseDialog, type EbayReviseTarget } from '../components/dialogs/EbayReviseDialog';
 import { useFormatters } from '../i18n/format';
+import { usePermissions } from '../context/usePermissions';
+import { KioskQueue } from '../components/kiosk/KioskQueue';
 
 function laneOf(order: OrderDto, lanes: WorkflowLaneDto[]): string {
   const byKey = lanes.find((l) => l.key === order.stageKey);
@@ -634,20 +637,50 @@ function CustomersTable() {
   );
 }
 
+type SalesTab = 'orders' | 'listings' | 'customers' | 'kiosk';
+
 export function SalesPage() {
   const { t } = useTranslation();
-  const [tab, setTab] = useState(0);
+  const { can } = usePermissions();
+  const [params, setParams] = useSearchParams();
+  const showKiosk = can('sales.kiosk.view');
+  const kioskCount = useQuery({
+    queryKey: ['kiosk-queue-count'],
+    queryFn: api.kioskQueueCount,
+    enabled: showKiosk,
+    refetchInterval: 20_000,
+  });
+  const requested = params.get('tab') as SalesTab | null;
+  const tab: SalesTab = requested === 'kiosk' && !showKiosk ? 'orders' : (requested ?? 'orders');
   return (
     <Stack spacing={2}>
       <Typography variant="h4">{t('sales.title')}</Typography>
-      <Tabs value={tab} onChange={(_, v) => setTab(v)}>
-        <Tab label={t('sales.tabs.orders')} />
-        <Tab label={t('sales.tabs.listings')} />
-        <Tab label={t('sales.tabs.customers')} />
+      <Tabs
+        value={tab}
+        onChange={(_, v: SalesTab) => {
+          const next = new URLSearchParams(params);
+          next.set('tab', v);
+          setParams(next, { replace: true });
+        }}
+      >
+        <Tab value="orders" label={t('sales.tabs.orders')} />
+        <Tab value="listings" label={t('sales.tabs.listings')} />
+        <Tab value="customers" label={t('sales.tabs.customers')} />
+        {showKiosk && (
+          <Tab
+            value="kiosk"
+            label={
+              <Badge badgeContent={kioskCount.data?.queued ?? 0} color="secondary" sx={{ pr: 1.5 }}>
+                {t('sales.tabs.kiosk')}
+              </Badge>
+            }
+          />
+        )}
       </Tabs>
-      {tab === 0 && <OrdersBoard />}
-      {tab === 1 && <ListingsTable />}
-      {tab === 2 && <CustomersTable />}
+      {tab === 'orders' && <OrdersBoard />}
+      {tab === 'listings' && <ListingsTable />}
+      {tab === 'customers' && <CustomersTable />}
+      {tab === 'kiosk' && <KioskQueue />}
     </Stack>
   );
 }
