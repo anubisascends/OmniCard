@@ -171,6 +171,39 @@ Deploy the published output to IIS:
 > The publish profiles under `OmniCard.Web/Properties/PublishProfiles/` pin `RuntimeIdentifier` to
 > `win-x64`, so the Web Deploy path produces the same slim, single-RID output as the command above.
 
+### Publish to a remote server (VS Code task)
+
+The VS Code task **Publish to Remote Server** (`Ctrl+Shift+P` ▸ *Tasks: Run Task*) runs
+`.vscode/deploy-remote.ps1`. It builds the SPA, publishes to a local staging folder
+(`-r win-x64 --self-contained false`) and replaces the remote site's files with the build. It
+deletes stale files, keeps the ASP.NET Core Module `logs\` folder, and takes the app offline while
+copying.
+
+Settings: `.vscode/deploy-remote.json` holds the tracked defaults. The first run copies it to
+`.vscode/deploy-remote.local.json`, which is git-ignored, then stops so you can fill in your server.
+Any key you leave out of the local file falls back to the default.
+
+| Key | Meaning |
+| --- | --- |
+| `Server`, `SiteName`, `SiteUrl` | Server host/IP, IIS site name, URL printed at the end. `{Server}`/`{SiteName}` expand in URLs and paths. |
+| `Method` | `Share` mirrors the build into a network share of the site folder (`SharePath`). `WebDeploy` syncs through msdeploy (`WebDeployUrl`, `WebDeployAuthType`, `MsDeployPath`). |
+| `UserName` | Server account. Leave it blank to use your Windows login. The password is prompted for; with `RememberPassword` it is saved DPAPI-encrypted (your Windows account on this PC only) in `.vscode/deploy-remote.local.secret`. Delete that file if the password changes. |
+| `PreserveSettings` | Top-level `appsettings.json` sections the server keeps between deploys (default `DataDirectory`, `ConnectionStrings`, `eBay`, `Mcp`). New repo keys still flow through. If the server's copy can't be read, it is left untouched. |
+| `BuildSpa` | Set to `false` to skip `npm install` + `npm run build`. |
+
+One-time server setup is the same as above (Hosting Bundle, app pool, site, SQL Server, data-directory
+grants). In addition:
+
+- **Share:** share the site's physical folder and give the deploy account **Change** permission on
+  both the share and the NTFS folder. As a safety check, the script refuses to mirror into a folder
+  that is not empty and has no `web.config`. `web.config` is replaced on every deploy, so put
+  server-specific config in `appsettings.json`.
+- **WebDeploy:** Windows Server uses the Web Management Service (`https://<server>:8172/msdeploy.axd`,
+  Basic auth). Install the **IIS Management Service** feature, enable remote connections, start
+  `WMSVC`, install Web Deploy with the **IIS Deployment Handler**, and open TCP 8172. On a Windows
+  client OS, the Web Deploy **Remote Agent Service** is the alternative:
+  `http://<server>/MSDEPLOYAGENTSERVICE`, NTLM, with an admin account on the server.
+
 ## Catalog data
 
 The per-game card catalogs, prices, and image hashes are refreshed **server-side** — the web app no
