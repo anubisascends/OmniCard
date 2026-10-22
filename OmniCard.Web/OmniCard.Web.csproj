@@ -30,6 +30,12 @@
     <InternalsVisibleTo Include="OmniCard.Tests" />
   </ItemGroup>
 
+  <!-- Ships with every publish so it's on the server, ready to switch hosting from IIS to a Windows
+       service (see README ▸ Run as a Windows service). -->
+  <ItemGroup>
+    <None Include="install-service.ps1" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- MCP server: exposes read-only collection/inventory/sales data to MCP clients (Claude, Gemini)
          over Streamable HTTP at /mcp. Loopback-only in this phase (see OmniCard.Web/Mcp/). The
@@ -43,6 +49,9 @@
          2.0.0 has a known high-severity DoS (CVE-2026-49451 / GHSA-v5pm-xwqc-g5wc — stack overflow
          on circular schema refs), fixed in 2.7.5. -->
     <PackageReference Include="Microsoft.OpenApi" Version="2.12.2" />
+    <!-- Lets the app run as a Windows service on Kestrel (install-service.ps1) instead of under IIS,
+         whose Windows-client editions cap a site at 10 concurrent requests. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.9" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

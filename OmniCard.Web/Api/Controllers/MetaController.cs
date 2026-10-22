@@ -84,7 +84,7 @@ public sealed class MetaController(IEnumerable<ICardGameService> gameServices) :
             new("Backend", "Entity Framework Core (SQL Server + SQLite)", "10.0.9", "MIT", "https://github.com/dotnet/efcore", mit),
             new("Backend", "Microsoft.Data.Sqlite", "10.0.9", "MIT", "https://github.com/dotnet/efcore", mit),
             new("Backend", "SQLitePCLRaw", "2.1.13", "Apache-2.0", "https://github.com/ericsink/SQLitePCL.raw", apache2),
-            new("Backend", "Microsoft.Extensions.* (Hosting, Http, Logging, Options)", "10.0.9", "MIT", "https://github.com/dotnet/runtime", mit),
+            new("Backend", "Microsoft.Extensions.* (Hosting, Hosting.WindowsServices, Http, Logging, Options)", "10.0.9", "MIT", "https://github.com/dotnet/runtime", mit),
             new("Backend", "Serilog", "4.3.0", "Apache-2.0", "https://serilog.net", apache2),
             new("Backend", "Serilog.Sinks.Console", "6.1.1", "Apache-2.0", "https://github.com/serilog/serilog-sinks-console", apache2),
             new("Backend", "Serilog.Sinks.File", "6.0.0", "Apache-2.0", "https://github.com/serilog/serilog-sinks-file", apache2),

@@ -50,8 +50,8 @@ Microsoft .NET libraries — MIT License
 --------------------------------------------------------------------------------
 Components:  Entity Framework Core + Microsoft.EntityFrameworkCore.Sqlite (10.0.9),
              Microsoft.Data.Sqlite (10.0.9),
-             Microsoft.Extensions.* — Hosting, Http, Logging.Abstractions,
-               Options (10.0.9),
+             Microsoft.Extensions.* — Hosting, Hosting.WindowsServices, Http,
+               Logging.Abstractions, Options (10.0.9),
              Microsoft.AspNetCore.SignalR.Client (10.0.9),
              Microsoft.Xaml.Behaviors.Wpf (1.1.142)
 Homepage:    https://github.com/dotnet
