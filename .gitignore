@@ -10,6 +10,10 @@
 *.userosscache
 *.sln.docstates
 
+# Per-machine remote-deploy settings + saved (DPAPI-encrypted) password; the tracked defaults are
+# .vscode/deploy-remote.json
+.vscode/deploy-remote.local.*
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 

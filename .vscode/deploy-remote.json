@@ -1,0 +1,27 @@
+{
+  "//": "Defaults for the 'Publish to Remote Server' task (.vscode/deploy-remote.ps1). Don't put your values here: the first run copies this file to deploy-remote.local.json (git-ignored), and that copy is the one to edit. A key missing from the local copy falls back to the value here. {Server} and {SiteName} are replaced in the URL and path values.",
+
+  "Server": "192.168.1.241",
+  "SiteName": "OmniCardWeb",
+  "SiteUrl": "https://{Server}:8081/app",
+
+  "//Method": "Share = mirror the build into a network share of the server's IIS site folder (no remote services needed). WebDeploy = msdeploy to the server's Web Deploy endpoint.",
+  "Method": "Share",
+
+  "//SharePath": "Share: UNC path of the share that points at the IIS site's physical folder (the folder holding web.config).",
+  "SharePath": "\\\\{Server}\\OmniCard",
+
+  "//WebDeployUrl": "WebDeploy: the Web Management Service handler on port 8172 (needs the IIS Management Service feature + remote connections enabled + Web Deploy's IIS Deployment Handler on the server). Alternative: the Remote Agent Service, http://{Server}/MSDEPLOYAGENTSERVICE with AuthType NTLM (UserName must be an admin on the server).",
+  "WebDeployUrl": "https://{Server}:8172/msdeploy.axd?site={SiteName}",
+  "WebDeployAuthType": "Basic",
+  "MsDeployPath": "C:\\Program Files\\IIS\\Microsoft Web Deploy V3\\msdeploy.exe",
+
+  "//UserName": "Account on the server, e.g. SERVER\\you or you@outlook.com. Leave blank to use your current Windows login. The password is prompted for, never stored here; RememberPassword saves it encrypted for your Windows account only in deploy-remote.local.secret.",
+  "UserName": "",
+  "RememberPassword": true,
+
+  "//PreserveSettings": "Top-level appsettings.json sections the server keeps between deploys. New keys from the repo's appsettings.json still flow through.",
+  "PreserveSettings": [ "DataDirectory", "ConnectionStrings", "eBay", "Mcp" ],
+
+  "BuildSpa": true
+}
