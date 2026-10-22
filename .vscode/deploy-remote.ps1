@@ -1,4 +1,5 @@
-# OmniCard - build + publish to a REMOTE IIS server, over a network share or Web Deploy.
+# OmniCard - build + publish to a REMOTE server (IIS, or the Windows service install-service.ps1 sets
+# up), over a network share or Web Deploy (IIS only).
 # Run via the "Publish to Remote Server" VS Code task (no elevation needed).
 # Settings: .vscode/deploy-remote.json holds the tracked defaults; your values go in
 # .vscode/deploy-remote.local.json (git-ignored, created from the defaults on the first run).
@@ -162,14 +163,16 @@ if ($ServerHasSettings) {
 # Both paths delete server files the new build no longer has (stale content-hashed SPA chunks would
 # otherwise pile up), except the ASP.NET Core Module's logs\ folder.
 if ($Method -eq 'Share') {
-    # app_offline.htm makes the ASP.NET Core Module stop the app and release its DLL locks.
+    # app_offline.htm makes the ASP.NET Core Module stop the app and release its DLL locks. A Windows-
+    # service install (install-service.ps1) honors it too: the service stops, and starts again by itself
+    # once the file is removed. robocopy's retries cover the app's shutdown either way.
     $offline = Join-Path $Share 'app_offline.htm'
     Set-Content -LiteralPath $offline -Value '<!doctype html><title>Updating</title><p>OmniCard is being updated. Try again in a minute.</p>'
     Start-Sleep -Seconds 3
     $exclude = @('app_offline.htm')
     if ($SkipAppSettings) { $exclude += 'appsettings.json' }
     Write-Host "Mirroring the build into $Share" -ForegroundColor Cyan
-    robocopy $Staging $Share /MIR /XF @exclude /XD logs /R:10 /W:3 /NFL /NDL /NP /NJH
+    robocopy $Staging $Share /MIR /XF @exclude /XD logs /R:20 /W:3 /NFL /NDL /NP /NJH
     $code = $LASTEXITCODE   # robocopy: 0-7 = success, 8+ = failure
     if ($code -ge 8) { Fail "robocopy FAILED (exit $code). The site is left offline (app_offline.htm) so nobody hits a half-updated app; run the task again." }
     Remove-Item -LiteralPath $offline

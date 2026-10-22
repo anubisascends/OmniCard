@@ -32,8 +32,39 @@ using OmniCard.Audit.Exporters;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Mcp;
 using ModelContextProtocol.AspNetCore.Authentication;
+using Microsoft.Extensions.Hosting.WindowsServices;
 
-var builder = WebApplication.CreateBuilder(args);
+// Run as a Windows service when installed as one (install-service.ps1): the app then hosts itself on
+// Kestrel instead of IIS, which on a Windows client OS caps a site at 10 concurrent requests. The SCM
+// starts services in System32, so root the app at its own folder; IIS / dotnet run are unaffected.
+var runningAsService = WindowsServiceHelpers.IsWindowsService();
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = runningAsService ? AppContext.BaseDirectory : null,
+});
+builder.Host.UseWindowsService();
+if (runningAsService)
+    builder.Services.AddHostedService<AppOfflineWatcher>();
+
+// The service install points Kestrel's HTTPS endpoint at a machine-store certificate by thumbprint
+// (Kestrel's own config can only pick store certificates by subject, which is ambiguous for the
+// self-signed certs IIS leaves behind). Endpoints themselves come from the Kestrel config section.
+var httpsThumbprint = builder.Configuration["HttpsCertificateThumbprint"];
+if (!string.IsNullOrWhiteSpace(httpsThumbprint))
+{
+    var httpsCertificate = WindowsServiceHosting.LoadMachineCertificate(httpsThumbprint);
+    builder.WebHost.ConfigureKestrel(kestrel =>
+        kestrel.ConfigureHttpsDefaults(https => https.ServerCertificate = httpsCertificate));
+}
+
+// Compress API JSON and the SPA bundle (~1.6 MB of JS → ~0.4 MB). Brotli first, gzip fallback, at
+// Optimal: ~20 ms for the bundle, which browsers then cache (see the static-file headers below).
+builder.Services.AddResponseCompression(options => options.EnableForHttps = true);
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProviderOptions>(
+    options => options.Level = System.IO.Compression.CompressionLevel.Optimal);
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProviderOptions>(
+    options => options.Level = System.IO.Compression.CompressionLevel.Optimal);
 
 // Load shared settings from %localappdata%/OmniCard (same as desktop app)
 var sharedSettingsDir = Path.Combine(
@@ -426,7 +457,25 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-app.UseStaticFiles();
+// Long-lived streams (SignalR, MCP's streamable HTTP) stay uncompressed so their messages aren't held
+// in a compression buffer.
+app.UseWhen(
+    ctx => !ctx.Request.Path.StartsWithSegments("/hubs") && !ctx.Request.Path.StartsWithSegments("/mcp"),
+    branch => branch.UseResponseCompression());
+
+// Vite content-hashes everything under /app/assets, so a file there never changes: let browsers keep
+// it for a year instead of re-checking it on every page load. index.html (no-cache, below) is what
+// points them at a new build's files.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        if (ctx.Context.Request.Path.StartsWithSegments("/app/assets"))
+            ctx.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        else if (ctx.File.Name.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
+            ctx.Context.Response.Headers.CacheControl = "no-cache";
+    },
+});
 app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -450,6 +499,9 @@ if (Directory.Exists(scansDir))
     {
         FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(cardImagesDir),
         RequestPath = CardImageCacheService.RequestPath,
+        // A card grid requests dozens of these at once; a day's caching spares the re-checks on every
+        // revisit. Kept short because an art refresh overwrites a card's image at the same URL.
+        OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "public, max-age=86400",
     });
 }
 
@@ -495,7 +547,11 @@ app.MapOpenApi();
 // The React SPA (built into wwwroot/app by `npm run build`) is the entire app now — the legacy Razor
 // pages have been retired. Serve it at /app, with a fallback so client-side deep links (e.g.
 // /app/collection) resolve to its index.html, and redirect the site root to it.
-app.MapFallbackToFile("/app/{*path:nonfile}", "/app/index.html");
+app.MapFallbackToFile("/app/{*path:nonfile}", "/app/index.html", new StaticFileOptions
+{
+    // Always revalidate the shell, so a deploy's new content-hashed bundles are picked up at once.
+    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache",
+});
 app.MapGet("/", () => Results.Redirect("/app/"));
 
 Console.WriteLine($"Serving collection from: {dataDir}");

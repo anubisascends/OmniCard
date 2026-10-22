@@ -204,6 +204,47 @@ grants). In addition:
   client OS, the Web Deploy **Remote Agent Service** is the alternative:
   `http://<server>/MSDEPLOYAGENTSERVICE`, NTLM, with an admin account on the server.
 
+### Run as a Windows service (instead of IIS)
+
+IIS on a Windows **client** OS (Windows 10/11 Pro) runs at most 10 requests at once, so a page full of
+card images queues behind itself and every open tab's scan-hub connection holds a slot. Windows
+Server's IIS has no such cap. On a client OS, run the app as a Windows service on its own web server
+(Kestrel) instead. Every publish ships `install-service.ps1` for this. On the server, in an elevated
+PowerShell in the deployed app folder:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-service.ps1            # switch from IIS to the service
+powershell -ExecutionPolicy Bypass -File .\install-service.ps1 -Uninstall # back to IIS
+```
+
+It finds the IIS site whose root folder is the one the script runs from (or `-IisSiteName`), reuses
+that site's ports and HTTPS certificate (or pass `-HttpPort`, `-HttpsPort`, `-CertificateThumbprint`),
+then stops the site and its app pool and turns off their auto-start. If IIS is installed but no site
+serves the folder, it lists the sites and stops rather than guessing; it also stops if a port is still
+taken after IIS is stopped. It creates the service (`-ServiceName`, default `OmniCard`; delayed auto-start,
+restarts after a crash, depends on a local SQL Server instance) under the virtual account
+`NT SERVICE\<name>`. It grants that account read on the app folder, modify on `DataDirectory` and the
+watched scan folders, read on the certificate's private key, and `db_owner` on the OmniCard databases
+plus `dbcreator`, for a local SQL Server using Windows auth. It opens the ports in Windows Firewall for
+the local subnet, then starts the service and checks it answers. Re-run it to change ports or the
+certificate; it updates the existing service.
+
+- The endpoints live with the service, not in `appsettings.json`, so deploys don't touch them. They're
+  in the service's registry `Environment` value: `Kestrel__Endpoints__Http__Url`,
+  `Kestrel__Endpoints__Https__Url`, `HttpsCertificateThumbprint` (a `LocalMachine\My` certificate, loaded
+  by `WindowsServiceHosting`) and `WindowsService__Name`.
+- **Deploys work unchanged** with the `Share` method. The service honors `app_offline.htm` like the
+  ASP.NET Core Module does (`AppOfflineWatcher`): it stops so its DLLs can be replaced, and a detached
+  helper starts it again once the file is removed. The installer lets the service account start its
+  own service for this. `WebDeploy` needs IIS, so use `Share`.
+- The app is always running, so [Keep the app running](#keep-the-app-running-iis) doesn't apply.
+  Errors go to the Windows **Application** event log rather than `logs\stdout`.
+
+**Caching + compression (any host):** API responses and the SPA are Brotli/gzip-compressed (the ~1.6 MB
+bundle goes out as ~450 KB). Content-hashed `/app/assets/*` files are cached for a year
+(`immutable`), `index.html` is always revalidated so a deploy shows up on the next load, and
+`/card-images` are cached for a day. SignalR (`/hubs`) and `/mcp` are not compressed.
+
 ## Catalog data
 
 The per-game card catalogs, prices, and image hashes are refreshed **server-side** — the web app no
