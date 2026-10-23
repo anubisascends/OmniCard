@@ -12,7 +12,7 @@ What you can see and do in OmniCard depends on your role and permissions. If a s
 
 - Ask an administrator to change your role or give you the permission. See [Administration](help:administration).
 - Once they've saved the change, move to another page. Your sidebar and buttons update without signing out.
-- Some things are for administrators only, whatever their role: managing users, roles and sites, tag rules, watched scan folders, resetting the collection, changing the catalog update schedule, and changing receipt and scan badge settings.
+- Some things are for administrators only, whatever their role: managing users, roles and sites, tag rules, watched scan folders, resetting the collection, changing the catalog update schedule, changing receipt and scan badge settings, and setting up the customer kiosk.
 
 ![The message shown when you open a section you don't have access to](troubleshooting-no-access.png)
 
@@ -220,6 +220,26 @@ Check **Automatic updates** on the **Catalog Data** tab:
 - **Some updates failed.** The last run lists each failed update with its error under **Failed updates**. An administrator can fix the cause and click **Run now**.
 
 See [Administration](help:administration).
+
+## Kiosk problems
+
+**The kiosk shows "Set up this kiosk".** The device isn't a kiosk any more: its setup was revoked in **Administration ▸ Kiosk**, or the browser's data was cleared. An administrator sets it up again with their username and password. The old entry under **Kiosk devices** can then be revoked and deleted.
+
+*That isn't an administrator's username and password.* Only an administrator account can set up a kiosk or take a device out of kiosk mode. Other accounts are refused, even with the right password.
+
+**The kiosk says "The kiosk is closed" or "There's nothing to browse yet".** In **Administration ▸ Kiosk**, turn on **Kiosk open**, add at least one location under **Browsable locations**, and click **Save**. Then tap **Refresh** on the kiosk.
+
+**A card is in a browsable location but the kiosk doesn't show it.** The kiosk leaves out copies listed on TCGplayer or eBay, copies on an open order, copies another customer is holding, and cards marked missing or traded away.
+
+*Someone is already using "…". Try adding an initial or a nickname.* Names must be unique while a list is open, including lists waiting at the counter. The name frees up once staff create the order or cancel the list.
+
+*Sorry, someone else just took the last copy.* Another customer added the last available copy a moment earlier. If they remove it, it becomes available again.
+
+*Your session ended. Please enter your name to start again.* Nobody touched the kiosk for longer than the **Idle timeout (minutes)**, so the unsent list was cleared. An administrator can raise the timeout in **Administration ▸ Kiosk**.
+
+*No longer in stock: …. Remove those cards from the list first.* A card on the pick list was sold or removed some other way after the customer added it. On **Sales ▸ Kiosk**, remove that card from the list, then click **Create order** again.
+
+See [Customer kiosk](help:kiosk).
 
 ## eBay errors
 

@@ -49,7 +49,7 @@ export function App() {
         <Route path="/lists" element={<RequirePermission anyOf={['lists.view']}><ListsPage /></RequirePermission>} />
         <Route path="/trades" element={<RequirePermission anyOf={['trades.view']}><TradesPage /></RequirePermission>} />
         <Route path="/ship" element={<RequirePermission anyOf={['sales.orders.ship', 'sales.orders.edit']}><Suspense fallback={<LinearProgress />}><ShipPage /></Suspense></RequirePermission>} />
-        <Route path="/sales" element={<RequirePermission anyOf={['sales.orders.view', 'sales.customers.view', 'sales.listings.view']}><SalesPage /></RequirePermission>} />
+        <Route path="/sales" element={<RequirePermission anyOf={['sales.orders.view', 'sales.customers.view', 'sales.listings.view', 'sales.kiosk.view']}><SalesPage /></RequirePermission>} />
         {/* Administration is always reachable: it hosts self-service password change + the
             always-viewable Components tab. Individual tabs gate themselves. */}
         <Route path="/settings" element={<SettingsPage />} />

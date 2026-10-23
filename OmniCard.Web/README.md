@@ -648,6 +648,37 @@ behavior is Shipped. The order drawer's **Scan label** button fills **Tracking**
   Over plain HTTP the page says so and falls back to typed / handheld-scanner entry. Barcodes are decoded
   in the browser with ZXing (`@zxing/browser`); nothing is uploaded.
 
+## Customer kiosk
+
+A **customer-facing kiosk** at `/kiosk`: customers type a name, browse/search the cards in admin-chosen
+locations, and put copies on a pick list that staff fulfill from **Sales ▸ Kiosk**. It is a second page of
+the same Vite build (`ClientApp/kiosk.html` → `wwwroot/app/kiosk.html`, `src/kiosk/`), served by
+`MapFallbackToFile("/kiosk…")` with no staff shell, router or sign-in.
+
+- **Devices.** An administrator opens `/kiosk` on the device and enters their credentials once
+  (`POST /api/kiosk/enroll`). The device gets its own cookie scheme (`KioskAuth`, cookie `OmniCard.Kiosk`,
+  path `/api/kiosk`, 1-year sliding) naming a `KioskDevice` row — never the staff cookie, so the device
+  can't reach `/app` or any staff API. Revoke in **Administration ▸ Kiosk**, or tap the kiosk logo five
+  times and enter admin credentials (`/api/kiosk/unenroll`).
+- **Holds.** Cards are grouped by printing + condition + language; adding one creates `KioskHold` rows on
+  specific lots. Available = lot quantity − other open sessions' holds − copies on open (Created/Packed)
+  orders − copies actively listed on TCGplayer/eBay (in-store Manual listings stay sellable). All writes go
+  through the singleton `KioskService` under one lock, so two kiosks can't hold the same copy (single
+  server process). The order editor's sellable search/AddLine also subtracts kiosk holds.
+- **Sessions.** One customer per device; the name is unique among open sessions (`ActiveNameKey`, filtered
+  unique index). A Browsing session idle past the timeout expires lazily (holds ignored immediately,
+  closed on the next write/queue read); Queued/Picking lists never expire.
+- **Fulfillment.** `POST /api/kiosk-queue/{id}/order` creates a Manual order (status Created) for a new or
+  existing customer, one line per held lot at the price shown to the customer, then closes the list —
+  the open order keeps the copies reserved until it ships.
+- **Settings** (`kiosk-settings.json`, admin only, `GET|PUT /api/kiosk-settings`): open/closed, browsable
+  location ids, idle timeout (2–240 min), show prices, welcome message. Devices:
+  `GET /api/kiosk-settings/devices`, `POST …/devices/{id}/revoke`, `DELETE …/devices/{id}`.
+- Tables `KioskDevices`, `KioskSessions`, `KioskHolds` (migration `AddKiosk`). Permissions: **Sales ·
+  Kiosk ▸ View pick-list queue** (`sales.kiosk.view`) and **Fulfill pick lists** (`sales.kiosk.fulfill`).
+  Not site-scoped (like the rest of Sales): the browsable locations are the admin's explicit choice.
+- In dev, open the kiosk at http://localhost:5173/app/kiosk.html.
+
 ## Card labels
 
 **Administration ▸ Labels** holds shared, user-designed **label templates** for card-holder labels; the app
@@ -802,7 +833,7 @@ different currency.
 - **Strings:** `ClientApp/src/i18n/locales/en-US/*.json`, one file per feature area (namespace):
   `common` (shared actions/labels/conditions/channels/statuses), `nav`, `auth`, `account`, `dashboard`,
   `collection`, `locations`, `binder`, `sets`, `scan`, `sales`, `inventory`, `importing`, `lists`,
-  `trades`, `settings`, `deckbox`, `dialogs`, `search`, `help`, `labels`. Each file is keyed by its namespace object
+  `trades`, `settings`, `deckbox`, `dialogs`, `search`, `help`, `labels`, `kiosk`. Each file is keyed by its namespace object
   and spread into the bundle in `index.ts`.
 - **In-app help:** the **Help** item pinned to the bottom of the sidebar opens `/help`. Topics are
   Markdown files, one per topic per culture, in `ClientApp/src/help/<culture>/<topic-id>.md`; each topic

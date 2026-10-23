@@ -93,6 +93,12 @@ public static class Permissions
     public const string SalesListingsDelete = "sales.listings.delete";
     public const string SalesListingsPick = "sales.listings.pick";
 
+    // Sales · Kiosk
+    /// <summary>See the customer kiosk's pick-list queue.</summary>
+    public const string SalesKioskView = "sales.kiosk.view";
+    /// <summary>Claim, edit, cancel kiosk pick lists and turn them into orders.</summary>
+    public const string SalesKioskFulfill = "sales.kiosk.fulfill";
+
     // Settings
     public const string SettingsView = "settings.view";
     public const string SettingsEdit = "settings.edit";
@@ -203,6 +209,11 @@ public static class Permissions
             new(SalesListingsEdit, "edit", "Edit"),
             new(SalesListingsDelete, "delete", "Delete"),
             new(SalesListingsPick, "pick", "Pick / mark picked"),
+        ]),
+        new("sales.kiosk", "Sales · Kiosk",
+        [
+            new(SalesKioskView, "view", "View pick-list queue"),
+            new(SalesKioskFulfill, "fulfill", "Fulfill pick lists"),
         ]),
         new("settings", "Settings",
         [

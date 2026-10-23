@@ -21,6 +21,7 @@ Click **Administration** in the sidebar. Everyone can open this page, but you on
 | **eBay** | Connect eBay and set seller details | People with the eBay view permission |
 | **Roles** | Permission bundles | Administrators only |
 | **Sites** | Major physical places and who can see them | Administrators only |
+| **Kiosk** | The customer kiosk: what customers can browse, and the kiosk devices | Administrators only |
 | **Users** | Every account: add, edit, require password resets, delete | Administrators only |
 | **Reset Collection** | Remove the whole collection to start over, keeping sales data | Administrators only |
 | **Components** | Software versions and licenses | Everyone |
@@ -125,12 +126,13 @@ Permissions are grouped by section. Most sections have **View**, plus actions su
 | Sales · Orders | View, Create, Edit, Delete, Import orders, Ship (scan labels) |
 | Sales · Customers | View, Create, Edit, Delete |
 | Sales · Listings | View, Create, Edit, Delete, Pick / mark picked |
+| Sales · Kiosk | View pick-list queue, Fulfill pick lists |
 | Settings | View, Edit |
 | Deck Types | View, Edit |
 | Catalog Data | View, Refresh |
 | eBay | View, Manage / connect |
 
-Managing users, roles and sites isn't a permission. Only administrators can do it.
+Managing users, roles, sites and the customer kiosk's settings isn't a permission. Only administrators can do it.
 
 ## Sites
 
@@ -163,6 +165,10 @@ A person gets the higher of their own level and their role's level. Administrato
 1. Click the **Delete** button (bin) on the site's row.
 2. If the site has locations, choose a site under **Move its locations to**. Its locations and all their cards move there.
 3. Click **Delete**.
+
+## Kiosk
+
+Only administrators see this tab. It sets up the [customer kiosk](help:kiosk): whether kiosks are open, which locations customers can browse, the idle timeout, whether prices are shown, and the welcome message. Below the settings, **Kiosk devices** lists every device set up as a kiosk, with **Revoke** to lock one out.
 
 ## Catalog Data
 
@@ -381,3 +387,4 @@ This tab lists the software and third-party components that OmniCard ships with 
 - [Tag rules](help:tag-rules): tagging cards automatically
 - [Locations](help:locations): creating locations inside sites
 - [eBay](help:ebay) and [Sales](help:sales): selling cards
+- [Customer kiosk](help:kiosk): letting customers browse your cards and send pick lists to the counter

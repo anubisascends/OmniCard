@@ -15,7 +15,8 @@
       "sites": "Sites",
       "users": "Users",
       "reset": "Reset Collection",
-      "components": "Components"
+      "components": "Components",
+      "kiosk": "Kiosk"
     },
     "roles": {
       "title": "Roles",
