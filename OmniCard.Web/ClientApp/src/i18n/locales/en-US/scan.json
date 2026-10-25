@@ -17,7 +17,9 @@
       "foilWithType": "Foil ({{type}})",
       "foilType": "Foil type",
       "notePlaceholder": "e.g. signed, played, misprint…",
-      "languageDetected": "Language read from the card"
+      "languageDetected": "Language read from the card",
+      "foilDetected": "Foil — star (★) read from the card",
+      "nonFoilDetected": "Non-foil — dot (•) read from the card"
     },
     "controls": {
       "artSets": "Sets (art fallback)",

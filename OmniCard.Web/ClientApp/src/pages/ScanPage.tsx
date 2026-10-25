@@ -373,6 +373,8 @@ function mergeBatchItems(
         // A scan the reviewer already checked (e.g. to delete it) stays checked once its match lands.
         include: mine.include || matched.include,
         language: matched.language,
+        // The server applied a finish read off the card to the item.
+        ...(matched.match?.foilDetected != null ? { isFoil: matched.isFoil, foilType: matched.foilType } : {}),
       };
     }
     if (mine.status !== 'matching' && dto.status === 'Pending') return { ...mine, status: 'matching' as const };
@@ -845,6 +847,7 @@ function PropertyFields({
   foilTypeOptions,
   tagOptions,
   ruleTags,
+  foilDetected,
   disabled = false,
 }: {
   game: string;
@@ -854,6 +857,8 @@ function PropertyFields({
   tagOptions: string[];
   /** Tags a tag rule added (marked in the tags box). */
   ruleTags?: string[];
+  /** The finish the matcher read off the card, if any. */
+  foilDetected?: boolean | null;
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
@@ -925,6 +930,11 @@ function PropertyFields({
             sx={{ minWidth: 200 }}
             renderInput={(p) => <TextField {...p} label={t('scan.props.foilType')} />}
           />
+        )}
+        {foilDetected != null && foilDetected === props.isFoil && (
+          <Typography variant="caption" color="text.secondary">
+            {t(foilDetected ? 'scan.props.foilDetected' : 'scan.props.nonFoilDetected')}
+          </Typography>
         )}
       </Stack>
       <Autocomplete
@@ -1133,6 +1143,7 @@ function DetailPanel({
           foilTypeOptions={foilTypeOptions}
           tagOptions={tagOptions}
           ruleTags={item.ruleTags}
+          foilDetected={item.match?.foilDetected}
           disabled={readOnly}
         />
 
@@ -1854,6 +1865,11 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
           const patch: Partial<ScanItem> = { status: 'done', match, include: match.matched };
           // The server's language (printed marker > session choice > matched printing) seeds the copy.
           if (match.language) patch.language = match.language;
+          // So does a finish read off the card (MTG star = foil, bullet = non-foil).
+          if (match.foilDetected != null) {
+            patch.isFoil = match.foilDetected;
+            if (!match.foilDetected) patch.foilType = null;
+          }
           if (match.scanPreviewDataUri) patch.previewUrl = match.scanPreviewDataUri;
           updateItem(staging.key, patch);
         } catch (e) {

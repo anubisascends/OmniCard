@@ -140,6 +140,15 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     // a split or single read stays at the 0.9 floor and remains bound by that filter.
     private const double MtgUnanimousReadConfidence = 0.96;
 
+    // Since M15 the mark between the set code and the language on line 2 tells the finish: a round
+    // bullet ("MID • EN") on a non-foil, a star ("MID ★ EN") on a foil. Tesseract can't read the star,
+    // so the mark is measured instead (see ClassifyMtgFoilMarker). On 2,600+ real scans the two never
+    // overlapped: bullets stand ≤0.50 of the neighbouring letters' height and fill ≥0.68 of their box,
+    // stars stand ≥0.67 and fill ≤0.63 (a five-pointed star leaves its box corners empty).
+    private const int MtgFoilMarkerRasterW = 700;
+    private const double MtgFoilMarkerMinStarHeight = 0.58;
+    private const double MtgFoilMarkerMaxStarFill = 0.66;
+
     public Dictionary<string, ulong> SymbolHashes { get; set; } = [];
 
     // The List (plst) reprints print the MTG Planeswalker "hand" logo immediately left of the collector
@@ -386,17 +395,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
                 lum[y * w + x] = (byte)l; hist[l]++;
             }
 
-        double sum = 0; for (int i = 0; i < 256; i++) sum += i * hist[i];
-        double sumB = 0; int wB = 0; double maxVar = 0; int thr = 127;
-        for (int i = 0; i < 256; i++)
-        {
-            wB += hist[i]; if (wB == 0) continue;
-            int wF = total - wB; if (wF == 0) break;
-            sumB += i * hist[i];
-            double mB = sumB / wB, mF = (sum - sumB) / wF;
-            double between = (double)wB * wF * (mB - mF) * (mB - mF);
-            if (between > maxVar) { maxVar = between; thr = i; }
-        }
+        int thr = OtsuThreshold(hist, total);
 
         int dark = 0; for (int i = 0; i < total; i++) if (lum[i] <= thr) dark++;
         bool textIsDark = dark <= total / 2; // ink = the minority tone
@@ -410,6 +409,23 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
                 outBmp.SetPixel(x, y, ink ? Color.Black : Color.White);
             }
         return outBmp;
+    }
+
+    // Otsu's threshold over a 256-bin luminance histogram: the level that best splits it into two tones.
+    private static int OtsuThreshold(int[] hist, int total)
+    {
+        double sum = 0; for (int i = 0; i < 256; i++) sum += i * hist[i];
+        double sumB = 0; int wB = 0; double maxVar = 0; int thr = 127;
+        for (int i = 0; i < 256; i++)
+        {
+            wB += hist[i]; if (wB == 0) continue;
+            int wF = total - wB; if (wF == 0) break;
+            sumB += i * hist[i];
+            double mB = sumB / wB, mF = (sum - sumB) / wF;
+            double between = (double)wB * wF * (mB - mF) * (mB - mF);
+            if (between > maxVar) { maxVar = between; thr = i; }
+        }
+        return thr;
     }
 
     public Task<(string? CollectorNumber, double Confidence)> DetectOptcgCollectorNumberAsync(byte[] imageData)
@@ -981,6 +997,142 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         {
             _logger.LogWarning(ex, "Failed to load MTG List glyph references — detection disabled");
         }
+    }
+
+    public Task<bool?> DetectMtgFoilMarkerAsync(byte[] imageData) => Task.Run(() => DetectMtgFoilMarker(imageData));
+
+    // Reads the finish off the set-code line: true for the foil star, false for the non-foil bullet, null
+    // when that line can't be found (pre-M15 frames print none, or the scan is rotated/cropped).
+    private bool? DetectMtgFoilMarker(byte[] imageData)
+    {
+        try
+        {
+            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            if (bitmap.Width > bitmap.Height) return null;
+            var rect = ToPixelRect(MtgCollectorRegion, bitmap.Width, bitmap.Height);
+            if (rect.Width < 10 || rect.Height < 5) return null;
+
+            // Enlarge so the bullet (a few pixels at scanner resolution) has a measurable shape.
+            int w = MtgFoilMarkerRasterW, h = Math.Max(1, (int)(rect.Height * (double)w / rect.Width));
+            var foil = ClassifyMtgFoilMarker(GrayResize(bitmap, rect, w, h), w, h);
+            _logger.LogDebug("MTG foil marker: {Marker}", foil switch { true => "star", false => "bullet", null => "not found" });
+            return foil;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "MTG foil marker detection failed");
+            return null;
+        }
+    }
+
+    // A connected run of ink pixels in the binarized corner crop.
+    private readonly record struct InkBlob(int X0, int Y0, int X1, int Y1, int Area)
+    {
+        public int W => X1 - X0;
+        public int H => Y1 - Y0;
+        public double CenterY => (Y0 + Y1) / 2.0;
+    }
+
+    // Finds the mark between the set code and the language in the MTG collector-block raster (row-major
+    // luminance) and classifies it: true = star (foil), false = bullet (non-foil), null = not found.
+    // The mark is the blob that sits mid-height between two letters with a 2–5 character set code
+    // running left of it and a 1–2 character language right of it, each ended by a word gap — the
+    // layout rules out letters and the collector line above. Exposed internal for the tests.
+    internal static bool? ClassifyMtgFoilMarker(float[] lum, int w, int h)
+    {
+        var hist = new int[256];
+        foreach (var v in lum) hist[Math.Clamp((int)v, 0, 255)]++;
+        int thr = OtsuThreshold(hist, lum.Length);
+        var ink = new bool[lum.Length];
+        int bright = 0;
+        for (int i = 0; i < lum.Length; i++) if (ink[i] = lum[i] > thr) bright++;
+        // Ink is the minority tone: light text on the usual black border, dark text on a white one.
+        if (bright > lum.Length / 2)
+            for (int i = 0; i < ink.Length; i++) ink[i] = !ink[i];
+
+        var blobs = FindInkBlobs(ink, w, h);
+        // Letter-sized: a text line's height range within the two-line crop, not touching its edges.
+        bool IsLetter(InkBlob b) => b.H >= 0.12 * h && b.H <= 0.40 * h && b.W <= b.H * 1.8 && b.Y0 > 0 && b.Y1 < h;
+
+        InkBlob? best = null;
+        double bestRel = 0, bestFill = 0;
+        foreach (var s in blobs)
+        {
+            if (s.W < 3 || s.H < 3 || s.W < 0.6 * s.H || s.W > 1.6 * s.H) continue;
+            var cy = s.CenterY;
+            var line = blobs.Where(l => l != s && IsLetter(l) && l.Y0 < cy && cy < l.Y1).ToList();
+            var lineLeft = line.Where(l => l.X1 <= s.X0).ToList();
+            var lineRight = line.Where(l => l.X0 >= s.X1).ToList();
+            if (lineLeft.Count == 0 || lineRight.Count == 0) continue;
+            var nearLeft = lineLeft.MaxBy(l => l.X1);
+            var nearRight = lineRight.MinBy(l => l.X0);
+            double letterH = (nearLeft.H + nearRight.H) / 2.0;
+            if (Math.Abs(nearLeft.H - nearRight.H) > 0.2 * letterH) continue;
+            if (s.H < 0.2 * letterH || s.H > 0.97 * letterH) continue;
+            double mid = (nearLeft.CenterY + nearRight.CenterY) / 2;
+            if (Math.Abs(cy - mid) > 0.2 * letterH) continue;
+
+            // Every mark on the line — letters, bullets, punctuation — so a short letter ("L", "T") can't
+            // pose as the mark: its neighbour on one side would be the real bullet, not a letter.
+            int top = Math.Min(nearLeft.Y0, nearRight.Y0), bottom = Math.Max(nearLeft.Y1, nearRight.Y1);
+            var marks = blobs.Where(k => k != s && k.H >= 0.2 * letterH
+                    && k.CenterY >= top - 0.1 * letterH && k.CenterY <= bottom + 0.1 * letterH)
+                .OrderBy(k => k.X0).ToList();
+            var left = marks.Where(k => k.X1 <= s.X0).ToList();
+            var right = marks.Where(k => k.X0 >= s.X1).ToList();
+            if (left.Count == 0 || right.Count == 0 || !IsLetter(left[^1]) || !IsLetter(right[0])) continue;
+            if (s.X0 - left[^1].X1 > 1.2 * letterH || right[0].X0 - s.X1 > 1.2 * letterH) continue;
+
+            double wordGap = 0.8 * letterH;
+            int setChars = 1;
+            for (int j = left.Count - 1; j > 0 && left[j].X0 - left[j - 1].X1 <= wordGap; j--) setChars++;
+            int langChars = 1;
+            for (int j = 0; j < right.Count - 1 && right[j + 1].X0 - right[j].X1 <= wordGap; j++) langChars++;
+            if (setChars is < 2 or > 5 || langChars > 2) continue;
+
+            // Several lines can qualify (rarely); the set code is on the lower one, leftmost first.
+            if (best is { } b && !(cy > b.CenterY + 0.5 * letterH || (Math.Abs(cy - b.CenterY) <= 0.5 * letterH && s.X0 < b.X0)))
+                continue;
+            best = s;
+            bestRel = s.H / letterH;
+            bestFill = (double)s.Area / (s.W * s.H);
+        }
+
+        if (best is null) return null;
+        if (bestRel < MtgFoilMarkerMinStarHeight) return false;
+        return bestFill <= MtgFoilMarkerMaxStarFill ? true : null;
+    }
+
+    // 8-connected components of the ink mask.
+    private static List<InkBlob> FindInkBlobs(bool[] ink, int w, int h)
+    {
+        var blobs = new List<InkBlob>();
+        var seen = new bool[ink.Length];
+        var stack = new Stack<int>();
+        for (int start = 0; start < ink.Length; start++)
+        {
+            if (!ink[start] || seen[start]) continue;
+            int x0 = w, y0 = h, x1 = 0, y1 = 0, area = 0;
+            seen[start] = true;
+            stack.Push(start);
+            while (stack.Count > 0)
+            {
+                int p = stack.Pop(), px = p % w, py = p / w;
+                area++;
+                x0 = Math.Min(x0, px); x1 = Math.Max(x1, px + 1);
+                y0 = Math.Min(y0, py); y1 = Math.Max(y1, py + 1);
+                for (int dy = -1; dy <= 1; dy++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int nx = px + dx, ny = py + dy;
+                        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+                        int n = ny * w + nx;
+                        if (ink[n] && !seen[n]) { seen[n] = true; stack.Push(n); }
+                    }
+            }
+            blobs.Add(new InkBlob(x0, y0, x1, y1, area));
+        }
+        return blobs;
     }
 
     // Parses the modern MTG bottom-left block into (set code, collector number). Both must be found

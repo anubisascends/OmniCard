@@ -70,6 +70,8 @@ public sealed class ScanBatchProcessor(
             var json = JsonSerializer.Serialize(match, ScanBatchStorage.Json);
             var include = match.Matched;
             var language = match.Language;
+            // The finish printed on the card (MTG ★/•) replaces the batch default; a non-foil drops its finish.
+            var foil = match.FoilDetected;
             // Only a still-pending row is written: a reviewer who removed the item meanwhile wins.
             await ctx.ScanBatchItems
                 .Where(i => i.Id == item.Id && i.Status == ScanBatchItemStatus.Pending)
@@ -79,6 +81,8 @@ public sealed class ScanBatchProcessor(
                     .SetProperty(i => i.Error, (string?)null)
                     .SetProperty(i => i.Include, include)
                     .SetProperty(i => i.Language, i => language ?? i.Language)
+                    .SetProperty(i => i.IsFoil, i => foil ?? i.IsFoil)
+                    .SetProperty(i => i.FoilType, i => foil == false ? null : i.FoilType)
                     .SetProperty(i => i.PreviewFileName, previewName), ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)

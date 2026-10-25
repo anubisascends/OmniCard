@@ -823,6 +823,9 @@ export interface ScanMatchDto {
   language?: string | null;
   /** True when `language` was read from the card rather than assumed. */
   languageDetected?: boolean;
+  /** The finish read off the card (MTG: star between set code and language = foil, bullet = non-foil);
+   * null when not read. Matching and `marketPrice` already used it. */
+  foilDetected?: boolean | null;
 }
 
 export interface ScanSearchResultDto {
