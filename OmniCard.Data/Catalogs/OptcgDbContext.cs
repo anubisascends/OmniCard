@@ -50,6 +50,8 @@ public class OptcgDbContext : DbContext
         if (!Database.IsSqlite())
         {
             CatalogSchema.AddSqlServerColumnIfMissing(this, "Cards", "Lang", "nvarchar(16) NOT NULL CONSTRAINT DF_Cards_Lang DEFAULT 'en'");
+            CatalogSchema.AddSqlServerColumnIfMissing(this, "Cards", "TcgplayerId", "int NULL");
+            CatalogSchema.AddSqlServerColumnIfMissing(this, "Cards", "FromTcgCsv", "bit NOT NULL CONSTRAINT DF_Cards_FromTcgCsv DEFAULT 0");
             return;
         }
 
@@ -63,6 +65,8 @@ public class OptcgDbContext : DbContext
         AddColumnIfMissing(conn, "Artist TEXT");
         AddColumnIfMissing(conn, "EdgeHash INTEGER");
         AddColumnIfMissing(conn, "Lang TEXT NOT NULL DEFAULT 'en'");
+        AddColumnIfMissing(conn, "TcgplayerId INTEGER");
+        AddColumnIfMissing(conn, "FromTcgCsv INTEGER NOT NULL DEFAULT 0");
     }
 
     private static void AddColumnIfMissing(System.Data.Common.DbConnection conn, string columnDef)
@@ -94,6 +98,7 @@ public class OptcgDbContext : DbContext
         card.HasIndex(c => c.CardColor);
         card.HasIndex(c => c.ImageHash);
         card.HasIndex(c => c.EdgeHash);
+        card.HasIndex(c => c.TcgplayerId);
 
         // HashCorrection entity
         modelBuilder.Entity<HashCorrection>(e =>

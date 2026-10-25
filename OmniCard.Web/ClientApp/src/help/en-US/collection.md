@@ -202,6 +202,7 @@ A selected stacked row counts every entry in the stack. Your selection stays whe
 | **Bulk edit** | Changes properties on all selected cards. |
 | **List for sale** | Lists all selected cards for sale at their market price. |
 | **Export CSV** | Downloads the selected cards as a file. |
+| **Print labels** | Prints labels for the selected cards from a label template. See [Labels](help:labels). Needs the Print labels permission. |
 | **Delete** | Deletes the selected cards after you confirm. This can't be undone. |
 
 ### Bulk edit
@@ -265,6 +266,8 @@ The **Missing** tab lists cards you don't have enough of, with the cost to buy t
 - **Move to deck box…** moves every picked copy into a deck box you choose (or create). This is only available once you own every card in the deck and have permission to move cards. If some copies are listed for sale or are in another deck box, a message warns you before you move them.
 
 After a move, the check runs again so the pull list shows the cards' new location. The dialog keeps its results while you close it to look at your collection.
+
+To keep a deck box matched to an online deck as it changes, link the deck box to the deck and use **Sync from URL** instead. See [Link a deck box to an online deck](help:deck-boxes#link-a-deck-box-to-an-online-deck).
 
 For deck boxes and saved card lists, see [Deck boxes](help:deck-boxes) and [Lists](help:lists).
 

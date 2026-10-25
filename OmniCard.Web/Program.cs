@@ -5,6 +5,8 @@ using OmniCard.CardMatching;
 using OmniCard.Collection;
 using OmniCard.Data;
 using OmniCard.Web.Services;
+using OmniCard.Web.Services.Kiosk;
+using OmniCard.Shared.Kiosk;
 using OmniCard.Shared.Audit;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
@@ -33,8 +35,39 @@ using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Mcp;
 using ModelContextProtocol.AspNetCore.Authentication;
 using Serilog;
+using Microsoft.Extensions.Hosting.WindowsServices;
 
-var builder = WebApplication.CreateBuilder(args);
+// Run as a Windows service when installed as one (install-service.ps1): the app then hosts itself on
+// Kestrel instead of IIS, which on a Windows client OS caps a site at 10 concurrent requests. The SCM
+// starts services in System32, so root the app at its own folder; IIS / dotnet run are unaffected.
+var runningAsService = WindowsServiceHelpers.IsWindowsService();
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = runningAsService ? AppContext.BaseDirectory : null,
+});
+builder.Host.UseWindowsService();
+if (runningAsService)
+    builder.Services.AddHostedService<AppOfflineWatcher>();
+
+// The service install points Kestrel's HTTPS endpoint at a machine-store certificate by thumbprint
+// (Kestrel's own config can only pick store certificates by subject, which is ambiguous for the
+// self-signed certs IIS leaves behind). Endpoints themselves come from the Kestrel config section.
+var httpsThumbprint = builder.Configuration["HttpsCertificateThumbprint"];
+if (!string.IsNullOrWhiteSpace(httpsThumbprint))
+{
+    var httpsCertificate = WindowsServiceHosting.LoadMachineCertificate(httpsThumbprint);
+    builder.WebHost.ConfigureKestrel(kestrel =>
+        kestrel.ConfigureHttpsDefaults(https => https.ServerCertificate = httpsCertificate));
+}
+
+// Compress API JSON and the SPA bundle (~1.6 MB of JS → ~0.4 MB). Brotli first, gzip fallback, at
+// Optimal: ~20 ms for the bundle, which browsers then cache (see the static-file headers below).
+builder.Services.AddResponseCompression(options => options.EnableForHttps = true);
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProviderOptions>(
+    options => options.Level = System.IO.Compression.CompressionLevel.Optimal);
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProviderOptions>(
+    options => options.Level = System.IO.Compression.CompressionLevel.Optimal);
 
 // Load shared settings from %localappdata%/OmniCard (same as desktop app)
 var sharedSettingsDir = Path.Combine(
@@ -210,6 +243,8 @@ builder.Services.AddSingleton(sp =>
     new WebBinderCardService(writableFactory, sp.GetRequiredService<IDataPathService>(),
         sp.GetRequiredService<IEnumerable<ICardGameService>>().ToDictionary(s => s.Game)));
 builder.Services.AddSingleton<LocationImportService>();
+// Deck box ↔ Moxfield/Archidekt link + "Sync from URL" (LocationsController deck-link / deck-sync).
+builder.Services.AddSingleton<DeckBoxSyncService>();
 // Shared scan → lots write path (interactive scan commit + watched-folder batch commits).
 builder.Services.AddSingleton<ScanCommitService>();
 // Admin-defined auto-tagging rules (Settings ▸ Tag rules): checked in scan review, applied to imports.
@@ -219,9 +254,24 @@ builder.Services.AddSingleton(sp => new OmniCard.Web.Services.TagRules.TagRuleSe
     sp.GetRequiredService<ITagService>(),
     sp.GetRequiredService<TimeProvider>(),
     sp.GetRequiredService<ILogger<OmniCard.Web.Services.TagRules.TagRuleService>>()));
+// Scan validation (Scan page): flag scanned cards that don't match a search; saved per-game rules.
+builder.Services.AddSingleton(sp => new OmniCard.Web.Services.ScanValidation.ScanValidationService(
+    writableFactory,
+    sp.GetRequiredService<IEnumerable<ICardGameService>>(),
+    sp.GetRequiredService<TimeProvider>()));
+// Card labels (Settings ▸ Labels): shared, user-designed label templates + the card data a print run
+// fills them with. The PDF is rendered in the browser (pdfme).
+builder.Services.AddSingleton(sp => new OmniCard.Web.Services.Labels.LabelTemplateService(
+    writableFactory,
+    sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddSingleton(sp => new OmniCard.Web.Services.Labels.LabelDataService(
+    writableFactory,
+    sp.GetRequiredService<IEnumerable<ICardGameService>>(),
+    sp.GetRequiredService<ICardService>(),
+    sp.GetService<IDbContextFactory<ScryfallDbContext>>()));
 
 // Watched-folder scan batches: images dropped in a per-game folder are picked up, matched in the
-// background (the app's only BackgroundService) and reviewed/committed from the Scan page.
+// background (ScanBatchHostedService) and reviewed/committed from the Scan page.
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<OmniCard.Web.Services.ScanBatches.ScanBatchStorage>();
 builder.Services.AddSingleton(sp => new OmniCard.Web.Services.ScanBatches.ScanFolderIngestor(
@@ -244,6 +294,12 @@ builder.Services.AddSingleton(sp => new OmniCard.Web.Services.ScanBatches.ScanBa
     sp.GetRequiredService<TimeProvider>(),
     sp.GetRequiredService<ILogger<OmniCard.Web.Services.ScanBatches.ScanBatchService>>()));
 builder.Services.AddHostedService<OmniCard.Web.Services.ScanBatches.ScanBatchHostedService>();
+// Automatic catalog updates (Settings ▸ Catalog data, admin-only schedule): refreshes card data +
+// prices through CatalogRefreshService at the configured times. Resolvable directly for "Run now".
+builder.Services.AddSingleton<ICatalogScheduleSettingsService>(sp =>
+    new CatalogScheduleSettingsService(sp.GetRequiredService<IDataPathService>(), sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddSingleton<CatalogScheduleHostedService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<CatalogScheduleHostedService>());
 builder.Services.AddScoped<BinderStateBuilder>();
 
 // User accounts + authentication. Passwords are stored only as salted PBKDF2 hashes; the built-in
@@ -268,6 +324,11 @@ builder.Services.AddSingleton(sp => new CollectionResetService(writableFactory,
     siteAccessService, sp.GetRequiredService<ILogger<CollectionResetService>>()));
 builder.Services.AddScoped(sp => new RequestSiteAccess(
     sp.GetRequiredService<IHttpContextAccessor>(), siteAccessService, writableFactory));
+// Customer kiosk (/kiosk): admin-enrolled devices where customers browse chosen locations and hold
+// cards on a pick list for staff to pull (Sales ▸ Kiosk). One singleton so its write lock is shared.
+builder.Services.AddSingleton<IKioskSettingsService, KioskSettingsService>();
+builder.Services.AddSingleton<IKioskCardEnricher, KioskCardEnricher>();
+builder.Services.AddSingleton<KioskService>();
 // Saved views of the Collection / Location pages (per user, plus admin-shared views and defaults).
 builder.Services.AddSingleton(sp => new SavedViewService(writableFactory, sp.GetRequiredService<TimeProvider>()));
 
@@ -291,6 +352,8 @@ var authBuilder = builder.Services
         options.Events.OnRedirectToLogin = ctx => { ctx.Response.StatusCode = 401; return Task.CompletedTask; };
         options.Events.OnRedirectToAccessDenied = ctx => { ctx.Response.StatusCode = 403; return Task.CompletedTask; };
     });
+// Kiosk devices carry their own cookie (scoped to /api/kiosk), never the staff sign-in — see KioskAuth.
+authBuilder.AddCookie(KioskAuth.Scheme, KioskAuth.Configure);
 
 // Cookie stays the app-wide default scheme (above); the JWT + MCP schemes are added only as named
 // schemes scoped to the /mcp endpoint, so the SPA's cookie auth is unaffected.
@@ -420,7 +483,25 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-app.UseStaticFiles();
+// Long-lived streams (SignalR, MCP's streamable HTTP) stay uncompressed so their messages aren't held
+// in a compression buffer.
+app.UseWhen(
+    ctx => !ctx.Request.Path.StartsWithSegments("/hubs") && !ctx.Request.Path.StartsWithSegments("/mcp"),
+    branch => branch.UseResponseCompression());
+
+// Vite content-hashes everything under /app/assets, so a file there never changes: let browsers keep
+// it for a year instead of re-checking it on every page load. index.html (no-cache, below) is what
+// points them at a new build's files.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        if (ctx.Context.Request.Path.StartsWithSegments("/app/assets"))
+            ctx.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        else if (ctx.File.Name.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
+            ctx.Context.Response.Headers.CacheControl = "no-cache";
+    },
+});
 app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -444,6 +525,9 @@ if (Directory.Exists(scansDir))
     {
         FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(cardImagesDir),
         RequestPath = CardImageCacheService.RequestPath,
+        // A card grid requests dozens of these at once; a day's caching spares the re-checks on every
+        // revisit. Kept short because an art refresh overwrites a card's image at the same URL.
+        OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "public, max-age=86400",
     });
 }
 
@@ -489,7 +573,19 @@ app.MapOpenApi();
 // The React SPA (built into wwwroot/app by `npm run build`) is the entire app now — the legacy Razor
 // pages have been retired. Serve it at /app, with a fallback so client-side deep links (e.g.
 // /app/collection) resolve to its index.html, and redirect the site root to it.
-app.MapFallbackToFile("/app/{*path:nonfile}", "/app/index.html");
+app.MapFallbackToFile("/app/{*path:nonfile}", "/app/index.html", new StaticFileOptions
+{
+    // Always revalidate the shell, so a deploy's new content-hashed bundles are picked up at once.
+    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache",
+});
+// The customer kiosk is a separate, shell-less page of the same build (kiosk.html); /kiosk and any
+// deep link under it serve it.
+var kioskShell = new StaticFileOptions
+{
+    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache",
+};
+app.MapFallbackToFile("/kiosk", "/app/kiosk.html", kioskShell);
+app.MapFallbackToFile("/kiosk/{*path:nonfile}", "/app/kiosk.html", kioskShell);
 app.MapGet("/", () => Results.Redirect("/app/"));
 
 Console.WriteLine($"Serving collection from: {dataDir}");

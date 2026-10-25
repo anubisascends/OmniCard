@@ -44,6 +44,16 @@ public sealed class SetsController(
         return svc.GetAvailableSets().Select(DtoMapping.ToDto).ToList();
     }
 
+    /// <summary>Lower-cased codes of the sets the user owns at least one card in.</summary>
+    [HttpGet("owned")]
+    [RequirePermission(Permissions.SetsView)]
+    public ActionResult<IReadOnlyList<string>> Owned([FromQuery] string game)
+    {
+        if (!Enum.TryParse<CardGame>(game, ignoreCase: true, out var g))
+            return NotFound(new { error = $"Unknown game '{game}'." });
+        return checklistService.GetOwnedSetCodes(g).Order(StringComparer.Ordinal).ToList();
+    }
+
     /// <summary>The ownership checklist for one set (every printing + owned quantity + prices).</summary>
     [HttpGet("{game}/{setCode}")]
     [RequirePermission(Permissions.SetsView)]

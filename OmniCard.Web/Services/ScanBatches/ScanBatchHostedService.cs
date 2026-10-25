@@ -3,10 +3,12 @@ using OmniCard.Shared.Settings;
 namespace OmniCard.Web.Services.ScanBatches;
 
 /// <summary>
-/// The background loop behind watched scan folders. Each pass picks up new files
-/// (<see cref="ScanFolderIngestor"/>), matches pending batch items (<see cref="ScanBatchProcessor"/>)
-/// and, hourly, purges expired batches. A <see cref="FileSystemWatcher"/> per folder only wakes the
-/// loop early; a full rescan every minute (and at startup) is what guarantees nothing is missed, since
+/// The background loop behind watched scan folders. Each pass checks the folders for waiting batches and
+/// starts the ones that are due (<see cref="ScanFolderIngestor"/>), matches pending batch items
+/// (<see cref="ScanBatchProcessor"/>) and, hourly, purges expired batches. The folders are checked
+/// every pass while any batch is waiting, so each batch's own timer is honored to within a few seconds
+/// and Run takes effect promptly. A <see cref="FileSystemWatcher"/> per folder only wakes the loop
+/// early; a full rescan every minute (and at startup) is what guarantees nothing is missed, since
 /// watcher events can be dropped.
 ///
 /// Under IIS this only runs while the app is running: the app pool needs AlwaysRunning + preload, or
@@ -54,16 +56,15 @@ public sealed class ScanBatchHostedService(
 
                 var now = clock.GetUtcNow();
                 var fileEvent = Interlocked.Exchange(ref _fileEvent, 0) == 1;
-                if (settings.Enabled && (fileEvent || now >= nextScan || ingestor.HasUnsettledFiles))
+                if (settings.Enabled && (fileEvent || now >= nextScan || ingestor.HasWaitingBatches))
                 {
                     ingestor.RunOnce(settings);
                     if (now >= nextScan)
                         nextScan = now + RescanInterval;
                 }
 
-                var quiet = TimeSpan.FromSeconds(settings.QuietPeriodSeconds);
                 var burstEnd = clock.GetUtcNow() + MatchBurst;
-                while (await processor.ProcessNextAsync(quiet, settings.AutoProcess, stoppingToken))
+                while (await processor.ProcessNextAsync(stoppingToken))
                 {
                     if (clock.GetUtcNow() >= burstEnd)
                     {

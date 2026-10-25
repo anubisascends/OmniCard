@@ -69,6 +69,8 @@ export interface CardDto {
   isTraded: boolean;
   /** "Listed" or "Picked" when this lot is already on the market, else null. Used to block re-listing. */
   listingStatus?: string | null;
+  /** TCGplayer product (or search) link — only on the single-card read. */
+  tcgPlayerUrl?: string | null;
 }
 
 /**
@@ -123,6 +125,101 @@ export interface LocationSummaryDto {
   /** Lists (find in collection, owned counts, putting a list away) and decklist checks ignore this
    * location's cards — e.g. a sales binder or a deck in use. */
   ignoredForLists: boolean;
+  /** The Moxfield/Archidekt deck URL a deck box is linked to. */
+  sourceUrl?: string | null;
+  /** Deck site of `sourceUrl` ("Moxfield", "Archidekt"). */
+  sourceName?: string | null;
+  /** When the deck box was last synced from `sourceUrl` (UTC ISO). */
+  sourceSyncedAt?: string | null;
+  /** A supported deck site serves this deck box's game, so it can be linked. */
+  deckLinkSupported?: boolean;
+}
+
+/** Owned cards in one location that match a collection search (card rows, like `cardCount`). */
+export interface LocationSearchMatchDto {
+  locationId: number;
+  matchCount: number;
+}
+
+/** An owned copy that could go into a deck box during a sync. `ignoredReason`: "Location" (its location is
+ * ignored for lists — usable, never suggested) or "Listed" (listed for sale — not usable). */
+export interface DeckSyncSourceDto {
+  lotId: number;
+  cardName: string;
+  setCode: string | null;
+  collectorNumber: string | null;
+  isFoil: boolean;
+  language: string | null;
+  condition: string | null;
+  locationId: number;
+  locationName: string;
+  section: string | null;
+  page: number | null;
+  slot: number | null;
+  available: number;
+  suggested: number;
+  isExactPrinting: boolean;
+  ignoredReason: 'Location' | 'Listed' | null;
+  imageUri: string | null;
+}
+
+/** A card the linked deck wants more copies of than the deck box holds. */
+export interface DeckSyncAddDto {
+  cardName: string;
+  setCode: string | null;
+  collectorNumber: string | null;
+  isFoil: boolean;
+  needed: number;
+  imageUri: string | null;
+  /** The previous sync marked it "not in collection". */
+  markedNotInCollection: boolean;
+  sources: DeckSyncSourceDto[];
+}
+
+/** A deck-box lot (or part of one) the linked deck no longer wants. */
+export interface DeckSyncCutDto {
+  lotId: number;
+  cardName: string;
+  setCode: string | null;
+  collectorNumber: string | null;
+  isFoil: boolean;
+  quantity: number;
+  /** Already tagged sideboard (kept by default). */
+  isSideboard: boolean;
+  imageUri: string | null;
+}
+
+export interface DeckSyncPreviewDto {
+  deckBoxId: number;
+  deckBoxName: string;
+  sourceUrl: string;
+  deckName: string;
+  deckCardCount: number;
+  keepCount: number;
+  adds: DeckSyncAddDto[];
+  cuts: DeckSyncCutDto[];
+}
+
+export type DeckSyncCutAction = 'Move' | 'Sideboard' | 'Keep';
+
+export interface DeckBoxMissingCardDto {
+  cardName: string;
+  setCode: string | null;
+  collectorNumber: string | null;
+  quantity: number;
+}
+
+export interface DeckSyncApplyRequest {
+  picks: { lotId: number; quantity: number }[];
+  cuts: { lotId: number; quantity: number; action: DeckSyncCutAction; destinationId: number | null }[];
+  notInCollection: DeckBoxMissingCardDto[];
+}
+
+export interface DeckSyncResultDto {
+  added: number;
+  removed: number;
+  sideboarded: number;
+  notInCollection: number;
 }
 
 /** A site: a MAJOR physical location (a home, a shop) holding many storage locations. `access` is
@@ -419,6 +516,8 @@ export interface ListingDetailDto {
 export interface SalesSettingsDto {
   forSaleLocationId?: number | null;
   movePickedToForSaleLocation: boolean;
+  /** Order add-card search covers every game instead of following the game selector. */
+  orderSearchAllGames: boolean;
 }
 
 /** Value-tier badge config for the scan page. `thresholds` is an ascending list of price ceilings
@@ -576,6 +675,8 @@ export interface LocationImportResultDto {
   substitutions: LocationImportIssueDto[];
   /** New cards the tag rules tagged. */
   ruleTagged?: number;
+  /** The target was an unlinked deck box, and it's now linked to the imported deck URL. */
+  linkedDeckBox?: boolean;
 }
 
 /** A rejected location import (HTTP 422): nothing was written. */
@@ -593,6 +694,8 @@ export interface ImportUrlResultDto {
   substitutedNames: string[];
   /** New cards the tag rules tagged. */
   ruleTagged?: number;
+  /** The target was an unlinked deck box, and it's now linked to the imported deck URL. */
+  linkedDeckBox?: boolean;
 }
 
 export interface SetInfoDto {
@@ -720,6 +823,9 @@ export interface ScanMatchDto {
   language?: string | null;
   /** True when `language` was read from the card rather than assumed. */
   languageDetected?: boolean;
+  /** The finish read off the card (MTG: star between set code and language = foil, bullet = non-foil);
+   * null when not read. Matching and `marketPrice` already used it. */
+  foilDetected?: boolean | null;
 }
 
 export interface ScanSearchResultDto {
@@ -784,7 +890,8 @@ export interface AuditCommitResultDto {
 
 // --- Scan batches (watched scan folders, matched in the background) ---
 
-export type ScanBatchStatus = 'Collecting' | 'Matching' | 'Ready' | 'Committed' | 'Discarded';
+/** Collecting = files still untouched in the watched folder; Starting = Run pressed (or timer up), files being taken in. */
+export type ScanBatchStatus = 'Collecting' | 'Starting' | 'Matching' | 'Ready' | 'Committed' | 'Discarded';
 
 export interface ScanBatchSummaryDto {
   id: number;
@@ -799,8 +906,14 @@ export interface ScanBatchSummaryDto {
   committed: number;
   /** Images set aside at pickup as exact copies of ones already scanned (not in `total`). */
   duplicates: number;
-  /** Collecting with auto-processing off: matching waits for Run. */
+  /** Collecting with auto-processing off: the batch waits for Run. */
   awaitingRun: boolean;
+  /** While Collecting/Starting: image files still sitting untouched in the watched folder. */
+  waitingFiles: number;
+  /** While Collecting with auto-processing on: when the batch starts by itself if its files don't change again. */
+  startsUtc?: string | null;
+  /** Committing/discarding also deletes the originals in _processed. */
+  deletesOriginalsOnClose: boolean;
   claimedBy?: string | null;
   claimedByMe: boolean;
   createdUtc: string;
@@ -887,10 +1000,12 @@ export interface ScanFolderConfigDto {
 
 export interface ScanFolderSettingsDto {
   enabled: boolean;
-  /** Match batches on their own after the quiet period; false = wait for Run on the Scan page. */
+  /** Start batches on their own after the quiet period; false = wait for Run on the Scan page. */
   autoProcess: boolean;
   quietPeriodSeconds: number;
   retentionDays: number;
+  /** Delete a batch's originals from _processed when it's committed or discarded. */
+  deleteOriginalsOnClose: boolean;
   folders: ScanFolderConfigDto[];
 }
 
@@ -977,6 +1092,35 @@ export interface CatalogJobDto {
   message: string;
   startedAt: string;
   finishedAt?: string | null;
+  /** Started by the automatic update schedule. */
+  scheduled?: boolean;
+}
+
+/** The automatic catalog update schedule (Settings ▸ Catalog data). Times are "HH:mm" in the server's
+ * time zone; days are English day names (Sunday…Saturday); games are game ids. */
+export interface CatalogScheduleDto {
+  enabled: boolean;
+  times: string[];
+  days: string[];
+  games: string[];
+  updateCards: boolean;
+  updatePrices: boolean;
+}
+
+export interface CatalogScheduleResponse {
+  schedule: CatalogScheduleDto;
+  /** ISO-8601 UTC; null when the schedule is off or has no slots. */
+  nextRunAt?: string | null;
+  lastRunStartedAt?: string | null;
+  lastRunFinishedAt?: string | null;
+  lastRunJobCount: number;
+  lastRunFailedCount: number;
+  lastRunFailures: string[];
+  isRunning: boolean;
+  /** The server's time zone display name — the schedule's times are in it. */
+  timeZone: string;
+  /** Admins only. */
+  canEdit: boolean;
 }
 
 export interface CatalogStatusDto {
@@ -1337,9 +1481,212 @@ export interface ScanTagRuleItem {
   language?: string | null;
   isFoil: boolean;
   foilType?: string | null;
+  /** The scan's tags (only scan validation looks at them). */
+  tags?: string[];
 }
 
 export interface ScanTagRuleResultDto {
   key: string;
   tags: string[];
+}
+
+/** A saved scan validation rule: a named search query for one game, shared by everyone who scans. */
+export interface ScanValidationRuleDto {
+  id: number;
+  game: string;
+  name: string;
+  query: string;
+  updatedAt: string;
+}
+
+/** The scanned cards that don't match a validation query; `errors` (invalid query) ⇒ nothing checked. */
+export interface ScanValidationResultDto {
+  failedKeys: string[];
+  errors: string[];
+}
+
+// ---- Labels ----
+
+/** A label template: the sheet layout (millimetres) and the pdfme design JSON of one label. The label
+ * size is derived from the sheet. */
+export interface LabelTemplateDto {
+  id: number;
+  name: string;
+  pageWidthMm: number;
+  pageHeightMm: number;
+  marginTopMm: number;
+  marginRightMm: number;
+  marginBottomMm: number;
+  marginLeftMm: number;
+  columns: number;
+  rows: number;
+  columnGapMm: number;
+  rowGapMm: number;
+  labelWidthMm: number;
+  labelHeightMm: number;
+  design: string;
+  updatedAt: string;
+}
+
+export type LabelTemplateInput = Omit<LabelTemplateDto, 'id' | 'labelWidthMm' | 'labelHeightMm' | 'updatedAt'>;
+
+/** The cards to label: `lotIds` (in that order), or every card in `containerId` (narrowed by game + search). */
+export interface LabelDataRequest {
+  lotIds?: number[];
+  containerId?: number;
+  game?: string;
+  q?: string;
+}
+
+/** The printable facts of one owned card — what a label's fields are filled from. */
+export interface LabelCardDto {
+  id: number;
+  game: string;
+  gameName: string;
+  name: string;
+  setCode: string;
+  setName: string;
+  collectorNumber: string;
+  rarity: string;
+  condition: string;
+  language: string;
+  finish: string;
+  quantity: number;
+  marketPrice: number;
+  tcgPlayerUrl: string;
+  tcgPlayerId: number | null;
+  location: string | null;
+}
+
+export interface LabelDataDto {
+  cards: LabelCardDto[];
+  truncated: boolean;
+}
+
+// --- Customer kiosk (/kiosk) ---
+
+export interface KioskSessionItemDto {
+  key: string;
+  name: string;
+  setName: string;
+  setCode: string;
+  number: string;
+  condition: string;
+  language: string;
+  isFoil: boolean;
+  imageUri?: string | null;
+  quantity: number;
+  /** Null when prices are hidden. */
+  unitPrice?: number | null;
+}
+
+export interface KioskSessionDto {
+  id: number;
+  customerName: string;
+  status: string;
+  items: KioskSessionItemDto[];
+  totalQuantity: number;
+  totalPrice?: number | null;
+}
+
+export interface KioskStatusDto {
+  enrolled: boolean;
+  deviceName?: string | null;
+  enabled: boolean;
+  hasLocations: boolean;
+  showPrices: boolean;
+  idleTimeoutMinutes: number;
+  welcomeMessage?: string | null;
+  session?: KioskSessionDto | null;
+}
+
+export interface KioskGameDto {
+  id: string;
+  displayName: string;
+  cardCount: number;
+}
+
+export interface KioskCardDto {
+  key: string;
+  game: string;
+  name: string;
+  setName: string;
+  setCode: string;
+  number: string;
+  rarity: string;
+  condition: string;
+  language: string;
+  isFoil: boolean;
+  foilType?: string | null;
+  imageUri?: string | null;
+  price?: number | null;
+  available: number;
+  inMyList: number;
+}
+
+export interface KioskSubmitResultDto {
+  sessionId: number;
+  customerName: string;
+  itemCount: number;
+}
+
+export interface KioskQueueLineDto {
+  holdId: number;
+  lotId: number;
+  name: string;
+  setName: string;
+  setCode: string;
+  number: string;
+  condition: string;
+  language: string;
+  isFoil: boolean;
+  imageUri?: string | null;
+  quantity: number;
+  unitPrice: number;
+  locationId?: number | null;
+  locationName?: string | null;
+  page?: number | null;
+  slot?: number | null;
+  section?: string | null;
+}
+
+export interface KioskQueueEntryDto {
+  id: number;
+  customerName: string;
+  status: 'Browsing' | 'Queued' | 'Picking' | string;
+  deviceName?: string | null;
+  createdAt: string;
+  submittedAt?: string | null;
+  lastActivityAt: string;
+  claimedByName?: string | null;
+  lines: KioskQueueLineDto[];
+  totalQuantity: number;
+  totalPrice: number;
+}
+
+export interface KioskQueueCountDto {
+  queued: number;
+  browsing: number;
+}
+
+export interface KioskCreateOrderResultDto {
+  orderId: number;
+  customerId: number;
+}
+
+export interface KioskSettingsDto {
+  enabled: boolean;
+  locationIds: number[];
+  idleTimeoutMinutes: number;
+  showPrices: boolean;
+  welcomeMessage?: string | null;
+}
+
+export interface KioskDeviceDto {
+  id: number;
+  name: string;
+  createdAt: string;
+  createdBy?: string | null;
+  lastSeenAt?: string | null;
+  revoked: boolean;
 }

@@ -110,7 +110,7 @@ When a Moxfield or Archidekt deck changes, you can bring those changes into your
 
 If the list already matches the deck, you'll see **The list already matches the deck.**
 
-![The Update from URL dialog listing added, removed, and quantity changes](lists-update-from-url.png)
+![The Update from URL dialog listing two added cards and a quantity change](lists-update-from-url.png)
 
 ## Use other printings you own
 

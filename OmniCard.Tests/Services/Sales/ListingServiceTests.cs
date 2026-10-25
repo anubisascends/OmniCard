@@ -120,6 +120,8 @@ public class ListingServiceTests : IDisposable
         public void SetForSaleLocationId(int? id) => ForSaleLocationId = id;
         public bool MovePickedToForSaleLocation { get; private set; } = true;
         public void SetMovePickedToForSaleLocation(bool move) => MovePickedToForSaleLocation = move;
+        public bool OrderSearchAllGames => false;
+        public void SetOrderSearchAllGames(bool allGames) { }
         public CompanyProfile GetCompany() => new();
         public void SaveCompany(CompanyProfile company) { }
         public ReceiptSettings GetReceipt() => new();

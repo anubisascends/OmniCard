@@ -1,7 +1,4 @@
 using System.Diagnostics;
-using System.Net.Http.Json;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -21,9 +18,7 @@ namespace OmniCard.CardMatching.Games;
 
 public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDisposable
 {
-    private const string ApiBaseUrl = "https://api.riftcodex.com";
     private const int CorrectionTrustBonus = 5;
-    private const string TcgCsvBaseUrl = "https://tcgcsv.com";
     private const int RiftboundCategoryId = 89;
 
     private readonly IHttpClientFactory _httpClientFactory;
@@ -37,19 +32,6 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
     private List<(string Id, ulong EdgeHash, string SetId)>? _edgeHashCache;
     private Dictionary<string, string>? _hashSetLookup;
     private List<(ulong ScanHash, string CorrectCardId)>? _correctionsCache;
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        NumberHandling = JsonNumberHandling.AllowReadingFromString
-    };
-
-    // TCGCSV returns camelCase JSON — do NOT reuse JsonOptions (SnakeCaseLower).
-    private static readonly JsonSerializerOptions TcgCsvJsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        NumberHandling = JsonNumberHandling.AllowReadingFromString
-    };
 
     public RiftboundService(
         IHttpClientFactory httpClientFactory,
@@ -128,83 +110,50 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
 
     public async Task DownloadBulkDataAsync(IProgress<string>? progress = null, CancellationToken ct = default)
     {
-        _logger.LogInformation("Starting Riftbound card data download from Riftcodex API");
+        _logger.LogInformation("Starting Riftbound card data download from TCGCSV");
         var sw = Stopwatch.StartNew();
 
         var client = _httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.UserAgent.ParseAdd("OmniCard/1.0");
 
         progress?.Report("Fetching Riftbound set list...");
-        var allCards = await FetchAllCardsAsync(client,
-            (done, total, code) => progress?.Report($"Fetched {done}/{total} sets ({code})..."), ct);
-
-        var deduped = allCards
-            .GroupBy(c => c.Id)
-            .Select(g => g.Last())
-            .ToList();
-        _logger.LogInformation("Fetched {Total} card rows ({Unique} unique)", allCards.Count, deduped.Count);
-        progress?.Report($"Fetched {deduped.Count} cards, importing...");
+        var groups = await TcgCsvCatalogClient.FetchGroupsAsync(client, RiftboundCategoryId, ct);
+        var catalog = await TcgCsvCatalogClient.FetchProductsAsync(client, RiftboundCategoryId, groups, _logger,
+            (done, total) => progress?.Report($"Fetched {done}/{total} sets..."), ct);
+        var incoming = MapTcgCsvCatalog(catalog);
+        _logger.LogInformation("Fetched {Count} Riftbound printings from TCGCSV", incoming.Count);
+        progress?.Report($"Fetched {incoming.Count} cards, importing...");
 
         await using var importContext = _dbContextFactory.CreateDbContext();
         importContext.Database.EnsureCreated();
 
-        var existingIds = (await importContext.Cards.Select(c => c.Id).ToListAsync(ct)).ToHashSet();
+        var existingRows = await importContext.Cards.AsNoTracking()
+            .Select(c => new ExistingRow(c.Id, c.TcgplayerId, c.RiftboundId))
+            .ToListAsync(ct);
+        LinkToExistingRows(incoming, existingRows);
+        var existingIds = existingRows.Select(r => r.Id).ToHashSet(StringComparer.Ordinal);
+
         var inserted = 0;
         var updated = 0;
-
-        foreach (var batch in deduped.Chunk(500))
+        var gainedArt = 0;
+        foreach (var batch in incoming.Chunk(500))
         {
-            var newCards = new List<RiftboundCard>();
-            var existingCardIds = new List<string>();
-
-            foreach (var card in batch)
-            {
-                if (existingIds.Contains(card.Id)) existingCardIds.Add(card.Id);
-                else newCards.Add(card);
-            }
-
+            var existingCardIds = batch.Where(c => existingIds.Contains(c.Id)).Select(c => c.Id).ToList();
             if (existingCardIds.Count > 0)
             {
                 var tracked = await importContext.Cards
                     .Where(c => existingCardIds.Contains(c.Id))
                     .ToDictionaryAsync(c => c.Id, ct);
-
                 foreach (var card in batch)
-                {
-                    if (tracked.TryGetValue(card.Id, out var existing))
-                    {
-                        // Refresh metadata; preserve computed ImageHash/EdgeHash/LocalImagePath.
-                        existing.RiftboundId = card.RiftboundId;
-                        existing.TcgplayerId = card.TcgplayerId;
-                        existing.CollectorNumber = card.CollectorNumber;
-                        existing.Name = card.Name;
-                        existing.CleanName = card.CleanName;
-                        existing.SetId = card.SetId;
-                        existing.SetName = card.SetName;
-                        existing.Rarity = card.Rarity;
-                        existing.CardType = card.CardType;
-                        existing.Supertype = card.Supertype;
-                        existing.Domain = card.Domain;
-                        existing.Energy = card.Energy;
-                        existing.Might = card.Might;
-                        existing.Power = card.Power;
-                        existing.CardText = card.CardText;
-                        existing.Flavour = card.Flavour;
-                        existing.Artist = card.Artist;
-                        existing.Orientation = card.Orientation;
-                        existing.AlternateArt = card.AlternateArt;
-                        existing.Overnumbered = card.Overnumbered;
-                        existing.Signature = card.Signature;
-                        existing.CardImageUri = card.CardImageUri;
-                        existing.DateScraped = card.DateScraped;
-                    }
-                }
+                    if (tracked.TryGetValue(card.Id, out var existing) && ApplyTcgCsvFields(existing, card))
+                        gainedArt++;
 
                 await importContext.SaveChangesAsync(ct);
                 importContext.ChangeTracker.Clear();
                 updated += existingCardIds.Count;
             }
 
+            var newCards = batch.Where(c => !existingIds.Contains(c.Id)).ToList();
             if (newCards.Count > 0)
             {
                 importContext.Cards.AddRange(newCards);
@@ -217,7 +166,7 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
             progress?.Report($"Processed {inserted + updated} cards ({inserted} new, {updated} updated)...");
         }
 
-        if (deduped.Count > 0)
+        if (incoming.Count > 0)
             importContext.MarkMigrationComplete();
 
         var oldContext = _readContext;
@@ -231,58 +180,166 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
         _logger.LogInformation("Riftbound download complete: {Inserted} new, {Updated} updated in {Sec:F1}s", inserted, updated, sw.Elapsed.TotalSeconds);
         progress?.Report($"Download complete — {inserted} new, {updated} updated.");
 
-        if (inserted > 0)
+        if (inserted > 0 || gainedArt > 0)
             await ComputeImageHashesAsync(forceAll: false, progress, ct);
     }
 
-    // Fetch the set list, then page every set's cards. onSetCompleted(done,total,setId) after each set.
-    private async Task<List<RiftboundCard>> FetchAllCardsAsync(
-        HttpClient client, Action<int, int, string>? onSetCompleted, CancellationToken ct)
+    // === TCGCSV catalog ===
+    // The catalog comes from TCGCSV (TCGplayer), refreshed daily. Rows imported before TCGCSV became the
+    // source carry Riftcodex ids; a TCGCSV printing updates such a row in place (matched by TcgplayerId,
+    // then by riftbound id) so owned copies keep their id. Printings with no existing row are added under
+    // a stable "tcgcsv-{productId}" id. Rows TCGCSV doesn't list are left as they are, never deleted.
+    internal const string TcgCsvIdPrefix = "tcgcsv-";
+
+    internal sealed record ExistingRow(string Id, string? TcgplayerId, string RiftboundId);
+
+    // Every card product (sealed products have no "Number") mapped to a row, one per TCGplayer product.
+    internal static List<RiftboundCard> MapTcgCsvCatalog(IEnumerable<(TcgCsvGroup Group, List<TcgCsvProduct> Products)> catalog)
     {
-        var setList = await client.GetFromJsonAsync<RiftboundSetListResponse>(
-            $"{ApiBaseUrl}/sets?size=100", JsonOptions, ct)
-            ?? throw new InvalidOperationException("Failed to fetch set list from Riftcodex API.");
-
-        _logger.LogInformation("Discovered {Count} Riftbound sets", setList.Items.Count);
-
-        var allCards = new List<RiftboundCard>();
-        var cardsLock = new object();
-        var fetchedSets = 0;
-
-        await Parallel.ForEachAsync(setList.Items, new ParallelOptions
+        var cards = new List<RiftboundCard>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (group, products) in catalog)
         {
-            MaxDegreeOfParallelism = 4,
-            CancellationToken = ct
-        }, async (set, token) =>
+            var setId = group.Abbreviation?.Trim().ToUpperInvariant();
+            if (string.IsNullOrEmpty(setId)) continue;
+            foreach (var product in products)
+                if (MapTcgCsvProduct(product, setId, group.Name) is { } card && seen.Add(card.TcgplayerId!))
+                    cards.Add(card);
+        }
+        return cards;
+    }
+
+    // Re-keys incoming cards onto the existing rows for the same printing: first by TcgplayerId, then (for
+    // rows that never had a TCGplayer id) by riftbound id. Each existing row is taken at most once.
+    internal static void LinkToExistingRows(List<RiftboundCard> incoming, IReadOnlyCollection<ExistingRow> existing)
+    {
+        var byTcgId = existing.Where(r => r.TcgplayerId is not null)
+            .GroupBy(r => r.TcgplayerId!).ToDictionary(g => g.Key, g => g.First().Id);
+        var byRiftboundId = existing.Where(r => r.TcgplayerId is null && r.RiftboundId.Length > 0)
+            .GroupBy(r => r.RiftboundId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
+        var taken = new HashSet<string>(StringComparer.Ordinal);
+        var unlinked = new List<RiftboundCard>();
+
+        foreach (var card in incoming)
         {
-            try
-            {
-                var page = 1;
-                var pages = 1;
-                do
-                {
-                    var resp = await client.GetFromJsonAsync<RiftboundCardListResponse>(
-                        $"{ApiBaseUrl}/cards?set_id={set.SetId}&size=100&page={page}", JsonOptions, token);
-                    if (resp is null) break;
-                    pages = resp.Pages;
+            if (byTcgId.TryGetValue(card.TcgplayerId!, out var id) && taken.Add(id)) card.Id = id;
+            else unlinked.Add(card);
+        }
+        foreach (var card in unlinked)
+            if (byRiftboundId.TryGetValue(card.RiftboundId, out var id) && taken.Add(id))
+                card.Id = id;
+    }
 
-                    var rows = resp.Items.Select(MapCard).ToList();
-                    lock (cardsLock) allCards.AddRange(rows);
-                    page++;
-                } while (page <= pages);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _logger.LogWarning(ex, "Failed to fetch Riftbound set {SetId}; skipping", set.SetId);
-            }
-            finally
-            {
-                var done = Interlocked.Increment(ref fetchedSets);
-                onSetCompleted?.Invoke(done, setList.Items.Count, set.SetId);
-            }
-        });
+    // Refreshes an existing row from its TCGCSV printing: TcgplayerId always. A row TCGCSV created
+    // ("tcgcsv-" id) also takes every catalog field TCGCSV has, so presale corrections land. A row from
+    // Riftcodex keeps its own data — it is richer than TCGplayer's listing (supertypes such as "Basic",
+    // stats, rules text) — and only fills fields it lacks. Either way the id, set code and stored
+    // art/hashes stay. Returns whether the row gained art (to hash).
+    internal static bool ApplyTcgCsvFields(RiftboundCard existing, RiftboundCard card)
+    {
+        existing.TcgplayerId = card.TcgplayerId;
+        existing.DateScraped = card.DateScraped;
 
-        return allCards;
+        var overwrite = existing.Id.StartsWith(TcgCsvIdPrefix, StringComparison.Ordinal);
+        static string? Pick(string? current, string? incoming, bool overwrite) =>
+            string.IsNullOrWhiteSpace(incoming) || (!overwrite && !string.IsNullOrWhiteSpace(current)) ? current : incoming;
+        static int? PickInt(int? current, int? incoming, bool overwrite) =>
+            overwrite || current is null ? incoming ?? current : current;
+
+        existing.RiftboundId = Pick(existing.RiftboundId, card.RiftboundId, overwrite)!;
+        if (overwrite || existing.CollectorNumber == 0) existing.CollectorNumber = card.CollectorNumber;
+        existing.Name = Pick(existing.Name, card.Name, overwrite)!;
+        existing.CleanName = Pick(existing.CleanName, card.CleanName, overwrite);
+        existing.SetName = Pick(existing.SetName, card.SetName, overwrite)!;
+        existing.Rarity = Pick(existing.Rarity, card.Rarity, overwrite)!;
+        if (overwrite || string.IsNullOrWhiteSpace(existing.CardType))
+        {
+            existing.CardType = Pick(existing.CardType, card.CardType, true)!;
+            existing.Supertype = card.Supertype ?? existing.Supertype;
+        }
+        existing.Domain = Pick(existing.Domain, card.Domain, overwrite)!;
+        existing.Energy = PickInt(existing.Energy, card.Energy, overwrite);
+        existing.Might = PickInt(existing.Might, card.Might, overwrite);
+        existing.Power = PickInt(existing.Power, card.Power, overwrite);
+        existing.CardText = Pick(existing.CardText, card.CardText, overwrite);
+        existing.Flavour = Pick(existing.Flavour, card.Flavour, overwrite);
+        existing.Orientation = Pick(existing.Orientation, card.Orientation, overwrite);
+        if (overwrite)
+        {
+            existing.AlternateArt = card.AlternateArt;
+            existing.Overnumbered = card.Overnumbered;
+            existing.Signature = card.Signature;
+        }
+
+        if (existing.CardImageUri is not null || card.CardImageUri is null) return false;
+        existing.CardImageUri = card.CardImageUri;
+        return true;
+    }
+
+    internal static RiftboundCard? MapTcgCsvProduct(TcgCsvProduct p, string setId, string setName)
+    {
+        string? Val(string name) => TcgCsvCatalogClient.Extended(p, name);
+
+        var number = Val("Number");
+        if (string.IsNullOrEmpty(number)) return null;
+
+        var slash = number.IndexOf('/');
+        var printed = (slash >= 0 ? number[..slash] : number).Trim();
+        var total = slash >= 0 ? number[(slash + 1)..].Trim() : "";
+        // Last digit run: "020a" → 20, "R01" → 1, "T1A 001" → 1.
+        var collectorNumber = int.TryParse(
+            System.Text.RegularExpressions.Regex.Match(printed, @"\d+(?=\D*$)").Value, out var cn) ? cn : 0;
+
+        // "Champion Unit" / "Signature Spell" → type Unit/Spell + supertype; "Unit;Token" → Unit + Token.
+        var typeParts = (Val("Card Type") ?? "")
+            .Split([';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var (cardType, supertype) = typeParts.Length switch
+        {
+            0 => ("", (string?)null),
+            1 => (typeParts[0], null),
+            _ => typeParts[0] is "Unit" or "Spell" or "Gear" or "Legend"
+                ? (typeParts[0], typeParts[1])
+                : (typeParts[1], typeParts[0]),
+        };
+
+        var isUnit = cardType == "Unit";
+        var power = TcgCsvCatalogClient.LeadingInt(Val("Power Cost"));
+
+        return new RiftboundCard
+        {
+            Id = TcgCsvIdPrefix + p.ProductId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            RiftboundId = total.Length > 0
+                ? $"{setId}-{printed}-{total}".ToLowerInvariant()
+                : $"{setId}-{printed}".ToLowerInvariant(),
+            TcgplayerId = p.ProductId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            CollectorNumber = collectorNumber,
+            Name = TcgCsvCatalogClient.CardName(p.Name),
+            CleanName = p.CleanName,
+            SetId = setId,
+            SetName = setName,
+            Rarity = Val("Rarity") ?? "",
+            CardType = cardType,
+            Supertype = supertype,
+            // Battlefields carry "None"; store them domain-less.
+            Domain = string.Join("/", (Val("Domain") ?? "")
+                .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(d => !d.Equals("None", StringComparison.OrdinalIgnoreCase))),
+            Energy = TcgCsvCatalogClient.LeadingInt(Val("Energy Cost")),
+            Might = isUnit ? TcgCsvCatalogClient.LeadingInt(Val("Might")) : null,
+            Power = power > 0 ? power : null,
+            CardText = TcgCsvCatalogClient.StripHtml(Val("Description")),
+            Flavour = TcgCsvCatalogClient.StripHtml(Val("Flavor Text")),
+            Orientation = cardType == "Battlefield" ? "landscape" : "portrait",
+            AlternateArt = p.Name.Contains("Alternate Art", StringComparison.OrdinalIgnoreCase)
+                || p.Name.Contains("Special Art", StringComparison.OrdinalIgnoreCase)
+                || (printed.Length > 0 && char.IsAsciiLetter(printed[^1])),
+            Overnumbered = p.Name.Contains("Overnumbered", StringComparison.OrdinalIgnoreCase)
+                || (int.TryParse(total, out var t) && t > 0 && collectorNumber > t),
+            Signature = printed.Contains('*') || p.Name.Contains("(Signature)", StringComparison.OrdinalIgnoreCase),
+            CardImageUri = TcgCsvCatalogClient.ProductImage(p),
+            DateScraped = DateTime.UtcNow.ToString("o"),
+        };
     }
 
     public async Task UpdatePricesAsync(IProgress<PriceUpdateProgress>? progress = null, CancellationToken ct = default)
@@ -352,71 +409,26 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
     private async Task<Dictionary<int, (decimal? Normal, decimal? Foil)>> FetchTcgCsvPriceMapAsync(
         HttpClient client, IProgress<PriceUpdateProgress>? progress, CancellationToken ct)
     {
-        var groups = await client.GetFromJsonAsync<TcgCsvGroupsResponse>(
-            $"{TcgCsvBaseUrl}/tcgplayer/{RiftboundCategoryId}/groups", TcgCsvJsonOptions, ct);
+        var groups = await TcgCsvCatalogClient.FetchGroupsAsync(client, RiftboundCategoryId, ct);
+        var rows = await TcgCsvCatalogClient.FetchPriceRowsAsync(client, RiftboundCategoryId, groups, _logger,
+            (done, total) => progress?.Report(new PriceUpdateProgress(CardGame.Riftbound, null, done, total,
+                $"Riftbound prices: {done}/{total} groups")), ct);
 
-        var map = new Dictionary<int, (decimal? Normal, decimal? Foil)>();
-        var groupList = groups?.Results ?? [];
-        var done = 0;
-
-        foreach (var group in groupList)
+        var map = new Dictionary<int, (decimal? Normal, decimal? Foil)>(rows.Count);
+        foreach (var (productId, productRows) in rows)
         {
-            ct.ThrowIfCancellationRequested();
-            try
+            (decimal? Normal, decimal? Foil) entry = default;
+            foreach (var row in productRows)
             {
-                var prices = await client.GetFromJsonAsync<TcgCsvPricesResponse>(
-                    $"{TcgCsvBaseUrl}/tcgplayer/{RiftboundCategoryId}/{group.GroupId}/prices", TcgCsvJsonOptions, ct);
-
-                foreach (var row in prices?.Results ?? [])
-                {
-                    map.TryGetValue(row.ProductId, out var entry);
-                    if (string.Equals(row.SubTypeName, "Foil", StringComparison.OrdinalIgnoreCase))
-                        entry.Foil = row.MarketPrice;
-                    else if (string.Equals(row.SubTypeName, "Normal", StringComparison.OrdinalIgnoreCase))
-                        entry.Normal = row.MarketPrice;
-                    map[row.ProductId] = entry;
-                }
+                if (string.Equals(row.SubTypeName, "Foil", StringComparison.OrdinalIgnoreCase))
+                    entry.Foil = row.MarketPrice;
+                else if (string.Equals(row.SubTypeName, "Normal", StringComparison.OrdinalIgnoreCase))
+                    entry.Normal = row.MarketPrice;
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _logger.LogWarning(ex, "Failed to fetch Riftbound prices for group {GroupId}; skipping", group.GroupId);
-            }
-
-            done++;
-            progress?.Report(new PriceUpdateProgress(CardGame.Riftbound, null, done, groupList.Count,
-                $"Riftbound prices: {done}/{groupList.Count} groups"));
+            map[productId] = entry;
         }
-
         return map;
     }
-
-    internal static RiftboundCard MapCard(RiftboundApiCard c) => new()
-    {
-        Id = c.Id,
-        RiftboundId = c.RiftboundId,
-        TcgplayerId = c.TcgplayerId,
-        CollectorNumber = c.CollectorNumber,
-        Name = c.Name,
-        CleanName = c.Metadata.CleanName,
-        SetId = c.Set.SetId,
-        SetName = c.Set.Label,
-        Rarity = c.Classification.Rarity ?? "",
-        CardType = c.Classification.Type,
-        Supertype = c.Classification.Supertype,
-        Domain = string.Join("/", c.Classification.Domain),
-        Energy = c.Attributes.Energy,
-        Might = c.Attributes.Might,
-        Power = c.Attributes.Power,
-        CardText = c.Text.Plain,
-        Flavour = c.Text.Flavour,
-        Artist = c.Media.Artist,
-        Orientation = c.Orientation,
-        AlternateArt = c.Metadata.AlternateArt,
-        Overnumbered = c.Metadata.Overnumbered,
-        Signature = c.Metadata.Signature,
-        CardImageUri = c.Media.ImageUrl,
-        DateScraped = DateTime.UtcNow.ToString("o"),
-    };
 
     // === Image hashing ===
     public async Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default)
@@ -963,26 +975,4 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
     }
 
     public void Dispose() => _readContext.Dispose();
-
-    private sealed class TcgCsvGroupsResponse
-    {
-        public List<TcgCsvGroup> Results { get; set; } = [];
-    }
-
-    private sealed class TcgCsvGroup
-    {
-        public int GroupId { get; set; }
-    }
-
-    private sealed class TcgCsvPricesResponse
-    {
-        public List<TcgCsvPrice> Results { get; set; } = [];
-    }
-
-    private sealed class TcgCsvPrice
-    {
-        public int ProductId { get; set; }
-        public decimal? MarketPrice { get; set; }
-        public string? SubTypeName { get; set; }
-    }
 }

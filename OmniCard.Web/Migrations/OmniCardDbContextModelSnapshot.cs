@@ -292,6 +292,191 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("Products");
                 });
 
+            modelBuilder.Entity("OmniCard.Shared.Kiosk.KioskDevice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("LastSeenAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("KioskDevices");
+                });
+
+            modelBuilder.Entity("OmniCard.Shared.Kiosk.KioskHold", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("LotId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SessionId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LotId");
+
+                    b.HasIndex("SessionId");
+
+                    b.ToTable("KioskHolds");
+                });
+
+            modelBuilder.Entity("OmniCard.Shared.Kiosk.KioskSession", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ActiveNameKey")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("ClaimedByName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<int?>("ClaimedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CustomerName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<int>("DeviceId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("LastActivityAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<DateTime?>("SubmittedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActiveNameKey")
+                        .IsUnique()
+                        .HasFilter("[ActiveNameKey] IS NOT NULL");
+
+                    b.HasIndex("DeviceId");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("KioskSessions");
+                });
+
+            modelBuilder.Entity("OmniCard.Shared.Labels.LabelTemplate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<double>("ColumnGapMm")
+                        .HasColumnType("float");
+
+                    b.Property<int>("Columns")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Design")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<double>("MarginBottomMm")
+                        .HasColumnType("float");
+
+                    b.Property<double>("MarginLeftMm")
+                        .HasColumnType("float");
+
+                    b.Property<double>("MarginRightMm")
+                        .HasColumnType("float");
+
+                    b.Property<double>("MarginTopMm")
+                        .HasColumnType("float");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<double>("PageHeightMm")
+                        .HasColumnType("float");
+
+                    b.Property<double>("PageWidthMm")
+                        .HasColumnType("float");
+
+                    b.Property<double>("RowGapMm")
+                        .HasColumnType("float");
+
+                    b.Property<int>("Rows")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("LabelTemplates");
+                });
+
             modelBuilder.Entity("OmniCard.Shared.Lists.CardList", b =>
                 {
                     b.Property<int>("Id")
@@ -823,6 +1008,9 @@ namespace OmniCard.Web.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("nvarchar(16)");
 
+                    b.Property<int>("WaitingFiles")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Status", "ClaimedByUserId");
@@ -886,6 +1074,10 @@ namespace OmniCard.Web.Migrations
                     b.Property<string>("PreviewFileName")
                         .HasMaxLength(260)
                         .HasColumnType("nvarchar(260)");
+
+                    b.Property<string>("ProcessedPath")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
 
                     b.Property<decimal?>("PurchasePrice")
                         .HasPrecision(18, 2)
@@ -970,6 +1162,43 @@ namespace OmniCard.Web.Migrations
                     b.HasIndex("SessionId");
 
                     b.ToTable("ScanDiagnosticEvents");
+                });
+
+            modelBuilder.Entity("OmniCard.Shared.Scanning.ScanValidationRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Game")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Query")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Game", "Name")
+                        .IsUnique();
+
+                    b.ToTable("ScanValidationRules");
                 });
 
             modelBuilder.Entity("OmniCard.Shared.Settings.MigrationState", b =>
@@ -1145,6 +1374,44 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("SiteAccessGrants");
                 });
 
+            modelBuilder.Entity("OmniCard.Shared.Storage.DeckBoxMissingCard", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CardName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("CollectorNumber")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<int>("ContainerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("MarkedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SetCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContainerId", "CardName")
+                        .IsUnique();
+
+                    b.ToTable("DeckBoxMissingCards");
+                });
+
             modelBuilder.Entity("OmniCard.Shared.Storage.DeckType", b =>
                 {
                     b.Property<int>("Id")
@@ -1258,6 +1525,13 @@ namespace OmniCard.Web.Migrations
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");
+
+                    b.Property<DateTime?>("SourceSyncedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SourceUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<int>("TotalPages")
                         .HasColumnType("int");
@@ -1576,6 +1850,21 @@ namespace OmniCard.Web.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("OmniCard.Shared.Kiosk.KioskHold", b =>
+                {
+                    b.HasOne("OmniCard.Shared.Inventory.InventoryLot", null)
+                        .WithMany()
+                        .HasForeignKey("LotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OmniCard.Shared.Kiosk.KioskSession", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("OmniCard.Shared.Scanning.FlagResolution", b =>
                 {
                     b.HasOne("OmniCard.Shared.Inventory.InventoryLot", "Lot")
@@ -1601,6 +1890,15 @@ namespace OmniCard.Web.Migrations
                     b.HasOne("OmniCard.Shared.Sites.Site", null)
                         .WithMany()
                         .HasForeignKey("SiteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OmniCard.Shared.Storage.DeckBoxMissingCard", b =>
+                {
+                    b.HasOne("OmniCard.Shared.Storage.StorageContainer", null)
+                        .WithMany()
+                        .HasForeignKey("ContainerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

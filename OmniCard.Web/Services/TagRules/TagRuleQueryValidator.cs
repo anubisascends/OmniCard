@@ -32,8 +32,9 @@ public static class TagRuleQueryValidator
     private static readonly HashSet<string> OwnedIsFlags = new(StringComparer.OrdinalIgnoreCase) { "foil", "nonfoil" };
 
     /// <summary>Problems with <paramref name="query"/> for a rule of <paramref name="game"/>, parsed with
-    /// that game's <paramref name="schema"/>. Empty = valid.</summary>
-    public static IReadOnlyList<string> Validate(CardGame game, string? query, SearchSchema schema)
+    /// that game's <paramref name="schema"/>. Empty = valid. Scan validation rules pass
+    /// <paramref name="allowTags"/>: they check a scan's tags as the reviewer left them.</summary>
+    public static IReadOnlyList<string> Validate(CardGame game, string? query, SearchSchema schema, bool allowTags = false)
     {
         if (string.IsNullOrWhiteSpace(query))
             return ["Enter a search query."];
@@ -47,14 +48,16 @@ public static class TagRuleQueryValidator
         var errors = new List<string>();
         foreach (var f in Fields(node))
         {
-            var error = Check(game, f, schema);
+            var error = Check(game, f, schema, allowTags);
             if (error is not null && !errors.Contains(error)) errors.Add(error);
         }
         return errors;
     }
 
-    private static string? Check(CardGame game, FieldFilter f, SearchSchema schema)
+    private static string? Check(CardGame game, FieldFilter f, SearchSchema schema, bool allowTags)
     {
+        if (allowTags && f.Field.Equals("tag", StringComparison.OrdinalIgnoreCase))
+            return string.IsNullOrWhiteSpace(f.Value) ? "'tag:' needs a value." : null;
         if (Disallowed.TryGetValue(f.Field, out var why)) return why;
         if (Directives.Contains(f.Field)) return $"'{f.Field}:' sorts results; it isn't allowed in a rule.";
         if (string.IsNullOrWhiteSpace(f.Value)) return $"'{f.Field}:' needs a value.";

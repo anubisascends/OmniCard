@@ -78,6 +78,11 @@ public sealed class WebScanMatchingService : IScanMatcher
 
         EnsureSymbolHashes();
 
+        // 0. Modern MTG prints its finish beside the set code (★ foil, • non-foil). A read beats the
+        //    scan's foil setting, so the foil edge hash and the price below follow the card in hand.
+        bool? foilDetected = game == CardGame.Mtg ? await _ocrService.DetectMtgFoilMarkerAsync(imageBytes) : null;
+        isFoil = foilDetected ?? isFoil;
+
         // User-chosen set filter (hard constraint on the candidate pool, all match paths).
         var chosenSets = setCodes?.Where(s => !string.IsNullOrWhiteSpace(s)).ToArray() ?? [];
         IReadOnlySet<string>? setFilter = chosenSets.Length == 0
@@ -171,6 +176,7 @@ public sealed class WebScanMatchingService : IScanMatcher
         {
             Language = copyLanguage,
             LanguageDetected = match is not null && languageEvidence.Detected is not null,
+            FoilDetected = foilDetected,
         };
         // Attach the current market price so the client can render the value-tier badge. The lookup
         // hits the game service's shared read context, so it goes through the same gate as matching.

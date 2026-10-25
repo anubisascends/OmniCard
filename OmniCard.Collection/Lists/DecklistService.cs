@@ -176,6 +176,22 @@ public sealed partial class DecklistService(
         return stdout;
     }
 
+    // The games each recognized deck site's decks belong to. Add a site here (and to ParseUrl /
+    // FetchDecklistAsync) to make it linkable for that game's deck boxes.
+    private static readonly Dictionary<string, CardGame[]> SourceGames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Moxfield"] = [CardGame.Mtg],
+        ["Archidekt"] = [CardGame.Mtg],
+    };
+
+    /// <summary>True when decks from <paramref name="source"/> (as named by <see cref="ParseUrl"/>) are
+    /// <paramref name="game"/> decks.</summary>
+    public static bool SourceServesGame(string source, CardGame game) =>
+        SourceGames.TryGetValue(source, out var games) && games.Contains(game);
+
+    /// <summary>True when any recognized deck site serves <paramref name="game"/>.</summary>
+    public static bool AnySourceServesGame(CardGame game) => SourceGames.Values.Any(g => g.Contains(game));
+
     /// <summary>Recognizes a Moxfield or Archidekt deck URL; (null, null) for anything else.</summary>
     public static (string? Source, string? DeckId) ParseUrl(string url)
     {

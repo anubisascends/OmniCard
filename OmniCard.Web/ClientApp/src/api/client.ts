@@ -18,6 +18,8 @@ import type {
   ListExportFormat,
   ListExportScope,
   CatalogLanguagesDto,
+  CatalogScheduleDto,
+  CatalogScheduleResponse,
   CatalogStatusDto,
   FulfillListRequest,
   FulfillListResultDto,
@@ -29,6 +31,11 @@ import type {
   DashboardDto,
   DeckBoxNeedsGameDto,
   DeckLegalityDto,
+  DeckBoxMissingCardDto,
+  DeckSyncApplyRequest,
+  DeckSyncPreviewDto,
+  DeckSyncResultDto,
+  DeckSyncSourceDto,
   DeckTypeDto,
   DeckTypeUpsertRequest,
   ImportListResultDto,
@@ -43,6 +50,7 @@ import type {
   GameDto,
   InventoryValuationDto,
   ListingDetailDto,
+  LocationSearchMatchDto,
   LocationSummaryDto,
   SiteDto,
   SiteGrantDto,
@@ -79,6 +87,12 @@ import type {
   ScanSearchResultDto,
   ScanTagRuleItem,
   ScanTagRuleResultDto,
+  ScanValidationResultDto,
+  ScanValidationRuleDto,
+  LabelTemplateDto,
+  LabelTemplateInput,
+  LabelDataRequest,
+  LabelDataDto,
   SearchSchemaDto,
   TagRuleDto,
   TagRuleInput,
@@ -95,6 +109,11 @@ import type {
   RoleDto,
   PermissionCatalogDto,
   WorkflowLaneDto,
+  KioskCreateOrderResultDto,
+  KioskDeviceDto,
+  KioskQueueCountDto,
+  KioskQueueEntryDto,
+  KioskSettingsDto,
 } from './types';
 
 /** Write-request bodies (mirror the Contracts upsert records). */
@@ -357,6 +376,9 @@ export const api = {
   /** Locations in the sites the user can read; `siteId` narrows to one site. */
   locations: (game?: string, siteId?: number) =>
     request<LocationSummaryDto[]>(`/api/locations${qs({ game, siteId })}`),
+  /** Matching cards per location for a collection search `q`; only locations with a match are returned. */
+  locationSearchMatches: (q: string, game?: string, siteId?: number) =>
+    request<LocationSearchMatchDto[]>(`/api/locations/search-matches${qs({ q, game, siteId })}`),
   locationSetSite: (id: number, siteId: number) =>
     request<void>(`/api/locations/${id}/site`, { method: 'PUT', body: JSON.stringify({ siteId }) }),
 
@@ -411,6 +433,8 @@ export const api = {
 
   // Sets
   sets: (game: string) => request<SetInfoDto[]>(`/api/sets${qs({ game })}`),
+  /** Lower-cased codes of the sets the user owns at least one card in. */
+  ownedSetCodes: (game: string) => request<string[]>(`/api/sets/owned${qs({ game })}`),
   setChecklist: (game: string, setCode: string) =>
     request<SetChecklistDto>(`/api/sets/${encodeURIComponent(game)}/${encodeURIComponent(setCode)}`),
 
@@ -529,6 +553,21 @@ export const api = {
     request<DeckBoxNeedsGameDto[]>('/api/locations/deck-boxes/needs-game'),
   locationDeckLegality: (id: number) =>
     request<DeckLegalityDto>(`/api/locations/${id}/deck-legality`),
+  /** Link a deck box to a Moxfield/Archidekt deck URL; a blank URL unlinks it. */
+  setDeckLink: (id: number, url: string | null) =>
+    request<void>(`/api/locations/${id}/deck-link`, { method: 'PUT', body: JSON.stringify({ url }) }),
+  /** Fetch the linked deck and diff it against the deck box (changes nothing). */
+  deckSyncPreview: (id: number) =>
+    request<DeckSyncPreviewDto>(`/api/locations/${id}/deck-sync/preview`, { method: 'POST' }),
+  deckSyncApply: (id: number, body: DeckSyncApplyRequest) =>
+    request<DeckSyncResultDto>(`/api/locations/${id}/deck-sync/apply`, { method: 'POST', body: JSON.stringify(body) }),
+  /** "Find a copy": owned cards of the deck box's game, by name, that could be moved into it. */
+  deckSyncSearch: (id: number, q: string) =>
+    request<DeckSyncSourceDto[]>(`/api/locations/${id}/deck-sync/search${qs({ q })}`),
+  deckNotInCollection: (id: number) =>
+    request<DeckBoxMissingCardDto[]>(`/api/locations/${id}/deck-sync/not-in-collection`),
+  removeDeckNotInCollection: (id: number, cardName: string) =>
+    request<void>(`/api/locations/${id}/deck-sync/not-in-collection${qs({ cardName })}`, { method: 'DELETE' }),
 
   // Deck types (per-game formats): built-ins + custom
   deckTypes: (game: string) => request<DeckTypeDto[]>(`/api/deck-types${qs({ game })}`),
@@ -690,7 +729,11 @@ export const api = {
     request<EbayListingResultDto>('/api/listings/ebay/revise', { method: 'POST', body: JSON.stringify(body) }),
   pickListPdfUrl: (game?: string) => `/api/listings/picklist.pdf${qs({ game })}`,
   settings: () => request<SalesSettingsDto>('/api/settings'),
-  settingsUpdate: (body: { forSaleLocationId: number | null; movePickedToForSaleLocation: boolean }) =>
+  settingsUpdate: (body: {
+    forSaleLocationId: number | null;
+    movePickedToForSaleLocation: boolean;
+    orderSearchAllGames?: boolean;
+  }) =>
     request<void>('/api/settings', { method: 'PUT', body: JSON.stringify(body) }),
   scanBadgeSettings: () => request<ScanBadgeSettingsDto>('/api/settings/scan-badges'),
   scanBadgeSettingsUpdate: (body: ScanBadgeSettingsDto) =>
@@ -944,6 +987,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ game, operation }),
     }),
+  catalogSchedule: () => request<CatalogScheduleResponse>('/api/catalog/schedule'),
+  /** Admin only. */
+  catalogSetSchedule: (schedule: CatalogScheduleDto) =>
+    request<CatalogScheduleResponse>('/api/catalog/schedule', {
+      method: 'PUT',
+      body: JSON.stringify(schedule),
+    }),
+  /** Admin only: run the saved schedule's games + updates now. */
+  catalogRunSchedule: () => request<void>('/api/catalog/schedule/run', { method: 'POST' }),
 
   // eBay
   ebayStatus: () => request<EbayStatusDto>('/api/ebay/status'),
@@ -1006,6 +1058,32 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ game, items }),
     }),
+  /** The scanned cards of one game that DON'T match a validation query. */
+  scanValidate: (game: string, query: string, items: ScanTagRuleItem[]) =>
+    request<ScanValidationResultDto>('/api/scan/validate', {
+      method: 'POST',
+      body: JSON.stringify({ game, query, items }),
+    }),
+  scanValidationRules: (game: string) =>
+    request<ScanValidationRuleDto[]>(`/api/scan/validation-rules${qs({ game })}`),
+  /** Save a validation rule; one with the same name for the game is replaced. */
+  scanValidationRuleSave: (game: string, name: string, query: string) =>
+    request<ScanValidationRuleDto>('/api/scan/validation-rules', {
+      method: 'POST',
+      body: JSON.stringify({ game, name, query }),
+    }),
+  scanValidationRuleDelete: (id: number) =>
+    request<void>(`/api/scan/validation-rules/${id}`, { method: 'DELETE' }),
+  // ---- Labels ----
+  labelTemplates: () => request<LabelTemplateDto[]>('/api/labels/templates'),
+  labelTemplateCreate: (input: LabelTemplateInput) =>
+    request<LabelTemplateDto>('/api/labels/templates', { method: 'POST', body: JSON.stringify(input) }),
+  labelTemplateUpdate: (id: number, input: LabelTemplateInput) =>
+    request<LabelTemplateDto>(`/api/labels/templates/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+  labelTemplateDelete: (id: number) => request<void>(`/api/labels/templates/${id}`, { method: 'DELETE' }),
+  /** The label values for the selected cards, or every card in a location. */
+  labelData: (req: LabelDataRequest) =>
+    request<LabelDataDto>('/api/labels/data', { method: 'POST', body: JSON.stringify(req) }),
   // Export staged scans WITHOUT adding them to the collection. One format ⇒ that file; several ⇒ a
   // zip with one file per format. `fileName` is the base name (no extension).
   scanExport: (formats: string[], items: ScanCommitItem[], fileName: string) =>
@@ -1027,7 +1105,7 @@ export const api = {
   scanBatches: () => request<ScanBatchSummaryDto[]>('/api/scan/batches'),
   scanBatchCount: () => request<{ unclaimed: number }>('/api/scan/batches/count'),
   scanBatch: (id: number) => request<ScanBatchDto>(`/api/scan/batches/${id}`),
-  /** Start matching waiting (Collecting) batches now — the listed ones, or all when none are given. */
+  /** Start waiting (Collecting) batches now — the listed ones, or all when none are given. */
   scanBatchRun: (batchIds: number[] = []) =>
     request<{ started: number }>('/api/scan/batches/run', { method: 'POST', body: JSON.stringify({ batchIds }) }),
   scanBatchClaim: (id: number, force = false) =>
@@ -1068,4 +1146,21 @@ export const api = {
   scanFolderSettings: () => request<ScanFolderSettingsResponse>('/api/settings/scan-folders'),
   scanFolderSettingsUpdate: (body: ScanFolderSettingsDto) =>
     request<void>('/api/settings/scan-folders', { method: 'PUT', body: JSON.stringify(body) }),
+
+  // Customer kiosk — staff queue (Sales ▸ Kiosk) and admin settings (Settings ▸ Kiosk)
+  kioskQueue: () => request<KioskQueueEntryDto[]>('/api/kiosk-queue'),
+  kioskQueueCount: () => request<KioskQueueCountDto>('/api/kiosk-queue/count'),
+  kioskClaim: (id: number) => request<void>(`/api/kiosk-queue/${id}/claim`, { method: 'POST' }),
+  kioskUnclaim: (id: number) => request<void>(`/api/kiosk-queue/${id}/unclaim`, { method: 'POST' }),
+  kioskRemoveHold: (id: number, holdId: number, quantity?: number) =>
+    request<void>(`/api/kiosk-queue/${id}/holds/${holdId}${qs({ quantity })}`, { method: 'DELETE' }),
+  kioskCancel: (id: number) => request<void>(`/api/kiosk-queue/${id}/cancel`, { method: 'POST' }),
+  kioskCreateOrder: (id: number, body: { customerId?: number | null; customerName?: string | null }) =>
+    request<KioskCreateOrderResultDto>(`/api/kiosk-queue/${id}/order`, { method: 'POST', body: JSON.stringify(body) }),
+  kioskSettings: () => request<KioskSettingsDto>('/api/kiosk-settings'),
+  kioskSettingsUpdate: (body: KioskSettingsDto) =>
+    request<KioskSettingsDto>('/api/kiosk-settings', { method: 'PUT', body: JSON.stringify(body) }),
+  kioskDevices: () => request<KioskDeviceDto[]>('/api/kiosk-settings/devices'),
+  kioskDeviceRevoke: (id: number) => request<void>(`/api/kiosk-settings/devices/${id}/revoke`, { method: 'POST' }),
+  kioskDeviceDelete: (id: number) => request<void>(`/api/kiosk-settings/devices/${id}`, { method: 'DELETE' }),
 };

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Api.Contracts;
 using OmniCard.Collection.Inventory;
 using OmniCard.Data;
@@ -25,6 +26,7 @@ public class ImportControllerUrlTests : IDisposable
     private readonly ImportController _controller;
     private readonly StubDecklists _decklists = new();
     private readonly int _boxId;
+    private readonly StorageContainerService _containers;
 
     private static readonly CardMatch Bolt2x2 = Printing("bolt-2x2", "Lightning Bolt", "2X2", "117");
     private static readonly CardMatch BoltM10 = Printing("bolt-m10", "Lightning Bolt", "M10", "146");
@@ -47,9 +49,13 @@ public class ImportControllerUrlTests : IDisposable
             OnGetCurrentPrices = (ids, _) => ids.ToDictionary(id => id, id => id == "bolt-m10" ? 1m : 3m),
         };
 
-        _controller = new ImportController(null!, new WebBinderCardService(factory, new StubDataPath()), _decklists,
-            new RecordingCardService(gs), null!, TagRuleServices.Create(factory));
-        _boxId = new StorageContainerService(factory).Create("Deck Box", ContainerType.Box).Id;
+        var binderCards = new WebBinderCardService(factory, new StubDataPath());
+        var cardService = new RecordingCardService(gs);
+        _controller = new ImportController(null!, binderCards, _decklists, cardService, null!, TagRuleServices.Create(factory),
+            new DeckBoxSyncService(factory, _decklists, cardService, binderCards, new TagService(factory),
+                NullLogger<DeckBoxSyncService>.Instance));
+        _containers = new StorageContainerService(factory);
+        _boxId = _containers.Create("Deck Box", ContainerType.Box).Id;
     }
 
     public void Dispose() => _conn.Dispose();
@@ -137,6 +143,29 @@ public class ImportControllerUrlTests : IDisposable
         Assert.Equal(1, result.Imported);
         Assert.Equal(2, result.Skipped);
         Assert.Equal(2, Lots().Count);
+    }
+
+    [Fact]
+    public async Task Url_IntoUnlinkedDeckBox_LinksItToTheDeck()
+    {
+        _decklists.FetchResult = ("My Deck", [new DecklistEntry(1, "Sol Ring", "SCD", "276")]);
+        var deckBox = _containers.Create("Commander", ContainerType.DeckBox, game: CardGame.Mtg).Id;
+        var linkedBox = _containers.Create("Linked", ContainerType.DeckBox, game: CardGame.Mtg).Id;
+        using (var ctx = new OmniCardDbContext(_opts))
+        {
+            ctx.StorageContainers.Find(linkedBox)!.SourceUrl = "https://archidekt.com/decks/1";
+            ctx.SaveChanges();
+        }
+
+        Assert.True(Value(await _controller.Url(Request() with { ContainerId = deckBox })).LinkedDeckBox);
+        // A box that's already linked keeps its link; a plain box never gets one.
+        Assert.False(Value(await _controller.Url(Request() with { ContainerId = linkedBox })).LinkedDeckBox);
+        Assert.False(Value(await _controller.Url(Request())).LinkedDeckBox);
+
+        using var check = new OmniCardDbContext(_opts);
+        Assert.Equal("https://moxfield.com/decks/abc", check.StorageContainers.Find(deckBox)!.SourceUrl);
+        Assert.Equal("https://archidekt.com/decks/1", check.StorageContainers.Find(linkedBox)!.SourceUrl);
+        Assert.Null(check.StorageContainers.Find(_boxId)!.SourceUrl);
     }
 
     [Fact]

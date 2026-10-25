@@ -12,7 +12,7 @@ What you can see and do in OmniCard depends on your role and permissions. If a s
 
 - Ask an administrator to change your role or give you the permission. See [Administration](help:administration).
 - Once they've saved the change, move to another page. Your sidebar and buttons update without signing out.
-- Some things are for administrators only, whatever their role: managing users, roles and sites, watched scan folders, and changing receipt and scan badge settings.
+- Some things are for administrators only, whatever their role: managing users, roles and sites, tag rules, watched scan folders, resetting the collection, changing the catalog update schedule, changing receipt and scan badge settings, and setting up the customer kiosk.
 
 ![The message shown when you open a section you don't have access to](troubleshooting-no-access.png)
 
@@ -77,11 +77,12 @@ OmniCard couldn't recognize the card well enough to guess. Click **View scan** t
 
 ## Prices are missing or look wrong
 
-Market prices come from each game's price source, and an administrator refreshes them on the server.
+Market prices come from TCGplayer: through Scryfall for Magic: The Gathering, and through TCGCSV for every other game. They're refreshed on the server, by an administrator or by the automatic update schedule.
 
-- **Prices are out of date.** Ask an administrator to run **Update prices** for the game under **Administration ▸ Catalog Data**.
+- **Prices are out of date.** Ask an administrator to run **Update prices** for the game under **Administration ▸ Catalog Data**, or to turn on **Automatic updates** there so prices refresh every day.
 - **One card has no price.** Some printings, such as certain promos and older editions, simply don't have a price at the source. OmniCard can't fill those in. A card with no price shows *n/a* when you open it and counts as zero in totals.
 - **A foreign card shows the English price.** Non-English printings rarely have their own price, so they use the English printing's price. Japanese Pokémon cards have their own prices.
+- **A brand-new card has no price yet.** TCGplayer often lists a new set before it has sales to price it from. The price appears after a later update.
 - **Foil and non-foil prices differ.** Check that the card's **Foil** setting is right. Foil copies use the foil price.
 - **Sealed product** has its own market price on the Inventory page. See [Inventory](help:inventory).
 
@@ -163,7 +164,9 @@ Scans from a watched scanner folder work differently. They're stored on the serv
 
 *Nobody is reviewing this batch. Start reviewing it to make changes.* Click **Review this batch** to claim it.
 
-**A batch never appears.** Check that the scanner saves into a subfolder of the game's watched folder, and wait for the quiet period to pass. An administrator can check the folder's status under **Administration ▸ Scan Badges**. See [Administration](help:administration) and [Scan batches](help:scan-batches).
+**A batch never appears.** A batch shows up as **Waiting** within a minute of its first file. Check that the scanner saves into a subfolder of the game's watched folder. An administrator can check the folder's status under **Administration ▸ Scan Badges**. See [Administration](help:administration) and [Scan batches](help:scan-batches).
+
+**My scanner software reports errors when it finishes a run.** OmniCard doesn't touch a batch's files until the batch starts. If it starts too soon, before the software has finished renaming or moving its files, ask an administrator to raise the **Quiet period**, or turn off **Process batches automatically** and click **Run** yourself.
 
 ## A card can't be moved, split or edited
 
@@ -183,13 +186,60 @@ A card that's listed for sale is locked against changes that would affect the li
 
 See [Importing](help:importing).
 
+## Deck box link and sync problems
+
+*That isn't a Moxfield or Archidekt deck URL.* Paste the deck's own address. It should look like `https://moxfield.com/decks/…` or `https://archidekt.com/decks/…`.
+
+*Moxfield decks are Magic: The Gathering decks, but "…" is a … deck box.* Moxfield and Archidekt only have Magic decks, so only Magic deck boxes can be linked. *Assign "…" a game before linking it to a deck* means the deck box has no game yet. Set one with **Game & deck type**.
+
+*Couldn't download the linked deck.* Open the link to check it still works, and make sure the deck is public. If the deck moved, click **Edit link** and paste the new address.
+
+*… is listed for sale — unlist it before putting it in a deck.* A sync can't use a copy that's listed for sale. Unlist it on **Sales ▸ Listings**, or choose another copy.
+
+*Sync again to refresh the list.* Your collection changed after the sync review opened, for example someone moved a card. Close the dialog and click **Sync from URL** again.
+
+**Apply sync is greyed out.** Every card that's still short needs a copy (use **Find a copy…**) or a tick in **Not in collection**. Also check for amounts shown in red and that **Move removed cards to** has a location.
+
+See [Deck boxes](help:deck-boxes#link-a-deck-box-to-an-online-deck).
+
 ## Catalog jobs won't start
 
 *A catalog refresh is already running.* Only one catalog job runs at a time. Wait for it to finish. Its progress shows on the **Catalog Data** tab.
 
 **A job finished almost instantly.** That's usually fine. If little has changed since the last run, there's little to do. Look for the ✓ under **Recent**. A ✗ means it failed, and the message next to it says why.
 
+*Couldn't link the existing One Piece catalog to TCGplayer… Nothing was changed; try again later.* The first One Piece update after an upgrade matches the cards you already have to TCGplayer, using a site that was unavailable. Nothing was changed. Run the update again later.
+
+## Automatic updates didn't run
+
+Check **Automatic updates** on the **Catalog Data** tab:
+
+- **Automatic updates are off.** An administrator needs to turn on **Update catalogs automatically** and click **Save schedule**.
+- **The next run is later than you expected.** Times are in the server's time zone, shown under **Run at**, and only on the ticked days.
+- **The server was off at the scheduled time.** The missed update runs once when the server starts again. If OmniCard only seems to run while someone has it open, ask whoever runs the server to keep it always running.
+- **Some updates failed.** The last run lists each failed update with its error under **Failed updates**. An administrator can fix the cause and click **Run now**.
+
 See [Administration](help:administration).
+
+## Kiosk problems
+
+**The kiosk shows "Set up this kiosk".** The device isn't a kiosk any more: its setup was revoked in **Administration ▸ Kiosk**, or the browser's data was cleared. An administrator sets it up again with their username and password. The old entry under **Kiosk devices** can then be revoked and deleted.
+
+*That isn't an administrator's username and password.* Only an administrator account can set up a kiosk or take a device out of kiosk mode. Other accounts are refused, even with the right password.
+
+**The kiosk says "The kiosk is closed" or "There's nothing to browse yet".** In **Administration ▸ Kiosk**, turn on **Kiosk open**, add at least one location under **Browsable locations**, and click **Save**. Then tap **Refresh** on the kiosk.
+
+**A card is in a browsable location but the kiosk doesn't show it.** The kiosk leaves out copies listed on TCGplayer or eBay, copies on an open order, copies another customer is holding, and cards marked missing or traded away.
+
+*Someone is already using "…". Try adding an initial or a nickname.* Names must be unique while a list is open, including lists waiting at the counter. The name frees up once staff create the order or cancel the list.
+
+*Sorry, someone else just took the last copy.* Another customer added the last available copy a moment earlier. If they remove it, it becomes available again.
+
+*Your session ended. Please enter your name to start again.* Nobody touched the kiosk for longer than the **Idle timeout (minutes)**, so the unsent list was cleared. An administrator can raise the timeout in **Administration ▸ Kiosk**.
+
+*No longer in stock: …. Remove those cards from the list first.* A card on the pick list was sold or removed some other way after the customer added it. On **Sales ▸ Kiosk**, remove that card from the list, then click **Create order** again.
+
+See [Customer kiosk](help:kiosk).
 
 ## eBay errors
 

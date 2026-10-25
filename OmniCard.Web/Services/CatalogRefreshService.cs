@@ -10,8 +10,10 @@ namespace OmniCard.Web.Services;
 /// Runs the per-game catalog refresh operations (download bulk data / update prices / compute image
 /// hashes) server-side as background jobs, so the web app no longer depends on the desktop to keep
 /// the SQLite catalog caches current. One job runs at a time (these are heavy, and they write the
-/// catalog DBs); progress is captured for the SPA to poll. State lives in memory only — a refresh is
-/// re-triggerable, so losing status on restart is harmless.
+/// catalog DBs): a manual start is refused while another job runs, while a scheduled one
+/// (<see cref="RunAndWaitAsync"/>, used by <see cref="CatalogScheduleHostedService"/>) waits its turn.
+/// Progress is captured for the SPA to poll. State lives in memory only — a refresh is re-triggerable,
+/// so losing status on restart is harmless.
 /// </summary>
 public sealed class CatalogRefreshService
 {
@@ -23,6 +25,8 @@ public sealed class CatalogRefreshService
     private readonly ICatalogLanguageSettingsService? _languages;
     private readonly ILogger<CatalogRefreshService> _logger;
     private readonly object _lock = new();
+    // Held by the running job (released when it completes).
+    private readonly SemaphoreSlim _gate = new(1, 1);
     private JobState? _running;
     private readonly LinkedList<JobState> _recent = new(); // most-recent-first, capped
 
@@ -40,44 +44,79 @@ public sealed class CatalogRefreshService
 
     /// <summary>Immutable snapshot of a refresh job for the API.</summary>
     public sealed record JobSnapshot(
-        string Game, string Operation, string State, string Message, string StartedAt, string? FinishedAt);
+        string Game, string Operation, string State, string Message, string StartedAt, string? FinishedAt,
+        bool Scheduled = false);
 
     public sealed record StatusSnapshot(JobSnapshot? Running, IReadOnlyList<JobSnapshot> Recent);
 
     public bool TryStart(CardGame game, string operation, out string? error)
     {
-        if (!Operations.Contains(operation))
+        if (!TryResolve(game, operation, out var service, out error))
+            return false;
+
+        if (!_gate.Wait(0))
         {
-            error = $"Unknown operation '{operation}' (expected prices, bulk, or hashes)";
+            lock (_lock)
+                error = _running is { } r
+                    ? $"A catalog refresh is already running ({r.Game} {r.Operation})"
+                    : "A catalog refresh is already running";
             return false;
         }
-        if (!_games.TryGetValue(game, out var service))
+
+        var job = Begin(game, operation, scheduled: false);
+        // Fire-and-forget: the job owns its lifecycle and records completion into state.
+        _ = Task.Run(() => RunAsync(service, job, CancellationToken.None));
+        error = null;
+        return true;
+    }
+
+    /// <summary>Runs one job to completion, first waiting for any running job to finish. Returns the
+    /// finished job (state succeeded/failed); throws <see cref="ArgumentException"/> for an unknown
+    /// operation or unavailable game.</summary>
+    public async Task<JobSnapshot> RunAndWaitAsync(CardGame game, string operation, bool scheduled, CancellationToken ct)
+    {
+        if (!TryResolve(game, operation, out var service, out var error))
+            throw new ArgumentException(error);
+
+        await _gate.WaitAsync(ct);
+        var job = Begin(game, operation, scheduled);
+        await RunAsync(service, job, ct);
+        lock (_lock)
+            return job.ToSnapshot();
+    }
+
+    private bool TryResolve(CardGame game, string operation, out ICardGameService service, out string? error)
+    {
+        service = null!;
+        if (!Operations.Contains(operation))
+        {
+            error = $"Unknown operation '{operation}' (expected prices, bulk, hashes, or images)";
+            return false;
+        }
+        if (!_games.TryGetValue(game, out service!))
         {
             error = $"Game {game} is not available";
             return false;
         }
-
-        lock (_lock)
-        {
-            if (_running is not null)
-            {
-                error = $"A catalog refresh is already running ({_running.Game} {_running.Operation})";
-                return false;
-            }
-            _running = new JobState
-            {
-                Game = game,
-                Operation = operation.ToLowerInvariant(),
-                State = "running",
-                Message = "Starting…",
-                StartedAt = DateTime.UtcNow,
-            };
-        }
-
-        // Fire-and-forget: the job owns its lifecycle and records completion into state.
-        _ = Task.Run(() => RunAsync(service, _running!));
         error = null;
         return true;
+    }
+
+    // Caller holds the gate.
+    private JobState Begin(CardGame game, string operation, bool scheduled)
+    {
+        var job = new JobState
+        {
+            Game = game,
+            Operation = operation.ToLowerInvariant(),
+            State = "running",
+            Message = "Starting…",
+            StartedAt = DateTime.UtcNow,
+            Scheduled = scheduled,
+        };
+        lock (_lock)
+            _running = job;
+        return job;
     }
 
     public StatusSnapshot Status()
@@ -88,7 +127,7 @@ public sealed class CatalogRefreshService
         }
     }
 
-    private async Task RunAsync(ICardGameService service, JobState job)
+    private async Task RunAsync(ICardGameService service, JobState job, CancellationToken ct)
     {
         void SetMessage(string message)
         {
@@ -111,19 +150,23 @@ public sealed class CatalogRefreshService
             switch (job.Operation)
             {
                 case "prices":
-                    await service.UpdatePricesAsync(new Progress<PriceUpdateProgress>(p => SetMessage(p.Message)));
+                    await service.UpdatePricesAsync(new Progress<PriceUpdateProgress>(p => SetMessage(p.Message)), ct);
                     break;
                 case "bulk":
-                    await service.DownloadBulkDataAsync(new Progress<string>(SetMessage));
+                    await service.DownloadBulkDataAsync(new Progress<string>(SetMessage), ct);
                     break;
                 case "hashes":
-                    await service.ComputeImageHashesAsync(forceAll: false, progress: new Progress<string>(SetMessage));
+                    await service.ComputeImageHashesAsync(forceAll: false, progress: new Progress<string>(SetMessage), ct: ct);
                     break;
                 case "images":
-                    await DownloadImagesAsync(service, job.Game, SetMessage);
+                    await DownloadImagesAsync(service, job.Game, SetMessage, ct);
                     break;
             }
-            Complete(job, "succeeded", "Completed");
+            // Keep the job's last progress line (e.g. "prices updated (N cards)") as its result.
+            string message;
+            lock (_lock)
+                message = job.Message is "Starting…" or "" ? "Completed" : job.Message;
+            Complete(job, "succeeded", message);
             _logger.LogInformation("Catalog refresh finished: {Game} {Operation}", job.Game, job.Operation);
         }
         catch (Exception ex)
@@ -135,12 +178,13 @@ public sealed class CatalogRefreshService
 
     /// <summary>Downloads every printing's artwork for a game into the server image cache
     /// (skip-if-present), walking the catalog set-by-set so progress is meaningful.</summary>
-    private async Task DownloadImagesAsync(ICardGameService service, CardGame game, Action<string> setMessage)
+    private async Task DownloadImagesAsync(ICardGameService service, CardGame game, Action<string> setMessage, CancellationToken ct)
     {
         var sets = service.GetAvailableSets();
         int setNo = 0, downloaded = 0, total = 0;
         foreach (var set in sets)
         {
+            ct.ThrowIfCancellationRequested();
             setNo++;
             setMessage($"Set {setNo}/{sets.Count} ({set.SetCode}) — {downloaded} images cached");
             List<SetCatalogCard> cards;
@@ -170,6 +214,7 @@ public sealed class CatalogRefreshService
             if (ReferenceEquals(_running, job))
                 _running = null;
         }
+        _gate.Release();
     }
 
     private sealed class JobState
@@ -180,9 +225,10 @@ public sealed class CatalogRefreshService
         public string Message = "";
         public DateTime StartedAt;
         public DateTime? FinishedAt;
+        public bool Scheduled;
 
         public JobSnapshot ToSnapshot() => new(
             Game.ToString(), Operation, State, Message,
-            StartedAt.ToString("o"), FinishedAt?.ToString("o"));
+            StartedAt.ToString("o"), FinishedAt?.ToString("o"), Scheduled);
     }
 }

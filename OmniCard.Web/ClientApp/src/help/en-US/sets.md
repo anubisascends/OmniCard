@@ -10,6 +10,10 @@ The Sets page shows every card printed in a set and which ones you own, so you c
 
 The checklist for that set loads below.
 
+### Show only sets you own cards in
+
+Turn on **Owned sets only** next to the **Set** box to limit the list to sets where you own at least one card. Cards you've traded away don't count. The switch stays on the next time you open the page.
+
 ![The Sets page with a set selected, the completion bar, and the checklist](sets-checklist.png)
 
 > [!NOTE]
@@ -34,7 +38,7 @@ Every card in the set is listed in collector-number order.
 | Normal | Current market price for a regular copy. |
 | Foil | Current market price for a foil copy, if one exists. |
 
-Cards you don't own are shown faded, so the gaps in your set stand out.
+Cards you don't own are shown faded, so the gaps in your set stand out. To hide them and list only the cards you have at least one copy of, turn on **Owned cards only** next to the **Set** box. The summary line and progress bar still count the whole set. Like **Owned sets only**, the switch stays on the next time you open the page.
 
 Click a column header to sort the checklist, for example by **Normal** price to see which missing cards cost the most. Large sets are split into pages. Use the controls at the bottom of the list to move between them.
 

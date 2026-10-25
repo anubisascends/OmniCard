@@ -7,12 +7,10 @@ using OmniCard.Shared.Scanning;
 namespace OmniCard.Web.Services.ScanBatches;
 
 /// <summary>
-/// Matches batch images in the background, one at a time. A Collecting batch starts once its quiet
-/// period passes with no new file (or, with auto-processing off, only when someone presses Run — see
-/// <see cref="ScanBatchService.Run"/>); items are matched oldest batch first, in ingest order; a batch
-/// with nothing left pending becomes Ready. A batch that received nothing but exact duplicates is
-/// closed as Discarded once its quiet period passes — there's nothing in it to review. Nothing is held "in flight", so after a restart any Pending item
-/// is simply matched again.
+/// Matches batch images in the background, one at a time across every started batch. Batches start in
+/// <see cref="ScanFolderIngestor"/>, which takes their files in and sets them Matching; items are matched
+/// oldest batch first, in ingest order, and a batch with nothing left pending becomes Ready. Nothing is
+/// held "in flight", so after a restart any Pending item is simply matched again.
 /// </summary>
 public sealed class ScanBatchProcessor(
     IDbContextFactory<OmniCardDbContext> dbFactory,
@@ -22,34 +20,12 @@ public sealed class ScanBatchProcessor(
     TimeProvider clock,
     ILogger<ScanBatchProcessor> logger)
 {
-    /// <summary>Advance batch states and match the next pending item. Returns false when there was
-    /// nothing to match. <paramref name="autoStart"/> false leaves Collecting batches waiting for Run.</summary>
-    public async Task<bool> ProcessNextAsync(TimeSpan quietPeriod, bool autoStart = true, CancellationToken ct = default)
+    /// <summary>Mark finished batches Ready and match the next pending item. Returns false when there
+    /// was nothing to match.</summary>
+    public async Task<bool> ProcessNextAsync(CancellationToken ct = default)
     {
         var now = clock.GetUtcNow().UtcDateTime;
         await using var ctx = await dbFactory.CreateDbContextAsync(ct);
-        var cutoff = now - quietPeriod;
-
-        // A batch that only ever got duplicates has nothing to review: close it (it stays listed for a
-        // day, so the skipped copies are still reported).
-        await ctx.ScanBatches
-            .Where(b => (b.Status == ScanBatchStatus.Collecting || b.Status == ScanBatchStatus.Matching)
-                        && b.LastFileUtc <= cutoff
-                        && ctx.ScanBatchItems.Any(i => i.ScanBatchId == b.Id && i.State == ScanBatchItemState.Duplicate)
-                        && !ctx.ScanBatchItems.Any(i => i.ScanBatchId == b.Id
-                                                        && (i.State == ScanBatchItemState.Open || i.State == ScanBatchItemState.Committed)))
-            .ExecuteUpdateAsync(u => u
-                .SetProperty(b => b.Status, ScanBatchStatus.Discarded)
-                .SetProperty(b => b.ClosedUtc, now)
-                .SetProperty(b => b.ClaimedByUserId, (int?)null)
-                .SetProperty(b => b.ClaimedByName, (string?)null)
-                .SetProperty(b => b.ClaimedUtc, (DateTime?)null), ct);
-
-        // Collecting → Matching once no file has arrived for the quiet period.
-        if (autoStart)
-            await ctx.ScanBatches
-                .Where(b => b.Status == ScanBatchStatus.Collecting && b.LastFileUtc <= cutoff)
-                .ExecuteUpdateAsync(u => u.SetProperty(b => b.Status, ScanBatchStatus.Matching), ct);
 
         // Matching → Ready once nothing open is still pending.
         await ctx.ScanBatches
@@ -94,6 +70,8 @@ public sealed class ScanBatchProcessor(
             var json = JsonSerializer.Serialize(match, ScanBatchStorage.Json);
             var include = match.Matched;
             var language = match.Language;
+            // The finish printed on the card (MTG ★/•) replaces the batch default; a non-foil drops its finish.
+            var foil = match.FoilDetected;
             // Only a still-pending row is written: a reviewer who removed the item meanwhile wins.
             await ctx.ScanBatchItems
                 .Where(i => i.Id == item.Id && i.Status == ScanBatchItemStatus.Pending)
@@ -103,6 +81,8 @@ public sealed class ScanBatchProcessor(
                     .SetProperty(i => i.Error, (string?)null)
                     .SetProperty(i => i.Include, include)
                     .SetProperty(i => i.Language, i => language ?? i.Language)
+                    .SetProperty(i => i.IsFoil, i => foil ?? i.IsFoil)
+                    .SetProperty(i => i.FoilType, i => foil == false ? null : i.FoilType)
                     .SetProperty(i => i.PreviewFileName, previewName), ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)

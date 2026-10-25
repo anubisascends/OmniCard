@@ -67,7 +67,7 @@ A new product has no units yet. Add a lot to record what you own.
 3. Fill in the lot:
    - **Quantity**: how many units are in this lot (at least 1).
    - **Unit cost**: what you paid for each one.
-   - **Location (optional)**: where the product is stored. Choose from your [storage locations](help:locations).
+   - **Location (optional)**: where the product is stored. Click the box to pick one of your [storage locations](help:locations), or create one with **New location**.
    - **Source (optional)**: where you got it, such as a store name or "Preorder".
 4. Click **Save**.
 
@@ -83,7 +83,7 @@ The product's **Qty** and the page totals update right away.
 In the product's details panel, each lot shows its **Qty**, **Cost** and **Source**, with buttons on the right.
 
 - **Edit a lot**: click the pencil button, change the fields and click **Save**. Lower the **Quantity** after you open or sell some units.
-- **Move a lot**: click the pencil button and pick a different **Location (optional)**. Choose **— none —** if it isn't stored anywhere in particular.
+- **Move a lot**: click the pencil button and pick a different **Location (optional)**. To clear it, click the **×** at the end of the box. The lot then shows as **— none —**, meaning it isn't stored anywhere in particular.
 - **Delete a lot**: click the trash button and confirm. This removes the lot and its units for good.
 
 ## Edit or delete a product

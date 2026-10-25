@@ -4,10 +4,11 @@ namespace OmniCard.Shared.Games;
 
 /// <summary>
 /// Implemented by the <see cref="ICardGameService"/>s whose upstream source can supply non-English
-/// printings (MTG via Scryfall <c>all_cards</c>, One Piece via poneglyph <c>lang=</c>, Pokémon Japan via
-/// TCGCSV category 85). The catalog-refresh job sets <see cref="CatalogLanguages"/> from the user's
-/// saved selection before each run; a bulk download then fetches exactly those languages and prunes
-/// non-English rows for languages that were un-ticked.
+/// printings (MTG via Scryfall <c>all_cards</c>, Pokémon Japan via TCGCSV category 85), or that hold
+/// non-English rows from an earlier source (One Piece: Japanese/French rows downloaded from poneglyph are
+/// kept, though its TCGCSV source is English-only). The catalog-refresh job sets
+/// <see cref="CatalogLanguages"/> from the user's saved selection before each run; a bulk download then
+/// fetches exactly those languages and prunes non-English rows for languages that were un-ticked.
 /// </summary>
 public interface ICatalogLanguageAware
 {

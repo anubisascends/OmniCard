@@ -71,6 +71,8 @@ public sealed record CardDto
     /// market. For a stacked row it's only set when every underlying lot is listed, so partially-listed
     /// stacks stay listable. The client uses it to disable "List for sale" on cards already on the market.</summary>
     public string? ListingStatus { get; init; }
+    /// <summary>TCGplayer product (or search) link — only filled for the single-card read.</summary>
+    public string? TcgPlayerUrl { get; init; }
 }
 
 /// <summary>A storage location tile for the collection/overview screens.</summary>
@@ -108,7 +110,21 @@ public sealed record LocationSummaryDto
     /// ignore this location's cards: a sales binder, a deck in use… (the stored
     /// <c>StorageContainer.ExcludeFromDeckCheck</c> flag).</summary>
     public bool IgnoredForLists { get; init; }
+
+    /// <summary>The online decklist URL a deck box is linked to (Moxfield / Archidekt), or null.</summary>
+    public string? SourceUrl { get; init; }
+    /// <summary>Site name of <see cref="SourceUrl"/> ("Moxfield", "Archidekt"), or null.</summary>
+    public string? SourceName { get; init; }
+    /// <summary>When the deck box was last synced from <see cref="SourceUrl"/> (UTC), or null.</summary>
+    public DateTime? SourceSyncedAt { get; init; }
+    /// <summary>True when a supported deck site serves this deck box's game, so it can be linked.</summary>
+    public bool DeckLinkSupported { get; init; }
 }
+
+/// <summary>How many owned cards in one location match a collection search — backs the Locations page
+/// search, which keeps only locations holding at least one match. <see cref="MatchCount"/> counts card
+/// rows (lots), like <see cref="LocationSummaryDto.CardCount"/>.</summary>
+public sealed record LocationSearchMatchDto(int LocationId, int MatchCount);
 
 /// <summary>One row of a valuation breakdown (by game / category / location).</summary>
 public sealed record ValuationLineDto(string Key, int Units, decimal Cost, decimal Market);
@@ -254,6 +270,60 @@ public sealed record DeckLegalityDto
 }
 
 public sealed record DeckLegalityWarningDto(string Code, string Message);
+
+// --- Deck box link + sync ---
+
+/// <summary>Body of <c>PUT /api/locations/{id}/deck-link</c>: the deck URL to link, or null/blank to unlink.</summary>
+public sealed record SetDeckLinkRequest(string? Url);
+
+/// <summary>An owned copy that could go into the deck box. <see cref="Suggested"/> is the pre-filled amount
+/// (shared across rows so two cards aren't both offered the same copies). <see cref="IgnoredReason"/>:
+/// <c>"Location"</c> = its location is ignored for lists (usable, but never suggested); <c>"Listed"</c> =
+/// listed for sale (not usable).</summary>
+public sealed record DeckSyncSourceDto(
+    int LotId, string CardName, string? SetCode, string? CollectorNumber, bool IsFoil, string? Language,
+    string? Condition, int LocationId, string LocationName, string? Section, int? Page, int? Slot,
+    int Available, int Suggested, bool IsExactPrinting, string? IgnoredReason, string? ImageUri);
+
+/// <summary>A card the deck wants more copies of than the box holds. <see cref="Sources"/> are owned copies
+/// of the same card name elsewhere in the collection; empty means none were found.
+/// <see cref="MarkedNotInCollection"/> is true when the previous sync marked it "not in collection".</summary>
+public sealed record DeckSyncAddDto(
+    string CardName, string? SetCode, string? CollectorNumber, bool IsFoil, int Needed, string? ImageUri,
+    bool MarkedNotInCollection, IReadOnlyList<DeckSyncSourceDto> Sources);
+
+/// <summary>A deck-box lot (or part of one) the deck no longer wants. <see cref="IsSideboard"/>: already
+/// tagged sideboard, so it's kept by default.</summary>
+public sealed record DeckSyncCutDto(
+    int LotId, string CardName, string? SetCode, string? CollectorNumber, bool IsFoil, int Quantity,
+    bool IsSideboard, string? ImageUri);
+
+/// <summary>The reconciliation between a deck box and its linked deck. <see cref="KeepCount"/> copies are
+/// already in the box; <see cref="Adds"/> are short; <see cref="Cuts"/> are surplus.</summary>
+public sealed record DeckSyncPreviewDto(
+    int DeckBoxId, string DeckBoxName, string SourceUrl, string DeckName, int DeckCardCount, int KeepCount,
+    IReadOnlyList<DeckSyncAddDto> Adds, IReadOnlyList<DeckSyncCutDto> Cuts);
+
+/// <summary>Copies of an owned lot to move into the deck box.</summary>
+public sealed record DeckSyncPickDto(int LotId, int Quantity);
+
+/// <summary>What to do with a cut lot: <c>"Move"</c> (to <see cref="DestinationId"/>), <c>"Sideboard"</c>
+/// (tag it, leave it in the box) or <c>"Keep"</c> (leave it alone).</summary>
+public sealed record DeckSyncCutDecisionDto(int LotId, int Quantity, string Action, int? DestinationId);
+
+/// <summary>A card short in the deck box that the user doesn't own.</summary>
+public sealed record DeckBoxMissingCardDto(string CardName, string? SetCode, string? CollectorNumber, int Quantity);
+
+/// <summary>Body of <c>POST /api/locations/{id}/deck-sync/apply</c>. <see cref="NotInCollection"/> replaces the
+/// box's "not in collection" list.</summary>
+public sealed record DeckSyncApplyRequest
+{
+    public IReadOnlyList<DeckSyncPickDto> Picks { get; init; } = [];
+    public IReadOnlyList<DeckSyncCutDecisionDto> Cuts { get; init; } = [];
+    public IReadOnlyList<DeckBoxMissingCardDto> NotInCollection { get; init; } = [];
+}
+
+public sealed record DeckSyncResultDto(int Added, int Removed, int Sideboarded, int NotInCollection);
 
 public sealed record RenameRequest
 {
@@ -643,12 +713,14 @@ public sealed record LotIdsRequest
 }
 
 /// <summary>App/sales settings surfaced to the SPA.</summary>
-public sealed record SalesSettingsDto(int? ForSaleLocationId, bool MovePickedToForSaleLocation);
+public sealed record SalesSettingsDto(int? ForSaleLocationId, bool MovePickedToForSaleLocation, bool OrderSearchAllGames);
 
 public sealed record UpdateSalesSettingsRequest
 {
     public int? ForSaleLocationId { get; init; }
     public bool MovePickedToForSaleLocation { get; init; } = true;
+    /// <summary>Null leaves the stored value unchanged.</summary>
+    public bool? OrderSearchAllGames { get; init; }
 }
 
 /// <summary>Value-tier badge configuration for the scan page: the ISO currency code the thresholds are
@@ -939,9 +1011,38 @@ public sealed record ImportListResultDto(
 // --- Catalog refresh ---
 
 /// <summary>One catalog-refresh job (running or recent). <see cref="State"/> is running|succeeded|failed;
-/// <see cref="Operation"/> is prices|bulk|hashes.</summary>
+/// <see cref="Operation"/> is prices|bulk|hashes|images. <see cref="Scheduled"/> marks jobs started by the
+/// automatic update schedule.</summary>
 public sealed record CatalogJobDto(
-    string Game, string Operation, string State, string Message, string StartedAt, string? FinishedAt);
+    string Game, string Operation, string State, string Message, string StartedAt, string? FinishedAt,
+    bool Scheduled = false);
+
+/// <summary>The automatic catalog update schedule. <see cref="Times"/> are "HH:mm" in the server's
+/// local time; <see cref="Days"/> are day names (Sunday…Saturday); <see cref="Games"/> are game ids.</summary>
+public sealed record CatalogScheduleDto
+{
+    public bool Enabled { get; init; }
+    public IReadOnlyList<string> Times { get; init; } = [];
+    public IReadOnlyList<string> Days { get; init; } = [];
+    public IReadOnlyList<string> Games { get; init; } = [];
+    public bool UpdateCards { get; init; } = true;
+    public bool UpdatePrices { get; init; } = true;
+}
+
+/// <summary>The schedule plus its status: the next run (ISO-8601 UTC; null when off), the last run's
+/// outcome, whether a run is in progress, the server's time zone (times are in it) and whether the
+/// caller may edit it (admins only).</summary>
+public sealed record CatalogScheduleResponse(
+    CatalogScheduleDto Schedule,
+    string? NextRunAt,
+    string? LastRunStartedAt,
+    string? LastRunFinishedAt,
+    int LastRunJobCount,
+    int LastRunFailedCount,
+    IReadOnlyList<string> LastRunFailures,
+    bool IsRunning,
+    string TimeZone,
+    bool CanEdit);
 
 public sealed record CatalogStatusDto(CatalogJobDto? Running, IReadOnlyList<CatalogJobDto> Recent);
 
@@ -1085,7 +1186,8 @@ public sealed record ImportUrlRequest
 /// collector number wasn't in the catalog, so the cheapest printing of the name was used instead.</summary>
 public sealed record ImportUrlResultDto(
     string DeckName, int Imported, int Skipped, int TotalCards,
-    IReadOnlyList<string> UnresolvedNames, IReadOnlyList<string> SubstitutedNames, int RuleTagged = 0);
+    IReadOnlyList<string> UnresolvedNames, IReadOnlyList<string> SubstitutedNames, int RuleTagged = 0,
+    bool LinkedDeckBox = false);
 
 /// <summary>Body of <c>POST /api/import/location/{id}/url</c>: a Moxfield/Archidekt deck imported
 /// all-or-nothing into the location in the route.</summary>
@@ -1105,7 +1207,7 @@ public sealed record LocationImportIssueDto(int? Row, string? Card, string Messa
 /// imported as another printing of the same card.</summary>
 public sealed record LocationImportResultDto(
     string Source, string? Format, int Lines, int Copies, IReadOnlyList<LocationImportIssueDto> Substitutions,
-    int RuleTagged = 0);
+    int RuleTagged = 0, bool LinkedDeckBox = false);
 
 /// <summary>A rejected location import (HTTP 422): nothing was written. <see cref="Error"/> is the
 /// summary; <see cref="Errors"/> every problem found, so the user can fix them all in one pass.</summary>
@@ -1164,6 +1266,10 @@ public sealed record ScanMatchDto
     public string? Language { get; init; }
     /// <summary>True when <see cref="Language"/> was read off the card itself rather than assumed.</summary>
     public bool LanguageDetected { get; init; }
+    /// <summary>The finish read off the card (MTG M15+: a star between set code and language marks a foil,
+    /// a bullet a non-foil). Null when not read — the scan's own foil setting stands. When set, matching
+    /// and <see cref="MarketPrice"/> already used it in place of the requested finish.</summary>
+    public bool? FoilDetected { get; init; }
 }
 
 /// <summary>One catalog card returned by the correction search (<c>GET /api/scan/search</c>).</summary>
@@ -1263,8 +1369,15 @@ public sealed record ScanBatchSummaryDto
     public int Committed { get; init; }
     /// <summary>Images set aside at pickup as exact copies of ones already scanned (not in <see cref="Total"/>).</summary>
     public int Duplicates { get; init; }
-    /// <summary>Collecting with auto-processing off: matching waits for someone to press Run.</summary>
+    /// <summary>Collecting with auto-processing off: the batch waits for someone to press Run.</summary>
     public bool AwaitingRun { get; init; }
+    /// <summary>While Collecting: image files still sitting untouched in the watched folder.</summary>
+    public int WaitingFiles { get; init; }
+    /// <summary>While Collecting with auto-processing on: when the batch starts on its own if its files
+    /// don't change again.</summary>
+    public DateTime? StartsUtc { get; init; }
+    /// <summary>Whether committing/discarding also deletes the originals in <c>_processed</c>.</summary>
+    public bool DeletesOriginalsOnClose { get; init; }
     public string? ClaimedBy { get; init; }
     public bool ClaimedByMe { get; init; }
     public DateTime CreatedUtc { get; init; }
@@ -1368,10 +1481,12 @@ public sealed record ScanBatchCountDto(int Unclaimed);
 public sealed record ScanFolderSettingsDto
 {
     public bool Enabled { get; init; }
-    /// <summary>Match batches on their own after the quiet period; off = wait for Run on the Scan page.</summary>
+    /// <summary>Start batches on their own after the quiet period; off = wait for Run on the Scan page.</summary>
     public bool AutoProcess { get; init; } = true;
     public int QuietPeriodSeconds { get; init; }
     public int RetentionDays { get; init; }
+    /// <summary>Delete a batch's originals from <c>_processed</c> when it's committed or discarded.</summary>
+    public bool DeleteOriginalsOnClose { get; init; }
     public IReadOnlyList<ScanFolderConfigDto> Folders { get; init; } = [];
 }
 
@@ -1673,6 +1788,8 @@ public sealed record ScanTagRuleItem
     public string? Language { get; init; }
     public bool IsFoil { get; init; }
     public string? FoilType { get; init; }
+    /// <summary>The scan's tags. Only scan validation looks at them (tag rules can't use <c>tag:</c>).</summary>
+    public IReadOnlyList<string> Tags { get; init; } = [];
 }
 
 /// <summary>Check scanned (not yet saved) cards of one game against the enabled tag rules.</summary>
@@ -1684,6 +1801,31 @@ public sealed record ScanTagRulesRequest
 
 /// <summary>The rule tags for one scanned card (empty when no rule matches).</summary>
 public sealed record ScanTagRuleResultDto(string Key, IReadOnlyList<string> Tags);
+
+// ---- Scan validation (Scan page: flag scanned cards that don't match a search) ----
+
+/// <summary>A saved validation rule: a named search query for one game, shared by everyone who scans.</summary>
+public sealed record ScanValidationRuleDto(int Id, string Game, string Name, string Query, DateTime UpdatedAt);
+
+/// <summary>Save a validation rule. A rule with the same name (for that game) is replaced.</summary>
+public sealed record ScanValidationRuleInput
+{
+    public string Game { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string Query { get; init; } = "";
+}
+
+/// <summary>Check scanned (not yet saved) cards of one game against a validation query.</summary>
+public sealed record ScanValidateRequest
+{
+    public string Game { get; init; } = "";
+    public string Query { get; init; } = "";
+    public IReadOnlyList<ScanTagRuleItem> Items { get; init; } = [];
+}
+
+/// <summary>The keys of the cards that don't match the query. When <see cref="Errors"/> isn't empty the
+/// query is invalid and nothing was checked.</summary>
+public sealed record ScanValidationResultDto(IReadOnlyList<string> FailedKeys, IReadOnlyList<string> Errors);
 
 /// <summary>Admin "Reset collection": what a reset removes (preview) or removed (result) — lots/units,
 /// orphaned products and non-sale movements, locations, sites, lists, trades, tags, tag rules — plus
@@ -1698,3 +1840,218 @@ public sealed record CollectionResetRequest
 {
     public string Confirmation { get; init; } = "";
 }
+
+// ---- Labels (user-designed label sheets for card holders) ----
+
+/// <summary>A label template: the sheet layout (page size, margins, grid, spacing — millimetres) and the
+/// pdfme design JSON of one label. <see cref="LabelWidthMm"/>/<see cref="LabelHeightMm"/> are derived.</summary>
+public sealed record LabelTemplateDto(
+    int Id,
+    string Name,
+    double PageWidthMm,
+    double PageHeightMm,
+    double MarginTopMm,
+    double MarginRightMm,
+    double MarginBottomMm,
+    double MarginLeftMm,
+    int Columns,
+    int Rows,
+    double ColumnGapMm,
+    double RowGapMm,
+    double LabelWidthMm,
+    double LabelHeightMm,
+    string Design,
+    DateTime UpdatedAt);
+
+/// <summary>Create or update a label template.</summary>
+public sealed record LabelTemplateInput
+{
+    public string Name { get; init; } = "";
+    public double PageWidthMm { get; init; }
+    public double PageHeightMm { get; init; }
+    public double MarginTopMm { get; init; }
+    public double MarginRightMm { get; init; }
+    public double MarginBottomMm { get; init; }
+    public double MarginLeftMm { get; init; }
+    public int Columns { get; init; } = 1;
+    public int Rows { get; init; } = 1;
+    public double ColumnGapMm { get; init; }
+    public double RowGapMm { get; init; }
+    public string Design { get; init; } = "";
+}
+
+/// <summary>The cards to print labels for: the given <see cref="LotIds"/> (in that order), or — when none
+/// are given — every card in <see cref="ContainerId"/>, narrowed by <see cref="Game"/> and the search
+/// <see cref="Q"/> like the Location page.</summary>
+public sealed record LabelDataRequest
+{
+    public IReadOnlyList<int>? LotIds { get; init; }
+    public int? ContainerId { get; init; }
+    public string? Game { get; init; }
+    public string? Q { get; init; }
+}
+
+/// <summary>The printable facts of one owned card (lot) — the values a label's fields are filled from.
+/// <see cref="Quantity"/> lets the client print one label per copy.</summary>
+public sealed record LabelCardDto
+{
+    public int Id { get; init; }
+    public string Game { get; init; } = "";
+    public string GameName { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string SetCode { get; init; } = "";
+    public string SetName { get; init; } = "";
+    public string CollectorNumber { get; init; } = "";
+    public string Rarity { get; init; } = "";
+    public string Condition { get; init; } = "";
+    public string Language { get; init; } = "en";
+    /// <summary>Finish name ("Foil", "Etched", …), empty for a non-foil copy.</summary>
+    public string Finish { get; init; } = "";
+    public int Quantity { get; init; } = 1;
+    public decimal MarketPrice { get; init; }
+    public string TcgPlayerUrl { get; init; } = "";
+    /// <summary>The TCGplayer product id when known (deep link), else null.</summary>
+    public int? TcgPlayerId { get; init; }
+    public string? Location { get; init; }
+}
+
+/// <summary>Label data for a print run. <see cref="Truncated"/> is set when the request hit the cap.</summary>
+public sealed record LabelDataDto(IReadOnlyList<LabelCardDto> Cards, bool Truncated);
+
+// --- Customer kiosk (/kiosk) ---
+
+/// <summary>What an enrolled (or not-yet-enrolled) kiosk device needs to draw its current screen.</summary>
+public sealed record KioskStatusDto
+{
+    public bool Enrolled { get; init; }
+    public string? DeviceName { get; init; }
+    public bool Enabled { get; init; }
+    /// <summary>False when no browsable location is configured (nothing to show customers).</summary>
+    public bool HasLocations { get; init; }
+    public bool ShowPrices { get; init; }
+    public int IdleTimeoutMinutes { get; init; }
+    public string? WelcomeMessage { get; init; }
+    /// <summary>The customer currently browsing on this device, if any.</summary>
+    public KioskSessionDto? Session { get; init; }
+}
+
+/// <summary>An administrator's credentials, required to enroll a kiosk or to take a device out of kiosk mode.</summary>
+public sealed record KioskCredentialsRequest(string Login, string Password, string? DeviceName = null);
+
+public sealed record KioskStartSessionRequest(string Name);
+
+/// <summary>Add/remove copies of a card group (<see cref="KioskCardDto.Key"/>) on the customer's pick list.</summary>
+public sealed record KioskHoldRequest(string Key, int Quantity = 1);
+
+public sealed record KioskGameDto(string Id, string DisplayName, int CardCount);
+
+/// <summary>One browsable card: every available copy of a printing in one condition + language,
+/// across the kiosk's locations.</summary>
+public sealed record KioskCardDto
+{
+    /// <summary>Opaque group key (product + condition + language) used to hold copies.</summary>
+    public string Key { get; init; } = "";
+    public string Game { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string SetName { get; init; } = "";
+    public string SetCode { get; init; } = "";
+    public string Number { get; init; } = "";
+    public string Rarity { get; init; } = "";
+    public string Condition { get; init; } = "";
+    public string Language { get; init; } = "";
+    public bool IsFoil { get; init; }
+    public string? FoilType { get; init; }
+    public string? ImageUri { get; init; }
+    /// <summary>Market price per copy; null when prices are hidden or unknown.</summary>
+    public decimal? Price { get; init; }
+    /// <summary>Copies the customer can still add.</summary>
+    public int Available { get; init; }
+    /// <summary>Copies already on this customer's pick list.</summary>
+    public int InMyList { get; init; }
+}
+
+public sealed record KioskSessionItemDto
+{
+    public string Key { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string SetName { get; init; } = "";
+    public string SetCode { get; init; } = "";
+    public string Number { get; init; } = "";
+    public string Condition { get; init; } = "";
+    public string Language { get; init; } = "";
+    public bool IsFoil { get; init; }
+    public string? ImageUri { get; init; }
+    public int Quantity { get; init; }
+    /// <summary>Null when prices are hidden.</summary>
+    public decimal? UnitPrice { get; init; }
+}
+
+public sealed record KioskSessionDto
+{
+    public int Id { get; init; }
+    public string CustomerName { get; init; } = "";
+    public string Status { get; init; } = "";
+    public IReadOnlyList<KioskSessionItemDto> Items { get; init; } = [];
+    public int TotalQuantity { get; init; }
+    /// <summary>Null when prices are hidden.</summary>
+    public decimal? TotalPrice { get; init; }
+}
+
+public sealed record KioskSubmitResultDto(int SessionId, string CustomerName, int ItemCount);
+
+/// <summary>A kiosk pick list as staff see it (Sales ▸ Kiosk).</summary>
+public sealed record KioskQueueEntryDto
+{
+    public int Id { get; init; }
+    public string CustomerName { get; init; } = "";
+    public string Status { get; init; } = "";
+    public string? DeviceName { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? SubmittedAt { get; init; }
+    public DateTime LastActivityAt { get; init; }
+    public string? ClaimedByName { get; init; }
+    public IReadOnlyList<KioskQueueLineDto> Lines { get; init; } = [];
+    public int TotalQuantity { get; init; }
+    public decimal TotalPrice { get; init; }
+}
+
+/// <summary>One held lot: what to pull and where it is.</summary>
+public sealed record KioskQueueLineDto
+{
+    public int HoldId { get; init; }
+    public int LotId { get; init; }
+    public string Name { get; init; } = "";
+    public string SetName { get; init; } = "";
+    public string SetCode { get; init; } = "";
+    public string Number { get; init; } = "";
+    public string Condition { get; init; } = "";
+    public string Language { get; init; } = "";
+    public bool IsFoil { get; init; }
+    public string? ImageUri { get; init; }
+    public int Quantity { get; init; }
+    public decimal UnitPrice { get; init; }
+    public int? LocationId { get; init; }
+    public string? LocationName { get; init; }
+    public int? Page { get; init; }
+    public int? Slot { get; init; }
+    public string? Section { get; init; }
+}
+
+public sealed record KioskQueueCountDto(int Queued, int Browsing);
+
+/// <summary>Turn a pick list into an order: an existing customer, or a new one named
+/// <see cref="CustomerName"/> (defaults to the name the customer gave at the kiosk).</summary>
+public sealed record KioskCreateOrderRequest(int? CustomerId = null, string? CustomerName = null);
+
+public sealed record KioskCreateOrderResultDto(int OrderId, int CustomerId);
+
+public sealed record KioskSettingsDto
+{
+    public bool Enabled { get; init; } = true;
+    public IReadOnlyList<int> LocationIds { get; init; } = [];
+    public int IdleTimeoutMinutes { get; init; } = 15;
+    public bool ShowPrices { get; init; } = true;
+    public string? WelcomeMessage { get; init; }
+}
+
+public sealed record KioskDeviceDto(int Id, string Name, DateTime CreatedAt, string? CreatedBy, DateTime? LastSeenAt, bool Revoked);

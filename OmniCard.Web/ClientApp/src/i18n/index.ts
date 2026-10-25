@@ -26,6 +26,8 @@ import deckbox from './locales/en-US/deckbox.json';
 import dialogs from './locales/en-US/dialogs.json';
 import search from './locales/en-US/search.json';
 import help from './locales/en-US/help.json';
+import labels from './locales/en-US/labels.json';
+import kiosk from './locales/en-US/kiosk.json';
 
 const enUS = {
   ...common,
@@ -48,6 +50,8 @@ const enUS = {
   ...dialogs,
   ...search,
   ...help,
+  ...labels,
+  ...kiosk,
 };
 
 export const FALLBACK_LNG = 'en-US';

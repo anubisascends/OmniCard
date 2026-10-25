@@ -112,7 +112,8 @@ dotnet build OmniCard.Web/OmniCard.Web.csproj
 ```
 
 `ClientApp/**` is excluded from the .NET globs, so `node_modules` never ends up in a publish; the
-built `wwwroot/app` output does.
+built `wwwroot/app` output does. `wwwroot/app` is build output and is git-ignored, so a fresh clone
+has no SPA until you run `npm run build` (the release/nightly workflows do this before publishing).
 
 ## Run (development)
 
@@ -173,6 +174,91 @@ Deploy the published output to IIS:
 > The publish profiles under `OmniCard.Web/Properties/PublishProfiles/` pin `RuntimeIdentifier` to
 > `win-x64`, so the Web Deploy path produces the same slim, single-RID output as the command above.
 
+### Publish to a remote server (VS Code task)
+
+The VS Code task **Publish to Remote Server** (`Ctrl+Shift+P` ▸ *Tasks: Run Task*) runs
+`.vscode/deploy-remote.ps1`. It builds the SPA, publishes to a local staging folder
+(`-r win-x64 --self-contained false`) and replaces the remote site's files with the build. It
+deletes stale files, keeps the ASP.NET Core Module `logs\` folder, and takes the app offline while
+copying.
+
+Settings: `.vscode/deploy-remote.json` holds the tracked defaults. The first run copies it to
+`.vscode/deploy-remote.local.json`, which is git-ignored, then stops so you can fill in your server.
+Any key you leave out of the local file falls back to the default.
+
+| Key | Meaning |
+| --- | --- |
+| `Server`, `SiteName`, `SiteUrl` | Server host/IP, IIS site name, URL printed at the end. `{Server}`/`{SiteName}` expand in URLs and paths. |
+| `Method` | `Share` mirrors the build into a network share of the site folder (`SharePath`). `WebDeploy` syncs through msdeploy (`WebDeployUrl`, `WebDeployAuthType`, `MsDeployPath`). |
+| `UserName` | Server account. Leave it blank to use your Windows login. The password is prompted for; with `RememberPassword` it is saved DPAPI-encrypted (your Windows account on this PC only) in `.vscode/deploy-remote.local.secret`. Delete that file if the password changes. |
+| `PreserveSettings` | Top-level `appsettings.json` sections the server keeps between deploys (default `DataDirectory`, `ConnectionStrings`, `eBay`, `Mcp`). New repo keys still flow through. If the server's copy can't be read, it is left untouched. |
+| `BuildSpa` | Set to `false` to skip `npm install` + `npm run build`. |
+| `ServiceAdminUserName`, `ServiceName`, `ServerAppPath` | Only for **Publish to Remote Server (service)**, below: an administrator account on the server (blank = `UserName`; its remembered password goes in `.vscode/deploy-remote.local.admin.secret` when the names differ), the service name (default `OmniCard`), and the app folder as the server sees it (blank = the folder behind `SharePath`'s share). |
+
+One-time server setup is the same as above (Hosting Bundle, app pool, site, SQL Server, data-directory
+grants). In addition:
+
+- **Share:** share the site's physical folder and give the deploy account **Change** permission on
+  both the share and the NTFS folder. As a safety check, the script refuses to mirror into a folder
+  that is not empty and has no `web.config`. `web.config` is replaced on every deploy, so put
+  server-specific config in `appsettings.json`.
+- **WebDeploy:** Windows Server uses the Web Management Service (`https://<server>:8172/msdeploy.axd`,
+  Basic auth). Install the **IIS Management Service** feature, enable remote connections, start
+  `WMSVC`, install Web Deploy with the **IIS Deployment Handler**, and open TCP 8172. On a Windows
+  client OS, the Web Deploy **Remote Agent Service** is the alternative:
+  `http://<server>/MSDEPLOYAGENTSERVICE`, NTLM, with an admin account on the server.
+
+### Run as a Windows service (instead of IIS)
+
+IIS on a Windows **client** OS (Windows 10/11 Pro) runs at most 10 requests at once, so a page full of
+card images queues behind itself and every open tab's scan-hub connection holds a slot. Windows
+Server's IIS has no such cap. On a client OS, run the app as a Windows service on its own web server
+(Kestrel) instead. Every publish ships `install-service.ps1` for this. On the server, in an elevated
+PowerShell in the deployed app folder:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-service.ps1            # switch from IIS to the service
+powershell -ExecutionPolicy Bypass -File .\install-service.ps1 -Uninstall # back to IIS
+```
+
+It finds the IIS site whose root folder is the one the script runs from (or `-IisSiteName`), reuses
+that site's ports and HTTPS certificate (or pass `-HttpPort`, `-HttpsPort`, `-CertificateThumbprint`),
+then stops the site and its app pool and turns off their auto-start. If IIS is installed but no site
+serves the folder, it lists the sites and stops rather than guessing; it also stops if a port is still
+taken after IIS is stopped. It creates the service (`-ServiceName`, default `OmniCard`; delayed auto-start,
+restarts after a crash, depends on a local SQL Server instance) under the virtual account
+`NT SERVICE\<name>`. It grants that account read on the app folder, modify on `DataDirectory` and the
+watched scan folders, read on the certificate's private key, and `db_owner` on the OmniCard databases
+plus `dbcreator`, for a local SQL Server using Windows auth. It opens the ports in Windows Firewall for
+the local subnet, then starts the service and checks it answers. Re-run it to change ports or the
+certificate; it updates the existing service.
+
+- The endpoints live with the service, not in `appsettings.json`, so deploys don't touch them. They're
+  in the service's registry `Environment` value: `Kestrel__Endpoints__Http__Url`,
+  `Kestrel__Endpoints__Https__Url`, `HttpsCertificateThumbprint` (a `LocalMachine\My` certificate, loaded
+  by `WindowsServiceHosting`) and `WindowsService__Name`.
+- **Deploys work unchanged** with the `Share` method. The service honors `app_offline.htm` like the
+  ASP.NET Core Module does (`AppOfflineWatcher`): it stops so its DLLs can be replaced, and a detached
+  helper starts it again once the file is removed. The installer lets the service account start its
+  own service for this. `WebDeploy` needs IIS, so use `Share`.
+- **Publish to Remote Server (service)** deploys and (re)installs the service in one step, without
+  logging in on the server. It connects first over PowerShell remoting as `ServiceAdminUserName`, so a
+  bad setting fails before the build. Then it stops the service, mirrors the build over the share, and
+  runs `install-service.ps1` from the app folder on the server, elevated, printing its output in the
+  task terminal. The first run also switches an IIS site over to the service. Share method only.
+  One-time setup:
+  - On the server, in an admin PowerShell: `Enable-PSRemoting -Force -SkipNetworkProfileCheck`. On a
+    workgroup PC this also lets local admin accounts keep their admin rights over the network.
+  - On this PC, in an admin PowerShell, if the server is an IP address or isn't in your domain:
+    `Start-Service WinRM; Set-Item WSMan:\localhost\Client\TrustedHosts -Value '<server>' -Concatenate -Force`.
+- The app is always running, so [Keep the app running](#keep-the-app-running-iis) doesn't apply.
+  Errors go to the Windows **Application** event log rather than `logs\stdout`.
+
+**Caching + compression (any host):** API responses and the SPA are Brotli/gzip-compressed (the ~1.6 MB
+bundle goes out as ~450 KB). Content-hashed `/app/assets/*` files are cached for a year
+(`immutable`), `index.html` is always revalidated so a deploy shows up on the next load, and
+`/card-images` are cached for a day. SignalR (`/hubs`) and `/mcp` are not compressed.
+
 ## Catalog data
 
 The per-game card catalogs, prices, and image hashes are refreshed **server-side** — the web app no
@@ -188,6 +274,29 @@ One job runs at a time; progress is shown live. The per-game catalog databases (
 are created on first run, so a fresh server with an empty SQL Server instance can build them from
 scratch. Columns added in later versions (e.g. the catalog `Lang` column) are added to existing
 catalog DBs automatically at startup.
+
+**Sources.** MTG comes from Scryfall. Every other game — One Piece, Riftbound, Pokémon, Yu-Gi-Oh!,
+Final Fantasy TCG — comes from [TCGCSV](https://tcgcsv.com) (TCGplayer data, republished daily).
+One Piece and Riftbound used to come from poneglyph / Riftcodex. Their existing catalog rows are matched
+by TCGplayer product id and keep their ids (so owned copies are unaffected) and their own card data, which
+is more accurate than TCGplayer's listing; TCGCSV only gives them prices and fills fields they lack. Rows
+TCGCSV created are fully refreshed on every run. Printings TCGCSV doesn't list are kept, never deleted. The first One Piece refresh after upgrading links the existing rows to
+TCGplayer once, using poneglyph's `tcgplayer_url` (if poneglyph is unreachable the refresh fails without
+changing anything — retry later). New One Piece printings get `{number}` / `{number}_t{productId}` ids;
+new Riftbound ones `tcgcsv-{productId}`.
+
+### Automatic updates
+
+**Settings → Catalog data → Automatic updates** schedules the refresh: times of day (server local
+time), weekdays, games, and whether to update card data (**Download catalog**), prices, or both. At
+each time the app runs each game's jobs one after another through the same job runner (queued behind a
+manual job if one is running). Anyone with the catalog view permission sees the schedule and the last
+run's result; only **admins** can save it or click **Run now**. A slot missed while the app was down
+runs once at the next start (within a week). The schedule is stored in
+`{dataDir}/catalog-schedule.json`, the last run in `catalog-schedule-state.json`.
+API: `GET /api/catalog/schedule`, `PUT /api/catalog/schedule` and `POST /api/catalog/schedule/run`
+(admin). Under IIS the app must stay running for the schedule to fire — see
+[Keep the app running](#keep-the-app-running-iis).
 
 ### Card languages
 
@@ -205,7 +314,7 @@ also prunes rows for languages that were un-ticked. The selection is stored in
 | Game | Downloadable | Source | Notes |
 |---|---|---|---|
 | MTG | all Scryfall languages | Scryfall `all_cards` (~400 MB gz) instead of `default_cards` once any non-English language is ticked | Same set + collector number as English; prices fall back to the English printing; placeholder scans borrow English art |
-| One Piece | en, ja, fr | poneglyph `/v1/search?lang=` | Rows keyed `OP01-001@ja`; names/colours kept English, art is the language's own; English price fallback |
+| One Piece | English only | TCGCSV (English) | Japanese/French rows downloaded earlier from poneglyph (`OP01-001@ja`) are kept, with an English price fallback |
 | Pokémon | en, ja | TCGCSV category 85 "Pokemon Japan" | Separate sets (codes prefixed `JP-`), Japanese art, **real prices** |
 | Yu-Gi-Oh!, FFTCG, Riftbound | English only | — | Copies can still be tagged with any printed language |
 
@@ -277,21 +386,30 @@ sets, condition, language, foil, default location).
 - **Layout:** `<game folder>\<batch name>\*.jpg|png|tif`. Each top-level subfolder is one batch, named after
   the folder; deeper subfolders belong to it. Images saved directly into the game folder go into a batch
   named after the date. Folders starting with `_` or `.` are ignored.
-- **Pick-up:** a file is taken in once it has stopped changing for a few seconds and the scanner software has
-  released it. It's copied to `{DataDirectory}\scan-batches\{batchId}\` and the original is moved to
-  `<game folder>\_processed\<batch name>\`. Clearing out `_processed` is up to you.
-- **Quiet period:** a batch starts matching once no new file has arrived for the quiet period (default 90 s).
-  Files added to a batch's folder later are appended to it, as long as it hasn't been committed or discarded;
-  after that, they start a new batch named `Name (2)`.
+- **Hands off until it starts:** a batch shows up on the Scan page (*Waiting*, with its file count) as soon as
+  files appear, but its files are left untouched in the folder: only directory entries (names, sizes,
+  timestamps) are read, never the files, so the scanner software can keep writing, renaming and completing
+  its run. The batch **starts** when someone clicks **Run** (`POST /api/scan/batches/run`, status
+  `Starting`), or by itself (see below). Only then are its files copied to
+  `{DataDirectory}\scan-batches\{batchId}\` and the originals moved to `<game folder>\_processed\<batch name>\`.
+  A file that's empty or still held open by another program at that moment is left in place.
+- **Quiet period:** with automatic processing on, a batch starts once its files have gone the quiet period
+  (default 90 s) without any change: a new, renamed, resized or removed file restarts it. Every batch counts
+  down on its own, so several batches can be waiting and starting at once; matching itself is one shared
+  queue. After a restart, waiting batches start their quiet period over. Files that land in a batch's folder
+  after it has started (or were left behind because they were locked) form a new batch named `Name (2)`.
+  If a waiting batch's files are removed before it starts, the batch disappears.
 - **Automatic processing:** on by default. Turn off **Process batches automatically** (`AutoProcess` in
-  `scan-folder-settings.json`) and files are still picked up, but each batch waits as *Waiting to run* until
-  someone clicks **Run** on the Scan page (`POST /api/scan/batches/run`), so unwanted scans can be deleted
-  before matching.
+  `scan-folder-settings.json`) and each batch waits as *Waiting to run* until someone clicks **Run** on the
+  Scan page.
+- **Originals:** kept in `_processed` by default; clearing it out is up to you. Turn on **Delete originals
+  when a batch is closed** (`DeleteOriginalsOnClose`) to delete a batch's originals (each item's
+  `ProcessedPath`) when it's committed or discarded, plus any folders under `_processed` that leaves empty.
 - **Duplicates:** every picked-up file is SHA-256 hashed (`ScanBatchItems.ContentHash`). A file byte-for-byte
   identical to an open or committed item of the same game (scanner software re-saving a run) is recorded as
   a `Duplicate` row: no stored image, never matched or committed; the original is still moved to
   `_processed`. The batch page folds them into repeated runs ("0001–1000 repeat 0001–1000"). A batch that
-  receives only duplicates closes itself as Discarded after the quiet period.
+  holds only duplicates closes itself as Discarded as soon as it starts.
 - **Review:** the **Scan** menu item shows how many batches nobody has opened yet, and the Scan page lists
   every batch with its progress. **Open** claims a batch for you; anyone else sees "In review by …" and can
   only look. The owner (or an admin) can **Release** it; an admin can **Take over**. Edits are saved on the
@@ -308,7 +426,7 @@ sets, condition, language, foil, default location).
 
 ### Keep the app running (IIS)
 
-Folders are only watched while the app is running. By default IIS stops an idle app and starts it on the
+Folders are only watched — and scheduled catalog updates only run — while the app is running. By default IIS stops an idle app and starts it on the
 next request, so scans would sit unnoticed until someone opens the site. To keep it running:
 
 1. Install the IIS **Application Initialization** feature.
@@ -486,6 +604,20 @@ the tags to add. Rules are **additive only** (they never remove a tag).
   `PUT/DELETE /api/tag-rules/{id}`, `POST /api/tag-rules/validate`, `POST /api/tag-rules/preview`,
   `POST /api/tag-rules/{id}/run`.
 
+## Scan validation
+
+The Scan page (and batches/audits) has a **Validation rule** box: a search query every scanned card should
+match. **Validate** checks the whole list (not just the filtered view) with `POST /api/scan/validate`;
+cards that don't match — and scans with no identity — get a red frame plus a *Failed validation* chip, and
+a *N failed* button filters the list to them. Each run clears the previous results first; nothing re-checks
+automatically. Queries use the strict `TagRuleQueryValidator` with `tag:` allowed (no `loc:`, prices or
+`date:`), and are matched in memory like tag rules on unsaved scans (`ScanValidationService`).
+
+Saved rules are per game and shared: `ScanValidationRules` table (migration `AddScanValidationRules`,
+unique by game + name; saving an existing name replaces it). API (`ScanValidationController`):
+`GET /api/scan/validation-rules?game=` and `POST /api/scan/validate` need `scan.view`;
+`POST /api/scan/validation-rules` and `DELETE /api/scan/validation-rules/{id}` need `scan.commit`.
+
 Related: collection search now resolves every MTG catalog field (`kw:`, `pow`, `f:`, catalog `is:` flags…)
 against the printings you own (`IGameFieldResolver.ResolveFieldCardIds(…, candidateIds)`), and an unknown
 `is:` flag matches nothing instead of everything. The matching ids travel as one JSON parameter
@@ -531,6 +663,64 @@ behavior is Shipped. The order drawer's **Scan label** button fills **Tracking**
 - **The live camera needs HTTPS** (browsers only allow `getUserMedia` on a secure origin or `localhost`).
   Over plain HTTP the page says so and falls back to typed / handheld-scanner entry. Barcodes are decoded
   in the browser with ZXing (`@zxing/browser`); nothing is uploaded.
+
+## Customer kiosk
+
+A **customer-facing kiosk** at `/kiosk`: customers type a name, browse/search the cards in admin-chosen
+locations, and put copies on a pick list that staff fulfill from **Sales ▸ Kiosk**. It is a second page of
+the same Vite build (`ClientApp/kiosk.html` → `wwwroot/app/kiosk.html`, `src/kiosk/`), served by
+`MapFallbackToFile("/kiosk…")` with no staff shell, router or sign-in.
+
+- **Devices.** An administrator opens `/kiosk` on the device and enters their credentials once
+  (`POST /api/kiosk/enroll`). The device gets its own cookie scheme (`KioskAuth`, cookie `OmniCard.Kiosk`,
+  path `/api/kiosk`, 1-year sliding) naming a `KioskDevice` row — never the staff cookie, so the device
+  can't reach `/app` or any staff API. Revoke in **Administration ▸ Kiosk**, or tap the kiosk logo five
+  times and enter admin credentials (`/api/kiosk/unenroll`).
+- **Holds.** Cards are grouped by printing + condition + language; adding one creates `KioskHold` rows on
+  specific lots. Available = lot quantity − other open sessions' holds − copies on open (Created/Packed)
+  orders − copies actively listed on TCGplayer/eBay (in-store Manual listings stay sellable). All writes go
+  through the singleton `KioskService` under one lock, so two kiosks can't hold the same copy (single
+  server process). The order editor's sellable search/AddLine also subtracts kiosk holds.
+- **Sessions.** One customer per device; the name is unique among open sessions (`ActiveNameKey`, filtered
+  unique index). A Browsing session idle past the timeout expires lazily (holds ignored immediately,
+  closed on the next write/queue read); Queued/Picking lists never expire.
+- **Fulfillment.** `POST /api/kiosk-queue/{id}/order` creates a Manual order (status Created) for a new or
+  existing customer, one line per held lot at the price shown to the customer, then closes the list —
+  the open order keeps the copies reserved until it ships.
+- **Settings** (`kiosk-settings.json`, admin only, `GET|PUT /api/kiosk-settings`): open/closed, browsable
+  location ids, idle timeout (2–240 min), show prices, welcome message. Devices:
+  `GET /api/kiosk-settings/devices`, `POST …/devices/{id}/revoke`, `DELETE …/devices/{id}`.
+- Tables `KioskDevices`, `KioskSessions`, `KioskHolds` (migration `AddKiosk`). Permissions: **Sales ·
+  Kiosk ▸ View pick-list queue** (`sales.kiosk.view`) and **Fulfill pick lists** (`sales.kiosk.fulfill`).
+  Not site-scoped (like the rest of Sales): the browsable locations are the admin's explicit choice.
+- In dev, open the kiosk at http://localhost:5173/app/kiosk.html.
+
+## Card labels
+
+**Administration ▸ Labels** holds shared, user-designed **label templates** for card-holder labels; the app
+defines no layout of its own. A template (`LabelTemplate` in `OmniCardDbContext`, migration
+`AddLabelTemplates`) is the sheet the user typed in — page size, margins, columns × rows and the spacing
+between them, all in millimetres (the editor shows inches or mm) — plus the design of one label. The label
+size is derived from the sheet (`LabelTemplate.LabelWidth/LabelHeight`).
+
+- **Designer and PDFs are client-side, built on [pdfme](https://pdfme.com) (MIT).** The design is a pdfme
+  template JSON for one blank label page; the SPA's Label Designer embeds pdfme's WYSIWYG designer, and a
+  print run renders one pdfme page per distinct label and tiles them onto sheets with pdfme's pdf-lib
+  (`ClientApp/src/lib/labels/`). Barcodes (QR, Code 128/39, UPC-A/E, EAN-13/8, ITF-14, GS1 Data Matrix,
+  PDF417) come from bwip-js via pdfme. Both pdfme chunks load on demand, so the main bundle is unaffected.
+  `vite.config.ts` aliases `@pdfme/converter` to a stub: the designer only needs it for uploaded background
+  PDFs, which labels never use, and the real one adds ~20 MB of wasm/worker to the publish.
+- **Card fields:** an element named after a field (`cardName`, `setCode`, `collectorNumber`, `marketPrice`,
+  `cardUrl`, `tcgplayerUrl`, `cardId`, … — see `lib/labels/fields.ts`) is filled from the card; "Text with
+  fields" elements combine them (`{setCode} #{collectorNumber}`).
+- **Card pages:** the `cardUrl` field links to `/app/card/{lotId}`, a read-only card page (with the editor for
+  users who may edit). QR codes use the address in the print dialog's **Card links open** box — by default the
+  address the browser is using, remembered per browser — so print from (or type) an address phones on the
+  LAN can reach, not `localhost`.
+- API: `GET|POST /api/labels/templates`, `GET|PUT|DELETE /api/labels/templates/{id}`; `POST /api/labels/data`
+  `{ lotIds }` or `{ containerId, game, q }` → the label values per card (site-scoped; max 5,000 cards).
+- Permissions: **Labels ▸ Print labels** (`labels.print`) and **Labels ▸ Manage label templates**
+  (`labels.edit`). Templates are configuration and survive **Reset collection**.
 
 ## Reset collection (admin)
 
@@ -660,7 +850,7 @@ different currency.
 - **Strings:** `ClientApp/src/i18n/locales/en-US/*.json`, one file per feature area (namespace):
   `common` (shared actions/labels/conditions/channels/statuses), `nav`, `auth`, `account`, `dashboard`,
   `collection`, `locations`, `binder`, `sets`, `scan`, `sales`, `inventory`, `importing`, `lists`,
-  `trades`, `settings`, `deckbox`, `dialogs`, `search`, `help`. Each file is keyed by its namespace object
+  `trades`, `settings`, `deckbox`, `dialogs`, `search`, `help`, `labels`, `kiosk`. Each file is keyed by its namespace object
   and spread into the bundle in `index.ts`.
 - **In-app help:** the **Help** item pinned to the bottom of the sidebar opens `/help`. Topics are
   Markdown files, one per topic per culture, in `ClientApp/src/help/<culture>/<topic-id>.md`; each topic

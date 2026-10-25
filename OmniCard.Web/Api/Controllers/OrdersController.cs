@@ -9,6 +9,7 @@ using OmniCard.Shared.Security;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Api.Mapping;
 using OmniCard.Web.Services;
+using OmniCard.Web.Services.Kiosk;
 
 namespace OmniCard.Web.Api.Controllers;
 
@@ -22,7 +23,8 @@ public sealed class OrdersController(
     ISalesSettingsService settings,
     IReceiptService receipts,
     IReceiptPdfExporter receiptPdf,
-    IDbContextFactory<OmniCardDbContext> dbFactory) : ApiControllerBase
+    IDbContextFactory<OmniCardDbContext> dbFactory,
+    KioskService? kiosk = null) : ApiControllerBase
 {
     /// <summary>Downloadable PDF receipt for an order.</summary>
     [HttpGet("{id:int}/receipt.pdf")]
@@ -238,7 +240,7 @@ public sealed class OrdersController(
                 .FirstOrDefault();
             if (listed is null)
                 return BadRequest(new { error = "Only cards listed for sale can be added to an order." });
-            var committed = CommittedCopies(ctx).GetValueOrDefault(req.LotId);
+            var committed = ReservedCopies(ctx).GetValueOrDefault(req.LotId);
             if (Math.Min(listed.Quantity, listed.ListedQuantity) - committed <= 0)
                 return Conflict(new { error = "Every listed copy of this card is already on an open order." });
         }
@@ -249,13 +251,14 @@ public sealed class OrdersController(
 
     /// <summary>The order editor's add-card search: listed-for-sale cards whose name, set code or set
     /// name contains every word of <paramref name="q"/> (or whose collector number is one of them),
-    /// with copies not already on an open order. The rest of the collection never shows up here.</summary>
+    /// with copies not already on an open order. The rest of the collection never shows up here.
+    /// <paramref name="game"/> is ignored when the store-wide "search all games" sales setting is on.</summary>
     [HttpGet("sellable")]
     [RequirePermission(Permissions.SalesOrdersEdit)]
     public ActionResult<IReadOnlyList<SellableListingDto>> Sellable(
         [FromQuery] string? q, [FromQuery] string? game, [FromQuery] int take = 20)
     {
-        var gameFilter = LocationsController.ParseGame(game);
+        var gameFilter = settings.OrderSearchAllGames ? null : LocationsController.ParseGame(game);
         using var ctx = dbFactory.CreateDbContext();
         var query = ActiveListings(ctx).Where(x => gameFilter == null || x.Product.Game == gameFilter);
         foreach (var term in (q ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -267,7 +270,7 @@ public sealed class OrdersController(
                 || x.Product.CollectorNumber == term);
         }
 
-        var committed = CommittedCopies(ctx);
+        var committed = ReservedCopies(ctx);
         return query
             .OrderBy(x => x.Product.Name).ThenBy(x => x.Product.SetCode)
             .ToList()
@@ -304,6 +307,17 @@ public sealed class OrdersController(
          group line by line.LotId!.Value into g
          select new { LotId = g.Key, Quantity = g.Sum(l => l.Quantity) })
         .ToDictionary(x => x.LotId, x => x.Quantity);
+
+    /// <summary>Copies per lot that can't go on another order: those on open orders plus those a customer
+    /// holds at the kiosk.</summary>
+    private Dictionary<int, int> ReservedCopies(OmniCardDbContext ctx)
+    {
+        var reserved = CommittedCopies(ctx);
+        if (kiosk is not null)
+            foreach (var (lotId, qty) in kiosk.HeldCopies(ctx))
+                reserved[lotId] = reserved.GetValueOrDefault(lotId) + qty;
+        return reserved;
+    }
 
     private static string EscapeLike(string term) =>
         term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_").Replace("[", "\\[");

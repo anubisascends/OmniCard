@@ -22,6 +22,7 @@ public class OrdersSellableTests : IDisposable
     private readonly DbContextOptions<OmniCardDbContext> _opts;
     private readonly OrderService _orders;
     private readonly OrdersController _controller;
+    private readonly Mock<ISalesSettingsService> _settings = new();
 
     public OrdersSellableTests()
     {
@@ -32,7 +33,7 @@ public class OrdersSellableTests : IDisposable
             ctx.Database.EnsureCreated();
 
         var factory = new Factory(_opts);
-        var settings = Mock.Of<ISalesSettingsService>();
+        var settings = _settings.Object;
         _orders = new OrderService(factory, new ListingService(factory, settings), new FakeEbayListingService(),
             NullLogger<OrderService>.Instance);
         _controller = new OrdersController(_orders, new CustomerService(factory), settings, null!, null!, factory);
@@ -79,6 +80,18 @@ public class OrdersSellableTests : IDisposable
     }
 
     [Fact]
+    public void Sellable_FollowsGameSelector_UnlessAllGamesSettingIsOn()
+    {
+        var mtg = SeedLot("Jace Beleren", "FRA", listedPrice: 60m);
+        var onePiece = SeedLot("Jace Pirate", "OP01", listedPrice: 1m, game: CardGame.OnePiece);
+
+        Assert.Equal(mtg, Assert.Single(Sellable("jace")).LotId);
+
+        _settings.SetupGet(s => s.OrderSearchAllGames).Returns(true);
+        Assert.Equal(new[] { mtg, onePiece }, Sellable("jace").Select(c => c.LotId).Order());
+    }
+
+    [Fact]
     public void AddLine_RejectsUnlistedCard_AndOverselling()
     {
         var unlisted = SeedLot("Sol Ring", "CMR", listedPrice: null);
@@ -96,10 +109,10 @@ public class OrdersSellableTests : IDisposable
     private IReadOnlyList<SellableListingDto> Sellable(string q) =>
         Assert.IsAssignableFrom<IReadOnlyList<SellableListingDto>>(_controller.Sellable(q, "Mtg").Value);
 
-    private int SeedLot(string name, string setCode, decimal? listedPrice, int quantity = 1)
+    private int SeedLot(string name, string setCode, decimal? listedPrice, int quantity = 1, CardGame game = CardGame.Mtg)
     {
         using var ctx = new OmniCardDbContext(_opts);
-        var product = new Product { Game = CardGame.Mtg, Category = ProductCategory.Single, Name = name, SetCode = setCode, SetName = setCode };
+        var product = new Product { Game = game, Category = ProductCategory.Single, Name = name, SetCode = setCode, SetName = setCode };
         ctx.Products.Add(product);
         ctx.SaveChanges();
         var lot = new InventoryLot { ProductId = product.Id, Quantity = quantity, Condition = "NM" };

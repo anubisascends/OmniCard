@@ -32,6 +32,79 @@
       "groupType": "Type",
       "groupTags": "Tags",
       "noCards": "No cards to show."
+    },
+    "link": {
+      "linkButton": "Link to deck URL",
+      "editButton": "Edit link",
+      "linkedTo": "Linked to {{source}}",
+      "lastSynced": "Last synced {{date}}",
+      "neverSynced": "Not synced yet",
+      "unsupported": "Deck links are available for Magic: The Gathering deck boxes (Moxfield or Archidekt).",
+      "dialogTitle": "Deck link — {{name}}",
+      "help": "Paste the deck's Moxfield or Archidekt URL. The deck must be public. Use Sync from URL whenever the online deck changes.",
+      "urlLabel": "Deck URL",
+      "remove": "Remove link",
+      "changeWarning": "Changing or removing the link clears this deck box's \"not in collection\" list."
+    },
+    "notInCollection": {
+      "chip_one": "{{count}} card not in collection",
+      "chip_other": "{{count}} cards not in collection",
+      "title": "Not in collection — {{name}}",
+      "help": "Cards the linked deck needs that you marked as not in your collection during a sync. The next sync checks your collection for them again.",
+      "removeTooltip": "Remove from this list",
+      "empty": "Nothing is marked as not in collection."
+    },
+    "sync": {
+      "button": "Sync from URL",
+      "title": "Sync from URL — {{name}}",
+      "loading": "Downloading the deck and checking your collection…",
+      "summary": "\"{{deck}}\" has {{cards}} cards. {{keep}} are already in this deck box.",
+      "upToDate": "This deck box already matches the deck. Nothing to change.",
+      "addsTitle": "Cards to add ({{count}})",
+      "cutsTitle": "Cards to remove ({{count}})",
+      "unresolved_one": "{{count}} card isn't covered yet. Find a copy in your collection or mark it as not in collection.",
+      "unresolved_other": "{{count}} cards aren't covered yet. Find a copy in your collection or mark them as not in collection.",
+      "markAllMissing": "Mark the rest as not in collection",
+      "need": "Need {{count}}",
+      "covered": "Covered",
+      "short": "{{count}} short",
+      "noneFound": "No copies found in your collection.",
+      "previouslyMarked": "Marked as not in collection last time",
+      "findCopy": "Find a copy…",
+      "notInCollection": "Not in collection ({{count}})",
+      "foundBySearch": "Found by search",
+      "exact": "Exact printing",
+      "lotOverUsed": "Some copies are chosen for more cards than they have. Lower the amounts shown in red.",
+      "tooMany": "More than needed: use at most {{count}}.",
+      "columns": {
+        "printing": "Printing",
+        "available": "Available",
+        "use": "Use"
+      },
+      "ignoredReasons": {
+        "Location": "Ignored location",
+        "Listed": "Listed for sale"
+      },
+      "ignoredLocationHint": "Copies in locations ignored for lists aren't suggested, but you can still use them.",
+      "moveTo": "Move removed cards to",
+      "moveToRequired": "Choose where the removed cards go.",
+      "actions": {
+        "Move": "Move out",
+        "Sideboard": "Keep as sideboard",
+        "Keep": "Leave in box"
+      },
+      "sideboardHint": "Keep as sideboard leaves the card in the box and tags it \"sideboard\". Cards already tagged sideboard are left in the box by default.",
+      "apply": "Apply sync",
+      "applying": "Applying…",
+      "result": "Sync applied: {{added}} added, {{removed}} moved out, {{sideboarded}} kept as sideboard, {{missing}} not in collection."
+    },
+    "findCopy": {
+      "title": "Find a copy — {{name}}",
+      "help": "Search your collection by card name. Choose a copy to put in the deck box.",
+      "searchLabel": "Card name",
+      "minChars": "Type at least 2 characters.",
+      "noResults": "No matching cards in your collection.",
+      "use": "Use"
     }
   }
 }

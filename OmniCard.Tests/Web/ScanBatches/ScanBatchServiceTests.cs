@@ -367,7 +367,7 @@ public sealed class ScanBatchServiceTests : IDisposable
     // --- run (auto-processing off) ---
 
     [Fact]
-    public void Run_StartsCollectingBatches_AllOrListed()
+    public void Run_MarksCollectingBatchesStarting_AllOrListed()
     {
         var (a, _) = Seed(ScanBatchStatus.Collecting);
         var (b, _) = Seed(ScanBatchStatus.Collecting);
@@ -375,11 +375,11 @@ public sealed class ScanBatchServiceTests : IDisposable
 
         Assert.Equal(1, _svc.Run([b, ready]));
         Assert.Equal(ScanBatchStatus.Collecting, Batch(a).Status);
-        Assert.Equal(ScanBatchStatus.Matching, Batch(b).Status);
+        Assert.Equal(ScanBatchStatus.Starting, Batch(b).Status);
         Assert.Equal(ScanBatchStatus.Ready, Batch(ready).Status);
 
         Assert.Equal(1, _svc.Run([]));
-        Assert.Equal(ScanBatchStatus.Matching, Batch(a).Status);
+        Assert.Equal(ScanBatchStatus.Starting, Batch(a).Status);
         Assert.Equal(0, _svc.Run([]));
     }
 
@@ -396,6 +396,95 @@ public sealed class ScanBatchServiceTests : IDisposable
         Assert.True(list[collecting].AwaitingRun);
         Assert.False(list[matching].AwaitingRun);
         Assert.True(_svc.Get(collecting, Alice).Summary.AwaitingRun);
+    }
+
+    [Fact]
+    public void Summary_GivesEachWaitingBatchItsOwnStartTime()
+    {
+        var (first, _) = Seed(ScanBatchStatus.Collecting);
+        _f.Clock.Advance(TimeSpan.FromSeconds(30));
+        var (second, _) = Seed(ScanBatchStatus.Collecting);
+        var (matching, _) = Seed(ScanBatchStatus.Matching);
+        Assert.Empty(_folderSettings.Save(new ScanFolderSettings { AutoProcess = true, QuietPeriodSeconds = 90 }));
+
+        var list = _svc.List(Alice).ToDictionary(b => b.Id);
+        var start = new DateTime(2026, 10, 6, 12, 0, 0, DateTimeKind.Utc);
+        Assert.Equal(start.AddSeconds(90), list[first].StartsUtc);
+        Assert.Equal(start.AddSeconds(120), list[second].StartsUtc);
+        Assert.Null(list[matching].StartsUtc);
+
+        Assert.Empty(_folderSettings.Save(new ScanFolderSettings { AutoProcess = false }));
+        Assert.Null(_svc.List(Alice).Single(b => b.Id == first).StartsUtc);
+    }
+
+    [Fact]
+    public void Discard_BatchThatHasNotStarted_Conflicts()
+    {
+        var (id, _) = Seed(ScanBatchStatus.Collecting, []);
+        using (var db = _f.Db())
+        {
+            db.ScanBatchItems.RemoveRange(db.ScanBatchItems.Where(i => i.ScanBatchId == id));
+            db.SaveChanges();
+        }
+
+        Assert.Equal(ScanBatchErrorKind.Conflict, Throws(() => _svc.Discard(id, Alice, isAdmin: true)).Kind);
+        Assert.Equal(ScanBatchStatus.Collecting, Batch(id).Status);
+    }
+
+    // --- deleting originals when a batch closes ---
+
+    /// <summary>Give each item of the batch an original under <c>_processed\Box 12</c>; returns the paths.</summary>
+    private List<string> AddOriginals(int batchId)
+    {
+        var dir = Path.Combine(_f.ScanRoot, "Mtg", ScanFolderIngestor.ProcessedFolderName, "Box 12");
+        Directory.CreateDirectory(dir);
+        using var db = _f.Db();
+        var paths = new List<string>();
+        foreach (var item in db.ScanBatchItems.Where(i => i.ScanBatchId == batchId).ToList())
+        {
+            item.ProcessedPath = Path.Combine(dir, item.OriginalFileName);
+            File.WriteAllBytes(item.ProcessedPath, [1]);
+            paths.Add(item.ProcessedPath);
+        }
+        db.SaveChanges();
+        return paths;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Commit_DeletesOriginals_OnlyWhenTheOptionIsOn(bool deleteOriginals)
+    {
+        Assert.Empty(_folderSettings.Save(new ScanFolderSettings { DeleteOriginalsOnClose = deleteOriginals }));
+        var (id, items) = Seed();
+        var originals = AddOriginals(id);
+        var unrelated = Path.Combine(_f.ScanRoot, "Mtg", ScanFolderIngestor.ProcessedFolderName, "Box 12", "other.jpg");
+        File.WriteAllBytes(unrelated, [1]);
+        _svc.Claim(id, Alice, "alice", false);
+
+        // A partial commit leaves the batch open, so nothing is deleted yet.
+        _svc.Commit(id, Alice, _location, [items[0]]);
+        Assert.All(originals, p => Assert.True(File.Exists(p)));
+
+        _svc.Commit(id, Alice, _location, [items[1]]);
+        Assert.All(originals, p => Assert.Equal(!deleteOriginals, File.Exists(p)));
+        Assert.True(File.Exists(unrelated)); // another batch's file in the same folder is left alone
+    }
+
+    [Fact]
+    public void Discard_DeletesOriginals_AndPrunesTheEmptyFolder()
+    {
+        Assert.Empty(_folderSettings.Save(new ScanFolderSettings { DeleteOriginalsOnClose = true }));
+        var (id, _) = Seed();
+        var originals = AddOriginals(id);
+
+        _svc.Discard(id, Alice, isAdmin: false);
+
+        Assert.All(originals, p => Assert.False(File.Exists(p)));
+        var processed = Path.Combine(_f.ScanRoot, "Mtg", ScanFolderIngestor.ProcessedFolderName);
+        Assert.False(Directory.Exists(Path.Combine(processed, "Box 12")));
+        Assert.True(Directory.Exists(processed)); // _processed itself stays
+        Assert.True(_svc.List(Alice).Single().DeletesOriginalsOnClose);
     }
 
     // --- duplicates set aside at pickup ---

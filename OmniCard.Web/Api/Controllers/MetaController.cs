@@ -84,7 +84,7 @@ public sealed class MetaController(IEnumerable<ICardGameService> gameServices) :
             new("Backend", "Entity Framework Core (SQL Server + SQLite)", "10.0.9", "MIT", "https://github.com/dotnet/efcore", mit),
             new("Backend", "Microsoft.Data.Sqlite", "10.0.9", "MIT", "https://github.com/dotnet/efcore", mit),
             new("Backend", "SQLitePCLRaw", "2.1.13", "Apache-2.0", "https://github.com/ericsink/SQLitePCL.raw", apache2),
-            new("Backend", "Microsoft.Extensions.* (Hosting, Http, Logging, Options)", "10.0.9", "MIT", "https://github.com/dotnet/runtime", mit),
+            new("Backend", "Microsoft.Extensions.* (Hosting, Hosting.WindowsServices, Http, Logging, Options)", "10.0.9", "MIT", "https://github.com/dotnet/runtime", mit),
             new("Backend", "Serilog", "4.3.0", "Apache-2.0", "https://serilog.net", apache2),
             new("Backend", "Serilog.Sinks.Console", "6.1.1", "Apache-2.0", "https://github.com/serilog/serilog-sinks-console", apache2),
             new("Backend", "Serilog.Sinks.File", "6.0.0", "Apache-2.0", "https://github.com/serilog/serilog-sinks-file", apache2),
@@ -111,6 +111,9 @@ public sealed class MetaController(IEnumerable<ICardGameService> gameServices) :
             new("Frontend", "TanStack Query", "5.59.16", "MIT", "https://tanstack.com/query", mit),
             new("Frontend", "ZXing (@zxing/library)", "0.23.0", "Apache-2.0", "https://github.com/zxing-js/library", apache2),
             new("Frontend", "ZXing browser (@zxing/browser)", "0.2.1", "MIT", "https://github.com/zxing-js/browser", mit),
+            new("Frontend", "pdfme (label designer & PDF generator)", "6.2.6", "MIT", "https://pdfme.com", mit),
+            new("Frontend", "bwip-js (label barcodes & QR codes)", "4.11.4", "MIT", "https://github.com/metafloor/bwip-js", mit),
+            new("Frontend", "Ant Design (used by the pdfme designer)", "6.6.7", "MIT", "https://ant.design", mit),
             new("Frontend", "TypeScript", "5.6.3", "Apache-2.0", "https://www.typescriptlang.org", apache2),
             new("Frontend", "Vite", "5.4.10", "MIT", "https://vitejs.dev", mit),
 

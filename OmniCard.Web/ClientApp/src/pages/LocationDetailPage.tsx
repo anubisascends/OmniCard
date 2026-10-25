@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
+import PrintIcon from '@mui/icons-material/Print';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
@@ -24,6 +25,7 @@ import { usePermissions } from '../context/usePermissions';
 import { CardTable } from '../components/CardTable';
 import { AddCardDialog } from '../components/dialogs/AddCardDialog';
 import { LocationImportDialog } from '../components/dialogs/LocationImportDialog';
+import { PrintLabelsDialog } from '../components/dialogs/PrintLabelsDialog';
 import { AuditSummaryDialog } from '../components/dialogs/AuditSummaryDialog';
 import type { AuditReturnState } from './AuditPage';
 import { DeckBoxPanel } from '../components/DeckBoxPanel';
@@ -47,6 +49,7 @@ export function LocationDetailPage() {
   useEffect(() => setSearch(sv.state.q), [sv.state.q]);
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [labelsOpen, setLabelsOpen] = useState(false);
   // An audit commit returns here with its summary in router state (see AuditPage).
   const location = useLocation();
   const navigate = useNavigate();
@@ -103,6 +106,11 @@ export function LocationDetailPage() {
             to={`/audit/${locationId}`}
           >
             {t('locations.detail.audit')}
+          </Button>
+        )}
+        {can('labels.print') && (
+          <Button variant="outlined" startIcon={<PrintIcon />} onClick={() => setLabelsOpen(true)}>
+            {t('labels.print')}
           </Button>
         )}
         {canWrite && can('import.run') && (
@@ -171,6 +179,12 @@ export function LocationDetailPage() {
         locationId={locationId}
         locationName={locQuery.data?.name ?? t('locations.detail.thisLocation')}
         onClose={() => setImportOpen(false)}
+      />
+      <PrintLabelsDialog
+        open={labelsOpen}
+        request={{ containerId: locationId, game, q: sv.state.q }}
+        title={t('labels.printDialog.titleLocation', { name: locQuery.data?.name ?? t('locations.detail.thisLocation') })}
+        onClose={() => setLabelsOpen(false)}
       />
       <AuditSummaryDialog
         open={auditSummary != null}

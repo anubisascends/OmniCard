@@ -60,6 +60,12 @@ public static class Permissions
     public const string TradesFinalize = "trades.finalize";
     public const string TradesCancel = "trades.cancel";
 
+    // Labels
+    /// <summary>Print card labels from a saved label template.</summary>
+    public const string LabelsPrint = "labels.print";
+    /// <summary>Create, design and delete label templates.</summary>
+    public const string LabelsEdit = "labels.edit";
+
     // Import / Export
     public const string ImportRun = "import.run";
     public const string ExportRun = "export.run";
@@ -86,6 +92,12 @@ public static class Permissions
     public const string SalesListingsEdit = "sales.listings.edit";
     public const string SalesListingsDelete = "sales.listings.delete";
     public const string SalesListingsPick = "sales.listings.pick";
+
+    // Sales · Kiosk
+    /// <summary>See the customer kiosk's pick-list queue.</summary>
+    public const string SalesKioskView = "sales.kiosk.view";
+    /// <summary>Claim, edit, cancel kiosk pick lists and turn them into orders.</summary>
+    public const string SalesKioskFulfill = "sales.kiosk.fulfill";
 
     // Settings
     public const string SettingsView = "settings.view";
@@ -161,6 +173,11 @@ public static class Permissions
             new(TradesFinalize, "finalize", "Finalize"),
             new(TradesCancel, "cancel", "Cancel"),
         ]),
+        new("labels", "Labels",
+        [
+            new(LabelsPrint, "print", "Print labels"),
+            new(LabelsEdit, "edit", "Manage label templates"),
+        ]),
         new("import", "Import",
         [
             new(ImportRun, "run", "Run import"),
@@ -192,6 +209,11 @@ public static class Permissions
             new(SalesListingsEdit, "edit", "Edit"),
             new(SalesListingsDelete, "delete", "Delete"),
             new(SalesListingsPick, "pick", "Pick / mark picked"),
+        ]),
+        new("sales.kiosk", "Sales · Kiosk",
+        [
+            new(SalesKioskView, "view", "View pick-list queue"),
+            new(SalesKioskFulfill, "fulfill", "Fulfill pick lists"),
         ]),
         new("settings", "Settings",
         [

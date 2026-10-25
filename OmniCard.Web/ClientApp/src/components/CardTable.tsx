@@ -39,6 +39,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
 import EditIcon from '@mui/icons-material/Edit';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import PrintIcon from '@mui/icons-material/Print';
 import SellIcon from '@mui/icons-material/Sell';
 import { api } from '../api/client';
 import { EXPORT_FORMATS } from '../lib/exportFormats';
@@ -48,6 +49,8 @@ import { CardHoverPreview, type CardHover } from './CardHoverPreview';
 import { CardEditDrawer } from './dialogs/CardEditDrawer';
 import { LocationPickerDialog } from './dialogs/LocationPickerDialog';
 import { BulkEditCardsDialog } from './dialogs/BulkEditCardsDialog';
+import { PrintLabelsDialog } from './dialogs/PrintLabelsDialog';
+import { usePermissions } from '../context/usePermissions';
 import { useFormatters } from '../i18n/format';
 import { orderColumns, PAGE_SIZES, type ViewState } from '../lib/savedViews';
 import { ColumnLayoutMenu } from './views/ColumnLayoutMenu';
@@ -352,6 +355,8 @@ export function CardTable({
   );
   const [bulkListOpen, setBulkListOpen] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [labelsOpen, setLabelsOpen] = useState(false);
+  const { can } = usePermissions();
   const [bulkChannel, setBulkChannel] = useState('Manual');
   const [bulkNote, setBulkNote] = useState('');
   const [exportAnchor, setExportAnchor] = useState<HTMLElement | null>(null);
@@ -564,6 +569,11 @@ export function CardTable({
                 </MenuItem>
               ))}
             </Menu>
+            {can('labels.print') && (
+              <Button size="small" startIcon={<PrintIcon />} onClick={() => setLabelsOpen(true)}>
+                {t('labels.print')}
+              </Button>
+            )}
             <Button
               size="small"
               color="error"
@@ -634,6 +644,12 @@ export function CardTable({
 
       <CardEditDrawer cardId={detailCardId} onClose={() => setDetailCardId(null)} />
 
+      <PrintLabelsDialog
+        open={labelsOpen}
+        request={{ lotIds: selectedLotIds }}
+        title={t('labels.printDialog.titleCount', { count: selectedLotIds.length, countText: fmt.number(selectedLotIds.length) })}
+        onClose={() => setLabelsOpen(false)}
+      />
       <BulkEditCardsDialog
         open={bulkEditOpen}
         lotIds={selectedLotIds}

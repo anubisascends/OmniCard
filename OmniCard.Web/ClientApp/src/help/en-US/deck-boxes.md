@@ -1,6 +1,6 @@
 # Deck boxes
 
-A deck box is a location that holds one built deck. It belongs to a single game, can be given a deck type (format) such as Commander or Standard, and warns you when the deck doesn't meet that format's rules.
+A deck box is a location that holds one built deck. It belongs to a single game, can be given a deck type (format) such as Commander or Standard, and warns you when the deck doesn't meet that format's rules. A Magic deck box can also be linked to its deck on Moxfield or Archidekt and synced from it.
 
 ## What makes a deck box different
 
@@ -10,6 +10,7 @@ Deck boxes are ordinary [locations](help:locations) with a few extras:
 - **Deck type.** You can pick a format for the deck. OmniCard then checks the deck's size, copy limits and commander against that format.
 - **Deck panel.** The deck box's page shows the game, deck type, card count and any legality warnings.
 - **Stacked view.** The deck can be shown as overlapping card stacks grouped by type, like a deck-building site.
+- **Deck link.** A Magic deck box can be linked to its deck on Moxfield or Archidekt, then kept up to date with **Sync from URL**.
 
 ## Create a deck box
 
@@ -67,6 +68,7 @@ The panel shows:
 - The total card count, for example *100 cards (99 + commander)*.
 - The **Game & deck type** button.
 - Any legality warnings, under **Deck legality (*deck type*)**.
+- The deck link, if the deck box has one. See [Link a deck box to an online deck](#link-a-deck-box-to-an-online-deck).
 
 ## Legality warnings
 
@@ -152,6 +154,44 @@ If you own every card in a decklist, you can pull them all into a deck box in on
 
 See [Collection](help:collection) for the full decklist check. To bring a deck's cards in as new cards instead, use **Import** on the deck box's page with a deck URL. See [Locations](help:locations#import-into-a-location).
 
+## Link a deck box to an online deck
+
+You can link a deck box to its deck on Moxfield or Archidekt. When you change the deck online, **Sync from URL** brings the deck box up to date with cards from your collection. Moxfield and Archidekt are Magic: The Gathering sites, so only Magic deck boxes can be linked. The deck must be public.
+
+### Link or change the link
+
+- **Import links automatically.** When you import a deck URL into a deck box that has no link yet, the deck box is linked to that deck. This works from **Import** on the deck box's page and from **Import from Moxfield / Archidekt** on the [Import / Export](/import) page. A deck box that's already linked keeps its link.
+- **Link by hand.** In the deck panel, click **Link to deck URL**, paste the deck's address into **Deck URL**, and click **Save**.
+- **Change or remove the link.** Click **Edit link** in the deck panel. Paste a new address and click **Save**, or click **Remove link**. Either one also clears the deck box's "not in collection" list.
+
+Once linked, the deck panel shows **Linked to Moxfield** (or **Archidekt**), which opens the deck online, and when the deck box was last synced. On the [Locations](/locations) page, a link icon next to the deck box's name shows it's linked. Click the icon to open the deck in a new tab.
+
+### Sync from URL
+
+1. Open the deck box and click **Sync from URL** in the deck panel. OmniCard downloads the deck and compares it with the cards in the deck box. Nothing changes until you apply.
+2. Review **Cards to add**. These are cards the deck needs more copies of. Cards are matched by name, so any printing in the deck box counts. For each card, OmniCard lists copies it found elsewhere in your collection and fills in how many to use. The deck's exact printing comes first, marked **Exact printing**. Change the amounts in **Use** if you want different copies.
+3. Deal with every card that is still short:
+   - Click **Find a copy…** to search your collection by name and choose a copy with **Use**. Use this when OmniCard didn't find the card, for example when your copy is spelled differently.
+   - Or tick **Not in collection** for the card. **Mark the rest as not in collection** ticks every card that's still short.
+4. Review **Cards to remove**. These are cards in the deck box that the deck no longer has. For each one choose **Move out**, **Keep as sideboard** (leaves it in the deck box and tags it `sideboard`) or **Leave in box**. Choose where moved cards go in **Move removed cards to**; it starts at Bulk.
+5. Click **Apply sync**.
+
+A few things to know:
+
+- Copies listed for sale are shown as **Listed for sale** and can't be used. Unlist them first.
+- Copies in locations ignored for lists are marked **Ignored location**. They're never filled in for you, but you can still use them.
+- Only copies in sites you can change are offered, because using a copy moves it into the deck box.
+- Cards already tagged `sideboard` are set to **Leave in box** by default, so they aren't moved out on every sync.
+
+### Cards not in your collection
+
+The cards you marked **Not in collection** are remembered. The deck panel shows a chip such as *3 cards not in collection*. Click it to see the list, or click **×** next to a card to remove it from the list.
+
+On the next sync these cards are checked again. A card you've since added to your collection is filled in like any other. A card you still don't own stays ticked as **Not in collection**. Each sync replaces the list with the cards you marked that time.
+
+> [!TIP]
+> To make a shopping list for the missing cards, import the same deck URL into [Lists](help:lists).
+
 ## Troubleshooting
 
 - **A deck box is missing from the Locations page.** The game selector is set to a different game. Choose that game or **All Games**.
@@ -159,3 +199,6 @@ See [Collection](help:collection) for the full decklist check. To bring a deck's
 - **Saving a new game for a deck box shows an error.** The deck box already holds cards from another game. Move them out first.
 - **There are no legality warnings.** Either the deck meets the format's rules, or the deck box has no deck type. Set one with **Game & deck type**.
 - **The deck says it needs a commander.** Tag your commander card `commander` in its details.
+- **There's no Link to deck URL button.** Only Magic: The Gathering deck boxes can be linked, and you need permission to edit locations.
+- **Sync from URL says it couldn't download the deck.** Check that the link opens the deck and that the deck is public on Moxfield or Archidekt.
+- **Apply sync is greyed out.** A card is still short and isn't ticked **Not in collection**, a copy is used more times than it has, or no **Move removed cards to** location is chosen.

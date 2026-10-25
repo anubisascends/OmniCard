@@ -40,7 +40,7 @@ Below the totals, two tables split the same numbers into groups. Each row shows 
 - **Realized Profit** is based on the cards and items you've sold. When only part of a stack was sold, only the cost of the sold copies is counted. Marketplace fees come from shipped and completed orders. See [Sales](help:sales).
 
 > [!TIP]
-> Market prices are only as fresh as the last price update. An administrator can refresh them under **Administration ▸ Catalog Data** with **Update prices**. See [Administration](help:administration).
+> Market prices are only as fresh as the last price update. An administrator can refresh them under **Administration ▸ Catalog Data** with **Update prices**, or have them refreshed every day with **Automatic updates**. See [Administration](help:administration#automatic-updates).
 
 ## Related topics
 

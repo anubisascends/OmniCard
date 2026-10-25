@@ -1,8 +1,8 @@
 import { createTheme } from '@mui/material/styles';
 
 // Material Design theme approximating the desktop app's MaterialDesignThemes look.
-// Follows the OS light/dark preference.
-export function buildTheme(mode: 'light' | 'dark') {
+// Follows the OS light/dark preference. The kiosk passes a larger `fontSize` for its touch screen.
+export function buildTheme(mode: 'light' | 'dark', fontSize = 13) {
   return createTheme({
     palette: {
       mode,
@@ -11,7 +11,7 @@ export function buildTheme(mode: 'light' | 'dark') {
     },
     shape: { borderRadius: 8 },
     typography: {
-      fontSize: 13,
+      fontSize,
     },
   });
 }

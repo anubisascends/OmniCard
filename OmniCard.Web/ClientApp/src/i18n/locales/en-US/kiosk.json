@@ -1,0 +1,158 @@
+{
+  "kiosk": {
+    "app": {
+      "title": "Card Kiosk",
+      "loading": "Loading…",
+      "error": "Something went wrong. Please try again.",
+      "enroll": {
+        "title": "Set up this kiosk",
+        "intro": "This device isn't a kiosk yet. An administrator can turn it into one: customers will be able to browse the cards you chose in Administration ▸ Kiosk and put them on a pick list.",
+        "deviceName": "Kiosk name",
+        "deviceNameHelp": "Shown to staff with each pick list, e.g. \"Front counter\".",
+        "login": "Administrator username or email",
+        "password": "Password",
+        "submit": "Make this a kiosk",
+        "notAdmin": "That isn't an administrator's username and password."
+      },
+      "exit": {
+        "title": "Exit kiosk mode",
+        "body": "An administrator's username and password take this device out of kiosk mode. It will need to be set up again to be used as a kiosk.",
+        "submit": "Exit kiosk mode"
+      },
+      "closed": {
+        "title": "The kiosk is closed",
+        "body": "Please ask at the counter for help finding cards."
+      },
+      "noLocations": "There's nothing to browse yet. Please ask at the counter.",
+      "welcome": {
+        "title": "Find your cards",
+        "body": "Browse or search our cards, tap the ones you want, and we'll pull them for you at the counter.",
+        "nameLabel": "Your name",
+        "nameHelp": "We'll call this name when your cards are ready.",
+        "start": "Start browsing",
+        "nameTaken": "Someone is already using \"{{name}}\". Try adding an initial or a nickname."
+      },
+      "browse": {
+        "greeting": "Hi, {{name}}",
+        "myList": "My list",
+        "startOver": "Start over",
+        "startOverConfirm": "Start over? Everything on your list will be put back.",
+        "search": "Search by card name or set",
+        "sort": "Sort",
+        "sortName": "Name",
+        "sortPriceDesc": "Price: high to low",
+        "sortPriceAsc": "Price: low to high",
+        "results_one": "{{count}} card",
+        "results_other": "{{count}} cards",
+        "noResults": "No cards found. Try a different search.",
+        "loadMore": "Show more",
+        "available": "{{count}} available",
+        "soldOut": "None left",
+        "inList": "{{count}} in your list",
+        "add": "Add",
+        "foil": "Foil",
+        "noPrice": "Ask for price",
+        "added": "Added {{name}} to your list",
+        "sessionEnded": "Your session ended. Please enter your name to start again."
+      },
+      "card": {
+        "set": "Set",
+        "number": "Number",
+        "rarity": "Rarity",
+        "condition": "Condition",
+        "language": "Language",
+        "price": "Price each",
+        "addToList": "Add to my list",
+        "removeOne": "Remove one",
+        "inList": "In your list: {{count}}"
+      },
+      "list": {
+        "title": "My pick list",
+        "empty": "Your list is empty. Tap a card to add it.",
+        "total": "Total",
+        "estimate": "Prices are estimates; the final price is confirmed at the counter.",
+        "decrease": "One fewer",
+        "increase": "One more",
+        "removeAll": "Remove",
+        "submit": "Send to counter",
+        "submitConfirmTitle": "Send your list to the counter?",
+        "submitConfirmBody": "We'll start pulling your {{count}} cards. You won't be able to change the list at the kiosk afterwards.",
+        "keepBrowsing": "Keep browsing"
+      },
+      "submitted": {
+        "title": "Thanks, {{name}}!",
+        "body_one": "Your pick list ({{count}} card) is on its way to the counter. Give your name at the counter to pick it up.",
+        "body_other": "Your pick list ({{count}} cards) is on its way to the counter. Give your name at the counter to pick it up.",
+        "done": "Done"
+      },
+      "idle": {
+        "title": "Are you still there?",
+        "body": "Your list will be cleared in {{seconds}} seconds.",
+        "stay": "I'm still here",
+        "leave": "Clear my list"
+      }
+    },
+    "queue": {
+      "title": "Kiosk pick lists",
+      "empty": "No pick lists right now. Customers' lists appear here when they send them from a kiosk.",
+      "status": {
+        "Browsing": "Still browsing",
+        "Queued": "Waiting",
+        "Picking": "Picking"
+      },
+      "pickedBy": "Picking: {{name}}",
+      "kiosk": "Kiosk: {{name}}",
+      "submittedAt": "Sent {{time}}",
+      "lastActive": "Active {{time}}",
+      "cards_one": "{{count}} card",
+      "cards_other": "{{count}} cards",
+      "browsingNote": "The customer is still choosing; their cards are held while they browse.",
+      "claim": "Start picking",
+      "unclaim": "Put back in queue",
+      "createOrder": "Create order",
+      "cancel": "Cancel list",
+      "cancelConfirm": "Cancel {{name}}'s pick list? Its cards are released for other customers.",
+      "removeLine": "Remove from list",
+      "removeOne": "Remove one",
+      "where": "Where",
+      "page": "Page {{page}}",
+      "slot": "slot {{slot}}",
+      "noLocation": "No location",
+      "printHint": "Pull the cards in the order shown, grouped by location.",
+      "orderDialog": {
+        "title": "Create order for {{name}}",
+        "body": "Creates a Manual order with these cards at the prices shown to the customer, then closes the pick list. Finish the sale from Sales ▸ Orders.",
+        "newCustomer": "New customer",
+        "existingCustomer": "Existing customer",
+        "customerName": "Customer name",
+        "customer": "Customer",
+        "created": "Order #{{id}} created."
+      }
+    },
+    "settings": {
+      "title": "Customer kiosk",
+      "intro": "Customers browse the locations below on a kiosk device and put cards on a pick list for staff to pull (Sales ▸ Kiosk). To set up a device, open {{url}} on it and sign in with an administrator account.",
+      "enabled": "Kiosk open",
+      "enabledHelp": "When off, kiosks show a \"closed\" screen.",
+      "locations": "Browsable locations",
+      "locationsHelp": "Customers can browse and hold every card in these locations. Copies listed on TCGplayer or eBay, on an open order, or held by another customer aren't offered.",
+      "addLocation": "Add location",
+      "noLocations": "No locations yet; customers have nothing to browse.",
+      "unknownLocation": "Location #{{id}} (deleted)",
+      "idleTimeout": "Idle timeout (minutes)",
+      "idleTimeoutHelp": "A customer who stops using the kiosk for this long loses their unsent list. Lists sent to the counter never expire.",
+      "showPrices": "Show prices to customers",
+      "welcomeMessage": "Welcome message",
+      "welcomeMessageHelp": "Optional text on the kiosk's welcome screen.",
+      "saved": "Kiosk settings saved.",
+      "devices": "Kiosk devices",
+      "noDevices": "No kiosks set up yet.",
+      "deviceCreated": "Set up {{date}} by {{by}}",
+      "deviceLastSeen": "Last seen {{date}}",
+      "revoked": "Revoked",
+      "revoke": "Revoke",
+      "revokeConfirm": "Revoke {{name}}? The device stops working as a kiosk right away, and its customer's unsent list is cleared.",
+      "deleteDevice": "Delete"
+    }
+  }
+}

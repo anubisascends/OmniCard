@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +19,7 @@ import {
   Divider,
   FormControlLabel,
   IconButton,
+  LinearProgress,
   ListItemIcon,
   ListItemText,
   Menu,
@@ -40,7 +42,9 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import FolderZipIcon from '@mui/icons-material/FolderZip';
+import KeyboardIcon from '@mui/icons-material/Keyboard';
 import EditIcon from '@mui/icons-material/Edit';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import LockIcon from '@mui/icons-material/Lock';
 import PlaceIcon from '@mui/icons-material/Place';
 import ReplayIcon from '@mui/icons-material/Replay';
@@ -65,6 +69,7 @@ import { ScanSessionStore } from '../lib/scanSessionStore';
 import { BatchItemStore } from '../lib/batchItemStore';
 import { usePermissions } from '../context/usePermissions';
 import { ScanBatchesPanel } from '../components/ScanBatchesPanel';
+import { ScanValidationBar, type ScanValidationResult } from '../components/ScanValidationBar';
 import type {
   AuditCommitResultDto,
   ScanBadgeSettingsDto,
@@ -76,6 +81,7 @@ import type {
   ScanCommitResultDto,
   ScanMatchDto,
   ScanSearchResultDto,
+  ScanTagRuleItem,
 } from '../api/types';
 import { CardHoverPreview, type CardHover } from '../components/CardHoverPreview';
 
@@ -185,6 +191,25 @@ function toCommitItem(it: ScanItem, game: string): ScanCommitItem {
     // Present on both auto-matches and manual corrections (it.match holds the original scan result
     // even when the identity was overridden).
     scanHash: it.match?.scanHash ?? null,
+  };
+}
+
+/** What the server's search rules (tag rules, validation) look at for a scan. Only call for an item
+ * with a resolved identity. */
+function toRuleItem(it: ScanItem): ScanTagRuleItem {
+  const id = identityOf(it)!;
+  return {
+    key: it.key,
+    gameCardId: id.gameCardId,
+    name: id.name,
+    setCode: id.setCode,
+    collectorNumber: id.collectorNumber,
+    rarity: id.rarity,
+    condition: it.condition,
+    language: it.language,
+    isFoil: it.isFoil,
+    foilType: it.isFoil ? it.foilType : null,
+    tags: it.tags,
   };
 }
 
@@ -348,6 +373,8 @@ function mergeBatchItems(
         // A scan the reviewer already checked (e.g. to delete it) stays checked once its match lands.
         include: mine.include || matched.include,
         language: matched.language,
+        // The server applied a finish read off the card to the item.
+        ...(matched.match?.foilDetected != null ? { isFoil: matched.isFoil, foilType: matched.foilType } : {}),
       };
     }
     if (mine.status !== 'matching' && dto.status === 'Pending') return { ...mine, status: 'matching' as const };
@@ -389,6 +416,8 @@ interface ScanListControls {
   minPrice: string;
   sortKey: SortKey;
   sortDir: SortDir;
+  /** Show only the scans that failed the last validation. */
+  failedOnly: boolean;
 }
 
 const DEFAULT_CONTROLS: ScanListControls = {
@@ -398,10 +427,13 @@ const DEFAULT_CONTROLS: ScanListControls = {
   minPrice: '',
   sortKey: 'none',
   sortDir: 'asc',
+  failedOnly: false,
 };
 
-/** Apply the filter half of the list controls to a single item. */
-function passesFilter(item: ScanItem, c: ScanListControls): boolean {
+/** Apply the filter half of the list controls to a single item. `failed` holds the keys that failed
+ * the last validation. */
+function passesFilter(item: ScanItem, c: ScanListControls, failed?: ReadonlySet<string>): boolean {
+  if (c.failedOnly && !failed?.has(item.key)) return false;
   if (c.checked === 'checked' && !item.include) return false;
   if (c.checked === 'unchecked' && item.include) return false;
   if (c.name.trim()) {
@@ -422,8 +454,8 @@ function passesFilter(item: ScanItem, c: ScanListControls): boolean {
 
 /** Filter then sort `items` per the list controls. Sort is stable and leaves the original scan order
  * (newest-first) intact when the sort key is 'none'; items missing a sort value sort last. */
-function applyControls(items: ScanItem[], c: ScanListControls): ScanItem[] {
-  const filtered = items.filter((it) => passesFilter(it, c));
+function applyControls(items: ScanItem[], c: ScanListControls, failed?: ReadonlySet<string>): ScanItem[] {
+  const filtered = items.filter((it) => passesFilter(it, c, failed));
   if (c.sortKey === 'none') return filtered;
   const dir = c.sortDir === 'asc' ? 1 : -1;
   const valueOf = (it: ScanItem): number | string | null => {
@@ -475,13 +507,16 @@ function CorrectionSearch({
   setCodes,
   setNames,
   onPick,
+  onCancel,
 }: {
   game: string;
   setCodes: string[];
   setNames: string;
   onPick: (r: ScanSearchResultDto) => void;
+  onCancel: () => void;
 }) {
   const { t } = useTranslation();
+  const rootRef = useRef<HTMLDivElement>(null);
   const [q, setQ] = useState('');
   const [cn, setCn] = useState('');
   // Hovering a result's thumbnail pops the enlarged art (same preview as the location grids).
@@ -503,8 +538,26 @@ function CorrectionSearch({
     queryFn: () => api.scanSearch(game, dq, setCodes, dcn.trim() || undefined),
     enabled: active,
   });
+  // Keyboard review: Esc cancels; ↓/↑ walk from the search boxes through the results, and Enter on
+  // a focused result picks it (it's a button).
+  const onKeyDown = (e: ReactKeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      onCancel();
+      return;
+    }
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const results = Array.from(rootRef.current?.querySelectorAll<HTMLElement>('[data-scan-result]') ?? []);
+    if (results.length === 0) return;
+    e.preventDefault();
+    const at = results.indexOf(document.activeElement as HTMLElement);
+    const next = e.key === 'ArrowDown' ? Math.min(at + 1, results.length - 1) : at - 1;
+    if (next < 0) rootRef.current?.querySelector<HTMLInputElement>('input')?.focus();
+    else results[next].focus();
+  };
   return (
-    <Box sx={{ mt: 1 }}>
+    <Box ref={rootRef} sx={{ mt: 1 }} onKeyDown={onKeyDown}>
       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
         <TextField
           size="small"
@@ -544,6 +597,7 @@ function CorrectionSearch({
               {search.data.map((r) => (
                 <Button
                   key={`${r.gameCardId}-${r.setCode}-${r.collectorNumber}`}
+                  data-scan-result
                   size="small"
                   variant="text"
                   startIcon={
@@ -563,6 +617,8 @@ function CorrectionSearch({
                 >
                   {r.name} · {r.setCode.toUpperCase()} #{r.collectorNumber}
                   {r.rarity ? ` · ${r.rarity}` : ''}
+                  {/* Language-aware catalogs hold one row per language, so name it to tell them apart. */}
+                  {r.language ? ` · ${languageName(t, r.language)}` : ''}
                 </Button>
               ))}
             </Stack>
@@ -605,6 +661,8 @@ function ImagePane({
       >
         {src ? (
           <Box
+            // A fresh element per image, so the previous card's picture never lingers while this loads.
+            key={src}
             component="img"
             src={src}
             alt={alt}
@@ -663,21 +721,25 @@ function propsSummary(item: ScanItem, t: TFunction): string {
   return parts.join(' · ');
 }
 
-/** Master-list row: scan thumbnail beside matched-art thumbnail + identity + status. */
-function MasterRow({
+/** Master-list row: scan thumbnail beside matched-art thumbnail + identity + status. Memoized (with
+ * key-based callbacks) so moving the selection re-renders two rows, not the whole list. */
+const MasterRow = memo(function MasterRow({
   item,
   selected,
   badgeSettings,
   onSelect,
   onToggle,
   readOnly = false,
+  failedValidation = false,
 }: {
   item: ScanItem;
   selected: boolean;
   badgeSettings?: ScanBadgeSettingsDto;
-  onSelect: () => void;
-  onToggle: (v: boolean, shiftKey: boolean) => void;
+  onSelect: (key: string) => void;
+  onToggle: (key: string, v: boolean, shiftKey: boolean) => void;
   readOnly?: boolean;
+  /** Failed the last validation: drawn with a red frame AND a labelled chip (never colour alone). */
+  failedValidation?: boolean;
 }) {
   const { t } = useTranslation();
   const id = identityOf(item);
@@ -688,9 +750,23 @@ function MasterRow({
   // (onClick) and keyboard (onKeyDown, for Space-toggle) so range-select works either way, and never
   // goes stale between a mouse click and a later keyboard toggle.
   const shiftHeld = useRef(false);
+  // Keep the selected row on screen as the keyboard review moves through the list. Only the list
+  // scrolls (never the page), and the list's sticky header is allowed for at the top.
+  const rowRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const row = rowRef.current;
+    const list = row?.closest<HTMLElement>('[data-scan-list]');
+    if (!selected || !row || !list || list.scrollHeight <= list.clientHeight) return;
+    const r = row.getBoundingClientRect();
+    const l = list.getBoundingClientRect();
+    const top = l.top + ((list.firstElementChild as HTMLElement | null)?.offsetHeight ?? 0);
+    if (r.top < top) list.scrollTop -= top - r.top;
+    else if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom;
+  }, [selected]);
   return (
     <Box
-      onClick={onSelect}
+      ref={rowRef}
+      onClick={() => onSelect(item.key)}
       sx={{
         p: 1.5,
         display: 'flex',
@@ -699,6 +775,8 @@ function MasterRow({
         cursor: 'pointer',
         borderLeft: 4,
         borderColor: selected ? 'primary.main' : 'transparent',
+        // Inset so the frame doesn't shift the layout or get clipped by the list.
+        ...(failedValidation && { outline: '2px solid', outlineColor: 'error.main', outlineOffset: '-2px' }),
         bgcolor: selected ? 'action.selected' : 'transparent',
         '&:hover': { bgcolor: selected ? 'action.selected' : 'action.hover' },
       }}
@@ -717,7 +795,7 @@ function MasterRow({
         onKeyDown={(e) => {
           shiftHeld.current = e.shiftKey;
         }}
-        onChange={(e) => onToggle(e.target.checked, shiftHeld.current)}
+        onChange={(e) => onToggle(item.key, e.target.checked, shiftHeld.current)}
         sx={{ p: 0 }}
       />
       <Stack direction="row" spacing={0.75}>
@@ -740,6 +818,9 @@ function MasterRow({
           {propsSummary(item, t)}
         </Typography>
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+          {failedValidation && (
+            <Chip size="small" color="error" icon={<ErrorOutlineIcon />} label={t('scan.validation.failedChip')} />
+          )}
           <ConfidenceChip item={item} />
           <LanguageChip language={item.language} detected={badgeMatch?.languageDetected} />
           <TagChips tags={item.tags} ruleTags={item.ruleTags} />
@@ -756,7 +837,7 @@ function MasterRow({
       </Box>
     </Box>
   );
-}
+});
 
 /** The per-copy property editors, reused by the detail panel and (a subset) the bulk dialog. */
 function PropertyFields({
@@ -766,6 +847,7 @@ function PropertyFields({
   foilTypeOptions,
   tagOptions,
   ruleTags,
+  foilDetected,
   disabled = false,
 }: {
   game: string;
@@ -775,6 +857,8 @@ function PropertyFields({
   tagOptions: string[];
   /** Tags a tag rule added (marked in the tags box). */
   ruleTags?: string[];
+  /** The finish the matcher read off the card, if any. */
+  foilDetected?: boolean | null;
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
@@ -847,6 +931,11 @@ function PropertyFields({
             renderInput={(p) => <TextField {...p} label={t('scan.props.foilType')} />}
           />
         )}
+        {foilDetected != null && foilDetected === props.isFoil && (
+          <Typography variant="caption" color="text.secondary">
+            {t(foilDetected ? 'scan.props.foilDetected' : 'scan.props.nonFoilDetected')}
+          </Typography>
+        )}
       </Stack>
       <Autocomplete
         multiple
@@ -903,7 +992,10 @@ function DetailPanel({
   onCorrect,
   onRemove,
   onProps,
+  correcting,
+  onCorrectingChange,
   readOnly = false,
+  failedValidationQuery = null,
 }: {
   item: ScanItem;
   game: string;
@@ -916,11 +1008,16 @@ function DetailPanel({
   onCorrect: (r: ScanSearchResultDto) => void;
   onRemove: () => void;
   onProps: (patch: Partial<ItemProps>) => void;
+  /** Whether the correction search is open (owned by the page so the S / Enter shortcuts can open it). */
+  correcting: boolean;
+  onCorrectingChange: (open: boolean) => void;
   /** Viewing someone else's background batch: hide the actions and lock the fields. */
   readOnly?: boolean;
+  /** The validation query this card failed (null = it didn't fail, or wasn't validated). */
+  failedValidationQuery?: string | null;
 }) {
   const { t } = useTranslation();
-  const [correcting, setCorrecting] = useState(false);
+  const setCorrecting = onCorrectingChange;
   const [scanOpen, setScanOpen] = useState(false);
   const id = identityOf(item);
 
@@ -974,6 +1071,14 @@ function DetailPanel({
           <Alert severity="warning">{t('scan.detail.noConfidentMatch')}</Alert>
         )}
 
+        {failedValidationQuery !== null && (
+          <Alert severity="error" icon={<ErrorOutlineIcon />}>
+            {id
+              ? t('scan.validation.detailFailed', { query: failedValidationQuery })
+              : t('scan.validation.detailFailedNoMatch', { query: failedValidationQuery })}
+          </Alert>
+        )}
+
         {readOnly ? null : correcting ? (
           <Box>
             <CorrectionSearch
@@ -981,9 +1086,10 @@ function DetailPanel({
               setCodes={artSets.map((s) => s.setCode)}
               setNames={artSets.map((s) => s.setName).join(', ')}
               onPick={(r) => {
-                onCorrect(r);
                 setCorrecting(false);
+                onCorrect(r);
               }}
+              onCancel={() => setCorrecting(false)}
             />
             <Button size="small" onClick={() => setCorrecting(false)} sx={{ mt: 1 }}>
               {t('common.actions.cancel')}
@@ -991,18 +1097,24 @@ function DetailPanel({
           </Box>
         ) : (
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Button
-              variant={item.verified ? 'outlined' : 'contained'}
-              color="success"
-              startIcon={<CheckCircleIcon />}
-              disabled={!id}
-              onClick={onVerify}
-            >
-              {item.verified ? t('scan.detail.looksCorrect') : t('scan.detail.confirmMatch')}
-            </Button>
-            <Button variant="outlined" startIcon={<SearchIcon />} onClick={() => setCorrecting(true)}>
-              {t('scan.detail.searchCatalog')}
-            </Button>
+            <Tooltip title={t('scan.keyboard.confirmTooltip')}>
+              <span>
+                <Button
+                  variant={item.verified ? 'outlined' : 'contained'}
+                  color="success"
+                  startIcon={<CheckCircleIcon />}
+                  disabled={!id}
+                  onClick={onVerify}
+                >
+                  {item.verified ? t('scan.detail.looksCorrect') : t('scan.detail.confirmMatch')}
+                </Button>
+              </span>
+            </Tooltip>
+            <Tooltip title={t('scan.keyboard.searchTooltip')}>
+              <Button variant="outlined" startIcon={<SearchIcon />} onClick={() => setCorrecting(true)}>
+                {t('scan.detail.searchCatalog')}
+              </Button>
+            </Tooltip>
             {item.include ? (
               <Button variant="text" onClick={() => onToggle(false)}>
                 {t('scan.detail.excludeFromCommit')}
@@ -1031,6 +1143,7 @@ function DetailPanel({
           foilTypeOptions={foilTypeOptions}
           tagOptions={tagOptions}
           ruleTags={item.ruleTags}
+          foilDetected={item.match?.foilDetected}
           disabled={readOnly}
         />
 
@@ -1057,6 +1170,71 @@ function DetailPanel({
         </DialogContent>
       </Dialog>
     </Paper>
+  );
+}
+
+/** Whether a key press on `el` is someone typing (text boxes keep their keys; checkboxes don't). */
+function isTypingTarget(el: HTMLElement): boolean {
+  if (el.isContentEditable || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
+  if (el.tagName !== 'INPUT') return false;
+  const type = (el as HTMLInputElement).type;
+  return !['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color', 'file'].includes(type);
+}
+
+/** The review keyboard shortcuts, as [keys, i18n key of what they do]. */
+const SHORTCUTS: [string[], string][] = [
+  [['Enter'], 'scan.keyboard.keys.confirm'],
+  [['↓', 'J'], 'scan.keyboard.keys.next'],
+  [['↑', 'K'], 'scan.keyboard.keys.previous'],
+  [['S', '/'], 'scan.keyboard.keys.search'],
+  [['Esc'], 'scan.keyboard.keys.cancelSearch'],
+  [['X'], 'scan.keyboard.keys.exclude'],
+  [['Ctrl', 'Z'], 'scan.keyboard.keys.undo'],
+  [['?'], 'scan.keyboard.keys.help'],
+];
+
+function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>{t('scan.keyboard.title')}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={1.25}>
+          {SHORTCUTS.map(([keys, label]) => (
+            <Stack key={label} direction="row" spacing={2} alignItems="center">
+              <Stack direction="row" spacing={0.5} sx={{ minWidth: 96 }}>
+                {keys.map((k) => (
+                  <Box
+                    key={k}
+                    component="kbd"
+                    sx={{
+                      px: 0.75,
+                      py: 0.25,
+                      border: 1,
+                      borderColor: 'divider',
+                      borderBottomWidth: 2,
+                      borderRadius: 1,
+                      fontFamily: 'inherit',
+                      fontSize: '0.8rem',
+                      bgcolor: 'action.hover',
+                    }}
+                  >
+                    {k}
+                  </Box>
+                ))}
+              </Stack>
+              <Typography variant="body2">{t(label)}</Typography>
+            </Stack>
+          ))}
+          <Typography variant="caption" color="text.secondary" sx={{ pt: 1 }}>
+            {t('scan.keyboard.footnote')}
+          </Typography>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{t('common.actions.close')}</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -1433,6 +1611,13 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   const [items, setItems] = useState<ScanItem[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [controls, setControls] = useState<ScanListControls>(DEFAULT_CONTROLS);
+  // Scan validation: the query typed (or loaded from a saved rule) and the last run's outcome. Every
+  // run replaces the outcome wholesale, so an earlier pass can never vouch for a card.
+  const [validationQuery, setValidationQuery] = useState('');
+  const [validation, setValidation] = useState<ScanValidationResult | null>(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validating, setValidating] = useState(false);
+  const validationRun = useRef(0);
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
 
@@ -1441,10 +1626,14 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   // The filtered + sorted view of the scans. Everything the toolbar acts on (Confirm / Add, the
   // select-all header, bulk edit, and the batch counts) is scoped to these visible items, so a
   // filtered list only ever confirms/commits what the user can actually see.
-  const visibleItems = useMemo(() => applyControls(items, controls), [items, controls]);
+  const visibleItems = useMemo(
+    () => applyControls(items, controls, validation?.failed),
+    [items, controls, validation],
+  );
   const visibleKeys = useMemo(() => new Set(visibleItems.map((it) => it.key)), [visibleItems]);
   const controlsActive =
     controls.checked !== 'all' ||
+    controls.failedOnly ||
     controls.name.trim() !== '' ||
     controls.minConfidence.trim() !== '' ||
     controls.minPrice.trim() !== '';
@@ -1466,6 +1655,12 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   // row's new state; the anchor only moves on a plain click, so consecutive Shift-clicks re-range
   // from the same origin (standard file-explorer / Gmail behaviour).
   const anchorKeyRef = useRef<string | null>(null);
+  // Stable for the memoized master rows; always runs the latest toggleInclude.
+  const toggleIncludeRef = useRef<typeof toggleInclude>(() => {});
+  const toggleRow = useCallback(
+    (key: string, checked: boolean, shiftKey: boolean) => toggleIncludeRef.current(key, checked, shiftKey),
+    [],
+  );
   const toggleInclude = (key: string, checked: boolean, shiftKey: boolean) => {
     // Range selection walks the VISIBLE order so a Shift-click never toggles rows hidden by a filter.
     const idx = visibleItems.findIndex((it) => it.key === key);
@@ -1481,6 +1676,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, include: checked } : it)));
     anchorKeyRef.current = key;
   };
+  toggleIncludeRef.current = toggleInclude;
 
   // Remove staged scans AND free the blob URL backing each one's preview. Each scan's thumbnail is
   // an `URL.createObjectURL(file)` that pins the image in the tab's memory until explicitly revoked;
@@ -1518,10 +1714,16 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   const tagOptions = useMemo(() => (tagsQuery.data ?? []).map((t) => t.name), [tagsQuery.data]);
   const sets = setsQuery.data ?? [];
 
-  // Reset the set filter whenever the game changes (a set only belongs to one game).
+  // Reset the set filter whenever the game changes (a set only belongs to one game). Validation rules
+  // are per game too.
   useEffect(() => {
     setArtSets([]);
     setLanguage('');
+    validationRun.current++;
+    setValidationQuery('');
+    setValidation(null);
+    setValidationErrors([]);
+    setControls((c) => (c.failedOnly ? { ...c, failedOnly: false } : c));
   }, [game]);
 
   // A batch's "Sets (art fallback)" are fixed; they still scope the correction search.
@@ -1663,6 +1865,11 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
           const patch: Partial<ScanItem> = { status: 'done', match, include: match.matched };
           // The server's language (printed marker > session choice > matched printing) seeds the copy.
           if (match.language) patch.language = match.language;
+          // So does a finish read off the card (MTG star = foil, bullet = non-foil).
+          if (match.foilDetected != null) {
+            patch.isFoil = match.foilDetected;
+            if (!match.foilDetected) patch.foilType = null;
+          }
           if (match.scanPreviewDataUri) patch.previewUrl = match.scanPreviewDataUri;
           updateItem(staging.key, patch);
         } catch (e) {
@@ -1822,21 +2029,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         api
           .scanTagRules(
             game,
-            chunk.map(({ it }) => {
-              const id = identityOf(it)!;
-              return {
-                key: it.key,
-                gameCardId: id.gameCardId,
-                name: id.name,
-                setCode: id.setCode,
-                collectorNumber: id.collectorNumber,
-                rarity: id.rarity,
-                condition: it.condition,
-                language: it.language,
-                isFoil: it.isFoil,
-                foilType: it.isFoil ? it.foilType : null,
-              };
-            }),
+            chunk.map(({ it }) => toRuleItem(it)),
           )
           .then((res) => settle(new Map(res.map((r) => [r.key, r.tags]))))
           .catch((e) => {
@@ -1851,6 +2044,52 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   // Hold the commit until every card about to be added has its rule tags.
   const rulesPending =
     applyTagRules && !readOnly && items.some((it) => isVisibleCommittable(it) && ruleSignature(it, game) !== it.ruleSig);
+
+  /** Check the whole scan list (not just the filtered view) against the validation query. Cards with no
+   * identity fail; cards still matching aren't checked. */
+  const runValidation = async () => {
+    const run = ++validationRun.current;
+    const query = validationQuery.trim();
+    // Wipe the previous outcome first: nothing from an earlier run survives this one.
+    setValidation(null);
+    setValidationErrors([]);
+    if (!query) return;
+    const snapshot = itemsRef.current;
+    const checkable = snapshot.filter((it) => it.status !== 'matching');
+    const identified = checkable.filter((it) => identityOf(it));
+    const failed = new Set(checkable.filter((it) => !identityOf(it)).map((it) => it.key));
+    // Large batches go in chunks; an empty list still sends one request so the query gets checked.
+    const chunks: ScanItem[][] = [];
+    for (let i = 0; i < identified.length; i += 500) chunks.push(identified.slice(i, i + 500));
+    if (chunks.length === 0) chunks.push([]);
+    setValidating(true);
+    try {
+      for (const chunk of chunks) {
+        const res = await api.scanValidate(game, query, chunk.map(toRuleItem));
+        if (run !== validationRun.current) return;
+        if (res.errors.length > 0) {
+          setValidationErrors(res.errors);
+          return;
+        }
+        res.failedKeys.forEach((k) => failed.add(k));
+      }
+      setValidation({
+        query,
+        checked: new Set(checkable.map((it) => it.key)),
+        failed,
+        skipped: snapshot.length - checkable.length,
+      });
+      // Nothing failed: don't leave the list filtered down to nothing.
+      if (failed.size === 0) setControls((c) => (c.failedOnly ? { ...c, failedOnly: false } : c));
+    } catch (e) {
+      if (run === validationRun.current) setValidationErrors([(e as Error).message]);
+    } finally {
+      if (run === validationRun.current) setValidating(false);
+    }
+  };
+  // Counts over the scans still in the list (committed / removed ones drop out).
+  const validationFailedCount = validation ? items.filter((it) => validation.failed.has(it.key)).length : 0;
+  const validationCheckedCount = validation ? items.filter((it) => validation.checked.has(it.key)).length : 0;
 
   /** Remove scans from the list — and, for a batch, from the server (deleting their stored images). */
   const removeItems = (shouldRemove: (it: ScanItem) => boolean | undefined) => {
@@ -1960,6 +2199,190 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         : { severity: 'error', text: t('scan.export.copyFailed') },
     );
   };
+
+  // --- Keyboard review: Enter confirms the selected card and moves to the next one still to review;
+  // ↑/↓ (K/J) move, S or / opens the catalog search, X excludes and moves on, Ctrl+Z undoes. ---
+  // The card whose catalog search is open. Keyed to the card (not a flag reset by an effect) so moving
+  // on closes it in the same render instead of costing a second one.
+  const [correctingKey, setCorrectingKey] = useState<string | null>(null);
+  const correcting = correctingKey !== null && correctingKey === selectedKey;
+  const setCorrecting = (open: boolean) => setCorrectingKey(open ? selectedKey : null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // Cards excluded while reviewing (X / "Exclude from commit"). They count as reviewed, so the
+  // review doesn't keep returning to them. Kept for this visit only.
+  const [skippedKeys, setSkippedKeys] = useState<ReadonlySet<string>>(() => new Set());
+  // What each confirm / correct / exclude changed, newest last, so Ctrl+Z can put it back.
+  const undoStack = useRef<{ key: string; before: Partial<ScanItem>; wasSkipped: boolean }[]>([]);
+
+
+  const isReviewed = (it: ScanItem) => !!it.verified || skippedKeys.has(it.key);
+  const needsReview = (it: ScanItem) => !isReviewed(it) && it.status !== 'matching';
+
+  /** The next visible card after `fromKey` that still needs review, wrapping round to the top. */
+  const nextToReview = (fromKey: string | null): string | null => {
+    const start = visibleItems.findIndex((it) => it.key === fromKey);
+    for (let i = 1; i <= visibleItems.length; i++) {
+      const it = visibleItems[(start + i) % visibleItems.length];
+      if (it.key !== fromKey && needsReview(it)) return it.key;
+    }
+    return null;
+  };
+
+  const setSkipped = (key: string, skipped: boolean) =>
+    setSkippedKeys((prev) => {
+      if (prev.has(key) === skipped) return prev;
+      const next = new Set(prev);
+      if (skipped) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+
+  /** Apply a review decision to a card (remembered for undo), then move on to the next card to review. */
+  const decide = (item: ScanItem, patch: Partial<ScanItem>, skip = false) => {
+    undoStack.current.push({
+      key: item.key,
+      before: { verified: item.verified, include: item.include, override: item.override, language: item.language },
+      wasSkipped: skippedKeys.has(item.key),
+    });
+    if (undoStack.current.length > 200) undoStack.current.shift();
+    const next = nextToReview(item.key);
+    updateItem(item.key, patch);
+    setSkipped(item.key, skip);
+    if (next) setSelectedKey(next);
+  };
+
+  const confirmItem = (item: ScanItem) => decide(item, { verified: true, include: true });
+  const correctItem = (item: ScanItem, r: ScanSearchResultDto) =>
+    decide(item, {
+      override: r,
+      include: true,
+      verified: true,
+      ...(r.language && r.language !== ENGLISH ? { language: r.language } : {}),
+    });
+  const excludeItem = (item: ScanItem) => decide(item, { include: false }, true);
+  const includeItem = (item: ScanItem) => {
+    if (identityOf(item)) updateItem(item.key, { include: true });
+    setSkipped(item.key, false);
+  };
+
+  /** Ctrl+Z: put back the last confirm / correct / exclude and return to that card. */
+  const undoLast = () => {
+    for (let last = undoStack.current.pop(); last; last = undoStack.current.pop()) {
+      if (!items.some((it) => it.key === last!.key)) continue; // Since committed or removed.
+      updateItem(last.key, last.before);
+      setSkipped(last.key, last.wasSkipped);
+      setSelectedKey(last.key);
+      return;
+    }
+  };
+
+  const moveSelection = (delta: number) => {
+    if (visibleItems.length === 0) return;
+    const at = visibleItems.findIndex((it) => it.key === selectedKey);
+    const to = at === -1 ? 0 : Math.max(0, Math.min(visibleItems.length - 1, at + delta));
+    setSelectedKey(visibleItems[to].key);
+  };
+
+  const reviewedCount = visibleItems.filter(isReviewed).length;
+  const confirmedCount = visibleItems.filter((it) => it.verified).length;
+  const stillMatchingCount = visibleItems.filter((it) => !isReviewed(it) && it.status === 'matching').length;
+  const reviewComplete = visibleItems.length > 0 && reviewedCount === visibleItems.length;
+
+  // Warm the browser cache with the next few cards' images so the compare panes appear instantly.
+  const preloaded = useRef(new Set<string>());
+  useEffect(() => {
+    const at = visibleItems.findIndex((it) => it.key === selectedKey);
+    const nextKey = nextToReview(selectedKey);
+    const upcoming = [
+      ...visibleItems.slice(at + 1, at + 4),
+      ...visibleItems.filter((it) => it.key === nextKey),
+    ];
+    for (const it of upcoming) {
+      for (const url of [it.previewUrl, identityOf(it)?.imageUri]) {
+        if (!url || url.startsWith('data:') || url.startsWith('blob:') || preloaded.current.has(url)) continue;
+        preloaded.current.add(url);
+        // Download and decode ahead, so showing the card doesn't wait on either.
+        const img = new Image();
+        img.src = url;
+        img.decode().catch(() => {});
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nextToReview is derived from these.
+  }, [selectedKey, visibleItems, skippedKeys]);
+
+  // One window listener that always calls the latest handler (it closes over this render's state).
+  const keyHandler = useRef<(e: KeyboardEvent) => void>(() => {});
+  keyHandler.current = (e: KeyboardEvent) => {
+    if (e.defaultPrevented || e.altKey || e.metaKey || items.length === 0) return;
+    const target = e.target instanceof HTMLElement ? e.target : null;
+    if (target && isTypingTarget(target)) return;
+    // Leave keys alone inside dialogs, menus, dropdowns and the open search.
+    if (target?.closest('[role="dialog"], [role="presentation"], [role="menu"], [role="listbox"], [role="combobox"]'))
+      return;
+    if (confirmDelete || bulkOpen || pickerOpen || webcamOpen || zipOpen || exportAnchor || shortcutsOpen) return;
+    // Holding a key repeats only the moves; holding Enter or X must not run through a string of cards.
+    const isMove = ['ArrowDown', 'ArrowUp', 'j', 'J', 'k', 'K'].includes(e.key);
+    if (e.repeat && !isMove) return;
+
+    if (e.ctrlKey) {
+      if (e.key.toLowerCase() === 'z' && !e.shiftKey && !readOnly) {
+        e.preventDefault();
+        undoLast();
+      }
+      return;
+    }
+    const item = selectedItem;
+    switch (e.key) {
+      case 'Enter':
+        // A focused button (e.g. Search catalog after a Tab) keeps its normal Enter behaviour.
+        if (target?.closest('button, a, [role="button"]') || !item || readOnly) return;
+        e.preventDefault();
+        if (identityOf(item)) confirmItem(item);
+        else if (item.status !== 'matching') setCorrecting(true);
+        return;
+      case 'ArrowDown':
+      case 'j':
+      case 'J':
+        e.preventDefault();
+        moveSelection(1);
+        return;
+      case 'ArrowUp':
+      case 'k':
+      case 'K':
+        e.preventDefault();
+        moveSelection(-1);
+        return;
+      case 's':
+      case 'S':
+      case '/':
+        if (!item || readOnly) return;
+        e.preventDefault();
+        setCorrecting(true);
+        return;
+      case 'x':
+      case 'X':
+        if (!item || readOnly) return;
+        e.preventDefault();
+        if (item.include || !skippedKeys.has(item.key)) excludeItem(item);
+        else includeItem(item);
+        return;
+      case 'Escape':
+        if (correcting) {
+          e.preventDefault();
+          setCorrecting(false);
+        }
+        return;
+      case '?':
+        e.preventDefault();
+        setShortcutsOpen(true);
+        return;
+    }
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => keyHandler.current(e);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
     <Stack spacing={3}>
@@ -2117,6 +2540,24 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
           </Typography>
         </Paper>
       )}
+
+      <ScanValidationBar
+        game={game}
+        query={validationQuery}
+        onQueryChange={(q) => {
+          setValidationQuery(q);
+          setValidationErrors([]);
+        }}
+        onValidate={() => void runValidation()}
+        validating={validating}
+        canValidate={items.length > 0}
+        errors={validationErrors}
+        result={validation}
+        failedCount={validationFailedCount}
+        checkedCount={validationCheckedCount}
+        failedOnly={controls.failedOnly}
+        onFailedOnlyChange={(on) => setControls((c) => ({ ...c, failedOnly: on }))}
+      />
 
       {restoredStillPresent > 0 && (
         <Alert
@@ -2359,6 +2800,41 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         </Paper>
       )}
 
+      {visibleItems.length > 0 &&
+        (reviewComplete ? (
+          <Alert
+            severity="success"
+            action={
+              <Button color="inherit" size="small" startIcon={<KeyboardIcon />} onClick={() => setShortcutsOpen(true)}>
+                {t('scan.keyboard.shortcuts')}
+              </Button>
+            }
+          >
+            {t('scan.keyboard.complete', { count: visibleItems.length, confirmed: confirmedCount })}
+          </Alert>
+        ) : (
+          <Paper variant="outlined" sx={{ px: 2, py: 1 }}>
+            <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {t('scan.keyboard.progress', { reviewed: reviewedCount, total: visibleItems.length })}
+              </Typography>
+              <LinearProgress
+                variant="determinate"
+                value={(reviewedCount / visibleItems.length) * 100}
+                sx={{ flex: '1 1 120px', height: 6, borderRadius: 3 }}
+              />
+              <Typography variant="caption" color="text.secondary">
+                {stillMatchingCount > 0 && !visibleItems.some(needsReview)
+                  ? t('scan.keyboard.waiting', { count: stillMatchingCount })
+                  : t('scan.keyboard.hint')}
+              </Typography>
+              <Button size="small" startIcon={<KeyboardIcon />} onClick={() => setShortcutsOpen(true)}>
+                {t('scan.keyboard.shortcuts')}
+              </Button>
+            </Stack>
+          </Paper>
+        ))}
+
       {items.length > 0 && (
         <Box
           sx={{
@@ -2369,7 +2845,11 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
           }}
         >
           {/* Master: the list of scanned cards (scan thumb + matched-art thumb per row). */}
-          <Paper variant="outlined" sx={{ overflow: 'hidden', maxHeight: { md: '75vh' }, overflowY: { md: 'auto' } }}>
+          <Paper
+            variant="outlined"
+            data-scan-list
+            sx={{ overflow: 'hidden', maxHeight: { md: '75vh' }, overflowY: { md: 'auto' } }}
+          >
             {/* Selection header: check/uncheck/invert + bulk edit. */}
             <Box
               sx={{
@@ -2437,9 +2917,10 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                   item={item}
                   selected={item.key === selectedKey}
                   badgeSettings={badgeSettings}
-                  onSelect={() => setSelectedKey(item.key)}
-                  onToggle={(v, shiftKey) => toggleInclude(item.key, v, shiftKey)}
+                  onSelect={setSelectedKey}
+                  onToggle={toggleRow}
                   readOnly={readOnly}
+                  failedValidation={!!validation?.failed.has(item.key)}
                 />
               ))}
               {visibleItems.length === 0 && (
@@ -2457,27 +2938,24 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
 
           {/* Detail: the selected card's full-size compare + verify/correct/remove + properties. */}
           {selectedItem ? (
+            // Not keyed by card: moving through the list updates the panel in place, which is much
+            // cheaper than rebuilding its form fields for every card.
             <DetailPanel
-              key={selectedItem.key}
               item={selectedItem}
               game={game}
               artSets={artSets}
               foilTypeOptions={foilTypeOptions}
               tagOptions={tagOptions}
               badgeSettings={badgeSettings}
-              onToggle={(v) => updateItem(selectedItem.key, { include: v })}
-              onVerify={() => updateItem(selectedItem.key, { verified: true, include: true })}
-              onCorrect={(r) =>
-                updateItem(selectedItem.key, {
-                  override: r,
-                  include: true,
-                  verified: true,
-                  ...(r.language && r.language !== ENGLISH ? { language: r.language } : {}),
-                })
-              }
+              onToggle={(v) => (v ? includeItem(selectedItem) : excludeItem(selectedItem))}
+              onVerify={() => confirmItem(selectedItem)}
+              onCorrect={(r) => correctItem(selectedItem, r)}
+              correcting={correcting}
+              onCorrectingChange={setCorrecting}
               onRemove={() => removeItems((it) => it.key === selectedItem.key)}
               onProps={(patch) => updateProps(selectedItem.key, patch)}
               readOnly={readOnly}
+              failedValidationQuery={validation?.failed.has(selectedItem.key) ? validation.query : null}
             />
           ) : (
             <Paper
@@ -2504,6 +2982,8 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
 
       <BulkEditDialog
         open={bulkOpen}

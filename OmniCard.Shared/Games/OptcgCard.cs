@@ -1,11 +1,13 @@
 namespace OmniCard.Shared.Games;
 
 // Persistence entity for OPTCG cards. One row per card variant (printing).
-// Populated by OptcgService from api.poneglyph.one DTOs (see OptcgApiModels).
+// Populated by OptcgService from TCGCSV (TCGplayer) products. Rows imported earlier from
+// api.poneglyph.one keep their poneglyph-style ids (see OptcgApiModels).
 public class OptcgCard
 {
     // Variant uid: bare card number for the base printing (index 0),
-    // "{CardNumber}_p{index}" for alternate arts. Non-English printings append "@{lang}"
+    // "{CardNumber}_p{index}" for poneglyph alternate arts, "{CardNumber}_t{productId}" for
+    // variants added from TCGCSV. Non-English printings append "@{lang}"
     // (e.g. "OP01-001@ja") — poneglyph numbers variants per language, so the suffix keeps the
     // Japanese "OP01-001_p2" from colliding with the English one.
     public string CardSetId { get; set; } = "";
@@ -13,6 +15,14 @@ public class OptcgCard
     /// <summary>Card language (CardLanguages code): "en" for the English catalog, "ja"/"fr" for
     /// rows downloaded via poneglyph's <c>lang=</c>.</summary>
     public string Lang { get; set; } = "en";
+
+    /// <summary>TCGplayer product id — how TCGCSV catalog and price updates find this row. Null for
+    /// non-English rows and printings TCGplayer doesn't list.</summary>
+    public int? TcgplayerId { get; set; }
+
+    /// <summary>True for rows created from TCGCSV: catalog updates refresh all their fields. Rows from
+    /// poneglyph keep their (more accurate) data and only take prices and missing fields.</summary>
+    public bool FromTcgCsv { get; set; }
 
     // Printed collector number, e.g. "OP01-001" (shared across variants).
     public string CardNumber { get; set; } = "";

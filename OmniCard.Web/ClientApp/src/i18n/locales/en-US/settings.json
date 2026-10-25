@@ -6,6 +6,7 @@
       "receipt": "Receipts",
       "scan": "Scan Badges",
       "tagRules": "Tag Rules",
+      "labels": "Labels",
       "deckTypes": "Deck Types",
       "appearance": "Appearance",
       "catalog": "Catalog Data",
@@ -14,7 +15,8 @@
       "sites": "Sites",
       "users": "Users",
       "reset": "Reset Collection",
-      "components": "Components"
+      "components": "Components",
+      "kiosk": "Kiosk"
     },
     "roles": {
       "title": "Roles",
@@ -62,7 +64,7 @@
     },
     "catalog": {
       "title": "Catalog data",
-      "description": "Refresh the per-game card catalogs, prices, and image hashes on the server (no desktop app needed). One job runs at a time.",
+      "description": "Refresh the per-game card catalogs, prices, and image hashes on the server. Magic comes from Scryfall; every other game comes from TCGCSV (TCGplayer data, refreshed daily). One job runs at a time.",
       "operations": {
         "prices": "Update prices",
         "bulk": "Download catalog",
@@ -79,6 +81,36 @@
         "saved": "Language selection saved — run “Download catalog” to apply it.",
         "mtgSizeWarning": "Any non-English language switches MTG to Scryfall’s all-languages file (~400 MB download) and hashes each language’s art.",
         "pricesNote": "Non-English cards rarely have their own prices; they’re valued at the English printing’s price (Pokémon Japan has real prices)."
+      },
+      "runningScheduled": "{{game}} · {{operation}} · running (scheduled update)",
+      "recentItemScheduled": "{{icon}} {{game}} · {{operation}} (scheduled) · {{message}}",
+      "schedule": {
+        "title": "Automatic updates",
+        "description": "Update the catalogs on a schedule. Card data adds new sets and printings (and hashes them for scanning); prices refresh market values. TCGCSV republishes once a day, so one run a day keeps everything current.",
+        "adminOnly": "Only administrators can change the schedule.",
+        "enabled": "Update catalogs automatically",
+        "timesLabel": "Run at",
+        "addTime": "Add time",
+        "removeTime": "Remove {{time}}",
+        "timeZone": "Times are in the server's time zone: {{zone}}.",
+        "noTimes": "No times yet. Add at least one.",
+        "daysLabel": "On",
+        "gamesLabel": "Games",
+        "updateLabel": "Update",
+        "updateCards": "Card data (new sets and cards)",
+        "updatePrices": "Prices",
+        "save": "Save schedule",
+        "saved": "Schedule saved.",
+        "runNow": "Run now",
+        "runNowHelp": "Runs the selected games and updates now, even when the schedule is off.",
+        "runStarted": "Update started. Progress shows under Recent above.",
+        "running": "An update is running now.",
+        "nextRun": "Next run: {{when}}",
+        "off": "Automatic updates are off.",
+        "lastRun": "Last run: {{when}}, {{succeeded}} of {{total}} updates succeeded.",
+        "lastRunUnfinished": "Last run started {{when}} and did not finish (the server stopped).",
+        "neverRun": "No automatic update has run yet.",
+        "failuresHeading": "Failed updates"
       }
     },
     "ebay": {
@@ -137,7 +169,10 @@
       "none": "— none —",
       "moveSwitch": "Move picked cards to the for-sale location",
       "moveOn": "Marking a listing as picked physically relocates the card to the for-sale location above.",
-      "moveOff": "Marking a listing as picked only changes its status — the card stays in its current location."
+      "moveOff": "Marking a listing as picked only changes its status — the card stays in its current location.",
+      "allGamesSwitch": "Order card search covers all games",
+      "allGamesOn": "Adding a card to an order searches listed cards of every game, whatever the game selector is set to. Applies to everyone who edits orders.",
+      "allGamesOff": "Adding a card to an order only searches listed cards of the game picked in the game selector."
     },
     "appearance": {
       "title": "Appearance",
@@ -263,13 +298,15 @@
     },
     "scanFolders": {
       "title": "Watched scan folders",
-      "description": "Point each game at a folder on the server. Save scans into a subfolder named after the batch; when no new file has arrived for the quiet period, the batch is matched in the background and appears on the Scan page. Picked-up files are moved to a _processed subfolder.",
+      "description": "Point each game at a folder on the server and save scans into a subfolder named after the batch. Each batch appears on the Scan page right away, but its files are left untouched in the folder until it starts: when someone presses Run, or by itself once its files stop changing for the quiet period. Then the files are moved to a _processed subfolder and matched in the background.",
       "adminOnly": "Only an administrator can change watched folders.",
       "enabled": "Watch folders",
       "autoProcess": "Process batches automatically",
-      "autoProcessHelp": "When off, new scans are still picked up, but each batch waits on the Scan page until someone presses Run. Use this to remove unwanted scans before matching starts.",
+      "autoProcessHelp": "When on, each batch starts by itself once its files have gone the quiet period without changing. Every batch has its own timer, so several can run at once. When off, batches wait on the Scan page until someone presses Run. Either way, files stay untouched in the folder until their batch starts.",
+      "deleteOriginals": "Delete originals when a batch is closed",
+      "deleteOriginalsHelp": "When a batch is committed or discarded, delete its original files from the folder's _processed subfolder. When off, they're kept there.",
       "quietPeriod": "Quiet period (seconds)",
-      "quietPeriodHelp": "How long to wait with no new file before matching starts.",
+      "quietPeriodHelp": "How long a batch's files must go unchanged (no new, renamed or growing files) before it starts by itself.",
       "retention": "Keep images (days)",
       "retentionHelp": "Stored scans of committed or discarded batches are deleted after this many days.",
       "folderPath": "Folder on the server",

@@ -2,13 +2,17 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Publish to LocalHost",
+            // Full local hosting deploy, elevated (Web Deploy → IIS needs admin). Runs
+            // .vscode/deploy.ps1, which: provisions IIS (app pool + site, idempotent) → builds the
+            // React SPA (npm) → dotnet publish with the `localhos` Web Deploy profile. Edit the
+            // settings at the top of deploy.ps1 (site name, port, physical path) to taste.
+            "label": "Publish",
             "type": "shell",
             "command": "Start-Process",
             "args": [
                 "powershell",
                 "-ArgumentList",
-                "'-NoProfile -Command \"cd ${workspaceFolder}; dotnet publish OmniCard.Web/OmniCard.Web.csproj -c Release /p:PublishProfile=localhos; Read-Host Press_Enter_to_close\"'",
+                "'-NoProfile -ExecutionPolicy Bypass -File \"${workspaceFolder}/.vscode/deploy.ps1\"'",
                 "-Verb",
                 "RunAs"
             ],
@@ -19,55 +23,57 @@
             }
         },
         {
-            "label": "Publish Single File",
-            "type": "shell",
-            "command": "dotnet",
-            "args":[
-                "publish",
-                "${workspaceFolder}/OmniCard/OmniCard.csproj",
-                "-c", "Release",
-                "-r", "win-x64",
-                "-p:PublishSingleFile=true",
-                "-p:IncludeNativeLibrariesForSelfExtract=true",
-                "--self-contained", "true"
-            ],
-            "problemMatcher": "$msCompile",
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            }
-
-        },
-        {
-            "label": "Build Release",
+            // Build + publish to a REMOTE IIS server over a network share or Web Deploy. Runs
+            // .vscode/deploy-remote.ps1. Your server's values go in .vscode/deploy-remote.local.json
+            // (git-ignored; the first run creates it from the tracked defaults in deploy-remote.json).
+            "label": "Publish to Remote Server",
             "type": "process",
-            "command": "dotnet",
-            "args":[
-                "build",
-                "${workspaceFolder}/OmniCard/OmniCard.csproj",
-                "-c",
-                "Release"
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}/.vscode/deploy-remote.ps1"
             ],
-            "problemMatcher": "$msCompile",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            },
             "group": {
                 "kind": "build",
                 "isDefault": false
-            },
+            }
+        },
+        {
+            // Same as "Publish to Remote Server", then (re)installs + starts the Windows service on the
+            // server: stops the service, mirrors the build over the share, and runs install-service.ps1
+            // there, elevated over PowerShell remoting (deploy-remote.ps1 -InstallService). Needs
+            // ServiceAdminUserName in deploy-remote.local.json and one-time remoting setup (see README).
+            "label": "Publish to Remote Server (service)",
+            "type": "process",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}/.vscode/deploy-remote.ps1",
+                "-InstallService"
+            ],
+            "problemMatcher": [],
             "presentation": {
-                "echo": true,
                 "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
+                "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
             }
         }
     ]

@@ -14,12 +14,14 @@ Click **Administration** in the sidebar. Everyone can open this page, but you on
 | **Receipts** | Store details and layout for printed receipts | People with the Settings view permission (only administrators can change it) |
 | **Scan Badges** | Value badges on the Scan page, plus watched scan folders | People with the Settings view permission (badges and folders can only be changed by administrators) |
 | **Tag Rules** | Searches that tag matching cards when they're scanned or imported | Administrators only |
+| **Labels** | Label templates for printing card-holder labels | People with the Print labels or Manage label templates permission (only Manage label templates can change them) |
 | **Deck Types** | Deck formats and their rules | People with the Deck Types view permission |
 | **Appearance** | Card preview size | Everyone |
 | **Catalog Data** | Download card catalogs, prices and artwork | People with the Catalog Data view permission |
 | **eBay** | Connect eBay and set seller details | People with the eBay view permission |
 | **Roles** | Permission bundles | Administrators only |
 | **Sites** | Major physical places and who can see them | Administrators only |
+| **Kiosk** | The customer kiosk: what customers can browse, and the kiosk devices | Administrators only |
 | **Users** | Every account: add, edit, require password resets, delete | Administrators only |
 | **Reset Collection** | Remove the whole collection to start over, keeping sales data | Administrators only |
 | **Components** | Software versions and licenses | Everyone |
@@ -118,17 +120,19 @@ Permissions are grouped by section. Most sections have **View**, plus actions su
 | Inventory | View, Create, Edit, Delete |
 | Lists | View, Create, Edit, Delete, Commit to collection |
 | Trades | View, Create, Finalize, Cancel |
+| Labels | Print labels, Manage label templates |
 | Import | Run import |
 | Export | Run export |
 | Sales · Orders | View, Create, Edit, Delete, Import orders, Ship (scan labels) |
 | Sales · Customers | View, Create, Edit, Delete |
 | Sales · Listings | View, Create, Edit, Delete, Pick / mark picked |
+| Sales · Kiosk | View pick-list queue, Fulfill pick lists |
 | Settings | View, Edit |
 | Deck Types | View, Edit |
 | Catalog Data | View, Refresh |
 | eBay | View, Manage / connect |
 
-Managing users, roles and sites isn't a permission. Only administrators can do it.
+Managing users, roles, sites and the customer kiosk's settings isn't a permission. Only administrators can do it.
 
 ## Sites
 
@@ -162,11 +166,15 @@ A person gets the higher of their own level and their role's level. Administrato
 2. If the site has locations, choose a site under **Move its locations to**. Its locations and all their cards move there.
 3. Click **Delete**.
 
+## Kiosk
+
+Only administrators see this tab. It sets up the [customer kiosk](help:kiosk): whether kiosks are open, which locations customers can browse, the idle timeout, whether prices are shown, and the welcome message. Below the settings, **Kiosk devices** lists every device set up as a kiosk, with **Revoke** to lock one out.
+
 ## Catalog Data
 
 OmniCard recognizes and prices cards using a catalog for each game, stored on the server. This tab refreshes those catalogs. You need the Catalog Data view permission to see it, and the Refresh permission to run anything.
 
-![The Catalog Data tab with a download in progress](administration-catalog-data.png)
+![The Catalog Data tab with the job buttons, Languages to download, and the Automatic updates schedule](administration-catalog-data.png)
 
 ### Refresh a catalog
 
@@ -183,6 +191,29 @@ Only one job runs at a time, for all games. While a job is running, the buttons 
 > [!NOTE]
 > A job that finishes very quickly hasn't necessarily failed. If nothing has changed since the last run, there's little to do. Check the ✓ under **Recent**.
 
+Magic: The Gathering cards come from Scryfall. Every other game comes from TCGCSV, a copy of TCGplayer's data that's refreshed once a day.
+
+### Automatic updates
+
+Below the jobs, **Automatic updates** keeps the catalogs current without anyone clicking a button. Everyone who can see this tab can see the schedule and how the last run went, but only administrators can change it.
+
+1. Turn on **Update catalogs automatically**.
+2. Under **Run at**, pick a time and click **Add time**. Add more than one time if you like. Times are in the server's time zone, which is shown under the times.
+3. Under **On**, tick the days to run.
+4. Under **Games**, tick the games to update.
+5. Under **Update**, tick **Card data (new sets and cards)**, **Prices**, or both.
+6. Click **Save schedule**.
+
+At each time, OmniCard updates each ticked game in turn, card data first and then prices. These are the same jobs as **Download catalog** and **Update prices**, and they show under **Recent** marked "(scheduled)". If someone is already running a job, the update waits for it to finish. Below the buttons you can see when the next run is due and whether the last run's updates succeeded. Any update that failed is listed with its error.
+
+To run the update straight away, click **Run now**. It uses the saved games and choices, even if the schedule is turned off.
+
+> [!TIP]
+> Once a day is enough. TCGCSV only publishes new data once a day, so running more often won't find anything new.
+
+> [!NOTE]
+> The server has to be running at the scheduled time. If it was off, the missed update runs once when it starts again.
+
 ### Languages to download
 
 Under the buttons, **Languages to download** controls which non-English printings the chosen game's catalog includes. Downloading them lets scans of foreign cards match their own artwork.
@@ -191,7 +222,7 @@ Under the buttons, **Languages to download** controls which non-English printing
 - Tick or untick languages. Your choice saves straight away, but only takes effect the next time you click **Download catalog**. Unticked languages are removed from the catalog then.
 - For Magic: The Gathering, adding any non-English language switches to a much larger download (about 400 MB).
 - Non-English cards rarely have their own prices, so they're valued at the English printing's price. Japanese Pokémon cards are the exception: they have real prices.
-- Some games' sources only provide English cards. For those games you'll see a note instead of checkboxes. You can still record a foreign copy's language when you scan or edit it.
+- Some games' sources only provide English cards (every game except Magic: The Gathering and Pokémon). For those games you'll see a note instead of checkboxes. You can still record a foreign copy's language when you scan or edit it. Japanese and French One Piece cards downloaded before are kept.
 
 ## Scan Badges
 
@@ -215,7 +246,7 @@ Only administrators see this part. It points OmniCard at folders on the server w
 ![The Watched scan folders settings for each game](administration-scan-folders.png)
 
 1. Turn on **Watch folders**.
-2. Set the **Quiet period (seconds)**. This is how long OmniCard waits after the last new file arrives before it starts matching a batch.
+2. Set the **Quiet period (seconds)**. This is how long a batch's files must go without changing before the batch starts on its own. Each batch counts down separately.
 3. Set **Keep images (days)**. Stored scans of batches that were added or discarded are deleted after this many days.
 4. For each game you scan, enter the **Folder on the server**, for example `D:\Scans\Mtg`, and make sure **Active** is on.
 5. Once a folder is entered, choose the defaults for that game's batches: **Sets (art fallback)**, **Condition**, **Card language** and **Foil**.
@@ -230,7 +261,12 @@ A chip next to each folder shows its status:
 | **Folder not found** | The path is wrong, or the server can't reach it |
 | **Can't move files** | OmniCard can read the folder but can't move processed files into its `_processed` subfolder. Check the folder's permissions |
 
-Save each batch into its own subfolder, named after the batch. When OmniCard picks up a file, it moves the original into a `_processed` subfolder.
+Save each batch into its own subfolder, named after the batch. OmniCard leaves the files alone until the batch starts, then moves the originals into a `_processed` subfolder.
+
+Two more switches control batches:
+
+- **Process batches automatically**: when on, each batch starts by itself after the quiet period. When off, batches wait until someone clicks **Run** on the Scan page.
+- **Delete originals when a batch is closed**: when on, a batch's originals are deleted from `_processed` once it is committed or discarded. When off, they're kept and clearing out `_processed` is up to you.
 
 > [!NOTE]
 > Folders are only watched while the OmniCard server is running. If batches only appear after someone opens OmniCard in a browser, ask whoever runs the server to keep it always running.
@@ -259,6 +295,10 @@ Changing these settings needs the Settings edit permission.
 ## Tag Rules
 
 Only administrators see this tab. Each rule is a search for one game plus the tags to add. Matching cards get the tags when anyone scans or imports them, and **Run now** tags the matching cards you already own. Rules only ever add tags. See [Tag rules](help:tag-rules).
+
+## Labels
+
+Label templates describe a label sheet (page size, margins, columns, rows and spacing) and the design of one label: card details, QR codes and barcodes. People with the Manage label templates permission click **New template** to open the label designer, and can edit, copy or delete templates. Everyone with the Print labels permission sees the list. See [Labels](help:labels).
 
 ## Deck Types
 
@@ -347,3 +387,4 @@ This tab lists the software and third-party components that OmniCard ships with 
 - [Tag rules](help:tag-rules): tagging cards automatically
 - [Locations](help:locations): creating locations inside sites
 - [eBay](help:ebay) and [Sales](help:sales): selling cards
+- [Customer kiosk](help:kiosk): letting customers browse your cards and send pick lists to the counter

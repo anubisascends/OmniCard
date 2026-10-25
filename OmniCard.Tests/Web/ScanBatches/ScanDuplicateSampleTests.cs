@@ -70,20 +70,24 @@ public sealed class ScanDuplicateSampleTests : IDisposable
             Assert.Equal(names.Count, wave.Count());
             foreach (var (file, name, _) in wave)
                 File.Copy(file, Path.Combine(batchFolder, name));
-            ingestor.RunOnce(settings);
-            _f.Clock.Advance(ScanFolderIngestor.StableFor + TimeSpan.FromSeconds(1));
-            ingestor.RunOnce(settings);
+            ingestor.RunOnce(settings); // noticed; left alone while it waits
+            _f.Clock.Advance(TimeSpan.FromSeconds(settings.QuietPeriodSeconds + 1));
+            ingestor.RunOnce(settings); // quiet period over: taken in
             Assert.Empty(Directory.GetFiles(batchFolder)); // everything picked up
         }
 
+        // Each wave is its own batch (later files never join a started batch).
         using var db = _f.Db();
-        var batch = Assert.Single(db.ScanBatches);
-        var items = db.ScanBatchItems.OrderBy(i => i.Sequence).ToList();
+        var batches = db.ScanBatches.OrderBy(b => b.Id).ToList();
+        Assert.Equal(expectedWaves, batches.Count);
+        var first = batches[0];
+        var items = db.ScanBatchItems.OrderBy(i => i.ScanBatchId).ThenBy(i => i.Sequence).ToList();
         var originals = items.Where(i => i.State == ScanBatchItemState.Open).ToList();
         var copies = items.Where(i => i.State == ScanBatchItemState.Duplicate).ToList();
 
-        // Every real scan is kept, and no two of them share bytes.
+        // Every real scan is kept, in the first batch, and no two of them share bytes.
         Assert.Equal(names, originals.Select(i => i.OriginalFileName));
+        Assert.All(originals, i => Assert.Equal(first.Id, i.ScanBatchId));
         Assert.Equal(originals.Count, originals.Select(i => i.ContentHash).Distinct().Count());
 
         // Every re-save is set aside as a copy of the scan with the same name.
@@ -91,20 +95,21 @@ public sealed class ScanDuplicateSampleTests : IDisposable
         var byId = originals.ToDictionary(i => i.Id);
         Assert.All(copies, c => Assert.Equal(c.OriginalFileName, byId[c.DuplicateOfItemId!.Value].OriginalFileName));
 
-        // Each re-saved wave reads as one repeated run of the whole sample.
+        // Each re-saved wave is closed straight away and reads as one repeated run of the whole sample.
         var service = new ScanBatchService(_f.Factory, null!, _f.Storage, new ScanFolderSettingsService(_f.Paths),
             _f.Clock, NullLogger<ScanBatchService>.Instance);
-        var dto = service.Get(batch.Id, userId: null);
-        Assert.Equal(names.Count, dto.Summary.Total);
-        Assert.Equal(copies.Count, dto.Summary.Duplicates);
-        Assert.Equal(expectedWaves - 1, dto.DuplicateRuns.Count);
-        Assert.All(dto.DuplicateRuns, r =>
+        Assert.Equal(names.Count, service.Get(first.Id, userId: null).Summary.Total);
+        foreach (var later in batches.Skip(1))
         {
-            Assert.Equal(names.Count, r.Count);
-            Assert.Equal((names[0], names[^1]), (r.FirstFile, r.LastFile));
-            Assert.Equal((names[0], names[^1]), (r.OriginalFirstFile, r.OriginalLastFile));
-            Assert.Null(r.OriginalBatchName);
-        });
+            Assert.Equal(ScanBatchStatus.Discarded, later.Status);
+            var dto = service.Get(later.Id, userId: null);
+            Assert.Equal(names.Count, dto.Summary.Duplicates);
+            var run = Assert.Single(dto.DuplicateRuns);
+            Assert.Equal(names.Count, run.Count);
+            Assert.Equal((names[0], names[^1]), (run.FirstFile, run.LastFile));
+            Assert.Equal((names[0], names[^1]), (run.OriginalFirstFile, run.OriginalLastFile));
+            Assert.Equal(first.Name, run.OriginalBatchName);
+        }
     }
 }
 

@@ -40,6 +40,58 @@ public sealed class ScanBatchStorage(IDataPathService dataPaths)
         catch (UnauthorizedAccessException) { }
     }
 
+    /// <summary>Delete a closed batch's original files from the watched folder's <c>_processed</c>
+    /// subfolder, then any folders under <c>_processed</c> that leaves empty. Best-effort: a file that
+    /// can't be deleted is logged and left. Returns how many were deleted.</summary>
+    public static int DeleteOriginals(IEnumerable<string?> processedPaths, ILogger logger)
+    {
+        var deleted = 0;
+        var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in processedPaths)
+        {
+            if (string.IsNullOrEmpty(path)) continue;
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                    deleted++;
+                }
+                if (Path.GetDirectoryName(path) is { } dir)
+                    dirs.Add(dir);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                logger.LogWarning(ex, "Couldn't delete processed scan {File}", path);
+            }
+        }
+
+        // Prune emptied folders, deepest first, but never _processed itself or anything above it.
+        foreach (var start in dirs.OrderByDescending(d => d.Length))
+        {
+            for (var dir = start; dir is not null && IsUnderProcessed(dir); dir = Path.GetDirectoryName(dir))
+            {
+                try
+                {
+                    if (!Directory.Exists(dir) || Directory.EnumerateFileSystemEntries(dir).Any())
+                        break;
+                    Directory.Delete(dir);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    break;
+                }
+            }
+        }
+        return deleted;
+    }
+
+    /// <summary>True for a folder strictly inside a <c>_processed</c> folder.</summary>
+    private static bool IsUnderProcessed(string dir) =>
+        Path.GetDirectoryName(dir) is { } parent
+        && (Path.GetFileName(parent).Equals(ScanFolderIngestor.ProcessedFolderName, StringComparison.OrdinalIgnoreCase)
+            || IsUnderProcessed(parent));
+
     public static bool IsTiff(string fileName)
     {
         var ext = Path.GetExtension(fileName);

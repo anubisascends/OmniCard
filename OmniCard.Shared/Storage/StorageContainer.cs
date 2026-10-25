@@ -30,6 +30,17 @@ public class StorageContainer
     /// the referenced deck type was deleted (FK is <c>SetNull</c>).</summary>
     public int? DeckTypeId { get; set; }
 
+    /// <summary>The online decklist (Moxfield / Archidekt URL) this deck box is linked to, or null. Only
+    /// meaningful for <see cref="ContainerType.DeckBox"/>. Set by hand or automatically when a deck URL
+    /// is imported into the box; "Sync from URL" reconciles the box against it.</summary>
+    public string? SourceUrl { get; set; }
+
+    /// <summary>When the box was last synced from <see cref="SourceUrl"/> (UTC), or null if never.</summary>
+    public DateTime? SourceSyncedAt { get; set; }
+
+    /// <summary>Longest <see cref="SourceUrl"/> accepted.</summary>
+    public const int MaxSourceUrlLength = 500;
+
     /// <summary>When true, this location is grouped under "Always Available" in the collection
     /// overview (alongside the system Bulk location) and is never hidden by the active game filter.
     /// The system Bulk location behaves this way regardless of the stored flag — see

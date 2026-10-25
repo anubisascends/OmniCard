@@ -42,7 +42,8 @@
       "substituted_one": "{{count}} card's exact printing wasn't in the catalog; used the cheapest printing:",
       "substituted_other": "{{count}} cards' exact printings weren't in the catalog; used the cheapest printing:",
       "unresolved_one": "{{count}} card couldn't be found:",
-      "unresolved_other": "{{count}} cards couldn't be found:"
+      "unresolved_other": "{{count}} cards couldn't be found:",
+      "linkedDeckBox": "The deck box is now linked to this deck. Use Sync from URL on the deck box whenever the online deck changes."
     },
     "location": {
       "title": "Import into {{name}}",
@@ -57,7 +58,8 @@
       "success_one": "Imported {{copies}} card from \"{{source}}\" into {{name}}.",
       "success_other": "Imported {{copies}} cards ({{lines}} lines) from \"{{source}}\" into {{name}}.",
       "substituted_one": "{{count}} line's exact printing wasn't in the catalog, so another printing of the same card was used:",
-      "substituted_other": "{{count}} lines' exact printings weren't in the catalog, so another printing of the same card was used:"
+      "substituted_other": "{{count}} lines' exact printings weren't in the catalog, so another printing of the same card was used:",
+      "linkedDeckBox": "{{name}} is now linked to this deck. Use Sync from URL on the deck box whenever the online deck changes."
     }
   }
 }

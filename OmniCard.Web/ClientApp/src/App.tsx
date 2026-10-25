@@ -20,6 +20,7 @@ import { ListsPage } from './pages/ListsPage';
 import { TradesPage } from './pages/TradesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AccountPage } from './pages/AccountPage';
+import { CardDetailPage } from './pages/CardDetailPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 
 // Help bundles every topic's Markdown, so it's split into its own chunk and only loaded on demand.
@@ -36,6 +37,8 @@ export function App() {
         <Route path="/scan" element={<RequirePermission anyOf={['scan.view']}><ScanPage /></RequirePermission>} />
         <Route path="/scan/batch/:batchId" element={<RequirePermission anyOf={['scan.view']}><ScanBatchPage /></RequirePermission>} />
         <Route path="/collection" element={<RequirePermission anyOf={['collection.view']}><CollectionPage /></RequirePermission>} />
+        {/* A card's own page — where the QR code on a printed label leads. */}
+        <Route path="/card/:id" element={<RequirePermission anyOf={['collection.view']}><CardDetailPage /></RequirePermission>} />
         <Route path="/locations" element={<RequirePermission anyOf={['locations.view']}><LocationsPage /></RequirePermission>} />
         <Route path="/location/:id" element={<RequirePermission anyOf={['locations.view']}><LocationDetailPage /></RequirePermission>} />
         <Route path="/audit/:locationId" element={<RequirePermission anyOf={['collection.delete']}><AuditPage /></RequirePermission>} />
@@ -46,7 +49,7 @@ export function App() {
         <Route path="/lists" element={<RequirePermission anyOf={['lists.view']}><ListsPage /></RequirePermission>} />
         <Route path="/trades" element={<RequirePermission anyOf={['trades.view']}><TradesPage /></RequirePermission>} />
         <Route path="/ship" element={<RequirePermission anyOf={['sales.orders.ship', 'sales.orders.edit']}><Suspense fallback={<LinearProgress />}><ShipPage /></Suspense></RequirePermission>} />
-        <Route path="/sales" element={<RequirePermission anyOf={['sales.orders.view', 'sales.customers.view', 'sales.listings.view']}><SalesPage /></RequirePermission>} />
+        <Route path="/sales" element={<RequirePermission anyOf={['sales.orders.view', 'sales.customers.view', 'sales.listings.view', 'sales.kiosk.view']}><SalesPage /></RequirePermission>} />
         {/* Administration is always reachable: it hosts self-service password change + the
             always-viewable Components tab. Individual tabs gate themselves. */}
         <Route path="/settings" element={<SettingsPage />} />

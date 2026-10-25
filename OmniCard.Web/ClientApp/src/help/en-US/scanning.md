@@ -8,7 +8,7 @@ Open [Scan](/scan) from the navigation menu. You add pictures of your cards (fro
 
 Nothing is added to your collection until you click the add button. Until then the scans live only in your browser, so you can take your time.
 
-![The Scan page with a review list on the left and the selected card's details on the right](scanning-overview.webp)
+![The Scan page with the session settings, the Validation rule box, and the review list below](scanning-overview.webp)
 
 > [!NOTE]
 > If you don't see **Scan** in the menu, ask an administrator for access.
@@ -18,11 +18,12 @@ Nothing is added to your collection until you click the add button. Until then t
 1. Open [Scan](/scan).
 2. In the top panel, choose the **Game** you are scanning.
 3. Optionally set the **Condition**, **Card language** and **Foil** that most of these cards share. Each new scan starts with these values (see [Session defaults](#session-defaults)).
-4. Add pictures with **Take photo**, **Use webcam** or **Add images** (see [Ways to add pictures](#ways-to-add-pictures)).
-5. Wait for matching to finish. Each row shows a spinner while it is being matched, then a confidence percentage.
-6. Select each row and compare **Uploaded scan** with **Matched art**. Click **Confirm match** when it is right, or **Search catalog** to pick the correct card.
-7. Click **Add to location…** and choose where the cards are going.
-8. Click **Add N confirmed cards**.
+4. Optionally type a **Validation rule** that every card should match, such as `set:dom` (see [Validate the list](#validate-the-list)).
+5. Add pictures with **Take photo**, **Use webcam** or **Add images** (see [Ways to add pictures](#ways-to-add-pictures)).
+6. Wait for matching to finish. Each row shows a spinner while it is being matched, then a confidence percentage.
+7. Compare **Uploaded scan** with **Matched art** for the selected card. Click **Confirm match** (or press **Enter**) when it is right. OmniCard moves on to the next card. If the match is wrong, click **Search catalog** to pick the correct card. See [Review with the keyboard](#review-with-the-keyboard).
+8. Click **Add to location…** and choose where the cards are going.
+9. Click **Add N confirmed cards**.
 
 Only cards that are both **confirmed** and **checked** are added. Everything else stays in the list.
 
@@ -61,7 +62,7 @@ The top panel controls apply to every scan you add **after** you set them:
 - **Sets (art fallback)** — pick one or more sets if you know what you are scanning. Matching is limited to those sets, and so is the catalog search when you correct a card. Leave it on **All sets** to search everything.
 - **Condition** — NM, LP, MP, HP or DMG.
 - **Card language** — **Auto (detect)** reads the language printed on Magic: The Gathering and Yu-Gi-Oh! cards. For other games, pick the language of the cards you are scanning.
-- **Foil** — tick this before scanning foil cards. It marks the new scans as foil, helps matching cope with foil shine, and shows the foil market value.
+- **Foil** — tick this before scanning foil cards. It marks the new scans as foil, helps matching cope with foil shine, and shows the foil market value. Magic: The Gathering cards from Magic 2015 on print their finish themselves: a star (★) between the set code and the language means foil, a dot (•) means non-foil. OmniCard reads that mark and sets **Foil** on each scan to match, whatever this switch says, so you can scan foils and non-foils together.
 
 Changing these later does not change cards already in the list. To change existing cards, edit them individually or in bulk (see [Card properties](#card-properties)).
 
@@ -93,12 +94,36 @@ Click a row to see it in the detail panel:
 - **Uploaded scan** and **Matched art** side by side, so you can compare them.
 - **View scan** opens a large version of your picture so you can read small print.
 - The card's name, set, collector number and rarity.
-- **Confirm match** marks the match as correct (the button then reads **Looks correct**). Confirming also checks the card.
+- **Confirm match** marks the match as correct (the button then reads **Looks correct**). Confirming also checks the card, then selects the next card that still needs review.
 - **Search catalog** opens the correction search.
-- **Exclude from commit** / **Include in commit** unchecks or checks the card.
+- **Exclude from commit** unchecks the card and moves on to the next card. **Include in commit** checks it again.
 - **Remove** deletes the scan from the list.
 
 ![The detail panel comparing the uploaded scan with the matched art, with Confirm match and Search catalog buttons](scanning-detail-panel.webp)
+
+### Review with the keyboard
+
+You can review a whole list without the mouse. The bar above the list shows **Reviewed N of M**. A card counts as reviewed once you confirm, correct or exclude it.
+
+| Key | What it does |
+| --- | --- |
+| **Enter** | Confirm the match and go to the next card that still needs review. On a card with no match, it opens **Search catalog** instead. |
+| **↓** or **J** | Next card |
+| **↑** or **K** | Previous card |
+| **S** or **/** | Open **Search catalog** |
+| **Esc** | Close the search |
+| **X** | Exclude the card from the commit and go to the next card. Press it again to include the card. |
+| **Ctrl+Z** | Undo the last confirm, correction or exclude, and go back to that card |
+| **?** | Show the list of shortcuts |
+
+"Next" follows the list's current filter and sort, skips cards you have already reviewed and cards still being matched, and starts again from the top when it reaches the end. Sorting by **Confidence**, for example, lets you confirm the strongest matches first.
+
+In the search, type a name or collector number, press **↓** to move into the results, then **Enter** to pick one. The pick confirms the card and moves on.
+
+When every card in the list has been reviewed, the bar changes to **Review complete**. Choose a location and add the cards as usual. Adding is never done from the keyboard alone.
+
+> [!NOTE]
+> Shortcuts don't work while you're typing in a field such as **Note** or **Tags**. Click an empty part of the page to use them again.
 
 ### Checking cards
 
@@ -113,10 +138,10 @@ The checkbox on each row decides whether the card is included when you add or ex
 
 1. Select the card and click **Search catalog**.
 2. Type at least two letters of the card's name, or enter its **Collector #**, or both.
-3. Hover over a result's small picture to see it larger.
+3. Each result shows the card name, set, collector number and rarity. If the game's catalog has more than one language, the result also shows the language (for example *English* or *Japanese*). Hover over a result's small picture to see it larger.
 4. Click the correct result.
 
-The card is now marked **Corrected**, and it is confirmed and checked. Click **Cancel** to close the search without changing anything.
+The card is now marked **Corrected**, and it is confirmed and checked. The next card that needs review is selected. Click **Cancel** to close the search without changing anything.
 
 The search looks only in the sets chosen in **Sets (art fallback)**; the line under the search box says which. If the right card isn't listed, clear that set selection at the top of the page and search again.
 
@@ -131,7 +156,7 @@ The **Card properties** section of the detail panel sets the details for that co
 - **Language** — the language of this copy. A small language code (for example *JA*) appears on the row for non-English cards; it is filled in solid when the language was read from the card itself.
 - **Quantity** — how many identical copies this scan represents.
 - **Purchase price** — what you paid, if you want to track it.
-- **Foil** — turn on for a foil copy, then optionally choose or type a **Foil type**.
+- **Foil** — turn on for a foil copy, then optionally choose or type a **Foil type**. When the foil star or dot was read from a Magic card, a note beside the switch says so.
 - **Tags** — pick existing tags or type new ones. Tags with a sparkle icon were added by a [tag rule](help:tag-rules). Remove one to keep it off this card. To stop rule tags altogether, turn off **Apply tag rules** in the action bar.
 - **Note** — free text, for example *signed, played, misprint…*
 
@@ -159,6 +184,66 @@ While a filter or sort is on, you'll see *Showing X of Y* and a **Clear** button
 
 > [!NOTE]
 > Everything in the action bar works only on the cards you can currently see. **Confirm**, **Add**, **Export**, check-all, bulk **Edit** and **Delete** all ignore rows hidden by a filter.
+
+## Validate the list
+
+A validation rule checks that every card in the list belongs there. Say a box should hold only creatures from Dominaria: use the rule `set:dom t:creature`, and any card that doesn't match is flagged. A stray card, or a scan that was matched to the wrong printing, is then easy to spot before you add anything.
+
+### Check the list against a rule
+
+1. Type the rule in the **Validation rule** box, below the session settings. It uses the same [search syntax](help:search-syntax) as the Collection search. You can type it before you start scanning, or right after you open a batch.
+2. Scan and review the cards as usual.
+3. Click **Validate**, or press **Enter** in the box. (**Validate** is available once there is a rule and at least one scan in the list.)
+
+Every scan in the list is checked, including scans hidden by a filter. A card that doesn't match the rule gets a red frame and a **Failed validation** chip. When you select it, its detail panel says which rule it failed.
+
+![The validated list: Giant Growth and Shivan Fire have a red frame and a Failed validation chip, and the detail panel explains that Shivan Fire doesn't match set:dom t:creature](scanning-validation.webp)
+
+- A scan with no matched card always fails, because there is nothing to check.
+- Scans that are still being matched aren't checked. A note next to the results tells you how many were skipped.
+- A rule with a mistake in it, such as a misspelled field name, isn't run. An error message explains the problem, and nothing is flagged.
+
+### See only the cards that failed
+
+After the check, a **N failed** button appears next to **Validate**. Click it to show only the cards that failed, so you can correct or remove them. Click it again to show every card. **Clear** in the filter bar also shows every card again.
+
+If every card passes, you'll see **All N cards passed** instead.
+
+### Run it again
+
+Each time you click **Validate**, the previous results are cleared first, then every card is checked again. Flags never carry over from an earlier run, so a card can't look as if it passed when it wasn't checked.
+
+The results don't update by themselves. After you correct a card or remove a stray one, click **Validate** again to see the new results. If you change the rule after a run, a note under the box reminds you to validate again.
+
+### What a rule can check
+
+A rule can test anything about the card and about this copy of it: name, set, collector number, rarity, type, color, condition, language, foil and tags. It can't use location, prices or dates. Some examples:
+
+| Rule | Every card must be… |
+| --- | --- |
+| `set:dom` | from Dominaria |
+| `set:dom t:creature` | a creature from Dominaria |
+| `set:dom or set:dmu` | from Dominaria or Dominaria United |
+| `r>=rare` | rare or mythic |
+| `is:foil` | marked as foil |
+| `lang:ja` | set to Japanese |
+| `cond:nm` | in Near Mint condition |
+| `-tag:trade` | without the *trade* tag |
+
+### Saved validation rules
+
+Saved rules let you reuse a rule without typing it again. Click the **Saved validation rules** button (the bookmark icon next to the box):
+
+- Click a saved rule to load it into the box. Then click **Validate**.
+- **Save current rule…** saves the rule in the box under a name you choose. If you type the name of an existing rule, that rule is replaced, and a message tells you so.
+- The delete button next to a rule removes it, after you confirm.
+
+![The Saved validation rules menu listing Binder foils, Dominaria creatures and Rares and up, with Save current rule… at the bottom](scanning-validation-rules.png)
+
+Saved rules belong to one game: the menu shows only the rules for the game you're scanning. They are shared by everyone who scans that game. Anyone who can scan can use them; saving and deleting rules needs the **Commit scans** permission.
+
+> [!TIP]
+> Validation doesn't stop you from adding cards. It only flags them, so you decide what to do with each one: correct the match, exclude it, or remove it.
 
 ## Value badges
 
@@ -221,10 +306,12 @@ The saved list belongs to this browser on this device only. It isn't kept in a p
 ## Tips and troubleshooting
 
 - **Lots of wrong matches?** Choose the set or sets you are scanning in **Sets (art fallback)** before adding pictures. Make sure the right **Game** is selected.
-- **Foils matching badly?** Tick **Foil** before you scan them.
+- **Foils matching badly?** Tick **Foil** before you scan them. For newer Magic cards OmniCard reads the foil star itself.
 - **Can't read the card in the thumbnail?** Use **View scan** to open the full picture.
 - **The add button stays grey.** Check that a location is chosen, that matching has finished for every row, and that at least one card is both confirmed and checked and visible under the current filter.
 - **A scan shows Error.** Remove it and try a sharper, well-lit picture.
+- **A card you fixed still shows Failed validation.** Results don't update by themselves. Click **Validate** again.
+- **Every card fails validation.** Check the rule for a typo in a value, such as a wrong set code. Select a flagged card to see the rule it was checked against.
 - Scanner output can also be processed in the background without opening the browser. See [Scan batches](help:scan-batches).
 - To check that a location holds exactly what you think it does, scan it in an audit. See [Auditing a location](help:location-audit).
 - Added cards appear in your [collection](help:collection) right away.

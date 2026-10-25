@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
   Button,
@@ -17,7 +17,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { api } from '../api/client';
 import { EXPORT_FORMATS as ALL_EXPORT_FORMATS } from '../lib/exportFormats';
-import { locationSelectOptions } from '../components/LocationSelectOptions';
+import { LocationPickerField } from '../components/LocationPickerField';
 import { useGame } from '../context/GameContext';
 import { useFormatters } from '../i18n/format';
 
@@ -62,11 +62,10 @@ function ImportSection() {
   const qc = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [skipDuplicates, setSkipDuplicates] = useState(true);
-  const [targetContainerId, setTargetContainerId] = useState<number | ''>('');
-  const locations = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations() });
+  const [targetContainerId, setTargetContainerId] = useState<number | null>(null);
 
   const importMut = useMutation({
-    mutationFn: () => api.importCsv(file!, skipDuplicates, targetContainerId === '' ? undefined : (targetContainerId as number)),
+    mutationFn: () => api.importCsv(file!, skipDuplicates, targetContainerId ?? undefined),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['collection'] });
       qc.invalidateQueries({ queryKey: ['locations'] });
@@ -96,15 +95,14 @@ function ImportSection() {
           control={<Checkbox checked={skipDuplicates} onChange={(e) => setSkipDuplicates(e.target.checked)} />}
           label={t('importing.import.skipDuplicates')}
         />
-        <TextField
-          select
+        <LocationPickerField
           size="small"
           label={t('importing.import.targetLocationOptional')}
           value={targetContainerId}
-          onChange={(e) => setTargetContainerId(e.target.value === '' ? '' : Number(e.target.value))}
-        >
-          {locationSelectOptions(locations.data, { label: t('importing.import.none') })}
-        </TextField>
+          onChange={setTargetContainerId}
+          clearable
+          emptyText={t('importing.import.none')}
+        />
         <Button
           variant="contained"
           disabled={!file || importMut.isPending}
@@ -143,14 +141,13 @@ function UrlImportSection() {
   const fmt = useFormatters();
   const qc = useQueryClient();
   const [url, setUrl] = useState('');
-  const [containerId, setContainerId] = useState<number | ''>('');
+  const [containerId, setContainerId] = useState<number | null>(null);
   const [condition, setCondition] = useState('NM');
   const [skipDuplicates, setSkipDuplicates] = useState(false);
-  const locations = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations() });
 
   const importMut = useMutation({
     mutationFn: () =>
-      api.importUrl({ url: url.trim(), game: 'Mtg', containerId: containerId as number, condition, skipDuplicates }),
+      api.importUrl({ url: url.trim(), game: 'Mtg', containerId: containerId!, condition, skipDuplicates }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['collection'] });
       qc.invalidateQueries({ queryKey: ['locations'] });
@@ -176,16 +173,15 @@ function UrlImportSection() {
           onChange={(e) => setUrl(e.target.value)}
         />
         <Stack direction="row" spacing={1}>
-          <TextField
-            select
+          <LocationPickerField
             size="small"
             label={t('importing.url.targetLocation')}
             value={containerId}
-            onChange={(e) => setContainerId(e.target.value === '' ? '' : Number(e.target.value))}
+            onChange={setContainerId}
+            required
+            cardGames={['Mtg']}
             sx={{ flex: 1 }}
-          >
-            {locationSelectOptions(locations.data)}
-          </TextField>
+          />
           <TextField
             select
             size="small"
@@ -208,7 +204,7 @@ function UrlImportSection() {
         <Button
           variant="contained"
           startIcon={<LinkIcon />}
-          disabled={!url.trim() || containerId === '' || importMut.isPending}
+          disabled={!url.trim() || containerId == null || importMut.isPending}
           onClick={() => importMut.mutate()}
         >
           {importMut.isPending ? t('importing.url.importing') : t('common.actions.import')}
@@ -233,6 +229,11 @@ function UrlImportSection() {
             {!!data.ruleTagged && (
               <Typography variant="body2" sx={{ mt: 1 }}>
                 {t('common.tagRules.tagged', { count: data.ruleTagged, formatted: fmt.number(data.ruleTagged) })}
+              </Typography>
+            )}
+            {data.linkedDeckBox && (
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                {t('importing.url.linkedDeckBox')}
               </Typography>
             )}
           </Alert>
