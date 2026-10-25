@@ -62,7 +62,7 @@ The top panel controls apply to every scan you add **after** you set them:
 - **Sets (art fallback)** — pick one or more sets if you know what you are scanning. Matching is limited to those sets, and so is the catalog search when you correct a card. Leave it on **All sets** to search everything.
 - **Condition** — NM, LP, MP, HP or DMG.
 - **Card language** — **Auto (detect)** reads the language printed on Magic: The Gathering and Yu-Gi-Oh! cards. For other games, pick the language of the cards you are scanning.
-- **Foil** — tick this before scanning foil cards. It marks the new scans as foil, helps matching cope with foil shine, and shows the foil market value.
+- **Foil** — tick this before scanning foil cards. It marks the new scans as foil, helps matching cope with foil shine, and shows the foil market value. Magic: The Gathering cards from Magic 2015 on print their finish themselves: a star (★) between the set code and the language means foil, a dot (•) means non-foil. OmniCard reads that mark and sets **Foil** on each scan to match, whatever this switch says, so you can scan foils and non-foils together.
 
 Changing these later does not change cards already in the list. To change existing cards, edit them individually or in bulk (see [Card properties](#card-properties)).
 
@@ -156,7 +156,7 @@ The **Card properties** section of the detail panel sets the details for that co
 - **Language** — the language of this copy. A small language code (for example *JA*) appears on the row for non-English cards; it is filled in solid when the language was read from the card itself.
 - **Quantity** — how many identical copies this scan represents.
 - **Purchase price** — what you paid, if you want to track it.
-- **Foil** — turn on for a foil copy, then optionally choose or type a **Foil type**.
+- **Foil** — turn on for a foil copy, then optionally choose or type a **Foil type**. When the foil star or dot was read from a Magic card, a note beside the switch says so.
 - **Tags** — pick existing tags or type new ones. Tags with a sparkle icon were added by a [tag rule](help:tag-rules). Remove one to keep it off this card. To stop rule tags altogether, turn off **Apply tag rules** in the action bar.
 - **Note** — free text, for example *signed, played, misprint…*
 
@@ -306,7 +306,7 @@ The saved list belongs to this browser on this device only. It isn't kept in a p
 ## Tips and troubleshooting
 
 - **Lots of wrong matches?** Choose the set or sets you are scanning in **Sets (art fallback)** before adding pictures. Make sure the right **Game** is selected.
-- **Foils matching badly?** Tick **Foil** before you scan them.
+- **Foils matching badly?** Tick **Foil** before you scan them. For newer Magic cards OmniCard reads the foil star itself.
 - **Can't read the card in the thumbnail?** Use **View scan** to open the full picture.
 - **The add button stays grey.** Check that a location is chosen, that matching has finished for every row, and that at least one card is both confirmed and checked and visible under the current filter.
 - **A scan shows Error.** Remove it and try a sharper, well-lit picture.

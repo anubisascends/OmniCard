@@ -39,6 +39,12 @@ public interface IOcrMatchingService
     /// Default no-op so test doubles needn't implement it; the real service overrides it.</summary>
     Task<(bool Present, double Confidence)> DetectMtgListSymbolAsync(byte[] imageData)
         => Task.FromResult((false, 0.0));
+    /// <summary>Reads the finish printed on a modern (M15+) MTG card: the mark between the set code and the
+    /// language is a star on foils ("MID ★ EN") and a bullet on non-foils ("MID • EN"). True = foil,
+    /// false = non-foil, null = no such line found (older frames, rotated scan). Default null so test
+    /// doubles needn't implement it; the real service overrides it.</summary>
+    Task<bool?> DetectMtgFoilMarkerAsync(byte[] imageData)
+        => Task.FromResult<bool?>(null);
     /// <summary>OCR the Yu-Gi-Oh! lower-left edition line, returning "1st Edition"/"Limited Edition"
     /// when present, or null when no edition text is printed (Unlimited). Default no-op so test doubles
     /// and non-OCR implementations needn't implement it; the real service overrides it.</summary>

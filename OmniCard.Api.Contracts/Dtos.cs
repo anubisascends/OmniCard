@@ -1266,6 +1266,10 @@ public sealed record ScanMatchDto
     public string? Language { get; init; }
     /// <summary>True when <see cref="Language"/> was read off the card itself rather than assumed.</summary>
     public bool LanguageDetected { get; init; }
+    /// <summary>The finish read off the card (MTG M15+: a star between set code and language marks a foil,
+    /// a bullet a non-foil). Null when not read — the scan's own foil setting stands. When set, matching
+    /// and <see cref="MarketPrice"/> already used it in place of the requested finish.</summary>
+    public bool? FoilDetected { get; init; }
 }
 
 /// <summary>One catalog card returned by the correction search (<c>GET /api/scan/search</c>).</summary>
