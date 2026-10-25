@@ -6,6 +6,14 @@
       "nameTaken": "This name is already in use"
     },
     "hideEmpty": "Hide empty locations",
+    "search": {
+      "help": "Search for cards to show only the locations that hold them. Press Enter to search.",
+      "matchesColumn": "Matches",
+      "summary_one": "{{count}} location holds cards matching “{{query}}”",
+      "summary_other": "{{count}} locations hold cards matching “{{query}}”",
+      "none": "No location holds cards matching “{{query}}”",
+      "clear": "Clear search"
+    },
     "types": {
       "Binder": "Binder",
       "Box": "Box",

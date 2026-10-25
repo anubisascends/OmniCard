@@ -190,6 +190,7 @@ Any key you leave out of the local file falls back to the default.
 | `UserName` | Server account. Leave it blank to use your Windows login. The password is prompted for; with `RememberPassword` it is saved DPAPI-encrypted (your Windows account on this PC only) in `.vscode/deploy-remote.local.secret`. Delete that file if the password changes. |
 | `PreserveSettings` | Top-level `appsettings.json` sections the server keeps between deploys (default `DataDirectory`, `ConnectionStrings`, `eBay`, `Mcp`). New repo keys still flow through. If the server's copy can't be read, it is left untouched. |
 | `BuildSpa` | Set to `false` to skip `npm install` + `npm run build`. |
+| `ServiceAdminUserName`, `ServiceName`, `ServerAppPath` | Only for **Publish to Remote Server (service)**, below: an administrator account on the server (blank = `UserName`; its remembered password goes in `.vscode/deploy-remote.local.admin.secret` when the names differ), the service name (default `OmniCard`), and the app folder as the server sees it (blank = the folder behind `SharePath`'s share). |
 
 One-time server setup is the same as above (Hosting Bundle, app pool, site, SQL Server, data-directory
 grants). In addition:
@@ -237,6 +238,16 @@ certificate; it updates the existing service.
   ASP.NET Core Module does (`AppOfflineWatcher`): it stops so its DLLs can be replaced, and a detached
   helper starts it again once the file is removed. The installer lets the service account start its
   own service for this. `WebDeploy` needs IIS, so use `Share`.
+- **Publish to Remote Server (service)** deploys and (re)installs the service in one step, without
+  logging in on the server. It connects first over PowerShell remoting as `ServiceAdminUserName`, so a
+  bad setting fails before the build. Then it stops the service, mirrors the build over the share, and
+  runs `install-service.ps1` from the app folder on the server, elevated, printing its output in the
+  task terminal. The first run also switches an IIS site over to the service. Share method only.
+  One-time setup:
+  - On the server, in an admin PowerShell: `Enable-PSRemoting -Force -SkipNetworkProfileCheck`. On a
+    workgroup PC this also lets local admin accounts keep their admin rights over the network.
+  - On this PC, in an admin PowerShell, if the server is an IP address or isn't in your domain:
+    `Start-Service WinRM; Set-Item WSMan:\localhost\Client\TrustedHosts -Value '<server>' -Concatenate -Force`.
 - The app is always running, so [Keep the app running](#keep-the-app-running-iis) doesn't apply.
   Errors go to the Windows **Application** event log rather than `logs\stdout`.
 

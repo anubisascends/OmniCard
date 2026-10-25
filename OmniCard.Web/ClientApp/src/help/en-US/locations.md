@@ -51,6 +51,7 @@ At the top of the page you'll find:
 - The add bar for creating a new location (see [Create a location](help:locations#create-a-location)).
 - **Hide empty locations**: hides locations that have no cards for the selected game.
 - **Ignored locations…**: opens the dialog that controls which locations lists never take cards from (see [Ignore a location for lists](help:locations#ignore-a-location-for-lists)).
+- A card search box (see [Find which locations hold a card](help:locations#find-which-locations-hold-a-card)).
 
 Below that, locations are shown in groups:
 
@@ -73,6 +74,15 @@ Click a group heading to collapse or expand it. Collapsed groups stay collapsed 
 | **Δ** | Market value minus cost, in dollars and percent. Green is a gain, red a loss. |
 
 Click any column header to sort by it.
+
+### Find which locations hold a card
+
+Type a search in the box above the tables and press **Enter**. Only locations that hold at least one matching card stay visible, and a **Matches** column shows how many matching cards each one holds. The search uses the same syntax as the [Collection](/collection) page: plain text matches card names, and you can use tokens such as `t:creature`, `set:mh3` or `tag:trade`. See [Search syntax](help:search-syntax).
+
+The search follows the **Site** filter and the game selector, so with a game selected only that game's cards count as matches. A line above the tables says how many locations matched. Click **Clear search** (or empty the box and press **Enter**) to show every location again. While a search is active, **Hide empty locations** has no effect.
+
+> [!TIP]
+> Searching from here tells you *where* a card is. To see the matching cards themselves, open the location and run the same search in its search box.
 
 ### The game selector and locations
 
@@ -223,7 +233,7 @@ In selection mode you can also use **Bulk edit**, **List for sale**, **Export CS
 
 ## Troubleshooting
 
-- **A location is missing.** Check the **Site** filter (try **All Sites**), turn off **Hide empty locations**, and check the game selector. Deck boxes for other games are hidden. If it's in a site you haven't been given access to, ask an administrator.
+- **A location is missing.** Check the **Site** filter (try **All Sites**), click **Clear search**, turn off **Hide empty locations**, and check the game selector. Deck boxes for other games are hidden. If it's in a site you haven't been given access to, ask an administrator.
 - **I can't change a location.** A lock icon or *view only* means you only have read access to its site. Ask an administrator for write access.
 - **Audit or Import buttons are missing.** These need extra permissions. Ask an administrator.
 - **Import says nothing was imported.** That's expected when any line has a problem. Fix every listed row and import again.

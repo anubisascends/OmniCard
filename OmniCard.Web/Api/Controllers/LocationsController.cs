@@ -1,8 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using OmniCard.Api.Contracts;
+using OmniCard.Collection;
+using OmniCard.Data;
 using OmniCard.Shared.Audit;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
+using OmniCard.Shared.Games;
 using OmniCard.Shared.Sales;
 using OmniCard.Shared.Security;
 using OmniCard.Shared.Sites;
@@ -29,8 +33,12 @@ public sealed class LocationsController(
     SiteService sites,
     RequestSiteAccess siteAccess,
     SavedViewService savedViews,
-    DeckBoxSyncService deckSync) : ApiControllerBase
+    DeckBoxSyncService deckSync,
+    IDbContextFactory<OmniCardDbContext> dbFactory,
+    IEnumerable<ICardGameService> gameServices) : ApiControllerBase
 {
+    private readonly IReadOnlyDictionary<CardGame, ICardGameService> _gameServices = gameServices.ToDictionary(s => s.Game);
+
     /// <summary>Printable price-sheet PDF for a location's cards.</summary>
     [HttpGet("{id:int}/pricesheet.pdf")]
     [RequirePermission(Permissions.LocationsView)]
@@ -66,6 +74,31 @@ public sealed class LocationsController(
         var match = ToSiteScopedDtos(summaries.Where(s => s.Container.Id == id), siteAccess.Current, sites.GetAll(), null);
         return match.Count == 0 ? NotFound() : match[0];
     }
+
+    /// <summary>Runs a collection search (<paramref name="q"/>, the same syntax as the Collection page) and
+    /// returns how many matching cards each location holds — only locations with at least one match.
+    /// Scoped like the collection search: the optional game, sites the user can read, and
+    /// <paramref name="siteId"/> when given. Cards with no location aren't counted.</summary>
+    [HttpGet("search-matches")]
+    [RequirePermission(Permissions.LocationsView)]
+    public ActionResult<IReadOnlyList<LocationSearchMatchDto>> SearchMatches(
+        [FromQuery] string? game, [FromQuery] string? q, [FromQuery] int? siteId = null)
+    {
+        using var ctx = dbFactory.CreateDbContext();
+        return CountSearchMatches(ctx, q ?? "", ParseGame(game), siteAccess.Current.ScopeTo(siteId), _gameServices);
+    }
+
+    /// <summary>Matching card rows per location for <see cref="SearchMatches"/>.</summary>
+    internal static List<LocationSearchMatchDto> CountSearchMatches(
+        OmniCardDbContext ctx, string q, CardGame? game, IReadOnlyCollection<int>? siteIds,
+        IReadOnlyDictionary<CardGame, ICardGameService>? gameServices = null) =>
+        CollectionQueryBuilder.BuildFilteredQuery(ctx, q, game, null, null, gameServices, siteIds)
+            .Where(c => c.ContainerId != null)
+            .GroupBy(c => c.ContainerId!.Value)
+            .Select(g => new { LocationId = g.Key, Count = g.Count() })
+            .AsEnumerable()
+            .Select(m => new LocationSearchMatchDto(m.LocationId, m.Count))
+            .ToList();
 
     /// <summary>Maps overview tiles to DTOs carrying their site (id, name, whether the user can write
     /// to it), dropping any the user can't read and — when <paramref name="siteId"/> is given — any
