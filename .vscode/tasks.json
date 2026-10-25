@@ -47,6 +47,34 @@
                 "kind": "build",
                 "isDefault": false
             }
+        },
+        {
+            // Same as "Publish to Remote Server", then (re)installs + starts the Windows service on the
+            // server: stops the service, mirrors the build over the share, and runs install-service.ps1
+            // there, elevated over PowerShell remoting (deploy-remote.ps1 -InstallService). Needs
+            // ServiceAdminUserName in deploy-remote.local.json and one-time remoting setup (see README).
+            "label": "Publish to Remote Server (service)",
+            "type": "process",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}/.vscode/deploy-remote.ps1",
+                "-InstallService"
+            ],
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
         }
     ]
 }

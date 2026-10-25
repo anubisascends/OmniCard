@@ -43,6 +43,7 @@ import { useSites } from '../context/useSites';
 import { ALL_SITES, SiteSelect, type SiteFilterValue } from '../components/SiteSelect';
 import { useGame } from '../context/GameContext';
 import { useFormatters } from '../i18n/format';
+import { SearchBox } from '../components/SearchBox';
 
 import { groupLocations, type LocationGroup } from '../lib/locationGroups';
 import { LOCATION_TYPES, isDeckBoxType } from '../lib/locationTypes';
@@ -334,9 +335,24 @@ function buildColumns(
   t: TFunction,
   fmt: ReturnType<typeof useFormatters>,
   showSite: boolean,
+  /** Matching cards per location id while a search is active, else null (no Matches column). */
+  matchCounts: Map<number, number> | null,
 ): GridColDef<LocationSummaryDto>[] {
   const num = (n: number) => fmt.number(n);
   const money = (n: number) => fmt.money(n);
+  const matchColumn: GridColDef<LocationSummaryDto>[] = matchCounts
+    ? [
+        {
+          field: 'matchCount',
+          headerName: t('locations.search.matchesColumn'),
+          width: 100,
+          align: 'right',
+          headerAlign: 'right',
+          valueGetter: (_v, row) => matchCounts.get(row.id) ?? 0,
+          valueFormatter: (v: number) => num(v),
+        },
+      ]
+    : [];
   const siteColumn: GridColDef<LocationSummaryDto>[] = showSite
     ? [
         {
@@ -421,6 +437,7 @@ function buildColumns(
         return p.row.type;
       },
     },
+    ...matchColumn,
     {
       field: 'cardCount',
       headerName: t('locations.columns.cards'),
@@ -537,19 +554,45 @@ export function LocationsPage() {
     localStorage.setItem(HIDE_EMPTY_KEY, value ? '1' : '0');
   };
 
+  // Card search: the box text vs. the submitted query (Enter), as on the Collection page. While a
+  // query is active only locations holding at least one matching card are shown.
+  const [searchText, setSearchText] = useState('');
+  const [activeQuery, setActiveQuery] = useState('');
+  const searching = activeQuery.length > 0;
+  const matches = useQuery({
+    queryKey: ['locations', 'search-matches', game, siteId, activeQuery],
+    queryFn: () => api.locationSearchMatches(activeQuery, game, siteId),
+    enabled: searching,
+  });
+  const matchCounts = useMemo(
+    () => (searching && matches.data ? new Map(matches.data.map((m) => [m.locationId, m.matchCount])) : null),
+    [searching, matches.data],
+  );
+  const clearSearch = () => {
+    setSearchText('');
+    setActiveQuery('');
+  };
+
   const groups = useMemo(() => {
     if (!data) return [];
     const all = groupLocations(data);
-    if (!hideEmpty) return all;
-    // Drop locations with no cards from the selected game, then drop groups left empty.
+    // A search keeps only locations with a match (which implies non-empty); otherwise "hide empty"
+    // drops locations with no cards from the selected game. Groups left empty are dropped either way.
+    const keep = matchCounts
+      ? (loc: LocationSummaryDto) => matchCounts.has(loc.id)
+      : hideEmpty
+        ? (loc: LocationSummaryDto) => loc.cardCount > 0
+        : null;
+    if (!keep) return all;
     return all
-      .map((g) => ({ ...g, items: g.items.filter((loc) => loc.cardCount > 0) }))
+      .map((g) => ({ ...g, items: g.items.filter(keep) }))
       .filter((g) => g.items.length > 0);
-  }, [data, hideEmpty]);
+  }, [data, hideEmpty, matchCounts]);
+  const matchedLocations = groups.reduce((n, g) => n + g.items.length, 0);
   const showSiteColumn = multiSite && effectiveSite === ALL_SITES;
   const columns = useMemo(
-    () => buildColumns(refresh, gameLabel, t, fmt, showSiteColumn),
-    [gameLabel, t, fmt, showSiteColumn],
+    () => buildColumns(refresh, gameLabel, t, fmt, showSiteColumn, matchCounts),
+    [gameLabel, t, fmt, showSiteColumn, matchCounts],
   );
 
   const headingFor = (g: LocationGroup) =>
@@ -604,7 +647,32 @@ export function LocationsPage() {
         </Tooltip>
       </Stack>
       <IgnoredLocationsDialog open={ignoredOpen} onClose={() => setIgnoredOpen(false)} onSaved={refresh} />
-      {isLoading || !data ? (
+      <Stack spacing={1}>
+        <Typography variant="body2" color="text.secondary">
+          {t('locations.search.help')}
+        </Typography>
+        <SearchBox
+          value={searchText}
+          onChange={setSearchText}
+          onSubmit={(q) => setActiveQuery(q.trim())}
+        />
+        {searching && matches.error instanceof ApiError && (
+          <Alert severity="error">{matches.error.message}</Alert>
+        )}
+        {matchCounts && data && (
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="body2" color="text.secondary">
+              {matchedLocations === 0
+                ? t('locations.search.none', { query: activeQuery })
+                : t('locations.search.summary', { count: matchedLocations, query: activeQuery })}
+            </Typography>
+            <Button size="small" onClick={clearSearch}>
+              {t('locations.search.clear')}
+            </Button>
+          </Stack>
+        )}
+      </Stack>
+      {isLoading || !data || (searching && matches.isLoading) ? (
         <CircularProgress />
       ) : (
         groups.map((group) => {

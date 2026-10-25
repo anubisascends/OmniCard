@@ -20,6 +20,13 @@
   "UserName": "",
   "RememberPassword": true,
 
+  "//ServiceAdminUserName": "'Publish to Remote Server (service)' only: an ADMINISTRATOR account on the server for PowerShell remoting, which runs install-service.ps1 there. Blank = UserName. Its password is kept apart from UserName's (deploy-remote.local.admin.secret) when the names differ.",
+  "ServiceAdminUserName": "",
+  "//ServiceName": "Windows service name (install-service.ps1 -ServiceName).",
+  "ServiceName": "OmniCard",
+  "//ServerAppPath": "The app folder as the server sees it (e.g. C:\\inetpub\\OmniCard). Blank = the folder behind SharePath's share.",
+  "ServerAppPath": "",
+
   "//PreserveSettings": "Top-level appsettings.json sections the server keeps between deploys. New keys from the repo's appsettings.json still flow through.",
   "PreserveSettings": [ "DataDirectory", "ConnectionStrings", "eBay", "Mcp" ],
 

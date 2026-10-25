@@ -50,6 +50,7 @@ import type {
   GameDto,
   InventoryValuationDto,
   ListingDetailDto,
+  LocationSearchMatchDto,
   LocationSummaryDto,
   SiteDto,
   SiteGrantDto,
@@ -375,6 +376,9 @@ export const api = {
   /** Locations in the sites the user can read; `siteId` narrows to one site. */
   locations: (game?: string, siteId?: number) =>
     request<LocationSummaryDto[]>(`/api/locations${qs({ game, siteId })}`),
+  /** Matching cards per location for a collection search `q`; only locations with a match are returned. */
+  locationSearchMatches: (q: string, game?: string, siteId?: number) =>
+    request<LocationSearchMatchDto[]>(`/api/locations/search-matches${qs({ q, game, siteId })}`),
   locationSetSite: (id: number, siteId: number) =>
     request<void>(`/api/locations/${id}/site`, { method: 'PUT', body: JSON.stringify({ siteId }) }),
 

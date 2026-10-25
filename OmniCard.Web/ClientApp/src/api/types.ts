@@ -135,6 +135,12 @@ export interface LocationSummaryDto {
   deckLinkSupported?: boolean;
 }
 
+/** Owned cards in one location that match a collection search (card rows, like `cardCount`). */
+export interface LocationSearchMatchDto {
+  locationId: number;
+  matchCount: number;
+}
+
 /** An owned copy that could go into a deck box during a sync. `ignoredReason`: "Location" (its location is
  * ignored for lists — usable, never suggested) or "Listed" (listed for sale — not usable). */
 export interface DeckSyncSourceDto {

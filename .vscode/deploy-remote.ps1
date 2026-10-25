@@ -8,6 +8,13 @@
 #     (the local .vscode/deploy.ps1 shows what those look like)
 #   - Share method: the site's physical folder shared with Change permission for the deploy account
 #   - WebDeploy method: Web Deploy's Remote Agent Service (or WMSVC on Windows Server) running
+#
+# -InstallService (the "Publish to Remote Server (service)" task): also runs install-service.ps1 on the
+# server after the copy, elevated over PowerShell remoting, so the Windows service is (re)installed and
+# started with no login on the server. Share method only. One-time setup: Enable-PSRemoting on the
+# server, and the server in this PC's WinRM TrustedHosts (the script prints both if it can't connect).
+
+param([switch]$InstallService)
 
 $ErrorActionPreference = 'Stop'
 
@@ -15,13 +22,16 @@ $Repo       = Split-Path -Parent $PSScriptRoot   # repo root (.vscode's parent)
 $Defaults   = Join-Path $PSScriptRoot 'deploy-remote.json'
 $LocalFile  = Join-Path $PSScriptRoot 'deploy-remote.local.json'
 $SecretFile = Join-Path $PSScriptRoot 'deploy-remote.local.secret'
+$AdminSecretFile = Join-Path $PSScriptRoot 'deploy-remote.local.admin.secret'
 $Temp       = [IO.Path]::GetTempPath()
 $Staging    = Join-Path $Temp 'OmniCardRemotePublish'
 $ServerCopy = Join-Path $Temp 'omnicard-remote-appsettings.json'
 
 $script:MappedShare = $null
+$script:Session = $null
 function Close-Share {
     if ($script:MappedShare) { net use $script:MappedShare /delete /y 2>$null | Out-Null; $script:MappedShare = $null }
+    if ($script:Session) { Remove-PSSession $script:Session -ErrorAction SilentlyContinue; $script:Session = $null }
 }
 function Fail($msg) { Write-Host $msg -ForegroundColor Red; Close-Share; exit 1 }
 
@@ -41,21 +51,24 @@ $Method  = $cfg.Method
 $SiteUrl = Expand $cfg.SiteUrl
 if ($Method -notin 'Share', 'WebDeploy') { Fail "Method must be 'Share' or 'WebDeploy' (got '$Method') - see $LocalFile." }
 
-# The password is never stored in the settings files: it's prompted for, or (RememberPassword) kept in
-# deploy-remote.local.secret, DPAPI-encrypted so only your Windows account on this PC can read it back.
-$script:Password = $null
-function Get-DeployPassword {
-    if ($script:Password) { return $script:Password }
+# Passwords are never stored in the settings files: they're prompted for, or (RememberPassword) kept in
+# deploy-remote.local[.admin].secret, DPAPI-encrypted so only your Windows account on this PC can read them back.
+$script:Passwords = @{}
+function Get-SecurePassword([string]$User, [string]$File) {
+    if ($script:Passwords[$File]) { return $script:Passwords[$File] }
     $secure = $null
-    if ($cfg.RememberPassword -and (Test-Path -LiteralPath $SecretFile)) {
-        try { $secure = (Get-Content -LiteralPath $SecretFile -Raw).Trim() | ConvertTo-SecureString } catch { $secure = $null }
+    if ($cfg.RememberPassword -and (Test-Path -LiteralPath $File)) {
+        try { $secure = (Get-Content -LiteralPath $File -Raw).Trim() | ConvertTo-SecureString } catch { $secure = $null }
     }
     if (-not $secure) {
-        $secure = Read-Host "Password for $($cfg.UserName) on $($cfg.Server)" -AsSecureString
-        if ($cfg.RememberPassword) { $secure | ConvertFrom-SecureString | Set-Content -LiteralPath $SecretFile }
+        $secure = Read-Host "Password for $User on $($cfg.Server)" -AsSecureString
+        if ($cfg.RememberPassword) { $secure | ConvertFrom-SecureString | Set-Content -LiteralPath $File }
     }
-    $script:Password = (New-Object System.Management.Automation.PSCredential 'deploy', $secure).GetNetworkCredential().Password
-    $script:Password
+    $script:Passwords[$File] = $secure
+    $secure
+}
+function Get-DeployPassword {
+    (New-Object System.Management.Automation.PSCredential 'deploy', (Get-SecurePassword $cfg.UserName $SecretFile)).GetNetworkCredential().Password
 }
 $WrongPasswordHint = "If the server password changed, delete $SecretFile and run the task again."
 
@@ -106,6 +119,54 @@ if ($Method -eq 'Share') {
     }
     $ServerHasSettings = [bool](Select-String -LiteralPath $dump -Pattern '\\appsettings\.json\s*$' -Quiet)
     Remove-Item -LiteralPath $dump, "$dump.err" -ErrorAction SilentlyContinue
+}
+
+# ---- 1b. (-InstallService) PowerShell remoting session as a server admin ----
+# Runs install-service.ps1 after the copy. ServiceAdminUserName (blank = UserName) must be an
+# administrator on the server; its password is kept apart from the share account's.
+$ServiceName = if ($cfg.ServiceName) { $cfg.ServiceName } else { 'OmniCard' }
+if ($InstallService) {
+    if ($Method -ne 'Share') { Fail "-InstallService needs Method 'Share' (Web Deploy is IIS only) - see $LocalFile." }
+    $adminUser = if ($cfg.ServiceAdminUserName) { $cfg.ServiceAdminUserName } else { $cfg.UserName }
+    $adminFile = if ($cfg.ServiceAdminUserName -and $cfg.ServiceAdminUserName -ne $cfg.UserName) { $AdminSecretFile } else { $SecretFile }
+    $sessionArgs = @{ ComputerName = $cfg.Server; ErrorAction = 'Stop' }
+    if ($adminUser) {
+        $sessionArgs.Credential = New-Object System.Management.Automation.PSCredential $adminUser, (Get-SecurePassword $adminUser $adminFile)
+    }
+    $who = if ($adminUser) { $adminUser } else { 'your Windows login' }
+    Write-Host "Connecting to $($cfg.Server) over PowerShell remoting as $who" -ForegroundColor Cyan
+    try { $script:Session = New-PSSession @sessionArgs } catch {
+        Fail (@(
+            "Couldn't open a PowerShell remoting session to $($cfg.Server): $($_.Exception.Message)",
+            'One-time setup:',
+            '  On the server, in an admin PowerShell:',
+            '      Enable-PSRemoting -Force -SkipNetworkProfileCheck',
+            '  On this PC, in an admin PowerShell (needed when the server is an IP address or not in your domain):',
+            "      Start-Service WinRM; Set-Item WSMan:\localhost\Client\TrustedHosts -Value '$($cfg.Server)' -Concatenate -Force",
+            "ServiceAdminUserName in $LocalFile must be an administrator on the server. If its password changed, delete $adminFile and run the task again."
+        ) -join "`n")
+    }
+    try {
+        $remote = Invoke-Command -Session $script:Session -ScriptBlock {
+            $id = [Security.Principal.WindowsIdentity]::GetCurrent()
+            [pscustomobject]@{
+                Admin = (New-Object Security.Principal.WindowsPrincipal $id).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+                Shares = @(Get-SmbShare -ErrorAction SilentlyContinue | ForEach-Object { [pscustomobject]@{ Name = $_.Name; Path = $_.Path } })
+            }
+        }
+    } catch { Fail "Connected to $($cfg.Server), but the remote check failed: $($_.Exception.Message)" }
+    if (-not $remote.Admin) {
+        Fail "$who isn't elevated on the server. Use an administrator account for ServiceAdminUserName. (Windows strips admin rights from LOCAL accounts over the network unless LocalAccountTokenFilterPolicy is 1 - Enable-PSRemoting sets it on a workgroup PC.)"
+    }
+    # The server-side folder behind SharePath (\\server\share[\sub]), unless ServerAppPath says otherwise.
+    $ServerAppPath = $cfg.ServerAppPath
+    if (-not $ServerAppPath) {
+        $parts = $Share.TrimStart('\') -split '\\'
+        $match = $remote.Shares | Where-Object { $_.Name -eq $parts[1] } | Select-Object -First 1
+        if (-not $match) { Fail "The server has no share named '$($parts[1])'. Set ServerAppPath in $LocalFile to the app folder on the server (e.g. C:\inetpub\OmniCard)." }
+        $ServerAppPath = (@($match.Path) + @($parts | Select-Object -Skip 2)) -join '\'
+    }
+    Write-Host "    App folder on the server: $ServerAppPath (service $ServiceName)"
 }
 
 # ---- 2. Build the React SPA (dotnet publish does NOT run npm) ----
@@ -166,6 +227,22 @@ if ($Method -eq 'Share') {
     # app_offline.htm makes the ASP.NET Core Module stop the app and release its DLL locks. A Windows-
     # service install (install-service.ps1) honors it too: the service stops, and starts again by itself
     # once the file is removed. robocopy's retries cover the app's shutdown either way.
+    # -InstallService stops the service outright first instead (install-service.ps1 starts it again), so
+    # its restart helper isn't involved; app_offline.htm still covers a first deploy over a live IIS site.
+    if ($InstallService) {
+        Write-Host "Stopping service $ServiceName on the server" -ForegroundColor Cyan
+        try {
+            Invoke-Command -Session $script:Session -ArgumentList $ServiceName, $ServerAppPath -ScriptBlock {
+                param($name, $dir)
+                $svc = Get-Service -Name $name -ErrorAction SilentlyContinue
+                if ($svc -and $svc.Status -ne 'Stopped') { Stop-Service -Name $name -Force -ErrorAction Stop }
+                # Wait for the process itself to exit so its DLLs are unlocked.
+                Get-Process -Name 'OmniCard.Web' -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Path -and $_.Path.StartsWith($dir, [StringComparison]::OrdinalIgnoreCase) } |
+                    Wait-Process -Timeout 60 -ErrorAction SilentlyContinue
+            }
+        } catch { Fail "Couldn't stop service $ServiceName on the server: $($_.Exception.Message)" }
+    }
     $offline = Join-Path $Share 'app_offline.htm'
     Set-Content -LiteralPath $offline -Value '<!doctype html><title>Updating</title><p>OmniCard is being updated. Try again in a minute.</p>'
     Start-Sleep -Seconds 3
@@ -176,6 +253,24 @@ if ($Method -eq 'Share') {
     $code = $LASTEXITCODE   # robocopy: 0-7 = success, 8+ = failure
     if ($code -ge 8) { Fail "robocopy FAILED (exit $code). The site is left offline (app_offline.htm) so nobody hits a half-updated app; run the task again." }
     Remove-Item -LiteralPath $offline
+
+    if ($InstallService) {
+        # A child powershell.exe so the server's execution policy doesn't block the script file; its
+        # output streams back as it runs, with the exit code as the last line.
+        Write-Host "Running install-service.ps1 on the server" -ForegroundColor Cyan
+        $exit = 1
+        try {
+            Invoke-Command -Session $script:Session -ArgumentList $ServerAppPath, $ServiceName -ScriptBlock {
+                param($dir, $name)
+                & "$env:windir\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+                    -File (Join-Path $dir 'install-service.ps1') -ServiceName $name 2>&1 | ForEach-Object { "$_" }
+                "EXIT:$LASTEXITCODE"
+            } | ForEach-Object {
+                if ($_ -match '^EXIT:(-?\d+)$') { $exit = [int]$Matches[1] } else { Write-Host "    $_" }
+            }
+        } catch { Fail "Couldn't run install-service.ps1 on the server: $($_.Exception.Message)" }
+        if ($exit -ne 0) { Fail "install-service.ps1 FAILED on the server (exit $exit) - see its output above. The new build is in place; fix the cause and run the task again." }
+    }
 } else {
     $skips = "-skip:objectName=dirPath,absolutePath='\\logs$'"
     if ($SkipAppSettings) { $skips += " -skip:objectName=filePath,absolutePath='\\appsettings\.json$'" }

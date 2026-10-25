@@ -121,6 +121,11 @@ public sealed record LocationSummaryDto
     public bool DeckLinkSupported { get; init; }
 }
 
+/// <summary>How many owned cards in one location match a collection search — backs the Locations page
+/// search, which keeps only locations holding at least one match. <see cref="MatchCount"/> counts card
+/// rows (lots), like <see cref="LocationSummaryDto.CardCount"/>.</summary>
+public sealed record LocationSearchMatchDto(int LocationId, int MatchCount);
+
 /// <summary>One row of a valuation breakdown (by game / category / location).</summary>
 public sealed record ValuationLineDto(string Key, int Units, decimal Cost, decimal Market);
 
