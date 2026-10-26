@@ -6,6 +6,7 @@
       "nameTaken": "This name is already in use"
     },
     "hideEmpty": "Hide empty locations",
+    "newLocation": "New location",
     "search": {
       "help": "Search for cards to show only the locations that hold them. Press Enter to search.",
       "matchesColumn": "Matches",
@@ -53,6 +54,7 @@
       "fallbackName": "Location",
       "thisLocation": "this location",
       "openBinderView": "Open binder view",
+      "moreActions": "More actions",
       "addCard": "Add card",
       "audit": "Audit",
       "summary_one": "{{countText}} card · {{value}} market",

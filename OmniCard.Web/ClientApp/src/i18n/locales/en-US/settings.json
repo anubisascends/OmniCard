@@ -1,6 +1,7 @@
 {
   "settings": {
     "title": "Administration",
+    "section": "Section",
     "tabs": {
       "sales": "Sales",
       "receipt": "Receipts",

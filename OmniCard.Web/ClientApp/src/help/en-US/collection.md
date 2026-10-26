@@ -18,6 +18,10 @@ The game selector in the top bar decides which game's cards you see. Choose a si
 > [!NOTE]
 > You only see cards in sites you have access to. If cards you expect are missing, ask an administrator whether you can view that site. See [Locations](help:locations).
 
+### On a phone
+
+On a phone the table becomes a list. Each card shows its picture, name, set and number, condition, language and foil badges, location, market price and quantity. Tap a card to open its details. Instead of clicking column headings, tap **Sort** and pick what to sort by. Pick the same choice again to reverse the order. In Select mode, tap cards to select them, then tap **Actions** for **Move to…**, **Bulk edit**, **List for sale**, **Export CSV**, **Print labels** and **Delete**. See [Using OmniCard on a phone](help:mobile).
+
 ### Columns
 
 | Column | What it shows |
@@ -97,7 +101,7 @@ Sorting and **Stack duplicates** work inside each group. Sorting by the column y
 
 ## Preview card art
 
-Hover over a card's name to see a larger image of the card. Foil cards show an animated rainbow sheen so you can tell them apart at a glance.
+Hover over a card's name to see a larger image of the card. On a phone, press and hold a card instead, and tap anywhere to close the picture. Foil cards show an animated rainbow sheen so you can tell them apart at a glance.
 
 To make the preview bigger or smaller, go to **Administration ▸ Appearance** and adjust the card preview size.
 

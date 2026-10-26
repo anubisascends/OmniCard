@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -12,6 +12,8 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
+  ListItemIcon,
+  ListItemText,
   Menu,
   MenuItem,
   Stack,
@@ -30,7 +32,11 @@ import {
   type GridRowSelectionModel,
   type GridSortModel,
 } from '@mui/x-data-grid';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ChecklistIcon from '@mui/icons-material/Checklist';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import SortIcon from '@mui/icons-material/Sort';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
@@ -46,6 +52,7 @@ import { EXPORT_FORMATS } from '../lib/exportFormats';
 import { LanguageChip, languageName } from '../lib/cardLanguages';
 import type { CardDto, CardGroupDto } from '../api/types';
 import { CardHoverPreview, type CardHover } from './CardHoverPreview';
+import { CardRowList } from './CardRowList';
 import { CardEditDrawer } from './dialogs/CardEditDrawer';
 import { LocationPickerDialog } from './dialogs/LocationPickerDialog';
 import { BulkEditCardsDialog } from './dialogs/BulkEditCardsDialog';
@@ -55,6 +62,7 @@ import { useFormatters } from '../i18n/format';
 import { orderColumns, PAGE_SIZES, type ViewState } from '../lib/savedViews';
 import { ColumnLayoutMenu } from './views/ColumnLayoutMenu';
 import { GROUPABLE_FIELDS, GroupByMenu } from './views/GroupByMenu';
+import { useIsPhone } from '../lib/responsive';
 
 /** A grid row: a card, or (in grouped mode) a group header dressed as an empty card with a negative id. */
 type TableRow = CardDto & { group?: CardGroupDto };
@@ -89,6 +97,9 @@ const ALL_EXPANDED: CollapseState = { byDefault: false, toggled: [] };
  * In Select mode the selection is kept across pages (it holds each selected row, not just its id), and
  * a group header's checkbox selects every card in that group — on every page and in collapsed
  * subgroups — fetching the group's rows from the server when the page doesn't show them all.
+ *
+ * On a phone the grid becomes a compact row list (`CardRowList`); a Sort menu stands in for the column
+ * headers, the column layout menu is dropped, and the Select-mode actions fold into one menu.
  */
 export function CardTable({
   game,
@@ -120,6 +131,9 @@ export function CardTable({
   const [detailCardId, setDetailCardId] = useState<number | null>(null);
   const [moveOpen, setMoveOpen] = useState(false);
   const [hover, setHover] = useState<CardHover | null>(null);
+  const isPhone = useIsPhone();
+  const [sortAnchor, setSortAnchor] = useState<HTMLElement | null>(null);
+  const [actionsAnchor, setActionsAnchor] = useState<HTMLElement | null>(null);
 
   // Row grouping. Game grouping only means something across games; location only where it's shown.
   const groupFields: string[] = GROUPABLE_FIELDS.filter(
@@ -496,19 +510,99 @@ export function CardTable({
       })]
     : columns;
 
+  const toggleSelected = (row: CardDto) =>
+    setSelected((prev) => {
+      const next = new Map(prev);
+      if (next.has(row.id)) next.delete(row.id);
+      else next.set(row.id, row);
+      return next;
+    });
+  const confirmDelete = () => {
+    if (confirm(t('collection.confirmDelete', { count: selectedLotIds.length }))) del.mutate();
+  };
+
+  // Select-mode actions on the selection: a row of buttons, or one menu on a phone. `onClick` gets the
+  // element to anchor a follow-up menu (the export formats) to.
+  const selectionActions: {
+    key: string;
+    icon: ReactNode;
+    label: string;
+    onClick: (el: HTMLElement) => void;
+    disabled?: boolean;
+    color?: 'error';
+  }[] = [
+    { key: 'move', icon: <DriveFileMoveIcon />, label: t('collection.moveTo'), onClick: () => setMoveOpen(true) },
+    { key: 'edit', icon: <EditIcon />, label: t('collection.bulkEdit'), onClick: () => setBulkEditOpen(true) },
+    { key: 'list', icon: <SellIcon />, label: t('collection.listForSale'), onClick: () => setBulkListOpen(true) },
+    {
+      key: 'export',
+      icon: <FileDownloadIcon />,
+      label: t('collection.exportCsv'),
+      onClick: (el) => setExportAnchor(el),
+      disabled: exportCsv.isPending,
+    },
+    ...(can('labels.print')
+      ? [{ key: 'labels', icon: <PrintIcon />, label: t('labels.print'), onClick: () => setLabelsOpen(true) }]
+      : []),
+    {
+      key: 'delete',
+      icon: <DeleteIcon />,
+      label: t('common.actions.delete'),
+      onClick: confirmDelete,
+      disabled: del.isPending,
+      color: 'error',
+    },
+  ];
+
+  // Phone: a Sort menu stands in for the grid's clickable column headers. Picking the current field
+  // again flips its direction.
+  const sortableColumns = columns.filter((c) => c.sortable !== false);
+  const sortMenu = (
+    <>
+      <Button size="small" startIcon={<SortIcon />} onClick={(e) => setSortAnchor(e.currentTarget)}>
+        {t('collection.mobile.sort')}
+      </Button>
+      <Menu anchorEl={sortAnchor} open={!!sortAnchor} onClose={() => setSortAnchor(null)}>
+        {sortableColumns.map((c) => {
+          const active = sortField === c.field;
+          return (
+            <MenuItem
+              key={c.field}
+              selected={active}
+              onClick={() => {
+                onViewChange({ sort: c.field, dir: active ? (sortDir === 'asc' ? 'desc' : 'asc') : sortDir });
+                setSortAnchor(null);
+              }}
+            >
+              <ListItemIcon>
+                {active &&
+                  (sortDir === 'asc' ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />)}
+              </ListItemIcon>
+              <ListItemText>{c.headerName ?? c.field}</ListItemText>
+            </MenuItem>
+          );
+        })}
+      </Menu>
+    </>
+  );
+
   return (
     <>
-      <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
+      <Stack direction="row" spacing={isPhone ? 1 : 2} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
         <FormControlLabel
           control={<Switch checked={stacked} onChange={(e) => onViewChange({ stacked: e.target.checked })} />}
-          label={t('collection.stackDuplicates')}
+          label={isPhone ? t('collection.mobile.stack') : t('collection.stackDuplicates')}
         />
-        <ColumnLayoutMenu
-          columns={columns.map((c) => ({ field: c.field, label: c.headerName ?? c.field, hideable: c.hideable !== false }))}
-          defaultOrder={defaultOrder}
-          hidden={view.hiddenColumns}
-          onChange={onViewChange}
-        />
+        {isPhone ? (
+          sortMenu
+        ) : (
+          <ColumnLayoutMenu
+            columns={columns.map((c) => ({ field: c.field, label: c.headerName ?? c.field, hideable: c.hideable !== false }))}
+            defaultOrder={defaultOrder}
+            hidden={view.hiddenColumns}
+            onChange={onViewChange}
+          />
+        )}
         <GroupByMenu fields={groupFields} value={groupColumns} onChange={(groupColumns) => onViewChange({ groupColumns })} />
         {grouped && (
           <>
@@ -545,23 +639,48 @@ export function CardTable({
             <Typography variant="body2" color="text.secondary">
               {t('collection.selectedCount', { count: selectedLotIds.length })}
             </Typography>
-            <Button size="small" startIcon={<DriveFileMoveIcon />} onClick={() => setMoveOpen(true)}>
-              {t('collection.moveTo')}
-            </Button>
-            <Button size="small" startIcon={<EditIcon />} onClick={() => setBulkEditOpen(true)}>
-              {t('collection.bulkEdit')}
-            </Button>
-            <Button size="small" startIcon={<SellIcon />} onClick={() => setBulkListOpen(true)}>
-              {t('collection.listForSale')}
-            </Button>
-            <Button
-              size="small"
-              startIcon={<FileDownloadIcon />}
-              disabled={exportCsv.isPending}
-              onClick={(e) => setExportAnchor(e.currentTarget)}
-            >
-              {t('collection.exportCsv')}
-            </Button>
+            {isPhone ? (
+              <>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<MoreVertIcon />}
+                  onClick={(e) => setActionsAnchor(e.currentTarget)}
+                >
+                  {t('collection.mobile.actions')}
+                </Button>
+                <Menu anchorEl={actionsAnchor} open={!!actionsAnchor} onClose={() => setActionsAnchor(null)}>
+                  {selectionActions.map((a) => (
+                    <MenuItem
+                      key={a.key}
+                      disabled={a.disabled}
+                      sx={a.color ? { color: `${a.color}.main` } : undefined}
+                      onClick={() => {
+                        const el = actionsAnchor!;
+                        setActionsAnchor(null);
+                        a.onClick(el);
+                      }}
+                    >
+                      <ListItemIcon sx={a.color ? { color: `${a.color}.main` } : undefined}>{a.icon}</ListItemIcon>
+                      <ListItemText>{a.label}</ListItemText>
+                    </MenuItem>
+                  ))}
+                </Menu>
+              </>
+            ) : (
+              selectionActions.map((a) => (
+                <Button
+                  key={a.key}
+                  size="small"
+                  color={a.color}
+                  startIcon={a.icon}
+                  disabled={a.disabled}
+                  onClick={(e) => a.onClick(e.currentTarget)}
+                >
+                  {a.label}
+                </Button>
+              ))
+            )}
             <Menu anchorEl={exportAnchor} open={!!exportAnchor} onClose={() => setExportAnchor(null)}>
               {EXPORT_FORMATS.map((f) => (
                 <MenuItem key={f} onClick={() => exportCsv.mutate(f)}>
@@ -569,75 +688,79 @@ export function CardTable({
                 </MenuItem>
               ))}
             </Menu>
-            {can('labels.print') && (
-              <Button size="small" startIcon={<PrintIcon />} onClick={() => setLabelsOpen(true)}>
-                {t('labels.print')}
-              </Button>
-            )}
-            <Button
-              size="small"
-              color="error"
-              startIcon={<DeleteIcon />}
-              disabled={del.isPending}
-              onClick={() => {
-                if (confirm(t('collection.confirmDelete', { count: selectedLotIds.length }))) del.mutate();
-              }}
-            >
-              {t('common.actions.delete')}
-            </Button>
           </>
         )}
       </Stack>
 
-      <Box sx={{ flexGrow: 1, minHeight: 0 }}>
-        <DataGrid
+      {isPhone ? (
+        <CardRowList
           rows={tableRows}
-          columns={gridColumns}
-          rowCount={total}
           loading={grouped ? groupedQuery.isFetching : query.isFetching}
-          paginationMode="server"
-          paginationModel={pagination}
-          onPaginationModelChange={(m) => {
-            if (m.pageSize !== pageSize) onViewChange({ pageSize: m.pageSize });
-            else setPage(m.page);
-          }}
-          pageSizeOptions={[...PAGE_SIZES]}
-          sortingMode="server"
-          sortModel={sortModel}
-          onSortModelChange={(model) =>
-            onViewChange(
-              model[0]?.sort
-                ? { sort: model[0].field, dir: model[0].sort }
-                : { sort: 'name', dir: 'asc' },
-            )
-          }
-          columnVisibilityModel={columnVisibility}
-          onColumnVisibilityModelChange={(m) =>
-            onViewChange({ hiddenColumns: Object.keys(m).filter((f) => m[f] === false) })
-          }
-          density="compact"
-          checkboxSelection={selectMode}
-          isRowSelectable={(p) => !p.row.group}
-          disableRowSelectionOnClick
-          keepNonExistentRowsSelected
-          rowSelectionModel={selectionModel}
-          onRowSelectionModelChange={onSelectionChange}
-          onRowClick={(p) => {
-            const row = p.row as TableRow;
-            if (row.group) toggleGroup(row.group.id);
-            else if (!selectMode) setDetailCardId(row.id);
-          }}
-          getRowClassName={(p) =>
-            p.row.group ? 'row-group' : p.indexRelativeToCurrentPage % 2 === 0 ? 'row-even' : 'row-odd'
-          }
-          sx={{
-            height: '100%',
-            '& .row-odd': { bgcolor: 'action.hover' },
-            '& .MuiDataGrid-row': { cursor: selectMode ? 'default' : 'pointer' },
-            '& .MuiDataGrid-row.row-group': { bgcolor: 'action.selected', cursor: 'pointer' },
-          }}
+          showLocation={showLocation}
+          selectMode={selectMode}
+          isSelected={(id) => selected.has(id)}
+          onToggleSelect={toggleSelected}
+          onOpen={(row) => setDetailCardId(row.id)}
+          onToggleGroup={toggleGroup}
+          renderGroupHeader={renderGroupHeader}
+          renderGroupCheckbox={renderGroupCheckbox}
+          onPreview={setHover}
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
         />
-      </Box>
+      ) : (
+        <Box sx={{ flexGrow: 1, minHeight: 0 }}>
+          <DataGrid
+            rows={tableRows}
+            columns={gridColumns}
+            rowCount={total}
+            loading={grouped ? groupedQuery.isFetching : query.isFetching}
+            paginationMode="server"
+            paginationModel={pagination}
+            onPaginationModelChange={(m) => {
+              if (m.pageSize !== pageSize) onViewChange({ pageSize: m.pageSize });
+              else setPage(m.page);
+            }}
+            pageSizeOptions={[...PAGE_SIZES]}
+            sortingMode="server"
+            sortModel={sortModel}
+            onSortModelChange={(model) =>
+              onViewChange(
+                model[0]?.sort
+                  ? { sort: model[0].field, dir: model[0].sort }
+                  : { sort: 'name', dir: 'asc' },
+              )
+            }
+            columnVisibilityModel={columnVisibility}
+            onColumnVisibilityModelChange={(m) =>
+              onViewChange({ hiddenColumns: Object.keys(m).filter((f) => m[f] === false) })
+            }
+            density="compact"
+            checkboxSelection={selectMode}
+            isRowSelectable={(p) => !p.row.group}
+            disableRowSelectionOnClick
+            keepNonExistentRowsSelected
+            rowSelectionModel={selectionModel}
+            onRowSelectionModelChange={onSelectionChange}
+            onRowClick={(p) => {
+              const row = p.row as TableRow;
+              if (row.group) toggleGroup(row.group.id);
+              else if (!selectMode) setDetailCardId(row.id);
+            }}
+            getRowClassName={(p) =>
+              p.row.group ? 'row-group' : p.indexRelativeToCurrentPage % 2 === 0 ? 'row-even' : 'row-odd'
+            }
+            sx={{
+              height: '100%',
+              '& .row-odd': { bgcolor: 'action.hover' },
+              '& .MuiDataGrid-row': { cursor: selectMode ? 'default' : 'pointer' },
+              '& .MuiDataGrid-row.row-group': { bgcolor: 'action.selected', cursor: 'pointer' },
+            }}
+          />
+        </Box>
+      )}
 
       {/* Hover artwork preview */}
       <CardHoverPreview hover={hover} onClose={() => setHover(null)} />

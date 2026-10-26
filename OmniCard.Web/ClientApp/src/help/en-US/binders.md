@@ -23,7 +23,7 @@ The binder is shown one spread (two facing pages) at a time, just like opening a
 To move around:
 
 - Click **‹ Prev** or **Next ›** to turn one spread at a time.
-- Click a tab in the page strip (labelled *1*, *2–3*, *4–5*…) to jump straight to that spread. On narrow screens the strip scrolls; use its arrows to see more tabs.
+- Click a tab in the page strip (labelled *1*, *2–3*, *4–5*…) to jump straight to that spread. On narrow screens the strip scrolls; use its arrows to see more tabs. On a phone, the two pages of a spread are shown one above the other.
 
 The heading shows which pages you're looking at and how many pages the binder has, for example *Pages 2-3 · 12 pages*.
 
