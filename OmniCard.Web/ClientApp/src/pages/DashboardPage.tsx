@@ -20,8 +20,8 @@ import { useFormatters } from '../i18n/format';
 
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <Card sx={{ minWidth: 180, flex: 1 }}>
-      <CardContent>
+    <Card sx={{ minWidth: { xs: 'calc(50% - 8px)', sm: 180 }, flex: 1 }}>
+      <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 3 } } }}>
         <Typography variant="overline" color="text.secondary">
           {label}
         </Typography>
@@ -37,7 +37,7 @@ function ValuationTable({ title, rows }: { title: string; rows: ValuationLineDto
   const { t } = useTranslation();
   const fmt = useFormatters();
   return (
-    <Paper sx={{ p: 2, flex: 1, minWidth: 320 }}>
+    <Paper sx={{ p: 2, flex: 1, minWidth: { xs: '100%', sm: 320 }, overflowX: 'auto' }}>
       <Typography variant="h6" gutterBottom>
         {title}
       </Typography>
@@ -73,7 +73,7 @@ export function DashboardPage() {
   if (isLoading || !data) return <CircularProgress />;
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={{ xs: 2, sm: 3 }}>
       <Typography variant="h4">{t('dashboard.title')}</Typography>
       <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
         <Stat label={t('dashboard.stats.totalUnits')} value={fmt.number(data.totalUnits)} />

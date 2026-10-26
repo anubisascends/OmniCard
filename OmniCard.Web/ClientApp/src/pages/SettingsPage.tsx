@@ -65,6 +65,7 @@ import {
   PREVIEW_BASE_MAX_HEIGHT,
 } from '../lib/previewScale';
 import { KioskSettingsCard } from '../components/kiosk/KioskSettingsCard';
+import { useIsPhone } from '../lib/responsive';
 
 const OPERATIONS: { key: 'prices' | 'bulk' | 'hashes' | 'images' }[] = [
   { key: 'prices' },
@@ -1832,26 +1833,34 @@ export function SettingsPage() {
     0,
     tabs.findIndex((tab) => tab.key === requested),
   );
+  const isPhone = useIsPhone();
+  const select = (index: number) => {
+    const nextParams = new URLSearchParams(params);
+    nextParams.set('tab', tabs[index].key);
+    setParams(nextParams, { replace: true });
+  };
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={{ xs: 2, sm: 3 }}>
       <Typography variant="h4">{t('settings.title')}</Typography>
-      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs
-          value={active}
-          onChange={(_, v) => {
-            const nextParams = new URLSearchParams(params);
-            nextParams.set('tab', tabs[v].key);
-            setParams(nextParams, { replace: true });
-          }}
-          variant="scrollable"
-          scrollButtons="auto"
-        >
-          {tabs.map((tab) => (
-            <Tab key={tab.key} label={t(tab.labelKey)} />
+      {/* A dozen tabs don't fit a phone: pick the section from a list there instead. */}
+      {isPhone ? (
+        <TextField select fullWidth label={t('settings.section')} value={active} onChange={(e) => select(Number(e.target.value))}>
+          {tabs.map((tab, i) => (
+            <MenuItem key={tab.key} value={i}>
+              {t(tab.labelKey)}
+            </MenuItem>
           ))}
-        </Tabs>
-      </Box>
+        </TextField>
+      ) : (
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs value={active} onChange={(_, v) => select(v)} variant="scrollable" scrollButtons="auto">
+            {tabs.map((tab) => (
+              <Tab key={tab.key} label={t(tab.labelKey)} />
+            ))}
+          </Tabs>
+        </Box>
+      )}
       <Box>{tabs[active]?.render()}</Box>
     </Stack>
   );

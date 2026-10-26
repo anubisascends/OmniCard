@@ -247,12 +247,13 @@ function UnplacedSidebar({
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDropUnassign}
       sx={{
-        width: 300,
+        width: { xs: '100%', sm: 300 },
         flexShrink: 0,
         alignSelf: 'flex-start',
-        position: 'sticky',
+        position: { xs: 'static', sm: 'sticky' },
         top: 8,
-        maxHeight: 'calc(100vh - 32px)',
+        maxHeight: { xs: 360, sm: 'calc(100vh - 32px)' },
+        boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
         p: 1,
@@ -511,8 +512,8 @@ export function BinderPage() {
         </Button>
       </Stack>
 
-      {/* Spread (+ unplaced sidebar in edit mode) */}
-      <Stack direction="row" spacing={2} alignItems="flex-start">
+      {/* Spread (+ unplaced sidebar in edit mode). A phone shows the spread's pages one above the other. */}
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'flex-start' }}>
         {editMode && (
           <UnplacedSidebar
             cards={unplaced.data ?? []}
@@ -525,7 +526,7 @@ export function BinderPage() {
             onCardClick={(c) => setDetailCardId(c.id)}
           />
         )}
-        <Stack direction="row" spacing={2} sx={{ flexGrow: 1, minWidth: 0 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ flexGrow: 1, minWidth: 0 }}>
           {data.leftPageNumber != null ? (
             <SlotGrid
               slots={data.leftSlots}
@@ -538,7 +539,7 @@ export function BinderPage() {
               onCardClick={(c) => setDetailCardId(c.id)}
             />
           ) : (
-            <Box sx={{ flex: 1 }} />
+            <Box sx={{ flex: 1, display: { xs: 'none', sm: 'block' } }} />
           )}
           {data.rightPageNumber != null ? (
             <SlotGrid
@@ -554,7 +555,7 @@ export function BinderPage() {
           ) : (
             // Keep the empty half reserved so a lone left page (e.g. an odd last page / a single
             // backside) fills only its half of the spread, mirroring page 1 alone on the right.
-            <Box sx={{ flex: 1 }} />
+            <Box sx={{ flex: 1, display: { xs: 'none', sm: 'block' } }} />
           )}
         </Stack>
       </Stack>

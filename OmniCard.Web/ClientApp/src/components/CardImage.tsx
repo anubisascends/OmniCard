@@ -24,6 +24,7 @@ export function CardImage({
   onError,
   onMouseEnter,
   onMouseLeave,
+  loading,
 }: {
   src?: string;
   alt?: string;
@@ -37,6 +38,7 @@ export function CardImage({
   onError?: React.ReactEventHandler<HTMLImageElement>;
   onMouseEnter?: React.MouseEventHandler<HTMLElement>;
   onMouseLeave?: React.MouseEventHandler<HTMLElement>;
+  loading?: 'lazy' | 'eager';
 }) {
   return (
     <Box
@@ -48,6 +50,7 @@ export function CardImage({
         component="img"
         src={src}
         alt={alt}
+        loading={loading}
         draggable={draggable}
         onDragStart={onDragStart}
         onContextMenu={onContextMenu}

@@ -158,7 +158,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
 
   return (
     <Drawer anchor="right" open={open} onClose={onClose}>
-      <Box sx={{ width: 380, p: 2 }}>
+      <Box sx={{ width: { xs: '100vw', sm: 380 }, maxWidth: '100vw', p: 2, boxSizing: 'border-box' }}>
         {!card ? (
           <CircularProgress />
         ) : (

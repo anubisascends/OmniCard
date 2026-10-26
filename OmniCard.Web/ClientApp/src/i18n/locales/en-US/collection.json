@@ -10,6 +10,16 @@
     },
     "printings_one": "{{count}} printing",
     "printings_other": "{{count}} printings",
+    "mobile": {
+      "noCards": "No cards",
+      "quantity": "×{{countText}}",
+      "range": "{{from}}–{{to}} of {{total}}",
+      "previousPage": "Previous page",
+      "nextPage": "Next page",
+      "sort": "Sort",
+      "stack": "Stack",
+      "actions": "Actions"
+    },
     "exportFormats": {
       "appnative": "OmniCard (full detail)",
       "tcgplayer": "TCGplayer",

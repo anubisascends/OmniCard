@@ -147,7 +147,17 @@ function OrdersBoard() {
           {t('sales.orders.importCsv')}
         </Button>
       </Stack>
-      <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1, alignSelf: 'stretch' }}>
+      {/* On a phone each lane is most of the screen wide and the board snaps to it as you swipe. */}
+      <Box
+        sx={{
+          display: 'flex',
+          gap: 1.5,
+          overflowX: 'auto',
+          pb: 1,
+          alignSelf: 'stretch',
+          scrollSnapType: { xs: 'x mandatory', sm: 'none' },
+        }}
+      >
       {lanes.map((lane) => {
         const laneOrders = orders.filter((o) => laneOf(o, lanes) === lane.key);
         return (
@@ -161,7 +171,14 @@ function OrdersBoard() {
                 setDragId(null);
               }
             }}
-            sx={{ minWidth: 240, width: 240, flexShrink: 0, p: 1, bgcolor: 'background.default' }}
+            sx={{
+              minWidth: { xs: '82%', sm: 240 },
+              width: { xs: '82%', sm: 240 },
+              flexShrink: 0,
+              p: 1,
+              bgcolor: 'background.default',
+              scrollSnapAlign: 'start',
+            }}
           >
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
               <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: lane.color }} />

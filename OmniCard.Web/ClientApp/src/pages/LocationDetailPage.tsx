@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useLocation, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -7,7 +7,12 @@ import {
   Breadcrumbs,
   Button,
   Chip,
+  IconButton,
   Link,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
   Stack,
   ToggleButton,
   ToggleButtonGroup,
@@ -15,6 +20,7 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import PrintIcon from '@mui/icons-material/Print';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import ViewListIcon from '@mui/icons-material/ViewList';
@@ -34,6 +40,7 @@ import { SearchBox } from '../components/SearchBox';
 import { SavedViewPicker } from '../components/views/SavedViewPicker';
 import { useSavedViews } from '../components/views/useSavedViews';
 import { useFormatters } from '../i18n/format';
+import { useIsPhone } from '../lib/responsive';
 
 export function LocationDetailPage() {
   const { t } = useTranslation();
@@ -71,16 +78,33 @@ export function LocationDetailPage() {
     qc.invalidateQueries({ queryKey: ['locations'] });
   };
 
+  // Header actions besides Add card: outlined buttons, or a ⋮ menu on a phone.
+  const isPhone = useIsPhone();
+  const [actionsAnchor, setActionsAnchor] = useState<HTMLElement | null>(null);
+  const secondaryActions: { key: string; icon: ReactNode; label: string; to?: string; onClick?: () => void }[] = [
+    ...(canWrite && can('collection.delete')
+      ? [{ key: 'audit', icon: <FactCheckIcon />, label: t('locations.detail.audit'), to: `/audit/${locationId}` }]
+      : []),
+    ...(can('labels.print')
+      ? [{ key: 'labels', icon: <PrintIcon />, label: t('labels.print'), onClick: () => setLabelsOpen(true) }]
+      : []),
+    ...(canWrite && can('import.run')
+      ? [{ key: 'import', icon: <UploadFileIcon />, label: t('common.actions.import'), onClick: () => setImportOpen(true) }]
+      : []),
+  ];
+
   return (
-    <Stack spacing={2} sx={{ height: 'calc(100vh - 120px)' }}>
+    <Stack spacing={2} sx={{ height: { xs: 'auto', sm: 'calc(100vh - 120px)' } }}>
       <Breadcrumbs>
         <Link component={RouterLink} to="/locations">
           {t('locations.title')}
         </Link>
         <Typography color="text.primary">{locQuery.data?.name ?? '…'}</Typography>
       </Breadcrumbs>
-      <Stack direction="row" spacing={2} alignItems="center">
-        <Typography variant="h4">{locQuery.data?.name ?? t('locations.detail.fallbackName')}</Typography>
+      <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+        <Typography variant="h4" sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+          {locQuery.data?.name ?? t('locations.detail.fallbackName')}
+        </Typography>
         {locQuery.data && <Chip label={locQuery.data.type} />}
         {locQuery.data?.siteName && (
           <Chip
@@ -98,30 +122,55 @@ export function LocationDetailPage() {
           </Link>
         )}
         <Box sx={{ flexGrow: 1 }} />
-        {canWrite && can('collection.delete') && (
-          <Button
-            variant="outlined"
-            startIcon={<FactCheckIcon />}
-            component={RouterLink}
-            to={`/audit/${locationId}`}
-          >
-            {t('locations.detail.audit')}
-          </Button>
-        )}
-        {can('labels.print') && (
-          <Button variant="outlined" startIcon={<PrintIcon />} onClick={() => setLabelsOpen(true)}>
-            {t('labels.print')}
-          </Button>
-        )}
-        {canWrite && can('import.run') && (
-          <Button variant="outlined" startIcon={<UploadFileIcon />} onClick={() => setImportOpen(true)}>
-            {t('common.actions.import')}
-          </Button>
-        )}
-        {canWrite && (
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>
-            {t('locations.detail.addCard')}
-          </Button>
+        {isPhone ? (
+          <>
+            {canWrite && (
+              <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>
+                {t('locations.detail.addCard')}
+              </Button>
+            )}
+            {secondaryActions.length > 0 && (
+              <>
+                <IconButton aria-label={t('locations.detail.moreActions')} onClick={(e) => setActionsAnchor(e.currentTarget)}>
+                  <MoreVertIcon />
+                </IconButton>
+                <Menu anchorEl={actionsAnchor} open={!!actionsAnchor} onClose={() => setActionsAnchor(null)}>
+                  {secondaryActions.map((a) => (
+                    <MenuItem
+                      key={a.key}
+                      {...(a.to ? { component: RouterLink, to: a.to } : {})}
+                      onClick={() => {
+                        setActionsAnchor(null);
+                        a.onClick?.();
+                      }}
+                    >
+                      <ListItemIcon>{a.icon}</ListItemIcon>
+                      <ListItemText>{a.label}</ListItemText>
+                    </MenuItem>
+                  ))}
+                </Menu>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            {secondaryActions.map((a) =>
+              a.to ? (
+                <Button key={a.key} variant="outlined" startIcon={a.icon} component={RouterLink} to={a.to}>
+                  {a.label}
+                </Button>
+              ) : (
+                <Button key={a.key} variant="outlined" startIcon={a.icon} onClick={a.onClick}>
+                  {a.label}
+                </Button>
+              ),
+            )}
+            {canWrite && (
+              <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>
+                {t('locations.detail.addCard')}
+              </Button>
+            )}
+          </>
         )}
       </Stack>
       {locQuery.data && (
@@ -134,8 +183,8 @@ export function LocationDetailPage() {
         </Typography>
       )}
       {isDeckBox && locQuery.data && <DeckBoxPanel loc={locQuery.data} onChanged={refresh} />}
-      <Stack direction="row" spacing={1} alignItems="center">
-        <Box sx={{ flexGrow: 1 }}>
+      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+        <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', sm: 0 } }}>
           <SearchBox value={search} onChange={setSearch} onSubmit={(q) => sv.setState({ q })} />
         </Box>
         <SavedViewPicker sv={sv} />

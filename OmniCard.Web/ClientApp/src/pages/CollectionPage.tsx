@@ -19,15 +19,15 @@ export function CollectionPage() {
   const [deckCheckOpen, setDeckCheckOpen] = useState(false);
 
   return (
-    <Stack spacing={2} sx={{ height: 'calc(100vh - 120px)' }}>
+    <Stack spacing={2} sx={{ height: { xs: 'auto', sm: 'calc(100vh - 120px)' } }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
         <Typography variant="h4">{t('collection.title')}</Typography>
         <Button variant="outlined" startIcon={<FactCheckIcon />} onClick={() => setDeckCheckOpen(true)}>
           {t('collection.decklist.open')}
         </Button>
       </Stack>
-      <Stack direction="row" spacing={1} alignItems="center">
-        <Box sx={{ flexGrow: 1 }}>
+      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+        <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', sm: 0 } }}>
           <SearchBox value={search} onChange={setSearch} onSubmit={(q) => sv.setState({ q })} />
         </Box>
         <SavedViewPicker sv={sv} />

@@ -26,7 +26,7 @@ Click **Administration** in the sidebar. Everyone can open this page, but you on
 | **Reset Collection** | Remove the whole collection to start over, keeping sales data | Administrators only |
 | **Components** | Software versions and licenses | Everyone |
 
-If the page scrolls sideways on a small screen, use the arrows at either end of the tab row to see more tabs.
+If the page scrolls sideways on a small screen, use the arrows at either end of the tab row to see more tabs. On a phone the tabs are replaced by a **Section** list: tap it and pick the section to open.
 
 ## Users
 

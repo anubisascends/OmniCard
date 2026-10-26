@@ -659,6 +659,22 @@ behavior is Shipped. The order drawer's **Scan label** button fills **Tracking**
   Over plain HTTP the page says so and falls back to typed / handheld-scanner entry. Barcodes are decoded
   in the browser with ZXing (`@zxing/browser`); nothing is uploaded.
 
+## Phones and home-screen install
+
+The SPA is responsive: below MUI's `sm` breakpoint (600 px) the shell swaps the sidebar for a bottom tab
+bar (first four of Dashboard / Scan / Collection / Locations the user can see, plus **More**), the card
+table becomes a compact row list (`CardRowList`, with a Sort menu and a Select-mode **Actions** menu),
+wide dialogs (`maxWidth` md and up) go full screen via the theme, and the Scan page opens a card's review
+full screen. Use `useIsPhone()` (`src/lib/responsive.ts`) for new phone-specific layouts; hover-only UI
+(the card art preview) needs a touch fallback — spread `useLongPress()` and set `touch: true` on
+`CardHover`.
+
+It is installable as a home-screen app: `ClientApp/public/manifest.webmanifest` + `public/icons/` (built
+to `/app/manifest.webmanifest`; source art is `icons/icon.svg`) and the `apple-*` meta tags in
+`index.html`. There is no service worker (no offline mode). **Android only offers a full-screen install
+over HTTPS** — over plain HTTP it adds a browser shortcut — and the webcam / live label camera need HTTPS
+too; **Take photo** on the Scan page (a file input with `capture`) works either way.
+
 ## Customer kiosk
 
 A **customer-facing kiosk** at `/kiosk`: customers type a name, browse/search the cards in admin-chosen

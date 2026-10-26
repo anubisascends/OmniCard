@@ -85,14 +85,13 @@ A number on the **Scan** icon counts scan batches that are waiting for someone t
 
 ### On a phone
 
-On a narrow screen the sidebar is hidden to save space.
+On a phone the sidebar is replaced by a bar along the bottom of the screen with **Dashboard**, **Scan**, **Collection** and **Locations** (the first four of these you're allowed to see). Tap **More** to open the full menu with every other section and **Help**.
 
-1. Tap the **menu button** (three lines) at the top left to open the sidebar.
-2. Tap a section. The sidebar closes again on its own.
+On a tablet the sidebar is hidden instead. Tap the **menu button** (three lines) at the top left to open it.
 
-The game selector and the account menu stay in the top bar. Most pages work well on a phone. For scanning on a phone, see [Scanning cards](help:scanning).
+The game selector and the account menu stay in the top bar. You can also add OmniCard to your home screen so it opens like an app. See [Using OmniCard on a phone](help:mobile).
 
-![OmniCard on a phone with the sidebar opened from the menu button](getting-started-phone-menu.png)
+![OmniCard on a phone, with the bottom bar and the More menu open](getting-started-phone-menu.png)
 
 
 ### Using Help
