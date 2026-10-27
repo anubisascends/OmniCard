@@ -44,6 +44,9 @@ export function CardHoverPreview({ hover, onClose }: { hover: CardHover | null; 
       onClose={onClose}
       anchorOrigin={{ vertical: 'center', horizontal: 'right' }}
       transformOrigin={{ vertical: 'center', horizontal: 'left' }}
+      // A passive preview: never take focus, so hovering a result doesn't interrupt typing in a search box.
+      disableAutoFocus
+      disableEnforceFocus
       disableRestoreFocus
       sx={{ pointerEvents: 'none' }}
       slotProps={{ paper: { sx: { p: 0.5 } } }}

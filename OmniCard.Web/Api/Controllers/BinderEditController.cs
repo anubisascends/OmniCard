@@ -315,7 +315,7 @@ public sealed class BinderEditController : ControllerBase
         int ContainerId, int Page, int Slot,
         string Game, string GameSpecificId, string Name, string SetCode, string SetName,
         string CollectorNumber, string Rarity, string? ImageUri,
-        string Condition, bool IsFoil, string? FoilType, decimal? PurchasePrice);
+        string Condition, bool IsFoil, string? FoilType, decimal? PurchasePrice, string? Language = null);
 
     /// <summary>Place a card chosen from the game catalog straight into a binder pocket (the "Add card
     /// ▸ from the catalog" flow), creating a new loose lot. Displaces any current occupant to the pool.</summary>
@@ -338,7 +338,7 @@ public sealed class BinderEditController : ControllerBase
         var foilType = r.IsFoil ? (r.FoilType ?? FoilTypes.BasicFoilType(game)) : null;
         var lotId = _binderCards.AddMissingCardToSlot(match, game,
             string.IsNullOrWhiteSpace(r.Condition) ? "NM" : r.Condition,
-            r.IsFoil, foilType, r.PurchasePrice, r.ContainerId, r.Page, r.Slot);
+            r.IsFoil, foilType, r.PurchasePrice, r.ContainerId, r.Page, r.Slot, r.Language);
         _tagRules.ApplyToNewLots([lotId]);
         return Ok(new { status = "ok" });
     }

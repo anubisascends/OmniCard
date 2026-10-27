@@ -867,6 +867,8 @@ export interface ScanCommitResultDto {
   imported: number;
   /** Cards the tag rules tagged (only when the commit asked for `applyTagRules`). */
   ruleTagged?: number;
+  /** The created lots, in input order. */
+  lotIds?: number[] | null;
 }
 
 /** One card line in an audit summary bucket. */

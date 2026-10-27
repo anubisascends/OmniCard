@@ -122,6 +122,9 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, ICatalo
 
     public IReadOnlyList<string> DownloadableLanguages => CardLanguages.DownloadableFor(CardGame.OnePiece);
 
+    // TCGCSV is English-only, but the Japanese/French rows downloaded earlier from poneglyph are kept.
+    public IReadOnlyList<string> SearchableLanguages { get; } = [CardLanguages.English, "ja", "fr"];
+
     public IReadOnlyCollection<string> CatalogLanguages
     {
         get => _catalogLanguages;

@@ -368,6 +368,8 @@ export const api = {
   searchFields: (game?: string) => request<SearchSchemaDto>(`/api/meta/search-fields${qs({ game })}`),
   /** Languages an owned copy of each game can be tagged with, keyed by game id. */
   cardLanguages: () => request<Record<string, string[]>>('/api/meta/card-languages'),
+  /** Languages each game's catalog can hold rows in (what catalog search can filter by), keyed by game id. */
+  catalogSearchLanguages: () => request<Record<string, string[]>>('/api/meta/catalog-languages'),
 
   // Dashboard
   dashboard: () => request<DashboardDto>('/api/dashboard'),
@@ -475,6 +477,8 @@ export const api = {
     rarity: string;
     imageUri?: string | null;
     condition: string;
+    /** Printed language of the copy; omitted/unknown ⇒ English. */
+    language?: string | null;
     isFoil: boolean;
     foilType?: string | null;
     purchasePrice?: number | null;
@@ -1036,12 +1040,14 @@ export const api = {
     return (await res.json()) as ScanMatchDto;
   },
   // `sets` scopes the correction search to the chosen "Sets (art fallback)" (empty ⇒ all sets); the
-  // server unions them, mirroring the set constraint used for auto-matching.
-  scanSearch: (game: string, q: string, sets?: string[], cn?: string) => {
+  // server unions them, mirroring the set constraint used for auto-matching. `langs` likewise keeps only
+  // catalog rows in those languages (empty ⇒ every language).
+  scanSearch: (game: string, q: string, sets?: string[], cn?: string, langs?: string[]) => {
     const sp = new URLSearchParams({ game });
     if (q) sp.set('q', q);
     if (cn) sp.set('cn', cn);
     for (const s of sets ?? []) if (s) sp.append('set', s);
+    for (const l of langs ?? []) if (l) sp.append('lang', l);
     return request<ScanSearchResultDto[]>(`/api/scan/search?${sp.toString()}`);
   },
   scanFoilTypes: (game: string) => request<string[]>(`/api/scan/foil-types${qs({ game })}`),

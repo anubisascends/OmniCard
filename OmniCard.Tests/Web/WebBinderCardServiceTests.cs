@@ -446,6 +446,18 @@ public class WebBinderCardServiceTests : IDisposable
         var placed = ctx.Lots.Include(l => l.Product)
             .Single(l => l.LocationId == _binderId && l.Page == 1 && l.Slot == 0);
         Assert.Equal("New Card", placed.Product.Name);
+        Assert.Null(placed.Language); // no language given ⇒ English (stored as null)
+    }
+
+    [Fact]
+    public void AddMissingCardToSlot_StoresTheCopysLanguage()
+    {
+        var match = new CardMatch { GameSpecificId = "ja-card", Name = "Japanese Card", SetCode = "SET", CollectorNumber = "1" };
+
+        var lotId = _service.AddMissingCardToSlot(match, CardGame.Mtg, "NM", false, null, null, _binderId, 2, 3, language: "japanese");
+
+        using var ctx = new OmniCardDbContext(_opts);
+        Assert.Equal("ja", ctx.Lots.Single(l => l.Id == lotId).Language);
     }
 
     private int AddLotIn(int containerId, string name, int quantity = 1, string condition = "NM")

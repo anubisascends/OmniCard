@@ -98,10 +98,10 @@ You can fill a specific pocket with a card from anywhere in your collection, or 
 
 1. Right-click a pocket and choose **Add card to this pocket…** (or **Replace card in this pocket…** if it already holds a card).
 2. The dialog shows the page and slot, and which card will be replaced.
-3. Choose the **Game**, then search by **Name**, and optionally **Set** and **Collector #**.
-4. Pick a result:
+3. Choose the **Game**, then search by **Name**, and optionally **Set** and **Collector #**. For games whose catalog holds more than one language, each result shows its language, and **Languages** limits the results, as in [Add cards to a location](help:locations#add-cards-to-a-location).
+4. Pick a result. Point at it to see a larger picture, or use ↓, ↑ and Enter from the search boxes:
    - **In your collection** lists copies you own in other locations, with the location each is in. Click one to move a single copy into the pocket right away. If it's part of a stack, only one copy moves.
-   - **In the catalog** lists every matching printing. Click one, set **Condition**, **Purchase price** and **Foil**, then click **Add to pocket** to add a new card to your collection in this pocket.
+   - **In the catalog** lists every matching printing. Click one, set **Condition**, **Language**, **Purchase price** and **Foil** (with its **Foil type**), then click **Add to pocket** to add a new card to your collection in this pocket.
 
 ![The Add card to pocket dialog](binders-add-to-pocket.png)
 

@@ -1316,7 +1316,9 @@ public sealed record ScanCommitRequest
     public bool ApplyTagRules { get; init; }
 }
 
-public sealed record ScanCommitResultDto(int Imported, int RuleTagged = 0);
+/// <summary>Outcome of a scan commit. <paramref name="LotIds"/> are the created lots in input order (lets the
+/// Add card dialog undo an add).</summary>
+public sealed record ScanCommitResultDto(int Imported, int RuleTagged = 0, IReadOnlyList<int>? LotIds = null);
 
 /// <summary>Export staged (not-yet-committed) scans as files without writing anything to the
 /// collection. One format ⇒ that file; several ⇒ a zip with one file per format.

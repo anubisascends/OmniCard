@@ -217,10 +217,13 @@ export function LocationDetailPage() {
 
       <AddCardDialog
         open={addOpen}
-        locationId={locationId}
-        locationName={locQuery.data?.name ?? t('locations.detail.thisLocation')}
+        target={{
+          kind: 'location',
+          locationId,
+          locationName: locQuery.data?.name ?? t('locations.detail.thisLocation'),
+          lockGame: isDeckBox && !!deckBoxGame,
+        }}
         defaultGame={deckBoxGame ?? game}
-        lockGame={isDeckBox && !!deckBoxGame}
         onClose={() => setAddOpen(false)}
       />
       <LocationImportDialog
