@@ -187,9 +187,12 @@ Click any card to open its details, where you can edit condition, foil, quantity
 1. Click **Add card**.
 2. Choose the **Game** (a deck box is locked to its own game).
 3. Search by **Name**, and optionally narrow with **Set** and **Collector #**.
-4. Click the printing you want.
-5. Set **Condition**, **Quantity**, **Purchase price** and **Foil**, then click **Add card**.
-6. The dialog stays open so you can add more. Click **Done** when you're finished.
+4. For games whose catalog holds more than one language, such as Magic, each result shows its language, for example **EN** or **JA**. To see only some languages, tick them in **Languages**. Leave it on **All languages** to see every one. OmniCard remembers your choice for each game.
+5. Point at a result to see a larger picture of the card. On a phone, press and hold it. Click the printing you want. From the keyboard, press ↓ and ↑ in the search boxes to move through the results, then Enter to pick one. If there's only one result, Enter picks it straight away.
+6. Set **Condition**, **Language**, **Quantity** and **Purchase price**. **Language** starts as the printing's language. Change it if your copy is in a language the catalog doesn't have.
+7. Turn on **Foil** for a foil copy, and pick its **Foil type**, such as etched. Leave **Foil type** empty for a regular foil.
+8. Click **Add card**, or press Enter. The dialog stays open with your search still showing, so you can pick another printing or language of the same card, or type the next name. The last few cards you added are listed at the bottom. Click **Undo** beside one to remove that card again. **Undo** shows only if you're allowed to delete cards.
+9. Click **Add & close** to add the last card and close the dialog, or **Done** if you've already added it.
 
 To add many cards at once, scan them (see [Scanning](help:scanning)) or import a file.
 

@@ -148,6 +148,76 @@ public class CardScanControllerTests : IDisposable
         Assert.Equal("abc", list[0].GameCardId);
     }
 
+    // A game service whose catalog tracks language (lang: is only applied to those).
+    private static Mock<ICardGameService> LanguageAwareGame()
+    {
+        var game = new Mock<ICardGameService>();
+        game.As<ICatalogLanguageAware>();
+        return game;
+    }
+
+    [Fact]
+    public void Search_OneLanguage_FoldsLangIntoTheQuery()
+    {
+        var game = LanguageAwareGame();
+        game.Setup(s => s.SearchCards("bolt lang:ja", 500)).Returns([
+            new CardMatch { Name = "Lightning Bolt", SetCode = "m10", GameSpecificId = "ja1", Language = "ja" }
+        ]);
+        _cardService.Setup(c => c.GetGameService(CardGame.Mtg)).Returns(game.Object);
+
+        // Printed/ISO spellings normalize like everywhere else (japanese → ja).
+        var result = CreateController().Search("Mtg", "bolt", lang: ["japanese"]);
+        var list = Assert.IsAssignableFrom<IReadOnlyList<ScanSearchResultDto>>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal("ja1", Assert.Single(list).GameCardId);
+        Assert.Equal("ja", list[0].Language);
+    }
+
+    [Fact]
+    public void Search_SeveralLanguages_UnionsOneSearchPerLanguage()
+    {
+        var game = LanguageAwareGame();
+        game.Setup(s => s.SearchCards("bolt lang:en", 500)).Returns([
+            new CardMatch { Name = "Lightning Bolt", SetCode = "m10", CollectorNumber = "146", GameSpecificId = "en1", Language = "en" }
+        ]);
+        game.Setup(s => s.SearchCards("bolt lang:ja", 500)).Returns([
+            new CardMatch { Name = "Lightning Bolt", SetCode = "m10", CollectorNumber = "146", GameSpecificId = "ja1", Language = "ja" }
+        ]);
+        _cardService.Setup(c => c.GetGameService(CardGame.Mtg)).Returns(game.Object);
+
+        var result = CreateController().Search("Mtg", "bolt", lang: ["en", "ja", "bogus"]);
+        var list = Assert.IsAssignableFrom<IReadOnlyList<ScanSearchResultDto>>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal(["en1", "ja1"], list.Select(r => r.GameCardId).Order());
+        // An unrecognized language is dropped, not searched as a literal.
+        game.Verify(s => s.SearchCards(It.Is<string>(q => q.Contains("bogus")), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public void Search_SetsAndLanguages_SearchesEveryPair()
+    {
+        var game = LanguageAwareGame();
+        game.Setup(s => s.SearchCards(It.IsAny<string>(), 500)).Returns([]);
+        _cardService.Setup(c => c.GetGameService(CardGame.Mtg)).Returns(game.Object);
+
+        CreateController().Search("Mtg", "bolt", set: ["m10", "lea"], lang: ["en", "ja"]);
+
+        foreach (var q in new[] { "bolt set:m10 lang:en", "bolt set:m10 lang:ja", "bolt set:lea lang:en", "bolt set:lea lang:ja" })
+            game.Verify(s => s.SearchCards(q, 500), Times.Once);
+    }
+
+    [Fact]
+    public void Search_LanguageOnACatalogWithoutLanguages_IsIgnored()
+    {
+        var game = new Mock<ICardGameService>(); // e.g. Riftbound: no lang: field
+        game.Setup(s => s.SearchCards("jinx", 500)).Returns([
+            new CardMatch { Name = "Jinx", SetCode = "ogn", GameSpecificId = "r1" }
+        ]);
+        _cardService.Setup(c => c.GetGameService(CardGame.Riftbound)).Returns(game.Object);
+
+        var result = CreateController().Search("Riftbound", "jinx", lang: ["en"]);
+        var list = Assert.IsAssignableFrom<IReadOnlyList<ScanSearchResultDto>>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal("r1", Assert.Single(list).GameCardId);
+    }
+
     [Fact]
     public void Commit_NoLocation_Returns400()
     {
@@ -186,12 +256,17 @@ public class CardScanControllerTests : IDisposable
         };
 
         var ok = Assert.IsType<OkObjectResult>(CreateController().Commit(req).Result);
-        Assert.Equal(2, Assert.IsType<ScanCommitResultDto>(ok.Value).Imported);
+        var result = Assert.IsType<ScanCommitResultDto>(ok.Value);
+        Assert.Equal(2, result.Imported);
 
         using var ctx = new OmniCardDbContext(_opts);
         var lots = ctx.Lots.Where(l => l.LocationId == loc).ToList();
         Assert.Equal(2, lots.Count);
         Assert.Contains(lots, l => l.Quantity == 2);
+        // The created lot ids come back in input order (the Add card dialog's undo deletes by them).
+        Assert.NotNull(result.LotIds);
+        Assert.Equal(2, ctx.Lots.Single(l => l.Id == result.LotIds[0]).Quantity);
+        Assert.Equal(1, ctx.Lots.Single(l => l.Id == result.LotIds[1]).Quantity);
     }
 
     [Fact]

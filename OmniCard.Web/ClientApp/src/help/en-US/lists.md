@@ -49,11 +49,11 @@ To add a whole deck to the list that's already open, paste its address into **Ad
 ## Add cards by hand
 
 1. Open the list and click **Add card**.
-2. In the **Add card to list** dialog, check the **Game**, then search by **Name**. You can narrow the search with **Set** and **Collector #**. If the list has a card language, a switch such as **Only Japanese cards** limits both groups of results to that language. Turn it off to see every language.
-3. Results come in two groups:
-   - **In your collection**: copies you already own. Each shows its set, number, condition, and location. Click one to add that copy to the list. The copy doesn't move yet. When you put the list away, that copy is the one that gets moved.
-   - **In the catalog**: every printing in the game's catalog, including ones you don't own. Click one, set the **Qty** and **Foil**, then click **Add to list**.
-4. The dialog stays open so you can add several cards in a row. The title shows how many you've added so far. Click **Close** when you're done.
+2. In the **Add card to list** dialog, check the **Game**, then search by **Name**. You can narrow the search with **Set** and **Collector #**. Each result shows its language. Tick languages in **Languages** to see only those. If the list has a card language, **Languages** starts on it. Choose **All languages** to see every one.
+3. Results come in two groups. Point at a result to see a larger picture, or use ↓, ↑ and Enter from the search boxes:
+   - **In your collection**: copies you already own. Each shows its set, number, condition, language and location. Click one to add that copy to the list. The copy doesn't move yet. When you put the list away, that copy is the one that gets moved.
+   - **In the catalog**: every printing in the game's catalog, including ones you don't own. Click one, set the **Quantity** and **Foil** (with its **Foil type**), then click **Add to list** or press Enter.
+4. The dialog stays open so you can add several cards in a row. It shows how many you've added so far and lists the last few. Click **Undo** beside one to take it off the list again. Click **Add & close** to add the last card and close, or **Done** when you're finished.
 
 ![The Add card to list dialog with results from your collection and the catalog](lists-add-card-dialog.png)
 

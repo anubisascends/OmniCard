@@ -41,7 +41,7 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import SyncIcon from '@mui/icons-material/Sync';
 import { api } from '../api/client';
-import { AddCardToListDialog } from '../components/dialogs/AddCardToListDialog';
+import { AddCardDialog } from '../components/dialogs/AddCardDialog';
 import { IgnoredLocationsDialog } from '../components/dialogs/IgnoredLocationsDialog';
 import { ListExportDialog } from '../components/dialogs/ListExportDialog';
 import { ListSubstitutesDialog } from '../components/dialogs/ListSubstitutesDialog';
@@ -611,11 +611,10 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (messag
 
       <Divider sx={{ mb: 1 }} />
 
-      <AddCardToListDialog
+      <AddCardDialog
         open={addCardOpen}
-        listId={list.id}
+        target={{ kind: 'list', listId: list.id, language: list.language }}
         defaultGame={list.game}
-        language={list.language}
         onClose={() => setAddCardOpen(false)}
         onDone={invalidate}
       />

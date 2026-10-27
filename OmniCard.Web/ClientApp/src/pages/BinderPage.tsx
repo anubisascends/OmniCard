@@ -29,7 +29,7 @@ import type { BinderCardDto, BinderSlotDto } from '../api/types';
 import { CardImage } from '../components/CardImage';
 import { ListForSaleDialog } from '../components/dialogs/ListForSaleDialog';
 import { CardEditDrawer } from '../components/dialogs/CardEditDrawer';
-import { AddCardToSlotDialog } from '../components/dialogs/AddCardToSlotDialog';
+import { AddCardDialog } from '../components/dialogs/AddCardDialog';
 import { SearchBox } from '../components/SearchBox';
 import { useFormatters } from '../i18n/format';
 
@@ -628,12 +628,15 @@ export function BinderPage() {
       </Menu>
 
       {addSlot && (
-        <AddCardToSlotDialog
+        <AddCardDialog
           open
-          containerId={binderId}
-          page={addSlot.page}
-          slot={addSlot.slot}
-          occupantName={addSlot.card?.name}
+          target={{
+            kind: 'pocket',
+            containerId: binderId,
+            page: addSlot.page,
+            slot: addSlot.slot,
+            occupantName: addSlot.card?.name,
+          }}
           defaultGame={gameName(
             addSlot.card?.game ??
               data.leftSlots.concat(data.rightSlots).find((s) => s.card)?.card?.game,

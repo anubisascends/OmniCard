@@ -122,11 +122,14 @@ public sealed class CardScanController(
     /// collector number, the results are scoped to <paramref name="set"/> — the union of the "Sets
     /// (art fallback)" the user chose on the scan page (the single source of truth for which sets to
     /// look through). Empty ⇒ all sets. Each term folds into the same <c>set:</c>/<c>cn:</c> query
-    /// grammar every game's <c>SearchCards</c> already understands.</summary>
+    /// grammar every game's <c>SearchCards</c> already understands. <paramref name="lang"/> likewise keeps
+    /// only catalog rows in those languages (empty ⇒ every language); it's applied in the query rather than
+    /// to the capped results so a narrow language choice isn't starved by other languages' rows.</summary>
     [HttpGet("search")]
     [RequirePermission(Permissions.ScanView)]
     public ActionResult<IReadOnlyList<ScanSearchResultDto>> Search(
-        [FromQuery] string game, [FromQuery] string? q = null, [FromQuery] string[]? set = null, [FromQuery] string? cn = null)
+        [FromQuery] string game, [FromQuery] string? q = null, [FromQuery] string[]? set = null, [FromQuery] string? cn = null,
+        [FromQuery] string[]? lang = null)
     {
         if (LocationsController.ParseGame(game) is not { } parsedGame)
             return BadRequest(new { error = $"Unknown game '{game}'" });
@@ -134,6 +137,11 @@ public sealed class CardScanController(
         var setCodes = (set ?? [])
             .Where(s => !string.IsNullOrWhiteSpace(s))
             .Select(s => s.Trim())
+            .ToArray();
+        var langCodes = (lang ?? [])
+            .Select(CardLanguages.Normalize)
+            .OfType<string>()
+            .Distinct()
             .ToArray();
 
         // Terms shared by every sub-query: bare name + collector number.
@@ -147,23 +155,32 @@ public sealed class CardScanController(
             return Ok(Array.Empty<ScanSearchResultDto>());
 
         var gameService = cardService.GetGameService(parsedGame);
+        // A catalog that doesn't track language (Riftbound) has no lang: field to filter on.
+        if (gameService is not ICatalogLanguageAware) langCodes = [];
         List<CardMatch> matches;
-        if (setCodes.Length == 0)
+        if (setCodes.Length == 0 && langCodes.Length <= 1)
         {
             // No set constraint (no art-fallback sets chosen) — search across all sets, as before.
-            matches = gameService.SearchCards(string.Join(' ', baseTerms), MaxSearchResults);
+            var terms = new List<string>(baseTerms);
+            if (langCodes.Length == 1) terms.Add($"lang:{langCodes[0]}");
+            matches = gameService.SearchCards(string.Join(' ', terms), MaxSearchResults);
         }
         else
         {
-            // The query grammar ANDs its terms, so several set:s can't be ORed in a single query.
-            // Run one search per chosen set and union the results — a bare set (no name/cn) simply
-            // lists that whole set. This keeps the correction search scoped to exactly the same
-            // art-fallback sets that constrain auto-matching.
+            // The query grammar ANDs its terms, so several set:s (or lang:s) can't be ORed in a single
+            // query. Run one search per chosen set × language and union the results — a bare set (no
+            // name/cn) simply lists that whole set. This keeps the correction search scoped to exactly
+            // the same art-fallback sets that constrain auto-matching.
+            string?[] setScopes = setCodes.Length == 0 ? [null] : [.. setCodes];
+            string?[] langScopes = langCodes.Length == 0 ? [null] : [.. langCodes];
             var seen = new HashSet<string>();
             var union = new List<CardMatch>();
-            foreach (var code in setCodes)
+            foreach (var code in setScopes)
+            foreach (var language in langScopes)
             {
-                var terms = new List<string>(baseTerms) { $"set:{code}" };
+                var terms = new List<string>(baseTerms);
+                if (code is not null) terms.Add($"set:{code}");
+                if (language is not null) terms.Add($"lang:{language}");
                 foreach (var m in gameService.SearchCards(string.Join(' ', terms), MaxSearchResults))
                 {
                     if (seen.Add($"{m.SetCode}|{m.CollectorNumber}|{m.GameSpecificId}"))
@@ -219,7 +236,7 @@ public sealed class CardScanController(
         var ruleTagged = request.ApplyTagRules ? tagRules.ApplyToNewLots(lotIds) : 0;
 
         logger.LogInformation("Committed {Count} scanned card(s) to location {LocationId}", lotIds.Count, request.ContainerId);
-        return Ok(new ScanCommitResultDto(lotIds.Count, ruleTagged));
+        return Ok(new ScanCommitResultDto(lotIds.Count, ruleTagged, lotIds));
     }
 
     /// <summary>The enabled tag rules' tags for scanned cards that haven't been saved yet, so the Scan page
