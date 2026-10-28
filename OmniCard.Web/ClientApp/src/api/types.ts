@@ -783,6 +783,8 @@ export interface BinderStateDto {
   leftSlots: BinderSlotDto[];
   rightSlots: BinderSlotDto[];
   spreadTabs: SpreadTabDto[];
+  /** Side count (1 or 2) of each physical sheet, in reading order. */
+  sheetSides: number[];
 }
 
 // --- Scan (server-side image matching; mirrors OmniCard.Api.Contracts scan DTOs) ---
