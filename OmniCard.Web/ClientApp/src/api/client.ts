@@ -453,6 +453,12 @@ export const api = {
     request<void>('/api/binder/unassign', { method: 'POST', body: JSON.stringify({ lotId }) }),
   binderAddPage: (containerId: number, mode: 'single' | 'double') =>
     request<{ spreadIndex: number }>('/api/binder/page/add', { method: 'POST', body: JSON.stringify({ containerId, mode }) }),
+  /** Insert an empty sheet before sheet `insertIndex` (0-based; the sheet count appends). */
+  binderInsertPage: (containerId: number, insertIndex: number, doubleSided: boolean) =>
+    request<{ spreadIndex: number }>('/api/binder/page/insert', {
+      method: 'POST',
+      body: JSON.stringify({ containerId, insertIndex, doubleSided }),
+    }),
   binderRemovePage: (containerId: number, page: number) =>
     request<void>('/api/binder/page/remove', { method: 'POST', body: JSON.stringify({ containerId, page }) }),
   binderLayout: (containerId: number, slotsPerPage: number, columns: number) =>

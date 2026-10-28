@@ -85,6 +85,7 @@ import type {
   ScanTagRuleItem,
 } from '../api/types';
 import { CardHoverPreview, type CardHover } from '../components/CardHoverPreview';
+import { Kbd } from '../components/Kbd';
 import { LONG_PRESS_SX, useIsPhone, useLongPress } from '../lib/responsive';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
@@ -1208,23 +1209,7 @@ function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void
             <Stack key={label} direction="row" spacing={2} alignItems="center">
               <Stack direction="row" spacing={0.5} sx={{ minWidth: 96 }}>
                 {keys.map((k) => (
-                  <Box
-                    key={k}
-                    component="kbd"
-                    sx={{
-                      px: 0.75,
-                      py: 0.25,
-                      border: 1,
-                      borderColor: 'divider',
-                      borderBottomWidth: 2,
-                      borderRadius: 1,
-                      fontFamily: 'inherit',
-                      fontSize: '0.8rem',
-                      bgcolor: 'action.hover',
-                    }}
-                  >
-                    {k}
-                  </Box>
+                  <Kbd key={k}>{k}</Kbd>
                 ))}
               </Stack>
               <Typography variant="body2">{t(label)}</Typography>

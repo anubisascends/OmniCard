@@ -92,7 +92,8 @@ public sealed class BinderStateBuilder
             name, slotsPerPage, columns, totalPages,
             spreadIndex, TotalSpreads(totalPages),
             leftPage, rightPage, PageRangeLabel(leftPage, rightPage),
-            leftSlots, rightSlots, BuildTabs(spreadIndex, totalPages));
+            leftSlots, rightSlots, BuildTabs(spreadIndex, totalPages),
+            sheetLayout.Sides.ToList());
     }
 
     public List<BinderCardDto> BuildUnplaced(int containerId, string? filter)
@@ -246,4 +247,7 @@ public sealed record BinderStateDto(
     int SpreadIndex, int TotalSpreads,
     int? LeftPageNumber, int? RightPageNumber, string PageRangeLabel,
     List<BinderSlotDto> LeftSlots, List<BinderSlotDto> RightSlots,
-    List<SpreadTabDto> SpreadTabs);
+    List<SpreadTabDto> SpreadTabs,
+    // Side count (1 or 2) of each physical sheet in reading order — lets the client tell a sheet's
+    // front from its back (a new sheet can only go in after a back, like a real binder).
+    List<int> SheetSides);
