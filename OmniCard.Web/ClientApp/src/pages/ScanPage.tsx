@@ -35,6 +35,7 @@ import {
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import RequestQuoteIcon from '@mui/icons-material/RequestQuote';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -1559,6 +1560,24 @@ export interface ScanPageProps {
   onAuditCommitted?: (result: AuditCommitResultDto) => void;
   /** Review a background scan batch instead of local uploads (see ScanBatchPage). */
   batch?: ScanBatchMode;
+  /** Scan a seller's cards for an intake quote instead of adding them to a location (see IntakePage). */
+  intake?: ScanIntakeMode;
+}
+
+/** One confirmed scan handed to the intake quote. */
+export interface IntakeScanCard {
+  /** The scan's key on the Scan page (pass it back in {@link ScanIntakeMode.boughtKeys}). */
+  key: string;
+  item: ScanCommitItem;
+  /** The scan photo (a blob URL that lives as long as the Scan page). */
+  previewUrl: string;
+}
+
+/** Intake: "Complete" hands the confirmed cards to the quote; nothing is written by the Scan page. */
+export interface ScanIntakeMode {
+  onComplete: (cards: IntakeScanCard[]) => void;
+  /** Cards that were bought — they're dropped from the scan list (a new array each time). */
+  boughtKeys?: string[];
 }
 
 /** A watched-folder batch under review: its items come from (and edits save to) the server, the game
@@ -1576,7 +1595,7 @@ export interface ScanBatchMode {
   onClosed: () => void;
 }
 
-export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitted, batch }: ScanPageProps = {}) {
+export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitted, batch, intake }: ScanPageProps = {}) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const { game: contextGame } = useGame();
@@ -1691,6 +1710,16 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
       return prev.filter((it) => !shouldDrop(it));
     });
 
+  // Intake: once the quote is bought, its cards leave the scan list.
+  const boughtKeys = intake?.boughtKeys;
+  useEffect(() => {
+    if (!boughtKeys?.length) return;
+    const bought = new Set(boughtKeys);
+    dropItems((it) => bought.has(it.key));
+    // dropItems only wraps setItems; re-run solely when a new set of bought keys arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boughtKeys]);
+
   // Free every remaining preview URL when the page unmounts (navigating away mid-session).
   const itemsRef = useRef(items);
   itemsRef.current = items;
@@ -1698,7 +1727,8 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
 
   const gamesQuery = useQuery({ queryKey: ['games'], queryFn: api.games });
   const setsQuery = useQuery({ queryKey: ['sets', game], queryFn: () => api.sets(game), enabled: !!game });
-  const locations = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations() });
+  // Intake buys into the admin's location, so it never picks one (and intake staff may not see locations).
+  const locations = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations(), enabled: !intake });
   const foilTypesQuery = useQuery({
     queryKey: ['scan-foil-types', game],
     queryFn: () => api.scanFoilTypes(game),
@@ -1903,9 +1933,15 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   // doesn't lose staged scans. Scan and each location's audit keep separate sessions. ---
   // Background batches persist on the server, not in IndexedDB.
   const isBatch = !!batch;
+  // Keyed on the mode, not the `intake` prop object (a new one every parent render), or the session would
+  // be re-created — and re-restored on top of the current scans — on each render.
+  const isIntake = !!intake;
   const sessionStore = useMemo(
-    () => (isBatch ? null : new ScanSessionStore<ScanItem>(auditMode ? `audit-${lockedContainerId}` : 'scan')),
-    [auditMode, lockedContainerId, isBatch],
+    () =>
+      isBatch
+        ? null
+        : new ScanSessionStore<ScanItem>(auditMode ? `audit-${lockedContainerId}` : isIntake ? 'intake' : 'scan'),
+    [auditMode, lockedContainerId, isBatch, isIntake],
   );
   const restoreDone = useRef(false);
   const [restoredKeys, setRestoredKeys] = useState<Set<string>>(new Set());
@@ -2412,8 +2448,8 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
 
   return (
     <Stack spacing={3}>
-      {/* In audit and batch mode the wrapping page supplies its own header/banner. */}
-      {!auditMode && !batch && (
+      {/* In audit, batch and intake mode the wrapping page supplies its own header/banner. */}
+      {!auditMode && !batch && !intake && (
         <>
           <Typography variant="h4">{t('scan.title')}</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: -1 }}>
@@ -2603,7 +2639,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         <Paper variant="outlined" sx={{ p: 2, position: { xs: 'static', sm: 'sticky' }, top: 56, zIndex: 1 }}>
           <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
             {/* Audit is locked to one location: show it read-only instead of the picker. */}
-            {readOnly ? null : lockedContainerId != null ? (
+            {readOnly || intake ? null : lockedContainerId != null ? (
               <Chip
                 icon={<LockIcon />}
                 variant="outlined"
@@ -2631,6 +2667,22 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                 >
                   {t('scan.commit.confirmChecked', { count: confirmableCount })}
                 </Button>
+                {intake ? (
+                  <Button
+                    variant="contained"
+                    startIcon={<RequestQuoteIcon />}
+                    disabled={committableCount === 0 || stillMatching || rulesPending}
+                    onClick={() =>
+                      intake.onComplete(
+                        items
+                          .filter(isVisibleCommittable)
+                          .map((it) => ({ key: it.key, item: toCommitItem(it, game), previewUrl: it.previewUrl })),
+                      )
+                    }
+                  >
+                    {t('intake.scan.complete', { count: committableCount })}
+                  </Button>
+                ) : (
                 <Button
                   variant="contained"
                   color={auditMode ? 'warning' : 'primary'}
@@ -2651,6 +2703,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                       ? t('scan.audit.commit', { count: committableCount })
                       : t('scan.commit.addConfirmed', { count: committableCount })}
                 </Button>
+                )}
                 <Tooltip title={t('scan.tagRules.switchHint')}>
                   <FormControlLabel
                     control={
@@ -2665,7 +2718,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                 </Tooltip>
               </>
             )}
-            {canExport && (
+            {canExport && !intake && (
               <>
                 <Tooltip title={t('scan.export.hint')}>
                   <span>
@@ -2724,7 +2777,9 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
             <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
               {auditMode
                 ? t('scan.audit.commitHint')
-                : controlsActive
+                : intake
+                  ? t('intake.scan.completeHint')
+                  : controlsActive
                   ? t('scan.commit.addedNoteFiltered')
                   : t('scan.commit.addedNote')}
             </Typography>
@@ -3059,7 +3114,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         onClose={() => setBulkOpen(false)}
       />
 
-      {lockedContainerId == null && (
+      {lockedContainerId == null && !intake && (
         <LocationPickerDialog
           open={pickerOpen}
           title={t('scan.locationPicker.title')}

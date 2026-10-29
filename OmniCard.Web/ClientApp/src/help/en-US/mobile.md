@@ -4,7 +4,7 @@ OmniCard works in your phone's browser, with layouts made for small screens. You
 
 ## Finding your way around
 
-A bar along the bottom of the screen takes you to **Dashboard**, **Scan**, **Collection** and **Locations** (the first four of these you're allowed to see). Tap **More** for every other section and for **Help**.
+A bar along the bottom of the screen takes you to the first four of **Dashboard**, **Scan**, **Intake**, **Collection** and **Locations** that you're allowed to see. Tap **More** for every other section and for **Help**.
 
 The game selector and the account menu stay in the top bar.
 

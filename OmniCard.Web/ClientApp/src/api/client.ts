@@ -28,6 +28,15 @@ import type {
   ListUpdatePreviewDto,
   ListUpdateRowDto,
   CustomerDto,
+  IntakeAcceptRequest,
+  IntakeAcceptResultDto,
+  IntakeDetailDto,
+  IntakePageDto,
+  IntakePriceBasis,
+  IntakeQuoteDto,
+  IntakeQuoteLineRequest,
+  IntakeSettingsDto,
+  StoreCreditDto,
   DashboardDto,
   DeckBoxNeedsGameDto,
   DeckLegalityDto,
@@ -771,6 +780,21 @@ export const api = {
     request<void>(`/api/customers/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   customerDelete: (id: number) =>
     request<void>(`/api/customers/${id}`, { method: 'DELETE' }),
+  customerCredit: (id: number) => request<StoreCreditDto>(`/api/customers/${id}/credit`),
+  customerCreditAdjust: (id: number, amount: number, reason: string) =>
+    request<StoreCreditDto>(`/api/customers/${id}/credit`, { method: 'POST', body: JSON.stringify({ amount, reason }) }),
+
+  // Intake (buying singles over the counter)
+  intakeSettings: () => request<IntakeSettingsDto>('/api/intake/settings'),
+  intakeSettingsUpdate: (body: IntakeSettingsDto) =>
+    request<IntakeSettingsDto>('/api/intake/settings', { method: 'PUT', body: JSON.stringify(body) }),
+  intakeQuote: (priceBasis: IntakePriceBasis, lines: IntakeQuoteLineRequest[]) =>
+    request<IntakeQuoteDto>('/api/intake/quote', { method: 'POST', body: JSON.stringify({ priceBasis, lines }) }),
+  intakeAccept: (body: IntakeAcceptRequest) =>
+    request<IntakeAcceptResultDto>('/api/intake/accept', { method: 'POST', body: JSON.stringify(body) }),
+  intakeHistory: (params: { page?: number; pageSize?: number; customerId?: number }) =>
+    request<IntakePageDto>(`/api/intake${qs(params)}`),
+  intakeDetail: (id: number) => request<IntakeDetailDto>(`/api/intake/${id}`),
 
   // Inventory (sealed)
   inventoryProducts: (game?: string, category?: string) =>

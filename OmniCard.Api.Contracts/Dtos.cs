@@ -789,6 +789,8 @@ public sealed record CustomerDto
     public string? State { get; init; }
     public string? PostalCode { get; init; }
     public string? Country { get; init; }
+    /// <summary>Store credit balance (sum of the customer's ledger).</summary>
+    public decimal StoreCredit { get; init; }
 }
 
 public sealed record ProductDto
@@ -2057,3 +2059,175 @@ public sealed record KioskSettingsDto
 }
 
 public sealed record KioskDeviceDto(int Id, string Name, DateTime CreatedAt, string? CreatedBy, DateTime? LastSeenAt, bool Revoked);
+
+// ---------------------------------------------------------------------------------------------------
+// Intake (buying singles over the counter)
+// ---------------------------------------------------------------------------------------------------
+
+/// <summary>What the seller is shown on a quote's customer view (offer totals always show).</summary>
+public sealed record IntakeCustomerViewDto
+{
+    public bool ShowCardImages { get; init; } = true;
+    public bool ShowCardDetails { get; init; } = true;
+    public bool ShowCardPrices { get; init; } = true;
+    public bool ShowCardOffers { get; init; } = true;
+    public bool ShowMarketTotal { get; init; } = true;
+}
+
+/// <summary>Settings ▸ Intake. Percentages are 0–200; <see cref="ConditionPercents"/> is keyed by condition
+/// code (NM, LP, MP, HP, DMG). Enums travel as their names: BulkMode = FlatRate|Exclude, RoundingScope =
+/// PerCard|Total.</summary>
+public sealed record IntakeSettingsDto
+{
+    public decimal CashPercent { get; init; } = 70m;
+    public decimal TradePercent { get; init; } = 80m;
+    public IReadOnlyDictionary<string, decimal> ConditionPercents { get; init; } = new Dictionary<string, decimal>();
+    public decimal BulkThreshold { get; init; }
+    public string BulkMode { get; init; } = "FlatRate";
+    public decimal BulkRate { get; init; }
+    public decimal RoundingStep { get; init; }
+    public string RoundingScope { get; init; } = "Total";
+    public int? LocationId { get; init; }
+    /// <summary>Read-only: the intake location's name (null when unset or deleted).</summary>
+    public string? LocationName { get; init; }
+    public IntakeCustomerViewDto CustomerView { get; init; } = new();
+}
+
+/// <summary>One scanned card on a quote. <see cref="Excluded"/> null = the default (bulk under the Exclude
+/// rule starts excluded); <see cref="ManualPrice"/> is a staff-entered per-copy price that replaces the
+/// catalog price; <see cref="Payout"/> is Cash or Trade. <see cref="Item"/> carries the card identity and
+/// per-copy properties exactly as a scan commit does.</summary>
+public sealed record IntakeQuoteLineRequest
+{
+    public ScanCommitItem Item { get; init; } = new();
+    public decimal? ManualPrice { get; init; }
+    public bool? Excluded { get; init; }
+    public string Payout { get; init; } = "Cash";
+}
+
+/// <summary>Price a quote. <see cref="PriceBasis"/> = Market or Low.</summary>
+public sealed record IntakeQuoteRequest
+{
+    public string PriceBasis { get; init; } = "Market";
+    public IReadOnlyList<IntakeQuoteLineRequest> Lines { get; init; } = [];
+}
+
+/// <summary>A priced quote line (amounts per copy), parallel to the request's lines.</summary>
+public sealed record IntakeQuoteLineDto
+{
+    public decimal? MarketPrice { get; init; }
+    public decimal? LowPrice { get; init; }
+    public decimal? BasePrice { get; init; }
+    public bool IsManualPrice { get; init; }
+    public bool UsedMarketFallback { get; init; }
+    public decimal ConditionPercent { get; init; }
+    public bool IsBulk { get; init; }
+    public bool Excluded { get; init; }
+    public bool NeedsPrice { get; init; }
+    public decimal CashUnit { get; init; }
+    public decimal TradeUnit { get; init; }
+}
+
+public sealed record IntakeQuoteDto
+{
+    public IReadOnlyList<IntakeQuoteLineDto> Lines { get; init; } = [];
+    public int CardCount { get; init; }
+    public decimal MarketTotal { get; init; }
+    public decimal CashOffer { get; init; }
+    public decimal TradeOffer { get; init; }
+    public decimal CashPaid { get; init; }
+    public decimal TradePaid { get; init; }
+    public decimal CashPercent { get; init; }
+    public decimal TradePercent { get; init; }
+    /// <summary>Cash and trade pay the same percentage — show a single offer.</summary>
+    public bool SingleOffer { get; init; }
+    /// <summary>Some included card still has no price; it must get one (or be excluded) before buying.</summary>
+    public bool NeedsPrices { get; init; }
+}
+
+/// <summary>Buy the quoted cards: price them again on the server, put them in the intake location, record
+/// the intake and credit the customer for any trade-paid cards (a customer is required then).</summary>
+public sealed record IntakeAcceptRequest
+{
+    public string PriceBasis { get; init; } = "Market";
+    public IReadOnlyList<IntakeQuoteLineRequest> Lines { get; init; } = [];
+    public int? CustomerId { get; init; }
+    public string? Note { get; init; }
+    /// <summary>The totals the staff member showed the seller; a mismatch (prices changed meanwhile) is
+    /// refused with 409 so they can re-quote.</summary>
+    public decimal ExpectedCashPaid { get; init; }
+    public decimal ExpectedTradePaid { get; init; }
+}
+
+public sealed record IntakeAcceptResultDto(int IntakeId, int CardCount, decimal CashPaid, decimal TradePaid, decimal? CustomerCreditBalance);
+
+public sealed record IntakeSummaryDto
+{
+    public int Id { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public string CreatedByName { get; init; } = "";
+    public int? CustomerId { get; init; }
+    public string? CustomerName { get; init; }
+    public string PriceBasis { get; init; } = "Market";
+    public string LocationName { get; init; } = "";
+    public int CardCount { get; init; }
+    public decimal MarketTotal { get; init; }
+    public decimal CashPaid { get; init; }
+    public decimal TradePaid { get; init; }
+}
+
+public sealed record IntakeLineDto
+{
+    public int Id { get; init; }
+    public string Game { get; init; } = "";
+    public string GameCardId { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string SetCode { get; init; } = "";
+    public string SetName { get; init; } = "";
+    public string CollectorNumber { get; init; } = "";
+    public bool IsFoil { get; init; }
+    public string? FoilType { get; init; }
+    public string Condition { get; init; } = "NM";
+    public string? Language { get; init; }
+    public int Quantity { get; init; }
+    public decimal? MarketPrice { get; init; }
+    public decimal? LowPrice { get; init; }
+    public decimal BasePrice { get; init; }
+    public bool IsManualPrice { get; init; }
+    public decimal ConditionPercent { get; init; }
+    public bool IsBulk { get; init; }
+    public string Payout { get; init; } = "Cash";
+    public decimal UnitPaid { get; init; }
+    public int? LotId { get; init; }
+}
+
+public sealed record IntakeDetailDto
+{
+    public IntakeSummaryDto Summary { get; init; } = new();
+    public decimal CashPercent { get; init; }
+    public decimal TradePercent { get; init; }
+    public int LocationId { get; init; }
+    public string? Note { get; init; }
+    public IReadOnlyList<IntakeLineDto> Lines { get; init; } = [];
+    /// <summary>The intake settings in force at the time.</summary>
+    public IntakeSettingsDto? Settings { get; init; }
+}
+
+/// <summary>A page of intake history (newest first).</summary>
+public sealed record IntakePageDto(IReadOnlyList<IntakeSummaryDto> Items, int Total);
+
+// ---------------------------------------------------------------------------------------------------
+// Store credit
+// ---------------------------------------------------------------------------------------------------
+
+public sealed record StoreCreditEntryDto(
+    int Id, decimal Amount, DateTime CreatedAt, string CreatedByName, string Reason, int? IntakeId);
+
+public sealed record StoreCreditDto(decimal Balance, IReadOnlyList<StoreCreditEntryDto> Entries);
+
+/// <summary>Manually credit (positive) or debit (negative) a customer's store credit, with a reason.</summary>
+public sealed record StoreCreditAdjustRequest
+{
+    public decimal Amount { get; init; }
+    public string Reason { get; init; } = "";
+}

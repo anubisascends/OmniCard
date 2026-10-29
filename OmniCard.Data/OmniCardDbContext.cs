@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Shared.Ebay;
+using OmniCard.Shared.Intake;
 using OmniCard.Shared.Inventory;
 using OmniCard.Shared.Kiosk;
 using OmniCard.Shared.Labels;
@@ -54,6 +55,9 @@ public class OmniCardDbContext : DbContext
     public DbSet<KioskDevice> KioskDevices => Set<KioskDevice>();
     public DbSet<KioskSession> KioskSessions => Set<KioskSession>();
     public DbSet<KioskHold> KioskHolds => Set<KioskHold>();
+    public DbSet<IntakeRecord> Intakes => Set<IntakeRecord>();
+    public DbSet<IntakeLine> IntakeLines => Set<IntakeLine>();
+    public DbSet<StoreCreditEntry> StoreCreditEntries => Set<StoreCreditEntry>();
 
     public OmniCardDbContext(DbContextOptions<OmniCardDbContext> options) : base(options) { }
 
@@ -511,6 +515,56 @@ public class OmniCardDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
             // A sold or deleted lot takes its holds with it.
             e.HasOne<InventoryLot>().WithMany().HasForeignKey(h => h.LotId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Intake (buying singles): append-only audit rows, written once when a quote is accepted.
+        modelBuilder.Entity<IntakeRecord>(e =>
+        {
+            e.ToTable("Intakes");
+            e.HasKey(i => i.Id);
+            e.Property(i => i.Id).ValueGeneratedOnAdd();
+            e.Property(i => i.CreatedByName).HasMaxLength(256);
+            e.Property(i => i.CustomerName).HasMaxLength(256);
+            e.Property(i => i.LocationName).HasMaxLength(256);
+            e.Property(i => i.PriceBasis).HasConversion<string>().HasMaxLength(16);
+            e.Property(i => i.CashPercent).HasPrecision(9, 2);
+            e.Property(i => i.TradePercent).HasPrecision(9, 2);
+            e.Property(i => i.MarketTotal).HasPrecision(18, 2);
+            e.Property(i => i.CashPaid).HasPrecision(18, 2);
+            e.Property(i => i.TradePaid).HasPrecision(18, 2);
+            e.Property(i => i.Note).HasMaxLength(IntakeRecord.MaxNoteLength);
+            e.HasIndex(i => i.CreatedAt);
+            e.HasIndex(i => i.CustomerId);
+            e.HasIndex(i => i.CreatedByUserId);
+        });
+
+        modelBuilder.Entity<IntakeLine>(e =>
+        {
+            e.HasKey(l => l.Id);
+            e.Property(l => l.Id).ValueGeneratedOnAdd();
+            e.Property(l => l.Game).HasConversion<string>().HasMaxLength(32);
+            e.Property(l => l.Payout).HasConversion<string>().HasMaxLength(16);
+            e.Property(l => l.MarketPrice).HasPrecision(18, 2);
+            e.Property(l => l.LowPrice).HasPrecision(18, 2);
+            e.Property(l => l.BasePrice).HasPrecision(18, 2);
+            e.Property(l => l.ConditionPercent).HasPrecision(9, 2);
+            e.Property(l => l.UnitPaid).HasPrecision(18, 4);
+            e.HasIndex(l => l.IntakeId);
+            e.HasIndex(l => l.LotId);
+            e.HasOne<IntakeRecord>().WithMany().HasForeignKey(l => l.IntakeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<StoreCreditEntry>(e =>
+        {
+            e.HasKey(c => c.Id);
+            e.Property(c => c.Id).ValueGeneratedOnAdd();
+            e.Property(c => c.Amount).HasPrecision(18, 2);
+            e.Property(c => c.CreatedByName).HasMaxLength(256);
+            e.Property(c => c.Reason).IsRequired().HasMaxLength(StoreCreditEntry.MaxReasonLength);
+            e.HasIndex(c => c.CustomerId);
+            e.HasOne<Customer>().WithMany().HasForeignKey(c => c.CustomerId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

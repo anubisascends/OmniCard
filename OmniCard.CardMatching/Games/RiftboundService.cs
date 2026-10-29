@@ -16,7 +16,7 @@ using OmniCard.Data.Catalogs;
 
 namespace OmniCard.CardMatching.Games;
 
-public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDisposable
+public sealed class RiftboundService : ICardGameService, ILowPriceSource, IGameFieldResolver, IDisposable
 {
     private const int CorrectionTrustBonus = 5;
     private const int RiftboundCategoryId = 89;
@@ -390,6 +390,8 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
                 {
                     existing.MarketPrice = prices.Normal;
                     existing.FoilMarketPrice = prices.Foil;
+                    existing.LowPrice = prices.NormalLow;
+                    existing.FoilLowPrice = prices.FoilLow;
                     existing.PriceUpdatedAt = now;
                     updated++;
                 }
@@ -405,8 +407,8 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
     }
 
     // Fetches all Riftbound group prices from TCGCSV and folds them into a
-    // productId -> (normal, foil) market-price map.
-    private async Task<Dictionary<int, (decimal? Normal, decimal? Foil)>> FetchTcgCsvPriceMapAsync(
+    // productId -> (normal, foil) market + low price map.
+    private async Task<Dictionary<int, (decimal? Normal, decimal? Foil, decimal? NormalLow, decimal? FoilLow)>> FetchTcgCsvPriceMapAsync(
         HttpClient client, IProgress<PriceUpdateProgress>? progress, CancellationToken ct)
     {
         var groups = await TcgCsvCatalogClient.FetchGroupsAsync(client, RiftboundCategoryId, ct);
@@ -414,16 +416,16 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
             (done, total) => progress?.Report(new PriceUpdateProgress(CardGame.Riftbound, null, done, total,
                 $"Riftbound prices: {done}/{total} groups")), ct);
 
-        var map = new Dictionary<int, (decimal? Normal, decimal? Foil)>(rows.Count);
+        var map = new Dictionary<int, (decimal? Normal, decimal? Foil, decimal? NormalLow, decimal? FoilLow)>(rows.Count);
         foreach (var (productId, productRows) in rows)
         {
-            (decimal? Normal, decimal? Foil) entry = default;
+            (decimal? Normal, decimal? Foil, decimal? NormalLow, decimal? FoilLow) entry = default;
             foreach (var row in productRows)
             {
                 if (string.Equals(row.SubTypeName, "Foil", StringComparison.OrdinalIgnoreCase))
-                    entry.Foil = row.MarketPrice;
+                    (entry.Foil, entry.FoilLow) = (row.MarketPrice, row.LowPrice);
                 else if (string.Equals(row.SubTypeName, "Normal", StringComparison.OrdinalIgnoreCase))
-                    entry.Normal = row.MarketPrice;
+                    (entry.Normal, entry.NormalLow) = (row.MarketPrice, row.LowPrice);
             }
             map[productId] = entry;
         }
@@ -934,6 +936,30 @@ public sealed class RiftboundService : ICardGameService, IGameFieldResolver, IDi
             }
         }
 
+        return result;
+    }
+
+    public Dictionary<string, decimal> GetLowPrices(IEnumerable<string> gameCardIds, bool isFoil)
+    {
+        var ids = gameCardIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return [];
+
+        var result = new Dictionary<string, decimal>(ids.Count);
+        using var ctx = _dbContextFactory.CreateDbContext();
+        foreach (var chunk in ids.Chunk(500))
+        {
+            var rows = ctx.Cards.AsNoTracking()
+                .Where(c => chunk.Contains(c.Id))
+                .Select(c => new { c.Id, c.LowPrice, c.FoilLowPrice })
+                .ToList();
+            foreach (var row in rows)
+            {
+                var price = isFoil ? row.FoilLowPrice ?? row.LowPrice : row.LowPrice ?? row.FoilLowPrice;
+                if (price.HasValue)
+                    result[row.Id] = price.Value;
+            }
+        }
         return result;
     }
 

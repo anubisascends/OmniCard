@@ -18,6 +18,8 @@ import { AuditPage } from './pages/AuditPage';
 import { ScanBatchPage } from './pages/ScanBatchPage';
 import { ListsPage } from './pages/ListsPage';
 import { TradesPage } from './pages/TradesPage';
+import { IntakePage } from './pages/IntakePage';
+import { IntakeHistoryPage } from './pages/IntakeHistoryPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AccountPage } from './pages/AccountPage';
 import { CardDetailPage } from './pages/CardDetailPage';
@@ -47,6 +49,8 @@ export function App() {
         <Route path="/inventory" element={<RequirePermission anyOf={['inventory.view']}><InventoryPage /></RequirePermission>} />
         <Route path="/import" element={<RequirePermission anyOf={['import.run']}><ImportPage /></RequirePermission>} />
         <Route path="/lists" element={<RequirePermission anyOf={['lists.view']}><ListsPage /></RequirePermission>} />
+        <Route path="/intake" element={<RequirePermission anyOf={['intake.quote']}><IntakePage /></RequirePermission>} />
+        <Route path="/intake/history" element={<RequirePermission anyOf={['intake.history']}><IntakeHistoryPage /></RequirePermission>} />
         <Route path="/trades" element={<RequirePermission anyOf={['trades.view']}><TradesPage /></RequirePermission>} />
         <Route path="/ship" element={<RequirePermission anyOf={['sales.orders.ship', 'sales.orders.edit']}><Suspense fallback={<LinearProgress />}><ShipPage /></Suspense></RequirePermission>} />
         <Route path="/sales" element={<RequirePermission anyOf={['sales.orders.view', 'sales.customers.view', 'sales.listings.view', 'sales.kiosk.view']}><SalesPage /></RequirePermission>} />

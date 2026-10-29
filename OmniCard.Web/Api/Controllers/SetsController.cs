@@ -36,7 +36,7 @@ public sealed class SetsController(
 
     /// <summary>All sets available for a game, newest catalog order.</summary>
     [HttpGet]
-    [RequirePermission(Permissions.SetsView)]
+    [RequirePermission(Permissions.SetsView, Permissions.IntakeQuote)]
     public ActionResult<IReadOnlyList<SetInfoDto>> Get([FromQuery] string game)
     {
         var svc = Game(game);

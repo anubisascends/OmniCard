@@ -98,6 +98,23 @@
       "failedWithError": "eBay update failed: {{error}}"
     },
     "customers": {
+      "storeCredit": "Store credit",
+      "credit": {
+        "title": "Store credit — {{name}}",
+        "balance": "Balance",
+        "history": "History",
+        "empty": "No store credit yet.",
+        "intake": "Intake #{{id}}",
+        "adjustTitle": "Adjust",
+        "adjustHelp": "Add credit, or enter a negative amount to take it off (e.g. when it's spent at the counter).",
+        "amount": "Amount",
+        "reason": "Reason",
+        "apply": "Apply",
+        "colDate": "Date",
+        "colAmount": "Amount",
+        "colReason": "Reason",
+        "colBy": "By"
+      },
       "newCustomer": "New customer",
       "editCustomer": "Edit customer",
       "deleteConfirm": "Delete customer \"{{name}}\"?",

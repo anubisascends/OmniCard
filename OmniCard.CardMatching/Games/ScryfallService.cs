@@ -20,7 +20,7 @@ using OmniCard.Data.Catalogs;
 
 namespace OmniCard.CardMatching.Games;
 
-public sealed class ScryfallService : IScryfallService, ICardGameService, IGameFieldResolver, IDisposable, ICatalogLanguageAware
+public sealed class ScryfallService : IScryfallService, ICardGameService, ILowPriceSource, IGameFieldResolver, IDisposable, ICatalogLanguageAware
 {
     // MTG exposes the full Scryfall vocabulary (see MtgSearchSchema). The catalog search
     // (SearchCards) understands every field; owned-collection search resolves the catalog-only fields
@@ -1731,6 +1731,99 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
             ? null
             : new Progress<string>(msg => progress.Report(new PriceUpdateProgress(CardGame.Mtg, null, 0, 0, msg)));
         await RunBulkImportAsync(pricesOnly: true, bridge, ct);
+        await UpdateTcgLowPricesAsync(progress, ct);
+    }
+
+    /// <summary>TCGCSV's Magic category — the source of MTG low prices (Scryfall only carries market).</summary>
+    internal const int MtgTcgCsvCategoryId = 1;
+
+    // Scryfall has no low price, so the price refresh also reads TCGCSV's Magic prices and stores each
+    // printing's TCGplayer low by its TcgplayerId. Best-effort: a TCGCSV outage keeps the old lows and
+    // never fails the (already applied) market-price refresh.
+    private async Task UpdateTcgLowPricesAsync(IProgress<PriceUpdateProgress>? progress, CancellationToken ct)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("OmniCard/1.0");
+            var groups = await TcgCsvCatalogClient.FetchGroupsAsync(client, MtgTcgCsvCategoryId, ct);
+            var rows = await TcgCsvCatalogClient.FetchPriceRowsAsync(client, MtgTcgCsvCategoryId, groups, _logger,
+                (done, total) => progress?.Report(new PriceUpdateProgress(CardGame.Mtg, null, done, total,
+                    $"MTG low prices: {done}/{total} groups")), ct);
+
+            await using var context = _dbContextFactory.CreateDbContext();
+            var updated = ApplyTcgLowPrices(context, rows);
+            _logger.LogInformation("MTG low prices updated from TCGCSV: {Updated} cards changed", updated);
+            progress?.Report(new PriceUpdateProgress(CardGame.Mtg, null, 0, 0, $"MTG low prices updated ({updated} cards)"));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "MTG low-price refresh from TCGCSV failed; keeping the previous low prices");
+        }
+    }
+
+    /// <summary>Writes TCGCSV low prices (product id → price rows) onto every printing whose
+    /// <see cref="Card.TcgplayerId"/> they cover: the "Normal" row's low as <see cref="Card.TcgLowPrice"/>,
+    /// the "Foil" row's as <see cref="Card.TcgFoilLowPrice"/>. Only changed rows are written, through
+    /// key-only stubs so the (large) card rows never have to be loaded. Returns the number changed.</summary>
+    internal static int ApplyTcgLowPrices(ScryfallDbContext context, IReadOnlyDictionary<int, List<TcgCsvPrice>> rows)
+    {
+        static decimal? Low(List<TcgCsvPrice> productRows, string subType) => productRows
+            .FirstOrDefault(r => string.Equals(r.SubTypeName, subType, StringComparison.OrdinalIgnoreCase))?.LowPrice;
+
+        var current = context.Cards.AsNoTracking()
+            .Where(c => c.TcgplayerId != null)
+            .Select(c => new { c.Id, c.TcgplayerId, c.TcgLowPrice, c.TcgFoilLowPrice })
+            .ToList();
+
+        var changed = 0;
+        foreach (var chunk in current.Chunk(500))
+        {
+            foreach (var card in chunk)
+            {
+                if (!rows.TryGetValue(card.TcgplayerId!.Value, out var productRows)) continue;
+                var low = Low(productRows, "Normal");
+                var foilLow = Low(productRows, "Foil");
+                if (low == card.TcgLowPrice && foilLow == card.TcgFoilLowPrice) continue;
+
+                var stub = new Card { Id = card.Id, TcgLowPrice = card.TcgLowPrice, TcgFoilLowPrice = card.TcgFoilLowPrice };
+                context.Cards.Attach(stub);
+                stub.TcgLowPrice = low;
+                stub.TcgFoilLowPrice = foilLow;
+                changed++;
+            }
+            context.SaveChanges();
+            context.ChangeTracker.Clear();
+        }
+        return changed;
+    }
+
+    public Dictionary<string, decimal> GetLowPrices(IEnumerable<string> gameCardIds, bool isFoil)
+    {
+        var ids = gameCardIds
+            .Where(id => Guid.TryParse(id, out _))
+            .Select(Guid.Parse)
+            .Distinct()
+            .ToList();
+        if (ids.Count == 0)
+            return [];
+
+        using var ctx = _dbContextFactory.CreateDbContext();
+        var result = new Dictionary<string, decimal>(ids.Count);
+        foreach (var chunk in ids.Chunk(500))
+        {
+            var rows = ctx.Cards.AsNoTracking()
+                .Where(c => chunk.Contains(c.Id))
+                .Select(c => new { c.Id, c.TcgLowPrice, c.TcgFoilLowPrice })
+                .ToList();
+            foreach (var row in rows)
+            {
+                var price = isFoil ? row.TcgFoilLowPrice ?? row.TcgLowPrice : row.TcgLowPrice ?? row.TcgFoilLowPrice;
+                if (price.HasValue)
+                    result[row.Id.ToString()] = price.Value;
+            }
+        }
+        return result;
     }
 
     private async Task<(int Inserted, int Updated)> UpsertBatchAsync(
@@ -1774,6 +1867,8 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
                 var artHash = existing.ArtHash;
                 var hashedIllustrationId = existing.HashedIllustrationId;
                 var localImagePath = existing.LocalImagePath;
+                var tcgLowPrice = existing.TcgLowPrice;
+                var tcgFoilLowPrice = existing.TcgFoilLowPrice;
 
                 // Copy all mapped scalar + JSON-converted properties in one shot,
                 // so newly added Card fields refresh automatically without touching this code.
@@ -1791,6 +1886,8 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, IGameF
                 existing.ArtHash = artHash;
                 existing.HashedIllustrationId = hashedIllustrationId;
                 existing.LocalImagePath = localImagePath;
+                existing.TcgLowPrice = tcgLowPrice;
+                existing.TcgFoilLowPrice = tcgFoilLowPrice;
             }
 
             await context.SaveChangesAsync(ct);

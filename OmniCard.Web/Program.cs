@@ -6,6 +6,8 @@ using OmniCard.Collection;
 using OmniCard.Data;
 using OmniCard.Web.Services;
 using OmniCard.Web.Services.Kiosk;
+using OmniCard.Web.Services.Intake;
+using OmniCard.Shared.Intake;
 using OmniCard.Shared.Kiosk;
 using OmniCard.Shared.Audit;
 using OmniCard.Shared.Cards;
@@ -312,6 +314,12 @@ builder.Services.AddScoped(sp => new RequestSiteAccess(
 builder.Services.AddSingleton<IKioskSettingsService, KioskSettingsService>();
 builder.Services.AddSingleton<IKioskCardEnricher, KioskCardEnricher>();
 builder.Services.AddSingleton<KioskService>();
+// Intake (/intake): buying singles over the counter — scan, quote cash/trade from the catalog price with
+// the admin's percentages (intake-settings.json), then buy into the intake location; customers' store
+// credit ledger. Singletons so the credit ledger's write lock is shared.
+builder.Services.AddSingleton<IIntakeSettingsService, IntakeSettingsService>();
+builder.Services.AddSingleton<StoreCreditService>();
+builder.Services.AddSingleton<IntakeService>();
 // Saved views of the Collection / Location pages (per user, plus admin-shared views and defaults).
 builder.Services.AddSingleton(sp => new SavedViewService(writableFactory, sp.GetRequiredService<TimeProvider>()));
 
@@ -415,7 +423,9 @@ using (var scope = app.Services.CreateScope())
             // EnsureCreated never alters an existing DB — add columns introduced since (e.g. Lang).
             switch (ctx)
             {
+                case ScryfallDbContext scryfall: scryfall.ApplySchemaUpgrades(); break;
                 case OptcgDbContext optcg: optcg.ApplySchemaUpgrades(); break;
+                case RiftboundDbContext riftbound: riftbound.ApplySchemaUpgrades(); break;
                 case TcgCsvDbContext tcgcsv: tcgcsv.ApplySchemaUpgrades(); break;
             }
         }

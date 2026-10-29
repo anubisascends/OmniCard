@@ -22,7 +22,7 @@ namespace OmniCard.CardMatching.Games;
 // Abstract base for all TCGCSV-backed games. Concrete games subclass this, supplying a
 // category id, extended-data mapping, and sub-type→price mapping. Catalog download, image
 // hashing, price refresh, matching, and queries live here — implemented once.
-public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameFieldResolver, ICatalogLanguageAware, IDisposable
+public abstract class TcgCsvGameService<TContext> : ICardGameService, ILowPriceSource, IGameFieldResolver, ICatalogLanguageAware, IDisposable
     where TContext : TcgCsvDbContext
 {
     protected const string TcgCsvBaseUrl = "https://tcgcsv.com";
@@ -384,7 +384,7 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
             catalogLanguages = await ctx.Cards.Select(c => c.Lang).Distinct().ToListAsync(ct);
         var categories = catalogLanguages.Prepend(CardLanguages.English)
             .Where(LanguageCategories.ContainsKey).Select(l => LanguageCategories[l]).Distinct().ToList();
-        var priceMap = new Dictionary<int, (decimal? Normal, decimal? Foil)>();
+        var priceMap = new Dictionary<int, SubtypePrices>();
         foreach (var categoryId in categories)
             foreach (var (pid, prices) in await FetchTcgCsvPriceMapAsync(client, categoryId, progress, ct))
                 priceMap[pid] = prices;
@@ -407,6 +407,8 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
                 {
                     existing.MarketPrice = prices.Normal;
                     existing.FoilMarketPrice = prices.Foil;
+                    existing.LowPrice = prices.NormalLow;
+                    existing.FoilLowPrice = prices.FoilLow;
                     existing.PriceUpdatedAt = now;
                     updated++;
                 }
@@ -419,7 +421,7 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
         progress?.Report(new PriceUpdateProgress(Game, null, 0, 0, $"{Game} prices updated ({updated} cards)"));
     }
 
-    private async Task<Dictionary<int, (decimal? Normal, decimal? Foil)>> FetchTcgCsvPriceMapAsync(
+    private async Task<Dictionary<int, SubtypePrices>> FetchTcgCsvPriceMapAsync(
         HttpClient client, int categoryId, IProgress<PriceUpdateProgress>? progress, CancellationToken ct)
     {
         var groups = await client.GetFromJsonAsync<TcgCsvGroupsResponse>(
@@ -450,10 +452,21 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
             progress?.Report(new PriceUpdateProgress(Game, null, done, groupList.Count, $"{Game} prices: {done}/{groupList.Count} groups"));
         }
 
-        var map = new Dictionary<int, (decimal? Normal, decimal? Foil)>(rowsByProduct.Count);
-        foreach (var (pid, rows) in rowsByProduct) map[pid] = MapSubtypePrices(rows);
+        var map = new Dictionary<int, SubtypePrices>(rowsByProduct.Count);
+        foreach (var (pid, rows) in rowsByProduct)
+        {
+            var (normal, foil) = MapSubtypePrices(rows);
+            // Lows follow the very same per-game subtype choice: run the mapping over the rows with each
+            // row's low standing in for its market price.
+            var (normalLow, foilLow) = MapSubtypePrices(rows
+                .Select(r => new TcgCsvPrice { ProductId = r.ProductId, SubTypeName = r.SubTypeName, MarketPrice = r.LowPrice })
+                .ToList());
+            map[pid] = new SubtypePrices(normal, foil, normalLow, foilLow);
+        }
         return map;
     }
+
+    private readonly record struct SubtypePrices(decimal? Normal, decimal? Foil, decimal? NormalLow, decimal? FoilLow);
     public async Task ComputeImageHashesAsync(bool forceAll = false, IProgress<string>? progress = null, CancellationToken ct = default)
     {
         _logger.LogInformation("Starting {Game} image hash computation (forceAll: {ForceAll})", Game, forceAll);
@@ -1081,6 +1094,25 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, IGameField
             foreach (var row in rows)
             {
                 var price = isFoil ? row.FoilMarketPrice ?? row.MarketPrice : row.MarketPrice ?? row.FoilMarketPrice;
+                if (price.HasValue) result[row.ProductId.ToString()] = price.Value;
+            }
+        }
+        return result;
+    }
+
+    public Dictionary<string, decimal> GetLowPrices(IEnumerable<string> gameCardIds, bool isFoil)
+    {
+        var ids = gameCardIds.Select(s => int.TryParse(s, out var i) ? i : (int?)null).OfType<int>().Distinct().ToList();
+        if (ids.Count == 0) return [];
+        var result = new Dictionary<string, decimal>(ids.Count);
+        using var ctx = _dbContextFactory.CreateDbContext();
+        foreach (var chunk in ids.Chunk(500))
+        {
+            var rows = ctx.Cards.AsNoTracking().Where(c => chunk.Contains(c.ProductId))
+                .Select(c => new { c.ProductId, c.LowPrice, c.FoilLowPrice }).ToList();
+            foreach (var row in rows)
+            {
+                var price = isFoil ? row.FoilLowPrice ?? row.LowPrice : row.LowPrice ?? row.FoilLowPrice;
                 if (price.HasValue) result[row.ProductId.ToString()] = price.Value;
             }
         }

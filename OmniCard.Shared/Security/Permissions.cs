@@ -85,6 +85,8 @@ public static class Permissions
     public const string SalesCustomersCreate = "sales.customers.create";
     public const string SalesCustomersEdit = "sales.customers.edit";
     public const string SalesCustomersDelete = "sales.customers.delete";
+    /// <summary>Manually credit or debit a customer's store credit (intake trade credit is issued by Buy).</summary>
+    public const string SalesCustomersCredit = "sales.customers.credit";
 
     // Sales · Listings
     public const string SalesListingsView = "sales.listings.view";
@@ -98,6 +100,15 @@ public static class Permissions
     public const string SalesKioskView = "sales.kiosk.view";
     /// <summary>Claim, edit, cancel kiosk pick lists and turn them into orders.</summary>
     public const string SalesKioskFulfill = "sales.kiosk.fulfill";
+
+    // Intake (buying singles over the counter). Deliberately no "view" action: the Viewer baseline
+    // (every *.view) must not be able to quote or see what was paid.
+    /// <summary>Scan a seller's cards and see the cash / trade quote.</summary>
+    public const string IntakeQuote = "intake.quote";
+    /// <summary>Buy the quoted cards: add them to the intake location and pay cash or store credit.</summary>
+    public const string IntakeBuy = "intake.buy";
+    /// <summary>Review the intake history (who bought what, from whom, at what price).</summary>
+    public const string IntakeHistory = "intake.history";
 
     // Settings
     public const string SettingsView = "settings.view";
@@ -201,6 +212,7 @@ public static class Permissions
             new(SalesCustomersCreate, "create", "Create"),
             new(SalesCustomersEdit, "edit", "Edit"),
             new(SalesCustomersDelete, "delete", "Delete"),
+            new(SalesCustomersCredit, "credit", "Adjust store credit"),
         ]),
         new("sales.listings", "Sales · Listings",
         [
@@ -214,6 +226,12 @@ public static class Permissions
         [
             new(SalesKioskView, "view", "View pick-list queue"),
             new(SalesKioskFulfill, "fulfill", "Fulfill pick lists"),
+        ]),
+        new("intake", "Intake",
+        [
+            new(IntakeQuote, "quote", "Scan and quote"),
+            new(IntakeBuy, "buy", "Buy cards"),
+            new(IntakeHistory, "history", "View history"),
         ]),
         new("settings", "Settings",
         [

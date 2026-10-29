@@ -38,6 +38,7 @@ import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import RequestQuoteIcon from '@mui/icons-material/RequestQuote';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
@@ -51,7 +52,7 @@ const DRAWER_WIDTH = 200;
 
 // Phones get a bottom tab bar: the first four of these sections the user can see, then "More" (the
 // full drawer).
-const BOTTOM_NAV = ['/', '/scan', '/collection', '/locations', '/sets', '/lists', '/sales'];
+const BOTTOM_NAV = ['/', '/scan', '/intake', '/collection', '/locations', '/sets', '/lists', '/sales'];
 const BOTTOM_NAV_HEIGHT = 56;
 const SECTION_ALIASES: Record<string, string[]> = {
   '/locations': ['/location/', '/binder/', '/audit/'],
@@ -72,6 +73,7 @@ const NAV: { to: string; labelKey: string; icon: ReactNode; perm?: string[]; bad
   { to: '/sets', labelKey: 'sets', icon: <ChecklistIcon />, perm: ['sets.view'] },
   { to: '/inventory', labelKey: 'inventory', icon: <Inventory2Icon />, perm: ['inventory.view'] },
   { to: '/lists', labelKey: 'lists', icon: <FormatListBulletedIcon />, perm: ['lists.view'] },
+  { to: '/intake', labelKey: 'intake', icon: <RequestQuoteIcon />, perm: ['intake.quote', 'intake.history'] },
   { to: '/trades', labelKey: 'trades', icon: <SwapHorizIcon />, perm: ['trades.view'] },
   { to: '/import', labelKey: 'import', icon: <UploadFileIcon />, perm: ['import.run'] },
   { to: '/sales', labelKey: 'sales', icon: <PointOfSaleIcon />, perm: ['sales.orders.view', 'sales.customers.view', 'sales.listings.view', 'sales.kiosk.view'], badge: 'kioskQueue' },
