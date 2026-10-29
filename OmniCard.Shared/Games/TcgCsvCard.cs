@@ -39,5 +39,7 @@ public class TcgCsvCard
     // Pricing — populated from TCGCSV prices, keyed by ProductId.
     public decimal? MarketPrice { get; set; }        // "Normal" subtype market price
     public decimal? FoilMarketPrice { get; set; }    // game's principal foil subtype market price
+    public decimal? LowPrice { get; set; }           // the same subtypes' TCGplayer low listing price
+    public decimal? FoilLowPrice { get; set; }
     public DateTime? PriceUpdatedAt { get; set; }     // UTC
 }

@@ -28,6 +28,7 @@ import search from './locales/en-US/search.json';
 import help from './locales/en-US/help.json';
 import labels from './locales/en-US/labels.json';
 import kiosk from './locales/en-US/kiosk.json';
+import intake from './locales/en-US/intake.json';
 
 const enUS = {
   ...common,
@@ -52,6 +53,7 @@ const enUS = {
   ...help,
   ...labels,
   ...kiosk,
+  ...intake,
 };
 
 export const FALLBACK_LNG = 'en-US';

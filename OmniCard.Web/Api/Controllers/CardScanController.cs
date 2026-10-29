@@ -78,7 +78,7 @@ public sealed class CardScanController(
     /// language is then read off the card where it prints one, else taken from the matched printing.</summary>
     [HttpPost("match")]
     [RequestSizeLimit(MaxFileSize)]
-    [RequirePermission(Permissions.ScanView)]
+    [RequirePermission(Permissions.ScanView, Permissions.IntakeQuote)]
     public async Task<ActionResult<ScanMatchDto>> Match(
         IFormFile image, [FromForm] string game, [FromForm] bool isFoil, [FromForm] string[]? set,
         CancellationToken ct, [FromForm] string? language = null)
@@ -126,7 +126,7 @@ public sealed class CardScanController(
     /// only catalog rows in those languages (empty ⇒ every language); it's applied in the query rather than
     /// to the capped results so a narrow language choice isn't starved by other languages' rows.</summary>
     [HttpGet("search")]
-    [RequirePermission(Permissions.ScanView)]
+    [RequirePermission(Permissions.ScanView, Permissions.IntakeQuote)]
     public ActionResult<IReadOnlyList<ScanSearchResultDto>> Search(
         [FromQuery] string game, [FromQuery] string? q = null, [FromQuery] string[]? set = null, [FromQuery] string? cn = null,
         [FromQuery] string[]? lang = null)
@@ -200,7 +200,7 @@ public sealed class CardScanController(
 
     /// <summary>Curated foil-finish presets for a game, for the scan bulk/per-item foil-type picker.</summary>
     [HttpGet("foil-types")]
-    [RequirePermission(Permissions.ScanView)]
+    [RequirePermission(Permissions.ScanView, Permissions.IntakeQuote)]
     public ActionResult<IReadOnlyList<string>> FoilTypesFor([FromQuery] string game)
     {
         if (LocationsController.ParseGame(game) is not { } parsedGame)
@@ -243,7 +243,7 @@ public sealed class CardScanController(
     /// can show them (removable) during review. Open to anyone who can scan; the rules themselves are
     /// admin-managed (<see cref="TagRulesController"/>).</summary>
     [HttpPost("tag-rules")]
-    [RequirePermission(Permissions.ScanView)]
+    [RequirePermission(Permissions.ScanView, Permissions.IntakeQuote)]
     public ActionResult<IReadOnlyList<ScanTagRuleResultDto>> TagRules([FromBody] ScanTagRulesRequest request)
     {
         if (LocationsController.ParseGame(request.Game) is not { } game)

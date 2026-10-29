@@ -17,7 +17,8 @@
       "users": "Users",
       "reset": "Reset Collection",
       "components": "Components",
-      "kiosk": "Kiosk"
+      "kiosk": "Kiosk",
+      "intake": "Intake"
     },
     "roles": {
       "title": "Roles",

@@ -14,6 +14,14 @@ public class ScryfallDbContext : DbContext
 
     public ScryfallDbContext(DbContextOptions<ScryfallDbContext> options) : base(options) { }
 
+    /// <summary>Adds columns introduced after an existing SQL Server catalog was first created (EnsureCreated
+    /// never alters one). Idempotent; no-op on SQLite, whose catalog file is created fresh.</summary>
+    public void ApplySchemaUpgrades()
+    {
+        CatalogSchema.AddSqlServerColumnIfMissing(this, "Cards", "TcgLowPrice", "decimal(18,2) NULL");
+        CatalogSchema.AddSqlServerColumnIfMissing(this, "Cards", "TcgFoilLowPrice", "decimal(18,2) NULL");
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         var card = modelBuilder.Entity<Card>();
@@ -121,6 +129,20 @@ public class ScryfallDbContext : DbContext
         catch (SqliteException ex) when (ex.Message.Contains("duplicate column name"))
         {
             // Column already exists — nothing to do
+        }
+
+        // 3b. TCGplayer low prices (fetched from TCGCSV during the price refresh)
+        foreach (var col in new[] { "TcgLowPrice", "TcgFoilLowPrice" })
+        {
+            try
+            {
+                cmd.CommandText = $"ALTER TABLE Cards ADD COLUMN {col} TEXT";
+                cmd.ExecuteNonQuery();
+            }
+            catch (SqliteException ex) when (ex.Message.Contains("duplicate column name"))
+            {
+                // Column already exists — nothing to do
+            }
         }
 
         // 4. Add ArtScanHash column to HashCorrections

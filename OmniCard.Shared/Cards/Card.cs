@@ -124,6 +124,13 @@ public class Card
     [JsonIgnore]
     public string? LocalImagePath { get; set; }
 
+    // TCGplayer low listing prices (non-foil / foil), fetched from TCGCSV by TcgplayerId during the
+    // price refresh — Scryfall itself only carries market prices (see ILowPriceSource).
+    [JsonIgnore]
+    public decimal? TcgLowPrice { get; set; }
+    [JsonIgnore]
+    public decimal? TcgFoilLowPrice { get; set; }
+
     // Navigation property (EF Core only, not from Scryfall JSON)
     [JsonIgnore]
     public List<RelatedCard> RelatedCards { get; set; } = [];

@@ -22,6 +22,7 @@ Click **Administration** in the sidebar. Everyone can open this page, but you on
 | **Roles** | Permission bundles | Administrators only |
 | **Sites** | Major physical places and who can see them | Administrators only |
 | **Kiosk** | The customer kiosk: what customers can browse, and the kiosk devices | Administrators only |
+| **Intake** | Buying singles: cash and trade percentages, condition, bulk, rounding, intake location, customer view | Administrators only |
 | **Users** | Every account: add, edit, require password resets, delete | Administrators only |
 | **Reset Collection** | Remove the whole collection to start over, keeping sales data | Administrators only |
 | **Components** | Software versions and licenses | Everyone |
@@ -124,15 +125,16 @@ Permissions are grouped by section. Most sections have **View**, plus actions su
 | Import | Run import |
 | Export | Run export |
 | Sales · Orders | View, Create, Edit, Delete, Import orders, Ship (scan labels) |
-| Sales · Customers | View, Create, Edit, Delete |
+| Sales · Customers | View, Create, Edit, Delete, Adjust store credit |
 | Sales · Listings | View, Create, Edit, Delete, Pick / mark picked |
 | Sales · Kiosk | View pick-list queue, Fulfill pick lists |
+| Intake | Scan and quote, Buy cards, View history |
 | Settings | View, Edit |
 | Deck Types | View, Edit |
 | Catalog Data | View, Refresh |
 | eBay | View, Manage / connect |
 
-Managing users, roles, sites and the customer kiosk's settings isn't a permission. Only administrators can do it.
+Managing users, roles, sites and the customer kiosk's and intake's settings isn't a permission. Only administrators can do it.
 
 ## Sites
 
@@ -169,6 +171,10 @@ A person gets the higher of their own level and their role's level. Administrato
 ## Kiosk
 
 Only administrators see this tab. It sets up the [customer kiosk](help:kiosk): whether kiosks are open, which locations customers can browse, the idle timeout, whether prices are shown, and the welcome message. Below the settings, **Kiosk devices** lists every device set up as a kiosk, with **Revoke** to lock one out.
+
+## Intake
+
+Only administrators see this tab. It sets how [intake](help:intake) prices the cards you buy from sellers: the cash and trade percentages, the condition adjustment, bulk handling, rounding, the intake location bought cards go into, and what the seller sees on the customer view.
 
 ## Catalog Data
 
@@ -388,3 +394,4 @@ This tab lists the software and third-party components that OmniCard ships with 
 - [Locations](help:locations): creating locations inside sites
 - [eBay](help:ebay) and [Sales](help:sales): selling cards
 - [Customer kiosk](help:kiosk): letting customers browse your cards and send pick lists to the counter
+- [Intake](help:intake): buying singles from sellers for cash or store credit

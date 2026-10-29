@@ -233,13 +233,14 @@ Next time, pick your template from the **Template** list. To remove a template y
 
 ## Manage customers
 
-The **Customers** tab lists everyone you sell to, with their **Name**, **Email**, **Phone** and **Location** (city and state).
+The **Customers** tab lists everyone you sell to, with their **Name**, **Email**, **Phone**, **Location** (city and state) and **Store credit**.
 
 ![The Customers tab](sales-customers.png)
 
 - **Add a customer**: click **New customer**, fill in at least the **Name**, and click **Save**. You can also add email, phone and a full mailing address.
 - **Edit a customer**: click the pencil button on their row.
-- **Delete a customer**: click the trash button and confirm.
+- **Delete a customer**: click the trash button and confirm. A customer who still has store credit can't be deleted.
+- **Store credit**: click the amount in the **Store credit** column to see the customer's balance and every change. Credit is added when you buy their cards for trade at [intake](help:intake); with the **Adjust store credit** permission you can also add or take off credit, with a reason.
 
 Customers are also created automatically when you import orders from a CSV file.
 
