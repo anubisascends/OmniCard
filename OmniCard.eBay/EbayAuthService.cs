@@ -65,22 +65,39 @@ public partial class EbayAuthService : ObservableObject, IEbayAuthService
         // DevId is unused by this flow, so a blank DevId must not block connecting.
         var missing = new List<string>();
         if (string.IsNullOrWhiteSpace(_settings.AppId)) missing.Add(nameof(_settings.AppId));
-        if (string.IsNullOrWhiteSpace(_settings.CertId)) missing.Add(nameof(_settings.CertId));
+        // With a broker, the CertId lives in the broker instead of on this server.
+        if (string.IsNullOrWhiteSpace(_settings.CertId) && !_settings.UsesBroker) missing.Add(nameof(_settings.CertId));
         if (string.IsNullOrWhiteSpace(_settings.RuName)) missing.Add(nameof(_settings.RuName));
-        // AcceptUrl is what the auth WebView matches to capture the returned code;
-        // without it the redirect is silently ignored and no tokens are ever saved.
-        if (string.IsNullOrWhiteSpace(_settings.AcceptUrl)) missing.Add(nameof(_settings.AcceptUrl));
+        // The RuName's accepted URL (set in the eBay dev portal) isn't needed here: the user can paste
+        // the address eBay sends them to, so no callback reachable from the browser is required.
         return missing;
     }
 
-    public string GetAuthorizationUrl()
+    public string GetAuthorizationUrl(string? state = null)
     {
         var scopes = Uri.EscapeDataString(string.Join(" ", OAuthScopes));
         return $"{_settings.AuthBaseUrl}/oauth2/authorize" +
             $"?client_id={Uri.EscapeDataString(_settings.AppId)}" +
             $"&response_type=code" +
             $"&redirect_uri={Uri.EscapeDataString(_settings.RuName)}" +
-            $"&scope={scopes}";
+            $"&scope={scopes}" +
+            (string.IsNullOrEmpty(state) ? "" : $"&state={Uri.EscapeDataString(state)}");
+    }
+
+    /// <summary>POSTs a token request: straight to eBay with this server's keyset, or to the broker,
+    /// which adds the keyset credentials and redirect_uri itself (the CertId never lives here).</summary>
+    private Task<HttpResponseMessage> PostTokenRequestAsync(Dictionary<string, string> form)
+    {
+        var client = _httpClientFactory.CreateClient();
+        if (_settings.UsesBroker)
+        {
+            form.Remove("redirect_uri");
+            return client.PostAsync($"{_settings.BrokerUrl.TrimEnd('/')}/token", new FormUrlEncodedContent(form));
+        }
+
+        var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_settings.AppId}:{_settings.CertId}"));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+        return client.PostAsync($"{_settings.ApiBaseUrl}/identity/v1/oauth2/token", new FormUrlEncodedContent(form));
     }
 
     public async Task<bool> ExchangeCodeForTokensAsync(string authCode)
@@ -88,19 +105,12 @@ public partial class EbayAuthService : ObservableObject, IEbayAuthService
         try
         {
             _logger.LogInformation("Exchanging authorization code for tokens");
-            var client = _httpClientFactory.CreateClient();
-
-            var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_settings.AppId}:{_settings.CertId}"));
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", credentials);
-
-            var content = new FormUrlEncodedContent(new Dictionary<string, string>
+            using var response = await PostTokenRequestAsync(new Dictionary<string, string>
             {
                 ["grant_type"] = "authorization_code",
                 ["code"] = authCode,
                 ["redirect_uri"] = _settings.RuName,
             });
-
-            var response = await client.PostAsync($"{_settings.ApiBaseUrl}/identity/v1/oauth2/token", content);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -162,19 +172,12 @@ public partial class EbayAuthService : ObservableObject, IEbayAuthService
         try
         {
             _logger.LogInformation("Refreshing eBay access token");
-            var client = _httpClientFactory.CreateClient();
-
-            var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_settings.AppId}:{_settings.CertId}"));
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", credentials);
-
-            var content = new FormUrlEncodedContent(new Dictionary<string, string>
+            using var response = await PostTokenRequestAsync(new Dictionary<string, string>
             {
                 ["grant_type"] = "refresh_token",
                 ["refresh_token"] = refreshToken,
                 ["scope"] = string.Join(" ", OAuthScopes),
             });
-
-            var response = await client.PostAsync($"{_settings.ApiBaseUrl}/identity/v1/oauth2/token", content);
 
             if (!response.IsSuccessStatusCode)
             {

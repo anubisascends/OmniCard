@@ -1071,10 +1071,16 @@ public sealed record SetCatalogLanguagesRequest
 
 /// <summary>eBay connection state for the settings screen. <see cref="Connected"/> = valid OAuth
 /// tokens on file; <see cref="Configured"/> = the app credentials needed to attempt a connection are
-/// all present (<see cref="MissingConfig"/> lists any that aren't).</summary>
-public sealed record EbayStatusDto(bool Connected, bool Configured, IReadOnlyList<string> MissingConfig);
+/// all present (<see cref="MissingConfig"/> lists any that aren't). <see cref="UsesBroker"/> = token
+/// calls and the sign-in redirect go through the eBay token broker, so connecting returns to this
+/// server automatically.</summary>
+public sealed record EbayStatusDto(bool Connected, bool Configured, IReadOnlyList<string> MissingConfig, bool UsesBroker);
 
 public sealed record EbaySetupResultDto(bool Success, string? Message);
+
+/// <summary>Finishes the eBay connection without a callback: <see cref="Input"/> is the address eBay
+/// showed after consent (or the bare authorization code), as pasted by the user.</summary>
+public sealed record EbayConnectCodeRequest(string? Input);
 
 /// <summary>Editable eBay seller settings (address for the inventory location + shipping/return policy
 /// inputs) surfaced in Settings ▸ eBay, plus read-only setup results (policy ids / provisioning state)

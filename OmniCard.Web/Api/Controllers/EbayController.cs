@@ -1,21 +1,28 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using OmniCard.Api.Contracts;
 using OmniCard.Shared.Ebay;
 using OmniCard.Shared.Security;
 using OmniCard.Web.Api.Infrastructure;
+using OmniCard.Web.Services;
 
 namespace OmniCard.Web.Api.Controllers;
 
 /// <summary>
 /// Server-side eBay OAuth + seller setup for the SPA. Reuses the desktop's eBay stack
 /// (<see cref="IEbayAuthService"/> / <see cref="IEbaySellerSetupService"/>); tokens persist via
-/// <c>WebCredentialStore</c>. The connect flow is a normal web redirect: the browser is sent to
-/// eBay's consent page and eBay redirects back to <see cref="Callback"/> with an authorization code.
-///
-/// Deployment: fill the <c>eBay</c> config section (AppId/CertId/RuName/AcceptUrl/Environment) and
-/// register this app's callback (<c>/api/ebay/callback</c>) as the RuName accept URL in the eBay dev
-/// portal, matching <c>Environment</c> (sandbox vs production).
+/// <c>WebCredentialStore</c>. The browser is sent to eBay's consent page; eBay then redirects it to the
+/// RuName's accepted URL with an authorization code. Two ways to finish:
+/// <list type="bullet">
+/// <item>Accepted URL = this app's <c>/api/ebay/callback</c> → <see cref="Callback"/> finishes automatically.</item>
+/// <item>Any other accepted URL (eBay's default page, an old host…) → the user pastes the address they
+/// landed on into Settings ▸ eBay → <see cref="ConnectWithCode"/>. Self-hosted servers need no callback.</item>
+/// <item>Broker mode (<see cref="EbaySettings.UsesBroker"/>): the accepted URL is the broker's
+/// <c>/callback</c>, which reads this server's callback URL from <c>state</c> and redirects there.</item>
+/// </list>
+/// Deployment: the shipped <c>eBay</c> config section (AppId/RuName/Environment/BrokerUrl) works out of
+/// the box via the broker; an install with its own keyset sets CertId (and its own RuName) instead.
 /// </summary>
 [ApiController]
 [ApiAuth]
@@ -24,6 +31,8 @@ public sealed class EbayController(
     IEbayAuthService auth,
     IEbaySellerSetupService sellerSetup,
     IEbaySellingSettingsService selling,
+    EbayOAuthStateStore oauthState,
+    IOptions<EbaySettings> settings,
     ILogger<EbayController> logger) : ControllerBase
 {
     [HttpGet("status")]
@@ -31,34 +40,59 @@ public sealed class EbayController(
     public ActionResult<EbayStatusDto> Status()
     {
         var missing = auth.GetMissingConfiguration();
-        return new EbayStatusDto(auth.IsConnected, missing.Count == 0, missing);
+        return new EbayStatusDto(auth.IsConnected, missing.Count == 0, missing, settings.Value.UsesBroker);
     }
 
     /// <summary>Redirects the browser to eBay's OAuth consent page. If the app isn't configured,
-    /// bounces back to the settings screen with an error marker instead.</summary>
+    /// bounces back to the settings screen with an error marker instead. The state carries this
+    /// server's callback URL (as the browser sees it) for the broker, plus a nonce.</summary>
     [HttpGet("connect")]
     [RequirePermission(Permissions.EbayManage)]
     public IActionResult Connect()
     {
         if (auth.GetMissingConfiguration().Count > 0)
             return Redirect("/app/settings?ebay=misconfigured");
-        return Redirect(auth.GetAuthorizationUrl());
+        var callbackUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}/api/ebay/callback";
+        return Redirect(auth.GetAuthorizationUrl(oauthState.Create(callbackUrl)));
     }
 
-    /// <summary>eBay redirects here after consent with an authorization <paramref name="code"/>.
-    /// Exchanges it for tokens (stored server-side) and returns the user to the settings screen.</summary>
+    /// <summary>eBay (directly, or via the broker) redirects here after consent with an authorization
+    /// <paramref name="code"/>. Exchanges it for tokens (stored server-side) and returns the user to the
+    /// settings screen. Only sign-ins this server started (a live <paramref name="state"/> nonce) count.</summary>
     [HttpGet("callback")]
     [AllowAnonymous]
-    public async Task<IActionResult> Callback([FromQuery] string? code, [FromQuery] string? error)
+    public async Task<IActionResult> Callback(
+        [FromQuery] string? code, [FromQuery] string? error, [FromQuery] string? state)
     {
         if (!string.IsNullOrEmpty(error) || string.IsNullOrEmpty(code))
         {
             logger.LogWarning("eBay OAuth callback returned without a code (error: {Error})", error);
             return Redirect("/app/settings?ebay=failed");
         }
+        if (!oauthState.Consume(state))
+        {
+            logger.LogWarning("eBay OAuth callback rejected: unknown or expired state");
+            return Redirect("/app/settings?ebay=failed");
+        }
 
         var ok = await auth.ExchangeCodeForTokensAsync(code);
         return Redirect(ok ? "/app/settings?ebay=connected" : "/app/settings?ebay=failed");
+    }
+
+    /// <summary>The no-callback way to finish connecting: the user pastes the address eBay sent them to
+    /// after consent (or just the code). eBay's codes expire after about five minutes.</summary>
+    [HttpPost("connect/code")]
+    [RequirePermission(Permissions.EbayManage)]
+    public async Task<ActionResult<EbayStatusDto>> ConnectWithCode([FromBody] EbayConnectCodeRequest request)
+    {
+        var code = OmniCard.eBay.EbayAuthCodeParser.ExtractCode(request.Input);
+        if (code is null)
+            return BadRequest(new { error = "No eBay authorization code was found in what you pasted.", reason = "noCode" });
+
+        if (!await auth.ExchangeCodeForTokensAsync(code))
+            return BadRequest(new { error = "eBay didn't accept the code. It may have expired.", reason = "rejected" });
+
+        return Status();
     }
 
     /// <summary>The editable eBay seller settings (inventory-location address + shipping/return policy

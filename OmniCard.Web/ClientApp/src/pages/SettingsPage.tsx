@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -50,6 +50,7 @@ import { SitesCard } from '../components/settings/SitesCard';
 import { ResetCollectionCard } from '../components/settings/ResetCollectionCard';
 import { ScanFoldersCard } from '../components/settings/ScanFoldersCard';
 import { CatalogScheduleCard } from '../components/settings/CatalogScheduleCard';
+import { EbayConnectDialog } from '../components/settings/EbayConnectDialog';
 import { PermissionChecklist } from '../components/settings/PermissionChecklist';
 import { usePermissions } from '../context/usePermissions';
 import { currencySymbol } from '../lib/scanBadges';
@@ -277,6 +278,20 @@ function EbayCard() {
     if (ebayParam === 'connected') qc.invalidateQueries({ queryKey: ['ebay-status'] });
   }, [ebayParam, qc]);
 
+  // Connecting happens in EbayConnectDialog (eBay opens in a new tab; the user pastes the address it
+  // lands on, or the callback finishes it). Reuse the ?ebay= marker for the success message.
+  const [connectOpen, setConnectOpen] = useState(false);
+  const onConnectClose = useCallback(
+    (connected: boolean) => {
+      setConnectOpen(false);
+      if (!connected) return;
+      qc.invalidateQueries({ queryKey: ['ebay-status'] });
+      params.set('ebay', 'connected');
+      setParams(params, { replace: true });
+    },
+    [params, setParams, qc],
+  );
+
   return (
     <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
       <Typography variant="h6" gutterBottom>
@@ -344,17 +359,30 @@ function EbayCard() {
                 </Button>
               </>
             ) : (
-              <Button
-                variant="contained"
-                disabled={!status.data.configured}
-                onClick={() => {
-                  window.location.href = api.ebayConnectUrl;
-                }}
-              >
-                {t('settings.ebay.connect')}
-              </Button>
+              <>
+                {/* Through the broker, eBay sends this tab straight back here; otherwise the dialog
+                    walks through pasting the address eBay lands on. */}
+                <Button
+                  variant="contained"
+                  disabled={!status.data.configured}
+                  onClick={() => {
+                    if (status.data.usesBroker) window.location.href = api.ebayConnectUrl;
+                    else setConnectOpen(true);
+                  }}
+                >
+                  {t('settings.ebay.connect')}
+                </Button>
+                {status.data.usesBroker && status.data.configured && (
+                  <Button onClick={() => setConnectOpen(true)}>{t('settings.ebay.pasteInstead')}</Button>
+                )}
+              </>
             )}
           </Stack>
+          <EbayConnectDialog
+            open={connectOpen}
+            onClose={onConnectClose}
+            showCallbackTip={!status.data.usesBroker}
+          />
 
           {setup.data && (
             <Alert severity={setup.data.success ? 'success' : 'error'}>
