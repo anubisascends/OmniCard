@@ -29,6 +29,31 @@
     "cardDetails": "Card details",
     "listForSale": "List for sale",
     "addCardToPocket": "Add card to this pocket…",
-    "replaceCardInPocket": "Replace card in this pocket…"
+    "replaceCardInPocket": "Replace card in this pocket…",
+    "simplified": "Simplified",
+    "simplifiedTooltip": "One page at a time, driven by the keyboard: arrow keys choose a pocket, Enter (or just typing a name) searches for its card",
+    "pageOf": "Page {{page}} of {{total}}",
+    "slotTooltipSimplified": "{{name}} · {{condition}}{{foilSuffix}} — double-click or Enter to replace",
+    "cursorEmpty": "Page {{page}} · pocket {{slot}} — empty",
+    "cursorCard": "Page {{page}} · pocket {{slot}} — {{name}} ({{set}} #{{number}})",
+    "keys": {
+      "move": "move",
+      "page": "previous / next page",
+      "firstLast": "first / last pocket",
+      "search": "search for this pocket",
+      "type": "start typing a name to search",
+      "remove": "take the card out (back to Unplaced)",
+      "addPage": "new sheet after this one (from a back page)",
+      "removePage": "remove this page"
+    },
+    "side": {
+      "front": "front of sheet {{sheet}}",
+      "back": "back of sheet {{sheet}}",
+      "only": "sheet {{sheet}}, one side"
+    },
+    "sheetAfterPage": "Double-sided sheet after page {{page}}",
+    "insertFromBack": "Page {{page}} is the front of its sheet, and a new sheet can't go between a sheet's two sides. Turn to the back (page {{back}}) and press + to add a sheet after it.",
+    "removePageTitle": "Remove page {{page}}?",
+    "removePageConfirm": "The whole sheet this page is on is removed — for a double-sided sheet, both sides. Its cards go back to the Unplaced pool, and the pages after it move up."
   }
 }

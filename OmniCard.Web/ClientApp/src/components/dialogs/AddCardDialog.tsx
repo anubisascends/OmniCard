@@ -31,6 +31,7 @@ import { api } from '../../api/client';
 import type { CardDto, CardListItemDto, ScanSearchResultDto } from '../../api/types';
 import { usePermissions } from '../../context/usePermissions';
 import { CardHoverPreview, type CardHover } from '../CardHoverPreview';
+import { Kbd } from '../Kbd';
 import {
   ENGLISH,
   LanguageChip,
@@ -82,6 +83,14 @@ type ResultRow = { kind: 'owned'; card: CardDto } | { kind: 'catalog'; result: S
 
 const rowId = (i: number) => `add-card-result-${i}`;
 
+/** The keys the simplified dialog lists under its search boxes, as [keys, i18n key of what they do]. */
+const KEY_HINTS: [string[], string][] = [
+  [['↑', '↓'], 'dialogs.addCard.keys.choose'],
+  [['Enter'], 'dialogs.addCard.keys.pickThenAdd'],
+  [['Esc'], 'dialogs.addCard.keys.back'],
+  [['Tab'], 'dialogs.addCard.keys.details'],
+];
+
 /**
  * The one "add a card" dialog, for a location, a binder pocket or a list (see {@link AddCardTarget}).
  * Search the game's catalog by name and/or set code + collector number, optionally limited to some
@@ -91,17 +100,27 @@ const rowId = (i: number) => `add-card-result-${i}`;
  * target needs, and add. Locations and lists stay open after "Add" (with the search kept, a running count
  * and the last few adds, each undoable); "Add & close" finishes. Catalog adds go through /api/scan/commit,
  * /api/binder/card/add-missing or /api/lists/{id}/items.
+ *
+ * Keyboard: Enter on a picked printing adds it; Esc or ↑/↓ go back from a picked printing to the results.
+ * `simplified` (the binder's keyboard fill mode) searches the catalog only, highlights the first result as
+ * soon as it arrives (an Enter pressed before then picks it) and shows the keys.
  */
 export function AddCardDialog({
   open,
   target,
   defaultGame,
+  simplified = false,
+  initialName = '',
   onClose,
   onDone,
 }: {
   open: boolean;
   target: AddCardTarget;
   defaultGame?: string;
+  /** Keyboard-first: catalog results only, first result auto-highlighted, key hints shown. */
+  simplified?: boolean;
+  /** Starts the Name box with this text (the caller caught the first keystroke). */
+  initialName?: string;
   onClose: () => void;
   /** Called after each add (and undo) so the caller can refresh. */
   onDone?: () => void;
@@ -112,7 +131,7 @@ export function AddCardDialog({
   const games = useQuery({ queryKey: ['games'], queryFn: api.games, enabled: open });
   const startGame = defaultGame ?? 'Mtg';
   const multiAdd = target.kind !== 'pocket';
-  const showOwned = target.kind !== 'location';
+  const showOwned = target.kind !== 'location' && !simplified;
   const lockGame = target.kind === 'location' && !!target.lockGame;
   const listLanguage = target.kind === 'list' ? target.language || null : null;
 
@@ -135,6 +154,8 @@ export function AddCardDialog({
   const [filterOverride, setFilterOverride] = useState<string[] | null>(null);
   const longPress = useLongPress();
   const nameRef = useRef<HTMLInputElement>(null);
+  // Simplified: an Enter pressed while the search is still running picks the top result once it lands.
+  const pendingEnter = useRef(false);
   const recentKey = useRef(0);
   // Last known quantity of each list line this sitting touched (adds of the same printing merge).
   const listQuantities = useRef(new Map<number, number>());
@@ -144,7 +165,7 @@ export function AddCardDialog({
   if (open && !wasOpen) {
     setWasOpen(true);
     setGame(startGame);
-    setName('');
+    setName(initialName);
     setSet('');
     setCn('');
     setSelected(null);
@@ -158,6 +179,7 @@ export function AddCardDialog({
     setActiveIndex(-1);
     setFilterOverride(listLanguage ? [listLanguage] : null);
     listQuantities.current.clear();
+    pendingEnter.current = false;
   }
   if (!open && wasOpen) setWasOpen(false);
 
@@ -216,6 +238,9 @@ export function AddCardDialog({
     queryKey: ['catalog-search', game, debounced, languageFilter],
     queryFn: () => api.scanSearch(game, debounced, undefined, undefined, languageFilter),
     enabled: canSearch,
+    // The catalog doesn't change while the dialog is open — going back from a picked printing (Esc/↑/↓)
+    // should show the same results at once, not search again.
+    staleTime: 5 * 60_000,
   });
 
   // Every row the keyboard can reach, in display order (collection first, then catalog).
@@ -229,6 +254,18 @@ export function AddCardDialog({
 
   // A new search starts unhighlighted.
   useEffect(() => setActiveIndex(-1), [debounced, filterKey, game]);
+  // Simplified: highlight the first result as soon as there is one, and honour an early Enter.
+  useEffect(() => {
+    if (!simplified || selected || rows.length === 0) return;
+    if (pendingEnter.current && composed === debounced) {
+      // The results weren't on screen when Enter was pressed, so the top one is what was meant.
+      pendingEnter.current = false;
+      choose(rows[0], 0);
+    } else if (activeIndex < 0) {
+      setActiveIndex(0);
+    }
+    // rows is derived each render; its length (a search landing) is what matters.
+  }, [simplified, selected, rows.length, activeIndex, composed, debounced]);
   // Keep the highlighted row in view and show its art, as hovering would.
   useEffect(() => {
     if (activeIndex < 0 || selected) return;
@@ -238,7 +275,9 @@ export function AddCardDialog({
     const url = row && rowImage(row);
     setHover(el && url ? { el, url, foil: row.kind === 'owned' && row.card.isFoil } : null);
     // rows is derived each render; the index (and the selection hiding the list) is what matters.
-  }, [activeIndex, selected]);
+  }, [activeIndex, selected, rows.length]);
+
+  const focusName = () => requestAnimationFrame(() => nameRef.current?.focus());
 
   const invalidate = () => {
     if (target.kind === 'list') {
@@ -315,6 +354,13 @@ export function AddCardDialog({
     // The copy defaults to the printing's language; it can still be changed (e.g. a French copy of a
     // card whose catalog only has the English row).
     setLanguage(r.language || ENGLISH);
+    // A clicked row disappears with the list — keep the keyboard in the search box, where Enter adds.
+    focusName();
+  };
+  /** Back from a picked printing to the results, keeping the picked row highlighted. */
+  const unpick = () => {
+    setSelected(null);
+    focusName();
   };
 
   const finishLabel = (foil: boolean, type?: string | null) => (foil ? type || t('common.labels.foil') : null);
@@ -409,16 +455,41 @@ export function AddCardDialog({
     });
   };
 
-  const choose = (row: ResultRow) => (row.kind === 'owned' ? addOwned(row.card) : pick(row.result));
+  const choose = (row: ResultRow, index: number) => {
+    setActiveIndex(index);
+    if (row.kind === 'owned') addOwned(row.card);
+    else pick(row.result);
+  };
 
   // From the search boxes: ↑/↓ move through the results, Enter picks the highlighted one (or the only
-  // one) — and, once a printing is picked, adds it.
+  // one) — and, once a printing is picked, adds it; ↑/↓ then go back to the results.
   const onSearchKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      // Handled here rather than by the dialog: while a highlighted row's art preview is open it is the
+      // top modal, and the dialog would ignore Esc.
+      e.preventDefault();
+      e.stopPropagation();
+      if (selected) unpick();
+      else {
+        setHover(null);
+        onClose();
+      }
+      return;
+    }
     if (selected) {
       if (e.key === 'Enter') {
         e.preventDefault();
         submit(false);
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        unpick();
       }
+      return;
+    }
+    if (e.key === 'Enter' && simplified && (composed !== debounced || catalog.isFetching)) {
+      // Typed ahead of the search — pick the top result when it arrives.
+      e.preventDefault();
+      pendingEnter.current = true;
       return;
     }
     if (rows.length === 0) return;
@@ -427,12 +498,12 @@ export function AddCardDialog({
       setActiveIndex((i) => Math.min(rows.length - 1, i + 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setActiveIndex((i) => Math.max(-1, i - 1));
+      setActiveIndex((i) => Math.max(simplified ? 0 : -1, i - 1));
     } else if (e.key === 'Enter' && composed === debounced) {
       const i = activeIndex >= 0 ? activeIndex : rows.length === 1 ? 0 : -1;
       if (i >= 0 && rows[i]) {
         e.preventDefault();
-        choose(rows[i]);
+        choose(rows[i], i);
       }
     }
   };
@@ -440,6 +511,7 @@ export function AddCardDialog({
   const editSearch = (setter: (v: string) => void) => (v: string) => {
     setter(v);
     setSelected(null);
+    pendingEnter.current = false;
   };
 
   const gameName = games.data?.find((g) => g.id === game)?.displayName ?? game;
@@ -453,7 +525,12 @@ export function AddCardDialog({
   const resultRowProps = (index: number, url: string | null | undefined, foil: boolean, onClick: () => void) => ({
     id: rowId(index),
     selected: index === activeIndex,
-    onClick,
+    onClick: () => {
+      setActiveIndex(index);
+      onClick();
+    },
+    // Rows are reached with ↑/↓ from the search boxes, so Tab skips them (on to the picked card's fields).
+    tabIndex: -1,
     onMouseEnter: (e: MouseEvent<HTMLElement>) => url && setHover({ el: e.currentTarget, url, foil }),
     onMouseLeave: () => setHover(null),
     ...longPress((el) => url && setHover({ el, url, foil, touch: true })),
@@ -496,7 +573,13 @@ export function AddCardDialog({
     );
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog
+      open={open}
+      // Esc on a picked printing goes back to the results; otherwise it closes.
+      onClose={(_, reason) => (reason === 'escapeKeyDown' && selected ? unpick() : onClose())}
+      fullWidth
+      maxWidth="sm"
+    >
       <DialogTitle>
         {target.kind === 'location' && t('dialogs.addCard.title', { location: target.locationName })}
         {target.kind === 'list' && t('dialogs.addToList.title')}
@@ -577,6 +660,20 @@ export function AddCardDialog({
               sx={{ width: 120 }}
             />
           </Stack>
+          {simplified && (
+            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: -1 }}>
+              {KEY_HINTS.map(([keys, label]) => (
+                <Stack key={label} direction="row" spacing={0.5} alignItems="center">
+                  {keys.map((k) => (
+                    <Kbd key={k}>{k}</Kbd>
+                  ))}
+                  <Typography variant="caption" color="text.secondary" sx={{ pr: 0.75 }}>
+                    {t(label)}
+                  </Typography>
+                </Stack>
+              ))}
+            </Stack>
+          )}
 
           {/* Results — collection first (pockets and lists), then catalog. */}
           {canSearch && (
@@ -675,7 +772,7 @@ export function AddCardDialog({
                     {selected.setName} · #{selected.collectorNumber} · {selected.rarity}
                   </Typography>
                 </Box>
-                <Button size="small" onClick={() => setSelected(null)}>{t('common.actions.change')}</Button>
+                <Button size="small" onClick={unpick}>{t('common.actions.change')}</Button>
               </Stack>
 
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>

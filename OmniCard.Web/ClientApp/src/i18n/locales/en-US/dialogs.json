@@ -15,7 +15,13 @@
       "unfiled": "Unfiled",
       "undo": "Undo",
       "addCard": "Add card",
-      "addAndClose": "Add & close"
+      "addAndClose": "Add & close",
+      "keys": {
+        "choose": "choose",
+        "pickThenAdd": "pick, then Enter again to add",
+        "back": "back to the results",
+        "details": "condition, language, foil"
+      }
     },
     "addToSlot": {
       "title": "Add card to pocket",
