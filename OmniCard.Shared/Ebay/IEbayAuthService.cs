@@ -8,7 +8,9 @@ public interface IEbayAuthService : INotifyPropertyChanged
     Task<string?> GetAccessTokenAsync();
     Task<bool> ExchangeCodeForTokensAsync(string authCode);
     void Disconnect();
-    string GetAuthorizationUrl();
+    /// <summary>eBay's consent-page URL. <paramref name="state"/> is echoed back on the redirect (the
+    /// broker reads the return address from it; the callback checks its nonce).</summary>
+    string GetAuthorizationUrl(string? state = null);
 
     /// <summary>
     /// Returns the names of required eBay settings that are missing or blank.

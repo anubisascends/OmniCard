@@ -1033,6 +1033,8 @@ export interface EbayStatusDto {
   connected: boolean;
   configured: boolean;
   missingConfig: string[];
+  /** Sign-in runs through the eBay token broker, so Connect returns here on its own. */
+  usesBroker: boolean;
 }
 
 export interface EbayCategoryOptionDto {

@@ -60,6 +60,7 @@ OmniCard.Api.Contracts/ Pure DTO records — the SPA's request/response contract
 OmniCard.Web/          ASP.NET Core API + React/TS SPA (ClientApp/, built to wwwroot/app). The app.
 OmniCard.DbMigrator/   Console tool: one-time SQLite → SQL Server copy (unified store + per-game catalogs)
 OmniCard.Tests/        xUnit tests for everything above
+tools/ebay-broker/     Cloudflare Worker holding the eBay CertId: token proxy + OAuth redirect relay (not part of the .NET build)
 ```
 
 ## Architecture

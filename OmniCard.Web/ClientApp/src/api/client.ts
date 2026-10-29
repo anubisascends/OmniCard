@@ -1035,6 +1035,10 @@ export const api = {
   ebayStatus: () => request<EbayStatusDto>('/api/ebay/status'),
   /** Top-level navigation URL to start the eBay OAuth consent flow. */
   ebayConnectUrl: '/api/ebay/connect',
+  /** Finish connecting without a callback: the address eBay showed after consent, or the bare code.
+   * A 400 body carries `reason`: "noCode" (nothing found in the input) or "rejected" (eBay refused it). */
+  ebayConnectWithCode: (input: string) =>
+    request<EbayStatusDto>('/api/ebay/connect/code', { method: 'POST', body: JSON.stringify({ input }) }),
   ebayDisconnect: () => request<void>('/api/ebay/disconnect', { method: 'POST' }),
   ebaySetup: () => request<EbaySetupResultDto>('/api/ebay/setup', { method: 'POST' }),
   ebaySelling: () => request<EbaySellingSettingsDto>('/api/ebay/selling'),
