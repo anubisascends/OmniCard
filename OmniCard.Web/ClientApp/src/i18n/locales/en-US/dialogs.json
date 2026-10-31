@@ -4,31 +4,35 @@
       "title": "Add card to {{location}}",
       "lockedHelper": "Locked to this deck box’s game",
       "noCatalogMatches": "No matches in the {{game}} catalog.",
+      "noCatalogMatchesInLanguages": "No {{languages}} matches in the {{game}} catalog.",
       "added_one": "Added {{count}} card to {{location}}.",
       "added_other": "Added {{count}} cards to {{location}}.",
-      "addCard": "Add card"
+      "recentLine": "{{quantity}}× {{name}} · {{set}} #{{number}}",
+      "inCollection": "In your collection",
+      "inCatalog": "In the catalog",
+      "noOwnedCopies": "No copies in your collection.",
+      "noCopiesElsewhere": "No copies in other locations.",
+      "unfiled": "Unfiled",
+      "undo": "Undo",
+      "addCard": "Add card",
+      "addAndClose": "Add & close",
+      "keys": {
+        "choose": "choose",
+        "pickThenAdd": "pick, then Enter again to add",
+        "back": "back to the results",
+        "details": "condition, language, foil"
+      }
     },
     "addToSlot": {
       "title": "Add card to pocket",
       "pageSlot": "Page {{page}} · slot {{slot}}",
       "replaces": " — replaces “{{name}}”",
-      "inCollection": "In your collection",
-      "inCatalog": "In the catalog",
-      "noCopiesElsewhere": "No copies in other locations.",
-      "noCatalogMatches": "No matches in the {{game}} catalog.",
-      "unfiled": "Unfiled",
       "addToPocket": "Add to pocket"
     },
     "addToList": {
       "title": "Add card to list",
       "addedSoFar": "Added {{count}} so far",
-      "inCollection": "In your collection",
-      "inCatalog": "In the catalog",
-      "noOwnedCopies": "No copies in your collection.",
-      "noCatalogMatches": "No matches in the {{game}} catalog.",
-      "unfiled": "Unfiled",
-      "addToList": "Add to list",
-      "onlyLanguage": "Only {{language}} cards"
+      "addToList": "Add to list"
     },
     "bulkEdit": {
       "title_one": "Edit {{count}} selected card",

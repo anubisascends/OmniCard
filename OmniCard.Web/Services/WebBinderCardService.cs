@@ -568,8 +568,10 @@ public sealed class WebBinderCardService
 
     /// <summary>Places a card chosen from the catalog straight into a binder slot, swapping out any
     /// existing occupant (displaced to the Unplaced pool). Mirrors
-    /// <c>CardService.AddMissingCardToSlot</c>. Returns the new lot's id.</summary>
-    public int AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, string? foilType, decimal? purchasePrice, int containerId, int page, int slot)
+    /// <c>CardService.AddMissingCardToSlot</c>. <paramref name="language"/> is the copy's printed language
+    /// (null/unknown ⇒ English). Returns the new lot's id.</summary>
+    public int AddMissingCardToSlot(CardMatch match, CardGame game, string condition, bool isFoil, string? foilType, decimal? purchasePrice, int containerId, int page, int slot,
+        string? language = null)
     {
         using var context = _dbFactory.CreateDbContext();
 
@@ -589,6 +591,7 @@ public sealed class WebBinderCardService
         {
             Product = product,
             Condition = condition,
+            Language = CardLanguages.ToStored(language),
             UnitCost = purchasePrice,
             LocationId = containerId,
             Page = page,

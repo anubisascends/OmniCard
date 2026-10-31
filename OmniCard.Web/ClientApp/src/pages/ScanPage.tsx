@@ -28,12 +28,14 @@ import {
   Stack,
   Switch,
   TextField,
+  Toolbar,
   Tooltip,
   Typography,
 } from '@mui/material';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import RequestQuoteIcon from '@mui/icons-material/RequestQuote';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -84,6 +86,8 @@ import type {
   ScanTagRuleItem,
 } from '../api/types';
 import { CardHoverPreview, type CardHover } from '../components/CardHoverPreview';
+import { Kbd } from '../components/Kbd';
+import { LONG_PRESS_SX, useIsPhone, useLongPress } from '../lib/responsive';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
@@ -521,6 +525,7 @@ function CorrectionSearch({
   const [cn, setCn] = useState('');
   // Hovering a result's thumbnail pops the enlarged art (same preview as the location grids).
   const [hover, setHover] = useState<CardHover | null>(null);
+  const longPress = useLongPress();
   // Debounce so fast typing doesn't fan out overlapping requests (which previously raced on the
   // server's shared DbContext and returned spurious "No matches").
   const [dq, setDq] = useState('');
@@ -608,11 +613,12 @@ function CorrectionSearch({
                         alt=""
                         onMouseEnter={(e) => setHover({ el: e.currentTarget, url: r.imageUri!, foil: false })}
                         onMouseLeave={() => setHover(null)}
-                        sx={{ width: 24, height: 34, objectFit: 'contain', borderRadius: 0.5 }}
+                        sx={{ width: { xs: 36, sm: 24 }, height: { xs: 50, sm: 34 }, objectFit: 'contain', borderRadius: 0.5 }}
                       />
                     ) : undefined
                   }
-                  sx={{ justifyContent: 'flex-start', textTransform: 'none' }}
+                  sx={{ ...LONG_PRESS_SX, justifyContent: 'flex-start', textAlign: 'left', textTransform: 'none' }}
+                  {...longPress((el) => r.imageUri && setHover({ el, url: r.imageUri, foil: false, touch: true }))}
                   onClick={() => onPick(r)}
                 >
                   {r.name} · {r.setCode.toUpperCase()} #{r.collectorNumber}
@@ -683,8 +689,8 @@ function Thumb({ src, alt }: { src?: string | null; alt: string }) {
   return (
     <Box
       sx={{
-        width: 84,
-        height: 116,
+        width: { xs: 56, sm: 84 },
+        height: { xs: 78, sm: 116 },
         flexShrink: 0,
         display: 'flex',
         alignItems: 'center',
@@ -768,9 +774,9 @@ const MasterRow = memo(function MasterRow({
       ref={rowRef}
       onClick={() => onSelect(item.key)}
       sx={{
-        p: 1.5,
+        p: { xs: 1, sm: 1.5 },
         display: 'flex',
-        gap: 1.5,
+        gap: { xs: 1, sm: 1.5 },
         alignItems: 'center',
         cursor: 'pointer',
         borderLeft: 4,
@@ -798,7 +804,7 @@ const MasterRow = memo(function MasterRow({
         onChange={(e) => onToggle(item.key, e.target.checked, shiftHeld.current)}
         sx={{ p: 0 }}
       />
-      <Stack direction="row" spacing={0.75}>
+      <Stack direction="row" spacing={{ xs: 0.5, sm: 0.75 }}>
         <Thumb src={item.previewUrl} alt={t('scan.alt.uploadedScan')} />
         <Thumb src={id?.imageUri ?? null} alt={t('scan.alt.matchedArt')} />
       </Stack>
@@ -1022,10 +1028,10 @@ function DetailPanel({
   const id = identityOf(item);
 
   return (
-    <Paper variant="outlined" sx={{ p: 3 }}>
+    <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 3 }, border: { xs: 0, sm: 1 }, borderColor: { sm: 'divider' } }}>
       <Stack spacing={2}>
         {/* Side-by-side compare at the top: uploaded scan vs. matched art, each half width. */}
-        <Stack direction="row" spacing={2}>
+        <Stack direction="row" spacing={{ xs: 1, sm: 2 }}>
           <ImagePane label={t('scan.detail.uploadedScan')} src={item.previewUrl} alt={item.fileName} />
           <ImagePane
             label={t('scan.detail.matchedArt')}
@@ -1204,23 +1210,7 @@ function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void
             <Stack key={label} direction="row" spacing={2} alignItems="center">
               <Stack direction="row" spacing={0.5} sx={{ minWidth: 96 }}>
                 {keys.map((k) => (
-                  <Box
-                    key={k}
-                    component="kbd"
-                    sx={{
-                      px: 0.75,
-                      py: 0.25,
-                      border: 1,
-                      borderColor: 'divider',
-                      borderBottomWidth: 2,
-                      borderRadius: 1,
-                      fontFamily: 'inherit',
-                      fontSize: '0.8rem',
-                      bgcolor: 'action.hover',
-                    }}
-                  >
-                    {k}
-                  </Box>
+                  <Kbd key={k}>{k}</Kbd>
                 ))}
               </Stack>
               <Typography variant="body2">{t(label)}</Typography>
@@ -1570,6 +1560,24 @@ export interface ScanPageProps {
   onAuditCommitted?: (result: AuditCommitResultDto) => void;
   /** Review a background scan batch instead of local uploads (see ScanBatchPage). */
   batch?: ScanBatchMode;
+  /** Scan a seller's cards for an intake quote instead of adding them to a location (see IntakePage). */
+  intake?: ScanIntakeMode;
+}
+
+/** One confirmed scan handed to the intake quote. */
+export interface IntakeScanCard {
+  /** The scan's key on the Scan page (pass it back in {@link ScanIntakeMode.boughtKeys}). */
+  key: string;
+  item: ScanCommitItem;
+  /** The scan photo (a blob URL that lives as long as the Scan page). */
+  previewUrl: string;
+}
+
+/** Intake: "Complete" hands the confirmed cards to the quote; nothing is written by the Scan page. */
+export interface ScanIntakeMode {
+  onComplete: (cards: IntakeScanCard[]) => void;
+  /** Cards that were bought — they're dropped from the scan list (a new array each time). */
+  boughtKeys?: string[];
 }
 
 /** A watched-folder batch under review: its items come from (and edits save to) the server, the game
@@ -1587,7 +1595,7 @@ export interface ScanBatchMode {
   onClosed: () => void;
 }
 
-export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitted, batch }: ScanPageProps = {}) {
+export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitted, batch, intake }: ScanPageProps = {}) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const { game: contextGame } = useGame();
@@ -1622,6 +1630,18 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   const cameraInput = useRef<HTMLInputElement>(null);
 
   const selectedItem = items.find((it) => it.key === selectedKey) ?? null;
+  // Phone: the list and the detail can't sit side by side, so tapping a card opens its detail full
+  // screen; the review actions there move on through the cards as the keyboard flow does.
+  const isPhone = useIsPhone();
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const openRow = useCallback(
+    (key: string) => {
+      setSelectedKey(key);
+      if (isPhone) setDetailOpen(true);
+    },
+    [isPhone],
+  );
 
   // The filtered + sorted view of the scans. Everything the toolbar acts on (Confirm / Add, the
   // select-all header, bulk edit, and the batch counts) is scoped to these visible items, so a
@@ -1690,6 +1710,16 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
       return prev.filter((it) => !shouldDrop(it));
     });
 
+  // Intake: once the quote is bought, its cards leave the scan list.
+  const boughtKeys = intake?.boughtKeys;
+  useEffect(() => {
+    if (!boughtKeys?.length) return;
+    const bought = new Set(boughtKeys);
+    dropItems((it) => bought.has(it.key));
+    // dropItems only wraps setItems; re-run solely when a new set of bought keys arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boughtKeys]);
+
   // Free every remaining preview URL when the page unmounts (navigating away mid-session).
   const itemsRef = useRef(items);
   itemsRef.current = items;
@@ -1697,7 +1727,8 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
 
   const gamesQuery = useQuery({ queryKey: ['games'], queryFn: api.games });
   const setsQuery = useQuery({ queryKey: ['sets', game], queryFn: () => api.sets(game), enabled: !!game });
-  const locations = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations() });
+  // Intake buys into the admin's location, so it never picks one (and intake staff may not see locations).
+  const locations = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations(), enabled: !intake });
   const foilTypesQuery = useQuery({
     queryKey: ['scan-foil-types', game],
     queryFn: () => api.scanFoilTypes(game),
@@ -1902,9 +1933,15 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   // doesn't lose staged scans. Scan and each location's audit keep separate sessions. ---
   // Background batches persist on the server, not in IndexedDB.
   const isBatch = !!batch;
+  // Keyed on the mode, not the `intake` prop object (a new one every parent render), or the session would
+  // be re-created — and re-restored on top of the current scans — on each render.
+  const isIntake = !!intake;
   const sessionStore = useMemo(
-    () => (isBatch ? null : new ScanSessionStore<ScanItem>(auditMode ? `audit-${lockedContainerId}` : 'scan')),
-    [auditMode, lockedContainerId, isBatch],
+    () =>
+      isBatch
+        ? null
+        : new ScanSessionStore<ScanItem>(auditMode ? `audit-${lockedContainerId}` : isIntake ? 'intake' : 'scan'),
+    [auditMode, lockedContainerId, isBatch, isIntake],
   );
   const restoreDone = useRef(false);
   const [restoredKeys, setRestoredKeys] = useState<Set<string>>(new Set());
@@ -2310,6 +2347,31 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nextToReview is derived from these.
   }, [selectedKey, visibleItems, skippedKeys]);
 
+  const closeWhenDone = (item: ScanItem, act: () => void) => {
+    const done = !nextToReview(item.key);
+    act();
+    if (done) setDetailOpen(false);
+  };
+  const detailPanel = (item: ScanItem) => (
+    <DetailPanel
+      item={item}
+      game={game}
+      artSets={artSets}
+      foilTypeOptions={foilTypeOptions}
+      tagOptions={tagOptions}
+      badgeSettings={badgeSettings}
+      onToggle={(v) => (v ? includeItem(item) : closeWhenDone(item, () => excludeItem(item)))}
+      onVerify={() => closeWhenDone(item, () => confirmItem(item))}
+      onCorrect={(r) => closeWhenDone(item, () => correctItem(item, r))}
+      correcting={correcting}
+      onCorrectingChange={setCorrecting}
+      onRemove={() => removeItems((it) => it.key === item.key)}
+      onProps={(patch) => updateProps(item.key, patch)}
+      readOnly={readOnly}
+      failedValidationQuery={validation?.failed.has(item.key) ? validation.query : null}
+    />
+  );
+
   // One window listener that always calls the latest handler (it closes over this render's state).
   const keyHandler = useRef<(e: KeyboardEvent) => void>(() => {});
   keyHandler.current = (e: KeyboardEvent) => {
@@ -2386,8 +2448,8 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
 
   return (
     <Stack spacing={3}>
-      {/* In audit and batch mode the wrapping page supplies its own header/banner. */}
-      {!auditMode && !batch && (
+      {/* In audit, batch and intake mode the wrapping page supplies its own header/banner. */}
+      {!auditMode && !batch && !intake && (
         <>
           <Typography variant="h4">{t('scan.title')}</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: -1 }}>
@@ -2435,7 +2497,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
               label={t('common.labels.game')}
               value={game}
               onChange={(e) => setGame(e.target.value)}
-              sx={{ minWidth: 200 }}
+              sx={{ minWidth: { xs: '100%', sm: 200 } }}
             >
               {gamesQuery.data?.map((g) => (
                 <MenuItem key={g.id} value={g.id}>
@@ -2451,7 +2513,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
               isOptionEqualToValue={(a, b) => a.setCode === b.setCode}
               value={artSets}
               onChange={(_, v) => setArtSets(v)}
-              sx={{ minWidth: 260, flex: '1 1 260px' }}
+              sx={{ minWidth: { xs: '100%', sm: 260 }, flex: '1 1 260px' }}
               renderInput={(p) => (
                 <TextField
                   {...p}
@@ -2574,22 +2636,22 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
       )}
 
       {items.length > 0 && (
-        <Paper variant="outlined" sx={{ p: 2, position: 'sticky', top: 56, zIndex: 1 }}>
+        <Paper variant="outlined" sx={{ p: 2, position: { xs: 'static', sm: 'sticky' }, top: 56, zIndex: 1 }}>
           <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
             {/* Audit is locked to one location: show it read-only instead of the picker. */}
-            {readOnly ? null : lockedContainerId != null ? (
+            {readOnly || intake ? null : lockedContainerId != null ? (
               <Chip
                 icon={<LockIcon />}
                 variant="outlined"
                 label={selectedLocationName ?? t('scan.commit.addToLocation')}
-                sx={{ minWidth: 220, justifyContent: 'flex-start' }}
+                sx={{ minWidth: { xs: '100%', sm: 220 }, justifyContent: 'flex-start' }}
               />
             ) : (
               <Button
                 variant="outlined"
                 startIcon={<PlaceIcon />}
                 onClick={() => setPickerOpen(true)}
-                sx={{ minWidth: 220, justifyContent: 'flex-start', textTransform: 'none' }}
+                sx={{ minWidth: { xs: '100%', sm: 220 }, justifyContent: 'flex-start', textTransform: 'none' }}
               >
                 {selectedLocationName ?? t('scan.commit.addToLocation')}
               </Button>
@@ -2605,6 +2667,22 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                 >
                   {t('scan.commit.confirmChecked', { count: confirmableCount })}
                 </Button>
+                {intake ? (
+                  <Button
+                    variant="contained"
+                    startIcon={<RequestQuoteIcon />}
+                    disabled={committableCount === 0 || stillMatching || rulesPending}
+                    onClick={() =>
+                      intake.onComplete(
+                        items
+                          .filter(isVisibleCommittable)
+                          .map((it) => ({ key: it.key, item: toCommitItem(it, game), previewUrl: it.previewUrl })),
+                      )
+                    }
+                  >
+                    {t('intake.scan.complete', { count: committableCount })}
+                  </Button>
+                ) : (
                 <Button
                   variant="contained"
                   color={auditMode ? 'warning' : 'primary'}
@@ -2625,6 +2703,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                       ? t('scan.audit.commit', { count: committableCount })
                       : t('scan.commit.addConfirmed', { count: committableCount })}
                 </Button>
+                )}
                 <Tooltip title={t('scan.tagRules.switchHint')}>
                   <FormControlLabel
                     control={
@@ -2639,7 +2718,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                 </Tooltip>
               </>
             )}
-            {canExport && (
+            {canExport && !intake && (
               <>
                 <Tooltip title={t('scan.export.hint')}>
                   <span>
@@ -2695,10 +2774,12 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                 />
               </>
             )}
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
               {auditMode
                 ? t('scan.audit.commitHint')
-                : controlsActive
+                : intake
+                  ? t('intake.scan.completeHint')
+                  : controlsActive
                   ? t('scan.commit.addedNoteFiltered')
                   : t('scan.commit.addedNote')}
             </Typography>
@@ -2717,7 +2798,25 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         </Paper>
       )}
 
-      {items.length > 0 && (
+      {items.length > 0 && isPhone && !filtersOpen && (
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Button variant="outlined" size="small" startIcon={<SearchIcon />} onClick={() => setFiltersOpen(true)}>
+            {t('scan.filter.filterAndSort')}
+          </Button>
+          {(controlsActive || controls.sortKey !== 'none') && (
+            <>
+              <Typography variant="caption" color="text.secondary">
+                {t('scan.filter.showingOf', { visible: visibleItems.length, total: items.length })}
+              </Typography>
+              <Button size="small" onClick={() => setControls(DEFAULT_CONTROLS)}>
+                {t('common.actions.clear')}
+              </Button>
+            </>
+          )}
+        </Stack>
+      )}
+
+      {items.length > 0 && (!isPhone || filtersOpen) && (
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
             <TextField
@@ -2796,6 +2895,11 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                 </Button>
               </>
             )}
+            {isPhone && (
+              <Button size="small" onClick={() => setFiltersOpen(false)}>
+                {t('common.actions.done')}
+              </Button>
+            )}
           </Stack>
         </Paper>
       )}
@@ -2805,9 +2909,11 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
           <Alert
             severity="success"
             action={
-              <Button color="inherit" size="small" startIcon={<KeyboardIcon />} onClick={() => setShortcutsOpen(true)}>
-                {t('scan.keyboard.shortcuts')}
-              </Button>
+              isPhone ? undefined : (
+                <Button color="inherit" size="small" startIcon={<KeyboardIcon />} onClick={() => setShortcutsOpen(true)}>
+                  {t('scan.keyboard.shortcuts')}
+                </Button>
+              )
             }
           >
             {t('scan.keyboard.complete', { count: visibleItems.length, confirmed: confirmedCount })}
@@ -2826,11 +2932,15 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
               <Typography variant="caption" color="text.secondary">
                 {stillMatchingCount > 0 && !visibleItems.some(needsReview)
                   ? t('scan.keyboard.waiting', { count: stillMatchingCount })
-                  : t('scan.keyboard.hint')}
+                  : isPhone
+                    ? t('scan.keyboard.tapHint')
+                    : t('scan.keyboard.hint')}
               </Typography>
-              <Button size="small" startIcon={<KeyboardIcon />} onClick={() => setShortcutsOpen(true)}>
-                {t('scan.keyboard.shortcuts')}
-              </Button>
+              {!isPhone && (
+                <Button size="small" startIcon={<KeyboardIcon />} onClick={() => setShortcutsOpen(true)}>
+                  {t('scan.keyboard.shortcuts')}
+                </Button>
+              )}
             </Stack>
           </Paper>
         ))}
@@ -2917,7 +3027,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                   item={item}
                   selected={item.key === selectedKey}
                   badgeSettings={badgeSettings}
-                  onSelect={setSelectedKey}
+                  onSelect={openRow}
                   onToggle={toggleRow}
                   readOnly={readOnly}
                   failedValidation={!!validation?.failed.has(item.key)}
@@ -2937,26 +3047,10 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
           </Paper>
 
           {/* Detail: the selected card's full-size compare + verify/correct/remove + properties. */}
-          {selectedItem ? (
+          {isPhone ? null : selectedItem ? (
             // Not keyed by card: moving through the list updates the panel in place, which is much
             // cheaper than rebuilding its form fields for every card.
-            <DetailPanel
-              item={selectedItem}
-              game={game}
-              artSets={artSets}
-              foilTypeOptions={foilTypeOptions}
-              tagOptions={tagOptions}
-              badgeSettings={badgeSettings}
-              onToggle={(v) => (v ? includeItem(selectedItem) : excludeItem(selectedItem))}
-              onVerify={() => confirmItem(selectedItem)}
-              onCorrect={(r) => correctItem(selectedItem, r)}
-              correcting={correcting}
-              onCorrectingChange={setCorrecting}
-              onRemove={() => removeItems((it) => it.key === selectedItem.key)}
-              onProps={(patch) => updateProps(selectedItem.key, patch)}
-              readOnly={readOnly}
-              failedValidationQuery={validation?.failed.has(selectedItem.key) ? validation.query : null}
-            />
+            detailPanel(selectedItem)
           ) : (
             <Paper
               variant="outlined"
@@ -2966,6 +3060,31 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
             </Paper>
           )}
         </Box>
+      )}
+
+      {isPhone && (
+        <Dialog fullScreen open={detailOpen && !!selectedItem} onClose={() => setDetailOpen(false)}>
+          <Toolbar variant="dense" sx={{ gap: 0.5, borderBottom: 1, borderColor: 'divider', px: 1 }}>
+            <IconButton edge="start" aria-label={t('common.actions.close')} onClick={() => setDetailOpen(false)}>
+              <CloseIcon />
+            </IconButton>
+            <Typography variant="subtitle1" sx={{ flexGrow: 1 }} noWrap>
+              {t('scan.detail.position', {
+                index: visibleItems.findIndex((it) => it.key === selectedKey) + 1,
+                total: visibleItems.length,
+              })}
+            </Typography>
+            <IconButton aria-label={t('scan.detail.previous')} onClick={() => moveSelection(-1)}>
+              <ArrowUpwardIcon />
+            </IconButton>
+            <IconButton aria-label={t('scan.detail.next')} onClick={() => moveSelection(1)}>
+              <ArrowDownwardIcon />
+            </IconButton>
+          </Toolbar>
+          <Box sx={{ overflowY: 'auto', pb: 'env(safe-area-inset-bottom)' }}>
+            {selectedItem && detailPanel(selectedItem)}
+          </Box>
+        </Dialog>
       )}
 
       <Dialog open={confirmDelete} onClose={() => setConfirmDelete(false)}>
@@ -2995,7 +3114,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         onClose={() => setBulkOpen(false)}
       />
 
-      {lockedContainerId == null && (
+      {lockedContainerId == null && !intake && (
         <LocationPickerDialog
           open={pickerOpen}
           title={t('scan.locationPicker.title')}

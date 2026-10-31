@@ -20,11 +20,21 @@ import type { SetChecklistCardDto, SetInfoDto } from '../api/types';
 import { useGame } from '../context/GameContext';
 import { CardHoverPreview, type CardHover } from '../components/CardHoverPreview';
 import { useFormatters } from '../i18n/format';
+import { LONG_PRESS_SX, useIsPhone, useLongPress } from '../lib/responsive';
+
+// The columns a phone keeps (number, name, owned, price), narrowed to fit.
+const PHONE_COLUMNS: Record<string, { width?: number; minWidth?: number }> = {
+  collectorNumber: { width: 52 },
+  name: { minWidth: 120 },
+  ownedQuantity: { width: 84 },
+  normalPrice: { width: 76 },
+};
 
 const buildColumns = (
   t: TFunction,
   money: (n?: number | null) => string,
   setHover: (h: CardHover | null) => void,
+  longPress: ReturnType<typeof useLongPress>,
 ): GridColDef<SetChecklistCardDto>[] => [
   { field: 'collectorNumber', headerName: t('sets.columns.no'), width: 80 },
   {
@@ -39,6 +49,8 @@ const buildColumns = (
           p.row.imageUri && setHover({ el: e.currentTarget, url: p.row.imageUri, foil: p.row.hasFoil })
         }
         onMouseLeave={() => setHover(null)}
+        {...longPress((el) => p.row.imageUri && setHover({ el, url: p.row.imageUri, foil: p.row.hasFoil, touch: true }))}
+        sx={LONG_PRESS_SX}
       >
         {p.row.name}
       </Box>
@@ -100,7 +112,12 @@ export function SetsPage() {
   const [hover, setHover] = useState<CardHover | null>(null);
   const [ownedOnly, setOwnedOnly] = useState(() => loadFlag(OWNED_SETS_KEY));
   const [ownedCardsOnly, setOwnedCardsOnly] = useState(() => loadFlag(OWNED_CARDS_KEY));
-  const columns = buildColumns(t, (n) => (n == null ? '' : fmt.money(n)), setHover);
+  const isPhone = useIsPhone();
+  const longPress = useLongPress();
+  const allColumns = buildColumns(t, (n) => (n == null ? '' : fmt.money(n)), setHover, longPress);
+  const columns = isPhone
+    ? allColumns.filter((c) => c.field in PHONE_COLUMNS).map((c) => ({ ...c, ...PHONE_COLUMNS[c.field] }))
+    : allColumns;
 
   const setsQuery = useQuery({
     queryKey: ['sets', game],
@@ -152,7 +169,7 @@ export function SetsPage() {
   const rows = (checklist?.cards ?? []).filter((c) => !ownedCardsOnly || c.ownedQuantity > 0);
 
   return (
-    <Stack spacing={2} sx={{ height: 'calc(100vh - 120px)' }}>
+    <Stack spacing={2} sx={{ height: { xs: 'auto', sm: 'calc(100vh - 120px)' } }}>
       <Typography variant="h4">{t('sets.title')}</Typography>
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
         <Autocomplete
@@ -163,7 +180,7 @@ export function SetsPage() {
           value={set}
           onChange={(_, v) => setSet(v)}
           noOptionsText={ownedOnly ? t('sets.noOwnedSets') : undefined}
-          sx={{ flex: 1, minWidth: 260, maxWidth: 480 }}
+          sx={{ flex: 1, minWidth: { xs: '100%', sm: 260 }, maxWidth: 480 }}
           renderInput={(params) => <TextField {...params} label={t('common.labels.set')} size="small" />}
         />
         <FormControlLabel
@@ -212,6 +229,8 @@ export function SetsPage() {
           columns={columns}
           loading={checklistQuery.isFetching}
           density="compact"
+          autoHeight={isPhone}
+          disableColumnMenu={isPhone}
           disableRowSelectionOnClick
           localeText={ownedCardsOnly ? { noRowsLabel: t('sets.noOwnedCards') } : undefined}
           getRowClassName={(p) => (p.row.ownedQuantity > 0 ? '' : 'unowned-row')}

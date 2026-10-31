@@ -86,6 +86,7 @@
     },
     "filter": {
       "filterByName": "Filter by name",
+      "filterAndSort": "Filter & sort",
       "show": "Show",
       "all": "All",
       "checkedOnly": "Checked only",
@@ -128,11 +129,15 @@
       "excludeFromCommit": "Exclude from commit",
       "includeInCommit": "Include in commit",
       "cardProperties": "Card properties",
-      "selectPrompt": "Select a scanned card to review it."
+      "selectPrompt": "Select a scanned card to review it.",
+      "position": "Card {{index}} of {{total}}",
+      "previous": "Previous card",
+      "next": "Next card"
     },
     "keyboard": {
       "progress": "Reviewed {{reviewed}} of {{total}}",
       "hint": "Press Enter to confirm and go to the next card",
+      "tapHint": "Tap a card to review it",
       "waiting_one": "Waiting for {{count}} card to finish matching",
       "waiting_other": "Waiting for {{count}} cards to finish matching",
       "complete_one": "Review complete: {{confirmed}} of {{count}} card confirmed.",

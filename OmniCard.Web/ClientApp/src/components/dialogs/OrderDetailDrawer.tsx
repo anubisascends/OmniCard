@@ -238,7 +238,7 @@ export function OrderDetailDrawer({ orderId, onClose }: { orderId: number | null
 
   return (
     <Drawer anchor="right" open={open} onClose={onClose}>
-      <Box sx={{ width: { xs: '100vw', sm: 460 }, maxWidth: '100vw', p: 2 }}>
+      <Box sx={{ width: { xs: '100vw', sm: 460 }, maxWidth: '100vw', p: 2, boxSizing: 'border-box' }}>
         {detail.isLoading || !detail.data || !form ? (
           <CircularProgress />
         ) : (

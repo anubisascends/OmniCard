@@ -85,7 +85,7 @@ Matched cards are checked automatically; unmatched ones are not. When you confir
 
 ## Review the list
 
-On a wide screen the review list is on the left and the selected card's details are on the right. On a phone the details appear below the list.
+On a wide screen the review list is on the left and the selected card's details are on the right. On a phone, tap a card in the list to open its details full screen (see [Reviewing on a phone](#reviewing-on-a-phone)).
 
 Each row shows the scan thumbnail next to the matched artwork, the card name, set and collector number, a one-line summary of its properties (condition, language, foil, quantity and a note icon), its badges and its tags. Tags added by a [tag rule](help:tag-rules) have a sparkle icon. A green check mark before the name means you have confirmed it.
 
@@ -125,6 +125,18 @@ When every card in the list has been reviewed, the bar changes to **Review compl
 > [!NOTE]
 > Shortcuts don't work while you're typing in a field such as **Note** or **Tags**. Click an empty part of the page to use them again.
 
+### Reviewing on a phone
+
+On a phone, tap a card in the list to open its details full screen. The top of the screen shows *Card N of M*, with arrows to go to the previous or next card and **X** to go back to the list.
+
+- **Confirm match** confirms the card and moves straight on to the next card that still needs review, just like **Enter** on a keyboard.
+- Picking a result in **Search catalog** corrects the card and moves on too.
+- When no cards are left to review, the details close and you're back at the list, ready to add the cards to a location.
+
+The **Filter & sort** button above the list opens the filter bar described in [Filter and sort the list](#filter-and-sort-the-list). Tap **Done** to fold it away again.
+
+![Reviewing a scanned card full screen on a phone](scanning-phone-review.png)
+
 ### Checking cards
 
 The checkbox on each row decides whether the card is included when you add or export. Any scan can be checked, but only checked cards with a match (or a correction) are added or exported.
@@ -138,7 +150,7 @@ The checkbox on each row decides whether the card is included when you add or ex
 
 1. Select the card and click **Search catalog**.
 2. Type at least two letters of the card's name, or enter its **Collector #**, or both.
-3. Each result shows the card name, set, collector number and rarity. If the game's catalog has more than one language, the result also shows the language (for example *English* or *Japanese*). Hover over a result's small picture to see it larger.
+3. Each result shows the card name, set, collector number and rarity. If the game's catalog has more than one language, the result also shows the language (for example *English* or *Japanese*). Hover over a result's small picture to see it larger. On a phone, press and hold the result instead.
 4. Click the correct result.
 
 The card is now marked **Corrected**, and it is confirmed and checked. The next card that needs review is selected. Click **Cancel** to close the search without changing anything.

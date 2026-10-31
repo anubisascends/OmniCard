@@ -28,6 +28,15 @@ import type {
   ListUpdatePreviewDto,
   ListUpdateRowDto,
   CustomerDto,
+  IntakeAcceptRequest,
+  IntakeAcceptResultDto,
+  IntakeDetailDto,
+  IntakePageDto,
+  IntakePriceBasis,
+  IntakeQuoteDto,
+  IntakeQuoteLineRequest,
+  IntakeSettingsDto,
+  StoreCreditDto,
   DashboardDto,
   DeckBoxNeedsGameDto,
   DeckLegalityDto,
@@ -368,6 +377,8 @@ export const api = {
   searchFields: (game?: string) => request<SearchSchemaDto>(`/api/meta/search-fields${qs({ game })}`),
   /** Languages an owned copy of each game can be tagged with, keyed by game id. */
   cardLanguages: () => request<Record<string, string[]>>('/api/meta/card-languages'),
+  /** Languages each game's catalog can hold rows in (what catalog search can filter by), keyed by game id. */
+  catalogSearchLanguages: () => request<Record<string, string[]>>('/api/meta/catalog-languages'),
 
   // Dashboard
   dashboard: () => request<DashboardDto>('/api/dashboard'),
@@ -451,6 +462,12 @@ export const api = {
     request<void>('/api/binder/unassign', { method: 'POST', body: JSON.stringify({ lotId }) }),
   binderAddPage: (containerId: number, mode: 'single' | 'double') =>
     request<{ spreadIndex: number }>('/api/binder/page/add', { method: 'POST', body: JSON.stringify({ containerId, mode }) }),
+  /** Insert an empty sheet before sheet `insertIndex` (0-based; the sheet count appends). */
+  binderInsertPage: (containerId: number, insertIndex: number, doubleSided: boolean) =>
+    request<{ spreadIndex: number }>('/api/binder/page/insert', {
+      method: 'POST',
+      body: JSON.stringify({ containerId, insertIndex, doubleSided }),
+    }),
   binderRemovePage: (containerId: number, page: number) =>
     request<void>('/api/binder/page/remove', { method: 'POST', body: JSON.stringify({ containerId, page }) }),
   binderLayout: (containerId: number, slotsPerPage: number, columns: number) =>
@@ -475,6 +492,8 @@ export const api = {
     rarity: string;
     imageUri?: string | null;
     condition: string;
+    /** Printed language of the copy; omitted/unknown ⇒ English. */
+    language?: string | null;
     isFoil: boolean;
     foilType?: string | null;
     purchasePrice?: number | null;
@@ -761,6 +780,21 @@ export const api = {
     request<void>(`/api/customers/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   customerDelete: (id: number) =>
     request<void>(`/api/customers/${id}`, { method: 'DELETE' }),
+  customerCredit: (id: number) => request<StoreCreditDto>(`/api/customers/${id}/credit`),
+  customerCreditAdjust: (id: number, amount: number, reason: string) =>
+    request<StoreCreditDto>(`/api/customers/${id}/credit`, { method: 'POST', body: JSON.stringify({ amount, reason }) }),
+
+  // Intake (buying singles over the counter)
+  intakeSettings: () => request<IntakeSettingsDto>('/api/intake/settings'),
+  intakeSettingsUpdate: (body: IntakeSettingsDto) =>
+    request<IntakeSettingsDto>('/api/intake/settings', { method: 'PUT', body: JSON.stringify(body) }),
+  intakeQuote: (priceBasis: IntakePriceBasis, lines: IntakeQuoteLineRequest[]) =>
+    request<IntakeQuoteDto>('/api/intake/quote', { method: 'POST', body: JSON.stringify({ priceBasis, lines }) }),
+  intakeAccept: (body: IntakeAcceptRequest) =>
+    request<IntakeAcceptResultDto>('/api/intake/accept', { method: 'POST', body: JSON.stringify(body) }),
+  intakeHistory: (params: { page?: number; pageSize?: number; customerId?: number }) =>
+    request<IntakePageDto>(`/api/intake${qs(params)}`),
+  intakeDetail: (id: number) => request<IntakeDetailDto>(`/api/intake/${id}`),
 
   // Inventory (sealed)
   inventoryProducts: (game?: string, category?: string) =>
@@ -1001,6 +1035,10 @@ export const api = {
   ebayStatus: () => request<EbayStatusDto>('/api/ebay/status'),
   /** Top-level navigation URL to start the eBay OAuth consent flow. */
   ebayConnectUrl: '/api/ebay/connect',
+  /** Finish connecting without a callback: the address eBay showed after consent, or the bare code.
+   * A 400 body carries `reason`: "noCode" (nothing found in the input) or "rejected" (eBay refused it). */
+  ebayConnectWithCode: (input: string) =>
+    request<EbayStatusDto>('/api/ebay/connect/code', { method: 'POST', body: JSON.stringify({ input }) }),
   ebayDisconnect: () => request<void>('/api/ebay/disconnect', { method: 'POST' }),
   ebaySetup: () => request<EbaySetupResultDto>('/api/ebay/setup', { method: 'POST' }),
   ebaySelling: () => request<EbaySellingSettingsDto>('/api/ebay/selling'),
@@ -1036,12 +1074,14 @@ export const api = {
     return (await res.json()) as ScanMatchDto;
   },
   // `sets` scopes the correction search to the chosen "Sets (art fallback)" (empty ⇒ all sets); the
-  // server unions them, mirroring the set constraint used for auto-matching.
-  scanSearch: (game: string, q: string, sets?: string[], cn?: string) => {
+  // server unions them, mirroring the set constraint used for auto-matching. `langs` likewise keeps only
+  // catalog rows in those languages (empty ⇒ every language).
+  scanSearch: (game: string, q: string, sets?: string[], cn?: string, langs?: string[]) => {
     const sp = new URLSearchParams({ game });
     if (q) sp.set('q', q);
     if (cn) sp.set('cn', cn);
     for (const s of sets ?? []) if (s) sp.append('set', s);
+    for (const l of langs ?? []) if (l) sp.append('lang', l);
     return request<ScanSearchResultDto[]>(`/api/scan/search?${sp.toString()}`);
   },
   scanFoilTypes: (game: string) => request<string[]>(`/api/scan/foil-types${qs({ game })}`),

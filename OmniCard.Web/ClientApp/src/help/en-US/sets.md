@@ -32,7 +32,7 @@ Every card in the set is listed in collector-number order.
 | Column | What it shows |
 |---|---|
 | No. | Collector number. |
-| Name | Card name. Hover over it to see the card art. |
+| Name | Card name. Hover over it to see the card art (on a phone, press and hold it). |
 | Rarity | Printed rarity. |
 | Owned | A green **×N** badge with how many copies you own, or a dash if you have none. |
 | Normal | Current market price for a regular copy. |

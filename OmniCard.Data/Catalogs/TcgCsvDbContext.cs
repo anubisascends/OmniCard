@@ -51,6 +51,8 @@ public abstract class TcgCsvDbContext : DbContext
         if (!Database.IsSqlite())
         {
             CatalogSchema.AddSqlServerColumnIfMissing(this, "Cards", "Lang", "nvarchar(16) NOT NULL CONSTRAINT DF_Cards_Lang DEFAULT 'en'");
+            CatalogSchema.AddSqlServerColumnIfMissing(this, "Cards", "LowPrice", "decimal(18,2) NULL");
+            CatalogSchema.AddSqlServerColumnIfMissing(this, "Cards", "FoilLowPrice", "decimal(18,2) NULL");
             return;
         }
 
@@ -63,6 +65,8 @@ public abstract class TcgCsvDbContext : DbContext
         AddColumnIfMissing(conn, "ExtendedDataJson TEXT");
         AddColumnIfMissing(conn, "MarketPrice TEXT");
         AddColumnIfMissing(conn, "FoilMarketPrice TEXT");
+        AddColumnIfMissing(conn, "LowPrice TEXT");
+        AddColumnIfMissing(conn, "FoilLowPrice TEXT");
         AddColumnIfMissing(conn, "PriceUpdatedAt TEXT");
     }
 

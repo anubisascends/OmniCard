@@ -23,7 +23,7 @@ The binder is shown one spread (two facing pages) at a time, just like opening a
 To move around:
 
 - Click **‹ Prev** or **Next ›** to turn one spread at a time.
-- Click a tab in the page strip (labelled *1*, *2–3*, *4–5*…) to jump straight to that spread. On narrow screens the strip scrolls; use its arrows to see more tabs.
+- Click a tab in the page strip (labelled *1*, *2–3*, *4–5*…) to jump straight to that spread. On narrow screens the strip scrolls; use its arrows to see more tabs. On a phone, the two pages of a spread are shown one above the other.
 
 The heading shows which pages you're looking at and how many pages the binder has, for example *Pages 2-3 · 12 pages*.
 
@@ -66,7 +66,7 @@ If you don't see **Edit**, the binder is in a site you can only view. If changes
 
 In edit mode you get:
 
-- An edit toolbar with **Add page**, **Layout** and **Remove page** buttons.
+- An edit toolbar with **Add page**, **Layout** and **Remove page** buttons, and the **Simplified** switch. See [Fill a binder from the keyboard](#fill-a-binder-from-the-keyboard).
 - The **Unplaced cards** panel on the left, listing cards that are in this binder but not in a pocket yet.
 - Dashed pocket outlines highlighting where you can drop cards.
 
@@ -98,17 +98,64 @@ You can fill a specific pocket with a card from anywhere in your collection, or 
 
 1. Right-click a pocket and choose **Add card to this pocket…** (or **Replace card in this pocket…** if it already holds a card).
 2. The dialog shows the page and slot, and which card will be replaced.
-3. Choose the **Game**, then search by **Name**, and optionally **Set** and **Collector #**.
-4. Pick a result:
+3. Choose the **Game**, then search by **Name**, and optionally **Set** and **Collector #**. For games whose catalog holds more than one language, each result shows its language, and **Languages** limits the results, as in [Add cards to a location](help:locations#add-cards-to-a-location).
+4. Pick a result. Point at it to see a larger picture, or use ↓, ↑ and Enter from the search boxes:
    - **In your collection** lists copies you own in other locations, with the location each is in. Click one to move a single copy into the pocket right away. If it's part of a stack, only one copy moves.
-   - **In the catalog** lists every matching printing. Click one, set **Condition**, **Purchase price** and **Foil**, then click **Add to pocket** to add a new card to your collection in this pocket.
+   - **In the catalog** lists every matching printing. Click one, set **Condition**, **Language**, **Purchase price** and **Foil** (with its **Foil type**), then click **Add to pocket** to add a new card to your collection in this pocket.
 
 ![The Add card to pocket dialog](binders-add-to-pocket.png)
 
 If the pocket already held a card, that card goes back to the Unplaced pool.
 
+Once you've picked a printing, the cursor stays in the search box: press Enter to add it. To choose a different printing, press Esc, ↑ or ↓ (or click **Change**) to go back to the results.
+
 > [!NOTE]
 > **In your collection** only lists copies in other locations. To place a copy that's already in this binder, drag it from the Unplaced cards panel.
+
+## Fill a binder from the keyboard
+
+**Simplified** editing is for filling a binder pocket by pocket without reaching for the mouse. It shows one page at a time, centered, and a cursor marks the selected pocket.
+
+1. Click **Edit**, then turn on **Simplified** at the right of the edit toolbar. OmniCard remembers the switch in this browser, so next time **Edit** opens straight into it.
+2. Move the cursor to a pocket with the arrow keys.
+3. Start typing the card's name. The search dialog opens with what you typed. You can also press Enter to open it empty.
+4. Press Enter to pick the highlighted printing, then Enter again to add it.
+
+The card is added to your collection in that pocket, the dialog closes, and the cursor moves on to the next pocket, ready for the next card.
+
+![Simplified editing: one page with the cursor on a pocket](binders-simplified.webp)
+
+Above the page, next to the page number, OmniCard shows which side of which physical sheet you're on, for example *Page 2 of 4 · back of sheet 1*. A single-sided sheet shows as *sheet 3, one side*.
+
+The line under the page names the selected pocket and what's in it, for example *Page 2 · pocket 1 — empty*. Below it is a reminder of the keys:
+
+| Key | What it does |
+|---|---|
+| ← ↑ ↓ → | Move the cursor. → at the right edge of a page goes on to the next page, ← at the left edge goes back. |
+| PgUp, PgDn | Go to the previous or next page. **‹ Prev** and **Next ›** above the page do the same. |
+| Home, End | Go to the first or last pocket on the page. |
+| Enter | Search for a card for this pocket. If the pocket holds a card, the new one replaces it. |
+| A–Z | Start typing a name: the search opens with it. |
+| Del | Take the card out of the pocket. It goes back to the Unplaced pool and stays in the binder. |
+| + | Insert a new double-sided sheet (two pages) right after the sheet you're on, and move the cursor to its front. This only works from the back of a sheet (or a single-sided sheet), like slipping a new sheet into a real binder: on a front page, OmniCard tells you to turn to the back first. To add a sheet at the end, go to the last page and press +. |
+| − | Remove the page the cursor is on. OmniCard asks first: press Enter to remove it or Esc to keep it. As with **Remove page**, the whole sheet goes, and its cards return to the Unplaced pool. |
+
+You can use the mouse too: click a pocket to move the cursor to it, or double-click it to search. Right-click still opens the pocket menu.
+
+### The search dialog in Simplified editing
+
+The dialog works as described in [Add or replace a card in a pocket](#add-or-replace-a-card-in-a-pocket), with a few changes to keep your hands on the keyboard:
+
+- Only **In the catalog** results are shown. Copies you already own elsewhere aren't offered, because a binder you're filling this way is usually new cards.
+- The first result is highlighted as soon as the results arrive, with its picture shown beside the dialog. Use ↑ and ↓ to move the highlight.
+- If you press Enter before the results have arrived, OmniCard picks the top result when they do.
+- Esc goes back from a picked printing to the results. With no printing picked, Esc closes the dialog.
+- To set **Condition**, **Language**, **Purchase price** or **Foil** before adding, press Tab to move to them. Enter then adds the card, except on **Condition** and **Language**, where it opens the list of choices.
+
+![The search dialog in Simplified editing, with the key reminder](binders-simplified-search.webp)
+
+> [!TIP]
+> To place a copy from the Unplaced pool, or one from another location, turn **Simplified** off and drag it from the Unplaced cards panel, or right-click the pocket in normal edit mode.
 
 ## Pages and layout
 
@@ -119,7 +166,15 @@ In edit mode, click **Add page** and choose:
 - **Double-sided sheet**: adds a sheet with a front and a back (two pages).
 - **Single-sided page**: adds a sheet with one usable side (one page).
 
-New sheets are added at the end of the binder.
+**Double-sided sheet** and **Single-sided page** add the new sheet at the end of the binder.
+
+### Insert a sheet between two others
+
+When the spread you're looking at shows the back of one sheet on the left and the front of the next on the right, **Add page** also offers an option to insert a sheet there, for example **Double-sided sheet after page 2**. It slips a new, empty sheet in between, exactly where you'd add one in a real binder. The pages after it move up by two, and their cards move with them.
+
+In Simplified editing, go to the back of the sheet you want the new one after, and press + (or use the same **Add page** option). See [Fill a binder from the keyboard](#fill-a-binder-from-the-keyboard).
+
+The option isn't offered between the two sides of one sheet, because a new sheet can't go there.
 
 ### Change the layout
 
@@ -148,4 +203,7 @@ Removing a page removes the whole physical sheet it's on. For a double-sided she
 - **There's no Edit button.** The binder is in a site you can only view. Ask an administrator for write access.
 - **Editing shows an error.** You may not have permission to edit binders. Ask an administrator.
 - **A card I added isn't showing in a pocket.** It's in the Unplaced pool. Click **Edit** and look in the **Unplaced cards** panel.
+- **The arrow keys don't move the cursor.** Simplified editing has to be on, and the keyboard mustn't be in a box or menu. Click the page, then try again.
+- **Pressing + says the page is the front of its sheet.** A new sheet goes in after a sheet's back. Press PgDn to turn to the back, then press + again.
+- **I can't see the Unplaced cards panel.** Turn **Simplified** off in the edit toolbar.
 - **A card I'm looking for isn't in the Unplaced panel.** Clear the panel's search box. If it still isn't there, it may be in another location; use **Add card to this pocket…** and look under **In your collection**.

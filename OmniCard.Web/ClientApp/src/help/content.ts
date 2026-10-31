@@ -18,12 +18,12 @@ const imageFiles = import.meta.glob('./images/*.{png,jpg,jpeg,webp,gif}', {
 
 /** Sidebar grouping + reading order. `key` resolves against `help.groups.*`. */
 export const HELP_GROUPS: { key: string; topics: string[] }[] = [
-  { key: 'start', topics: ['getting-started', 'dashboard'] },
+  { key: 'start', topics: ['getting-started', 'mobile', 'dashboard'] },
   { key: 'scanning', topics: ['scanning', 'scan-batches', 'location-audit'] },
   { key: 'collection', topics: ['collection', 'saved-views', 'search-syntax', 'tag-rules', 'sets'] },
   { key: 'organizing', topics: ['locations', 'binders', 'deck-boxes', 'labels'] },
   { key: 'lists', topics: ['lists', 'importing', 'trades'] },
-  { key: 'selling', topics: ['inventory', 'sales', 'kiosk', 'shipping', 'ebay'] },
+  { key: 'selling', topics: ['inventory', 'sales', 'intake', 'kiosk', 'shipping', 'ebay'] },
   { key: 'admin', topics: ['account', 'administration', 'troubleshooting'] },
 ];
 

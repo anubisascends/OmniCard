@@ -6,6 +6,8 @@ using OmniCard.Collection;
 using OmniCard.Data;
 using OmniCard.Web.Services;
 using OmniCard.Web.Services.Kiosk;
+using OmniCard.Web.Services.Intake;
+using OmniCard.Shared.Intake;
 using OmniCard.Shared.Kiosk;
 using OmniCard.Shared.Audit;
 using OmniCard.Shared.Cards;
@@ -194,11 +196,14 @@ builder.Services.AddSingleton<ISetChecklistService, SetChecklistService>();
 // DataProtection-encrypted file). All services degrade gracefully when unconfigured/unconnected
 // (GetAccessTokenAsync returns null → listing/end operations return false), so OrderService's
 // best-effort ship-time listing-end keeps working without a live eBay connection. Connect via the
-// OAuth flow in EbayController. Requires the "eBay" config section (AppId/CertId/RuName/AcceptUrl/
-// Environment) — until it's filled in, GetMissingConfiguration() reports what's missing.
+// OAuth flow in EbayController (callback redirect, or the pasted-code fallback). Requires the "eBay"
+// config section (AppId/RuName/Environment, plus CertId or BrokerUrl — the shipped appsettings use the
+// tools/ebay-broker Worker so installs need no secret) — until it's filled in,
+// GetMissingConfiguration() reports what's missing.
 builder.Services.Configure<EbaySettings>(builder.Configuration.GetSection("eBay"));
 builder.Services.AddSingleton<ICredentialStore, WebCredentialStore>();
 builder.Services.AddSingleton<IEbayAuthService, OmniCard.eBay.EbayAuthService>();
+builder.Services.AddSingleton<EbayOAuthStateStore>();
 builder.Services.AddSingleton<IEbaySellingSettingsService, EbaySellingSettingsService>();
 builder.Services.AddSingleton<IEbayCatalogService, OmniCard.eBay.EbayCatalogService>();
 builder.Services.AddSingleton<IEbaySellerSetupService, OmniCard.eBay.EbaySellerSetupService>();
@@ -329,6 +334,12 @@ builder.Services.AddScoped(sp => new RequestSiteAccess(
 builder.Services.AddSingleton<IKioskSettingsService, KioskSettingsService>();
 builder.Services.AddSingleton<IKioskCardEnricher, KioskCardEnricher>();
 builder.Services.AddSingleton<KioskService>();
+// Intake (/intake): buying singles over the counter — scan, quote cash/trade from the catalog price with
+// the admin's percentages (intake-settings.json), then buy into the intake location; customers' store
+// credit ledger. Singletons so the credit ledger's write lock is shared.
+builder.Services.AddSingleton<IIntakeSettingsService, IntakeSettingsService>();
+builder.Services.AddSingleton<StoreCreditService>();
+builder.Services.AddSingleton<IntakeService>();
 // Saved views of the Collection / Location pages (per user, plus admin-shared views and defaults).
 builder.Services.AddSingleton(sp => new SavedViewService(writableFactory, sp.GetRequiredService<TimeProvider>()));
 
@@ -432,7 +443,9 @@ using (var scope = app.Services.CreateScope())
             // EnsureCreated never alters an existing DB — add columns introduced since (e.g. Lang).
             switch (ctx)
             {
+                case ScryfallDbContext scryfall: scryfall.ApplySchemaUpgrades(); break;
                 case OptcgDbContext optcg: optcg.ApplySchemaUpgrades(); break;
+                case RiftboundDbContext riftbound: riftbound.ApplySchemaUpgrades(); break;
                 case TcgCsvDbContext tcgcsv: tcgcsv.ApplySchemaUpgrades(); break;
             }
         }

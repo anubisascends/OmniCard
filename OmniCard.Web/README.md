@@ -264,7 +264,7 @@ bundle goes out as ~450 KB). Content-hashed `/app/assets/*` files are cached for
 The per-game card catalogs, prices, and image hashes are refreshed **server-side** — the web app no
 longer needs the desktop to keep them current. In **Settings → Catalog data**, pick a game and run:
 
-- **Update prices** — refresh market prices.
+- **Update prices** — refresh market prices (and TCGplayer low prices, used by [Intake](#intake-buying-singles)).
 - **Download catalog** — pull the latest card data (bulk).
 - **Recompute hashes** — rebuild perceptual hashes used for scan matching.
 
@@ -326,19 +326,41 @@ holds it.
 
 ## eBay setup
 
-The full desktop eBay stack runs server-side; the OAuth flow is a normal web redirect.
+The full eBay stack runs server-side. There are two ways a server gets eBay access:
 
-1. Fill the `eBay` section (from the eBay developer portal):
+**Built-in (default, no setup).** Releases ship `eBay:AppId`, `RuName`, `Environment` and `BrokerUrl`
+in `appsettings.json`, with `CertId` blank. The keyset's secret lives only in the OmniCard eBay token
+broker, a Cloudflare Worker in [`tools/ebay-broker`](../tools/ebay-broker/README.md) that the
+maintainer runs. In **Settings → eBay → Connect to eBay**, the browser goes to eBay, then to the
+broker's `/callback`, then back to this server's `GET /api/ebay/callback`. The broker reads that
+address from the OAuth `state`, so a LAN-only server works too. Token exchange and refresh POST to
+`{BrokerUrl}/token`. **Paste a code instead** (`POST /api/ebay/connect/code`) covers the case where the
+redirect back fails. `GET /api/ebay/status` reports `usesBroker`.
+
+**Own keyset (optional).** Set `CertId`; a `CertId` always disables the broker:
+
+1. At [developer.ebay.com](https://developer.ebay.com), create a keyset (Sandbox or Production) and,
+   under **User Tokens → Get a Token from eBay via Your Application**, add an eBay Redirect URL (RuName).
+   Its **Auth accepted URL** can stay eBay's default page.
+2. Fill the `eBay` section (override the shipped values, for example in `appsettings.Production.json`):
    ```json
    "eBay": {
      "AppId": "…", "CertId": "…", "DevId": "…",
-     "RuName": "…", "AcceptUrl": "https://<host>/api/ebay/callback",
+     "RuName": "…",
      "Environment": "sandbox"
    }
    ```
-2. In the eBay dev portal, set the RuName's **Auth accepted URL** to `https://<host>/api/ebay/callback`,
-   matching `Environment` (sandbox vs production hosts differ).
-3. In the app, go to **Settings → eBay → Connect to eBay**, approve consent, then **Run seller setup**.
+   `Environment` must match the keyset (sandbox vs production hosts differ). `DevId` is optional.
+3. In **Settings → eBay → Connect to eBay**, click **Open eBay sign-in**, approve consent in the new
+   tab, copy the address eBay lands on (it holds `?code=…`, even if the page fails to load), paste it
+   and click **Finish connecting**. Codes expire after ~5 minutes.
+   *Optional automatic return:* if the server has an HTTPS address the admin's browser can open, set the
+   RuName's **Auth accepted URL** to `https://<host>/api/ebay/callback` (the Connect dialog shows and
+   copies it). The dialog then closes on its own once connected.
+
+Then click **Run seller setup**. Every sign-in carries a single-use `state` nonce
+(`EbayOAuthStateStore`, 15 minutes, in memory), and the callback rejects sign-ins this server didn't
+start. A restart mid-sign-in just means clicking Connect again.
 
 Until configured, `GET /api/ebay/status` reports what's missing and all listing operations no-op
 (so order status changes keep working without a live connection). Tokens are stored encrypted in
@@ -664,6 +686,22 @@ behavior is Shipped. The order drawer's **Scan label** button fills **Tracking**
   Over plain HTTP the page says so and falls back to typed / handheld-scanner entry. Barcodes are decoded
   in the browser with ZXing (`@zxing/browser`); nothing is uploaded.
 
+## Phones and home-screen install
+
+The SPA is responsive: below MUI's `sm` breakpoint (600 px) the shell swaps the sidebar for a bottom tab
+bar (first four of Dashboard / Scan / Collection / Locations the user can see, plus **More**), the card
+table becomes a compact row list (`CardRowList`, with a Sort menu and a Select-mode **Actions** menu),
+wide dialogs (`maxWidth` md and up) go full screen via the theme, and the Scan page opens a card's review
+full screen. Use `useIsPhone()` (`src/lib/responsive.ts`) for new phone-specific layouts; hover-only UI
+(the card art preview) needs a touch fallback — spread `useLongPress()` and set `touch: true` on
+`CardHover`.
+
+It is installable as a home-screen app: `ClientApp/public/manifest.webmanifest` + `public/icons/` (built
+to `/app/manifest.webmanifest`; source art is `icons/icon.svg`) and the `apple-*` meta tags in
+`index.html`. There is no service worker (no offline mode). **Android only offers a full-screen install
+over HTTPS** — over plain HTTP it adds a browser shortcut — and the webcam / live label camera need HTTPS
+too; **Take photo** on the Scan page (a file input with `capture`) works either way.
+
 ## Customer kiosk
 
 A **customer-facing kiosk** at `/kiosk`: customers type a name, browse/search the cards in admin-chosen
@@ -694,6 +732,38 @@ the same Vite build (`ClientApp/kiosk.html` → `wwwroot/app/kiosk.html`, `src/k
   Kiosk ▸ View pick-list queue** (`sales.kiosk.view`) and **Fulfill pick lists** (`sales.kiosk.fulfill`).
   Not site-scoped (like the rest of Sales): the browsable locations are the admin's explicit choice.
 - In dev, open the kiosk at http://localhost:5173/app/kiosk.html.
+
+## Intake (buying singles)
+
+Staff buy singles over the counter at `/intake` (phone-first): the Scan page in intake mode (scan, match,
+correct, confirm) → **Complete** → a quote priced on the server → **Customer view** for the seller → **Buy**.
+
+- **Pricing** (`IntakePricing`, re-run on the server at buy time — the client never sends amounts): base =
+  staff-entered price, else the chosen basis (Market, or Low falling back to market) → × condition % →
+  bulk rule below the threshold (flat rate, or excluded by default) → × cash % / trade %. Offers always
+  round **down** to the step (whole cents … $1), per card or on the totals. Equal percentages ⇒ one "Offer".
+- **Low prices.** Every catalog stores a TCGplayer low beside market (`ILowPriceSource`): TCGCSV games and
+  Riftbound store `LowPrice`/`FoilLowPrice`, One Piece already had it as `InventoryPrice`, and MTG's price
+  refresh makes an extra pass over TCGCSV category 1 (~450 small group downloads) to fill
+  `Cards.TcgLowPrice`/`TcgFoilLowPrice` by `TcgplayerId` — best-effort, a TCGCSV outage keeps the old lows.
+  The new catalog columns are added to existing catalog DBs at startup.
+- **Buying** (`POST /api/intake/accept`) refuses with 409 (and the fresh quote) if the totals differ from what
+  the seller was shown. It writes an `Intakes` row + `IntakeLines` (who, when, customer, location, basis,
+  percentages, each card's prices/condition %/paid amount, and a JSON snapshot of the settings) and the
+  store credit for trade-paid cards in one transaction, then adds the copies to the intake location through
+  `ScanCommitService` as lots with `UnitCost` = paid per copy and `Source` = `Intake #N` (a failure there
+  removes the record again). Tags come from scan review, as with a scan commit.
+- **Store credit** is a ledger (`StoreCreditEntries`; balance = sum, never edited). Intake trade credit is
+  added automatically; `GET|POST /api/customers/{id}/credit` shows it / adjusts it with a reason (no
+  overdraw). A customer with a non-zero balance can't be deleted. Applying credit to an order isn't built yet.
+- **Settings** (`intake-settings.json`, `GET|PUT /api/intake/settings`, PUT admin-only): cash % (70), trade %
+  (80), condition %, bulk threshold/mode/rate, rounding step/scope, intake location (until set, staff can
+  quote but not buy; buyers need write access to its site), customer-view fields.
+- **History**: `GET /api/intake`, `GET /api/intake/{id}` (Intake ▸ History).
+- Tables `Intakes`, `IntakeLines`, `StoreCreditEntries` (migration `AddIntake`). Permissions: **Intake ▸ Scan
+  and quote** (`intake.quote`, also opens the scan match/search endpoints), **Buy cards** (`intake.buy`, also
+  lists/creates customers), **View history** (`intake.history`), and **Sales · Customers ▸ Adjust store
+  credit** (`sales.customers.credit`). Not site-scoped beyond the write check on the intake location.
 
 ## Card labels
 

@@ -29,12 +29,33 @@ Before you can list on eBay, an administrator sets things up once:
    - **Not connected**: continue below.
    - **Not configured**: the OmniCard server isn't set up for eBay yet. The message lists what's missing. Ask whoever installed OmniCard to add the server's eBay app credentials, then reload the page.
 3. Click **Connect to eBay**. You're taken to eBay.
-4. Sign in to your eBay seller account and approve access for OmniCard.
-5. eBay sends you back to OmniCard, which shows **Connected to eBay.**
+4. Sign in to your eBay seller account and agree to give OmniCard access.
+5. eBay brings you back to OmniCard, which shows **Connected to eBay.**
 
 ![The eBay tab with the connection status and seller settings](administration-ebay-connected.png)
 
 If you see **eBay connection failed. Please try again.**, click **Connect to eBay** again and finish signing in on eBay.
+
+### If eBay doesn't bring you back
+
+If, after you agree, you land on a page titled **Almost done**, or a page that can't be reached, you can finish by pasting:
+
+1. Copy the whole address from that tab's address bar. Copy it even if the page says it can't be reached, because the address holds the sign-in code OmniCard needs. The **Almost done** page also shows the address in a box you can copy from.
+2. In OmniCard, go to **Administration ▸ eBay** and click **Paste a code instead**.
+3. Paste the address into **Address from the eBay tab** and click **Finish connecting**.
+
+> [!WARNING]
+> eBay's sign-in code expires after about 5 minutes. If you see **eBay didn't accept that code.**, connect again and paste the new address right away.
+
+### Servers with their own eBay app keys
+
+If your OmniCard server was set up with its own eBay app keys, clicking **Connect to eBay** opens a **Connect to eBay** window instead:
+
+1. Click **Open eBay sign-in**. eBay opens in a new tab. Sign in and agree to give OmniCard access.
+2. Copy the whole address of the page eBay moves that tab to, even if it can't be reached.
+3. Paste it into **Address from the eBay tab** and click **Finish connecting**.
+
+To skip the paste step on such a server, the window shows this server's return address, which ends in `/api/ebay/callback`. If the server has an `https://` address, whoever manages the eBay developer account can enter it as the RuName's accepted URL in the eBay developer portal. After that, the window closes by itself once you're connected.
 
 To stop using eBay, click **Disconnect**. Your existing listings in OmniCard stay as they are.
 
@@ -144,6 +165,8 @@ The change is published to eBay, and the price in OmniCard updates to match. If 
 
 - **The status says "Not configured".** The OmniCard server doesn't have eBay app credentials yet. This is set up on the server by whoever installed OmniCard, not on this page.
 - **After clicking Connect to eBay, you see "eBay isn't configured on the server yet".** Same cause: the server's eBay setup is incomplete. Ask whoever installed OmniCard to finish it.
+- **After agreeing on eBay, the page can't be reached or times out.** Copy the address from that tab anyway, and finish as described in [If eBay doesn't bring you back](help:ebay#if-ebay-doesn-t-bring-you-back).
+- **"That address doesn't contain an eBay sign-in code."** You copied the address before agreeing on eBay, or only part of it. Agree on eBay first, then copy the whole address of the page it sends you to.
 - **"Seller setup failed."** Check that the address has **Address line 1**, **City**, **Postal code** and a two-letter **Country**, click **Save seller settings**, then run setup again.
 - **The eBay listing failed.** See [If the eBay listing fails](help:ebay#if-the-ebay-listing-fails).
 - **There's no "Update on eBay" button.** The card isn't live on eBay. It may have failed to publish, or been listed in bulk.

@@ -3,7 +3,10 @@ import { Link as RouterLink, useLocation } from 'react-router-dom';
 import {
   AppBar,
   Badge,
+  BottomNavigation,
+  BottomNavigationAction,
   Box,
+  Paper,
   Divider,
   Drawer,
   FormControl,
@@ -21,6 +24,7 @@ import {
   useTheme,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
+import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LogoutIcon from '@mui/icons-material/Logout';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -34,6 +38,7 @@ import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import RequestQuoteIcon from '@mui/icons-material/RequestQuote';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
@@ -44,6 +49,15 @@ import { useGame } from '../context/GameContext';
 import { usePermissions } from '../context/usePermissions';
 
 const DRAWER_WIDTH = 200;
+
+// Phones get a bottom tab bar: the first four of these sections the user can see, then "More" (the
+// full drawer).
+const BOTTOM_NAV = ['/', '/scan', '/intake', '/collection', '/locations', '/sets', '/lists', '/sales'];
+const BOTTOM_NAV_HEIGHT = 56;
+const SECTION_ALIASES: Record<string, string[]> = {
+  '/locations': ['/location/', '/binder/', '/audit/'],
+  '/collection': ['/card/'],
+};
 
 // `labelKey` resolves against the `nav` namespace at render time. `perm` lists the view permission(s)
 // that reveal the item — a user needs at least one. Items with no `perm` are always shown
@@ -59,6 +73,7 @@ const NAV: { to: string; labelKey: string; icon: ReactNode; perm?: string[]; bad
   { to: '/sets', labelKey: 'sets', icon: <ChecklistIcon />, perm: ['sets.view'] },
   { to: '/inventory', labelKey: 'inventory', icon: <Inventory2Icon />, perm: ['inventory.view'] },
   { to: '/lists', labelKey: 'lists', icon: <FormatListBulletedIcon />, perm: ['lists.view'] },
+  { to: '/intake', labelKey: 'intake', icon: <RequestQuoteIcon />, perm: ['intake.quote', 'intake.history'] },
   { to: '/trades', labelKey: 'trades', icon: <SwapHorizIcon />, perm: ['trades.view'] },
   { to: '/import', labelKey: 'import', icon: <UploadFileIcon />, perm: ['import.run'] },
   { to: '/sales', labelKey: 'sales', icon: <PointOfSaleIcon />, perm: ['sales.orders.view', 'sales.customers.view', 'sales.listings.view', 'sales.kiosk.view'], badge: 'kioskQueue' },
@@ -76,6 +91,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { canAny, isAdmin } = usePermissions();
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
+  const isPhone = useMediaQuery(theme.breakpoints.down('sm'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountAnchor, setAccountAnchor] = useState<null | HTMLElement>(null);
 
@@ -115,9 +131,27 @@ export function AppShell({ children }: { children: ReactNode }) {
   });
   const badges = { scanBatches: batchCount.data?.unclaimed ?? 0, kioskQueue: kioskCount.data?.queued ?? 0 };
 
+  // A section also owns its detail pages (a location's cards and binder, a card's page).
+  const isActive = (to: string) =>
+    to === '/'
+      ? location.pathname === '/'
+      : [to, ...(SECTION_ALIASES[to] ?? [])].some((p) => location.pathname.startsWith(p));
+  const navIcon = (item: { icon: ReactNode; badge?: NavBadge }) =>
+    item.badge ? (
+      <Badge badgeContent={badges[item.badge]} color="secondary" max={99}>
+        {item.icon}
+      </Badge>
+    ) : (
+      item.icon
+    );
+
+  const bottomNav = BOTTOM_NAV.map((to) => visibleNav.find((n) => n.to === to))
+    .filter((n) => n !== undefined)
+    .slice(0, 4);
+  const bottomValue = bottomNav.find((n) => isActive(n.to))?.to ?? 'more';
+
   const navItem = (item: { to: string; labelKey: string; icon: ReactNode; badge?: NavBadge }) => {
-    const selected =
-      item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to);
+    const selected = isActive(item.to);
     return (
       <ListItemButton
         key={item.to}
@@ -126,15 +160,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         selected={selected}
         onClick={() => setMobileOpen(false)}
       >
-        <ListItemIcon sx={{ minWidth: 40 }}>
-          {item.badge ? (
-            <Badge badgeContent={badges[item.badge]} color="secondary" max={99}>
-              {item.icon}
-            </Badge>
-          ) : (
-            item.icon
-          )}
-        </ListItemIcon>
+        <ListItemIcon sx={{ minWidth: 40 }}>{navIcon(item)}</ListItemIcon>
         <ListItemText primary={t(`nav.${item.labelKey}`)} />
       </ListItemButton>
     );
@@ -152,9 +178,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <Box sx={{ display: 'flex' }}>
-      <AppBar position="fixed" sx={{ zIndex: (t) => t.zIndex.drawer + 1 }}>
+      {/* Above the permanent desktop sidebar; below that, under drawers (card editor, menu) like any page. */}
+      <AppBar position="fixed" sx={{ zIndex: (t) => (isDesktop ? t.zIndex.drawer + 1 : t.zIndex.appBar) }}>
         <Toolbar variant="dense">
-          {!isDesktop && (
+          {!isDesktop && !isPhone && (
             <IconButton
               color="inherit"
               edge="start"
@@ -250,17 +277,62 @@ export function AppShell({ children }: { children: ReactNode }) {
           open={mobileOpen}
           onClose={() => setMobileOpen(false)}
           ModalProps={{ keepMounted: true }}
-          sx={{ [`& .MuiDrawer-paper`]: { width: DRAWER_WIDTH, boxSizing: 'border-box' } }}
+          sx={{ [`& .MuiDrawer-paper`]: { width: DRAWER_WIDTH, boxSizing: 'border-box', pb: 'env(safe-area-inset-bottom)' } }}
         >
-          <Toolbar variant="dense" />
           {navList}
         </Drawer>
       )}
 
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 1.5, sm: 3 }, minHeight: '100vh', width: 0 }}>
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: { xs: 1.5, sm: 3 },
+          // Room for the bottom tab bar (and the phone's home indicator under it).
+          pb: { xs: `calc(${BOTTOM_NAV_HEIGHT + 16}px + env(safe-area-inset-bottom))`, sm: 3 },
+          minHeight: '100vh',
+          width: 0,
+        }}
+      >
         <Toolbar variant="dense" />
         {children}
       </Box>
+
+      {isPhone && (
+        <Paper
+          elevation={8}
+          square
+          sx={{
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: (t) => t.zIndex.appBar,
+            pb: 'env(safe-area-inset-bottom)',
+          }}
+        >
+          <BottomNavigation value={bottomValue} showLabels sx={{ height: BOTTOM_NAV_HEIGHT }}>
+            {bottomNav.map((item) => (
+              <BottomNavigationAction
+                key={item.to}
+                value={item.to}
+                component={RouterLink}
+                to={item.to}
+                label={t(`nav.${item.labelKey}`)}
+                icon={navIcon(item)}
+                sx={{ minWidth: 0, px: 0.5 }}
+              />
+            ))}
+            <BottomNavigationAction
+              value="more"
+              label={t('nav.more')}
+              icon={<MoreHorizIcon />}
+              onClick={() => setMobileOpen(true)}
+              sx={{ minWidth: 0, px: 0.5 }}
+            />
+          </BottomNavigation>
+        </Paper>
+      )}
     </Box>
   );
 }

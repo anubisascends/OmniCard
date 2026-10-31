@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -50,6 +50,7 @@ import { SitesCard } from '../components/settings/SitesCard';
 import { ResetCollectionCard } from '../components/settings/ResetCollectionCard';
 import { ScanFoldersCard } from '../components/settings/ScanFoldersCard';
 import { CatalogScheduleCard } from '../components/settings/CatalogScheduleCard';
+import { EbayConnectDialog } from '../components/settings/EbayConnectDialog';
 import { PermissionChecklist } from '../components/settings/PermissionChecklist';
 import { usePermissions } from '../context/usePermissions';
 import { currencySymbol } from '../lib/scanBadges';
@@ -65,6 +66,8 @@ import {
   PREVIEW_BASE_MAX_HEIGHT,
 } from '../lib/previewScale';
 import { KioskSettingsCard } from '../components/kiosk/KioskSettingsCard';
+import { IntakeSettingsCard } from '../components/intake/IntakeSettingsCard';
+import { useIsPhone } from '../lib/responsive';
 
 const OPERATIONS: { key: 'prices' | 'bulk' | 'hashes' | 'images' }[] = [
   { key: 'prices' },
@@ -275,6 +278,20 @@ function EbayCard() {
     if (ebayParam === 'connected') qc.invalidateQueries({ queryKey: ['ebay-status'] });
   }, [ebayParam, qc]);
 
+  // Connecting happens in EbayConnectDialog (eBay opens in a new tab; the user pastes the address it
+  // lands on, or the callback finishes it). Reuse the ?ebay= marker for the success message.
+  const [connectOpen, setConnectOpen] = useState(false);
+  const onConnectClose = useCallback(
+    (connected: boolean) => {
+      setConnectOpen(false);
+      if (!connected) return;
+      qc.invalidateQueries({ queryKey: ['ebay-status'] });
+      params.set('ebay', 'connected');
+      setParams(params, { replace: true });
+    },
+    [params, setParams, qc],
+  );
+
   return (
     <Paper variant="outlined" sx={{ p: 2, maxWidth: 640 }}>
       <Typography variant="h6" gutterBottom>
@@ -342,17 +359,30 @@ function EbayCard() {
                 </Button>
               </>
             ) : (
-              <Button
-                variant="contained"
-                disabled={!status.data.configured}
-                onClick={() => {
-                  window.location.href = api.ebayConnectUrl;
-                }}
-              >
-                {t('settings.ebay.connect')}
-              </Button>
+              <>
+                {/* Through the broker, eBay sends this tab straight back here; otherwise the dialog
+                    walks through pasting the address eBay lands on. */}
+                <Button
+                  variant="contained"
+                  disabled={!status.data.configured}
+                  onClick={() => {
+                    if (status.data.usesBroker) window.location.href = api.ebayConnectUrl;
+                    else setConnectOpen(true);
+                  }}
+                >
+                  {t('settings.ebay.connect')}
+                </Button>
+                {status.data.usesBroker && status.data.configured && (
+                  <Button onClick={() => setConnectOpen(true)}>{t('settings.ebay.pasteInstead')}</Button>
+                )}
+              </>
             )}
           </Stack>
+          <EbayConnectDialog
+            open={connectOpen}
+            onClose={onConnectClose}
+            showCallbackTip={!status.data.usesBroker}
+          />
 
           {setup.data && (
             <Alert severity={setup.data.success ? 'success' : 'error'}>
@@ -1817,6 +1847,7 @@ const TABS: {
   { key: 'roles', labelKey: 'settings.tabs.roles', render: () => <RolesCard />, show: (g) => g.isAdmin },
   { key: 'sites', labelKey: 'settings.tabs.sites', render: () => <SitesCard />, show: (g) => g.isAdmin },
   { key: 'kiosk', labelKey: 'settings.tabs.kiosk', render: () => <KioskSettingsCard />, show: (g) => g.isAdmin },
+  { key: 'intake', labelKey: 'settings.tabs.intake', render: () => <IntakeSettingsCard />, show: (g) => g.isAdmin },
   { key: 'users', labelKey: 'settings.tabs.users', render: () => <ManageUsersCard />, show: (g) => g.isAdmin },
   { key: 'reset', labelKey: 'settings.tabs.reset', render: () => <ResetCollectionCard />, show: (g) => g.isAdmin },
   { key: 'components', labelKey: 'settings.tabs.components', render: () => <ComponentsCard />, show: () => true },
@@ -1832,26 +1863,34 @@ export function SettingsPage() {
     0,
     tabs.findIndex((tab) => tab.key === requested),
   );
+  const isPhone = useIsPhone();
+  const select = (index: number) => {
+    const nextParams = new URLSearchParams(params);
+    nextParams.set('tab', tabs[index].key);
+    setParams(nextParams, { replace: true });
+  };
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={{ xs: 2, sm: 3 }}>
       <Typography variant="h4">{t('settings.title')}</Typography>
-      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs
-          value={active}
-          onChange={(_, v) => {
-            const nextParams = new URLSearchParams(params);
-            nextParams.set('tab', tabs[v].key);
-            setParams(nextParams, { replace: true });
-          }}
-          variant="scrollable"
-          scrollButtons="auto"
-        >
-          {tabs.map((tab) => (
-            <Tab key={tab.key} label={t(tab.labelKey)} />
+      {/* A dozen tabs don't fit a phone: pick the section from a list there instead. */}
+      {isPhone ? (
+        <TextField select fullWidth label={t('settings.section')} value={active} onChange={(e) => select(Number(e.target.value))}>
+          {tabs.map((tab, i) => (
+            <MenuItem key={tab.key} value={i}>
+              {t(tab.labelKey)}
+            </MenuItem>
           ))}
-        </Tabs>
-      </Box>
+        </TextField>
+      ) : (
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs value={active} onChange={(_, v) => select(v)} variant="scrollable" scrollButtons="auto">
+            {tabs.map((tab) => (
+              <Tab key={tab.key} label={t(tab.labelKey)} />
+            ))}
+          </Tabs>
+        </Box>
+      )}
       <Box>{tabs[active]?.render()}</Box>
     </Stack>
   );

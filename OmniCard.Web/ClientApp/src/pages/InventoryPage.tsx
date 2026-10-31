@@ -33,6 +33,7 @@ import type { InventoryLotDto, ProductDto } from '../api/types';
 import { LocationPickerField } from '../components/LocationPickerField';
 import { useGame } from '../context/GameContext';
 import { useFormatters } from '../i18n/format';
+import { useIsPhone } from '../lib/responsive';
 import type { TFunction } from 'i18next';
 
 // Sealed categories (Single is managed in the Collection). Server identifiers — not translated.
@@ -43,7 +44,7 @@ function buildColumns(
   fmt: ReturnType<typeof useFormatters>,
 ): GridColDef<ProductDto>[] {
   return [
-    { field: 'name', headerName: t('inventory.columns.product'), flex: 2, minWidth: 240 },
+    { field: 'name', headerName: t('inventory.columns.product'), flex: 2, minWidth: 160 },
     {
       field: 'category',
       headerName: t('inventory.columns.type'),
@@ -67,8 +68,8 @@ function buildColumns(
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <Card sx={{ minWidth: 160, flex: 1 }}>
-      <CardContent>
+    <Card sx={{ minWidth: { xs: 'calc(50% - 8px)', sm: 160 }, flex: 1 }}>
+      <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 3 } } }}>
         <Typography variant="overline" color="text.secondary">
           {label}
         </Typography>
@@ -360,7 +361,7 @@ function ProductDrawer({ product, onClose }: { product: ProductDto; onClose: () 
 
   return (
     <Drawer anchor="right" open onClose={onClose}>
-      <Box sx={{ width: 400, p: 2 }}>
+      <Box sx={{ width: { xs: '100vw', sm: 400 }, maxWidth: '100vw', p: 2, boxSizing: 'border-box' }}>
         <Stack direction="row" alignItems="center" spacing={1}>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             {product.name}
@@ -463,10 +464,11 @@ export function InventoryPage() {
   const valuation = useQuery({ queryKey: ['inventory-valuation'], queryFn: api.inventoryValuation });
   const [selected, setSelected] = useState<ProductDto | null>(null);
   const [creating, setCreating] = useState(false);
+  const isPhone = useIsPhone();
 
   return (
-    <Stack spacing={2} sx={{ height: 'calc(100vh - 120px)' }}>
-      <Stack direction="row" alignItems="center">
+    <Stack spacing={2} sx={{ height: { xs: 'auto', sm: 'calc(100vh - 120px)' } }}>
+      <Stack direction="row" alignItems="center" spacing={1}>
         <Typography variant="h4" sx={{ flexGrow: 1 }}>
           {t('inventory.title')}
         </Typography>
@@ -474,7 +476,7 @@ export function InventoryPage() {
           {t('inventory.newProduct')}
         </Button>
       </Stack>
-      <Stack direction="row" spacing={2}>
+      <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
         <Stat
           label={t('inventory.stats.totalUnits')}
           value={valuation.data ? fmt.number(valuation.data.totalUnits) : '…'}
@@ -496,6 +498,10 @@ export function InventoryPage() {
             rows={products.data}
             columns={buildColumns(t, fmt)}
             density="compact"
+            // Phone: the page scrolls, so the grid takes its rows' height; type, set and UPC make room for the name.
+            autoHeight={isPhone}
+            disableColumnMenu={isPhone}
+            columnVisibilityModel={isPhone ? { category: false, setCode: false, upc: false } : undefined}
             disableRowSelectionOnClick
             onRowClick={(p: GridRowParams<ProductDto>) => setSelected(p.row)}
             sx={{ '& .MuiDataGrid-row': { cursor: 'pointer' } }}

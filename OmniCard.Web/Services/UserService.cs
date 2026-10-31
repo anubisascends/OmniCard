@@ -71,6 +71,7 @@ public sealed class UserService(IDbContextFactory<OmniCardDbContext> factory)
         Permissions.SalesOrdersCreate, Permissions.SalesOrdersEdit, Permissions.SalesOrdersImport,
         Permissions.SalesCustomersCreate, Permissions.SalesCustomersEdit,
         Permissions.SalesListingsCreate, Permissions.SalesListingsEdit, Permissions.SalesListingsPick,
+        Permissions.IntakeQuote, Permissions.IntakeBuy,
     ];
 
     public async Task<List<User>> ListAsync()

@@ -38,6 +38,14 @@ public sealed class MetaController(IEnumerable<ICardGameService> gameServices) :
         Enum.GetValues<OmniCard.Shared.Cards.CardGame>()
             .ToDictionary(DtoMapping.GameId, g => CardLanguages.ForGame(g));
 
+    /// <summary>The languages each game's catalog can hold rows in (English first) — what a catalog search
+    /// can filter by (the Add card dialog's language filter). English-only catalogs list just "en".</summary>
+    [HttpGet("catalog-languages")]
+    public ActionResult<IReadOnlyDictionary<string, IReadOnlyList<string>>> CatalogLanguagesByGame() =>
+        gameServices.ToDictionary(
+            s => DtoMapping.GameId(s.Game),
+            s => s is ICatalogLanguageAware aware ? aware.SearchableLanguages : (IReadOnlyList<string>)[CardLanguages.English]);
+
     /// <summary>The granular permission catalog grouped by feature section — drives the role/user
     /// permission checklists in Administration. Read-only reference data; any signed-in user may fetch it.</summary>
     [HttpGet("permissions")]

@@ -45,9 +45,14 @@ public class RiftboundDbContext : DbContext
 
     public void ApplySchemaUpgrades()
     {
-        // SQL Server schema comes from EF migrations; the additive ALTER TABLEs below are SQLite-only.
+        // SQL Server: EnsureCreated never alters an existing catalog DB, so columns added after it was
+        // first created are added here (idempotent). The ALTER TABLEs below are the SQLite equivalents.
         if (!Database.IsSqlite())
+        {
+            CatalogSchema.AddSqlServerColumnIfMissing(this, "Cards", "LowPrice", "decimal(18,2) NULL");
+            CatalogSchema.AddSqlServerColumnIfMissing(this, "Cards", "FoilLowPrice", "decimal(18,2) NULL");
             return;
+        }
 
         var conn = Database.GetDbConnection();
         conn.Open();
@@ -56,6 +61,8 @@ public class RiftboundDbContext : DbContext
         AddColumnIfMissing(conn, "LocalImagePath TEXT");
         AddColumnIfMissing(conn, "MarketPrice TEXT");
         AddColumnIfMissing(conn, "FoilMarketPrice TEXT");
+        AddColumnIfMissing(conn, "LowPrice TEXT");
+        AddColumnIfMissing(conn, "FoilLowPrice TEXT");
         AddColumnIfMissing(conn, "PriceUpdatedAt TEXT");
     }
 

@@ -573,6 +573,8 @@ export interface CustomerDto {
   state?: string | null;
   postalCode?: string | null;
   country?: string | null;
+  /** Store credit balance. */
+  storeCredit?: number;
 }
 
 export interface ProductDto {
@@ -783,6 +785,8 @@ export interface BinderStateDto {
   leftSlots: BinderSlotDto[];
   rightSlots: BinderSlotDto[];
   spreadTabs: SpreadTabDto[];
+  /** Side count (1 or 2) of each physical sheet, in reading order. */
+  sheetSides: number[];
 }
 
 // --- Scan (server-side image matching; mirrors OmniCard.Api.Contracts scan DTOs) ---
@@ -867,6 +871,8 @@ export interface ScanCommitResultDto {
   imported: number;
   /** Cards the tag rules tagged (only when the commit asked for `applyTagRules`). */
   ruleTagged?: number;
+  /** The created lots, in input order. */
+  lotIds?: number[] | null;
 }
 
 /** One card line in an audit summary bucket. */
@@ -1027,6 +1033,8 @@ export interface EbayStatusDto {
   connected: boolean;
   configured: boolean;
   missingConfig: string[];
+  /** Sign-in runs through the eBay token broker, so Connect returns here on its own. */
+  usesBroker: boolean;
 }
 
 export interface EbayCategoryOptionDto {
@@ -1689,4 +1697,159 @@ export interface KioskDeviceDto {
   createdBy?: string | null;
   lastSeenAt?: string | null;
   revoked: boolean;
+}
+
+// --- Intake (buying singles over the counter) ---
+
+export type IntakePriceBasis = 'Market' | 'Low';
+export type IntakePayout = 'Cash' | 'Trade';
+export type IntakeBulkMode = 'FlatRate' | 'Exclude';
+export type IntakeRoundingScope = 'PerCard' | 'Total';
+
+/** What the seller sees on a quote's customer view (offer totals always show). */
+export interface IntakeCustomerViewDto {
+  showCardImages: boolean;
+  showCardDetails: boolean;
+  showCardPrices: boolean;
+  showCardOffers: boolean;
+  showMarketTotal: boolean;
+}
+
+export interface IntakeSettingsDto {
+  cashPercent: number;
+  tradePercent: number;
+  /** Percent of the price paid per condition code (NM, LP, MP, HP, DMG). */
+  conditionPercents: Record<string, number>;
+  bulkThreshold: number;
+  bulkMode: IntakeBulkMode;
+  bulkRate: number;
+  /** Offers round down to a multiple of this (0 = whole cents). */
+  roundingStep: number;
+  roundingScope: IntakeRoundingScope;
+  locationId?: number | null;
+  /** Read-only: the intake location's name. */
+  locationName?: string | null;
+  customerView: IntakeCustomerViewDto;
+}
+
+export interface IntakeQuoteLineRequest {
+  item: ScanCommitItem;
+  /** Staff-entered per-copy price replacing the catalog's. */
+  manualPrice?: number | null;
+  /** null/omitted = the default (bulk under the Exclude rule starts excluded). */
+  excluded?: boolean | null;
+  payout: IntakePayout;
+}
+
+export interface IntakeQuoteLineDto {
+  marketPrice?: number | null;
+  lowPrice?: number | null;
+  basePrice?: number | null;
+  isManualPrice: boolean;
+  usedMarketFallback: boolean;
+  conditionPercent: number;
+  isBulk: boolean;
+  excluded: boolean;
+  needsPrice: boolean;
+  cashUnit: number;
+  tradeUnit: number;
+}
+
+export interface IntakeQuoteDto {
+  lines: IntakeQuoteLineDto[];
+  cardCount: number;
+  marketTotal: number;
+  cashOffer: number;
+  tradeOffer: number;
+  cashPaid: number;
+  tradePaid: number;
+  cashPercent: number;
+  tradePercent: number;
+  /** Cash and trade pay the same percentage — show one offer. */
+  singleOffer: boolean;
+  needsPrices: boolean;
+}
+
+export interface IntakeAcceptRequest {
+  priceBasis: IntakePriceBasis;
+  lines: IntakeQuoteLineRequest[];
+  customerId?: number | null;
+  note?: string | null;
+  expectedCashPaid: number;
+  expectedTradePaid: number;
+}
+
+export interface IntakeAcceptResultDto {
+  intakeId: number;
+  cardCount: number;
+  cashPaid: number;
+  tradePaid: number;
+  customerCreditBalance?: number | null;
+}
+
+export interface IntakeSummaryDto {
+  id: number;
+  createdAt: string;
+  createdByName: string;
+  customerId?: number | null;
+  customerName?: string | null;
+  priceBasis: IntakePriceBasis;
+  locationName: string;
+  cardCount: number;
+  marketTotal: number;
+  cashPaid: number;
+  tradePaid: number;
+}
+
+export interface IntakeLineDto {
+  id: number;
+  game: string;
+  gameCardId: string;
+  name: string;
+  setCode: string;
+  setName: string;
+  collectorNumber: string;
+  isFoil: boolean;
+  foilType?: string | null;
+  condition: string;
+  language?: string | null;
+  quantity: number;
+  marketPrice?: number | null;
+  lowPrice?: number | null;
+  basePrice: number;
+  isManualPrice: boolean;
+  conditionPercent: number;
+  isBulk: boolean;
+  payout: IntakePayout;
+  unitPaid: number;
+  lotId?: number | null;
+}
+
+export interface IntakeDetailDto {
+  summary: IntakeSummaryDto;
+  cashPercent: number;
+  tradePercent: number;
+  locationId: number;
+  note?: string | null;
+  lines: IntakeLineDto[];
+  settings?: IntakeSettingsDto | null;
+}
+
+export interface IntakePageDto {
+  items: IntakeSummaryDto[];
+  total: number;
+}
+
+export interface StoreCreditEntryDto {
+  id: number;
+  amount: number;
+  createdAt: string;
+  createdByName: string;
+  reason: string;
+  intakeId?: number | null;
+}
+
+export interface StoreCreditDto {
+  balance: number;
+  entries: StoreCreditEntryDto[];
 }

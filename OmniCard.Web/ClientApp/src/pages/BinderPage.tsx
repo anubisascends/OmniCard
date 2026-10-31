@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useParams, Link as RouterLink } from 'react-router-dom';
@@ -9,16 +9,25 @@ import {
   Breadcrumbs,
   Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  FormControlLabel,
   Link,
   Menu,
   MenuItem,
   Paper,
   Stack,
+  Switch,
   Tab,
   Tabs,
   TextField,
   Tooltip,
   Typography,
+  alpha,
+  type Theme,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
@@ -29,8 +38,9 @@ import type { BinderCardDto, BinderSlotDto } from '../api/types';
 import { CardImage } from '../components/CardImage';
 import { ListForSaleDialog } from '../components/dialogs/ListForSaleDialog';
 import { CardEditDrawer } from '../components/dialogs/CardEditDrawer';
-import { AddCardToSlotDialog } from '../components/dialogs/AddCardToSlotDialog';
+import { AddCardDialog } from '../components/dialogs/AddCardDialog';
 import { SearchBox } from '../components/SearchBox';
+import { Kbd } from '../components/Kbd';
 import { useFormatters } from '../i18n/format';
 
 const CARD_BACK_SLUGS = ['mtg', 'optcg', 'riftbound', 'pokemon', 'yugioh', 'fftcg'];
@@ -150,6 +160,9 @@ function SlotGrid({
   onDropSlot,
   onSlotContextMenu,
   onCardClick,
+  cursorSlot,
+  onSlotSelect,
+  onSlotOpen,
 }: {
   slots: BinderSlotDto[];
   columns: number;
@@ -159,6 +172,12 @@ function SlotGrid({
   onDropSlot: (page: number, slot: number) => void;
   onSlotContextMenu: (e: React.MouseEvent, page: number, slot: number, card: BinderCardDto | null) => void;
   onCardClick: (card: BinderCardDto) => void;
+  /** Simplified editing: the pocket under the keyboard cursor. */
+  cursorSlot?: number;
+  /** Simplified editing: a click moves the cursor (instead of opening the card's details)… */
+  onSlotSelect?: (slot: number) => void;
+  /** …and a double-click searches for the pocket's card. */
+  onSlotOpen?: (slot: number) => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -166,13 +185,15 @@ function SlotGrid({
       <Typography variant="caption" color="text.secondary">
         {t('binder.page', { page: pageNumber })}
       </Typography>
-      <Box sx={{ display: 'grid', gap: 0.5, gridTemplateColumns: `repeat(${columns}, 1fr)`, mt: 0.5 }}>
+      <Box sx={{ display: 'grid', gap: onSlotSelect ? 1 : 0.5, gridTemplateColumns: `repeat(${columns}, 1fr)`, mt: 0.5 }}>
         {slots.map((s) => (
           <Box
             key={s.slotIndex}
             onDragOver={editMode ? (e) => e.preventDefault() : undefined}
             onDrop={editMode ? () => onDropSlot(pageNumber, s.slotIndex) : undefined}
             onContextMenu={(e) => onSlotContextMenu(e, pageNumber, s.slotIndex, s.card ?? null)}
+            onClick={onSlotSelect ? () => onSlotSelect(s.slotIndex) : undefined}
+            onDoubleClick={onSlotOpen ? () => onSlotOpen(s.slotIndex) : undefined}
             sx={{
               position: 'relative',
               aspectRatio: '0.72',
@@ -183,19 +204,31 @@ function SlotGrid({
               bgcolor: 'action.hover',
               display: 'grid',
               placeItems: 'center',
-              cursor: s.card ? 'default' : 'context-menu',
+              cursor: onSlotSelect ? 'pointer' : s.card ? 'default' : 'context-menu',
+              ...(cursorSlot === s.slotIndex && {
+                outline: '3px solid',
+                outlineColor: 'primary.main',
+                outlineOffset: 2,
+                boxShadow: (th: Theme) => `0 0 0 7px ${alpha(th.palette.primary.main, 0.25)}`,
+              }),
             }}
           >
             {s.card?.imageUrl ? (
               <>
-                <Tooltip title={t('binder.slotTooltip', { name: s.card.name, condition: s.card.condition, foilSuffix: s.card.foil ? t('binder.foilSuffix') : '' })}>
+                <Tooltip
+                  title={t(onSlotSelect ? 'binder.slotTooltipSimplified' : 'binder.slotTooltip', {
+                    name: s.card.name,
+                    condition: s.card.condition,
+                    foilSuffix: s.card.foil ? t('binder.foilSuffix') : '',
+                  })}
+                >
                   <CardImage
                     src={s.card.imageUrl}
                     alt={s.card.name}
                     foil={s.card.foil}
                     draggable={editMode}
                     onDragStart={editMode ? () => onDragCard(s.card!.id) : undefined}
-                    onClick={() => onCardClick(s.card!)}
+                    onClick={onSlotSelect ? undefined : () => onCardClick(s.card!)}
                     wrapperSx={{ width: '100%', height: '100%' }}
                     sx={{
                       width: '100%',
@@ -247,12 +280,13 @@ function UnplacedSidebar({
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDropUnassign}
       sx={{
-        width: 300,
+        width: { xs: '100%', sm: 300 },
         flexShrink: 0,
         alignSelf: 'flex-start',
-        position: 'sticky',
+        position: { xs: 'static', sm: 'sticky' },
         top: 8,
-        maxHeight: 'calc(100vh - 32px)',
+        maxHeight: { xs: 360, sm: 'calc(100vh - 32px)' },
+        boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
         p: 1,
@@ -343,6 +377,61 @@ function UnplacedSidebar({
   );
 }
 
+// Simplified editing: one page at a time, driven by the keyboard. The switch is remembered per browser.
+const SIMPLIFIED_KEY = 'omnicard.binder.simplified';
+const readSimplified = () => {
+  try {
+    return localStorage.getItem(SIMPLIFIED_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+const writeSimplified = (on: boolean) => {
+  try {
+    localStorage.setItem(SIMPLIFIED_KEY, on ? '1' : '0');
+  } catch {
+    // Storage blocked — the switch just isn't remembered.
+  }
+};
+
+/** Page 1 stands alone on spread 0; after that pages pair up two per spread (2–3, 4–5, …). */
+const spreadOfPage = (page: number) => Math.floor(page / 2);
+const firstPageOfSpread = (spread: number) => (spread === 0 ? 1 : spread * 2);
+
+/** Where a page sits physically: its sheet (0-based), the sheet's first page and side count, and which
+ *  side the page is — `only` for a single-sided sheet. Null when the page is past the end. */
+const sheetOfPage = (sheetSides: number[], page: number) => {
+  let first = 1;
+  for (let index = 0; index < sheetSides.length; index++) {
+    const sides = sheetSides[index];
+    if (page < first + sides) {
+      const side: 'front' | 'back' | 'only' = sides === 1 ? 'only' : page === first ? 'front' : 'back';
+      return { index, first, sides, side };
+    }
+    first += sides;
+  }
+  return null;
+};
+
+type Cursor = { page: number; slot: number };
+
+/** The simplified editor's keys, as [keys, i18n key of what they do]. */
+const SIMPLIFIED_KEYS: [string[], string][] = [
+  [['←', '↑', '↓', '→'], 'binder.keys.move'],
+  [['PgUp', 'PgDn'], 'binder.keys.page'],
+  [['Home', 'End'], 'binder.keys.firstLast'],
+  [['Enter'], 'binder.keys.search'],
+  [['A–Z'], 'binder.keys.type'],
+  [['Del'], 'binder.keys.remove'],
+  [['+'], 'binder.keys.addPage'],
+  [['−'], 'binder.keys.removePage'],
+];
+
+/** Keys typed into these belong to them, not to the binder cursor. */
+const EDITABLE = 'input, textarea, select, [contenteditable="true"], [role="combobox"], [role="menu"], [role="listbox"], [role="dialog"]';
+/** Enter/Space on a focused control presses it. */
+const PRESSABLE = 'button, a, [role="button"], [role="tab"]';
+
 export function BinderPage() {
   const { t } = useTranslation();
   const { id } = useParams();
@@ -350,6 +439,16 @@ export function BinderPage() {
   const qc = useQueryClient();
   const [spread, setSpread] = useState(0);
   const [editMode, setEditMode] = useState(false);
+  const [simplified, setSimplified] = useState(readSimplified);
+  const [cursor, setCursor] = useState<Cursor>({ page: 1, slot: 0 });
+  // Simplified editing: the page − asked to remove, awaiting confirmation.
+  const [confirmRemove, setConfirmRemove] = useState<number | null>(null);
+  // Simplified editing: why a key did nothing (+ on a sheet's front); cleared when the cursor moves.
+  const [notice, setNotice] = useState<string | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  // Simplified editing shows the cursor's page alone; the spread follows it.
+  const quick = editMode && simplified;
+  const viewSpread = quick ? spreadOfPage(cursor.page) : spread;
   const [dragLotId, setDragLotId] = useState<number | null>(null);
   const [addAnchor, setAddAnchor] = useState<null | HTMLElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -361,7 +460,15 @@ export function BinderPage() {
   const [slotMenu, setSlotMenu] = useState<{ x: number; y: number; page: number; slot: number; card: BinderCardDto | null } | null>(null);
   const [listCard, setListCard] = useState<BinderCardDto | null>(null);
   const [detailCardId, setDetailCardId] = useState<number | null>(null);
-  const [addSlot, setAddSlot] = useState<{ page: number; slot: number; card: BinderCardDto | null } | null>(null);
+  // `quick`: opened from the simplified editor (catalog-only search, cursor advances after the add);
+  // `initialName`: the keystroke(s) that opened it.
+  const [addSlot, setAddSlot] = useState<{
+    page: number;
+    slot: number;
+    card: BinderCardDto | null;
+    quick?: boolean;
+    initialName?: string;
+  } | null>(null);
 
   const openCardMenu = (e: React.MouseEvent, card: BinderCardDto) => {
     e.preventDefault();
@@ -369,6 +476,7 @@ export function BinderPage() {
   };
   const openSlotMenu = (e: React.MouseEvent, page: number, slot: number, card: BinderCardDto | null) => {
     e.preventDefault();
+    if (quick) setCursor({ page, slot });
     setSlotMenu({ x: e.clientX, y: e.clientY, page, slot, card });
   };
 
@@ -379,8 +487,8 @@ export function BinderPage() {
   }, [filter]);
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ['binder', binderId, spread],
-    queryFn: () => api.binder(binderId, spread),
+    queryKey: ['binder', binderId, viewSpread],
+    queryFn: () => api.binder(binderId, viewSpread),
     placeholderData: keepPreviousData,
   });
   // Site access: a binder in a site the user can only view can be flipped through but not edited.
@@ -409,6 +517,160 @@ export function BinderPage() {
   const removePage = useMutation({ mutationFn: (page: number) => api.binderRemovePage(binderId, page) });
   const layout = useMutation({ mutationFn: (l: { slots: number; cols: number }) => api.binderLayout(binderId, l.slots, l.cols) });
 
+  // Keep the cursor inside the binder when pages are removed or the layout shrinks.
+  const totalPages = data?.totalPages ?? 1;
+  const slotsPerPage = data?.slotsPerPage ?? 9;
+  useEffect(() => {
+    if (cursor.page > totalPages || cursor.slot >= slotsPerPage)
+      setCursor((c) => ({ page: Math.min(c.page, totalPages), slot: Math.min(c.slot, slotsPerPage - 1) }));
+  }, [cursor, totalPages, slotsPerPage]);
+
+  // Turning pages should feel instant: fetch the spreads either side of the cursor's.
+  const totalSpreads = data?.totalSpreads ?? 1;
+  useEffect(() => {
+    if (!quick) return;
+    for (const s of [viewSpread - 1, viewSpread + 1])
+      if (s >= 0 && s < totalSpreads)
+        qc.prefetchQuery({ queryKey: ['binder', binderId, s], queryFn: () => api.binder(binderId, s), staleTime: 30_000 });
+  }, [quick, viewSpread, totalSpreads, binderId, qc]);
+
+  // Entering simplified editing puts the keyboard on the page (off the switch / Edit button).
+  useEffect(() => {
+    if (quick) gridRef.current?.focus({ preventScroll: true });
+  }, [quick]);
+
+  /** Switch simplified editing on/off, carrying the position across (spread ⇄ its first page). */
+  const toggleSimplified = (on: boolean) => {
+    setSimplified(on);
+    writeSimplified(on);
+    if (on) setCursor({ page: firstPageOfSpread(spread), slot: 0 });
+    else setSpread(spreadOfPage(cursor.page));
+  };
+  const toggleEdit = () => {
+    if (!editMode && simplified) setCursor({ page: firstPageOfSpread(spread), slot: 0 });
+    if (editMode && simplified) setSpread(spreadOfPage(cursor.page));
+    setEditMode((v) => !v);
+  };
+
+  // The cursor's page, when the loaded spread has it (a page turn shows empty pockets until it arrives).
+  const cursorSlots =
+    data?.leftPageNumber === cursor.page ? data.leftSlots : data?.rightPageNumber === cursor.page ? data.rightSlots : null;
+  const cursorCard = cursorSlots?.[cursor.slot]?.card ?? null;
+
+  const openSearch = (slot: number, initialName?: string) => {
+    const card = cursorSlots?.[slot]?.card ?? null;
+    setCursor((c) => ({ ...c, slot }));
+    setAddSlot({ page: cursor.page, slot, card, quick: true, initialName });
+  };
+  // The sheet a new one would go in after: the cursor's page, or in the spread view the left page (the
+  // gap between facing pages). Only after a sheet's back (or a single-sided sheet) — like slipping a new
+  // sheet into a real binder; a front's other side is still the same sheet.
+  const sheetSides = data?.sheetSides ?? [];
+  const cursorSheet = sheetOfPage(sheetSides, cursor.page);
+  const insertAfterPage = quick ? cursor.page : data?.leftPageNumber ?? null;
+  const insertAfterSheet = insertAfterPage != null ? sheetOfPage(sheetSides, insertAfterPage) : null;
+  const canInsertAfter = insertAfterSheet != null && insertAfterSheet.side !== 'front';
+
+  useEffect(() => setNotice(null), [cursor, quick]);
+
+  /** Insert an empty double-sided sheet after the one `page` is on, and turn to its front. */
+  const insertSheetAfter = (page: number) => {
+    const sheet = sheetOfPage(sheetSides, page);
+    if (!sheet) return;
+    const newPage = sheet.first + sheet.sides;
+    run(
+      (async () => {
+        await api.binderInsertPage(binderId, sheet.index + 1, true);
+        // Load the new page before moving there, so the cursor isn't clamped back to the old last page.
+        await qc.invalidateQueries({ queryKey: ['binder', binderId] });
+        await qc.fetchQuery({ queryKey: ['binder', binderId, spreadOfPage(newPage)], queryFn: () => api.binder(binderId, spreadOfPage(newPage)) });
+        if (quick) setCursor({ page: newPage, slot: 0 });
+        else setSpread(spreadOfPage(newPage));
+      })(),
+    );
+  };
+
+  /** Next pocket in reading order, on to the next page. */
+  const advance = () =>
+    setCursor((c) =>
+      c.slot + 1 < slotsPerPage ? { ...c, slot: c.slot + 1 } : c.page < totalPages ? { page: c.page + 1, slot: 0 } : c,
+    );
+
+  // Simplified editing's keyboard. Re-bound each render so it always sees the current cursor and page.
+  useEffect(() => {
+    if (!quick || !data) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.defaultPrevented || e.ctrlKey || e.altKey || e.metaKey) return;
+      if (addSlot || detailCardId != null || listCard || slotMenu || cardMenu || addAnchor || confirmRemove != null) return;
+      const el = e.target instanceof HTMLElement ? e.target : null;
+      if (el?.closest(EDITABLE)) return;
+      const cols = data.columns;
+      const col = cursor.slot % cols;
+      let next: Cursor | null = null;
+      switch (e.key) {
+        case 'ArrowRight':
+          // Off the right edge onto the next page, same row — like reading across a spread.
+          next = col < cols - 1 ? { ...cursor, slot: cursor.slot + 1 } : cursor.page < totalPages ? { page: cursor.page + 1, slot: cursor.slot - col } : cursor;
+          break;
+        case 'ArrowLeft':
+          next = col > 0 ? { ...cursor, slot: cursor.slot - 1 } : cursor.page > 1 ? { page: cursor.page - 1, slot: cursor.slot + cols - 1 } : cursor;
+          break;
+        case 'ArrowDown':
+          next = cursor.slot + cols < slotsPerPage ? { ...cursor, slot: cursor.slot + cols } : cursor;
+          break;
+        case 'ArrowUp':
+          next = cursor.slot - cols >= 0 ? { ...cursor, slot: cursor.slot - cols } : cursor;
+          break;
+        case 'Home':
+          next = { ...cursor, slot: 0 };
+          break;
+        case 'End':
+          next = { ...cursor, slot: slotsPerPage - 1 };
+          break;
+        case 'PageDown':
+          next = { ...cursor, page: Math.min(totalPages, cursor.page + 1) };
+          break;
+        case 'PageUp':
+          next = { ...cursor, page: Math.max(1, cursor.page - 1) };
+          break;
+        case 'Enter':
+          if (el?.closest(PRESSABLE)) return;
+          e.preventDefault();
+          openSearch(cursor.slot);
+          return;
+        case '+':
+        case '=':
+          e.preventDefault();
+          if (cursorSheet?.side === 'front') setNotice(t('binder.insertFromBack', { page: cursor.page, back: cursor.page + 1 }));
+          else insertSheetAfter(cursor.page);
+          return;
+        case '-':
+          // A whole sheet goes at once, so ask first (Enter confirms, Esc cancels).
+          e.preventDefault();
+          setConfirmRemove(cursor.page);
+          return;
+        case 'Delete':
+        case 'Backspace':
+          if (cursorCard) {
+            e.preventDefault();
+            run(api.binderUnassign(cursorCard.id));
+          }
+          return;
+        default:
+          // Any printable character starts the search with it — no Enter needed.
+          if (e.key.length === 1 && e.key.trim() !== '') {
+            e.preventDefault();
+            openSearch(cursor.slot, e.key);
+          }
+          return;
+      }
+      e.preventDefault();
+      setCursor(next);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   if (isLoading || !data) return <CircularProgress />;
 
   const dropOnSlot = (page: number, slot: number) => {
@@ -433,7 +695,7 @@ export function BinderPage() {
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
         <Typography variant="h4">{data.containerName}</Typography>
         <Typography variant="body2" color="text.secondary">
-          {data.pageRangeLabel} · {t('binder.pages', { count: data.totalPages })}
+          {quick ? t('binder.page', { page: cursor.page }) : data.pageRangeLabel} · {t('binder.pages', { count: data.totalPages })}
         </Typography>
         {isFetching && <CircularProgress size={16} />}
         <Box sx={{ flexGrow: 1 }} />
@@ -442,7 +704,7 @@ export function BinderPage() {
             size="small"
             variant={editMode ? 'contained' : 'outlined'}
             startIcon={<EditIcon />}
-            onClick={() => setEditMode((v) => !v)}
+            onClick={toggleEdit}
           >
             {editMode ? t('binder.doneEditing') : t('common.actions.edit')}
           </Button>
@@ -463,6 +725,11 @@ export function BinderPage() {
               <MenuItem onClick={() => { setAddAnchor(null); run(addPage.mutateAsync('single')); }}>
                 {t('binder.singleSidedPage')}
               </MenuItem>
+              {canInsertAfter && insertAfterPage! < data.totalPages && (
+                <MenuItem onClick={() => { setAddAnchor(null); insertSheetAfter(insertAfterPage!); }}>
+                  {t('binder.sheetAfterPage', { page: insertAfterPage })}
+                </MenuItem>
+              )}
             </Menu>
             <TextField
               select
@@ -481,83 +748,185 @@ export function BinderPage() {
                 </MenuItem>
               ))}
             </TextField>
-            {data.leftPageNumber != null && (
-              <Button size="small" color="error" onClick={() => run(removePage.mutateAsync(data.leftPageNumber!))}>
-                {t('binder.removePage', { page: data.leftPageNumber })}
-              </Button>
+            {(quick ? [cursor.page] : [data.leftPageNumber, data.rightPageNumber]).map(
+              (p) =>
+                p != null && (
+                  <Button key={p} size="small" color="error" onClick={() => run(removePage.mutateAsync(p))}>
+                    {t('binder.removePage', { page: p })}
+                  </Button>
+                ),
             )}
-            {data.rightPageNumber != null && (
-              <Button size="small" color="error" onClick={() => run(removePage.mutateAsync(data.rightPageNumber!))}>
-                {t('binder.removePage', { page: data.rightPageNumber })}
-              </Button>
-            )}
+            <Box sx={{ flexGrow: 1 }} />
+            <Tooltip title={t('binder.simplifiedTooltip')}>
+              <FormControlLabel
+                control={<Switch size="small" checked={simplified} onChange={(e) => toggleSimplified(e.target.checked)} />}
+                label={t('binder.simplified')}
+                sx={{ mr: 0 }}
+              />
+            </Tooltip>
           </Stack>
         </Paper>
       )}
       {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
+      {quick && notice && <Alert severity="info" onClose={() => setNotice(null)}>{notice}</Alert>}
 
-      {/* Spread navigation */}
-      <Stack direction="row" spacing={1} alignItems="center">
-        <Button size="small" disabled={spread <= 0} onClick={() => setSpread((s) => Math.max(0, s - 1))}>
-          {t('binder.prev')}
-        </Button>
-        <Tabs value={data.spreadIndex} onChange={(_, v) => setSpread(v)} variant="scrollable" scrollButtons="auto" sx={{ flexGrow: 1, minHeight: 36 }}>
-          {data.spreadTabs.map((t) => (
-            <Tab key={t.index} value={t.index} label={t.label} sx={{ minHeight: 36 }} />
-          ))}
-        </Tabs>
-        <Button size="small" disabled={spread >= data.totalSpreads - 1} onClick={() => setSpread((s) => Math.min(data.totalSpreads - 1, s + 1))}>
-          {t('binder.next')}
-        </Button>
-      </Stack>
+      {quick ? (
+        <>
+          {/* Simplified editing: page navigation (the keyboard does the same with PgUp/PgDn). */}
+          <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
+            <Button
+              size="small"
+              disabled={cursor.page <= 1}
+              onClick={() => {
+                setCursor((c) => ({ ...c, page: c.page - 1 }));
+                gridRef.current?.focus({ preventScroll: true });
+              }}
+            >
+              {t('binder.prev')}
+            </Button>
+            <Typography variant="subtitle2" sx={{ minWidth: 120, textAlign: 'center' }}>
+              {t('binder.pageOf', { page: cursor.page, total: data.totalPages })}
+              {cursorSheet && (
+                <Typography component="span" variant="body2" color="text.secondary">
+                  {' · '}
+                  {t(`binder.side.${cursorSheet.side}`, { sheet: cursorSheet.index + 1 })}
+                </Typography>
+              )}
+            </Typography>
+            <Button
+              size="small"
+              disabled={cursor.page >= data.totalPages}
+              onClick={() => {
+                setCursor((c) => ({ ...c, page: c.page + 1 }));
+                gridRef.current?.focus({ preventScroll: true });
+              }}
+            >
+              {t('binder.next')}
+            </Button>
+          </Stack>
 
-      {/* Spread (+ unplaced sidebar in edit mode) */}
-      <Stack direction="row" spacing={2} alignItems="flex-start">
-        {editMode && (
-          <UnplacedSidebar
-            cards={unplaced.data ?? []}
-            loading={unplaced.isFetching}
-            filter={filter}
-            onFilter={setFilter}
-            onDragCard={setDragLotId}
-            onDropUnassign={dropUnassign}
-            onCardContextMenu={openCardMenu}
-            onCardClick={(c) => setDetailCardId(c.id)}
-          />
-        )}
-        <Stack direction="row" spacing={2} sx={{ flexGrow: 1, minWidth: 0 }}>
-          {data.leftPageNumber != null ? (
+          {/* The cursor's page alone, centred and sized to fit the window. */}
+          <Box
+            ref={gridRef}
+            tabIndex={0}
+            sx={{
+              alignSelf: 'center',
+              width: {
+                xs: '100%',
+                // Pocket aspect 0.72, so a page of c × r pockets is about c·0.72 / r as wide as it is tall.
+                sm: `min(100%, max(320px, calc((100vh - 470px) * ${(data.columns * 0.72) / (data.slotsPerPage / data.columns)})))`,
+              },
+              borderRadius: 1,
+              outline: 'none',
+              '&:focus-visible': { boxShadow: (th) => `0 0 0 2px ${th.palette.primary.main}` },
+            }}
+          >
             <SlotGrid
-              slots={data.leftSlots}
+              slots={cursorSlots ?? Array.from({ length: data.slotsPerPage }, (_, i) => ({ slotIndex: i, card: null }))}
               columns={data.columns}
-              pageNumber={data.leftPageNumber}
+              pageNumber={cursor.page}
               editMode={editMode}
               onDragCard={setDragLotId}
               onDropSlot={dropOnSlot}
               onSlotContextMenu={openSlotMenu}
               onCardClick={(c) => setDetailCardId(c.id)}
+              cursorSlot={cursor.slot}
+              onSlotSelect={(slot) => setCursor((c) => ({ ...c, slot }))}
+              onSlotOpen={(slot) => openSearch(slot)}
             />
-          ) : (
-            <Box sx={{ flex: 1 }} />
-          )}
-          {data.rightPageNumber != null ? (
-            <SlotGrid
-              slots={data.rightSlots}
-              columns={data.columns}
-              pageNumber={data.rightPageNumber}
-              editMode={editMode}
-              onDragCard={setDragLotId}
-              onDropSlot={dropOnSlot}
-              onSlotContextMenu={openSlotMenu}
-              onCardClick={(c) => setDetailCardId(c.id)}
-            />
-          ) : (
-            // Keep the empty half reserved so a lone left page (e.g. an odd last page / a single
-            // backside) fills only its half of the spread, mirroring page 1 alone on the right.
-            <Box sx={{ flex: 1 }} />
-          )}
-        </Stack>
-      </Stack>
+          </Box>
+          <Stack spacing={1} alignItems="center">
+            <Typography variant="body2" color="text.secondary">
+              {cursorCard
+                ? t('binder.cursorCard', {
+                    page: cursor.page,
+                    slot: cursor.slot + 1,
+                    name: cursorCard.name,
+                    set: cursorCard.setCode.toUpperCase(),
+                    number: cursorCard.number,
+                  })
+                : t('binder.cursorEmpty', { page: cursor.page, slot: cursor.slot + 1 })}
+            </Typography>
+            <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" useFlexGap>
+              {SIMPLIFIED_KEYS.map(([keys, label]) => (
+                <Stack key={label} direction="row" spacing={0.5} alignItems="center">
+                  {keys.map((k) => (
+                    <Kbd key={k}>{k}</Kbd>
+                  ))}
+                  <Typography variant="caption" color="text.secondary">
+                    {t(label)}
+                  </Typography>
+                </Stack>
+              ))}
+            </Stack>
+          </Stack>
+        </>
+      ) : (
+        <>
+          {/* Spread navigation */}
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Button size="small" disabled={spread <= 0} onClick={() => setSpread((s) => Math.max(0, s - 1))}>
+              {t('binder.prev')}
+            </Button>
+            <Tabs value={data.spreadIndex} onChange={(_, v) => setSpread(v)} variant="scrollable" scrollButtons="auto" sx={{ flexGrow: 1, minHeight: 36 }}>
+              {data.spreadTabs.map((t) => (
+                <Tab key={t.index} value={t.index} label={t.label} sx={{ minHeight: 36 }} />
+              ))}
+            </Tabs>
+            <Button size="small" disabled={spread >= data.totalSpreads - 1} onClick={() => setSpread((s) => Math.min(data.totalSpreads - 1, s + 1))}>
+              {t('binder.next')}
+            </Button>
+          </Stack>
+
+          {/* Spread (+ unplaced sidebar in edit mode). A phone shows the spread's pages one above the other. */}
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'flex-start' }}>
+            {editMode && (
+              <UnplacedSidebar
+                cards={unplaced.data ?? []}
+                loading={unplaced.isFetching}
+                filter={filter}
+                onFilter={setFilter}
+                onDragCard={setDragLotId}
+                onDropUnassign={dropUnassign}
+                onCardContextMenu={openCardMenu}
+                onCardClick={(c) => setDetailCardId(c.id)}
+              />
+            )}
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ flexGrow: 1, minWidth: 0 }}>
+              {data.leftPageNumber != null ? (
+                <SlotGrid
+                  slots={data.leftSlots}
+                  columns={data.columns}
+                  pageNumber={data.leftPageNumber}
+                  editMode={editMode}
+                  onDragCard={setDragLotId}
+                  onDropSlot={dropOnSlot}
+                  onSlotContextMenu={openSlotMenu}
+                  onCardClick={(c) => setDetailCardId(c.id)}
+                />
+              ) : (
+                <Box sx={{ flex: 1, display: { xs: 'none', sm: 'block' } }} />
+              )}
+              {data.rightPageNumber != null ? (
+                <SlotGrid
+                  slots={data.rightSlots}
+                  columns={data.columns}
+                  pageNumber={data.rightPageNumber}
+                  editMode={editMode}
+                  onDragCard={setDragLotId}
+                  onDropSlot={dropOnSlot}
+                  onSlotContextMenu={openSlotMenu}
+                  onCardClick={(c) => setDetailCardId(c.id)}
+                />
+              ) : (
+                // Keep the empty half reserved so a lone left page (e.g. an odd last page / a single
+                // backside) fills only its half of the spread, mirroring page 1 alone on the right.
+                <Box sx={{ flex: 1, display: { xs: 'none', sm: 'block' } }} />
+              )}
+            </Stack>
+          </Stack>
+        </>
+      )}
 
       {/* Unplaced-sidebar card menu */}
       <Menu
@@ -595,7 +964,7 @@ export function BinderPage() {
       >
         <MenuItem
           onClick={() => {
-            setAddSlot({ page: slotMenu!.page, slot: slotMenu!.slot, card: slotMenu!.card });
+            setAddSlot({ page: slotMenu!.page, slot: slotMenu!.slot, card: slotMenu!.card, quick });
             setSlotMenu(null);
           }}
         >
@@ -627,20 +996,50 @@ export function BinderPage() {
       </Menu>
 
       {addSlot && (
-        <AddCardToSlotDialog
+        <AddCardDialog
           open
-          containerId={binderId}
-          page={addSlot.page}
-          slot={addSlot.slot}
-          occupantName={addSlot.card?.name}
+          target={{
+            kind: 'pocket',
+            containerId: binderId,
+            page: addSlot.page,
+            slot: addSlot.slot,
+            occupantName: addSlot.card?.name,
+          }}
           defaultGame={gameName(
             addSlot.card?.game ??
               data.leftSlots.concat(data.rightSlots).find((s) => s.card)?.card?.game,
           )}
+          simplified={addSlot.quick}
+          initialName={addSlot.initialName}
           onClose={() => setAddSlot(null)}
-          onDone={refresh}
+          onDone={() => {
+            refresh();
+            // Filling a binder from the keyboard: straight on to the next pocket.
+            if (addSlot.quick) advance();
+          }}
         />
       )}
+
+      <Dialog open={confirmRemove != null} onClose={() => setConfirmRemove(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>{t('binder.removePageTitle', { page: confirmRemove })}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>{t('binder.removePageConfirm')}</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmRemove(null)}>{t('common.actions.cancel')}</Button>
+          <Button
+            color="error"
+            variant="contained"
+            autoFocus
+            onClick={() => {
+              run(removePage.mutateAsync(confirmRemove!));
+              setConfirmRemove(null);
+            }}
+          >
+            {t('binder.removePage', { page: confirmRemove })}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <CardEditDrawer
         cardId={detailCardId}

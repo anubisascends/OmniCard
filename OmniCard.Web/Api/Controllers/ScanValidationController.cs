@@ -16,7 +16,7 @@ namespace OmniCard.Web.Api.Controllers;
 public sealed class ScanValidationController(ScanValidationService validation) : ControllerBase
 {
     [HttpGet("validation-rules")]
-    [RequirePermission(Permissions.ScanView)]
+    [RequirePermission(Permissions.ScanView, Permissions.IntakeQuote)]
     public ActionResult<IReadOnlyList<ScanValidationRuleDto>> List([FromQuery] string game)
     {
         if (LocationsController.ParseGame(game) is not { } g)
@@ -45,7 +45,7 @@ public sealed class ScanValidationController(ScanValidationService validation) :
 
     /// <summary>The scanned cards that don't match the query (an invalid query returns its errors instead).</summary>
     [HttpPost("validate")]
-    [RequirePermission(Permissions.ScanView)]
+    [RequirePermission(Permissions.ScanView, Permissions.IntakeQuote)]
     public ActionResult<ScanValidationResultDto> Validate([FromBody] ScanValidateRequest request)
     {
         if (LocationsController.ParseGame(request.Game) is not { } game)

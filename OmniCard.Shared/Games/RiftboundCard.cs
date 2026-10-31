@@ -44,5 +44,7 @@ public class RiftboundCard
     // Pricing — populated by RiftboundService.UpdatePricesAsync from TCGCSV, keyed by TcgplayerId.
     public decimal? MarketPrice { get; set; }        // TCGCSV "Normal" subtype market price
     public decimal? FoilMarketPrice { get; set; }    // TCGCSV "Foil" subtype market price
+    public decimal? LowPrice { get; set; }           // TCGCSV "Normal" subtype low listing price
+    public decimal? FoilLowPrice { get; set; }       // TCGCSV "Foil" subtype low listing price
     public DateTime? PriceUpdatedAt { get; set; }     // UTC timestamp of last successful price write
 }

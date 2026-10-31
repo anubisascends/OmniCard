@@ -15,6 +15,11 @@ public interface ICatalogLanguageAware
     /// <summary>Languages this game's source can download, English first (see <see cref="CardLanguages"/>).</summary>
     IReadOnlyList<string> DownloadableLanguages { get; }
 
+    /// <summary>Languages the catalog can hold rows in, English first — what a catalog search can filter
+    /// by with <c>lang:</c>. Usually <see cref="DownloadableLanguages"/>; a game that keeps rows from an
+    /// earlier source (One Piece's poneglyph Japanese/French rows) adds those.</summary>
+    IReadOnlyList<string> SearchableLanguages => DownloadableLanguages;
+
     /// <summary>The languages the next download should fetch. English is always included.</summary>
     IReadOnlyCollection<string> CatalogLanguages { get; set; }
 

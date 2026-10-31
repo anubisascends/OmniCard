@@ -51,6 +51,15 @@ import { DeckBoxGamePicker } from '../components/DeckBoxGamePicker';
 import { DeckBoxGameBanner } from '../components/DeckBoxGameBanner';
 import { DeckBoxGameDialog } from '../components/dialogs/DeckBoxGameDialog';
 import { IgnoredLocationsDialog } from '../components/dialogs/IgnoredLocationsDialog';
+import { useIsPhone } from '../lib/responsive';
+
+// The columns a phone keeps: the location, how many cards (or search matches) it holds and their value.
+const PHONE_COLUMNS: Record<string, { width?: number; minWidth?: number }> = {
+  name: { minWidth: 120 },
+  matchCount: { width: 80 },
+  cardCount: { width: 64 },
+  totalMarketValue: { width: 96 },
+};
 
 function AddLocationBar({ onAdded, siteFilter }: { onAdded: () => void; siteFilter: SiteFilterValue }) {
   const { t } = useTranslation();
@@ -590,10 +599,14 @@ export function LocationsPage() {
   }, [data, hideEmpty, matchCounts]);
   const matchedLocations = groups.reduce((n, g) => n + g.items.length, 0);
   const showSiteColumn = multiSite && effectiveSite === ALL_SITES;
-  const columns = useMemo(
-    () => buildColumns(refresh, gameLabel, t, fmt, showSiteColumn, matchCounts),
-    [gameLabel, t, fmt, showSiteColumn, matchCounts],
-  );
+  const isPhone = useIsPhone();
+  const [addOpen, setAddOpen] = useState(false);
+  const columns = useMemo(() => {
+    const all = buildColumns(refresh, gameLabel, t, fmt, showSiteColumn, matchCounts);
+    return isPhone
+      ? all.filter((c) => c.field in PHONE_COLUMNS).map((c) => ({ ...c, ...PHONE_COLUMNS[c.field] }))
+      : all;
+  }, [gameLabel, t, fmt, showSiteColumn, matchCounts, isPhone]);
 
   const headingFor = (g: LocationGroup) =>
     g.key === '__always__'
@@ -617,7 +630,7 @@ export function LocationsPage() {
     });
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={{ xs: 2, sm: 3 }}>
       <Typography variant="h4">{t('locations.title')}</Typography>
       <DeckBoxGameBanner onResolved={refresh} />
       <SiteSelect
@@ -626,9 +639,16 @@ export function LocationsPage() {
         onChange={setSiteFilter}
         includeAll
         label={t('locations.sites.filterLabel')}
-        sx={{ alignSelf: 'flex-start', width: 260 }}
+        sx={{ alignSelf: 'flex-start', width: { xs: '100%', sm: 260 } }}
       />
-      <AddLocationBar onAdded={refresh} siteFilter={effectiveSite} />
+      {/* On a phone the add form waits behind a button, so the locations come first. */}
+      {isPhone && !addOpen ? (
+        <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setAddOpen(true)} sx={{ alignSelf: 'flex-start' }}>
+          {t('locations.newLocation')}
+        </Button>
+      ) : (
+        <AddLocationBar onAdded={refresh} siteFilter={effectiveSite} />
+      )}
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
         <FormControlLabel
           control={

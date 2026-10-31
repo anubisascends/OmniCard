@@ -51,6 +51,7 @@ import { EbayReviseDialog, type EbayReviseTarget } from '../components/dialogs/E
 import { useFormatters } from '../i18n/format';
 import { usePermissions } from '../context/usePermissions';
 import { KioskQueue } from '../components/kiosk/KioskQueue';
+import { StoreCreditDialog } from '../components/intake/StoreCreditDialog';
 
 function laneOf(order: OrderDto, lanes: WorkflowLaneDto[]): string {
   const byKey = lanes.find((l) => l.key === order.stageKey);
@@ -147,7 +148,17 @@ function OrdersBoard() {
           {t('sales.orders.importCsv')}
         </Button>
       </Stack>
-      <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1, alignSelf: 'stretch' }}>
+      {/* On a phone each lane is most of the screen wide and the board snaps to it as you swipe. */}
+      <Box
+        sx={{
+          display: 'flex',
+          gap: 1.5,
+          overflowX: 'auto',
+          pb: 1,
+          alignSelf: 'stretch',
+          scrollSnapType: { xs: 'x mandatory', sm: 'none' },
+        }}
+      >
       {lanes.map((lane) => {
         const laneOrders = orders.filter((o) => laneOf(o, lanes) === lane.key);
         return (
@@ -161,7 +172,14 @@ function OrdersBoard() {
                 setDragId(null);
               }
             }}
-            sx={{ minWidth: 240, width: 240, flexShrink: 0, p: 1, bgcolor: 'background.default' }}
+            sx={{
+              minWidth: { xs: '82%', sm: 240 },
+              width: { xs: '82%', sm: 240 },
+              flexShrink: 0,
+              p: 1,
+              bgcolor: 'background.default',
+              scrollSnapAlign: 'start',
+            }}
           >
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
               <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: lane.color }} />
@@ -567,10 +585,12 @@ function CustomerDialog({
 
 function CustomersTable() {
   const { t } = useTranslation();
+  const fmt = useFormatters();
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ['customers'], queryFn: api.customers });
   const [editing, setEditing] = useState<CustomerDto | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [creditFor, setCreditFor] = useState<CustomerDto | null>(null);
 
   const del = useMutation({
     mutationFn: (id: number) => api.customerDelete(id),
@@ -590,6 +610,11 @@ function CustomersTable() {
       >
         {t('sales.customers.newCustomer')}
       </Button>
+      {del.isError && (
+        <Alert severity="error" onClose={() => del.reset()} sx={{ alignSelf: 'stretch' }}>
+          {(del.error as Error).message}
+        </Alert>
+      )}
       <Paper variant="outlined" sx={{ alignSelf: 'stretch' }}>
         <Table size="small">
           <TableHead>
@@ -598,6 +623,7 @@ function CustomersTable() {
               <TableCell>{t('common.labels.email')}</TableCell>
               <TableCell>{t('common.labels.phone')}</TableCell>
               <TableCell>{t('common.labels.location')}</TableCell>
+              <TableCell align="right">{t('sales.customers.storeCredit')}</TableCell>
               <TableCell align="right"></TableCell>
             </TableRow>
           </TableHead>
@@ -608,6 +634,11 @@ function CustomersTable() {
                 <TableCell>{c.email}</TableCell>
                 <TableCell>{c.phone}</TableCell>
                 <TableCell>{[c.city, c.state].filter(Boolean).join(', ')}</TableCell>
+                <TableCell align="right">
+                  <Link component="button" variant="body2" onClick={() => setCreditFor(c)}>
+                    {fmt.money(c.storeCredit ?? 0)}
+                  </Link>
+                </TableCell>
                 <TableCell align="right">
                   <IconButton
                     size="small"
@@ -633,6 +664,7 @@ function CustomersTable() {
         </Table>
       </Paper>
       <CustomerDialog open={dialogOpen} initial={editing} onClose={() => setDialogOpen(false)} />
+      <StoreCreditDialog customer={creditFor} onClose={() => setCreditFor(null)} />
     </Stack>
   );
 }

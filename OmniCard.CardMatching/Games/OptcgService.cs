@@ -19,7 +19,7 @@ using OmniCard.Data.Catalogs;
 
 namespace OmniCard.CardMatching.Games;
 
-public sealed class OptcgService : ICardGameService, IGameFieldResolver, ICatalogLanguageAware, IDisposable
+public sealed class OptcgService : ICardGameService, ILowPriceSource, IGameFieldResolver, ICatalogLanguageAware, IDisposable
 {
     private const string ApiBaseUrl = "https://api.poneglyph.one";
 
@@ -121,6 +121,9 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, ICatalo
     // === ICatalogLanguageAware ===
 
     public IReadOnlyList<string> DownloadableLanguages => CardLanguages.DownloadableFor(CardGame.OnePiece);
+
+    // TCGCSV is English-only, but the Japanese/French rows downloaded earlier from poneglyph are kept.
+    public IReadOnlyList<string> SearchableLanguages { get; } = [CardLanguages.English, "ja", "fr"];
 
     public IReadOnlyCollection<string> CatalogLanguages
     {
@@ -1394,6 +1397,14 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, ICatalo
         => GetCurrentPrices([gameCardId], isFoil).TryGetValue(gameCardId, out var price) ? price : null;
 
     public Dictionary<string, decimal> GetCurrentPrices(IEnumerable<string> gameCardIds, bool isFoil)
+        => LookupPrices(gameCardIds, low: false);
+
+    /// <summary>The TCGplayer low price, stored as <see cref="OptcgCard.InventoryPrice"/>. One Piece prices
+    /// a printing once (no separate foil row), so <paramref name="isFoil"/> doesn't change the answer.</summary>
+    public Dictionary<string, decimal> GetLowPrices(IEnumerable<string> gameCardIds, bool isFoil)
+        => LookupPrices(gameCardIds, low: true);
+
+    private Dictionary<string, decimal> LookupPrices(IEnumerable<string> gameCardIds, bool low)
     {
         var requested = gameCardIds.Distinct().ToList();
         if (requested.Count == 0)
@@ -1409,13 +1420,13 @@ public sealed class OptcgService : ICardGameService, IGameFieldResolver, ICatalo
         {
             var rows = ctx.Cards.AsNoTracking()
                 .Where(c => chunk.Contains(c.CardSetId))
-                .Select(c => new { c.CardSetId, c.MarketPrice })
+                .Select(c => new { c.CardSetId, Price = low ? c.InventoryPrice : c.MarketPrice })
                 .ToList();
 
             foreach (var row in rows)
             {
-                if (row.MarketPrice.HasValue)
-                    result[row.CardSetId] = row.MarketPrice.Value;
+                if (row.Price.HasValue)
+                    result[row.CardSetId] = row.Price.Value;
             }
         }
 

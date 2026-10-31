@@ -34,7 +34,8 @@ public class InventoryCustomerWriteTests : IDisposable
         using (var ctx = new OmniCardDbContext(_opts)) ctx.Database.EnsureCreated();
 
         _factory = new MockFactory(_opts);
-        _customersController = new CustomersController(new CustomerService(_factory), _factory);
+        _customersController = new CustomersController(new CustomerService(_factory), _factory,
+            new OmniCard.Web.Services.Intake.StoreCreditService(_factory));
         _inventoryController = new InventoryController(new InventoryService(_factory), _factory);
     }
 
