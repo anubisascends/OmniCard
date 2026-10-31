@@ -991,7 +991,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     {
         try
         {
-            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            using var bitmap = ImageOps.Decode(imageData);
             if (bitmap.Width > bitmap.Height) return null;
             var rect = ToPixelRect(MtgCollectorRegion, bitmap.Width, bitmap.Height);
             if (rect.Width < 10 || rect.Height < 5) return null;

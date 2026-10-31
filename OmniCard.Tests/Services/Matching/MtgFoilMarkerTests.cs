@@ -1,5 +1,6 @@
-using System.Drawing;
+using SkiaSharp;
 using OmniCard.Imaging;
+using OmniCard.Tests.Fakes;
 
 namespace OmniCard.Tests.Services.Matching;
 
@@ -20,13 +21,12 @@ public class MtgFoilMarkerTests
     // Line 1: "365 R". Line 2: {set code} {mark} {language}, then the artist credit after a word gap.
     private static float[] Render(Mark mark, int setChars = 3, bool darkOnLight = false, bool lastSetCharIsT = false)
     {
-        using var bmp = new Bitmap(W, H);
-        using (var g = Graphics.FromImage(bmp))
+        using var bmp = ImageOps.Create(W, H, darkOnLight ? SKColors.White : SKColors.Black);
+        using (var canvas = new SKCanvas(bmp))
         {
-            g.Clear(darkOnLight ? Color.White : Color.Black);
-            using var ink = new SolidBrush(darkOnLight ? Color.Black : Color.White);
-            for (int i = 0; i < 3; i++) g.FillRectangle(ink, 20 + i * Pitch, Line1Top, LetterW, LetterH);
-            g.FillRectangle(ink, 200, Line1Top, LetterW, LetterH);
+            using var ink = TestImages.Fill(darkOnLight ? SKColors.Black : SKColors.White);
+            for (int i = 0; i < 3; i++) canvas.DrawRect(20 + i * Pitch, Line1Top, LetterW, LetterH, ink);
+            canvas.DrawRect(200, Line1Top, LetterW, LetterH, ink);
 
             int x = 20;
             for (int i = 0; i < setChars; i++, x += Pitch)
@@ -34,11 +34,11 @@ public class MtgFoilMarkerTests
                 if (lastSetCharIsT && i == setChars - 1)
                 {
                     // A "T" a touch shorter than its neighbours: star-sized, with a star's sparse fill.
-                    g.FillRectangle(ink, x, Line2Top + 2, LetterW + 6, 7);
-                    g.FillRectangle(ink, x + LetterW / 2 - 1, Line2Top + 2, 8, LetterH - 4);
+                    canvas.DrawRect(x, Line2Top + 2, LetterW + 6, 7, ink);
+                    canvas.DrawRect(x + LetterW / 2 - 1, Line2Top + 2, 8, LetterH - 4, ink);
                 }
                 else
-                    g.FillRectangle(ink, x, Line2Top, LetterW, LetterH);
+                    canvas.DrawRect(x, Line2Top, LetterW, LetterH, ink);
             }
             x += 12; // word-ish space either side of the mark
             int markW = 0;
@@ -46,33 +46,35 @@ public class MtgFoilMarkerTests
             if (mark == Mark.Bullet)
             {
                 markW = 16;
-                g.FillEllipse(ink, x, cy - 8, 16, 16);
+                canvas.DrawOval(x + 8, cy, 8, 8, ink);
             }
             else if (mark == Mark.Star)
             {
                 markW = 36;
-                g.FillPolygon(ink, StarPoints(x + 18, cy, 18, 7));
+                using var star = new SKPath();
+                star.AddPoly(StarPoints(x + 18, cy, 18, 7), true);
+                canvas.DrawPath(star, ink);
             }
             x += markW + 12;
-            for (int i = 0; i < 2; i++, x += Pitch) g.FillRectangle(ink, x, Line2Top, LetterW, LetterH);
-            g.FillRectangle(ink, x + 40, Line2Top, 60, LetterH); // artist credit
+            for (int i = 0; i < 2; i++, x += Pitch) canvas.DrawRect(x, Line2Top, LetterW, LetterH, ink);
+            canvas.DrawRect(x + 40, Line2Top, 60, LetterH, ink); // artist credit
         }
         var lum = new float[W * H];
         for (int y = 0; y < H; y++)
             for (int x = 0; x < W; x++)
             {
                 var c = bmp.GetPixel(x, y);
-                lum[y * W + x] = 0.299f * c.R + 0.587f * c.G + 0.114f * c.B;
+                lum[y * W + x] = 0.299f * c.Red + 0.587f * c.Green + 0.114f * c.Blue;
             }
         return lum;
     }
 
-    private static PointF[] StarPoints(float cx, float cy, float outer, float inner) =>
+    private static SKPoint[] StarPoints(float cx, float cy, float outer, float inner) =>
         Enumerable.Range(0, 10).Select(i =>
         {
             var r = i % 2 == 0 ? outer : inner;
             var a = -Math.PI / 2 + i * Math.PI / 5;
-            return new PointF(cx + (float)(r * Math.Cos(a)), cy + (float)(r * Math.Sin(a)));
+            return new SKPoint(cx + (float)(r * Math.Cos(a)), cy + (float)(r * Math.Sin(a)));
         }).ToArray();
 
     [Fact]
