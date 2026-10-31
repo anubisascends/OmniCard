@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Drawing;
 using Microsoft.Extensions.Logging;
+using SkiaSharp;
 using Tesseract;
 using OmniCard.Shared.Matching;
 
@@ -181,6 +182,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         LoadListSymbolReferences();
 
         _tessdataPath = Path.Combine(AppContext.BaseDirectory, "tessdata");
+        TesseractNativeSetup.EnsureConfigured(_logger);
 
         // Validate the engine can be constructed (native libs + language data present).
         // Mirror the previous behaviour: if OCR is unavailable, log a warning and degrade
@@ -224,7 +226,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
 
         try
         {
-            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            using var bitmap = ImageOps.Decode(imageData);
             var width = bitmap.Width;
             var height = bitmap.Height;
 
@@ -281,7 +283,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
 
         try
         {
-            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            using var bitmap = ImageOps.Decode(imageData);
             var symbolRect = ToPixelRect(SymbolCropRegion, bitmap.Width, bitmap.Height);
             if (symbolRect.Width < 5 || symbolRect.Height < 5)
                 return ([], 0);
@@ -304,24 +306,21 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         return new Rectangle(x, y, w, h);
     }
 
-    private (string Text, double Confidence) OcrCroppedRegion(Bitmap source, Rectangle cropRect, PageSegMode psm, string? whitelist)
+    private (string Text, double Confidence) OcrCroppedRegion(SKBitmap source, Rectangle cropRect, PageSegMode psm, string? whitelist)
     {
         // Crop
-        using var cropped = source.Clone(cropRect, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using var cropped = ImageOps.Crop(source, cropRect);
 
         // Upscale if too small (OCR works better with larger text)
-        Bitmap toOcr = cropped;
+        SKBitmap toOcr = cropped;
         bool needsDispose = false;
         if (cropped.Width < 200)
         {
             var scale = 200.0 / cropped.Width;
             var newWidth = (int)(cropped.Width * scale);
             var newHeight = (int)(cropped.Height * scale);
-            toOcr = new Bitmap(newWidth, newHeight);
+            toOcr = ImageOps.Resize(cropped, newWidth, newHeight);
             needsDispose = true;
-            using var g = Graphics.FromImage(toOcr);
-            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-            g.DrawImage(cropped, 0, 0, newWidth, newHeight);
         }
 
         try { return RunOcr(toOcr, psm, whitelist); }
@@ -330,7 +329,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
 
     // Runs Tesseract on an already-prepared bitmap. Extracted so the plain crop path and the
     // binarized collector-number path share one engine-pool + whitelist discipline.
-    private (string Text, double Confidence) RunOcr(Bitmap toOcr, PageSegMode psm, string? whitelist)
+    private (string Text, double Confidence) RunOcr(SKBitmap toOcr, PageSegMode psm, string? whitelist)
     {
         var engine = RentEngine();
         try
@@ -339,9 +338,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
             // and clear it afterward so a pooled engine doesn't leak the restriction.
             engine.SetVariable("tessedit_char_whitelist", whitelist ?? string.Empty);
 
-            using var ms = new MemoryStream();
-            toOcr.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-            using var pix = Pix.LoadFromMemory(ms.ToArray());
+            using var pix = Pix.LoadFromMemory(ImageOps.EncodePng(toOcr));
             using var page = engine.Process(pix, psm);
 
             var text = page.GetText() ?? string.Empty;
@@ -357,58 +354,53 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
 
     // Upscale a crop to targetW and convert to high-contrast grayscale. Small holofoil set-code
     // text (Yu-Gi-Oh!) reads far better enlarged and desaturated than at native size in colour.
-    private static Bitmap UpscaleGray(Bitmap crop, int targetW, float contrast)
+    private static SKBitmap UpscaleGray(SKBitmap crop, int targetW, float contrast)
     {
         var scale = (double)targetW / crop.Width;
         int nw = targetW, nh = Math.Max(1, (int)(crop.Height * scale));
-        var outBmp = new Bitmap(nw, nh);
-        using var g = Graphics.FromImage(outBmp);
-        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+        // The grey/contrast colour matrix GDI+ applied (to the source pixels, before scaling):
+        // v = (0.299 R + 0.587 G + 0.114 B) * contrast + (0.5 - 0.5 * contrast), alpha unchanged.
         float t = 0.5f - 0.5f * contrast;
-        var cm = new System.Drawing.Imaging.ColorMatrix(
-        [
-            [0.299f * contrast, 0.299f * contrast, 0.299f * contrast, 0, 0],
-            [0.587f * contrast, 0.587f * contrast, 0.587f * contrast, 0, 0],
-            [0.114f * contrast, 0.114f * contrast, 0.114f * contrast, 0, 0],
-            [0, 0, 0, 1, 0],
-            [t, t, t, 0, 1],
-        ]);
-        using var ia = new System.Drawing.Imaging.ImageAttributes();
-        ia.SetColorMatrix(cm);
-        g.DrawImage(crop, new Rectangle(0, 0, nw, nh), 0, 0, crop.Width, crop.Height, GraphicsUnit.Pixel, ia);
-        return outBmp;
+        var px = ImageOps.GetBgra(crop);
+        for (int i = 0; i < px.Length; i += 4)
+        {
+            double v = (0.299f * contrast * px[i + 2] + 0.587f * contrast * px[i + 1] + 0.114f * contrast * px[i]) / 255.0 + t;
+            px[i] = px[i + 1] = px[i + 2] = (byte)Math.Clamp(Math.Round(v * 255), 0, 255);
+        }
+        using var gray = ImageOps.FromBgra(px, crop.Width, crop.Height);
+        return ImageOps.Resize(gray, nw, nh);
     }
 
     // Upscale + grayscale + Otsu threshold to a clean black-on-white binary, auto-picking polarity
     // so the code reads whether it's dark-on-light or light-on-dark against the card border.
-    private static Bitmap BinarizeOtsu(Bitmap crop, int targetW)
+    private static SKBitmap BinarizeOtsu(SKBitmap crop, int targetW)
     {
         using var gray = UpscaleGray(crop, targetW, 1.0f);
         int w = gray.Width, h = gray.Height, total = w * h;
+        var px = ImageOps.GetBgra(gray);
         var lum = new byte[total];
         var hist = new int[256];
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-            {
-                var c = gray.GetPixel(x, y);
-                int l = (int)(0.299 * c.R + 0.587 * c.G + 0.114 * c.B);
-                lum[y * w + x] = (byte)l; hist[l]++;
-            }
+        for (int i = 0; i < total; i++)
+        {
+            int l = (int)(0.299 * px[i * 4 + 2] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4]);
+            lum[i] = (byte)l; hist[l]++;
+        }
 
         int thr = OtsuThreshold(hist, total);
 
         int dark = 0; for (int i = 0; i < total; i++) if (lum[i] <= thr) dark++;
         bool textIsDark = dark <= total / 2; // ink = the minority tone
 
-        var outBmp = new Bitmap(w, h);
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-            {
-                bool isDark = lum[y * w + x] <= thr;
-                bool ink = textIsDark ? isDark : !isDark;
-                outBmp.SetPixel(x, y, ink ? Color.Black : Color.White);
-            }
-        return outBmp;
+        var outPx = new byte[total * 4];
+        for (int i = 0; i < total; i++)
+        {
+            bool isDark = lum[i] <= thr;
+            bool ink = textIsDark ? isDark : !isDark;
+            byte v = ink ? (byte)0 : (byte)255;
+            outPx[i * 4] = outPx[i * 4 + 1] = outPx[i * 4 + 2] = v;
+            outPx[i * 4 + 3] = 255;
+        }
+        return ImageOps.FromBgra(outPx, w, h);
     }
 
     // Otsu's threshold over a 256-bin luminance histogram: the level that best splits it into two tones.
@@ -438,7 +430,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
 
         try
         {
-            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            using var bitmap = ImageOps.Decode(imageData);
             var rect = ToPixelRect(OptcgCollectorNumberRegion, bitmap.Width, bitmap.Height);
             if (rect.Width < 10 || rect.Height < 5)
                 return (null, 0);
@@ -485,7 +477,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         var reads = new List<string>();
         try
         {
-            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            using var bitmap = ImageOps.Decode(imageData);
             foreach (var line in OptcgCollectorLineLocator.Locate(bitmap))
                 using (line)
                 {
@@ -527,7 +519,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         if (!_ocrAvailable) return (null, 0);
         try
         {
-            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            using var bitmap = ImageOps.Decode(imageData);
             // Landscape cards (Battlefields) are wider than tall; portrait cards ~0.72 ratio.
             var region = bitmap.Width > bitmap.Height ? RiftboundLandscapeRegion : RiftboundPortraitRegion;
             var rect = ToPixelRect(region, bitmap.Width, bitmap.Height);
@@ -578,7 +570,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         if (!_ocrAvailable) return (null, 0);
         try
         {
-            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            using var bitmap = ImageOps.Decode(imageData);
             var landscape = bitmap.Width > bitmap.Height;
             var regions = spec.RegionsFor(landscape);
 
@@ -663,13 +655,13 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         if (!_ocrAvailable) return (null, 0);
         try
         {
-            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            using var bitmap = ImageOps.Decode(imageData);
             foreach (var region in YugiohEditionRegions)
             {
                 var rect = ToPixelRect(region, bitmap.Width, bitmap.Height);
                 if (rect.Width < 10 || rect.Height < 5) continue;
 
-                using var crop = bitmap.Clone(rect, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                using var crop = ImageOps.Crop(bitmap, rect);
                 // Same cheap-to-aggressive passes as the collector-code path; the text is the same size/finish.
                 IEnumerable<(string Text, double Confidence)> Passes()
                 {
@@ -714,7 +706,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
 
     // Yields OCR (text, confidence) for a region: plain when Binarize is off, else both the Otsu
     // binarization and a high-contrast grayscale pass (each wins on different card finishes).
-    private IEnumerable<(string Text, double Confidence)> ReadRegion(Bitmap bitmap, Rectangle rect, OcrCollectorSpec spec)
+    private IEnumerable<(string Text, double Confidence)> ReadRegion(SKBitmap bitmap, Rectangle rect, OcrCollectorSpec spec)
     {
         var psm = ResolvePsm(spec);
         if (!spec.Binarize)
@@ -723,7 +715,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
             yield break;
         }
 
-        using var crop = bitmap.Clone(rect, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using var crop = ImageOps.Crop(bitmap, rect);
         // For block/multi-line crops (FFTCG), add a plain upscaled pass: on codes printed over
         // artwork (no light footer, e.g. FFTCG full-art) the raw crop often reads cleaner than a
         // binarization the busy background corrupts. Scoring keeps whichever pass is best-shaped.
@@ -760,7 +752,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         if (!_ocrAvailable) return ([], 0);
         try
         {
-            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            using var bitmap = ImageOps.Decode(imageData);
             // Only meaningful for portrait card scans; skip clearly non-card / landscape crops.
             if (bitmap.Width > bitmap.Height) return ([], 0);
 
@@ -772,7 +764,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
             // glare that the binarization crushes). All three always run: on real scans the first pass to
             // parse was often the wrong one (a stray digit from the rules box, or a misread digit that two
             // passes shared), so the passes vote and every anchored read is kept as a candidate.
-            using var crop = bitmap.Clone(rect, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            using var crop = ImageOps.Crop(bitmap, rect);
 
             IEnumerable<(string Text, double Confidence)> Passes()
             {
@@ -877,7 +869,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         if (_listTemplate is null) return -1;
         try
         {
-            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            using var bitmap = ImageOps.Decode(imageData);
             // Portrait card scans only — the glyph position is defined for upright cards.
             if (bitmap.Width > bitmap.Height) return -1;
 
@@ -896,22 +888,14 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     }
 
     // Crop `rect`, resize to w×h, return row-major luminance in [0,255].
-    private static float[] GrayResize(Bitmap source, Rectangle rect, int w, int h)
+    private static float[] GrayResize(SKBitmap source, Rectangle rect, int w, int h)
     {
-        using var cropped = source.Clone(rect, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-        using var resized = new Bitmap(w, h);
-        using (var g = Graphics.FromImage(resized))
-        {
-            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-            g.DrawImage(cropped, 0, 0, w, h);
-        }
+        using var cropped = ImageOps.Crop(source, rect);
+        using var resized = ImageOps.Resize(cropped, w, h);
+        var c = ImageOps.GetBgra(resized);
         var px = new float[w * h];
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-            {
-                var c = resized.GetPixel(x, y);
-                px[y * w + x] = 0.299f * c.R + 0.587f * c.G + 0.114f * c.B;
-            }
+        for (int i = 0; i < px.Length; i++)
+            px[i] = 0.299f * c[i * 4 + 2] + 0.587f * c[i * 4 + 1] + 0.114f * c[i * 4];
         return px;
     }
 
@@ -970,7 +954,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
                 if (!name.Contains("mtg-list-glyph", StringComparison.OrdinalIgnoreCase)) continue;
                 using var stream = asm.GetManifestResourceStream(name);
                 if (stream is null) continue;
-                using var bmp = new Bitmap(stream);
+                using var bmp = ImageOps.Decode(stream);
                 var g = GrayResize(bmp, new Rectangle(0, 0, bmp.Width, bmp.Height), ListTemplateW, ListTemplateH);
                 // Per-crop z-normalize.
                 double mean = g.Average(v => (double)v);
@@ -1007,7 +991,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     {
         try
         {
-            using var bitmap = new Bitmap(new MemoryStream(imageData));
+            using var bitmap = ImageOps.Decode(imageData);
             if (bitmap.Width > bitmap.Height) return null;
             var rect = ToPixelRect(MtgCollectorRegion, bitmap.Width, bitmap.Height);
             if (rect.Width < 10 || rect.Height < 5) return null;
@@ -1267,14 +1251,14 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     {
         try
         {
-            using var bitmap = CropToCard(new Bitmap(new MemoryStream(imageData)));
+            using var bitmap = CropToCard(ImageOps.Decode(imageData));
             var border = ClassifyBorder(bitmap);
             if (!_ocrAvailable)
                 return new MtgPrintEvidence { BorderColor = border };
 
             var titles = new List<string>();
             var bottoms = new List<string>();
-            using (var title = bitmap.Clone(ToPixelRect(OldFrameTitleRegion, bitmap.Width, bitmap.Height), System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+            using (var title = ImageOps.Crop(bitmap, ToPixelRect(OldFrameTitleRegion, bitmap.Width, bitmap.Height)))
             {
                 // Old-frame titles are white glyphs with a dark drop shadow on a coloured bar. Keeping only
                 // bright, near-neutral pixels as ink isolates the glyphs from the frame texture — the plain
@@ -1292,7 +1276,7 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
                     using (var bright = InkMask(title, 1400, IsBrightInk, clean: true, levels: levels)) AddRead(titles, RunOcr(bright, PageSegMode.SingleLine, null).Text);
                 }
             }
-            using (var bottom = bitmap.Clone(ToPixelRect(OldFrameBottomRegion, bitmap.Width, bitmap.Height), System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+            using (var bottom = ImageOps.Crop(bitmap, ToPixelRect(OldFrameBottomRegion, bitmap.Width, bitmap.Height)))
             {
                 // The credit/copyright text is small and light-on-dark; each variant reads some frames the
                 // others garble, so all are kept and the catalog side looks for its cues across them.
@@ -1322,8 +1306,8 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         if (!_ocrAvailable) return null;
         try
         {
-            using var bitmap = CropToCard(new Bitmap(new MemoryStream(imageData)));
-            using var box = bitmap.Clone(ToPixelRect(OldFrameTextBoxRegion, bitmap.Width, bitmap.Height), System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            using var bitmap = CropToCard(ImageOps.Decode(imageData));
+            using var box = ImageOps.Crop(bitmap, ToPixelRect(OldFrameTextBoxRegion, bitmap.Width, bitmap.Height));
             using var gray = UpscaleGray(box, 1400, 1.2f);
             var text = RunOcr(gray, PageSegMode.SingleBlock, null).Text.Replace('\n', ' ').Trim();
             return text.Length > 0 ? text : null;
@@ -1338,13 +1322,13 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     /// <summary>Takes ownership of <paramref name="scan"/> and returns it cropped to the card when it sits on
     /// a visible margin of scanner bed / mat (<see cref="FindCardBounds"/>), else unchanged. The old-frame
     /// regions are fractions of the card, so a margin would shift every crop.</summary>
-    private static Bitmap CropToCard(Bitmap scan)
+    private static SKBitmap CropToCard(SKBitmap scan)
     {
         var bounds = FindCardBounds(scan);
         if (bounds.Width == scan.Width && bounds.Height == scan.Height)
             return scan;
         using (scan)
-            return scan.Clone(bounds, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            return ImageOps.Crop(scan, bounds);
     }
 
     /// <summary>
@@ -1353,21 +1337,13 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
     /// a background that can't be mistaken for a card border is trimmed — mid-grey or coloured, not
     /// near-white or near-black — since trimming a white lid off a white-bordered card would eat the border.
     /// </summary>
-    internal static Rectangle FindCardBounds(Bitmap bitmap)
+    internal static Rectangle FindCardBounds(SKBitmap bitmap)
     {
         int w = bitmap.Width, h = bitmap.Height;
         var full = new Rectangle(0, 0, w, h);
         if (w < 50 || h < 50) return full;
-        using var argb = bitmap.Clone(full, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-        var data = argb.LockBits(full, System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-        byte[] buf;
-        int stride = data.Stride;
-        try
-        {
-            buf = new byte[stride * h];
-            System.Runtime.InteropServices.Marshal.Copy(data.Scan0, buf, 0, buf.Length);
-        }
-        finally { argb.UnlockBits(data); }
+        var buf = ImageOps.GetBgra(bitmap);
+        int stride = w * 4;
 
         (int R, int G, int B) Px(int x, int y) { var i = y * stride + x * 4; return (buf[i + 2], buf[i + 1], buf[i]); }
 
@@ -1405,36 +1381,29 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
 
     /// <summary>"white"/"black" from the median luminance of a band 1–2.5% inside each edge (corners
     /// skipped — rounded corners show the scanner background), or null when it's neither clearly.</summary>
-    internal static string? ClassifyBorder(Bitmap bitmap)
+    internal static string? ClassifyBorder(SKBitmap bitmap)
     {
         int w = bitmap.Width, h = bitmap.Height;
         if (w < 50 || h < 50) return null;
-        using var argb = bitmap.Clone(new Rectangle(0, 0, w, h), System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-        var data = argb.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-        try
+        var stride = w * 4;
+        var buf = ImageOps.GetBgra(bitmap);
+        int Lum(int x, int y)
         {
-            var stride = data.Stride;
-            var buf = new byte[stride * h];
-            System.Runtime.InteropServices.Marshal.Copy(data.Scan0, buf, 0, buf.Length);
-            int Lum(int x, int y)
-            {
-                var i = y * stride + x * 4; // BGRA
-                return (int)(0.114 * buf[i] + 0.587 * buf[i + 1] + 0.299 * buf[i + 2]);
-            }
-            var lums = new List<int>();
-            for (double t = 0.15; t <= 0.85; t += 0.01)
-                for (double d = 0.010; d <= 0.0251; d += 0.005)
-                {
-                    lums.Add(Lum((int)(t * w), (int)(d * h)));
-                    lums.Add(Lum((int)(t * w), (int)((1 - d) * h)));
-                    lums.Add(Lum((int)(d * w), (int)(t * h)));
-                    lums.Add(Lum((int)((1 - d) * w), (int)(t * h)));
-                }
-            lums.Sort();
-            var median = lums[lums.Count / 2];
-            return median >= WhiteBorderMinLuminance ? "white" : median <= BlackBorderMaxLuminance ? "black" : null;
+            var i = y * stride + x * 4; // BGRA
+            return (int)(0.114 * buf[i] + 0.587 * buf[i + 1] + 0.299 * buf[i + 2]);
         }
-        finally { argb.UnlockBits(data); }
+        var lums = new List<int>();
+        for (double t = 0.15; t <= 0.85; t += 0.01)
+            for (double d = 0.010; d <= 0.0251; d += 0.005)
+            {
+                lums.Add(Lum((int)(t * w), (int)(d * h)));
+                lums.Add(Lum((int)(t * w), (int)((1 - d) * h)));
+                lums.Add(Lum((int)(d * w), (int)(t * h)));
+                lums.Add(Lum((int)((1 - d) * w), (int)(t * h)));
+            }
+        lums.Sort();
+        var median = lums[lums.Count / 2];
+        return median >= WhiteBorderMinLuminance ? "white" : median <= BlackBorderMaxLuminance ? "black" : null;
     }
 
     // Bright and near-neutral: the white title/credit glyphs, not the coloured frame behind them.
@@ -1453,52 +1422,41 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         return mn > 228 && mx - mn < 35;
     }
 
-    private static Bitmap UpscaleColor(Bitmap crop, int targetW)
+    private static SKBitmap UpscaleColor(SKBitmap crop, int targetW)
     {
         var scale = (double)targetW / crop.Width;
-        var outBmp = new Bitmap(targetW, Math.Max(1, (int)(crop.Height * scale)));
-        using var g = Graphics.FromImage(outBmp);
-        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-        g.DrawImage(crop, 0, 0, outBmp.Width, outBmp.Height);
-        return outBmp;
+        return ImageOps.Resize(crop, targetW, Math.Max(1, (int)(crop.Height * scale)));
     }
 
     /// <summary>Upscales <paramref name="crop"/> and renders pixels passing <paramref name="isInk"/> black on
     /// white — Tesseract's preferred polarity. With <paramref name="levels"/> the crop is auto-levelled first
     /// (<see cref="AutoLevels"/>); with <paramref name="clean"/>, near-solid ink rows/columns (a border caught
     /// in the crop) are blanked and speckle is removed with a 3×3 majority filter.</summary>
-    private static Bitmap InkMask(Bitmap crop, int targetW, Func<byte, byte, byte, bool> isInk, bool clean = false, bool levels = false)
+    private static SKBitmap InkMask(SKBitmap crop, int targetW, Func<byte, byte, byte, bool> isInk, bool clean = false, bool levels = false)
     {
-        var outBmp = UpscaleColor(crop, targetW); // new Bitmap(w, h) is 32bpp ARGB
-        int w = outBmp.Width, h = outBmp.Height;
-        var data = outBmp.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.ReadWrite, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-        try
-        {
-            var buf = new byte[data.Stride * h];
-            System.Runtime.InteropServices.Marshal.Copy(data.Scan0, buf, 0, buf.Length);
-            if (levels)
-                AutoLevels(buf, data.Stride, w, h);
-            var ink = new bool[w * h];
-            for (int y = 0; y < h; y++)
-                for (int x = 0; x < w; x++)
-                {
-                    var i = y * data.Stride + x * 4; // BGRA
-                    ink[y * w + x] = isInk(buf[i + 2], buf[i + 1], buf[i]);
-                }
-            if (clean)
-                ink = CleanInk(ink, w, h);
-            for (int y = 0; y < h; y++)
-                for (int x = 0; x < w; x++)
-                {
-                    var i = y * data.Stride + x * 4;
-                    byte v = ink[y * w + x] ? (byte)0 : (byte)255;
-                    buf[i] = buf[i + 1] = buf[i + 2] = v;
-                    buf[i + 3] = 255;
-                }
-            System.Runtime.InteropServices.Marshal.Copy(buf, 0, data.Scan0, buf.Length);
-        }
-        finally { outBmp.UnlockBits(data); }
-        return outBmp;
+        using var upscaled = UpscaleColor(crop, targetW);
+        int w = upscaled.Width, h = upscaled.Height, stride = w * 4;
+        var buf = ImageOps.GetBgra(upscaled);
+        if (levels)
+            AutoLevels(buf, stride, w, h);
+        var ink = new bool[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                var i = y * stride + x * 4; // BGRA
+                ink[y * w + x] = isInk(buf[i + 2], buf[i + 1], buf[i]);
+            }
+        if (clean)
+            ink = CleanInk(ink, w, h);
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                var i = y * stride + x * 4;
+                byte v = ink[y * w + x] ? (byte)0 : (byte)255;
+                buf[i] = buf[i + 1] = buf[i + 2] = v;
+                buf[i + 3] = 255;
+            }
+        return ImageOps.FromBgra(buf, w, h);
     }
 
     /// <summary>Stretches a BGRA buffer's luminance range (1st–99.5th percentile) to full scale, all channels
@@ -1559,22 +1517,15 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         return outInk;
     }
 
-    private (List<string> SetCodes, double Confidence) MatchSymbol(Bitmap source, Rectangle symbolRect)
+    private (List<string> SetCodes, double Confidence) MatchSymbol(SKBitmap source, Rectangle symbolRect)
     {
         // Crop and hash the symbol region
-        using var cropped = source.Clone(symbolRect, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using var cropped = ImageOps.Crop(source, symbolRect);
 
         // Resize to 32x32 for pHash (same as reference symbols)
-        using var resized = new Bitmap(32, 32);
-        using (var g = Graphics.FromImage(resized))
-        {
-            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-            g.DrawImage(cropped, 0, 0, 32, 32);
-        }
+        using var resized = ImageOps.Resize(cropped, 32, 32);
 
-        using var ms = new MemoryStream();
-        resized.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-        ms.Position = 0;
+        using var ms = new MemoryStream(ImageOps.EncodePng(resized));
         var scanSymbolHash = _hashService.ComputeHash(ms);
 
         // Compare against all known symbol hashes

@@ -36,6 +36,7 @@ using OmniCard.Audit.Exporters;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Mcp;
 using ModelContextProtocol.AspNetCore.Authentication;
+using Serilog;
 using Microsoft.Extensions.Hosting.WindowsServices;
 
 // Run as a Windows service when installed as one (install-service.ps1): the app then hosts itself on
@@ -95,6 +96,22 @@ if (string.IsNullOrWhiteSpace(dataDir))
 var connectionString = OmniCard.Web.Data.SqlServerDb.ConnectionString(builder.Configuration);
 
 var scansDir = Path.Combine(dataDir, "scans");
+
+// Optional rolling log files under {dataDir}/logs, in addition to the console. Off by default (IIS and
+// console hosts keep their own logging); the Docker image enables it so logs live on the data volume.
+// Levels are still filtered by the "Logging" configuration section, as for the console.
+if (builder.Configuration.GetValue<bool>("Logging:File:Enabled"))
+{
+    var fileLogger = new Serilog.LoggerConfiguration()
+        .MinimumLevel.Verbose()
+        .WriteTo.File(
+            Path.Combine(dataDir, "logs", "omnicard-.log"),
+            rollingInterval: Serilog.RollingInterval.Day,
+            retainedFileCountLimit: builder.Configuration.GetValue("Logging:File:RetainedFileCount", 14),
+            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}")
+        .CreateLogger();
+    builder.Logging.AddSerilog(fileLogger, dispose: true);
+}
 
 builder.Services.AddSignalR();
 builder.Services.AddControllers(options =>

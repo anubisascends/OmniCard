@@ -145,13 +145,13 @@ public sealed partial class DecklistService(
         }
     }
 
-    /// <summary>Fetch a URL's body via the OS curl.exe (bypasses Cloudflare TLS fingerprinting that
-    /// blocks .NET's HttpClient). Throws if curl.exe is unavailable or the request fails.</summary>
+    /// <summary>Fetch a URL's body via the OS curl (bypasses Cloudflare TLS fingerprinting that
+    /// blocks .NET's HttpClient). Throws if curl is unavailable or the request fails.</summary>
     private static async Task<string> CurlGetStringAsync(string url)
     {
         var psi = new ProcessStartInfo
         {
-            FileName = "curl.exe",
+            FileName = OperatingSystem.IsWindows() ? "curl.exe" : "curl",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -166,12 +166,12 @@ public sealed partial class DecklistService(
         psi.ArgumentList.Add(url);
 
         using var proc = Process.Start(psi)
-            ?? throw new InvalidOperationException("curl.exe could not be started.");
+            ?? throw new InvalidOperationException("curl could not be started.");
         var stdout = await proc.StandardOutput.ReadToEndAsync();
         await proc.WaitForExitAsync();
 
         if (proc.ExitCode != 0 || string.IsNullOrWhiteSpace(stdout))
-            throw new InvalidOperationException($"curl.exe request failed (exit code {proc.ExitCode}).");
+            throw new InvalidOperationException($"curl request failed (exit code {proc.ExitCode}).");
 
         return stdout;
     }

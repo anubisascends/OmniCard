@@ -40,9 +40,11 @@ dotnet publish OmniCard.Web/OmniCard.Web.csproj -c Release -r win-x64 --self-con
 
 See **`OmniCard.Web/README.md`** for the full deployment/operations guide (SQL Server setup, data migration, config keys, eBay, artwork).
 
-CI (`.github/workflows/ci.yml`) runs `dotnet build` + `dotnet test` with coverage on `windows-latest` for every push to `master` and every PR — Windows-only (the imaging/OCR stack uses `System.Drawing`). Releases (`.github/workflows/release.yml`) build the SPA, publish a framework-dependent win-x64 web build, and attach the IIS zip to the GitHub Release.
+CI (`.github/workflows/ci.yml`) runs `dotnet build` + `dotnet test` on `windows-latest` (with coverage) and on `ubuntu-24.04` (with the distro's `libtesseract5`/`liblept5` and fonts) for every push to `master` and every PR. Releases (`.github/workflows/release.yml`) build the SPA, publish a framework-dependent win-x64 web build, and attach the IIS zip to the GitHub Release. `Dockerfile` + `docker-compose.yml` package the app for Linux (see README ▸ Docker / Linux).
 
-Requires the .NET 10 SDK, Node 18+ (SPA), SQL Server 2019+ (unified store + catalogs), and Windows (target framework `net10.0-windows10.0.22621.0`; the imaging code is Windows-only). Gotcha: `dotnet run` spawns `OmniCard.Web.exe` that lingers and locks DLLs — `taskkill //F //IM OmniCard.Web.exe` before rebuilding.
+Requires the .NET 10 SDK, Node 18+ (SPA), SQL Server 2019+ (unified store + catalogs). Runs on Windows and Linux (target framework `net10.0`). On Linux, OCR uses the distribution's Tesseract (mapped by `OmniCard.Imaging/TesseractNativeSetup.cs`) and QuestPDF needs system fonts. Gotcha: `dotnet run` spawns `OmniCard.Web.exe` that lingers and locks DLLs — `taskkill //F //IM OmniCard.Web.exe` before rebuilding.
+
+**Imaging is cross-platform — never reintroduce `System.Drawing`.** Decode/crop/rotate/encode go through `OmniCard.Imaging/ImageOps` (SkiaSharp + LibTiff.NET, 32-bit BGRA non-premultiplied buffers). Every resize goes through `GdiPlusResampler`, a managed copy of GDI+ `HighQualityBicubic` that keeps hashes compatible with the ones already stored. `ImagingBaselineTests` / `OcrBaselineTests` compare against reference output of the original GDI+ pipeline (`OmniCard.Tests/TestData/Baseline`); a change that moves hashes must keep those tests within their documented tolerance.
 
 ## Solution layout
 
@@ -51,7 +53,7 @@ Dependencies flow downward; `OmniCard.Shared` is the common core everything refe
 ```
 OmniCard.Shared/       Interfaces (I*Service) and models shared across every project — no implementation logic
 OmniCard.Data/         EF Core DbContexts — per-game catalog contexts + the unified OmniCardDbContext (multi-provider: SQLite + SQL Server)
-OmniCard.Imaging/      Perceptual hashing (pHash, foil-aware edge hash), OCR, image caching
+OmniCard.Imaging/      Perceptual hashing (pHash, foil-aware edge hash), OCR, image I/O (ImageOps, GdiPlusResampler)
 OmniCard.CardMatching/ Per-game ICardGameService implementations (Scryfall, OPTCG, Riftbound, TCGCSV-backed games)
 OmniCard.Collection/   Business logic: collection queries, CSV import/export, decklists, inventory, sales/fulfillment
 OmniCard.eBay/         eBay OAuth, catalog lookup, listing create/sync, seller setup

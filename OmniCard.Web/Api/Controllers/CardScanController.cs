@@ -306,7 +306,7 @@ public sealed class CardScanController(
     internal static string? SafeFileName(string? name)
     {
         if (string.IsNullOrWhiteSpace(name)) return null;
-        var invalid = Path.GetInvalidFileNameChars();
+        var invalid = OmniCard.Shared.PortableFileName.InvalidChars;
         var cleaned = new string(name.Trim().Select(ch => invalid.Contains(ch) ? '-' : ch).ToArray()).Trim(' ', '.', '-');
         if (cleaned.Length > 100) cleaned = cleaned[..100];
         return cleaned.Length == 0 ? null : cleaned;

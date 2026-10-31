@@ -51,9 +51,11 @@ whole app — the original WPF desktop app has been retired.
 - **.NET 10 SDK** (build) / **.NET 10 Hosting Bundle** (IIS host).
 - **Node 18+ / npm** for the SPA build (developed on Node 24 / npm 9).
 - **SQL Server 2019+** (Express is fine). Default connection targets `localhost` with Windows auth.
-- A **data directory** (default `%LOCALAPPDATA%\OmniCard`, or `--db <path>`) for `scans/`,
+- A **data directory** (default `%LOCALAPPDATA%\OmniCard` — `~/.local/share/OmniCard` on Linux — or `--db <path>`) for `scans/`,
   `card-images/`, `symbols/`, and `dataprotection-keys/`. A fresh server builds the SQL Server DBs
   itself; to bring existing data over, run the one-time migration below.
+- **Windows or Linux (x64).** For Linux, the Docker setup in the root [README ▸ Docker / Linux](../README.md#docker--linux)
+  bundles everything (SQL Server, OCR libraries, fonts, backups, reverse proxy notes).
 
 ## Configuration
 
@@ -65,6 +67,7 @@ loaded automatically if present). Key settings:
 | `DataDirectory` (or `--db <path>` CLI arg) | Folder holding `scans/`, `card-images/`, `symbols/`, `dataprotection-keys/`. |
 | `ConnectionStrings:OmniCard` | SQL Server unified store. Default: `Server=localhost;Database=OmniCard;Trusted_Connection=True;TrustServerCertificate=True;` The per-game catalog DBs reuse this with the database name swapped (or set `ConnectionStrings:OmniCard_<Game>` explicitly). |
 | `Binder:EditPassphrase` | Legacy binder-editor gate (separate from the per-user sign-in). |
+| `Logging:File:Enabled` | `true` adds daily rolling log files under `<DataDirectory>/logs` (`Logging:File:RetainedFileCount`, default 14). Off by default; on in the Docker image. |
 | `eBay` section | eBay app credentials — see [eBay](#ebay-setup). |
 
 DataProtection keys (used to encrypt stored eBay tokens) are persisted to
@@ -376,7 +379,9 @@ condition.
 - API: `POST /api/import/url` (`ImportRun` permission).
 - Moxfield's API sits behind Cloudflare, which blocks .NET's `HttpClient`, so the server fetches it by
   running Windows' built-in **`curl.exe`**. It must be on the server's `PATH` (it is by default on Windows
-  10 1803+ / Server 2019+). The server needs outbound HTTPS to `api2.moxfield.com` and `archidekt.com`.
+  10 1803+ / Server 2019+). On Linux the app runs `curl` (included in the Docker image); Cloudflare may
+  still block it there, since Linux curl presents a different TLS fingerprint. The server needs outbound
+  HTTPS to `api2.moxfield.com` and `archidekt.com`.
 
 ## Export scans without adding them
 
@@ -878,8 +883,9 @@ otherwise the server stays in loopback mode. Clients discover the IdP automatica
   `Authority = https://<host>/realms/<realm>`, `Audience = <client/audience id>`.
 
 **HTTPS / IIS:** OAuth requires HTTPS. In-process IIS hosting sees the public host/scheme, so the PRM
-document and challenge URLs come out correct. If you host **out-of-process** behind a reverse proxy,
-enable forwarded headers so the request scheme/host reflect the public URL.
+document and challenge URLs come out correct. If you host **out-of-process** behind a reverse proxy
+(including the Docker setup), enable forwarded headers (`ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`) so the
+request scheme/host reflect the public URL.
 
 ### Connecting a client
 

@@ -1,8 +1,7 @@
-using System.Drawing;
-using System.Drawing.Imaging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.CardMatching.Games;
 using OmniCard.Imaging;
+using SkiaSharp;
 
 namespace OmniCard.Tests.Services.Matching;
 
@@ -29,24 +28,17 @@ public class OptcgCollectorLineTests
         new(new PerceptualHashService(NullLogger<PerceptualHashService>.Instance),
             NullLogger<OcrMatchingService>.Instance);
 
-    private static Bitmap ScanFromFixture(string number)
+    private static SKBitmap ScanFromFixture(string number)
     {
         var path = Directory.GetFiles(DataDir, $"{number}_*.png").Single();
         var size = Path.GetFileNameWithoutExtension(path).Split('_')[1].Split('x').Select(int.Parse).ToArray();
-        var scan = new Bitmap(size[0], size[1], PixelFormat.Format32bppArgb);
-        using var g = Graphics.FromImage(scan);
-        g.Clear(Color.White);
-        using var strip = new Bitmap(path);
-        g.DrawImageUnscaled(strip, (int)(0.45 * size[0]), (int)(0.84 * size[1]));
+        var scan = ImageOps.Create(size[0], size[1], SKColors.White);
+        using var strip = ImageOps.Decode(File.ReadAllBytes(path));
+        ImageOps.DrawOver(scan, strip, (int)(0.45 * size[0]), (int)(0.84 * size[1]));
         return scan;
     }
 
-    private static byte[] Png(Bitmap bmp)
-    {
-        using var ms = new MemoryStream();
-        bmp.Save(ms, ImageFormat.Png);
-        return ms.ToArray();
-    }
+    private static byte[] Png(SKBitmap bmp) => ImageOps.EncodePng(bmp);
 
     [Theory]
     [InlineData("OP09-110")]
@@ -79,7 +71,7 @@ public class OptcgCollectorLineTests
             var first = lines[0];
             Assert.True(first.Height is > 60 and < 160, $"line height {first.Height}");
             Assert.True(first.Width > first.Height * 2, $"line {first.Width}x{first.Height} should be a wide strip");
-            Assert.Equal(Color.White.ToArgb(), first.GetPixel(2, 2).ToArgb());
+            Assert.Equal(SKColors.White, first.GetPixel(2, 2));
         }
         finally
         {
@@ -90,8 +82,7 @@ public class OptcgCollectorLineTests
     [Fact]
     public void Locate_BlankScan_FindsNothing()
     {
-        using var scan = new Bitmap(800, 1060);
-        using (var g = Graphics.FromImage(scan)) g.Clear(Color.White);
+        using var scan = ImageOps.Create(800, 1060, SKColors.White);
 
         Assert.Empty(OptcgCollectorLineLocator.Locate(scan));
     }

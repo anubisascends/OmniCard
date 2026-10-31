@@ -145,7 +145,7 @@ public sealed class DecklistController(
 
     internal static string SafeFileName(string name)
     {
-        var invalid = Path.GetInvalidFileNameChars();
+        var invalid = OmniCard.Shared.PortableFileName.InvalidChars;
         var cleaned = new string(name.Select(c => invalid.Contains(c) ? '-' : c).ToArray()).Trim();
         return cleaned.Length == 0 ? "deck" : cleaned;
     }

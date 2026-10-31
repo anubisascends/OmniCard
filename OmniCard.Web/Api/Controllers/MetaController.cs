@@ -96,6 +96,7 @@ public sealed class MetaController(IEnumerable<ICardGameService> gameServices) :
             new("Backend", "Serilog", "4.3.0", "Apache-2.0", "https://serilog.net", apache2),
             new("Backend", "Serilog.Sinks.Console", "6.1.1", "Apache-2.0", "https://github.com/serilog/serilog-sinks-console", apache2),
             new("Backend", "Serilog.Sinks.File", "6.0.0", "Apache-2.0", "https://github.com/serilog/serilog-sinks-file", apache2),
+            new("Backend", "Serilog.Extensions.Logging", "10.0.0", "Apache-2.0", "https://github.com/serilog/serilog-extensions-logging", apache2),
             new("Backend", "CommunityToolkit.Mvvm", "8.4.2", "MIT", "https://github.com/CommunityToolkit/dotnet", mit),
             new("Backend", "CsvHelper", "33.1.0", "MS-PL OR Apache-2.0", "https://github.com/JoshClose/CsvHelper", apache2),
             new("Backend", "AdysTech.CredentialManager", "3.1.0", "Apache-2.0", "https://github.com/mnottale/AdysTech.CredentialManager", apache2),
@@ -105,7 +106,7 @@ public sealed class MetaController(IEnumerable<ICardGameService> gameServices) :
             new("Imaging & OCR", "Tesseract (.NET wrapper)", "5.2.0", "Apache-2.0", "https://github.com/charlesw/tesseract", apache2),
             new("Imaging & OCR", "Tesseract OCR engine (tesseract, leptonica)", "5.x", "Apache-2.0", "https://github.com/tesseract-ocr/tesseract", apache2),
             new("Imaging & OCR", "Svg.Skia", "5.2.2", "MIT", "https://github.com/wieslawsoltes/Svg.Skia", mit),
-            new("Imaging & OCR", "System.Drawing.Common", "10.0.9", "MIT", "https://github.com/dotnet/winforms", mit),
+            new("Imaging & OCR", "BitMiracle.LibTiff.NET", "2.4.660", "BSD-3-Clause", "https://bitmiracle.com/libtiff/", "https://github.com/BitMiracle/libtiff.net/blob/master/license.txt"),
             new("Documents", "QuestPDF", "2026.7.0", "MIT (Community) / dual-licensed", "https://www.questpdf.com", "https://www.questpdf.com/license/"),
 
             // ── Frontend (SPA) ──────────────────────────────────────────────────

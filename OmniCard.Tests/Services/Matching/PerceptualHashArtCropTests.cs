@@ -1,7 +1,7 @@
-using System.Drawing;
-using System.Drawing.Imaging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Imaging;
+using OmniCard.Tests.Fakes;
+using SkiaSharp;
 
 namespace OmniCard.Tests.Services.Matching;
 
@@ -84,23 +84,19 @@ public class PerceptualHashArtCropTests
     /// <summary>
     /// Creates a 500x700 test image simulating a card with distinct art and frame regions.
     /// </summary>
-    private static MemoryStream CreateCardImage()
-    {
-        using var bmp = new Bitmap(500, 700, PixelFormat.Format24bppRgb);
-        using (var g = Graphics.FromImage(bmp))
+    private static MemoryStream CreateCardImage() =>
+        // Frame (border) — solid gray
+        new(TestImages.Png(500, 700, SKColors.Gray, g =>
         {
-            // Frame (border) — solid gray
-            g.Clear(Color.Gray);
             // Art region — colorful shapes (roughly 7%-93% X, 11%-55% Y)
-            g.FillRectangle(Brushes.Blue, 35, 77, 200, 150);
-            g.FillEllipse(Brushes.Red, 150, 120, 180, 130);
-            g.FillRectangle(Brushes.Green, 100, 200, 250, 80);
+            using var blue = TestImages.Fill(SKColors.Blue);
+            using var red = TestImages.Fill(SKColors.Red);
+            using var green = TestImages.Fill(SKColors.Green);
+            using var white = TestImages.Fill(SKColors.White);
+            g.DrawRect(SKRect.Create(35, 77, 200, 150), blue);
+            g.DrawOval(SKRect.Create(150, 120, 180, 130), red);
+            g.DrawRect(SKRect.Create(100, 200, 250, 80), green);
             // Text box — white area below art
-            g.FillRectangle(Brushes.White, 35, 400, 430, 250);
-        }
-        var ms = new MemoryStream();
-        bmp.Save(ms, ImageFormat.Png);
-        ms.Position = 0;
-        return ms;
-    }
+            g.DrawRect(SKRect.Create(35, 400, 430, 250), white);
+        }));
 }

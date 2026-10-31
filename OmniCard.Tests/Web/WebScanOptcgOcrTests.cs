@@ -1,5 +1,3 @@
-using System.Drawing;
-using System.Drawing.Imaging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Imaging;
 using OmniCard.Shared.Cards;
@@ -21,13 +19,7 @@ namespace OmniCard.Tests.Web;
 public class WebScanOptcgOcrTests
 {
     private static byte[] PortraitPng()
-    {
-        using var bmp = new Bitmap(320, 440);
-        using (var g = Graphics.FromImage(bmp)) g.Clear(Color.White);
-        using var ms = new MemoryStream();
-        bmp.Save(ms, ImageFormat.Png);
-        return ms.ToArray();
-    }
+        => OmniCard.Tests.Fakes.TestImages.Png(320, 440, SkiaSharp.SKColors.White);
 
     private static WebScanMatchingService Build(FakeOcr ocr, FakeGame game) =>
         new(new PerceptualHashService(NullLogger<PerceptualHashService>.Instance),

@@ -100,7 +100,7 @@ public sealed class WebScanMatchingService : IScanMatcher
         List<(double Frac, ulong Hash)> hashCandidates;
         ulong[]? artHashes;
         ulong? edgeHash;
-        using (var decoded = new System.Drawing.Bitmap(new MemoryStream(imageBytes)))
+        using (var decoded = OmniCard.Imaging.ImageOps.Decode(imageBytes))
         {
             hashCandidates = ComputeHashCandidates(decoded);
 
@@ -471,12 +471,12 @@ public sealed class WebScanMatchingService : IScanMatcher
     // Portrait cards (Units/Spells/Legends) read at 0°; landscape Battlefield cards are fed sideways,
     // so we then try both 90° rotations (the collector line only lands in the lower-left crop region
     // under the correct one) and finally 180° for upside-down feeds.
-    private static readonly (System.Drawing.RotateFlipType Rot, string Label)[] RiftboundOrientations =
+    private static readonly (int Degrees, string Label)[] RiftboundOrientations =
     [
-        (System.Drawing.RotateFlipType.RotateNoneFlipNone, "0"),
-        (System.Drawing.RotateFlipType.Rotate90FlipNone, "90cw"),
-        (System.Drawing.RotateFlipType.Rotate270FlipNone, "90ccw"),
-        (System.Drawing.RotateFlipType.Rotate180FlipNone, "180"),
+        (0, "0"),
+        (90, "90cw"),
+        (270, "90ccw"),
+        (180, "180"),
     ];
 
     /// <summary>
@@ -496,7 +496,7 @@ public sealed class WebScanMatchingService : IScanMatcher
 
         foreach (var (rot, label) in RiftboundOrientations)
         {
-            var atZero = rot == System.Drawing.RotateFlipType.RotateNoneFlipNone;
+            var atZero = rot == 0;
             var bytes = atZero ? imageBytes : RotateImage(imageBytes, rot);
             var rotHash = atZero ? hash : _hashService.ComputeHash(new MemoryStream(bytes));
 
@@ -552,30 +552,18 @@ public sealed class WebScanMatchingService : IScanMatcher
             ? "data:image/jpeg;base64," + Convert.ToBase64String(jpeg)
             : null;
 
-    /// <summary>Render a downscaled JPEG of any image <see cref="System.Drawing.Bitmap"/> can decode
-    /// (GDI+), for previewing formats a browser can't display (TIFF). Returns null on failure.</summary>
+    /// <summary>Render a downscaled JPEG of any image <see cref="OmniCard.Imaging.ImageOps"/> can decode,
+    /// for previewing formats a browser can't display (TIFF). Returns null on failure.</summary>
     public static byte[]? RenderPreviewJpeg(byte[] imageBytes, int maxDim = 1400)
     {
         try
         {
-            using var src = new System.Drawing.Bitmap(new MemoryStream(imageBytes));
+            using var src = OmniCard.Imaging.ImageOps.Decode(imageBytes);
             var scale = Math.Min(1.0, (double)maxDim / Math.Max(src.Width, src.Height));
             var w = Math.Max(1, (int)Math.Round(src.Width * scale));
             var h = Math.Max(1, (int)Math.Round(src.Height * scale));
-            using var dst = new System.Drawing.Bitmap(w, h);
-            using (var g = System.Drawing.Graphics.FromImage(dst))
-            {
-                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                g.DrawImage(src, 0, 0, w, h);
-            }
-            var encoder = System.Drawing.Imaging.ImageCodecInfo.GetImageEncoders()
-                .First(c => c.FormatID == System.Drawing.Imaging.ImageFormat.Jpeg.Guid);
-            using var ep = new System.Drawing.Imaging.EncoderParameters(1);
-            ep.Param[0] = new System.Drawing.Imaging.EncoderParameter(
-                System.Drawing.Imaging.Encoder.Quality, 85L);
-            using var ms = new MemoryStream();
-            dst.Save(ms, encoder, ep);
-            return ms.ToArray();
+            using var dst = OmniCard.Imaging.ImageOps.Resize(src, w, h);
+            return OmniCard.Imaging.ImageOps.EncodeJpeg(dst, 85);
         }
         catch
         {
@@ -583,14 +571,12 @@ public sealed class WebScanMatchingService : IScanMatcher
         }
     }
 
-    // Rotate/flip an encoded image and re-encode as PNG. Used to try alternate scan orientations.
-    private static byte[] RotateImage(byte[] imageBytes, System.Drawing.RotateFlipType rot)
+    // Rotate an encoded image (degrees clockwise) and re-encode as PNG. Used to try alternate scan orientations.
+    private static byte[] RotateImage(byte[] imageBytes, int degreesClockwise)
     {
-        using var bmp = new System.Drawing.Bitmap(new MemoryStream(imageBytes));
-        bmp.RotateFlip(rot);
-        using var ms = new MemoryStream();
-        bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-        return ms.ToArray();
+        using var bmp = OmniCard.Imaging.ImageOps.Decode(imageBytes);
+        using var rotated = OmniCard.Imaging.ImageOps.Rotate(bmp, degreesClockwise);
+        return OmniCard.Imaging.ImageOps.EncodePng(rotated);
     }
 
     private async Task<(CardMatch? Match, ulong Hash)> RetryRotatedAsync(
@@ -600,7 +586,7 @@ public sealed class WebScanMatchingService : IScanMatcher
         languageEvidence ??= new LanguageEvidence();
         try
         {
-            var rotatedBytes = RotateImage(imageBytes, System.Drawing.RotateFlipType.Rotate180FlipNone);
+            var rotatedBytes = RotateImage(imageBytes, 180);
             ulong rotatedHash = _hashService.ComputeHash(new MemoryStream(rotatedBytes));
 
             OcrMatchResult? ocr = null;
@@ -654,7 +640,7 @@ public sealed class WebScanMatchingService : IScanMatcher
 
     /// <summary>Perceptual hashes of the scan at each <see cref="CropFractions"/> border trim, all taken
     /// from the one decoded bitmap (each trim cropped in memory). The first entry is always the full image.</summary>
-    private List<(double Frac, ulong Hash)> ComputeHashCandidates(System.Drawing.Bitmap src)
+    private List<(double Frac, ulong Hash)> ComputeHashCandidates(SkiaSharp.SKBitmap src)
     {
         var result = new List<(double, ulong)>();
         foreach (var f in CropFractions)
@@ -667,7 +653,7 @@ public sealed class WebScanMatchingService : IScanMatcher
             int x = (int)(src.Width * f), y = (int)(src.Height * f);
             int w = src.Width - 2 * x, h = src.Height - 2 * y;
             if (w < 10 || h < 10) continue;
-            using var crop = src.Clone(new System.Drawing.Rectangle(x, y, w, h), src.PixelFormat);
+            using var crop = OmniCard.Imaging.ImageOps.Crop(src, new System.Drawing.Rectangle(x, y, w, h));
             result.Add((f, _hashService.ComputeHash(crop)));
         }
         return result;
