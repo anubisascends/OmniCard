@@ -26,7 +26,7 @@ The top of the quote shows:
 
 When an administrator sets the same percentage for cash and trade, the quote shows a single **Offer** instead.
 
-Each card shows its market (and low) price, its condition adjustment, and what it pays in cash and in trade. On each card you can:
+Each card shows its market (and low) price, its condition adjustment, and what it pays in cash and in trade. Cards on the [Buy List](help:buy-list) come first, with a gold frame, their priority and any staff note. On each card you can:
 
 - Tap **Cash** or **Trade** to choose how that card is paid. **All cash** and **All trade** set every card at once.
 - Clear the checkbox to leave the card out (the seller keeps it).
@@ -41,7 +41,15 @@ Use the **Price** switch at the top to build the offer on the **Market** price o
 > [!NOTE]
 > Low prices are downloaded with each game's prices. If **Low** shows market prices for every card, refresh that game's prices in **Administration ▸ Catalog Data**.
 
+### Buy List cards
+
+A banner counts the [Buy List](help:buy-list) cards on the quote. If an administrator set a Buy List rate, the copies you still want pay that rate, and the totals show **Includes the Buy List rate**. If you want fewer copies than the card's quantity, a chip such as **Buy List rate on 1 of 3 copies** shows how many get it.
+
+A card you still want is never treated as bulk, so it's never left out automatically. Leaving a card out frees its wanted copies for another copy on the quote.
+
 ## Show the seller
+
+The customer view never marks a [Buy List](help:buy-list) card, and it keeps the cards in the order you scanned them.
 
 Tap **Customer view** for a full-screen offer you can turn toward the seller. It always shows the cash and store credit totals. An administrator chooses what else it shows: card pictures, card details, each card's price and offer, and the total market value.
 
@@ -66,6 +74,8 @@ Add a **Note** if you like, then tap **Buy**. OmniCard:
 
 You need the **Intake ▸ Buy cards** permission to buy. Staff with only **Scan and quote** can price cards but not buy them.
 
+Wanted copies count off the [Buy List](help:buy-list). If the game has a set-aside location, they go there instead of the intake location, and the **Buy** dialog says so first.
+
 ## Intake history
 
 Click **History** on the Intake page to see every buy: when, who took it in, the customer, and the market value, cash and store credit paid. Click a row to see each card's condition, prices and what was paid for it. The card names link to the bought copies.
@@ -85,6 +95,7 @@ Administrators set up intake in [Administration](/settings) on the **Intake** ta
 ![The Intake settings](intake-settings.png)
 
 - **Cash offer (%)** and **Trade offer (%)**: the share of the card's price paid in cash and in store credit. The defaults are 70% and 80%.
+- **Cash % for Buy List cards** and **Trade % for Buy List cards**: what to pay for copies still wanted on the [Buy List](help:buy-list). Leave them blank to pay the regular percentages. The condition adjustment still applies. If the customer view shows card offers, sellers can see which cards pay more.
 - **Condition adjustment**: the share of the price paid for each condition (NM, LP, MP, HP, DMG).
 - **Bulk below**: cards worth less than this, after the condition adjustment, are bulk. Set it to 0 to turn bulk off.
 - **Bulk cards**: **Pay a flat rate** (the **Flat rate per card**), or **Leave out of the offer**.

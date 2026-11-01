@@ -1,4 +1,5 @@
 import type {
+  KioskBuyListEntryDto,
   KioskCardDto,
   KioskGameDto,
   KioskSessionDto,
@@ -58,6 +59,7 @@ export const kioskApi = {
   removeHold: (key: string, quantity = 1) => post<KioskSessionDto>('/api/kiosk/session/holds/remove', { key, quantity }),
   submit: () => post<KioskSubmitResultDto>('/api/kiosk/session/submit'),
   games: () => request<KioskGameDto[]>('/api/kiosk/games'),
+  buyList: () => request<KioskBuyListEntryDto[]>('/api/kiosk/buy-list'),
   cards: (opts: { game: string; q?: string; sort?: string; skip?: number; take?: number }) => {
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(opts)) if (v !== undefined && v !== '') sp.set(k, String(v));

@@ -279,8 +279,10 @@ public sealed class ScanBatchService(
 
     /// <summary>Write the listed items into <paramref name="containerId"/> from the server's saved copy.
     /// The items are marked committed first (so a double submit can't create duplicate lots) and put
-    /// back if the write fails.</summary>
-    public ScanBatchCommitResultDto Commit(int id, int userId, int containerId, IReadOnlyList<int> itemIds)
+    /// back if the write fails. Copies wanted on the Buy List are counted off and set aside unless
+    /// <paramref name="canWriteLocation"/> refuses that location.</summary>
+    public ScanBatchCommitResultDto Commit(int id, int userId, int containerId, IReadOnlyList<int> itemIds,
+        Func<int, bool>? canWriteLocation = null)
     {
         if (containerId <= 0)
             throw new ScanBatchException(ScanBatchErrorKind.BadRequest, "A target location is required.");
@@ -311,10 +313,10 @@ public sealed class ScanBatchService(
             throw new ScanBatchException(ScanBatchErrorKind.Conflict, "Some of these cards were already committed. Reload the batch.");
         }
 
-        IReadOnlyList<int> lotIds;
+        ScanCommitOutcome outcome;
         try
         {
-            lotIds = commits.Commit(containerId, commitItems);
+            outcome = commits.CommitWithBuyList(containerId, commitItems, canWriteLocation);
         }
         catch
         {
@@ -324,8 +326,8 @@ public sealed class ScanBatchService(
 
         var closed = CloseIfEmpty(ctx, id);
         logger.LogInformation("Committed {Count} card(s) from scan batch {Batch} to location {LocationId}",
-            lotIds.Count, batch.Name, containerId);
-        return new ScanBatchCommitResultDto(lotIds.Count, closed);
+            commitItems.Count, batch.Name, containerId);
+        return new ScanBatchCommitResultDto(commitItems.Count, closed, outcome.BuyList);
     }
 
     /// <summary>Throw away every open item and close the batch. The reviewer or an admin may discard;

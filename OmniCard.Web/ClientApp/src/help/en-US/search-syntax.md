@@ -89,6 +89,7 @@ These fields work in collection search for every game.
 | `is:nonfoil` | Non-foil copies. |
 | `is:missing` | Copies flagged as missing, for example by an audit. |
 | `is:missingdb` | Copies flagged because the card couldn't be found in the card catalog. |
+| `is:buylist` | Copies of cards still wanted on the [Buy List](help:buy-list). |
 
 Use `-is:foil` or `not:foil` for the opposite. For Magic, collection search also understands the printing flags listed under [is: flags in card search](help:search-syntax#is-flags-in-card-search), such as `is:commander` or `is:reprint`. An `is:` flag OmniCard doesn't know finds nothing.
 

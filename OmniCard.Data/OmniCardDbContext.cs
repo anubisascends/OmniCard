@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using OmniCard.Shared.BuyList;
 using OmniCard.Shared.Ebay;
 using OmniCard.Shared.Intake;
 using OmniCard.Shared.Inventory;
@@ -58,6 +59,7 @@ public class OmniCardDbContext : DbContext
     public DbSet<IntakeRecord> Intakes => Set<IntakeRecord>();
     public DbSet<IntakeLine> IntakeLines => Set<IntakeLine>();
     public DbSet<StoreCreditEntry> StoreCreditEntries => Set<StoreCreditEntry>();
+    public DbSet<BuyListEntry> BuyListEntries => Set<BuyListEntry>();
 
     public OmniCardDbContext(DbContextOptions<OmniCardDbContext> options) : base(options) { }
 
@@ -552,8 +554,27 @@ public class OmniCardDbContext : DbContext
             e.Property(l => l.UnitPaid).HasPrecision(18, 4);
             e.HasIndex(l => l.IntakeId);
             e.HasIndex(l => l.LotId);
+            e.Property(l => l.SetAsideLocationName).HasMaxLength(256);
             e.HasOne<IntakeRecord>().WithMany().HasForeignKey(l => l.IntakeId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Cards the collection's owner wants to buy, one list per game.
+        modelBuilder.Entity<BuyListEntry>(e =>
+        {
+            e.HasKey(b => b.Id);
+            e.Property(b => b.Id).ValueGeneratedOnAdd();
+            e.Property(b => b.Game).HasConversion<string>().HasMaxLength(32);
+            e.Property(b => b.Name).IsRequired().HasMaxLength(BuyListEntry.MaxNameLength);
+            e.Property(b => b.MatchName).IsRequired().HasMaxLength(BuyListEntry.MaxNameLength);
+            e.Property(b => b.GameCardId).IsRequired().HasMaxLength(128);
+            e.Property(b => b.SetCode).HasMaxLength(32);
+            e.Property(b => b.SetName).HasMaxLength(256);
+            e.Property(b => b.CollectorNumber).HasMaxLength(64);
+            e.Property(b => b.Priority).HasConversion<string>().HasMaxLength(16);
+            e.Property(b => b.Note).HasMaxLength(BuyListEntry.MaxNoteLength);
+            e.Property(b => b.CreatedByName).HasMaxLength(256);
+            e.HasIndex(b => new { b.Game, b.WantedQuantity });
         });
 
         modelBuilder.Entity<StoreCreditEntry>(e =>

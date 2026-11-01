@@ -24,6 +24,7 @@ Open [Administration](/settings) and choose the **Kiosk** tab. Only administrato
 - **Browsable locations**: click **Add location** to choose a location. Customers can browse and hold every card in these locations. Click a location's **x** to remove it.
 - **Idle timeout (minutes)**: when a customer stops using the kiosk for this long, their unsent list is cleared and the cards are released. Lists already sent to the counter never expire.
 - **Show prices to customers**: shows each card's market price, and the list total, on the kiosk.
+- **Show the Buy List to customers**: adds a **Cards we're looking for** button. See [What customers see](#what-customers-see).
 - **Welcome message**: optional text shown on the kiosk's welcome screen.
 
 Click **Save** when you're done.
@@ -70,6 +71,10 @@ Each card shows how many copies are still available. Copies of the same printing
 **My list** opens the pick list. Customers can change quantities, remove cards, and tap **Send to counter**. The kiosk then thanks them and returns to the welcome screen for the next customer.
 
 ![A customer's pick list](kiosk-pick-list.webp)
+
+**Cards we're looking for** opens the [Buy List](help:buy-list), so customers know what to bring in. It's on the welcome screen and at the top while browsing. It shows each wanted card's art and name, plus any wanted printing or finish, and marks the keenest ones **Really want** or **Most wanted**. Customers never see quantities, prices or staff notes. The button doesn't show when nothing is wanted.
+
+![The Cards we're looking for screen on the kiosk](kiosk-buy-list.png)
 
 **Start over** clears the list and releases the cards. If nobody touches the kiosk for most of the idle timeout, it asks "Are you still there?" and clears the list a minute later.
 

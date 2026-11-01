@@ -87,7 +87,9 @@ Matched cards are checked automatically; unmatched ones are not. When you confir
 
 On a wide screen the review list is on the left and the selected card's details are on the right. On a phone, tap a card in the list to open its details full screen (see [Reviewing on a phone](#reviewing-on-a-phone)).
 
-Each row shows the scan thumbnail next to the matched artwork, the card name, set and collector number, a one-line summary of its properties (condition, language, foil, quantity and a note icon), its badges and its tags. Tags added by a [tag rule](help:tag-rules) have a sparkle icon. A green check mark before the name means you have confirmed it.
+Each row shows the card's number (see [Go to a card](#go-to-a-card)), the scan thumbnail next to the matched artwork, the card name, set and collector number, a one-line summary of its properties (condition, language, foil, quantity and a note icon), its badges and its tags. Tags added by a [tag rule](help:tag-rules) have a sparkle icon. A green check mark before the name means you have confirmed it.
+
+A card on the game's [Buy List](help:buy-list) also gets a gold frame and a chip such as **Buy List Grail: want 2**, and a banner above the list counts these cards. Select **Show only these** to filter the list down to them.
 
 Click a row to see it in the detail panel:
 
@@ -145,6 +147,12 @@ The checkbox on each row decides whether the card is included when you add or ex
 - The header above the list has a check-all box plus **All**, **None** and **Invert**, and shows how many are checked.
 - **Delete** in the list header removes every checked scan from the list, including scans that didn't match or are still matching. OmniCard asks you to confirm first, because this can't be undone.
 - **Confirm N checked** in the action bar confirms every checked, matched card at once. Use it after you have eyeballed a batch of strong matches.
+
+### Go to a card
+
+Every card in the list has a number, shown at the start of its row, and the selected card's number shows above the list as, for example, **#143 of 300**. The first row is #1. A card keeps its number when you filter or sort the list; numbers only change when cards are added to or removed from the list.
+
+To jump to a card, type its number in **Go to #** above the list and press Enter or select **Go**. If a filter is hiding that card, the filter is cleared so you can see it.
 
 ## Correct a wrong match
 
@@ -304,7 +312,7 @@ Exported scans stay in the list, so you can still add them to a location later.
 
 ## Pick up where you left off
 
-Your scan list is saved in this browser as you work. If you refresh the page, close the tab or your browser crashes, the next visit to Scan shows *Restored N scans from your last session*. Scans that were still matching are matched again automatically. Click **Discard** in that message to throw the restored scans away.
+Your scan list is saved in this browser as you work. If you refresh the page, close the tab or your browser crashes, the next visit to Scan shows *Restored N scans from your last session* and scrolls back to the card you had selected. Scans that were still matching are matched again automatically. Filters and sorting aren't saved, so they're cleared. Click **Discard** in that message to throw the restored scans away.
 
 The saved list belongs to this browser on this device only. It isn't kept in a private or incognito window, and another person or device won't see it.
 

@@ -53,6 +53,10 @@ public class CollectionCard : INotifyPropertyChanged
     [NotMapped]
     public double? ManaValue { get; set; }
 
+    /// <summary>Filled only when <c>is:buylist</c> is evaluated in memory; SQL filters use a subquery.</summary>
+    [NotMapped]
+    public bool OnBuyList { get; set; }
+
     public bool IsMissing { get; set; }
     public FlagReason? FlagReason { get; set; }
     public EbayListing? EbayListing { get; set; }

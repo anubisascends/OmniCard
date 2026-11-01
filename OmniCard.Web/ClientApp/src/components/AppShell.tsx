@@ -42,6 +42,7 @@ import RequestQuoteIcon from '@mui/icons-material/RequestQuote';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import TrackChangesIcon from '@mui/icons-material/TrackChanges';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
@@ -73,6 +74,7 @@ const NAV: { to: string; labelKey: string; icon: ReactNode; perm?: string[]; bad
   { to: '/sets', labelKey: 'sets', icon: <ChecklistIcon />, perm: ['sets.view'] },
   { to: '/inventory', labelKey: 'inventory', icon: <Inventory2Icon />, perm: ['inventory.view'] },
   { to: '/lists', labelKey: 'lists', icon: <FormatListBulletedIcon />, perm: ['lists.view'] },
+  { to: '/buy-list', labelKey: 'buyList', icon: <TrackChangesIcon /> },
   { to: '/intake', labelKey: 'intake', icon: <RequestQuoteIcon />, perm: ['intake.quote', 'intake.history'] },
   { to: '/trades', labelKey: 'trades', icon: <SwapHorizIcon />, perm: ['trades.view'] },
   { to: '/import', labelKey: 'import', icon: <UploadFileIcon />, perm: ['import.run'] },

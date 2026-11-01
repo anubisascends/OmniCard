@@ -81,6 +81,21 @@ export function IntakePage() {
               })}
             </Box>
           )}
+          {!!bought.result.buyList?.matchedCopies && (
+            <Box component="span" sx={{ display: 'block' }}>
+              {t('buyList.scan.committed', { count: bought.result.buyList.matchedCopies })}
+              {bought.result.buyList.setAsideCopies > 0 &&
+                ` ${t('buyList.scan.setAsideDone', {
+                  count: bought.result.buyList.setAsideCopies,
+                  locations: bought.result.buyList.setAsideLocations.join(', '),
+                })}`}
+            </Box>
+          )}
+          {!!bought.result.buyList?.notSetAside && (
+            <Box component="span" sx={{ display: 'block' }}>
+              {t('buyList.scan.notSetAside', { count: bought.result.buyList.notSetAside })}
+            </Box>
+          )}
         </Alert>
       )}
 

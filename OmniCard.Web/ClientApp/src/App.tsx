@@ -18,6 +18,7 @@ import { AuditPage } from './pages/AuditPage';
 import { ScanBatchPage } from './pages/ScanBatchPage';
 import { ListsPage } from './pages/ListsPage';
 import { TradesPage } from './pages/TradesPage';
+import { BuyListPage } from './pages/BuyListPage';
 import { IntakePage } from './pages/IntakePage';
 import { IntakeHistoryPage } from './pages/IntakeHistoryPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -49,6 +50,7 @@ export function App() {
         <Route path="/inventory" element={<RequirePermission anyOf={['inventory.view']}><InventoryPage /></RequirePermission>} />
         <Route path="/import" element={<RequirePermission anyOf={['import.run']}><ImportPage /></RequirePermission>} />
         <Route path="/lists" element={<RequirePermission anyOf={['lists.view']}><ListsPage /></RequirePermission>} />
+        <Route path="/buy-list" element={<BuyListPage />} />
         <Route path="/intake" element={<RequirePermission anyOf={['intake.quote']}><IntakePage /></RequirePermission>} />
         <Route path="/intake/history" element={<RequirePermission anyOf={['intake.history']}><IntakeHistoryPage /></RequirePermission>} />
         <Route path="/trades" element={<RequirePermission anyOf={['trades.view']}><TradesPage /></RequirePermission>} />

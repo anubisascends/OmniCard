@@ -61,6 +61,7 @@ export function IntakeSettingsCard() {
     setDraft({ ...draft, ...patch });
   };
   const num = (value: string) => (value.trim() === '' ? 0 : Number(value) || 0);
+  const optionalNum = (value: string) => (value.trim() === '' ? null : Number(value) || 0);
   const percentAdornment = { endAdornment: <InputAdornment position="end">%</InputAdornment> };
   const moneyAdornment = { startAdornment: <InputAdornment position="start">$</InputAdornment> };
 
@@ -96,6 +97,41 @@ export function IntakeSettingsCard() {
           <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
             {t('intake.settings.samePercentHint')}
           </Typography>
+
+          <Divider />
+          <Box>
+            <Typography variant="subtitle2">{t('buyList.settings.title')}</Typography>
+            <Typography variant="caption" color="text.secondary" component="div" sx={{ mb: 1 }}>
+              {t('buyList.settings.help')}
+            </Typography>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                type="number"
+                label={t('buyList.settings.cash')}
+                value={draft.buyListCashPercent ?? ''}
+                placeholder={String(draft.cashPercent)}
+                onChange={(e) => update({ buyListCashPercent: optionalNum(e.target.value) })}
+                inputProps={{ min: 0, max: 200, step: 1 }}
+                InputProps={percentAdornment}
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                type="number"
+                label={t('buyList.settings.trade')}
+                value={draft.buyListTradePercent ?? ''}
+                placeholder={String(draft.tradePercent)}
+                onChange={(e) => update({ buyListTradePercent: optionalNum(e.target.value) })}
+                inputProps={{ min: 0, max: 200, step: 1 }}
+                InputProps={percentAdornment}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Stack>
+            {(draft.buyListCashPercent != null || draft.buyListTradePercent != null) && draft.customerView.showCardOffers && (
+              <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 0.5 }}>
+                {t('buyList.settings.customerHint')}
+              </Typography>
+            )}
+          </Box>
 
           <Divider />
           <Box>

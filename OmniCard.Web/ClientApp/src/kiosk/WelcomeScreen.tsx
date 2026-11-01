@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import type { KioskSessionDto, KioskStatusDto } from '../api/types';
 import { kioskApi, KioskApiError } from './kioskApi';
 import { Centered } from './Centered';
+import { BuyListButton } from './BuyListButton';
 
 /** The customer gives a name (unique among open pick lists) to start browsing. */
 export function WelcomeScreen({
@@ -70,6 +71,7 @@ export function WelcomeScreen({
           <Button type="submit" variant="contained" size="large" disabled={!name.trim() || start.isPending} sx={{ py: 1.5 }}>
             {t('kiosk.app.welcome.start')}
           </Button>
+          {status.showBuyList && <BuyListButton />}
         </Stack>
       </Centered>
     </>

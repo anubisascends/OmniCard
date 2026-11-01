@@ -12,6 +12,7 @@ using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Helpers;
+using OmniCard.Web.Services.BuyList;
 using OmniCard.Web.Services.TagRules;
 
 namespace OmniCard.Web.Api.Controllers;
@@ -34,6 +35,8 @@ public sealed class CardScanController(
     ICsvExportImportService csv,
     ScanCommitService commits,
     TagRuleService tagRules,
+    BuyListService buyList,
+    RequestSiteAccess siteAccess,
     ILogger<CardScanController> logger) : ControllerBase
 {
     /// <summary>Upper bound on correction-search results. High enough to show every printing of a
@@ -219,10 +222,12 @@ public sealed class CardScanController(
         if (request.Items.Count == 0)
             return BadRequest(new { error = "No cards to commit" });
 
-        IReadOnlyList<int> lotIds;
+        ScanCommitOutcome outcome;
         try
         {
-            lotIds = commits.Commit(request.ContainerId, request.Items);
+            outcome = request.ApplyBuyList
+                ? commits.CommitWithBuyList(request.ContainerId, request.Items, siteAccess.CanWriteLocation)
+                : new ScanCommitOutcome(commits.Commit(request.ContainerId, request.Items), null);
         }
         catch (UnknownScanGameException ex)
         {
@@ -233,10 +238,22 @@ public sealed class CardScanController(
             return Conflict(new { error = ex.Message });
         }
 
+        var lotIds = outcome.LotIds;
         var ruleTagged = request.ApplyTagRules ? tagRules.ApplyToNewLots(lotIds) : 0;
 
         logger.LogInformation("Committed {Count} scanned card(s) to location {LocationId}", lotIds.Count, request.ContainerId);
-        return Ok(new ScanCommitResultDto(lotIds.Count, ruleTagged, lotIds));
+        return Ok(new ScanCommitResultDto(request.Items.Count, ruleTagged, lotIds, outcome.BuyList));
+    }
+
+    /// <summary>Which scanned cards are on the game's Buy List, so the Scan and Intake pages can flag them
+    /// during review. Open to anyone who can scan; the list itself is admin-managed.</summary>
+    [HttpPost("buy-list")]
+    [RequirePermission(Permissions.ScanView, Permissions.IntakeQuote)]
+    public ActionResult<IReadOnlyList<ScanBuyListResultDto>> BuyList([FromBody] ScanTagRulesRequest request)
+    {
+        if (LocationsController.ParseGame(request.Game) is not { } game)
+            return BadRequest(new { error = $"Unknown game '{request.Game}'" });
+        return Ok(buyList.Evaluate(game, request.Items));
     }
 
     /// <summary>The enabled tag rules' tags for scanned cards that haven't been saved yet, so the Scan page

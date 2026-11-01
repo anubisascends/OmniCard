@@ -102,6 +102,11 @@
       "showingOf": "Showing {{visible}} of {{total}}"
     },
     "master": {
+      "rowNumber": "#{{number}}",
+      "selectedNumber": "#{{number}} of {{total}}",
+      "goTo": "Go to card number",
+      "goToPlaceholder": "Go to #",
+      "go": "Go",
       "checkAll": "Check all",
       "uncheckAll": "Uncheck all",
       "all": "All",

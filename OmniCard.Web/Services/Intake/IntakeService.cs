@@ -7,6 +7,7 @@ using OmniCard.Shared.Games;
 using OmniCard.Shared.Intake;
 using OmniCard.Shared.Storage;
 using OmniCard.Web.Api.Controllers;
+using OmniCard.Web.Services.BuyList;
 
 namespace OmniCard.Web.Services.Intake;
 
@@ -24,7 +25,8 @@ public sealed class IntakeException(string message, int statusCode = 400, Intake
 /// buy (<see cref="IntakeRecord"/> + lines, for the audit), credits the customer for trade-paid cards and
 /// puts the copies into the intake location as lots costed at what was paid. Like a scan commit, the
 /// cards carry the tags settled during scan review (rule tags included, minus any the reviewer removed),
-/// so tag rules aren't run again here.
+/// so tag rules aren't run again here. Copies still wanted on the Buy List price at its rate, go to its
+/// set-aside location and count down; a line only partly wanted is split so each part keeps its own cost.
 /// </summary>
 public sealed class IntakeService(
     IDbContextFactory<OmniCardDbContext> dbFactory,
@@ -32,9 +34,14 @@ public sealed class IntakeService(
     ICardService cardService,
     ScanCommitService commits,
     StoreCreditService storeCredit,
+    BuyListService buyList,
     ILogger<IntakeService> logger)
 {
-    private sealed record PricedLine(IntakeQuoteLineRequest Request, CardGame Game, IntakePricingInput Input, IntakePricedLine Priced);
+    private sealed record PricedLine(
+        IntakeQuoteLineRequest Request, CardGame Game, IntakePricingInput Input, IntakePricedLine Priced, BuyListAllocation BuyList);
+
+    /// <summary>What a bought line becomes: all of it, or its wanted and ordinary copies separately.</summary>
+    private sealed record BoughtPart(PricedLine Line, int Quantity, bool OnBuyList, decimal UnitPaid);
 
     public IntakeQuoteDto Quote(IntakeQuoteRequest request) =>
         Quote(request.PriceBasis, request.Lines, settingsService.Get()).Dto;
@@ -49,6 +56,9 @@ public sealed class IntakeService(
                 ?? throw new IntakeException($"Unknown game '{line.Item.Game}'"));
 
         var (market, low) = LookupPrices(lines, games);
+        // A card left out claims no wanted copies, so a later copy of it can take them.
+        var allocations = buyList.Allocate(lines.Select((l, i) => new BuyListCandidate(
+            games[i], l.Item.Name, l.Item.GameCardId, l.Item.IsFoil, l.Excluded == true ? 0 : Math.Max(1, l.Item.Quantity))).ToList());
         var priced = new List<PricedLine>(lines.Count);
         for (var i = 0; i < lines.Count; i++)
         {
@@ -59,10 +69,14 @@ public sealed class IntakeService(
                 market.TryGetValue(key, out var marketPrice) ? marketPrice : null,
                 low.TryGetValue(key, out var lowPrice) ? lowPrice : null,
                 line.ManualPrice is { } m ? Math.Round(m, 2) : null,
-                line.Item.Condition, Math.Max(1, line.Item.Quantity), line.Excluded, ParsePayout(line.Payout));
-            priced.Add(new PricedLine(line, games[i], input, IntakePricing.PriceLine(input, settings, basis)));
+                line.Item.Condition, Math.Max(1, line.Item.Quantity), line.Excluded, ParsePayout(line.Payout),
+                allocations[i].Copies);
+            priced.Add(new PricedLine(line, games[i], input, IntakePricing.PriceLine(input, settings, basis), allocations[i]));
         }
 
+        var hasBuyListCopies = priced.Any(p => !p.Priced.Excluded && p.Priced.BuyListCopies > 0);
+        var buyListCash = settings.BuyListCashPercent ?? settings.CashPercent;
+        var buyListTrade = settings.BuyListTradePercent ?? settings.TradePercent;
         var totals = IntakePricing.Totals(priced.Select(p => (p.Input, p.Priced)).ToList(), settings);
         var dto = new IntakeQuoteDto
         {
@@ -77,8 +91,10 @@ public sealed class IntakeService(
                 IsBulk = p.Priced.IsBulk,
                 Excluded = p.Priced.Excluded,
                 NeedsPrice = p.Priced.NeedsPrice,
-                CashUnit = p.Priced.CashUnit,
-                TradeUnit = p.Priced.TradeUnit,
+                CashUnit = p.Priced.CashTotal(p.Input.Quantity) / p.Input.Quantity,
+                TradeUnit = p.Priced.TradeTotal(p.Input.Quantity) / p.Input.Quantity,
+                BuyList = p.BuyList.Hit,
+                BuyListCopies = p.Priced.BuyListCopies,
             }).ToList(),
             CardCount = totals.CardCount,
             MarketTotal = totals.MarketTotal,
@@ -88,8 +104,10 @@ public sealed class IntakeService(
             TradePaid = totals.TradePaid,
             CashPercent = settings.CashPercent,
             TradePercent = settings.TradePercent,
-            SingleOffer = settings.CashPercent == settings.TradePercent,
+            SingleOffer = settings.CashPercent == settings.TradePercent && (!hasBuyListCopies || buyListCash == buyListTrade),
             NeedsPrices = priced.Any(p => p.Priced.NeedsPrice),
+            BuyListRateApplied = hasBuyListCopies
+                && (buyListCash != settings.CashPercent || buyListTrade != settings.TradePercent),
         };
         return (dto, priced, totals);
     }
@@ -118,10 +136,11 @@ public sealed class IntakeService(
     }
 
     /// <summary>Buys the included cards. The caller has checked the user may write to
-    /// <see cref="IntakeSettings.LocationId"/>.</summary>
+    /// <see cref="IntakeSettings.LocationId"/>; <paramref name="canWriteLocation"/> decides whether wanted
+    /// copies may go to a Buy List set-aside location (refused, they stay in the intake location).</summary>
     /// <exception cref="IntakeException">Nothing to buy, missing prices/customer/location (400/409), or the
     /// totals no longer match what the seller was shown (409, with the fresh quote).</exception>
-    public IntakeAcceptResultDto Accept(IntakeAcceptRequest request, int? userId, string userName)
+    public IntakeAcceptResultDto Accept(IntakeAcceptRequest request, int? userId, string userName, Func<int, bool>? canWriteLocation = null)
     {
         var settings = settingsService.Get();
         if (settings.LocationId is not int locationId)
@@ -169,27 +188,38 @@ public sealed class IntakeService(
             Note = note,
             SettingsJson = JsonSerializer.Serialize(settings, IntakeSettingsService.JsonOptions),
         };
-        var recordLines = bought.Select(l => new IntakeLine
+
+        var parts = bought.SelectMany(SplitForBuyList).ToList();
+        var setAside = bought.Select(l => l.Game).Distinct().ToDictionary(g => g, buyList.SetAsideLocation);
+        var targets = parts.Select(p => SetAsideTarget(p, setAside, canWriteLocation)).ToList();
+
+        var recordLines = parts.Select((part, i) =>
         {
-            Game = l.Game,
-            GameCardId = l.Request.Item.GameCardId,
-            Name = l.Request.Item.Name,
-            SetCode = l.Request.Item.SetCode,
-            SetName = l.Request.Item.SetName,
-            CollectorNumber = l.Request.Item.CollectorNumber,
-            IsFoil = l.Request.Item.IsFoil,
-            FoilType = l.Request.Item.IsFoil ? l.Request.Item.FoilType : null,
-            Condition = string.IsNullOrWhiteSpace(l.Request.Item.Condition) ? "NM" : l.Request.Item.Condition,
-            Language = CardLanguages.ToStored(CardLanguages.Normalize(l.Request.Item.Language)),
-            Quantity = l.Input.Quantity,
-            MarketPrice = l.Input.MarketPrice,
-            LowPrice = l.Input.LowPrice,
-            BasePrice = l.Priced.BasePrice!.Value,
-            IsManualPrice = l.Priced.IsManualPrice,
-            ConditionPercent = l.Priced.ConditionPercent,
-            IsBulk = l.Priced.IsBulk,
-            Payout = l.Input.Payout,
-            UnitPaid = l.Priced.PaidUnit(l.Input.Payout),
+            var l = part.Line;
+            return new IntakeLine
+            {
+                Game = l.Game,
+                GameCardId = l.Request.Item.GameCardId,
+                Name = l.Request.Item.Name,
+                SetCode = l.Request.Item.SetCode,
+                SetName = l.Request.Item.SetName,
+                CollectorNumber = l.Request.Item.CollectorNumber,
+                IsFoil = l.Request.Item.IsFoil,
+                FoilType = l.Request.Item.IsFoil ? l.Request.Item.FoilType : null,
+                Condition = string.IsNullOrWhiteSpace(l.Request.Item.Condition) ? "NM" : l.Request.Item.Condition,
+                Language = CardLanguages.ToStored(CardLanguages.Normalize(l.Request.Item.Language)),
+                Quantity = part.Quantity,
+                MarketPrice = l.Input.MarketPrice,
+                LowPrice = l.Input.LowPrice,
+                BasePrice = l.Priced.BasePrice!.Value,
+                IsManualPrice = l.Priced.IsManualPrice,
+                ConditionPercent = l.Priced.ConditionPercent,
+                IsBulk = l.Priced.IsBulk,
+                Payout = l.Input.Payout,
+                UnitPaid = part.UnitPaid,
+                OnBuyList = part.OnBuyList,
+                SetAsideLocationName = targets[i]?.Name,
+            };
         }).ToList();
 
         // The record, its lines and the store credit land together; the ledger lock keeps the credit
@@ -209,35 +239,46 @@ public sealed class IntakeService(
             return request.CustomerId is int id ? StoreCreditService.Balance(db, id) : (decimal?)null;
         });
 
-        // Then the cards themselves, costed at what was paid per copy. A failure here undoes the record and
-        // its credit so the audit never shows a buy whose cards aren't in inventory.
-        IReadOnlyList<int> lotIds;
+        // Then the cards themselves, costed at what was paid per copy, each location's lots written together.
+        // A failure here undoes the record, its credit and any lots already written, so the audit never
+        // shows a buy whose cards aren't in inventory.
+        var lotIds = new int[parts.Count];
         try
         {
-            var items = bought.Select(l => l.Request.Item with
+            var groups = Enumerable.Range(0, parts.Count).GroupBy(i => targets[i]?.Id ?? locationId);
+            foreach (var group in groups)
             {
-                Quantity = l.Input.Quantity,
-                PurchasePrice = l.Priced.PaidUnit(l.Input.Payout),
-                Tags = l.Request.Item.Tags,
-            }).ToList();
-            lotIds = commits.Commit(locationId, items);
+                var indexes = group.ToList();
+                var created = commits.Commit(group.Key, indexes.Select(i => parts[i].Line.Request.Item with
+                {
+                    Quantity = parts[i].Quantity,
+                    PurchasePrice = parts[i].UnitPaid,
+                    Tags = parts[i].Line.Request.Item.Tags,
+                }).ToList());
+                for (var i = 0; i < indexes.Count; i++) lotIds[indexes[i]] = created[i];
+            }
         }
         catch (Exception ex)
         {
             db.ChangeTracker.Clear();
             db.StoreCreditEntries.Where(e => e.IntakeId == record.Id).ExecuteDelete();
             db.Intakes.Where(i => i.Id == record.Id).ExecuteDelete();
+            var written = lotIds.Where(id => id != 0).ToList();
+            db.Lots.Where(l => written.Contains(l.Id)).ExecuteDelete();
             if (ex is DeckBoxGameMismatchException)
                 throw new IntakeException(ex.Message, 409);
             throw;
         }
+
+        buyList.Consume(bought.Select(l => l.BuyList));
 
         try
         {
             for (var i = 0; i < recordLines.Count; i++) recordLines[i].LotId = lotIds[i];
             db.SaveChanges();
             var source = $"Intake #{record.Id}";
-            db.Lots.Where(l => lotIds.Contains(l.Id)).ExecuteUpdate(s => s.SetProperty(l => l.Source, source));
+            var bookedLots = lotIds.ToList();
+            db.Lots.Where(l => bookedLots.Contains(l.Id)).ExecuteUpdate(s => s.SetProperty(l => l.Source, source));
         }
         catch (Exception ex)
         {
@@ -247,7 +288,35 @@ public sealed class IntakeService(
 
         logger.LogInformation("Intake {IntakeId} by {User}: {Cards} card(s), cash {Cash}, trade {Trade}",
             record.Id, userName, totals.CardCount, totals.CashPaid, totals.TradePaid);
-        return new IntakeAcceptResultDto(record.Id, totals.CardCount, totals.CashPaid, totals.TradePaid, balance);
+        return new IntakeAcceptResultDto(record.Id, totals.CardCount, totals.CashPaid, totals.TradePaid, balance,
+            BuyListSummary(parts, targets, setAside));
+    }
+
+    private static IEnumerable<BoughtPart> SplitForBuyList(PricedLine line)
+    {
+        var wanted = line.Priced.BuyListCopies;
+        var ordinary = line.Input.Quantity - wanted;
+        if (wanted > 0) yield return new BoughtPart(line, wanted, true, line.Priced.BuyListPaidUnit(line.Input.Payout));
+        if (ordinary > 0) yield return new BoughtPart(line, ordinary, false, line.Priced.PaidUnit(line.Input.Payout));
+    }
+
+    private static (int Id, string Name)? SetAsideTarget(
+        BoughtPart part, Dictionary<CardGame, (int Id, string Name)?> setAside, Func<int, bool>? canWriteLocation)
+    {
+        if (!part.OnBuyList || setAside[part.Line.Game] is not { } location) return null;
+        return canWriteLocation?.Invoke(location.Id) == false ? null : location;
+    }
+
+    private static BuyListCommitResultDto? BuyListSummary(
+        List<BoughtPart> parts, List<(int Id, string Name)?> targets, Dictionary<CardGame, (int Id, string Name)?> setAside)
+    {
+        var wanted = parts.Where(p => p.OnBuyList).ToList();
+        if (wanted.Count == 0) return null;
+        var names = targets.OfType<(int Id, string Name)>().Select(t => t.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToList();
+        var moved = parts.Where((_, i) => targets[i] is not null).Sum(p => p.Quantity);
+        var refused = parts.Where((p, i) => p.OnBuyList && targets[i] is null && setAside[p.Line.Game] is not null).Sum(p => p.Quantity);
+        return new BuyListCommitResultDto(wanted.Sum(p => p.Quantity), moved, names, refused);
     }
 
     /// <summary>Intake history, newest first, optionally narrowed to one customer or staff member.</summary>
@@ -309,6 +378,8 @@ public sealed class IntakeService(
                 Payout = l.Payout.ToString(),
                 UnitPaid = l.UnitPaid,
                 LotId = l.LotId,
+                OnBuyList = l.OnBuyList,
+                SetAsideLocationName = l.SetAsideLocationName,
             }).ToList(),
         };
     }
@@ -333,6 +404,8 @@ public sealed class IntakeService(
     {
         CashPercent = s.CashPercent,
         TradePercent = s.TradePercent,
+        BuyListCashPercent = s.BuyListCashPercent,
+        BuyListTradePercent = s.BuyListTradePercent,
         ConditionPercents = s.ConditionPercents,
         BulkThreshold = s.BulkThreshold,
         BulkMode = s.BulkMode.ToString(),
@@ -355,6 +428,8 @@ public sealed class IntakeService(
     {
         CashPercent = d.CashPercent,
         TradePercent = d.TradePercent,
+        BuyListCashPercent = d.BuyListCashPercent,
+        BuyListTradePercent = d.BuyListTradePercent,
         ConditionPercents = new Dictionary<string, decimal>(d.ConditionPercents, StringComparer.OrdinalIgnoreCase),
         BulkThreshold = d.BulkThreshold,
         BulkMode = Enum.TryParse<IntakeBulkMode>(d.BulkMode, true, out var mode) ? mode : IntakeBulkMode.FlatRate,

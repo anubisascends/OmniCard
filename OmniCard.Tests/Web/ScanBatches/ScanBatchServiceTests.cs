@@ -12,6 +12,7 @@ using OmniCard.Shared.Scanning;
 using OmniCard.Shared.Settings;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
+using OmniCard.Tests.Fakes;
 using OmniCard.Web.Services;
 using OmniCard.Web.Services.ScanBatches;
 using Xunit;
@@ -35,7 +36,8 @@ public sealed class ScanBatchServiceTests : IDisposable
     {
         _cardService.Setup(c => c.GetGameService(CardGame.Mtg)).Returns(_mtg.Object);
         var binder = new WebBinderCardService(_f.Factory, _f.Paths);
-        var commits = new ScanCommitService(_cardService.Object, binder, _tags.Object, NullLogger<ScanCommitService>.Instance);
+        var commits = new ScanCommitService(_cardService.Object, binder, _tags.Object, BuyListServices.Create(_f.Factory),
+            NullLogger<ScanCommitService>.Instance);
         _folderSettings = new ScanFolderSettingsService(_f.Paths);
         _svc = new ScanBatchService(_f.Factory, commits, _f.Storage, _folderSettings, _f.Clock, NullLogger<ScanBatchService>.Instance);
         _location = new StorageContainerService(_f.Factory).Create("Box", ContainerType.Box).Id;
