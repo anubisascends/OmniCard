@@ -553,7 +553,7 @@ public class ListingsControllerEbayTests : IDisposable
         public Task<string?> GetAccessTokenAsync() => Task.FromResult<string?>("token");
         public Task<bool> ExchangeCodeForTokensAsync(string authCode) => Task.FromResult(true);
         public void Disconnect() { }
-        public string GetAuthorizationUrl() => "https://ebay.example/auth";
+        public string GetAuthorizationUrl(string? state = null) => "https://ebay.example/auth";
         public IReadOnlyList<string> GetMissingConfiguration() => [];
         public event PropertyChangedEventHandler? PropertyChanged;
         private void Touch() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsConnected)));

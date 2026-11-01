@@ -343,7 +343,7 @@ Connect OmniCard to your eBay seller account so you can list cards on eBay. See 
 The **Status** shows one of:
 
 - **Connected**: OmniCard is linked to your eBay account.
-- **Not connected**: you can click **Connect to eBay**. You're sent to eBay to sign in and approve access, then brought back here.
+- **Not connected**: you can click **Connect to eBay**. You're sent to eBay to sign in and approve access, then brought back here. If that doesn't work, click **Paste a code instead**. See [Connect your eBay account](help:ebay#connect-your-ebay-account).
 - **Not configured**: the server is missing eBay app credentials. Whoever runs the server needs to add them first.
 
 When you're connected, **Run seller setup** creates your eBay inventory location and business policies from the seller settings below. **Disconnect** unlinks your account.

@@ -245,6 +245,8 @@ See [Customer kiosk](help:kiosk).
 
 *Connect to eBay first.* OmniCard isn't linked to your eBay account. An administrator, or someone with eBay permissions, can connect it under **Administration ▸ eBay**.
 
+*That address doesn't contain an eBay sign-in code.* or *eBay didn't accept that code.* While connecting, the address you pasted had no sign-in code, or the code had expired. Connect to eBay again, agree on eBay, and paste the full address of the page it sends you to within about 5 minutes. See [Connect your eBay account](help:ebay#connect-your-ebay-account).
+
 *Listed locally, but the eBay push failed.* The card is listed in OmniCard but eBay rejected the listing. Read the error, fix the problem (often the seller settings), and try again. See [eBay](help:ebay).
 
 ## Still stuck

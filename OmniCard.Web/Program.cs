@@ -179,11 +179,14 @@ builder.Services.AddSingleton<ISetChecklistService, SetChecklistService>();
 // DataProtection-encrypted file). All services degrade gracefully when unconfigured/unconnected
 // (GetAccessTokenAsync returns null → listing/end operations return false), so OrderService's
 // best-effort ship-time listing-end keeps working without a live eBay connection. Connect via the
-// OAuth flow in EbayController. Requires the "eBay" config section (AppId/CertId/RuName/AcceptUrl/
-// Environment) — until it's filled in, GetMissingConfiguration() reports what's missing.
+// OAuth flow in EbayController (callback redirect, or the pasted-code fallback). Requires the "eBay"
+// config section (AppId/RuName/Environment, plus CertId or BrokerUrl — the shipped appsettings use the
+// tools/ebay-broker Worker so installs need no secret) — until it's filled in,
+// GetMissingConfiguration() reports what's missing.
 builder.Services.Configure<EbaySettings>(builder.Configuration.GetSection("eBay"));
 builder.Services.AddSingleton<ICredentialStore, WebCredentialStore>();
 builder.Services.AddSingleton<IEbayAuthService, OmniCard.eBay.EbayAuthService>();
+builder.Services.AddSingleton<EbayOAuthStateStore>();
 builder.Services.AddSingleton<IEbaySellingSettingsService, EbaySellingSettingsService>();
 builder.Services.AddSingleton<IEbayCatalogService, OmniCard.eBay.EbayCatalogService>();
 builder.Services.AddSingleton<IEbaySellerSetupService, OmniCard.eBay.EbaySellerSetupService>();

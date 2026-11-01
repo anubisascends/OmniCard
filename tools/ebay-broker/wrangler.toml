@@ -1,0 +1,10 @@
+# Cloudflare Worker config for the OmniCard eBay token broker. See README.md.
+# Secrets (EBAY_APP_ID, EBAY_CERT_ID, EBAY_RU_NAME) are set with `npx wrangler secret put …`,
+# never written here.
+name = "omnicard-ebay-broker"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+
+[vars]
+# production | sandbox — must match the keyset and OmniCard's eBay:Environment.
+EBAY_ENVIRONMENT = "production"

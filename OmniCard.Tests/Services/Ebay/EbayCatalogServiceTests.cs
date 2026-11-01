@@ -114,7 +114,7 @@ public class FakeEbayAuthService : IEbayAuthService
     public Task<string?> GetAccessTokenAsync() => Task.FromResult(_token);
     public Task<bool> ExchangeCodeForTokensAsync(string authCode) => Task.FromResult(true);
     public void Disconnect() { }
-    public string GetAuthorizationUrl() => "";
+    public string GetAuthorizationUrl(string? state = null) => "";
     public IReadOnlyList<string> GetMissingConfiguration() => [];
 #pragma warning disable CS0067 // Required by INotifyPropertyChanged; this fake never raises it.
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;

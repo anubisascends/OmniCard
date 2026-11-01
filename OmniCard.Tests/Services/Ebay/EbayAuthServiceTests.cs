@@ -120,7 +120,6 @@ public class EbayAuthServiceTests
             AppId = "app",
             CertId = "cert",
             RuName = "ru",
-            AcceptUrl = "https://example.com/accept",
             Environment = "sandbox",
         };
         var svc = new EbayAuthService(
@@ -133,16 +132,15 @@ public class EbayAuthServiceTests
     }
 
     [Fact]
-    public void GetMissingConfiguration_ReportsAcceptUrl_WhenMissing()
+    public void GetMissingConfiguration_DoesNotRequireAcceptUrl()
     {
-        // Mirrors the real-world failure: everything set except AcceptUrl,
-        // which silently disables the OAuth redirect capture.
+        // Connecting no longer needs a callback the browser can reach: the user can paste the address
+        // eBay sends them to, so only the keyset + RuName are required.
         var settings = new EbaySettings
         {
             AppId = "app",
             CertId = "cert",
             RuName = "ru",
-            AcceptUrl = "",
             Environment = "sandbox",
         };
         var svc = new EbayAuthService(
@@ -151,7 +149,7 @@ public class EbayAuthServiceTests
             new InMemoryCredentialStore(),
             NullLogger<EbayAuthService>.Instance);
 
-        Assert.Contains("AcceptUrl", svc.GetMissingConfiguration());
+        Assert.Empty(svc.GetMissingConfiguration());
     }
 
     [Fact]
@@ -168,7 +166,7 @@ public class EbayAuthServiceTests
         Assert.Contains("AppId", missing);
         Assert.Contains("CertId", missing);
         Assert.Contains("RuName", missing);
-        Assert.Contains("AcceptUrl", missing);
+        Assert.Equal(3, missing.Count);
     }
 
     [Fact]
@@ -181,7 +179,6 @@ public class EbayAuthServiceTests
             AppId = "app",
             CertId = "cert",
             RuName = "ru",
-            AcceptUrl = "https://example.com/accept",
             DevId = "",
             Environment = "sandbox",
         };
@@ -202,7 +199,6 @@ public class EbayAuthServiceTests
             AppId = "   ",
             CertId = "cert",
             RuName = "ru",
-            AcceptUrl = "https://example.com/accept",
             Environment = "sandbox",
         };
         var svc = new EbayAuthService(
@@ -212,6 +208,96 @@ public class EbayAuthServiceTests
             NullLogger<EbayAuthService>.Instance);
 
         Assert.Contains("AppId", svc.GetMissingConfiguration());
+    }
+
+    [Fact]
+    public void GetMissingConfiguration_DoesNotRequireCertId_WhenBrokerConfigured()
+    {
+        var settings = new EbaySettings { AppId = "app", RuName = "ru", BrokerUrl = "https://broker.example" };
+        var svc = new EbayAuthService(
+            Options.Create(settings),
+            new StubHttpClientFactory(),
+            new InMemoryCredentialStore(),
+            NullLogger<EbayAuthService>.Instance);
+
+        Assert.True(settings.UsesBroker);
+        Assert.Empty(svc.GetMissingConfiguration());
+    }
+
+    [Fact]
+    public void UsesBroker_IsFalse_WhenServerHasItsOwnCertId()
+    {
+        var settings = new EbaySettings { AppId = "app", CertId = "cert", RuName = "ru", BrokerUrl = "https://broker.example" };
+        Assert.False(settings.UsesBroker);
+    }
+
+    [Fact]
+    public void GetAuthorizationUrl_AppendsState()
+    {
+        var url = CreateService().GetAuthorizationUrl("abc-_123");
+        Assert.EndsWith("&state=abc-_123", url);
+        Assert.DoesNotContain("state=", CreateService().GetAuthorizationUrl());
+    }
+
+    [Fact]
+    public async Task ExchangeCode_GoesThroughBroker_WithoutCredentialsOrRedirectUri()
+    {
+        var handler = new CapturingTokenHandler();
+        var settings = new EbaySettings { AppId = "app", RuName = "ru", BrokerUrl = "https://broker.example/" };
+        var store = new InMemoryCredentialStore();
+        var svc = new EbayAuthService(
+            Options.Create(settings),
+            new FakeHttpClientFactory(handler),
+            store,
+            NullLogger<EbayAuthService>.Instance);
+
+        Assert.True(await svc.ExchangeCodeForTokensAsync("v^1#code"));
+
+        Assert.Equal("https://broker.example/token", handler.Url);
+        Assert.Null(handler.Authorization);
+        Assert.Equal("grant_type=authorization_code&code=v%5E1%23code", handler.Body);
+        Assert.True(svc.IsConnected);
+    }
+
+    [Fact]
+    public async Task ExchangeCode_GoesStraightToEbay_WithOwnKeyset()
+    {
+        var handler = new CapturingTokenHandler();
+        var settings = new EbaySettings
+        {
+            AppId = "app", CertId = "cert", RuName = "ru", BrokerUrl = "https://broker.example", Environment = "production",
+        };
+        var svc = new EbayAuthService(
+            Options.Create(settings),
+            new FakeHttpClientFactory(handler),
+            new InMemoryCredentialStore(),
+            NullLogger<EbayAuthService>.Instance);
+
+        Assert.True(await svc.ExchangeCodeForTokensAsync("code"));
+
+        Assert.Equal("https://api.ebay.com/identity/v1/oauth2/token", handler.Url);
+        Assert.Equal("Basic", handler.Authorization?.Scheme);
+        Assert.Contains("redirect_uri=ru", handler.Body);
+    }
+
+    [Fact]
+    public async Task GetAccessTokenAsync_RefreshesThroughBroker()
+    {
+        var handler = new CapturingTokenHandler();
+        var store = new InMemoryCredentialStore();
+        store.Set("OmniCard:eBay:AccessToken", "old");
+        store.Set("OmniCard:eBay:TokenExpiry", DateTime.UtcNow.AddMinutes(-1).ToString("o"));
+        store.Set("OmniCard:eBay:RefreshToken", "refresh");
+        store.Set("OmniCard:eBay:RefreshTokenExpiry", DateTime.UtcNow.AddMonths(18).ToString("o"));
+        var svc = new EbayAuthService(
+            Options.Create(new EbaySettings { AppId = "app", RuName = "ru", BrokerUrl = "https://broker.example" }),
+            new FakeHttpClientFactory(handler),
+            store,
+            NullLogger<EbayAuthService>.Instance);
+
+        Assert.Equal("new-access", await svc.GetAccessTokenAsync());
+        Assert.Equal("https://broker.example/token", handler.Url);
+        Assert.StartsWith("grant_type=refresh_token&refresh_token=refresh&scope=", handler.Body);
     }
 
     [Fact]
@@ -242,4 +328,26 @@ public class InMemoryCredentialStore : ICredentialStore
 public class StubHttpClientFactory : IHttpClientFactory
 {
     public HttpClient CreateClient(string name) => new();
+}
+
+/// <summary>Records the token request and answers like eBay's token endpoint.</summary>
+public class CapturingTokenHandler : HttpMessageHandler
+{
+    public string? Url { get; private set; }
+    public System.Net.Http.Headers.AuthenticationHeaderValue? Authorization { get; private set; }
+    public string? Body { get; private set; }
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        Url = request.RequestUri?.ToString();
+        Authorization = request.Headers.Authorization;
+        Body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
+        return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                """{"access_token":"new-access","refresh_token":"new-refresh","expires_in":7200,"refresh_token_expires_in":47304000}""",
+                System.Text.Encoding.UTF8,
+                "application/json"),
+        };
+    }
 }
