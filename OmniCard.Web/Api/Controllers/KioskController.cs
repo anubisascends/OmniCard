@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.Filters;
 using OmniCard.Api.Contracts;
 using OmniCard.Shared.Kiosk;
 using OmniCard.Web.Services;
+using OmniCard.Web.Services.BuyList;
 using OmniCard.Web.Services.Kiosk;
 
 namespace OmniCard.Web.Api.Controllers;
@@ -15,7 +16,7 @@ namespace OmniCard.Web.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/kiosk")]
-public sealed class KioskController(KioskService kiosk, IKioskSettingsService settings, UserService users) : ControllerBase
+public sealed class KioskController(KioskService kiosk, IKioskSettingsService settings, UserService users, BuyListService buyList) : ControllerBase
 {
     private const string DeviceItem = "kiosk-device";
 
@@ -105,6 +106,15 @@ public sealed class KioskController(KioskService kiosk, IKioskSettingsService se
         if (LocationsController.ParseGame(game) is not { } g)
             return BadRequest(new { error = "Pick a game.", code = "bad-game" });
         return kiosk.Search(Device.Id, g, q, sort, skip, take);
+    }
+
+    /// <summary>The cards the owner wants to buy, for any customer at the kiosk (no session needed).</summary>
+    [HttpGet("buy-list")]
+    [KioskDevice]
+    public ActionResult<IReadOnlyList<KioskBuyListEntryDto>> BuyList()
+    {
+        var s = settings.Get();
+        return s.Enabled && s.ShowBuyList ? Ok(buyList.ForKiosk()) : Ok(Array.Empty<KioskBuyListEntryDto>());
     }
 
     private ActionResult<T> Run<T>(Func<T> action)

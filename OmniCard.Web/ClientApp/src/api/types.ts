@@ -871,8 +871,10 @@ export interface ScanCommitResultDto {
   imported: number;
   /** Cards the tag rules tagged (only when the commit asked for `applyTagRules`). */
   ruleTagged?: number;
-  /** The created lots, in input order. */
+  /** The created lots, in input order unless the Buy List moved some. */
   lotIds?: number[] | null;
+  /** What the commit did with the Buy List (when asked to apply it and a card was on it). */
+  buyList?: BuyListCommitResultDto | null;
 }
 
 /** One card line in an audit summary bucket. */
@@ -991,6 +993,7 @@ export interface ScanBatchCommitResultDto {
   imported: number;
   /** True once the batch has no open items left. */
   batchClosed: boolean;
+  buyList?: BuyListCommitResultDto | null;
 }
 
 export interface ScanFolderConfigDto {
@@ -1601,9 +1604,104 @@ export interface KioskStatusDto {
   enabled: boolean;
   hasLocations: boolean;
   showPrices: boolean;
+  showBuyList: boolean;
   idleTimeoutMinutes: number;
   welcomeMessage?: string | null;
   session?: KioskSessionDto | null;
+}
+
+export type BuyListPriority = 'Normal' | 'High' | 'Grail';
+
+/** One Buy List entry. `foil`: true = foil only, false = non-foil only, null = either. */
+export interface BuyListEntryDto {
+  id: number;
+  game: string;
+  name: string;
+  gameCardId: string;
+  setCode?: string | null;
+  setName?: string | null;
+  collectorNumber?: string | null;
+  imageUri?: string | null;
+  /** Only the printing above matches, rather than any printing of the card. */
+  pinPrinting: boolean;
+  foil?: boolean | null;
+  wantedQuantity: number;
+  acquiredQuantity: number;
+  priority: BuyListPriority;
+  note?: string | null;
+  /** Copies in the collection this user can see that match an active entry. */
+  ownedCopies: number;
+  createdAt: string;
+  /** On a create: the card was already listed, so its wanted quantity went up instead. */
+  merged?: boolean;
+}
+
+export interface BuyListEntryCreateRequest {
+  game: string;
+  name: string;
+  gameCardId: string;
+  setCode?: string | null;
+  setName?: string | null;
+  collectorNumber?: string | null;
+  imageUri?: string | null;
+  pinPrinting: boolean;
+  foil?: boolean | null;
+  wantedQuantity: number;
+  priority: BuyListPriority;
+  note?: string | null;
+}
+
+export interface BuyListEntryUpdateRequest {
+  pinPrinting: boolean;
+  foil?: boolean | null;
+  wantedQuantity: number;
+  priority: BuyListPriority;
+  note?: string | null;
+}
+
+export interface BuyListPageDto {
+  items: BuyListEntryDto[];
+  activeCount: number;
+  fulfilledCount: number;
+  setAsideLocationId?: number | null;
+  setAsideLocationName?: string | null;
+}
+
+/** Why a card is flagged: the best matching entry and the copies wanted across every match. */
+export interface BuyListHitDto {
+  entryId: number;
+  priority: BuyListPriority;
+  wantedQuantity: number;
+  /** Staff only: never sent to customers. */
+  note?: string | null;
+  setAsideLocationName?: string | null;
+}
+
+export interface ScanBuyListResultDto {
+  key: string;
+  hit: BuyListHitDto;
+}
+
+/** What a commit did with the Buy List. */
+export interface BuyListCommitResultDto {
+  matchedCopies: number;
+  setAsideCopies: number;
+  setAsideLocations: string[];
+  /** Copies left with the rest because the user can't write to the set-aside location's site. */
+  notSetAside: number;
+}
+
+/** A Buy List card as customers see it: no quantities, prices or notes. */
+export interface KioskBuyListEntryDto {
+  game: string;
+  gameName: string;
+  name: string;
+  /** Filled only when a specific printing is wanted. */
+  setName?: string | null;
+  setCode?: string | null;
+  imageUri?: string | null;
+  foil?: boolean | null;
+  priority: BuyListPriority;
 }
 
 export interface KioskGameDto {
@@ -1685,6 +1783,7 @@ export interface KioskSettingsDto {
   locationIds: number[];
   idleTimeoutMinutes: number;
   showPrices: boolean;
+  showBuyList: boolean;
   welcomeMessage?: string | null;
 }
 
@@ -1716,6 +1815,9 @@ export interface IntakeCustomerViewDto {
 export interface IntakeSettingsDto {
   cashPercent: number;
   tradePercent: number;
+  /** Percentages for copies still wanted on the Buy List; null = the regular percentage. */
+  buyListCashPercent?: number | null;
+  buyListTradePercent?: number | null;
   /** Percent of the price paid per condition code (NM, LP, MP, HP, DMG). */
   conditionPercents: Record<string, number>;
   bulkThreshold: number;
@@ -1749,8 +1851,13 @@ export interface IntakeQuoteLineDto {
   isBulk: boolean;
   excluded: boolean;
   needsPrice: boolean;
+  /** Per copy, averaged when only some copies get the Buy List rate. */
   cashUnit: number;
   tradeUnit: number;
+  /** The Buy List entry this card matches. Staff only: the customer view never shows it. */
+  buyList?: BuyListHitDto | null;
+  /** Copies on this line still wanted on the Buy List. */
+  buyListCopies: number;
 }
 
 export interface IntakeQuoteDto {
@@ -1765,6 +1872,8 @@ export interface IntakeQuoteDto {
   tradePercent: number;
   /** Cash and trade pay the same percentage — show one offer. */
   singleOffer: boolean;
+  /** Some included copy pays the Buy List rate, so the offers aren't a flat percentage. */
+  buyListRateApplied: boolean;
   needsPrices: boolean;
 }
 
@@ -1783,6 +1892,7 @@ export interface IntakeAcceptResultDto {
   cashPaid: number;
   tradePaid: number;
   customerCreditBalance?: number | null;
+  buyList?: BuyListCommitResultDto | null;
 }
 
 export interface IntakeSummaryDto {
@@ -1821,6 +1931,8 @@ export interface IntakeLineDto {
   payout: IntakePayout;
   unitPaid: number;
   lotId?: number | null;
+  onBuyList: boolean;
+  setAsideLocationName?: string | null;
 }
 
 export interface IntakeDetailDto {

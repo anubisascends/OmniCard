@@ -29,6 +29,7 @@ import help from './locales/en-US/help.json';
 import labels from './locales/en-US/labels.json';
 import kiosk from './locales/en-US/kiosk.json';
 import intake from './locales/en-US/intake.json';
+import buyList from './locales/en-US/buylist.json';
 
 const enUS = {
   ...common,
@@ -54,6 +55,7 @@ const enUS = {
   ...labels,
   ...kiosk,
   ...intake,
+  ...buyList,
 };
 
 export const FALLBACK_LNG = 'en-US';

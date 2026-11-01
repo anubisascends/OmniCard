@@ -675,6 +675,28 @@ to `/app/manifest.webmanifest`; source art is `icons/icon.svg`) and the `apple-*
 over HTTPS** — over plain HTTP it adds a browser shortcut — and the webcam / live label camera need HTTPS
 too; **Take photo** on the Scan page (a file input with `capture`) works either way.
 
+## Buy List
+
+One list per game of the cards the collection's owner wants to buy (`BuyListEntry` in the unified store;
+page at `/buy-list`). Everyone can read it; `POST`/`PUT`/`DELETE /api/buy-list` and
+`PUT /api/buy-list/set-aside` are admin-only.
+
+- **Matching.** An entry matches any printing by name (printing details in the name are ignored), or one
+  printing (`PinPrinting`), optionally one finish. The printing it was added from always matches.
+- **Flag.** The Scan and Intake pages call `POST /api/scan/buy-list`; the Intake quote carries it per line.
+  The intake customer view never shows it.
+- **Count-down.** Scan-page commits (`ApplyBuyList`), scan batch commits and intake buys subtract the copies
+  they bring in; at 0 an entry is fulfilled. Other ways of adding cards leave the list alone.
+- **Set-aside location.** Per game, in `buy-list-settings.json` in the data directory. Wanted copies go there
+  unless the user can't write to its site.
+- **Buy List rate.** Optional `BuyListCashPercent`/`BuyListTradePercent` in `intake-settings.json`
+  (Settings ▸ Intake).
+- **Search.** `is:buylist` on the collection and locations.
+- **Kiosk.** `GET /api/kiosk/buy-list`, switched by `ShowBuyList` in `kiosk-settings.json`. It carries no
+  quantities, prices or notes.
+
+Migration: `AddBuyList`.
+
 ## Customer kiosk
 
 A **customer-facing kiosk** at `/kiosk`: customers type a name, browse/search the cards in admin-chosen

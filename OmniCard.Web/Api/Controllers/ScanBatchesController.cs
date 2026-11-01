@@ -17,7 +17,7 @@ namespace OmniCard.Web.Api.Controllers;
 [ApiController]
 [ApiAuth]
 [Route("api/scan/batches")]
-public sealed class ScanBatchesController(ScanBatchService batches) : ControllerBase
+public sealed class ScanBatchesController(ScanBatchService batches, RequestSiteAccess siteAccess) : ControllerBase
 {
     private int? UserId => AppAuthGate.CurrentUserId(HttpContext);
     private bool IsAdmin => AppAuthGate.IsAdmin(HttpContext);
@@ -94,7 +94,7 @@ public sealed class ScanBatchesController(ScanBatchService batches) : Controller
     {
         try
         {
-            return Run(() => batches.Commit(id, UserId ?? 0, request.ContainerId, request.ItemIds));
+            return Run(() => batches.Commit(id, UserId ?? 0, request.ContainerId, request.ItemIds, siteAccess.CanWriteLocation));
         }
         catch (UnknownScanGameException ex)
         {

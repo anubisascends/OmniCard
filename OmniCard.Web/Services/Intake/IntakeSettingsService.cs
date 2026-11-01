@@ -54,6 +54,8 @@ public sealed class IntakeSettingsService : IIntakeSettingsService
     {
         s.CashPercent = Percent(s.CashPercent);
         s.TradePercent = Percent(s.TradePercent);
+        s.BuyListCashPercent = s.BuyListCashPercent is { } buyListCash ? Percent(buyListCash) : null;
+        s.BuyListTradePercent = s.BuyListTradePercent is { } buyListTrade ? Percent(buyListTrade) : null;
 
         // Exactly the known conditions, each 0–100 (a missing one pays full price).
         var given = s.ConditionPercents ?? [];

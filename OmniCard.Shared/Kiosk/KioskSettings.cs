@@ -19,6 +19,9 @@ public sealed class KioskSettings
     /// <summary>Show market prices to customers.</summary>
     public bool ShowPrices { get; set; } = true;
 
+    /// <summary>Show customers the cards on the Buy List.</summary>
+    public bool ShowBuyList { get; set; } = true;
+
     /// <summary>Optional text on the kiosk's welcome screen.</summary>
     public string? WelcomeMessage { get; set; }
 }

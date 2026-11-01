@@ -28,7 +28,7 @@ import UndoIcon from '@mui/icons-material/Undo';
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import { api } from '../../api/client';
-import type { CardDto, CardListItemDto, ScanSearchResultDto } from '../../api/types';
+import type { BuyListPriority, CardDto, CardListItemDto, ScanSearchResultDto } from '../../api/types';
 import { usePermissions } from '../../context/usePermissions';
 import { CardHoverPreview, type CardHover } from '../CardHoverPreview';
 import { Kbd } from '../Kbd';
@@ -57,10 +57,15 @@ export type AddCardTarget =
   | { kind: 'pocket'; containerId: number; page: number; slot: number; occupantName?: string | null }
   /** A list line: an owned copy is referenced (moved only when the list is put away), a catalog printing
    * is recorded as wholly new. `language` is the list's forced card language, which the search starts on. */
-  | { kind: 'list'; listId: number; language?: string | null };
+  | { kind: 'list'; listId: number; language?: string | null }
+  /** A card the owner wants: the picked printing, or any printing of it, on its game's Buy List. */
+  | { kind: 'buyList' };
 
 /** How to take one add back: delete the new lot, or take the added copies off a (possibly merged) list line. */
-type Undo = { kind: 'lot'; lotId: number } | { kind: 'listItem'; itemId: number; quantity: number };
+type Undo =
+  | { kind: 'lot'; lotId: number }
+  | { kind: 'listItem'; itemId: number; quantity: number }
+  | { kind: 'buyListEntry'; entryId: number };
 
 type RecentAdd = {
   key: number;
@@ -92,7 +97,7 @@ const KEY_HINTS: [string[], string][] = [
 ];
 
 /**
- * The one "add a card" dialog, for a location, a binder pocket or a list (see {@link AddCardTarget}).
+ * The one "add a card" dialog, for a location, a binder pocket, a list or a Buy List (see {@link AddCardTarget}).
  * Search the game's catalog by name and/or set code + collector number, optionally limited to some
  * languages (remembered per game; a list with a language starts on it). Pockets and lists also show
  * matching copies already in your collection. Pick a printing — hover (or long-press) a row for the art,
@@ -131,7 +136,8 @@ export function AddCardDialog({
   const games = useQuery({ queryKey: ['games'], queryFn: api.games, enabled: open });
   const startGame = defaultGame ?? 'Mtg';
   const multiAdd = target.kind !== 'pocket';
-  const showOwned = target.kind !== 'location' && !simplified;
+  const showOwned = (target.kind === 'pocket' || target.kind === 'list') && !simplified;
+  const buyList = target.kind === 'buyList';
   const lockGame = target.kind === 'location' && !!target.lockGame;
   const listLanguage = target.kind === 'list' ? target.language || null : null;
 
@@ -146,6 +152,10 @@ export function AddCardDialog({
   const [foilType, setFoilType] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [purchasePrice, setPurchasePrice] = useState('');
+  const [pinPrinting, setPinPrinting] = useState(false);
+  const [finishChoice, setFinishChoice] = useState('any');
+  const [priority, setPriority] = useState<BuyListPriority>('Normal');
+  const [note, setNote] = useState('');
   const [addedCount, setAddedCount] = useState(0);
   const [recent, setRecent] = useState<RecentAdd[]>([]);
   const [hover, setHover] = useState<CardHover | null>(null);
@@ -174,6 +184,10 @@ export function AddCardDialog({
     setFoilType(null);
     setQuantity(1);
     setPurchasePrice('');
+    setPinPrinting(false);
+    setFinishChoice('any');
+    setPriority('Normal');
+    setNote('');
     setAddedCount(0);
     setRecent([]);
     setActiveIndex(-1);
@@ -285,6 +299,10 @@ export function AddCardDialog({
       qc.invalidateQueries({ queryKey: ['lists'] });
       return;
     }
+    if (target.kind === 'buyList') {
+      qc.invalidateQueries({ queryKey: ['buy-list'] });
+      return;
+    }
     if (target.kind === 'location') qc.invalidateQueries({ queryKey: ['location', target.locationId] });
     qc.invalidateQueries({ queryKey: ['collection'] });
     qc.invalidateQueries({ queryKey: ['location-cards'] });
@@ -313,6 +331,7 @@ export function AddCardDialog({
       setSelected(null);
       setQuantity(1);
       setPurchasePrice('');
+      setNote('');
       requestAnimationFrame(() => {
         nameRef.current?.focus();
         nameRef.current?.select();
@@ -325,6 +344,10 @@ export function AddCardDialog({
       const u = r.undo!;
       if (u.kind === 'lot') {
         await api.cardDelete(u.lotId);
+        return;
+      }
+      if (u.kind === 'buyListEntry') {
+        await api.buyListDelete(u.entryId);
         return;
       }
       const left = (listQuantities.current.get(u.itemId) ?? u.quantity) - u.quantity;
@@ -344,8 +367,8 @@ export function AddCardDialog({
     },
   });
   // Deleting a location's new copy needs the delete permission; a list line only needs list editing,
-  // which adding already required.
-  const canUndo = target.kind === 'list' || can('collection.delete');
+  // which adding already required (likewise a Buy List entry: adding needed an administrator).
+  const canUndo = target.kind === 'list' || target.kind === 'buyList' || can('collection.delete');
   const busy = add.isPending || undo.isPending;
 
   const pick = (r: ScanSearchResultDto) => {
@@ -367,7 +390,7 @@ export function AddCardDialog({
 
   /** Pocket: move this copy into the pocket. List: reference it on the list. */
   const addOwned = (card: CardDto) => {
-    if (busy || target.kind === 'location') return;
+    if (busy || target.kind === 'location' || target.kind === 'buyList') return;
     setHover(null);
     add.mutate({
       close: target.kind === 'pocket',
@@ -402,9 +425,11 @@ export function AddCardDialog({
     const finish = isFoil ? foilType?.trim() || null : null;
     const price = purchasePrice === '' ? null : Number(purchasePrice);
     const details =
-      target.kind === 'list'
-        ? [s.language ? languageName(t, s.language) : null, finishLabel(isFoil, finish)]
-        : [t(`common.conditions.${condition}`), languageName(t, language), finishLabel(isFoil, finish)];
+      target.kind === 'buyList'
+        ? [t(`buyList.priority.${priority}`)]
+        : target.kind === 'list'
+          ? [s.language ? languageName(t, s.language) : null, finishLabel(isFoil, finish)]
+          : [t(`common.conditions.${condition}`), languageName(t, language), finishLabel(isFoil, finish)];
     add.mutate({
       close: close || !multiAdd,
       summary: {
@@ -450,6 +475,24 @@ export function AddCardDialog({
             return null;
           case 'list':
             return trackListItem(await api.listAddItem(target.listId, { ...printing, gameCardId: s.gameCardId, quantity: qty }), qty);
+          case 'buyList': {
+            const entry = await api.buyListCreate({
+              game,
+              name: s.name,
+              gameCardId: s.gameCardId,
+              setCode: s.setCode,
+              setName: s.setName,
+              collectorNumber: s.collectorNumber,
+              imageUri: s.imageUri,
+              pinPrinting,
+              foil: finishChoice === 'any' ? null : finishChoice === 'foil',
+              wantedQuantity: qty,
+              priority,
+              note: note.trim() || null,
+            });
+            // A merged add raised an existing entry's quantity; removing the entry wouldn't undo that.
+            return entry.merged ? null : { kind: 'buyListEntry', entryId: entry.id };
+          }
         }
       },
     });
@@ -583,6 +626,7 @@ export function AddCardDialog({
       <DialogTitle>
         {target.kind === 'location' && t('dialogs.addCard.title', { location: target.locationName })}
         {target.kind === 'list' && t('dialogs.addToList.title')}
+        {target.kind === 'buyList' && t('buyList.add.title')}
         {target.kind === 'pocket' && (
           <>
             {t('dialogs.addToSlot.title')}
@@ -776,7 +820,7 @@ export function AddCardDialog({
               </Stack>
 
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                {target.kind !== 'list' && (
+                {target.kind !== 'list' && !buyList && (
                   <>
                     <TextField select size="small" label={t('common.labels.condition')} value={condition} onChange={(e) => setCondition(e.target.value)} sx={{ width: 120 }}>
                       {CONDITIONS.map((c) => (
@@ -789,7 +833,7 @@ export function AddCardDialog({
                 {target.kind !== 'pocket' && (
                   <TextField
                     size="small"
-                    label={t('common.labels.quantity')}
+                    label={buyList ? t('buyList.edit.wanted') : t('common.labels.quantity')}
                     type="number"
                     value={quantity}
                     onChange={(e) => setQuantity(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
@@ -797,7 +841,7 @@ export function AddCardDialog({
                     sx={{ width: 100 }}
                   />
                 )}
-                {target.kind !== 'list' && (
+                {target.kind !== 'list' && !buyList && (
                   <TextField
                     size="small"
                     label={t('common.labels.purchasePrice')}
@@ -809,26 +853,80 @@ export function AddCardDialog({
                   />
                 )}
               </Stack>
-              <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
-                <FormControlLabel
-                  control={<Switch checked={isFoil} onChange={(e) => setIsFoil(e.target.checked)} />}
-                  label={t('common.labels.foil')}
-                />
-                {isFoil && (
-                  <Autocomplete
-                    freeSolo
+              {buyList ? (
+                <>
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    <TextField
+                      select
+                      size="small"
+                      label={t('buyList.edit.printing')}
+                      value={pinPrinting ? 'one' : 'any'}
+                      onChange={(e) => setPinPrinting(e.target.value === 'one')}
+                      sx={{ minWidth: 180 }}
+                    >
+                      <MenuItem value="any">{t('buyList.edit.printingAny')}</MenuItem>
+                      <MenuItem value="one">
+                        {t('buyList.edit.printingOne', { set: selected.setCode.toUpperCase(), number: selected.collectorNumber })}
+                      </MenuItem>
+                    </TextField>
+                    <TextField
+                      select
+                      size="small"
+                      label={t('buyList.edit.finish')}
+                      value={finishChoice}
+                      onChange={(e) => setFinishChoice(e.target.value)}
+                      sx={{ minWidth: 150 }}
+                    >
+                      <MenuItem value="any">{t('buyList.edit.finishAny')}</MenuItem>
+                      <MenuItem value="foil">{t('buyList.edit.finishFoil')}</MenuItem>
+                      <MenuItem value="nonfoil">{t('buyList.edit.finishNonFoil')}</MenuItem>
+                    </TextField>
+                    <TextField
+                      select
+                      size="small"
+                      label={t('buyList.edit.priority')}
+                      value={priority}
+                      onChange={(e) => setPriority(e.target.value as BuyListPriority)}
+                      sx={{ minWidth: 120 }}
+                    >
+                      {(['Normal', 'High', 'Grail'] as const).map((p) => (
+                        <MenuItem key={p} value={p}>
+                          {t(`buyList.priority.${p}`)}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Stack>
+                  <TextField
                     size="small"
-                    options={foilTypes.data ?? []}
-                    value={foilType ?? ''}
-                    onChange={(_, v) => setFoilType(v || null)}
-                    onInputChange={(_, v) => setFoilType(v || null)}
-                    sx={{ minWidth: 220 }}
-                    renderInput={(p) => (
-                      <TextField {...p} label={t('common.labels.foilType')} placeholder={foilTypes.data?.[0]} />
-                    )}
+                    label={t('buyList.edit.note')}
+                    helperText={t('buyList.edit.noteHelp')}
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    inputProps={{ maxLength: 500 }}
                   />
-                )}
-              </Stack>
+                </>
+              ) : (
+                <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+                  <FormControlLabel
+                    control={<Switch checked={isFoil} onChange={(e) => setIsFoil(e.target.checked)} />}
+                    label={t('common.labels.foil')}
+                  />
+                  {isFoil && (
+                    <Autocomplete
+                      freeSolo
+                      size="small"
+                      options={foilTypes.data ?? []}
+                      value={foilType ?? ''}
+                      onChange={(_, v) => setFoilType(v || null)}
+                      onInputChange={(_, v) => setFoilType(v || null)}
+                      sx={{ minWidth: 220 }}
+                      renderInput={(p) => (
+                        <TextField {...p} label={t('common.labels.foilType')} placeholder={foilTypes.data?.[0]} />
+                      )}
+                    />
+                  )}
+                </Stack>
+              )}
             </Stack>
           )}
 
@@ -841,7 +939,9 @@ export function AddCardDialog({
               <Typography variant="body2" color="success.main">
                 {target.kind === 'location'
                   ? t('dialogs.addCard.added', { count: addedCount, location: target.locationName })
-                  : t('dialogs.addToList.addedSoFar', { count: addedCount })}
+                  : buyList
+                    ? t('buyList.add.addedSoFar', { count: addedCount })
+                    : t('dialogs.addToList.addedSoFar', { count: addedCount })}
               </Typography>
               {recent.map((r) => (
                 <Stack key={r.key} direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
@@ -886,7 +986,9 @@ export function AddCardDialog({
               ? t('dialogs.addToSlot.addToPocket')
               : target.kind === 'list'
                 ? t('dialogs.addToList.addToList')
-                : t('dialogs.addCard.addCard')}
+                : buyList
+                  ? t('buyList.add.button')
+                  : t('dialogs.addCard.addCard')}
         </Button>
       </DialogActions>
     </Dialog>

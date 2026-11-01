@@ -4,7 +4,7 @@
  *
  * Layout: `files` holds each scan's image once (written when the item first appears — images are
  * large, and an item is rewritten many times as it matches / is edited); `items` holds everything
- * else; `sessions` holds the list order + game. Each scan surface keys its own session ("scan", or
+ * else; `sessions` holds the list order, game + selected card. Each scan surface keys its own session ("scan", or
  * "audit-<locationId>"). Everything is best-effort: if IndexedDB is unavailable (private window,
  * blocked storage, quota) the page simply works without persistence.
  */
@@ -23,6 +23,8 @@ export interface StoredScanItem {
 export interface RestoredSession<T> {
   game: string;
   items: T[];
+  /** The scan that was selected, so a refresh lands back on it. */
+  selectedKey: string | null;
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -85,7 +87,7 @@ export class ScanSessionStore<T extends StoredScanItem> {
       const tx = db.transaction(['sessions', 'items', 'files'], 'readonly');
       // Issue every request up front: a transaction auto-commits once it has nothing pending.
       const [meta, rows, files] = await Promise.all([
-        get<{ game: string; order: string[] }>(tx.objectStore('sessions'), this.session),
+        get<{ game: string; order: string[]; selectedKey?: string | null }>(tx.objectStore('sessions'), this.session),
         getAll<{ key: string; data: Omit<T, 'file'> }>(tx.objectStore('items').index('session'), this.session),
         getAll<{ key: string; file: File }>(tx.objectStore('files').index('session'), this.session),
       ]);
@@ -99,7 +101,7 @@ export class ScanSessionStore<T extends StoredScanItem> {
       const items = meta.order.map((k) => byKey.get(k)).filter((it): it is T => !!it);
       // The restored list is exactly what's stored, so the next sync diffs against it.
       this.saved = new Map(items.map((it) => [it.key, it]));
-      return { game: meta.game, items };
+      return { game: meta.game, items, selectedKey: meta.selectedKey ?? null };
     } catch (e) {
       console.warn('Scan session restore failed', e);
       return null;
@@ -107,17 +109,17 @@ export class ScanSessionStore<T extends StoredScanItem> {
   }
 
   /** Persist the list. Writes are serialized so a slow write can't land after a newer one. */
-  sync(game: string, items: T[]): Promise<void> {
+  sync(game: string, items: T[], selectedKey: string | null): Promise<void> {
     const prev = this.saved;
     const next = new Map(items.map((it) => [it.key, it]));
     this.saved = next;
-    this.chain = this.chain.then(() => this.write(game, items, prev)).catch((e) => {
+    this.chain = this.chain.then(() => this.write(game, items, selectedKey, prev)).catch((e) => {
       console.warn('Scan session save failed', e);
     });
     return this.chain;
   }
 
-  private async write(game: string, items: T[], prev: Map<string, T>): Promise<void> {
+  private async write(game: string, items: T[], selectedKey: string | null, prev: Map<string, T>): Promise<void> {
     const db = await this.db();
     const tx = db.transaction(['sessions', 'items', 'files'], 'readwrite');
     const itemStore = tx.objectStore('items');
@@ -140,7 +142,7 @@ export class ScanSessionStore<T extends StoredScanItem> {
     }
     const sessions = tx.objectStore('sessions');
     if (items.length === 0) sessions.delete(this.session);
-    else sessions.put({ session: this.session, game, order: items.map((it) => it.key) });
+    else sessions.put({ session: this.session, game, order: items.map((it) => it.key), selectedKey });
     await done(tx);
   }
 }

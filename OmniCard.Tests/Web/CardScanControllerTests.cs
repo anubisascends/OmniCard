@@ -53,8 +53,11 @@ public class CardScanControllerTests : IDisposable
     private CardScanController CreateController() =>
         new(matcher: null!, _cardService.Object, _binderCards, _tagService.Object,
             new CsvExportImportService(null, null, NullLogger<CsvExportImportService>.Instance),
-            new ScanCommitService(_cardService.Object, _binderCards, _tagService.Object, NullLogger<ScanCommitService>.Instance),
+            new ScanCommitService(_cardService.Object, _binderCards, _tagService.Object, BuyListServices.Create(new MockFactory(_opts)),
+                NullLogger<ScanCommitService>.Instance),
             TagRuleServices.Create(new MockFactory(_opts)),
+            BuyListServices.Create(new MockFactory(_opts)),
+            siteAccess: null!, // only read when a commit asks for the Buy List; these don't
             NullLogger<CardScanController>.Instance);
 
     private static IFormFile CreateFormFile(byte[]? content = null, string contentType = "image/jpeg",

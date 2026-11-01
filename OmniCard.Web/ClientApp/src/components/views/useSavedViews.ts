@@ -14,6 +14,7 @@ import {
 } from '../../lib/savedViews';
 
 const VIEW_PARAM = 'view';
+const SEARCH_PARAM = 'q';
 
 export interface SavedViewsScope {
   page: 'Collection' | 'Location';
@@ -60,6 +61,8 @@ export function useSavedViews({ page, containerId }: SavedViewsScope): SavedView
   const [searchParams, setSearchParams] = useSearchParams();
   const routerLocation = useLocation();
   const urlViewId = Number(searchParams.get(VIEW_PARAM)) || null;
+  // A link that opens the page on a search (`?q=`): applied once, over whichever view the page opens with.
+  const linkedSearch = useRef(searchParams.get(SEARCH_PARAM));
 
   const listQuery = useQuery({
     queryKey: ['saved-views', page, containerId ?? null, gameKey],
@@ -98,7 +101,8 @@ export function useSavedViews({ page, containerId }: SavedViewsScope): SavedView
     (view: SavedViewDto | null) => {
       const next = view ? normalizeViewState(view.state, onLocation) : builtInViewState(onLocation);
       setActiveId(view?.id ?? null);
-      setStateRaw(next);
+      setStateRaw(linkedSearch.current ? { ...next, q: linkedSearch.current } : next);
+      linkedSearch.current = null;
       setBaseline(next);
       setViewParam(view?.id ?? null);
     },

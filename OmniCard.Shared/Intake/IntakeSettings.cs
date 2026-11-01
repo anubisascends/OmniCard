@@ -62,6 +62,12 @@ public sealed class IntakeSettings
     /// <summary>Trade (store credit) offer as a percentage of the (condition-adjusted) price.</summary>
     public decimal TradePercent { get; set; } = 80m;
 
+    /// <summary>Cash percentage for copies still wanted on the Buy List. Null = <see cref="CashPercent"/>.</summary>
+    public decimal? BuyListCashPercent { get; set; }
+
+    /// <summary>Trade percentage for copies still wanted on the Buy List. Null = <see cref="TradePercent"/>.</summary>
+    public decimal? BuyListTradePercent { get; set; }
+
     /// <summary>Percent of the price paid per condition code (NM, LP, MP, HP, DMG). Missing = 100.</summary>
     public Dictionary<string, decimal> ConditionPercents { get; set; } = new(StringComparer.OrdinalIgnoreCase)
     {

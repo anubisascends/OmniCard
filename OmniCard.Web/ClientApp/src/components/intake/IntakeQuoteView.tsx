@@ -27,6 +27,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PersonIcon from '@mui/icons-material/Person';
 import ShoppingCartCheckoutIcon from '@mui/icons-material/ShoppingCartCheckout';
+import TrackChangesIcon from '@mui/icons-material/TrackChanges';
 import { useTranslation } from 'react-i18next';
 import { api, ApiError } from '../../api/client';
 import type {
@@ -42,6 +43,7 @@ import type {
 import { useFormatters } from '../../i18n/format';
 import { usePermissions } from '../../context/usePermissions';
 import { useIsPhone } from '../../lib/responsive';
+import { BuyListHitChip, buyListFrameSx } from '../BuyListBadge';
 import { CardImage } from '../CardImage';
 import type { IntakeScanCard } from '../../pages/ScanPage';
 
@@ -119,6 +121,15 @@ export function IntakeQuoteView({
   const pct = (value: number) => fmt.percent(value / 100, 2);
   const canBuy = can('intake.buy');
   const buyable = !!q && q.cardCount > 0 && !q.needsPrices && !quote.isFetching && settings.locationId != null;
+  // Staff see Buy List cards first. The customer view keeps the scan order, so it gives nothing away.
+  const staffOrder = useMemo(
+    () =>
+      cards
+        .map((card, i) => ({ card, line: q?.lines[i] }))
+        .sort((a, b) => Number(!!b.line?.buyList) - Number(!!a.line?.buyList)),
+    [cards, q],
+  );
+  const buyListLines = q?.lines.filter((l) => l.buyList).length ?? 0;
 
   if (cards.length === 0) {
     return (
@@ -153,6 +164,11 @@ export function IntakeQuoteView({
       </Stack>
 
       {quote.isError && <Alert severity="error">{(quote.error as Error).message}</Alert>}
+      {buyListLines > 0 && (
+        <Alert severity="warning" icon={<TrackChangesIcon />}>
+          {t('buyList.intake.banner', { count: buyListLines })}
+        </Alert>
+      )}
       {q && (
         <Paper variant="outlined" sx={{ p: 2, position: { xs: 'static', sm: 'sticky' }, top: 56, zIndex: 1 }}>
           {quote.isFetching && <LinearProgress sx={{ mb: 1 }} />}
@@ -206,8 +222,7 @@ export function IntakeQuoteView({
 
       {q && (
         <Stack spacing={1}>
-          {cards.map((card, i) => {
-            const line = q.lines[i];
+          {staffOrder.map(({ card, line }) => {
             if (!line) return null;
             return (
               <QuoteLine
@@ -286,6 +301,7 @@ function QuoteTotals({ quote, large = false }: { quote: IntakeQuoteDto; large?: 
           </Typography>
           <Typography variant="caption" color="text.secondary">
             {t('intake.quote.percentOf', { percent: fmt.percent(o.percent / 100, 2) })}
+            {quote.buyListRateApplied && ` · ${t('buyList.intake.rateApplied')}`}
           </Typography>
         </Box>
       ))}
@@ -324,8 +340,9 @@ function QuoteLine({
   const it = card.item;
   const qty = Math.max(1, it.quantity);
   const showPriceField = line.needsPrice || line.isManualPrice;
+  const hit = line.buyList;
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, opacity: line.excluded ? 0.55 : 1 }}>
+    <Paper variant="outlined" sx={{ p: 1.5, opacity: line.excluded ? 0.55 : 1, ...buyListFrameSx(hit?.priority) }}>
       <Stack direction="row" spacing={1.5} alignItems="flex-start">
         <CardImage
           src={it.imageUri ?? card.previewUrl}
@@ -360,6 +377,18 @@ function QuoteLine({
           </Stack>
 
           <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+            {hit && <BuyListHitChip hit={hit} />}
+            {hit && !line.excluded && line.buyListCopies === 0 && (
+              <Chip size="small" variant="outlined" label={t('buyList.intake.noCopiesLeft')} />
+            )}
+            {hit && line.buyListCopies > 0 && line.buyListCopies < qty && (
+              <Chip
+                size="small"
+                variant="outlined"
+                color="warning"
+                label={t('buyList.intake.partial', { copies: line.buyListCopies, total: qty })}
+              />
+            )}
             {line.marketPrice != null ? (
               <Chip size="small" variant="outlined" label={t('intake.quote.market', { price: fmt.money(line.marketPrice) })} />
             ) : (
@@ -373,6 +402,11 @@ function QuoteLine({
             {line.isManualPrice && <Chip size="small" color="secondary" label={t('intake.quote.manual')} />}
             {line.excluded && <Chip size="small" label={t('intake.quote.excluded')} />}
           </Stack>
+          {hit?.note && (
+            <Typography variant="caption" color="warning.main" component="div" sx={{ mt: 0.5, whiteSpace: 'pre-line' }}>
+              {hit.note}
+            </Typography>
+          )}
 
           {showPriceField && !line.excluded && (
             <ManualPriceField value={line.isManualPrice ? (line.basePrice ?? null) : null} onCommit={onManualPrice} />
@@ -590,6 +624,16 @@ function BuyDialog({
   const qc = useQueryClient();
   const isPhone = useIsPhone();
   const needsCustomer = quote.tradePaid > 0;
+  // Where this buy's wanted copies go, by location.
+  const setAside = useMemo(() => {
+    const byLocation = new Map<string, number>();
+    for (const line of quote.lines) {
+      const location = line.buyList?.setAsideLocationName;
+      if (location && !line.excluded && line.buyListCopies > 0)
+        byLocation.set(location, (byLocation.get(location) ?? 0) + line.buyListCopies);
+    }
+    return [...byLocation];
+  }, [quote]);
   const [mode, setMode] = useState<CustomerMode>('existing');
   const [customer, setCustomer] = useState<CustomerDto | null>(null);
   const [name, setName] = useState('');
@@ -631,6 +675,7 @@ function BuyDialog({
       void qc.invalidateQueries({ queryKey: ['locations'] });
       void qc.invalidateQueries({ queryKey: ['dashboard'] });
       void qc.invalidateQueries({ queryKey: ['intake-history'] });
+      void qc.invalidateQueries({ queryKey: ['buy-list'] });
       setNote('');
       onBought(bought);
     },
@@ -701,6 +746,11 @@ function BuyDialog({
               {t('intake.buy.location', { location: settings.locationName })}
             </Typography>
           )}
+          {setAside.map(([location, copies]) => (
+            <Typography key={location} variant="caption" color="warning.main">
+              {t('buyList.intake.setAsideBuy', { count: copies, location })}
+            </Typography>
+          ))}
           {buy.isError && (
             <Alert severity={pricesChanged ? 'warning' : 'error'}>
               {pricesChanged ? t('intake.buy.pricesChanged') : (buy.error as Error).message}

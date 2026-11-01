@@ -11,6 +11,7 @@ using OmniCard.Shared.Sales;
 using OmniCard.Shared.Settings;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
+using OmniCard.Tests.Fakes;
 using OmniCard.Web.Services;
 using OmniCard.Web.Services.Intake;
 
@@ -48,10 +49,11 @@ public class IntakeServiceTests : IDisposable
         cardService.Setup(c => c.GetGameService(CardGame.Mtg)).Returns(game.Object);
 
         var binderCards = new WebBinderCardService(_factory, new StubDataPath());
-        var commits = new ScanCommitService(cardService.Object, binderCards, new Mock<ITagService>().Object,
+        var buyList = BuyListServices.Create(_factory);
+        var commits = new ScanCommitService(cardService.Object, binderCards, new Mock<ITagService>().Object, buyList,
             NullLogger<ScanCommitService>.Instance);
         _credit = new StoreCreditService(_factory);
-        _intake = new IntakeService(_factory, _settings, cardService.Object, commits, _credit,
+        _intake = new IntakeService(_factory, _settings, cardService.Object, commits, _credit, buyList,
             NullLogger<IntakeService>.Instance);
 
         using var db = _factory.CreateDbContext();
