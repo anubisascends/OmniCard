@@ -43,6 +43,11 @@ import type {
   IntakeSettingsDto,
   StoreCreditDto,
   DashboardDto,
+  DashboardDataDto,
+  DashboardLayoutDto,
+  DashboardSqlSchemaDto,
+  DashboardStateDto,
+  DashboardWidgetDto,
   DeckBoxNeedsGameDto,
   DeckLegalityDto,
   DeckBoxMissingCardDto,
@@ -387,6 +392,17 @@ export const api = {
 
   // Dashboard
   dashboard: () => request<DashboardDto>('/api/dashboard'),
+  dashboardState: () => request<DashboardStateDto>('/api/dashboard/layout'),
+  saveDashboardLayout: (layout: DashboardLayoutDto) =>
+    request<DashboardLayoutDto>('/api/dashboard/layout', { method: 'PUT', body: JSON.stringify(layout) }),
+  resetDashboardLayout: () => request<void>('/api/dashboard/layout', { method: 'DELETE' }),
+  saveDefaultDashboardLayout: (layout: DashboardLayoutDto) =>
+    request<DashboardLayoutDto>('/api/dashboard/layout/default', { method: 'PUT', body: JSON.stringify(layout) }),
+  resetDefaultDashboardLayout: () => request<void>('/api/dashboard/layout/default', { method: 'DELETE' }),
+  dashboardWidgetData: (widget: DashboardWidgetDto, signal?: AbortSignal) =>
+    request<DashboardDataDto>('/api/dashboard/data', { method: 'POST', body: JSON.stringify(widget), signal }),
+  dashboardSqlSchema: (database: string) =>
+    request<DashboardSqlSchemaDto>(`/api/dashboard/sql/schema?database=${encodeURIComponent(database)}`),
 
   // Locations
   /** Locations in the sites the user can read; `siteId` narrows to one site. */

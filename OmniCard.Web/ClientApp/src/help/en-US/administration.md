@@ -112,7 +112,7 @@ Permissions are grouped by section. Most sections have **View**, plus actions su
 
 | Section | Permissions |
 |---|---|
-| Dashboard | View |
+| Dashboard | View, Write SQL widgets ([SQL widgets](help:dashboard#sql-widgets)) |
 | Scan | View, Commit scans |
 | Collection | View, Edit, Delete, Export |
 | Locations | View, Create, Edit, Delete |
