@@ -5,6 +5,7 @@ using OmniCard.CardMatching;
 using OmniCard.Collection;
 using OmniCard.Data;
 using OmniCard.Web.Services;
+using OmniCard.Web.Services.Dashboard;
 using OmniCard.Web.Services.Kiosk;
 using OmniCard.Web.Services.Intake;
 using OmniCard.Shared.Intake;
@@ -332,6 +333,38 @@ builder.Services.AddSingleton<StoreCreditService>();
 builder.Services.AddSingleton<IntakeService>();
 // Saved views of the Collection / Location pages (per user, plus admin-shared views and defaults).
 builder.Services.AddSingleton(sp => new SavedViewService(writableFactory, sp.GetRequiredService<TimeProvider>()));
+// Dashboard widgets: per-user layouts + everyone's default, each widget's data, and the read-only SQL
+// widgets. SQL runs against the main store or one game's catalog; ConnectionStrings:OmniCardDashboard
+// (optional) points it at a read-only login instead of the app's own (the catalog DB names are kept).
+builder.Services.AddSingleton(sp => new DashboardLayoutService(writableFactory, sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddSingleton(_ =>
+{
+    var dashboardConn = builder.Configuration.GetConnectionString("OmniCardDashboard");
+    string Readable(string conn) => string.IsNullOrWhiteSpace(dashboardConn)
+        ? conn
+        : new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(dashboardConn)
+        {
+            InitialCatalog = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(conn).InitialCatalog,
+        }.ConnectionString;
+    DashboardSqlTarget Target(string key, string label, string conn)
+    {
+        var readable = Readable(conn);
+        return new DashboardSqlTarget(key, label, () => new Microsoft.Data.SqlClient.SqlConnection(readable));
+    }
+    (CardGame Game, string Suffix)[] catalogs =
+    [
+        (CardGame.Mtg, "Scryfall"), (CardGame.OnePiece, "Optcg"), (CardGame.Riftbound, "Riftbound"),
+        (CardGame.Pokemon, "Pokemon"), (CardGame.YuGiOh, "Yugioh"), (CardGame.FinalFantasy, "FinalFantasy"),
+    ];
+    return new DashboardSqlRunner(
+    [
+        Target(DashboardSqlRunner.MainDatabase, "OmniCard", connectionString),
+        .. catalogs.Select(c => Target(c.Game.ToString(),
+            OmniCard.Web.Api.Mapping.DtoMapping.GameDisplayName(c.Game),
+            Sdb.CatalogConnectionString(builder.Configuration, c.Suffix))),
+    ]);
+});
+builder.Services.AddSingleton<DashboardDataService>();
 
 // MCP OAuth resource-server mode (Phase 2). When configured (Mcp:OAuth:Enabled + Authority/Audience/
 // PublicBaseUrl), /mcp is exposed to remote MCP clients and gated by JWTs from an external IdP;

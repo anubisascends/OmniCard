@@ -2365,3 +2365,117 @@ public sealed record StoreCreditAdjustRequest
     public decimal Amount { get; init; }
     public string Reason { get; init; } = "";
 }
+
+// --- Dashboard widgets ---
+
+/// <summary>A Dashboard: its widgets on a <see cref="Columns"/>-column grid.</summary>
+public sealed record DashboardLayoutDto
+{
+    /// <summary>Grid width every widget's <see cref="DashboardWidgetDto.X"/>/<see cref="DashboardWidgetDto.W"/> is measured in.</summary>
+    public const int Columns = 60;
+
+    public int Version { get; init; } = 1;
+    public List<DashboardWidgetDto> Widgets { get; init; } = [];
+}
+
+/// <summary>
+/// One Dashboard widget: where it sits, where its data comes from and how it's drawn. One flat record
+/// for every <see cref="Type"/>; fields a type doesn't use are null.
+/// <list type="bullet">
+/// <item><c>metric</c> — one holdings / sales total (<see cref="Metric"/>).</item>
+/// <item><c>breakdown</c> — holdings by game or category, or sales by game (<see cref="GroupBy"/>).</item>
+/// <item><c>search</c> — owned cards matching a search (<see cref="Query"/>) in one game or all
+/// (<see cref="Game"/>), as a <see cref="Output"/> of summary / cards / groups.</item>
+/// <item><c>sql</c> — a read-only SELECT (<see cref="Sql"/>) against the main store or a game's catalog
+/// (<see cref="Database"/>).</item>
+/// <item><c>note</c> — Markdown text (<see cref="Text"/>).</item>
+/// </list>
+/// Every data widget yields a table (<see cref="DashboardDataDto"/>) that <see cref="Display"/> draws as
+/// a stat, a table or a chart.
+/// </summary>
+public sealed record DashboardWidgetDto
+{
+    public string Id { get; init; } = "";
+    public string Type { get; init; } = "";
+
+    /// <summary>Shown in the widget's header; null = a title derived from its settings.</summary>
+    public string? Title { get; init; }
+
+    public int X { get; init; }
+    public int Y { get; init; }
+    public int W { get; init; }
+    public int H { get; init; }
+
+    // --- data source ---------------------------------------------------------------------------
+    public string? Metric { get; init; }
+    public string? GroupBy { get; init; }
+    public string? Game { get; init; }
+    public string? Query { get; init; }
+    public string? Output { get; init; }
+    public string? Sort { get; init; }
+    public int? Limit { get; init; }
+    public string? Sql { get; init; }
+    public string? Database { get; init; }
+    public string? Text { get; init; }
+
+    // --- display -------------------------------------------------------------------------------
+    /// <summary><c>stat</c>, <c>table</c> or <c>chart</c>.</summary>
+    public string? Display { get; init; }
+
+    /// <summary><c>bar</c>, <c>horizontalBar</c>, <c>line</c>, <c>area</c> or <c>pie</c>.</summary>
+    public string? Chart { get; init; }
+
+    /// <summary>The column naming each chart point; null = the first text column.</summary>
+    public string? LabelColumn { get; init; }
+
+    /// <summary>The columns charted (or shown, for a table); null/empty = every number column (every column).</summary>
+    public List<string>? ValueColumns { get; init; }
+
+    /// <summary>The column a stat shows (from the first row); null = the first number column.</summary>
+    public string? StatColumn { get; init; }
+
+    /// <summary>Per-column display format overrides: <c>number</c>, <c>money</c>, <c>percent</c>, <c>text</c>, <c>date</c>.</summary>
+    public Dictionary<string, string>? Formats { get; init; }
+
+    /// <summary>Stat shown green when ≥ 0 and red when negative.</summary>
+    public bool ColorBySign { get; init; }
+}
+
+/// <summary>One column of widget data. <see cref="Kind"/>: <c>text</c>, <c>number</c>, <c>money</c>,
+/// <c>percent</c>, <c>date</c> or <c>bool</c>.</summary>
+public sealed record DashboardColumnDto(string Key, string Kind);
+
+/// <summary>A widget's data as a table. <see cref="Truncated"/> = more rows matched than were returned.</summary>
+public sealed record DashboardDataDto
+{
+    public List<DashboardColumnDto> Columns { get; init; } = [];
+    public List<List<object?>> Rows { get; init; } = [];
+    public bool Truncated { get; init; }
+}
+
+/// <summary>A database a SQL widget can query: the main store (<c>main</c>) or a game's catalog (the game id).</summary>
+public sealed record DashboardSqlDatabaseDto(string Key, string Label);
+
+/// <summary>
+/// What the Dashboard page needs: the layout to show (<see cref="Source"/>: <c>personal</c>,
+/// <c>default</c> or <c>builtIn</c>) and everyone's default (<see cref="DefaultSource"/>: <c>default</c>
+/// or <c>builtIn</c>) to start editing from, plus what the user may change.
+/// </summary>
+public sealed record DashboardStateDto
+{
+    public DashboardLayoutDto Layout { get; init; } = new();
+    public string Source { get; init; } = "builtIn";
+    public DashboardLayoutDto DefaultLayout { get; init; } = new();
+    public string DefaultSource { get; init; } = "builtIn";
+    public bool CanEditDefault { get; init; }
+    public bool CanWriteSql { get; init; }
+    public bool CanSearchCollection { get; init; }
+    public List<DashboardSqlDatabaseDto> SqlDatabases { get; init; } = [];
+}
+
+/// <summary>The tables (and their columns) a SQL widget may read in one database.</summary>
+public sealed record DashboardSqlSchemaDto(List<DashboardSqlTableDto> Tables);
+
+public sealed record DashboardSqlTableDto(string Name, List<DashboardSqlColumnDto> Columns);
+
+public sealed record DashboardSqlColumnDto(string Name, string Type);

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OmniCard.Shared.BuyList;
+using OmniCard.Shared.Dashboard;
 using OmniCard.Shared.Ebay;
 using OmniCard.Shared.Intake;
 using OmniCard.Shared.Inventory;
@@ -60,6 +61,7 @@ public class OmniCardDbContext : DbContext
     public DbSet<IntakeLine> IntakeLines => Set<IntakeLine>();
     public DbSet<StoreCreditEntry> StoreCreditEntries => Set<StoreCreditEntry>();
     public DbSet<BuyListEntry> BuyListEntries => Set<BuyListEntry>();
+    public DbSet<DashboardLayout> DashboardLayouts => Set<DashboardLayout>();
 
     public OmniCardDbContext(DbContextOptions<OmniCardDbContext> options) : base(options) { }
 
@@ -575,6 +577,19 @@ public class OmniCardDbContext : DbContext
             e.Property(b => b.Note).HasMaxLength(BuyListEntry.MaxNoteLength);
             e.Property(b => b.CreatedByName).HasMaxLength(256);
             e.HasIndex(b => new { b.Game, b.WantedQuantity });
+        });
+
+        // Dashboard widget layouts: one per user, plus everyone's default (null user). The unfiltered
+        // unique index lets SQL Server treat the null "everyone" user as a single value.
+        modelBuilder.Entity<DashboardLayout>(e =>
+        {
+            e.HasKey(d => d.Id);
+            e.Property(d => d.Id).ValueGeneratedOnAdd();
+            e.Property(d => d.LayoutJson).IsRequired();
+            e.Ignore(d => d.IsDefault);
+            e.HasIndex(d => d.UserId).IsUnique().HasFilter(null);
+            e.HasOne<User>().WithMany().HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<StoreCreditEntry>(e =>

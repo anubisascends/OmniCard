@@ -17,6 +17,205 @@
       "units": "Units",
       "cost": "Cost",
       "market": "Market"
+    },
+    "toolbar": {
+      "customize": "Customize",
+      "addWidget": "Add widget",
+      "editing": "Editing",
+      "mine": "My dashboard",
+      "everyone": "Everyone's default",
+      "useDefault": "Use the default dashboard",
+      "restoreBuiltIn": "Restore the built-in dashboard",
+      "saved": "Dashboard saved.",
+      "sourcePersonal": "Your own layout",
+      "sourceDefault": "Default layout",
+      "sourceBuiltIn": "Built-in layout",
+      "editingDefaultHint": "Changes here are what every user without their own dashboard sees.",
+      "phoneArrangeHint": "Drag and resize widgets on a larger screen. Here you can edit, copy and remove them."
+    },
+    "confirm": {
+      "discard": "Discard your unsaved changes?",
+      "useDefault": "Remove your own dashboard and use the default one?",
+      "restoreBuiltIn": "Remove everyone's default dashboard? Users without their own will see the built-in dashboard.",
+      "remove": "Remove this widget?"
+    },
+    "empty": {
+      "title": "No widgets yet",
+      "body": "Choose Customize, then Add widget to build your dashboard."
+    },
+    "widget": {
+      "edit": "Edit widget",
+      "duplicate": "Duplicate",
+      "remove": "Remove",
+      "more": "More actions",
+      "move": "Drag to move",
+      "truncated": "Showing the first {{count}} rows",
+      "noData": "No data",
+      "error": "This widget couldn't load: {{message}}",
+      "untitled": "Widget"
+    },
+    "types": {
+      "metric": "Total",
+      "breakdown": "Breakdown",
+      "search": "Card search",
+      "sql": "SQL query",
+      "note": "Note"
+    },
+    "metrics": {
+      "holdings": "Holdings",
+      "sales": "Sales",
+      "totalUnits": "Total Units",
+      "totalCost": "Cost",
+      "totalMarket": "Market",
+      "unrealized": "Unrealized",
+      "realizedProfit": "Realized Profit",
+      "realizedProceeds": "Sales Proceeds",
+      "realizedCost": "Cost of Sold Items",
+      "realizedFees": "Marketplace Fees",
+      "totalSold": "Items Sold",
+      "shippingCost": "Shipping Cost",
+      "shippingCharged": "Shipping Charged"
+    },
+    "breakdowns": {
+      "game": "Holdings by game",
+      "category": "Holdings by category",
+      "salesGame": "Sales by game"
+    },
+    "outputs": {
+      "summary": "Totals",
+      "cards": "Top cards",
+      "groups": "Grouped totals"
+    },
+    "sorts": {
+      "value": "Total value",
+      "price": "Card price",
+      "quantity": "Quantity",
+      "name": "Name",
+      "added": "Newest",
+      "units": "Units",
+      "cards": "Cards",
+      "group": "Group order"
+    },
+    "groupFields": {
+      "setCode": "Set",
+      "rarity": "Rarity",
+      "condition": "Condition",
+      "language": "Language",
+      "isFoil": "Foil",
+      "game": "Game",
+      "containerName": "Location",
+      "listingStatus": "Listing status"
+    },
+    "displays": {
+      "stat": "Number",
+      "table": "Table",
+      "chart": "Chart"
+    },
+    "charts": {
+      "bar": "Columns",
+      "horizontalBar": "Bars",
+      "line": "Line",
+      "area": "Area",
+      "pie": "Pie"
+    },
+    "formats": {
+      "auto": "Automatic",
+      "number": "Number",
+      "money": "Money",
+      "percent": "Percent",
+      "text": "Text",
+      "date": "Date"
+    },
+    "data": {
+      "none": "(none)",
+      "other": "Other",
+      "columns": {
+        "group": "Group",
+        "units": "Units",
+        "cost": "Cost",
+        "market": "Market",
+        "sold": "Sold",
+        "proceeds": "Proceeds",
+        "profit": "Profit",
+        "cards": "Cards",
+        "name": "Name",
+        "set": "Set",
+        "number": "Number",
+        "quantity": "Qty",
+        "price": "Price",
+        "value": "Value"
+      }
+    },
+    "titles": {
+      "searchSummary": "{{game}} cards",
+      "searchCards": "Top {{game}} cards",
+      "searchGroups": "{{game}} cards by {{field}}",
+      "searchSummaryAll": "All cards",
+      "searchCardsAll": "Top cards",
+      "searchGroupsAll": "Cards by {{field}}",
+      "sql": "SQL query",
+      "note": "Note"
+    },
+    "add": {
+      "title": "Add a widget",
+      "sections": {
+        "totals": "Totals",
+        "breakdowns": "Breakdowns",
+        "search": "Card search",
+        "sql": "SQL",
+        "other": "Other"
+      },
+      "presets": {
+        "metric": { "name": "Total", "description": "One number: what you own, what it cost, what it's worth, or what your sales made." },
+        "breakdownTable": { "name": "Breakdown table", "description": "Holdings by game or category, or sales by game." },
+        "breakdownChart": { "name": "Breakdown chart", "description": "What your holdings are worth per game, as a pie chart." },
+        "searchSummary": { "name": "Search totals", "description": "How many cards match a search, and what they cost and are worth." },
+        "searchCards": { "name": "Most valuable cards", "description": "The top cards matching a search, sorted by value, price or date added." },
+        "searchGroups": { "name": "Cards by set", "description": "Cards matching a search, totaled per set, rarity, location or more, as a chart." },
+        "sql": { "name": "SQL query", "description": "Your own read-only SELECT over the database, shown as a number, table or chart." },
+        "sqlOrders": { "name": "Orders per month", "description": "An example SQL widget: a line chart of orders by month." },
+        "sqlAdded": { "name": "Cards added per month", "description": "An example SQL widget: a column chart of cards added by month." },
+        "note": { "name": "Note", "description": "Text for headings, reminders or links (Markdown)." }
+      }
+    },
+    "editor": {
+      "title": "Edit widget",
+      "addTitle": "New widget",
+      "widgetTitle": "Title",
+      "titlePlaceholder": "Automatic: {{title}}",
+      "source": "Data",
+      "metric": "Total",
+      "breakdown": "Breakdown",
+      "game": "Game",
+      "allGames": "All games",
+      "gameHint": "Widgets ignore the game picked in the top bar.",
+      "query": "Search",
+      "queryHint": "The same search syntax as the Collection page. Leave empty for every card.",
+      "output": "Show",
+      "sort": "Sort by",
+      "limit": "Rows",
+      "groupBy": "Group by",
+      "database": "Database",
+      "sql": "SQL",
+      "sqlHint": "One read-only SELECT. Up to {{rows}} rows are returned; queries stop after {{seconds}} seconds.",
+      "sqlReadOnly": "You can move, resize and retitle this widget, but changing its query needs the Write SQL widgets permission.",
+      "schema": "Tables",
+      "schemaHint": "Click a name to insert it.",
+      "run": "Run",
+      "text": "Text",
+      "textHint": "Markdown: # headings, **bold**, lists and [links](/collection).",
+      "display": "Show as",
+      "chart": "Chart type",
+      "labelColumn": "Labels",
+      "valueColumns": "Values",
+      "tableColumns": "Columns",
+      "allColumns": "All",
+      "statColumn": "Value",
+      "colorBySign": "Green when positive, red when negative",
+      "formats": "Column formats",
+      "preview": "Preview",
+      "previewHint": "Run the query to see a preview.",
+      "apply": "Apply"
     }
   }
 }

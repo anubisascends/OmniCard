@@ -337,6 +337,80 @@ export interface DashboardDto {
   realized: RealizedDto;
 }
 
+// --- Dashboard widgets (mirror OmniCard.Api.Contracts DashboardLayoutDto & co.) ---
+
+export type DashboardWidgetType = 'metric' | 'breakdown' | 'search' | 'sql' | 'note';
+export type DashboardDisplay = 'stat' | 'table' | 'chart';
+export type DashboardChart = 'bar' | 'horizontalBar' | 'line' | 'area' | 'pie';
+export type DashboardFormat = 'number' | 'money' | 'percent' | 'text' | 'date';
+export type DashboardColumnKind = DashboardFormat | 'bool';
+
+/** One widget: grid position (x/w in `DASHBOARD_COLUMNS` columns, y/h in rows), source and display. */
+export interface DashboardWidgetDto {
+  id: string;
+  type: DashboardWidgetType;
+  /** Null = a title derived from the widget's settings (translated). */
+  title?: string | null;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  metric?: string | null;
+  groupBy?: string | null;
+  /** Card search: a game id, or null for every game. Never the top-bar game. */
+  game?: string | null;
+  query?: string | null;
+  output?: 'summary' | 'cards' | 'groups' | null;
+  sort?: string | null;
+  limit?: number | null;
+  sql?: string | null;
+  database?: string | null;
+  text?: string | null;
+  display?: DashboardDisplay | null;
+  chart?: DashboardChart | null;
+  labelColumn?: string | null;
+  valueColumns?: string[] | null;
+  statColumn?: string | null;
+  formats?: Record<string, DashboardFormat> | null;
+  colorBySign?: boolean;
+}
+
+export interface DashboardLayoutDto {
+  version: number;
+  widgets: DashboardWidgetDto[];
+}
+
+export interface DashboardColumnDto {
+  key: string;
+  kind: DashboardColumnKind;
+}
+
+export interface DashboardDataDto {
+  columns: DashboardColumnDto[];
+  rows: (string | number | boolean | null)[][];
+  truncated: boolean;
+}
+
+export interface DashboardSqlDatabaseDto {
+  key: string;
+  label: string;
+}
+
+export interface DashboardStateDto {
+  layout: DashboardLayoutDto;
+  source: 'personal' | 'default' | 'builtIn';
+  defaultLayout: DashboardLayoutDto;
+  defaultSource: 'default' | 'builtIn';
+  canEditDefault: boolean;
+  canWriteSql: boolean;
+  canSearchCollection: boolean;
+  sqlDatabases: DashboardSqlDatabaseDto[];
+}
+
+export interface DashboardSqlSchemaDto {
+  tables: { name: string; columns: { name: string; type: string }[] }[];
+}
+
 export interface AuthStatusDto {
   authRequired: boolean;
   authenticated: boolean;

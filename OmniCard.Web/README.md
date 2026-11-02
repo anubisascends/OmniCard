@@ -65,6 +65,7 @@ loaded automatically if present). Key settings:
 | `DataDirectory` (or `--db <path>` CLI arg) | Folder holding `scans/`, `card-images/`, `symbols/`, `dataprotection-keys/`. |
 | `ConnectionStrings:OmniCard` | SQL Server unified store. Default: `Server=localhost;Database=OmniCard;Trusted_Connection=True;TrustServerCertificate=True;` The per-game catalog DBs reuse this with the database name swapped (or set `ConnectionStrings:OmniCard_<Game>` explicitly). |
 | `Binder:EditPassphrase` | Legacy binder-editor gate (separate from the per-user sign-in). |
+| `ConnectionStrings:OmniCardDashboard` | Optional. A login the Dashboard's SQL widgets run under instead of the app's own (the database name is swapped per catalog, as above). See [Dashboard widgets](#dashboard-widgets). |
 | `eBay` section | eBay app credentials — see [eBay](#ebay-setup). |
 
 DataProtection keys (used to encrypt stored eBay tokens) are persisted to
@@ -596,6 +597,49 @@ the whole filtered set per request, like a market-price sort. Groups open expand
 - API (`ViewsController`, needs `collection.view` / `locations.view` + site read access for location
   views): `GET /api/views?page=&containerId=&game=`, `GET/PUT/DELETE /api/views/{id}`, `POST /api/views`,
   `PUT/DELETE /api/views/{id}/default?page=&containerId=&game=&everyone=`, `POST /api/views/{id}/copy`.
+
+## Dashboard widgets
+
+The Dashboard is a grid of widgets each user can arrange: **Customize** → add, drag, resize, edit,
+duplicate and remove widgets → **Save**. A user sees their own dashboard, else everyone's default
+(administrators edit it with the **Everyone's default** switch while customizing), else the built-in
+layout: the classic five totals over *By Game* / *By Category*, so an upgrade shows the same Dashboard
+as before. Widgets never follow the game picked in the top bar.
+
+| Widget | Data |
+|---|---|
+| **Total** | One holdings or sales total (the classic tiles, plus sales proceeds / cost / fees / items sold / shipping). Every site, as before. |
+| **Breakdown** | Holdings by game or category, or sales by game. |
+| **Card search** | Owned singles (not traded away) matching a Scryfall-style search in one game or all, as totals, top cards, or totals grouped by set / rarity / condition / language / foil / game / location / listing status. Needs `collection.view`; only the user's readable sites. |
+| **SQL query** | One read-only `SELECT` over the main store or one game's catalog. |
+| **Note** | Markdown text (the Help center's subset). |
+
+Every data widget can be drawn as a number, a table or a chart (columns, bars, line, area, pie; MUI X
+Charts) with per-column formats. Holdings/sales numbers are cached for 30 s server-side.
+
+**SQL widgets.** Writing them needs the **Dashboard ▸ Write SQL widgets** permission (`dashboard.sql`;
+admins hold it). Anyone with `dashboard.view` can still see the SQL widgets on everyone's default, even
+in a copy in their own layout, but only while the default still contains that exact query. Each query
+is checked before it runs (`DashboardSqlValidator`, Microsoft's ScriptDom T-SQL parser):
+
+- exactly one `SELECT` (CTEs, joins, `UNION`, window functions… are fine), no `SELECT … INTO`;
+- only `dbo` tables of the chosen database, with no other databases or linked servers, no `sys` /
+  `INFORMATION_SCHEMA` / `sys*` views, no `OPENROWSET` / `OPENQUERY` / `OPENDATASOURCE`, and no
+  locking table hints;
+- never the `Users` table (password hashes and setup keys).
+
+It then runs in a `READ UNCOMMITTED` transaction that is always rolled back, with a 30 s timeout and at
+most 1,000 rows. To harden further, create a SQL login with `db_datareader` on `OmniCard` and the
+catalog databases (and `DENY SELECT ON dbo.Users`), then set `ConnectionStrings:OmniCardDashboard` to
+it.
+
+- Storage: `DashboardLayouts` table (migration `AddDashboardLayouts`): one row per user plus one
+  everyone's-default row (`UserId` null), layout JSON sanitized on every save and load
+  (`DashboardLayoutService`). Rows cascade with their user.
+- API (`DashboardController`, needs `dashboard.view`): `GET /api/dashboard/layout`,
+  `PUT/DELETE /api/dashboard/layout` (own), `PUT/DELETE /api/dashboard/layout/default` (admins),
+  `POST /api/dashboard/data` (one widget's data), `GET /api/dashboard/sql/schema?database=` (`dashboard.sql`).
+  `GET /api/dashboard` still serves the classic totals (the MCP `collection_dashboard` tool).
 
 ## Tag rules
 

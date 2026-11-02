@@ -103,6 +103,32 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("BuyListEntries");
                 });
 
+            modelBuilder.Entity("OmniCard.Shared.Dashboard.DashboardLayout", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("LayoutJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("DashboardLayouts");
+                });
+
             modelBuilder.Entity("OmniCard.Shared.Ebay.EbayListing", b =>
                 {
                     b.Property<int>("Id")
@@ -2126,6 +2152,14 @@ namespace OmniCard.Web.Migrations
                         .IsUnique();
 
                     b.ToTable("SavedViewDefaults");
+                });
+
+            modelBuilder.Entity("OmniCard.Shared.Dashboard.DashboardLayout", b =>
+                {
+                    b.HasOne("OmniCard.Shared.Settings.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade);
                 });
 
             modelBuilder.Entity("OmniCard.Shared.Ebay.EbayListing", b =>
