@@ -194,6 +194,27 @@ Click any card to open its details, where you can edit condition, foil, quantity
 8. Click **Add card**, or press Enter. The dialog stays open with your search still showing, so you can pick another printing or language of the same card, or type the next name. The last few cards you added are listed at the bottom. Click **Undo** beside one to remove that card again. **Undo** shows only if you're allowed to delete cards.
 9. Click **Add & close** to add the last card and close the dialog, or **Done** if you've already added it.
 
+### Set card details from the keyboard
+
+When you pick a printing, the keyboard moves from the search boxes to the picked card, which is outlined. Single keys then set its details, and each field's label shows its key, for example **Condition (C)**. A reminder of the keys is shown under the card.
+
+![A picked card with its shortcut keys, after C then L set Lightly Played and P set the price](locations-add-card-keys.webp)
+
+| Key | What it does |
+|---|---|
+| Enter | Add the card. |
+| Ctrl+Enter | Add the card and close the dialog (**Add & close**). |
+| Esc | Wrong card: go back to the search, with the results and your highlighted row still there. ↑ and ↓ do the same. |
+| C | Open the **Condition** list. Press N, L, M, H or D (or ↑ and ↓) to choose, then Enter. |
+| L | Open the **Language** list, then choose the same way. |
+| F | Turn **Foil** on and go to **Foil type**. If the card is already foil, F turns foil off. |
+| P | Go to **Purchase price**. Type over the old value. |
+| Q | Go to **Quantity**. |
+
+In a field, press Enter when you're done, or Esc to leave it. Either way the keyboard goes back to the picked card, so you can press the next key, or Enter to add. In an open list, Esc closes it without changing anything.
+
+A key does nothing where its field isn't offered. A list line has no condition, language or price, for example. The same keys work when you add a card to a binder pocket, a list or the Buy List.
+
 To add many cards at once, scan them (see [Scanning](help:scanning)) or import a file.
 
 ## Import into a location

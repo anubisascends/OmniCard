@@ -40,6 +40,8 @@
       "name": "Name",
       "game": "Game",
       "set": "Set",
+      "sets": "Sets",
+      "allSets": "All sets",
       "quantity": "Quantity",
       "condition": "Condition",
       "language": "Language",

@@ -203,7 +203,8 @@ public class CardScanControllerTests : IDisposable
 
         CreateController().Search("Mtg", "bolt", set: ["m10", "lea"], lang: ["en", "ja"]);
 
-        foreach (var q in new[] { "bolt set:m10 lang:en", "bolt set:m10 lang:ja", "bolt set:lea lang:en", "bolt set:lea lang:ja" })
+        // set= is the exact code — set: would also take sets whose name contains it.
+        foreach (var q in new[] { "bolt set=m10 lang:en", "bolt set=m10 lang:ja", "bolt set=lea lang:en", "bolt set=lea lang:ja" })
             game.Verify(s => s.SearchCards(q, 500), Times.Once);
     }
 

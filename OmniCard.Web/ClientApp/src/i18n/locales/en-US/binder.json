@@ -42,6 +42,7 @@
       "firstLast": "first / last pocket",
       "search": "search for this pocket",
       "type": "start typing a name to search",
+      "sets": "choose the sets to search",
       "remove": "take the card out (back to Unplaced)",
       "addPage": "new sheet after this one (from a back page)",
       "removePage": "remove this page"
@@ -51,7 +52,14 @@
       "back": "back of sheet {{sheet}}",
       "only": "sheet {{sheet}}, one side"
     },
-    "sheetAfterPage": "Double-sided sheet after page {{page}}",
+    "setFilter": {
+      "button": "Sets: {{sets}}",
+      "more": "+{{n}}",
+      "tooltip": "Search only these sets when adding a card (F2)",
+      "title": "Search these sets",
+      "help": "Card searches start limited to these sets until you leave this page. In the Add card dialog you can change them for one card, or press Alt+A to search all sets."
+    },
+    "sheetAfterPage":"Double-sided sheet after page {{page}}",
     "insertFromBack": "Page {{page}} is the front of its sheet, and a new sheet can't go between a sheet's two sides. Turn to the back (page {{back}}) and press + to add a sheet after it.",
     "removePageTitle": "Remove page {{page}}?",
     "removePageConfirm": "The whole sheet this page is on is removed — for a double-sided sheet, both sides. Its cards go back to the Unplaced pool, and the pages after it move up."

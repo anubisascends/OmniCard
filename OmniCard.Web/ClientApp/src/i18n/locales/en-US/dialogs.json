@@ -5,6 +5,9 @@
       "lockedHelper": "Locked to this deck box’s game",
       "noCatalogMatches": "No matches in the {{game}} catalog.",
       "noCatalogMatchesInLanguages": "No {{languages}} matches in the {{game}} catalog.",
+      "noCatalogMatchesInSets": "No matches in {{sets}}.",
+      "searchAllSets": "Search all sets",
+      "setBoxOverrides": "The Set box is used instead",
       "added_one": "Added {{count}} card to {{location}}.",
       "added_other": "Added {{count}} cards to {{location}}.",
       "recentLine": "{{quantity}}× {{name}} · {{set}} #{{number}}",
@@ -20,7 +23,19 @@
         "choose": "choose",
         "pickThenAdd": "pick, then Enter again to add",
         "back": "back to the results",
-        "details": "condition, language, foil"
+        "sets": "sets",
+        "allSets": "all sets"
+      },
+      "withKey": "{{label}} ({{key}})",
+      "pickedKeys": {
+        "add": "add",
+        "addAndClose": "add & close",
+        "back": "back to the search",
+        "condition": "condition",
+        "language": "language",
+        "foil": "foil",
+        "price": "price",
+        "quantity": "quantity"
       }
     },
     "addToSlot": {
