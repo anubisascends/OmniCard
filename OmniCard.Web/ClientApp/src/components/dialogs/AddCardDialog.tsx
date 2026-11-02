@@ -22,16 +22,19 @@ import {
   TextField,
   Tooltip,
   Typography,
+  type SxProps,
+  type Theme,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import UndoIcon from '@mui/icons-material/Undo';
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import { api } from '../../api/client';
-import type { BuyListPriority, CardDto, CardListItemDto, ScanSearchResultDto } from '../../api/types';
+import type { BuyListPriority, CardDto, CardListItemDto, ScanSearchResultDto, SetInfoDto } from '../../api/types';
 import { usePermissions } from '../../context/usePermissions';
 import { CardHoverPreview, type CardHover } from '../CardHoverPreview';
 import { Kbd } from '../Kbd';
+import { SetMultiSelect } from '../SetMultiSelect';
 import {
   ENGLISH,
   LanguageChip,
@@ -41,7 +44,7 @@ import {
   useCatalogLanguages,
   useRememberedLanguageFilter,
 } from '../../lib/cardLanguages';
-import { LONG_PRESS_SX, useLongPress } from '../../lib/responsive';
+import { LONG_PRESS_SX, useCanHover, useLongPress } from '../../lib/responsive';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 /** How many of this sitting's adds the dialog lists back. */
@@ -93,8 +96,34 @@ const KEY_HINTS: [string[], string][] = [
   [['↑', '↓'], 'dialogs.addCard.keys.choose'],
   [['Enter'], 'dialogs.addCard.keys.pickThenAdd'],
   [['Esc'], 'dialogs.addCard.keys.back'],
-  [['Tab'], 'dialogs.addCard.keys.details'],
 ];
+/** Added to the hints when the dialog offers a set filter. */
+const SET_KEY_HINTS: [string[], string][] = [
+  [['F2'], 'dialogs.addCard.keys.sets'],
+  [['Alt', 'A'], 'dialogs.addCard.keys.allSets'],
+];
+
+/** A row of key caps, each followed by what it does (an i18n key). */
+function KeyHints({ hints, sx }: { hints: [string[], string][]; sx?: SxProps<Theme> }) {
+  const { t } = useTranslation();
+  return (
+    <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap sx={sx}>
+      {hints.map(([keys, label]) => (
+        <Stack key={label} direction="row" spacing={0.5} alignItems="center">
+          {keys.map((k) => (
+            <Kbd key={k}>{k}</Kbd>
+          ))}
+          <Typography variant="caption" color="text.secondary" sx={{ pr: 0.75 }}>
+            {t(label)}
+          </Typography>
+        </Stack>
+      ))}
+    </Stack>
+  );
+}
+
+/** The caller's chosen sets (the binder's set filter), for the game they belong to. */
+export type AddCardSetFilter = { game: string; sets: SetInfoDto[] };
 
 /**
  * The one "add a card" dialog, for a location, a binder pocket, a list or a Buy List (see {@link AddCardTarget}).
@@ -106,9 +135,15 @@ const KEY_HINTS: [string[], string][] = [
  * and the last few adds, each undoable); "Add & close" finishes. Catalog adds go through /api/scan/commit,
  * /api/binder/card/add-missing or /api/lists/{id}/items.
  *
- * Keyboard: Enter on a picked printing adds it; Esc or ↑/↓ go back from a picked printing to the results.
+ * Keyboard: picking a printing moves the keyboard off the search onto the picked card, where Enter adds it
+ * (Ctrl+Enter adds and closes), Esc or ↑/↓ go back to the results, and C/L open Condition/Language, F flips
+ * Foil (on → its finish box), P/Q go to Purchase price/Quantity. Enter or Esc in one of those returns to the card.
  * `simplified` (the binder's keyboard fill mode) searches the catalog only, highlights the first result as
  * soon as it arrives (an Enter pressed before then picks it) and shows the keys.
+ *
+ * `setFilter` (the binder's) adds a Sets picker that starts on the caller's sets and limits both searches to
+ * them. Changing it only affects this sitting; text in the Set box wins over it; F2 moves between the picker
+ * and the Name box, Alt+A searches all sets.
  */
 export function AddCardDialog({
   open,
@@ -116,6 +151,7 @@ export function AddCardDialog({
   defaultGame,
   simplified = false,
   initialName = '',
+  setFilter,
   onClose,
   onDone,
 }: {
@@ -126,6 +162,8 @@ export function AddCardDialog({
   simplified?: boolean;
   /** Starts the Name box with this text (the caller caught the first keystroke). */
   initialName?: string;
+  /** Offers a set filter, starting on these sets while the dialog is on their game. */
+  setFilter?: AddCardSetFilter;
   onClose: () => void;
   /** Called after each add (and undo) so the caller can refresh. */
   onDone?: () => void;
@@ -162,8 +200,18 @@ export function AddCardDialog({
   const [activeIndex, setActiveIndex] = useState(-1);
   // A list with a language starts its filter on that language, without touching the remembered choice.
   const [filterOverride, setFilterOverride] = useState<string[] | null>(null);
+  // The sets this search is limited to — the caller's filter to start with, changeable for this sitting.
+  const [searchSets, setSearchSets] = useState<SetInfoDto[]>([]);
   const longPress = useLongPress();
   const nameRef = useRef<HTMLInputElement>(null);
+  const setsRef = useRef<HTMLInputElement>(null);
+  // A picked printing: the panel holds the keyboard (single-key shortcuts), and these are what they reach.
+  const pickedRef = useRef<HTMLDivElement>(null);
+  const priceRef = useRef<HTMLInputElement>(null);
+  const quantityRef = useRef<HTMLInputElement>(null);
+  const foilTypeRef = useRef<HTMLInputElement>(null);
+  const [openSelect, setOpenSelect] = useState<'condition' | 'language' | null>(null);
+  const canHover = useCanHover();
   // Simplified: an Enter pressed while the search is still running picks the top result once it lands.
   const pendingEnter = useRef(false);
   const recentKey = useRef(0);
@@ -192,6 +240,7 @@ export function AddCardDialog({
     setRecent([]);
     setActiveIndex(-1);
     setFilterOverride(listLanguage ? [listLanguage] : null);
+    setSearchSets(setFilter?.game === startGame ? setFilter.sets : []);
     listQuantities.current.clear();
     pendingEnter.current = false;
   }
@@ -231,16 +280,20 @@ export function AddCardDialog({
 
   const canSearch = open && !selected && debounced.trim().length >= 2;
 
-  // Owned copies are searched in their own language (lang: on the collection is the copy's language).
-  const ownedLanguageQuery =
-    languageFilter.length === 0
+  // A code typed in the Set box overrides the chosen sets (the two would otherwise AND to nothing).
+  const scopeSets = setFilter && !set.trim() ? searchSets.map((s) => s.setCode) : [];
+  const scopeKey = scopeSets.join(',');
+  const anyOf = (field: string, values: string[]) =>
+    values.length === 0
       ? ''
-      : languageFilter.length === 1
-        ? ` lang:${languageFilter[0]}`
-        : ` (${languageFilter.map((l) => `lang:${l}`).join(' or ')})`;
+      : values.length === 1
+        ? ` ${field}:${values[0]}`
+        : ` (${values.map((v) => `${field}:${v}`).join(' or ')})`;
+  // Owned copies are searched in their own language (lang: on the collection is the copy's language).
+  const ownedQuery = anyOf('lang', languageFilter) + anyOf('set', scopeSets);
   const owned = useQuery({
-    queryKey: ['collection', 'add-card', target.kind, game, debounced, ownedLanguageQuery],
-    queryFn: () => api.collection({ game, q: debounced + ownedLanguageQuery, take: 25 }),
+    queryKey: ['collection', 'add-card', target.kind, game, debounced, ownedQuery],
+    queryFn: () => api.collection({ game, q: debounced + ownedQuery, take: 25 }),
     enabled: canSearch && showOwned,
   });
   // A pocket only offers copies that live somewhere *else* — a lot already in this binder has nothing to
@@ -249,8 +302,8 @@ export function AddCardDialog({
     (c) => target.kind !== 'pocket' || c.containerId !== target.containerId,
   );
   const catalog = useQuery({
-    queryKey: ['catalog-search', game, debounced, languageFilter],
-    queryFn: () => api.scanSearch(game, debounced, undefined, undefined, languageFilter),
+    queryKey: ['catalog-search', game, debounced, languageFilter, scopeSets],
+    queryFn: () => api.scanSearch(game, debounced, scopeSets, undefined, languageFilter),
     enabled: canSearch,
     // The catalog doesn't change while the dialog is open — going back from a picked printing (Esc/↑/↓)
     // should show the same results at once, not search again.
@@ -267,7 +320,7 @@ export function AddCardDialog({
   const rowImage = (row: ResultRow) => (row.kind === 'owned' ? row.card.imageUri : row.result.imageUri);
 
   // A new search starts unhighlighted.
-  useEffect(() => setActiveIndex(-1), [debounced, filterKey, game]);
+  useEffect(() => setActiveIndex(-1), [debounced, filterKey, scopeKey, game]);
   // Simplified: highlight the first result as soon as there is one, and honour an early Enter.
   useEffect(() => {
     if (!simplified || selected || rows.length === 0) return;
@@ -292,6 +345,13 @@ export function AddCardDialog({
   }, [activeIndex, selected, rows.length]);
 
   const focusName = () => requestAnimationFrame(() => nameRef.current?.focus());
+  const focusPicked = () => requestAnimationFrame(() => pickedRef.current?.focus());
+  /** Into a text field from the picked panel, its text selected so typing replaces it. */
+  const focusField = (ref: { current: HTMLInputElement | null }) =>
+    requestAnimationFrame(() => {
+      ref.current?.focus();
+      ref.current?.select();
+    });
 
   const invalidate = () => {
     if (target.kind === 'list') {
@@ -377,9 +437,12 @@ export function AddCardDialog({
     // The copy defaults to the printing's language; it can still be changed (e.g. a French copy of a
     // card whose catalog only has the English row).
     setLanguage(r.language || ENGLISH);
-    // A clicked row disappears with the list — keep the keyboard in the search box, where Enter adds.
-    focusName();
   };
+  // Done searching: once the picked card is on screen, the keyboard moves to it (Enter adds, single keys
+  // set its details). An effect, because a pick can come from an effect too (an early Enter).
+  useEffect(() => {
+    if (selected) pickedRef.current?.focus();
+  }, [selected]);
   /** Back from a picked printing to the results, keeping the picked row highlighted. */
   const unpick = () => {
     setSelected(null);
@@ -507,6 +570,16 @@ export function AddCardDialog({
   // From the search boxes: ↑/↓ move through the results, Enter picks the highlighted one (or the only
   // one) — and, once a printing is picked, adds it; ↑/↓ then go back to the results.
   const onSearchKeyDown = (e: KeyboardEvent) => {
+    if (setFilter && e.key === 'F2') {
+      e.preventDefault();
+      setsRef.current?.focus();
+      return;
+    }
+    if (setFilter && e.altKey && !e.ctrlKey && e.code === 'KeyA') {
+      e.preventDefault();
+      searchAllSets();
+      return;
+    }
     if (e.key === 'Escape') {
       // Handled here rather than by the dialog: while a highlighted row's art preview is open it is the
       // top modal, and the dialog would ignore Esc.
@@ -522,7 +595,7 @@ export function AddCardDialog({
     if (selected) {
       if (e.key === 'Enter') {
         e.preventDefault();
-        submit(false);
+        submit(e.ctrlKey || e.metaKey);
       } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
         unpick();
@@ -551,10 +624,92 @@ export function AddCardDialog({
     }
   };
   // Editing the search means picking again.
-  const editSearch = (setter: (v: string) => void) => (v: string) => {
+  const editSearch = <T,>(setter: (v: T) => void) => (v: T) => {
     setter(v);
     setSelected(null);
     pendingEnter.current = false;
+  };
+  // The copy details each target asks for (and so which shortcut keys do anything).
+  const hasCopyDetails = target.kind !== 'list' && !buyList; // condition, language, price
+  const hasQuantity = target.kind !== 'pocket';
+  const hasFoil = !buyList;
+
+  /** On the picked card: single keys reach its details, Enter adds, Esc goes back to the search. In a
+   *  detail field, Enter or Esc finishes with it and returns here; Ctrl+Enter adds (and closes) from anywhere. */
+  const onPickedKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const el = e.target as HTMLElement;
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      submit(true);
+      return;
+    }
+    if (el !== e.currentTarget) {
+      if (el.closest('button')) return; // a button acts on Enter itself
+      // Enter in a text box (even one whose suggestion list just used it) or Esc anywhere but an open
+      // list (which closes itself): finished with this field. Enter on a closed list opens it.
+      if ((e.key === 'Enter' && el.tagName === 'INPUT') || (e.key === 'Escape' && !el.closest('[role="listbox"]'))) {
+        e.preventDefault();
+        e.stopPropagation();
+        focusPicked();
+      }
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submit(false);
+      return;
+    }
+    if (e.key === 'Escape' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      // Wrong card: back to the results, still highlighted. (Handled here so the dialog doesn't close.)
+      e.preventDefault();
+      e.stopPropagation();
+      unpick();
+      return;
+    }
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+    const key = e.key.toLowerCase();
+    if (hasCopyDetails && (key === 'c' || key === 'l')) setOpenSelect(key === 'c' ? 'condition' : 'language');
+    else if (hasCopyDetails && key === 'p') focusField(priceRef);
+    else if (hasQuantity && key === 'q') focusField(quantityRef);
+    else if (hasFoil && key === 'f') {
+      // Foil on goes straight to its finish; foil off stays here.
+      setIsFoil(!isFoil);
+      if (!isFoil) focusField(foilTypeRef);
+    } else return;
+    e.preventDefault();
+  };
+  /** A shortcut-opened list (condition, language) hands the keyboard back to the picked card when it closes. */
+  const selectProps = (which: 'condition' | 'language') => ({
+    open: openSelect === which,
+    onOpen: () => setOpenSelect(which),
+    onClose: () => {
+      setOpenSelect(null);
+      focusPicked();
+    },
+    MenuProps: { disableRestoreFocus: true },
+  });
+  /** "Condition (C)": a field's label with its shortcut key, where there's a keyboard to press it. */
+  const keyLabel = (label: string, key: string) => (canHover ? t('dialogs.addCard.withKey', { label, key }) : label);
+  // [keys, what they do, whether this target has it]
+  const pickedKeyHints = (
+    [
+      [['Enter'], 'add', true],
+      [['Ctrl', 'Enter'], 'addAndClose', multiAdd],
+      [['Esc'], 'back', true],
+      [['C'], 'condition', hasCopyDetails],
+      [['L'], 'language', hasCopyDetails],
+      [['F'], 'foil', hasFoil],
+      [['P'], 'price', hasCopyDetails],
+      [['Q'], 'quantity', hasQuantity],
+    ] as [string[], string, boolean][]
+  )
+    .filter(([, , shown]) => shown)
+    .map(([keys, what]): [string[], string] => [keys, `dialogs.addCard.pickedKeys.${what}`]);
+  const changeSearchSets = editSearch(setSearchSets);
+  /** Drop the set filter for this sitting (the card is in a set that wasn't chosen). */
+  const searchAllSets = () => {
+    changeSearchSets([]);
+    focusName();
   };
 
   const gameName = games.data?.find((g) => g.id === game)?.displayName ?? game;
@@ -605,14 +760,27 @@ export function AddCardDialog({
         ))}
       </List>
     ) : (
-      <Typography variant="body2" color="text.secondary">
-        {languageFilter.length > 0
-          ? t('dialogs.addCard.noCatalogMatchesInLanguages', {
-              game: gameName,
-              languages: languageFilter.map((l) => languageName(t, l)).join(', '),
-            })
-          : t('dialogs.addCard.noCatalogMatches', { game: gameName })}
-      </Typography>
+      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+        <Typography variant="body2" color="text.secondary">
+          {scopeSets.length > 0
+            ? t('dialogs.addCard.noCatalogMatchesInSets', { sets: scopeSets.map((s) => s.toUpperCase()).join(', ') })
+            : languageFilter.length > 0
+              ? t('dialogs.addCard.noCatalogMatchesInLanguages', {
+                  game: gameName,
+                  languages: languageFilter.map((l) => languageName(t, l)).join(', '),
+                })
+              : t('dialogs.addCard.noCatalogMatches', { game: gameName })}
+        </Typography>
+        {scopeSets.length > 0 && (
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <Button size="small" onClick={searchAllSets}>
+              {t('dialogs.addCard.searchAllSets')}
+            </Button>
+            <Kbd>Alt</Kbd>
+            <Kbd>A</Kbd>
+          </Stack>
+        )}
+      </Stack>
     );
 
   return (
@@ -653,6 +821,8 @@ export function AddCardDialog({
                 // Finishes are per game, and a list's language only applies to the list's game.
                 setFoilType(null);
                 setFilterOverride(null);
+                // Sets are per game: back on the filter's game its sets come back.
+                setSearchSets(setFilter?.game === e.target.value ? setFilter.sets : []);
               }}
               sx={{ width: 220 }}
             >
@@ -664,6 +834,26 @@ export function AddCardDialog({
             </TextField>
             {multiLanguage && (
               <LanguageFilterSelect languages={filterLanguages} value={languageFilter} onChange={setLanguageFilter} />
+            )}
+            {setFilter && (
+              <Box
+                sx={{ flex: '1 1 220px', minWidth: 200 }}
+                // F2 goes back to the Name box (it came here from there).
+                onKeyDown={(e) => {
+                  if (e.key === 'F2') {
+                    e.preventDefault();
+                    focusName();
+                  }
+                }}
+              >
+                <SetMultiSelect
+                  game={game}
+                  value={searchSets}
+                  onChange={changeSearchSets}
+                  inputRef={setsRef}
+                  helperText={set.trim() && searchSets.length > 0 ? t('dialogs.addCard.setBoxOverrides') : undefined}
+                />
+              </Box>
             )}
           </Stack>
 
@@ -704,20 +894,7 @@ export function AddCardDialog({
               sx={{ width: 120 }}
             />
           </Stack>
-          {simplified && (
-            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: -1 }}>
-              {KEY_HINTS.map(([keys, label]) => (
-                <Stack key={label} direction="row" spacing={0.5} alignItems="center">
-                  {keys.map((k) => (
-                    <Kbd key={k}>{k}</Kbd>
-                  ))}
-                  <Typography variant="caption" color="text.secondary" sx={{ pr: 0.75 }}>
-                    {t(label)}
-                  </Typography>
-                </Stack>
-              ))}
-            </Stack>
-          )}
+          {simplified && !selected && <KeyHints hints={setFilter ? [...KEY_HINTS, ...SET_KEY_HINTS] : KEY_HINTS} sx={{ mt: -1 }} />}
 
           {/* Results — collection first (pockets and lists), then catalog. */}
           {canSearch && (
@@ -782,19 +959,22 @@ export function AddCardDialog({
           )}
 
           {/* Selected catalog card + the fields this target needs */}
+          {selected && <Divider />}
           {selected && (
             <Stack
+              ref={pickedRef}
+              tabIndex={-1}
               spacing={2}
-              // Enter adds — unless a picker already used it (opening a select, choosing a foil-type
-              // suggestion) or a button has focus (it acts on Enter itself).
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.defaultPrevented && !(e.target as HTMLElement).closest('button')) {
-                  e.preventDefault();
-                  submit(false);
-                }
+              onKeyDown={onPickedKeyDown}
+              // A ring while the picked card holds the keyboard, so it's clear the shortcut keys apply.
+              sx={{
+                p: 1,
+                mx: -1,
+                borderRadius: 1,
+                outline: 'none',
+                '&:focus': { boxShadow: (th) => `0 0 0 2px ${th.palette.primary.main}` },
               }}
             >
-              <Divider />
               <Stack direction="row" spacing={1} alignItems="center">
                 {selected.imageUri && (
                   <Box
@@ -818,38 +998,56 @@ export function AddCardDialog({
                 </Box>
                 <Button size="small" onClick={unpick}>{t('common.actions.change')}</Button>
               </Stack>
+              {canHover && <KeyHints hints={pickedKeyHints} />}
 
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                {target.kind !== 'list' && !buyList && (
+                {hasCopyDetails && (
                   <>
-                    <TextField select size="small" label={t('common.labels.condition')} value={condition} onChange={(e) => setCondition(e.target.value)} sx={{ width: 120 }}>
+                    <TextField
+                      select
+                      size="small"
+                      label={keyLabel(t('common.labels.condition'), 'C')}
+                      value={condition}
+                      onChange={(e) => setCondition(e.target.value)}
+                      slotProps={{ select: selectProps('condition') }}
+                      sx={{ width: 140 }}
+                    >
                       {CONDITIONS.map((c) => (
                         <MenuItem key={c} value={c}>{t(`common.conditions.${c}`)}</MenuItem>
                       ))}
                     </TextField>
-                    <LanguageSelect game={game} value={language} onChange={setLanguage} sx={{ width: 150 }} />
+                    <LanguageSelect
+                      game={game}
+                      value={language}
+                      onChange={setLanguage}
+                      label={keyLabel(t('common.labels.language'), 'L')}
+                      selectProps={selectProps('language')}
+                      sx={{ width: 160 }}
+                    />
                   </>
                 )}
-                {target.kind !== 'pocket' && (
+                {hasQuantity && (
                   <TextField
                     size="small"
-                    label={buyList ? t('buyList.edit.wanted') : t('common.labels.quantity')}
+                    label={keyLabel(buyList ? t('buyList.edit.wanted') : t('common.labels.quantity'), 'Q')}
                     type="number"
                     value={quantity}
                     onChange={(e) => setQuantity(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+                    inputRef={quantityRef}
                     slotProps={{ htmlInput: { min: 1, step: 1 } }}
-                    sx={{ width: 100 }}
+                    sx={{ width: 120 }}
                   />
                 )}
-                {target.kind !== 'list' && !buyList && (
+                {hasCopyDetails && (
                   <TextField
                     size="small"
-                    label={t('common.labels.purchasePrice')}
+                    label={keyLabel(t('common.labels.purchasePrice'), 'P')}
                     type="number"
                     value={purchasePrice}
                     onChange={(e) => setPurchasePrice(e.target.value)}
+                    inputRef={priceRef}
                     slotProps={{ htmlInput: { min: 0, step: '0.01' } }}
-                    sx={{ width: 140 }}
+                    sx={{ width: 170 }}
                   />
                 )}
               </Stack>
@@ -909,7 +1107,7 @@ export function AddCardDialog({
                 <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
                   <FormControlLabel
                     control={<Switch checked={isFoil} onChange={(e) => setIsFoil(e.target.checked)} />}
-                    label={t('common.labels.foil')}
+                    label={keyLabel(t('common.labels.foil'), 'F')}
                   />
                   {isFoil && (
                     <Autocomplete
@@ -921,7 +1119,7 @@ export function AddCardDialog({
                       onInputChange={(_, v) => setFoilType(v || null)}
                       sx={{ minWidth: 220 }}
                       renderInput={(p) => (
-                        <TextField {...p} label={t('common.labels.foilType')} placeholder={foilTypes.data?.[0]} />
+                        <TextField {...p} label={t('common.labels.foilType')} placeholder={foilTypes.data?.[0]} inputRef={foilTypeRef} />
                       )}
                     />
                   )}

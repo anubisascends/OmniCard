@@ -182,7 +182,9 @@ public sealed class CardScanController(
             foreach (var language in langScopes)
             {
                 var terms = new List<string>(baseTerms);
-                if (code is not null) terms.Add($"set:{code}");
+                // set= (exact code): set: would also take every set whose *name* contains the code
+                // ("dom" → Dominaria United, Alchemy: Dominaria, …).
+                if (code is not null) terms.Add($"set={code}");
                 if (language is not null) terms.Add($"lang:{language}");
                 foreach (var m in gameService.SearchCards(string.Join(' ', terms), MaxSearchResults))
                 {

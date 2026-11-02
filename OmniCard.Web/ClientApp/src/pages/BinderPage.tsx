@@ -19,6 +19,7 @@ import {
   Menu,
   MenuItem,
   Paper,
+  Popover,
   Stack,
   Switch,
   Tab,
@@ -33,13 +34,15 @@ import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import SellIcon from '@mui/icons-material/Sell';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import { api } from '../api/client';
-import type { BinderCardDto, BinderSlotDto } from '../api/types';
+import type { BinderCardDto, BinderSlotDto, SetInfoDto } from '../api/types';
 import { CardImage } from '../components/CardImage';
 import { ListForSaleDialog } from '../components/dialogs/ListForSaleDialog';
 import { CardEditDrawer } from '../components/dialogs/CardEditDrawer';
 import { AddCardDialog } from '../components/dialogs/AddCardDialog';
 import { SearchBox } from '../components/SearchBox';
+import { SetMultiSelect } from '../components/SetMultiSelect';
 import { Kbd } from '../components/Kbd';
 import { useFormatters } from '../i18n/format';
 
@@ -422,6 +425,7 @@ const SIMPLIFIED_KEYS: [string[], string][] = [
   [['Home', 'End'], 'binder.keys.firstLast'],
   [['Enter'], 'binder.keys.search'],
   [['A–Z'], 'binder.keys.type'],
+  [['F2'], 'binder.keys.sets'],
   [['Del'], 'binder.keys.remove'],
   [['+'], 'binder.keys.addPage'],
   [['−'], 'binder.keys.removePage'],
@@ -434,6 +438,7 @@ const PRESSABLE = 'button, a, [role="button"], [role="tab"]';
 
 export function BinderPage() {
   const { t } = useTranslation();
+  const fmt = useFormatters();
   const { id } = useParams();
   const binderId = Number(id);
   const qc = useQueryClient();
@@ -469,6 +474,13 @@ export function BinderPage() {
     quick?: boolean;
     initialName?: string;
   } | null>(null);
+  // The sets card searches start limited to, for this sitting only. `filterGame` is null until chosen
+  // (the filter then follows the game of the cards on screen).
+  const [filterGame, setFilterGame] = useState<string | null>(null);
+  const [filterSets, setFilterSets] = useState<SetInfoDto[]>([]);
+  const [setsAnchor, setSetsAnchor] = useState<HTMLElement | null>(null);
+  const setsButtonRef = useRef<HTMLButtonElement>(null);
+  const games = useQuery({ queryKey: ['games'], queryFn: api.games, enabled: editMode });
 
   const openCardMenu = (e: React.MouseEvent, card: BinderCardDto) => {
     e.preventDefault();
@@ -601,7 +613,7 @@ export function BinderPage() {
     if (!quick || !data) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.defaultPrevented || e.ctrlKey || e.altKey || e.metaKey) return;
-      if (addSlot || detailCardId != null || listCard || slotMenu || cardMenu || addAnchor || confirmRemove != null) return;
+      if (addSlot || detailCardId != null || listCard || slotMenu || cardMenu || addAnchor || setsAnchor || confirmRemove != null) return;
       const el = e.target instanceof HTMLElement ? e.target : null;
       if (el?.closest(EDITABLE)) return;
       const cols = data.columns;
@@ -671,7 +683,38 @@ export function BinderPage() {
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  const openSets = () => setSetsAnchor(setsButtonRef.current);
+  const closeSets = () => {
+    setSetsAnchor(null);
+    // Back to the pocket cursor, not the button (where Enter would open the filter again).
+    if (quick) requestAnimationFrame(() => gridRef.current?.focus({ preventScroll: true }));
+  };
+  // F2 opens (and closes) the set filter in either edit mode; the Add card dialog has its own F2.
+  useEffect(() => {
+    if (!editMode) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== 'F2' || e.defaultPrevented) return;
+      if (addSlot || detailCardId != null || listCard || confirmRemove != null) return;
+      e.preventDefault();
+      if (setsAnchor) closeSets();
+      else openSets();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   if (isLoading || !data) return <CircularProgress />;
+
+  // Without a chosen game, the filter is for the game of the cards on screen.
+  const spreadGame = gameName(data.leftSlots.concat(data.rightSlots).find((s) => s.card)?.card?.game);
+  const setsGame = filterGame ?? spreadGame;
+  const setsLabel =
+    filterSets.length === 0
+      ? t('common.labels.allSets')
+      : filterSets
+          .slice(0, 3)
+          .map((s) => s.setCode.toUpperCase())
+          .join(', ') + (filterSets.length > 3 ? ` ${t('binder.setFilter.more', { n: fmt.number(filterSets.length - 3) })}` : '');
 
   const dropOnSlot = (page: number, slot: number) => {
     if (dragLotId != null) run(assign.mutateAsync({ page, slot }));
@@ -756,6 +799,65 @@ export function BinderPage() {
                   </Button>
                 ),
             )}
+            <Tooltip title={t('binder.setFilter.tooltip')}>
+              <Button
+                ref={setsButtonRef}
+                size="small"
+                variant={filterSets.length ? 'contained' : 'text'}
+                startIcon={<FilterListIcon />}
+                onClick={openSets}
+              >
+                {t('binder.setFilter.button', { sets: setsLabel })}
+              </Button>
+            </Tooltip>
+            <Popover
+              open={!!setsAnchor}
+              anchorEl={setsAnchor}
+              onClose={closeSets}
+              disableRestoreFocus
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            >
+              <Stack spacing={1.5} sx={{ p: 2, width: { xs: 'calc(100vw - 32px)', sm: 380 } }}>
+                <Typography variant="subtitle2">{t('binder.setFilter.title')}</Typography>
+                <TextField
+                  select
+                  size="small"
+                  label={t('common.labels.game')}
+                  value={setsGame}
+                  onChange={(e) => {
+                    setFilterGame(e.target.value);
+                    setFilterSets([]);
+                  }}
+                >
+                  {(games.data ?? [{ id: setsGame, displayName: setsGame }]).map((g) => (
+                    <MenuItem key={g.id} value={g.id}>
+                      {g.displayName}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <SetMultiSelect
+                  game={setsGame}
+                  value={filterSets}
+                  onChange={(v) => {
+                    // Picking sets pins the filter to this game, wherever the pages turn.
+                    setFilterGame(setsGame);
+                    setFilterSets(v);
+                  }}
+                  autoFocus
+                />
+                <Typography variant="caption" color="text.secondary">
+                  {t('binder.setFilter.help')}
+                </Typography>
+                <Stack direction="row" spacing={1} justifyContent="flex-end">
+                  <Button size="small" disabled={filterSets.length === 0} onClick={() => setFilterSets([])}>
+                    {t('common.actions.clear')}
+                  </Button>
+                  <Button size="small" variant="contained" onClick={closeSets}>
+                    {t('common.actions.done')}
+                  </Button>
+                </Stack>
+              </Stack>
+            </Popover>
             <Box sx={{ flexGrow: 1 }} />
             <Tooltip title={t('binder.simplifiedTooltip')}>
               <FormControlLabel
@@ -1005,12 +1107,10 @@ export function BinderPage() {
             slot: addSlot.slot,
             occupantName: addSlot.card?.name,
           }}
-          defaultGame={gameName(
-            addSlot.card?.game ??
-              data.leftSlots.concat(data.rightSlots).find((s) => s.card)?.card?.game,
-          )}
+          defaultGame={addSlot.card ? gameName(addSlot.card.game) : setsGame}
           simplified={addSlot.quick}
           initialName={addSlot.initialName}
+          setFilter={{ game: setsGame, sets: filterSets }}
           onClose={() => setAddSlot(null)}
           onDone={() => {
             refresh();

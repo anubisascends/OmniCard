@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Checkbox, Chip, ListItemText, MenuItem, TextField, Tooltip, type SxProps, type Theme } from '@mui/material';
+import { Checkbox, Chip, ListItemText, MenuItem, TextField, Tooltip, type SelectProps, type SxProps, type Theme } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -147,6 +147,7 @@ export function LanguageSelect({
   sx,
   helperText,
   disabled,
+  selectProps,
 }: {
   game: string | null | undefined;
   value: string;
@@ -159,6 +160,8 @@ export function LanguageSelect({
   sx?: SxProps<Theme>;
   helperText?: string;
   disabled?: boolean;
+  /** Passed to the underlying Select (e.g. to open it from the keyboard). */
+  selectProps?: Partial<SelectProps>;
 }) {
   const { t } = useTranslation();
   const languages = useCardLanguages(game);
@@ -174,6 +177,7 @@ export function LanguageSelect({
       helperText={helperText}
       disabled={disabled}
       sx={sx ?? { minWidth: 150 }}
+      slotProps={selectProps ? { select: selectProps } : undefined}
     >
       {allowAuto && <MenuItem value="">{emptyLabel ?? t('scan.controls.languageAuto')}</MenuItem>}
       {options.map((code) => (
