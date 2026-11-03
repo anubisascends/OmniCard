@@ -59,6 +59,8 @@ import { useFormatters } from '../i18n/format';
 import { useGame } from '../context/GameContext';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import { WebcamScanDialog } from '../components/dialogs/WebcamScanDialog';
+import { splitPhotoIntoCards } from '../utils/cardCapture';
+import { ensureCvReady } from '../utils/cvWorker';
 import { ScanValueBadges, ListReprintChip } from '../lib/scanBadges';
 import { ENGLISH, LanguageChip, LanguageSelect, languageName } from '../lib/cardLanguages';
 import {
@@ -1718,6 +1720,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [webcamOpen, setWebcamOpen] = useState(false);
+  const [findingCards, setFindingCards] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [items, setItems] = useState<ScanItem[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -1974,6 +1977,21 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
 
   function handleFiles(files: FileList | null) {
     return stageFiles(Array.from(files ?? []));
+  }
+
+  // A camera photo is cut into one scanner-style image per card in it (one card, or several laid out
+  // with gaps) before matching; a photo with no card found goes through untouched.
+  async function handlePhotos(files: FileList | null) {
+    const chosen = Array.from(files ?? []);
+    if (chosen.length === 0) return;
+    setFindingCards(true);
+    const cards: File[] = [];
+    try {
+      for (const file of chosen) cards.push(...(await splitPhotoIntoCards(file, game)));
+    } finally {
+      setFindingCards(false);
+    }
+    await stageFiles(cards);
   }
 
   // Stage a set of images and match them with bounded concurrency. Shared by the file-input paths and
@@ -2739,10 +2757,13 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
             />
             <Button
               variant="contained"
-              startIcon={<CameraAltIcon />}
+              startIcon={findingCards ? <CircularProgress size={18} color="inherit" /> : <CameraAltIcon />}
+              disabled={findingCards}
+              // Warm up the card finder while the camera app is open.
+              onPointerDown={() => void ensureCvReady().catch(() => undefined)}
               onClick={() => cameraInput.current?.click()}
             >
-              {t('scan.controls.takePhoto')}
+              {findingCards ? t('scan.controls.findingCards') : t('scan.controls.takePhoto')}
             </Button>
             <Button
               variant="outlined"
@@ -2767,7 +2788,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
               capture="environment"
               hidden
               onChange={(e) => {
-                void handleFiles(e.target.files);
+                void handlePhotos(e.target.files);
                 e.target.value = '';
               }}
             />
@@ -3348,6 +3369,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
       )}
       <WebcamScanDialog
         open={webcamOpen}
+        game={game}
         onCapture={(file) => void stageFiles([file])}
         onClose={() => setWebcamOpen(false)}
       />
