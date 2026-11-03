@@ -522,6 +522,17 @@ export const api = {
     foilType?: string | null;
     purchasePrice?: number | null;
   }) => request<void>('/api/binder/card/add-missing', { method: 'POST', body: JSON.stringify(body) }),
+  /** Paste a copied card into a pocket: a new copy of the source lot's card, finish, condition and language. */
+  binderPaste: (sourceLotId: number, containerId: number, page: number, slot: number) =>
+    request<void>('/api/binder/card/paste', {
+      method: 'POST',
+      body: JSON.stringify({ sourceLotId, containerId, page, slot }),
+    }),
+  /** Whether a catalog printing matches the binder's foil rule (a search query). */
+  binderFoilRuleCheck: (game: string, rule: string, printing: { gameCardId: string; setCode: string; collectorNumber: string }) =>
+    request<{ matches: boolean }>(
+      `/api/binder/foil-rule/check${qs({ game, rule, id: printing.gameCardId, set: printing.setCode, cn: printing.collectorNumber })}`,
+    ).then((r) => r.matches),
 
   // Collection
   collection: (opts: {

@@ -526,6 +526,69 @@ public class WebBinderCardServiceTests : IDisposable
     }
 
     [Fact]
+    public void PasteCopyToSlot_AddsNewCopyWithSameCardAndDetails()
+    {
+        var sourceId = AddLot("Pikachu", page: 1, slot: 0, foil: true, condition: "LP");
+        using (var seed = new OmniCardDbContext(_opts))
+        {
+            var src = seed.Lots.Single(l => l.Id == sourceId);
+            src.Language = "ja";
+            src.UnitCost = 1.25m;
+            seed.SaveChanges();
+        }
+
+        var newId = _service.PasteCopyToSlot(sourceId, _binderId, 1, 1);
+
+        using var ctx = new OmniCardDbContext(_opts);
+        var source = ctx.Lots.Single(l => l.Id == sourceId);
+        var copy = ctx.Lots.Single(l => l.Id == newId);
+        Assert.NotEqual(sourceId, newId);
+        Assert.Equal(source.ProductId, copy.ProductId); // same printing + finish
+        Assert.Equal("LP", copy.Condition);
+        Assert.Equal("ja", copy.Language);
+        Assert.Equal(1.25m, copy.UnitCost);
+        Assert.Equal(1, copy.Quantity);
+        Assert.Equal((1, 1), (copy.Page, copy.Slot));
+        Assert.Equal((1, 0), (source.Page, source.Slot)); // the original stays put
+        Assert.Equal(1, ctx.Movements.Count(m => m.LotId == newId && m.Type == MovementType.Acquire));
+    }
+
+    [Fact]
+    public void PasteCopyToSlot_DisplacesOccupantToUnplaced()
+    {
+        var sourceId = AddLot("Pikachu", page: 1, slot: 0);
+        var occupantId = AddLot("Occupant", page: 1, slot: 1);
+
+        var newId = _service.PasteCopyToSlot(sourceId, _binderId, 1, 1);
+
+        using var ctx = new OmniCardDbContext(_opts);
+        var occupant = ctx.Lots.Single(l => l.Id == occupantId);
+        Assert.Null(occupant.Page);
+        Assert.Null(occupant.Slot);
+        Assert.Equal(_binderId, occupant.LocationId);
+        Assert.Equal(1, ctx.Lots.Single(l => l.Id == newId).Slot);
+    }
+
+    [Fact]
+    public void PasteCopyToSlot_MissingSource_Throws()
+        => Assert.Throws<InvalidOperationException>(() => _service.PasteCopyToSlot(9999, _binderId, 1, 0));
+
+    [Fact]
+    public void LastPlacedPocket_IsHighestPageThenSlot_NullWhenNonePlaced()
+    {
+        Assert.Null(_service.LastPlacedPocket(_binderId));
+        AddLot("Unplaced");
+        Assert.Null(_service.LastPlacedPocket(_binderId));
+
+        AddLot("A", page: 2, slot: 8);
+        AddLot("B", page: 3, slot: 1);
+        AddLot("C", page: 3, slot: 4);
+        AddLot("D", page: 1, slot: 8);
+
+        Assert.Equal((3, 4), _service.LastPlacedPocket(_binderId));
+    }
+
+    [Fact]
     public void PlaceOwnedCardInSlot_DisplacesExistingOccupant()
     {
         var occupantId = AddLot("Occupant", page: 1, slot: 0);
