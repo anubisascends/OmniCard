@@ -31,25 +31,41 @@ Only cards that are both **confirmed** and **checked** are added. Everything els
 
 | Button | Best for | What happens |
 |---|---|---|
-| **Take photo** | Phones and tablets | Opens the device's rear camera so you can photograph one card. On a computer it opens a normal file picker instead. |
-| **Use webcam** | A computer with a webcam | Opens a live camera view that finds the card and captures it automatically. |
+| **Take photo** | Phones and tablets | Opens the device's rear camera. Photograph one card, or several laid out side by side. Each card in the photo becomes its own scan. On a computer it opens a normal file picker instead. |
+| **Use webcam** | A computer with a webcam, or a phone | Opens a live camera view that finds cards and captures them automatically. |
 | **Add images** | Scanner output or saved photos | Lets you pick one or many image files at once. JPEG, PNG and TIFF files are supported. |
 
 You can mix all three in one session. New scans appear at the top of the list.
+
+Pictures from **Take photo** and **Use webcam** are straightened and cropped to look like the output of a document scanner: the card upright, at scanner resolution, with a thin white margin. That's the layout OmniCard reads set codes and collector numbers from, so camera scans match as well as scanner scans.
+
+### Several cards in one photo
+
+**Take photo** can scan a whole spread of cards at once:
+
+1. Lay the cards flat on a plain surface that contrasts with their borders, with a finger-width gap between them. Cards that touch or overlap can't be told apart.
+2. Tap **Take photo** and photograph them, keeping every card fully in view.
+3. While **Finding cards…** shows on the button, OmniCard cuts the photo into one scan per card. They appear in the list in reading order: left to right, top row first.
+
+The fewer cards in the photo, the more detail each one keeps. If a card comes back unmatched, photograph it on its own. A photo with no card found is added as it is.
 
 ### Scanning with a webcam
 
 1. Click **Use webcam**. The **Scan with webcam** window opens. If your browser asks for permission to use the camera, allow it.
 2. If you have more than one camera, choose it from the **Camera** list.
 3. Hold a card in front of the camera on a plain, contrasting background. An outline appears around the card when it is found.
-4. Keep the card still. The status changes from **Point a card at the camera** to **Hold steady…**, and after about a second the card is captured: the frame flashes and the status reads **Captured ✓ — present the next card**.
-5. Take the card away and present the next one. A card left sitting in view is captured only once.
-6. To capture the same card again, click **Capture now**.
+4. Keep the card still. The status changes from **Point a card at the camera** to **Hold steady…**. About a third of a second later, once the picture is in focus, the card is captured: the frame flashes, the outline turns green and the status reads **Captured ✓ — present the next card**.
+5. Present the next card. You can swap it straight in where the last one was. A card left sitting in view is captured only once.
+6. To capture the same card again, click **Capture now**, or take it away for a moment and present it again.
 7. Click **Done** when you are finished.
 
-The window shows how many cards you have captured and thumbnails of the last few. Each capture is straightened and cropped automatically, then sent for matching just like an uploaded image.
+To capture several cards at a time, turn on **Multiple cards** and lay the cards out with a finger-width gap between them. Every card in view is captured as its own scan. Swap in the next cards; only the ones that changed are captured again. OmniCard remembers this switch.
 
-![The Scan with webcam window with a card outlined and the captured count below](scanning-webcam.png)
+If **The cards look small to the camera** appears, move the camera closer (or use fewer cards). Small cards in the picture carry less detail for reading the set code and collector number.
+
+The window shows how many cards you have captured and thumbnails of the last few. Each capture is sent for matching just like an uploaded image.
+
+![The Scan with webcam window with Multiple cards on and four cards outlined and captured](scanning-webcam.png)
 
 > [!TIP]
 > Most browsers only allow webcam access when OmniCard is opened over a secure (https) address or on the same computer that runs it. If the camera won't start, use **Take photo** on a phone or **Add images** instead, or ask your administrator.

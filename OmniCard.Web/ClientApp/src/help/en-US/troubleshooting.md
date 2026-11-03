@@ -122,11 +122,10 @@ Another person, or another tab or device of yours, saved a change to the same ca
 
 ## Take better photos with your phone
 
-On a phone, **Take photo** on the Scan page opens the rear camera. For the best matches:
+On a phone, **Take photo** on the Scan page opens the rear camera. OmniCard finds each card in the photo, straightens it and crops it the way a document scanner would. For the best matches:
 
-- Photograph **one card per photo**.
-- Fill most of the frame with the card, keeping the whole card in view.
-- Hold the phone **straight above the card** so the card isn't skewed.
+- Fill as much of the frame with cards as you can, keeping every card fully in view. One card gives the sharpest scan. Several cards work too if you leave a finger-width gap between them (see [Several cards in one photo](help:scanning#several-cards-in-one-photo)).
+- Hold the phone **above the cards**. A slight angle is fine; OmniCard straightens it out.
 - Use **even light**. Avoid glare and reflections, especially on foils and cards in sleeves or top-loaders. Tilting the card slightly away from a lamp often helps.
 - Put the card on a **plain, dark background** that contrasts with its border.
 - Make sure the bottom of the card, where the set code and collector number are, is **in focus**. That's what OmniCard reads to find the exact printing.
