@@ -289,6 +289,11 @@ builder.Services.AddSingleton(sp => new OmniCard.Web.Services.ScanBatches.ScanBa
     sp.GetRequiredService<IScanFolderSettingsService>(),
     sp.GetRequiredService<TimeProvider>(),
     sp.GetRequiredService<ILogger<OmniCard.Web.Services.ScanBatches.ScanBatchService>>()));
+builder.Services.AddSingleton(sp => new OmniCard.Web.Services.ScanBatches.ScanBatchUploadService(
+    writableFactory,
+    sp.GetRequiredService<OmniCard.Web.Services.ScanBatches.ScanBatchStorage>(),
+    sp.GetRequiredService<TimeProvider>(),
+    sp.GetRequiredService<ILogger<OmniCard.Web.Services.ScanBatches.ScanBatchUploadService>>()));
 builder.Services.AddHostedService<OmniCard.Web.Services.ScanBatches.ScanBatchHostedService>();
 // Automatic catalog updates (Settings ▸ Catalog data, admin-only schedule): refreshes card data +
 // prices through CatalogRefreshService at the configured times. Resolvable directly for "Run now".

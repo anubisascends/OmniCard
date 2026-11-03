@@ -5,8 +5,10 @@ namespace OmniCard.Shared.Scanning;
 /// <summary>Lifecycle of a <see cref="ScanBatch"/>. Collecting (files still in the watched folder,
 /// untouched) → Starting (Run pressed, or the quiet period elapsed with auto-processing on) → Matching
 /// (files taken in and moved to <c>_processed</c>) → (no pending items) Ready → Committed/Discarded.
-/// Files that land after a batch has started form a new batch.</summary>
-public enum ScanBatchStatus { Collecting, Starting, Matching, Ready, Committed, Discarded }
+/// Files that land after a batch has started form a new batch. A batch saved from the Scan page instead
+/// starts as Uploading (claimed by the uploader, hidden from the list) while its images arrive, then goes
+/// straight to Matching.</summary>
+public enum ScanBatchStatus { Uploading, Collecting, Starting, Matching, Ready, Committed, Discarded }
 
 /// <summary>Whether a batch item has been through the matcher yet.</summary>
 public enum ScanBatchItemStatus { Pending, Matched, Error }
@@ -19,8 +21,8 @@ public enum ScanBatchItemState { Open, Committed, Removed, Duplicate }
 
 /// <summary>
 /// A group of card images picked up from a watched scan folder (one per game; each subfolder is a
-/// batch) and matched in the background. Users claim a batch to review and commit it from the web
-/// Scan page. The match settings are a snapshot of the folder configuration at creation time, so later
+/// batch) — or saved from the web Scan page — and matched in the background. Users claim a batch to
+/// review and commit it from the web Scan page. The match settings are a snapshot of the folder configuration at creation time, so later
 /// configuration edits don't change a batch already in flight.
 /// </summary>
 public class ScanBatch
@@ -32,7 +34,8 @@ public class ScanBatch
     public string Name { get; set; } = "";
 
     /// <summary>The source subfolder name, or empty for files dropped in the game folder's root (older
-    /// root batches hold the date). Files under this key belong to the batch until it starts.</summary>
+    /// root batches hold the date). Files under this key belong to the batch until it starts. Empty for
+    /// a batch saved from the Scan page (never Collecting, so the folder lookup can't pick it up).</summary>
     public string FolderKey { get; set; } = "";
 
     public ScanBatchStatus Status { get; set; }

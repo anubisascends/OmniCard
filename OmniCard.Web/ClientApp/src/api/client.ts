@@ -98,6 +98,9 @@ import type {
   ScanBatchCommitResultDto,
   ScanBatchDto,
   ScanBatchItemEdit,
+  ScanBatchUploadFinishedDto,
+  ScanBatchUploadItem,
+  ScanBatchUploadStartRequest,
   ScanBatchSummaryDto,
   ScanFolderSettingsDto,
   ScanFolderSettingsResponse,
@@ -1197,6 +1200,19 @@ export const api = {
       body: JSON.stringify({ containerId, itemIds }),
     }),
   scanBatchDiscard: (id: number) => request<void>(`/api/scan/batches/${id}/discard`, { method: 'POST' }),
+  // Save the Scan page's scans as a batch: start (hidden, claimed by you), one upload per image, then
+  // finish (released for anyone to review) — or cancel to throw a half-sent one away.
+  scanBatchUploadStart: (req: ScanBatchUploadStartRequest) =>
+    request<{ id: number; name: string }>('/api/scan/batches/upload', { method: 'POST', body: JSON.stringify(req) }),
+  scanBatchUploadItem: (id: number, image: File, item: ScanBatchUploadItem) => {
+    const form = new FormData();
+    form.append('image', image);
+    form.append('item', JSON.stringify(item));
+    return postForm<{ duplicate: boolean }>(`/api/scan/batches/${id}/upload`, form);
+  },
+  scanBatchUploadFinish: (id: number) =>
+    request<ScanBatchUploadFinishedDto>(`/api/scan/batches/${id}/upload/finish`, { method: 'POST' }),
+  scanBatchUploadCancel: (id: number) => request<void>(`/api/scan/batches/${id}/upload/cancel`, { method: 'POST' }),
   // Tag rules (admin only).
   buyList: (game: string | undefined, fulfilled: boolean) =>
     request<BuyListPageDto>(`/api/buy-list${qs({ game, fulfilled })}`),

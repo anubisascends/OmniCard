@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
 using OmniCard.Shared.Security;
@@ -11,13 +12,15 @@ namespace OmniCard.Web.Api.Controllers;
 
 /// <summary>
 /// Watched-folder scan batches: list them (and the nav-badge count), claim one for review, save the
-/// reviewer's edits, and commit/remove/rematch/discard. Batches aren't site-scoped until commit, where
+/// reviewer's edits, and commit/remove/rematch/discard. The Scan page can also save its scans as a
+/// batch (<c>upload</c> → one <c>{id}/upload</c> per image → <c>{id}/upload/finish</c>). Batches aren't site-scoped until commit, where
 /// the target location's site write access is enforced like the interactive scan commit.
 /// </summary>
 [ApiController]
 [ApiAuth]
 [Route("api/scan/batches")]
-public sealed class ScanBatchesController(ScanBatchService batches, RequestSiteAccess siteAccess) : ControllerBase
+public sealed class ScanBatchesController(
+    ScanBatchService batches, ScanBatchUploadService uploads, RequestSiteAccess siteAccess) : ControllerBase
 {
     private int? UserId => AppAuthGate.CurrentUserId(HttpContext);
     private bool IsAdmin => AppAuthGate.IsAdmin(HttpContext);
@@ -36,6 +39,79 @@ public sealed class ScanBatchesController(ScanBatchService batches, RequestSiteA
     [RequirePermission(Permissions.ScanView)]
     public ActionResult<ScanBatchRunResultDto> RunBatches([FromBody] ScanBatchRunRequest? request) =>
         new ScanBatchRunResultDto(batches.Run(request?.BatchIds ?? []));
+
+    /// <summary>Start saving the Scan page's scans as a batch. It stays hidden and claimed by the caller
+    /// until <see cref="FinishUpload"/> releases it.</summary>
+    [HttpPost("upload")]
+    [RequirePermission(Permissions.ScanView)]
+    public ActionResult<ScanBatchUploadStartedDto> StartUpload([FromBody] ScanBatchUploadStartRequest request)
+    {
+        if (UserId is not { } userId)
+            return Unauthorized();
+        if (LocationsController.ParseGame(request.Game) is not { } game)
+            return BadRequest(new { error = $"Unknown game '{request.Game}'" });
+        var name = AppAuthGate.CurrentUsername(HttpContext) ?? $"User {userId}";
+        return uploads.Start(game, request, userId, name);
+    }
+
+    /// <summary>One image of a batch being saved, with its <c>item</c> (a <see cref="ScanBatchUploadItem"/>
+    /// as JSON). One image per request keeps each under the server's request size limit.</summary>
+    [HttpPost("{id:int}/upload")]
+    [RequestSizeLimit(CardScanController.MaxFileSize + 256 * 1024)]
+    [RequirePermission(Permissions.ScanView)]
+    public async Task<ActionResult<ScanBatchUploadItemResultDto>> UploadItem(
+        int id, IFormFile image, [FromForm] string item, CancellationToken ct)
+    {
+        if (image is null || image.Length == 0)
+            return BadRequest(new { error = "No image provided" });
+        if (!CardScanController.IsAcceptedImage(image.ContentType, image.FileName))
+            return BadRequest(new { error = "Only JPEG, PNG and TIFF images are accepted" });
+        if (image.Length > CardScanController.MaxFileSize)
+            return BadRequest(new { error = "Image exceeds 30 MB limit" });
+        ScanBatchUploadItem? upload;
+        try
+        {
+            upload = JsonSerializer.Deserialize<ScanBatchUploadItem>(item ?? "", ScanBatchStorage.Json);
+        }
+        catch (JsonException)
+        {
+            upload = null;
+        }
+        if (upload is null)
+            return BadRequest(new { error = "Invalid scan details" });
+
+        using var ms = new MemoryStream();
+        await image.CopyToAsync(ms, ct);
+        return Run(() => new ScanBatchUploadItemResultDto(
+            uploads.AddItem(id, UserId ?? 0, ms.ToArray(), image.FileName, StoredExtension(image), upload)));
+    }
+
+    /// <summary>Release a saved batch for review (Matching, unclaimed).</summary>
+    [HttpPost("{id:int}/upload/finish")]
+    [RequirePermission(Permissions.ScanView)]
+    public ActionResult<ScanBatchUploadFinishedDto> FinishUpload(int id) =>
+        Run(() => uploads.Finish(id, UserId ?? 0));
+
+    /// <summary>Throw away a batch whose save failed part-way.</summary>
+    [HttpPost("{id:int}/upload/cancel")]
+    [RequirePermission(Permissions.ScanView)]
+    public IActionResult CancelUpload(int id) =>
+        RunVoid(() => uploads.Cancel(id, UserId ?? 0));
+
+    /// <summary>The stored file's extension: the upload's own when it's an accepted one, else from its
+    /// content type (a camera capture may come up without a usable name).</summary>
+    private static string StoredExtension(IFormFile image)
+    {
+        var ext = Path.GetExtension(image.FileName ?? "").ToLowerInvariant();
+        if (ext is ".jpg" or ".jpeg" or ".png" or ".tif" or ".tiff")
+            return ext;
+        return image.ContentType?.ToLowerInvariant() switch
+        {
+            "image/png" => ".png",
+            "image/tiff" or "image/tif" or "image/x-tiff" => ".tif",
+            _ => ".jpg",
+        };
+    }
 
     [HttpGet("{id:int}")]
     [RequirePermission(Permissions.ScanView)]

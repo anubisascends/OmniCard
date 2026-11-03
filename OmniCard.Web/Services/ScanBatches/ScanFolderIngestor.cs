@@ -453,7 +453,7 @@ public sealed class ScanFolderIngestor(
     }
 
     /// <summary>The folder key, or "key (n)" with the lowest n ≥ 2 not already used by this game.</summary>
-    private static string UniqueName(OmniCardDbContext ctx, CardGame game, string folderKey)
+    internal static string UniqueName(OmniCardDbContext ctx, CardGame game, string folderKey)
     {
         var baseName = Truncate(folderKey, 190);
         var prefix = baseName + " (";

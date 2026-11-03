@@ -42,6 +42,26 @@
       "addedNoteFiltered": "Only confirmed & checked scans are added, and only those shown by the current filter.",
       "success": "Added {{count}} card(s) to your collection."
     },
+    "saveBatch": {
+      "button": "Save as batch",
+      "hint": "Store every scan in this list on the server as a scan batch and clear them from this page. The batch is released, so anyone — you too, on another device — can open it from Scan batches and finish the review there.",
+      "title": "Save as batch",
+      "body_one": "{{count}} {{game}} scan will be stored on the server as a scan batch and cleared from this page.",
+      "body_other": "{{count}} {{game}} scans will be stored on the server as a scan batch and cleared from this page.",
+      "released": "Nobody will be reviewing it, so anyone can open it from Scan batches. Matches, corrections and properties you've set go with it.",
+      "stillMatching_one": "{{count}} scan is still matching; the server will finish it.",
+      "stillMatching_other": "{{count}} scans are still matching; the server will finish them.",
+      "location": "{{location}} will be pre-selected when the batch is reviewed.",
+      "name": "Batch name",
+      "nameHelp": "Leave blank to use your name and the current time.",
+      "save": "Save batch",
+      "saving": "Saving {{done}} of {{total}}…",
+      "failed": "The batch wasn't saved, and your scans are still here. {{error}}",
+      "success_one": "Saved {{count}} scan as the batch “{{name}}”. Anyone can review it from Scan batches.",
+      "success_other": "Saved {{count}} scans as the batch “{{name}}”. Anyone can review it from Scan batches.",
+      "duplicates_one": "{{count}} exact copy of an image already in a batch was skipped.",
+      "duplicates_other": "{{count}} exact copies of images already in a batch were skipped."
+    },
     "export": {
       "button": "Export ({{count}})",
       "exporting": "Exporting…",
@@ -201,10 +221,11 @@
     "batches": {
       "panelTitle": "Scan batches",
       "title": "Batch: {{name}}",
-      "intro": "Scans saved to a watched folder stay untouched there until their batch starts: when you press Run, or by itself once its files stop changing. Then they're matched in the background. Open a batch to review it and add it to a location.",
+      "intro": "Scans saved to a watched folder stay untouched there until their batch starts: when you press Run, or by itself once its files stop changing. Then they're matched in the background. Scans you save as a batch from this page show up here too. Open a batch to review it and add it to a location.",
       "empty": "No scan batches right now.",
       "status": {
         "AwaitingRun": "Waiting to run",
+        "Uploading": "Saving",
         "Collecting": "Waiting",
         "Starting": "Starting",
         "Matching": "Matching {{done}} of {{total}}",

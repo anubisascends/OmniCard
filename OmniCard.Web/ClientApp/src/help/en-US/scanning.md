@@ -219,7 +219,7 @@ When the list is long, use the filter bar above it:
 While a filter or sort is on, you'll see *Showing X of Y* and a **Clear** button.
 
 > [!NOTE]
-> Everything in the action bar works only on the cards you can currently see. **Confirm**, **Add**, **Export**, check-all, bulk **Edit** and **Delete** all ignore rows hidden by a filter.
+> Everything in the action bar works only on the cards you can currently see. **Confirm**, **Add**, **Export**, check-all, bulk **Edit** and **Delete** all ignore rows hidden by a filter. The one exception is **Save as batch**, which always saves the whole list.
 
 ## Validate the list
 
@@ -325,6 +325,29 @@ Exported scans stay in the list, so you can still add them to a location later.
 
 > [!NOTE]
 > If you don't see **Export**, ask an administrator for access.
+
+## Save scans as a batch
+
+To finish a review later, on another device, or to hand it to someone else, save your scans to the server as a scan batch. For example, take photos with your phone, save them as a batch, then review them at a desktop.
+
+1. Add your pictures as usual: **Take photo**, **Use webcam** or **Add images**.
+2. Click **Save as batch**.
+3. Optionally type a **Batch name**. Leave it blank to use your name and the current time.
+4. Click **Save batch**. A progress bar shows the images being saved.
+
+When it's done, every scan in the list is stored on the server and cleared from this page, and *Saved N scans as the batch "name"* appears. The batch shows up in the **Scan batches** panel with nobody reviewing it, so anyone can open it, including you from another device. See [Scan batches](help:scan-batches#review-a-batch).
+
+What goes with the batch:
+
+- Every scan in the list, even ones hidden by a filter.
+- Matches, corrections, **Confirm match** marks, card properties and tags you've set.
+- Scans that are still matching (or failed to match) are matched on the server instead, so you don't have to wait for them.
+- The session's game, **Sets (art fallback)**, **Condition**, **Card language** and **Foil**. If you've chosen a location in **Add to location…**, it's pre-selected when the batch is reviewed.
+
+If saving fails part-way (for example the connection drops), nothing is saved and your scans stay in the list, so you can try again.
+
+> [!NOTE]
+> An image that is an exact copy of one already in a batch for the same game is skipped, as it is for watched folders. See [Duplicate images are skipped](help:scan-batches#duplicate-images-are-skipped).
 
 ## Pick up where you left off
 
