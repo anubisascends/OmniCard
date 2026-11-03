@@ -3,7 +3,7 @@
 // worker chunk (which bundles the ~10 MB opencv runtime) only loads when the webcam dialog first calls
 // ensureCvReady(), so the rest of the app never pays for it.
 
-import type { Point } from './cardDetect';
+import type { DetectedCard, Point, ScanLayout } from './cardDetect';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Pending = { resolve: (m: any) => void; reject: (e: Error) => void };
@@ -45,20 +45,21 @@ export function ensureCvReady(): Promise<void> {
   return readyPromise!;
 }
 
-/** Detect the most card-like quad in a frame. Transfers the pixel buffer (caller must not reuse it). */
-export async function detectCardQuad(imageData: ImageData): Promise<Point[] | null> {
+/** Detect cards in a frame — the largest one, or with `multi` every card-sized quad in reading order.
+ *  Transfers the pixel buffer (caller must not reuse it). */
+export async function detectCards(imageData: ImageData, multi: boolean): Promise<DetectedCard[]> {
   const w = ensureWorker();
   await readyPromise;
   const id = ++seq;
   const buffer = imageData.data.buffer;
   return new Promise((resolve, reject) => {
-    pending.set(id, { resolve: (m) => resolve(m.quad ?? null), reject });
-    w.postMessage({ type: 'detect', id, width: imageData.width, height: imageData.height, buffer }, [buffer]);
+    pending.set(id, { resolve: (m) => resolve(m.cards ?? []), reject });
+    w.postMessage({ type: 'detect', id, width: imageData.width, height: imageData.height, buffer, multi }, [buffer]);
   });
 }
 
-/** Deskew + crop the given quad from a (full-resolution) frame to a portrait JPEG blob. */
-export async function cropCard(imageData: ImageData, quad: Point[]): Promise<Blob> {
+/** Deskew + crop the given quad from a (full-resolution) frame into the ADF layout, as a JPEG blob. */
+export async function cropCard(imageData: ImageData, quad: Point[], layout: ScanLayout): Promise<Blob> {
   const w = ensureWorker();
   await readyPromise;
   const id = ++seq;
@@ -66,7 +67,7 @@ export async function cropCard(imageData: ImageData, quad: Point[]): Promise<Blo
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve: (m) => resolve(new Blob([m.buffer], { type: 'image/jpeg' })), reject });
     w.postMessage(
-      { type: 'crop', id, width: imageData.width, height: imageData.height, buffer, quad },
+      { type: 'crop', id, width: imageData.width, height: imageData.height, buffer, quad, layout },
       [buffer],
     );
   });

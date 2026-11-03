@@ -9,43 +9,80 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   MenuItem,
   Stack,
+  Switch,
   TextField,
   Typography,
 } from '@mui/material';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { centroid, quadArea, type Point } from '../../utils/cardDetect';
-import { cropCard, detectCardQuad, ensureCvReady } from '../../utils/cvWorker';
+import { centroid, quadArea, sigDistance, type DetectedCard, type Point } from '../../utils/cardDetect';
+import { cardWidthPx, cropRegion, readRegions } from '../../utils/cardCapture';
+import { detectCards, ensureCvReady } from '../../utils/cvWorker';
 
-// --- Tuning constants for the detect → stabilize → capture → lock state machine. ---
-const DETECT_INTERVAL_MS = 120; // ~8 fps detection cadence.
+// --- Tuning constants for the detect → hold steady → capture loop. ---
+const DETECT_INTERVAL_MS = 30; // pause between detections; the worker's own detect time sets the real pace.
 const DETECT_WIDTH = 720; // downscale frames for detection (fast + small worker transfer); capture is full-res.
-const STABLE_FRAMES = 8; // consecutive stable frames (~0.8s) before auto-capture.
-const MISSING_TO_REARM = 5; // frames with no card before we re-arm for the next one.
-const STABLE_MOVE_FRAC = 0.02; // centroid may drift < 2% of frame width and still count as "stable".
-const STABLE_AREA_FRAC = 0.05; // quad area may change < 5% and still count as "stable".
-const REARM_MOVE_FRAC = 0.08; // a locked card that jumps > 8% is treated as a new card.
-const REARM_AREA_FRAC = 0.25; // ...or whose area changes > 25%.
-const MAX_THUMBS = 5;
+const STABLE_MS = 350; // new card(s) must hold still this long before auto-capture...
+const STABLE_DRIFT_FRAC = 0.025; // ...staying within 2.5% of frame width of where they settled...
+const STABLE_AREA_FRAC = 0.06; // ...and within 6% of their settled size.
+const SHARP_KEEP = 0.75; // capture only when focus is ≥ 75% of the best seen while holding still...
+const SHARP_WAIT_MS = 1000; // ...unless it never gets back there; then take what we have.
+const SAME_CARD_MOVE_FRAC = 0.08; // a captured card nudged < 8% of frame width is still that card...
+const SAME_CARD_AREA_FRAC = 0.3;
+const SAME_CARD_SIG_BITS = 14; // ...if its content signature differs in ≤ 14 of 64 bits (a new card differs in ~30).
+const FORGET_MS = 500; // a captured card unseen this long has been taken away (the same card can then be re-scanned).
+const SMALL_CARD_PX = 500; // a card narrower than this in the full-res frame gets the "move closer" hint.
+const MAX_THUMBS = 8;
+const MULTI_KEY = 'omnicard.webcam.multi';
 
-type Phase = 'armed' | 'locked';
 type Status = 'starting' | 'searching' | 'stabilizing' | 'captured' | 'error';
 
+interface Pose {
+  c: Point;
+  area: number;
+}
+/** A card already captured and still sitting in view — not captured again until it leaves or changes. */
+interface Tracked extends Pose {
+  sig: number[];
+  lastSeen: number;
+}
+
+function readMulti(): boolean {
+  try {
+    return localStorage.getItem(MULTI_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function saveMulti(on: boolean) {
+  try {
+    localStorage.setItem(MULTI_KEY, String(on));
+  } catch {
+    // Per-browser convenience only.
+  }
+}
+
 /**
- * Live-webcam card capture. Opens the selected camera, auto-detects a card via opencv.js contour
- * detection (see utils/cardDetect), and when the card holds still it deskews + crops it to a thin-border
- * portrait JPEG and hands it to `onCapture`. A card left sitting in view is captured only once (the
- * machine locks until the card leaves or changes); the "Capture now" button forces an extra scan of the
- * same card. The dialog stays open so a stack of cards can be scanned in a row.
+ * Live-webcam card capture. Opens the selected camera, finds cards via opencv.js contour detection
+ * (workers/opencv.worker.ts), and when new card(s) hold still and in focus it deskews each into the
+ * same layout a dedicated ADF scanner produces (utils/cardDetect.scanLayoutFor) and hands it to
+ * `onCapture`. A captured card is remembered by position + content, so it isn't captured again while
+ * it sits there, but a different card put in its place is. "Multiple cards" captures every card in
+ * view, each as its own scan. "Capture now" forces a capture of everything in view.
  */
 export function WebcamScanDialog({
   open,
+  game,
   onCapture,
   onClose,
 }: {
   open: boolean;
+  /** The scan session's game — sets the card size of the ADF layout. */
+  game: string;
   onCapture: (file: File) => void;
   onClose: () => void;
 }) {
@@ -53,18 +90,20 @@ export function WebcamScanDialog({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const overlayRef = useRef<HTMLCanvasElement | null>(null);
   const workRef = useRef<HTMLCanvasElement | null>(null);
+  const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   // Loop/state kept in refs so the detection loop never re-renders per frame.
   const runningRef = useRef(false);
-  const phaseRef = useRef<Phase>('armed');
-  const stableCountRef = useRef(0);
-  const missingCountRef = useRef(0);
-  const lastRef = useRef<{ c: Point; area: number } | null>(null);
-  const lastQuadRef = useRef<Point[] | null>(null);
-  const busyRef = useRef(false);
+  const trackedRef = useRef<Tracked[]>([]);
+  const holdRef = useRef<{ poses: Pose[]; since: number; maxSharp: number } | null>(null);
+  const lastCardsRef = useRef<DetectedCard[]>([]);
   const captureSeqRef = useRef(0);
   const thumbUrlsRef = useRef<string[]>([]);
+  const onCaptureRef = useRef(onCapture);
+  onCaptureRef.current = onCapture;
+  const gameRef = useRef(game);
+  gameRef.current = game;
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string>('');
@@ -72,11 +111,15 @@ export function WebcamScanDialog({
   const [error, setError] = useState<string | null>(null);
   const [cvReady, setCvReady] = useState(false);
   const [hasCard, setHasCard] = useState(false);
+  const [tooSmall, setTooSmall] = useState(false);
   const [capturedCount, setCapturedCount] = useState(0);
   const [thumbs, setThumbs] = useState<string[]>([]);
   const [flash, setFlash] = useState(false);
+  const [multi, setMulti] = useState(readMulti);
+  const multiRef = useRef(multi);
+  multiRef.current = multi;
 
-  const drawOverlay = useCallback((quad: Point[] | null, locked: boolean) => {
+  const drawOverlay = useCallback((cards: DetectedCard[], known: Set<DetectedCard>) => {
     const overlay = overlayRef.current;
     const work = workRef.current;
     if (!overlay || !work) return;
@@ -87,65 +130,79 @@ export function WebcamScanDialog({
     const ctx = overlay.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, overlay.width, overlay.height);
-    if (!quad || quad.length !== 4) return;
     ctx.lineWidth = Math.max(3, overlay.width / 240);
-    ctx.strokeStyle = locked ? '#4caf50' : '#ffb300';
-    ctx.beginPath();
-    ctx.moveTo(quad[0].x, quad[0].y);
-    for (let i = 1; i < quad.length; i++) ctx.lineTo(quad[i].x, quad[i].y);
-    ctx.closePath();
-    ctx.stroke();
+    for (const card of cards) {
+      const quad = card.pts;
+      ctx.strokeStyle = known.has(card) ? '#4caf50' : '#ffb300';
+      ctx.beginPath();
+      ctx.moveTo(quad[0].x, quad[0].y);
+      for (let i = 1; i < quad.length; i++) ctx.lineTo(quad[i].x, quad[i].y);
+      ctx.closePath();
+      ctx.stroke();
+    }
   }, []);
 
-  const doCapture = useCallback(
-    async (quad: Point[]) => {
+  const emit = useCallback((blob: Blob) => {
+    onCaptureRef.current(new File([blob], `webcam-${Date.now()}-${captureSeqRef.current++}.jpg`, { type: 'image/jpeg' }));
+    const url = URL.createObjectURL(blob);
+    thumbUrlsRef.current = [url, ...thumbUrlsRef.current];
+    // Revoke thumbnails beyond the visible strip.
+    while (thumbUrlsRef.current.length > MAX_THUMBS) {
+      const old = thumbUrlsRef.current.pop();
+      if (old) URL.revokeObjectURL(old);
+    }
+    setThumbs([...thumbUrlsRef.current]);
+    setCapturedCount((n) => n + 1);
+  }, []);
+
+  /** Capture `cards` (work-canvas coordinates) from the current video frame at full sensor resolution.
+   *  The pixels are read synchronously; the crops then run in the worker while detection carries on. */
+  const capture = useCallback(
+    (cards: DetectedCard[]) => {
       const video = videoRef.current;
       const work = workRef.current;
-      if (!video || !work || busyRef.current || video.videoWidth === 0) return;
-      busyRef.current = true;
-      try {
-        // Capture at full sensor resolution: re-grab the frame at native size and scale the quad
-        // (detected on the downscaled work canvas) up to match, so the crop keeps maximum detail.
-        const vw = video.videoWidth;
-        const vh = video.videoHeight;
-        const scale = vw / work.width;
-        const cap = document.createElement('canvas');
+      if (!video || !work || video.videoWidth === 0 || cards.length === 0) return;
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      const scale = vw / work.width;
+      const cap = (captureCanvasRef.current ??= document.createElement('canvas'));
+      if (cap.width !== vw || cap.height !== vh) {
         cap.width = vw;
         cap.height = vh;
-        const cctx = cap.getContext('2d');
-        if (!cctx) throw new Error(t('dialogs.webcam.errors.canvasUnavailable'));
-        cctx.drawImage(video, 0, 0, vw, vh);
-        const full = cctx.getImageData(0, 0, vw, vh);
-        const scaledQuad = quad.map((p) => ({ x: p.x * scale, y: p.y * scale }));
-        const blob = await cropCard(full, scaledQuad);
-        const file = new File([blob], `webcam-${Date.now()}-${captureSeqRef.current++}.jpg`, {
-          type: 'image/jpeg',
-        });
-        onCapture(file);
-
-        const url = URL.createObjectURL(blob);
-        thumbUrlsRef.current = [url, ...thumbUrlsRef.current];
-        // Revoke thumbnails beyond the visible strip.
-        while (thumbUrlsRef.current.length > MAX_THUMBS) {
-          const old = thumbUrlsRef.current.pop();
-          if (old) URL.revokeObjectURL(old);
-        }
-        setThumbs([...thumbUrlsRef.current]);
-        setCapturedCount((n) => n + 1);
-        setFlash(true);
-        setTimeout(() => setFlash(false), 220);
-      } catch (e) {
-        // A single failed crop shouldn't kill the loop — surface it but keep scanning.
-        setError((e as Error).message);
-      } finally {
-        busyRef.current = false;
       }
+      const cctx = cap.getContext('2d', { willReadFrequently: true });
+      if (!cctx) {
+        setError(t('dialogs.webcam.errors.canvasUnavailable'));
+        return;
+      }
+      cctx.drawImage(video, 0, 0, vw, vh);
+      const regions = readRegions(cap, cards.map((card) => card.pts.map((p) => ({ x: p.x * scale, y: p.y * scale }))));
+
+      // Remember them now so the frames that follow don't capture them again while the crops run.
+      const now = performance.now();
+      for (const card of cards) {
+        trackedRef.current.push({ c: centroid(card.pts), area: quadArea(card.pts), sig: card.sig, lastSeen: now });
+      }
+      setStatus('captured');
+      setFlash(true);
+      setTimeout(() => setFlash(false), 220);
+
+      void (async () => {
+        for (const region of regions) {
+          try {
+            emit(await cropRegion(region, gameRef.current));
+          } catch (e) {
+            // A single failed crop shouldn't kill the loop — surface it but keep scanning.
+            setError((e as Error).message);
+          }
+        }
+      })();
     },
-    [onCapture, t],
+    [emit, t],
   );
 
-  // The self-scheduling detection loop. Uses setTimeout-after-completion so detections never overlap
-  // and the cadence naturally backs off if a frame takes longer than DETECT_INTERVAL_MS.
+  // One detection pass. The loop (setTimeout-after-completion) never overlaps passes, and the cadence
+  // naturally backs off when a frame takes longer to process.
   const detectOnce = useCallback(async () => {
     const video = videoRef.current;
     const work = workRef.current;
@@ -163,76 +220,81 @@ export function WebcamScanDialog({
     wctx.drawImage(video, 0, 0, dw, dh);
     const imgData = wctx.getImageData(0, 0, dw, dh);
 
-    let quad: Point[] | null = null;
+    let cards: DetectedCard[] = [];
     try {
-      quad = await detectCardQuad(imgData);
+      cards = await detectCards(imgData, multiRef.current);
     } catch {
-      quad = null;
+      cards = [];
     }
-
-    const locked = phaseRef.current === 'locked';
-    drawOverlay(quad, locked);
-
-    if (!quad) {
-      setHasCard(false);
-      lastQuadRef.current = null;
-      missingCountRef.current++;
-      if (missingCountRef.current >= MISSING_TO_REARM) {
-        phaseRef.current = 'armed';
-        stableCountRef.current = 0;
-        lastRef.current = null;
-        setStatus('searching');
-      }
-      return;
-    }
-
-    setHasCard(true);
-    lastQuadRef.current = quad;
-    missingCountRef.current = 0;
-
-    const c = centroid(quad);
-    const area = quadArea(quad);
+    const now = performance.now();
     const frameW = work.width;
-    const prev = lastRef.current;
-    const moved = prev ? Math.hypot(c.x - prev.c.x, c.y - prev.c.y) / frameW : Infinity;
-    const areaDelta = prev ? Math.abs(area - prev.area) / prev.area : Infinity;
 
-    if (phaseRef.current === 'locked') {
-      // Detect that a different card has been presented; if so, re-arm for a fresh auto-capture.
-      if (moved > REARM_MOVE_FRAC || areaDelta > REARM_AREA_FRAC) {
-        phaseRef.current = 'armed';
-        stableCountRef.current = 1;
-        setStatus('stabilizing');
+    // Split what's in view into cards already captured (same spot, same content) and new ones.
+    const known = new Set<DetectedCard>();
+    const claimed = new Set<Tracked>();
+    for (const card of cards) {
+      const c = centroid(card.pts);
+      const area = quadArea(card.pts);
+      const hit = trackedRef.current.find(
+        (tr) =>
+          !claimed.has(tr) &&
+          Math.hypot(c.x - tr.c.x, c.y - tr.c.y) / frameW < SAME_CARD_MOVE_FRAC &&
+          Math.abs(area - tr.area) / tr.area < SAME_CARD_AREA_FRAC &&
+          sigDistance(card.sig, tr.sig) <= SAME_CARD_SIG_BITS,
+      );
+      if (hit) {
+        claimed.add(hit);
+        Object.assign(hit, { c, area, sig: card.sig, lastSeen: now });
+        known.add(card);
       }
-      lastRef.current = { c, area };
+    }
+    trackedRef.current = trackedRef.current.filter((tr) => now - tr.lastSeen <= FORGET_MS);
+    const fresh = cards.filter((card) => !known.has(card));
+
+    lastCardsRef.current = cards;
+    drawOverlay(cards, known);
+    setHasCard(cards.length > 0);
+    const scale = video.videoWidth / frameW;
+    setTooSmall(cards.some((card) => cardWidthPx(card.pts) * scale < SMALL_CARD_PX));
+
+    if (fresh.length === 0) {
+      holdRef.current = null;
+      setStatus(cards.length > 0 ? 'captured' : 'searching');
       return;
     }
 
-    // Armed: count consecutive stable frames, then capture.
-    if (prev && moved < STABLE_MOVE_FRAC && areaDelta < STABLE_AREA_FRAC) {
-      stableCountRef.current++;
-    } else {
-      stableCountRef.current = 1;
-    }
-    lastRef.current = { c, area };
+    // New card(s): wait until they hold still where they settled, then catch the sharpest moment.
     setStatus('stabilizing');
-
-    if (stableCountRef.current >= STABLE_FRAMES && !busyRef.current) {
-      phaseRef.current = 'locked';
-      setStatus('captured');
-      await doCapture(quad);
+    const poses = fresh.map((card) => ({ c: centroid(card.pts), area: quadArea(card.pts) }));
+    const sharp = fresh.reduce((s, card) => s + card.sharpness, 0);
+    const hold = holdRef.current;
+    const steady =
+      hold !== null &&
+      hold.poses.length === poses.length &&
+      poses.every((p) =>
+        hold.poses.some(
+          (h) =>
+            Math.hypot(p.c.x - h.c.x, p.c.y - h.c.y) / frameW < STABLE_DRIFT_FRAC &&
+            Math.abs(p.area - h.area) / h.area < STABLE_AREA_FRAC,
+        ),
+      );
+    if (!steady) {
+      holdRef.current = { poses, since: now, maxSharp: sharp };
+      return;
     }
-  }, [drawOverlay, doCapture]);
+    hold.maxSharp = Math.max(hold.maxSharp, sharp);
+    const held = now - hold.since;
+    if (held >= STABLE_MS && (sharp >= SHARP_KEEP * hold.maxSharp || held >= SHARP_WAIT_MS)) {
+      holdRef.current = null;
+      capture(fresh);
+    }
+  }, [drawOverlay, capture]);
 
-  // Manual capture — bypasses the lock so the same static card can be re-scanned on demand.
+  // Manual capture — everything in view, including cards already captured.
   const captureNow = useCallback(() => {
-    const quad = lastQuadRef.current;
-    if (quad && !busyRef.current) {
-      phaseRef.current = 'locked';
-      setStatus('captured');
-      void doCapture(quad);
-    }
-  }, [doCapture]);
+    holdRef.current = null;
+    capture(lastCardsRef.current);
+  }, [capture]);
 
   // Start (or restart) the camera stream for the chosen device.
   const startStream = useCallback(async (preferredDeviceId?: string) => {
@@ -242,14 +304,22 @@ export function WebcamScanDialog({
     setError(null);
     setStatus('starting');
     try {
+      // Ask for up to 4K: the capture is cropped from the full frame, so sensor pixels are what the
+      // fine print (collector number, set code) is read from. Cameras that can't do it pick their best.
+      const size = { width: { ideal: 3840 }, height: { ideal: 2160 } };
       const constraints: MediaStreamConstraints = {
         video: preferredDeviceId
-          ? { deviceId: { exact: preferredDeviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-          : { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+          ? { deviceId: { exact: preferredDeviceId }, ...size }
+          : { facingMode: 'environment', ...size },
         audio: false,
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
+      // Keep autofocus running where the camera exposes it (not in the standard typings).
+      const track = stream.getVideoTracks()[0];
+      await track
+        ?.applyConstraints({ advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] })
+        .catch(() => undefined);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => undefined);
@@ -258,7 +328,7 @@ export function WebcamScanDialog({
       const all = await navigator.mediaDevices.enumerateDevices();
       const cams = all.filter((d) => d.kind === 'videoinput');
       setDevices(cams);
-      const active = stream.getVideoTracks()[0]?.getSettings().deviceId;
+      const active = track?.getSettings().deviceId;
       if (active) setDeviceId(active);
       setStatus('searching');
     } catch (e) {
@@ -280,14 +350,13 @@ export function WebcamScanDialog({
     let cancelled = false;
 
     // Reset per-session state.
-    phaseRef.current = 'armed';
-    stableCountRef.current = 0;
-    missingCountRef.current = 0;
-    lastRef.current = null;
-    lastQuadRef.current = null;
+    trackedRef.current = [];
+    holdRef.current = null;
+    lastCardsRef.current = [];
     setCapturedCount(0);
     setThumbs([]);
     setHasCard(false);
+    setTooSmall(false);
 
     ensureCvReady()
       .then(() => {
@@ -319,11 +388,18 @@ export function WebcamScanDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  const toggleMulti = (on: boolean) => {
+    setMulti(on);
+    saveMulti(on);
+    trackedRef.current = [];
+    holdRef.current = null;
+  };
+
   const statusText: Record<Status, string> = {
     starting: t('dialogs.webcam.status.starting'),
-    searching: t('dialogs.webcam.status.searching'),
+    searching: multi ? t('dialogs.webcam.status.searchingMulti') : t('dialogs.webcam.status.searching'),
     stabilizing: t('dialogs.webcam.status.stabilizing'),
-    captured: t('dialogs.webcam.status.captured'),
+    captured: multi ? t('dialogs.webcam.status.capturedMulti') : t('dialogs.webcam.status.captured'),
     error: t('dialogs.webcam.status.error'),
   };
 
@@ -334,23 +410,35 @@ export function WebcamScanDialog({
         <Stack spacing={2}>
           {error && <Alert severity="error">{error}</Alert>}
 
-          {devices.length > 1 && (
-            <TextField
-              select
-              size="small"
-              label={t('dialogs.webcam.camera')}
-              value={deviceId}
-              onChange={(e) => {
-                setDeviceId(e.target.value);
-                void startStream(e.target.value);
-              }}
-            >
-              {devices.map((d, i) => (
-                <MenuItem key={d.deviceId} value={d.deviceId}>
-                  {d.label || t('dialogs.webcam.cameraN', { number: i + 1 })}
-                </MenuItem>
-              ))}
-            </TextField>
+          <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+            {devices.length > 1 && (
+              <TextField
+                select
+                size="small"
+                label={t('dialogs.webcam.camera')}
+                value={deviceId}
+                onChange={(e) => {
+                  setDeviceId(e.target.value);
+                  void startStream(e.target.value);
+                }}
+                sx={{ flex: 1, minWidth: 200 }}
+              >
+                {devices.map((d, i) => (
+                  <MenuItem key={d.deviceId} value={d.deviceId}>
+                    {d.label || t('dialogs.webcam.cameraN', { number: i + 1 })}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+            <FormControlLabel
+              control={<Switch checked={multi} onChange={(e) => toggleMulti(e.target.checked)} />}
+              label={t('dialogs.webcam.multiple')}
+            />
+          </Stack>
+          {multi && (
+            <Typography variant="body2" color="text.secondary">
+              {t('dialogs.webcam.multipleHint')}
+            </Typography>
           )}
 
           <Box
@@ -415,6 +503,11 @@ export function WebcamScanDialog({
               {t('dialogs.webcam.capturedCount', { count: capturedCount })}
             </Typography>
           </Stack>
+          {tooSmall && (
+            <Typography variant="body2" color="warning.main">
+              {t('dialogs.webcam.tooSmall')}
+            </Typography>
+          )}
 
           {thumbs.length > 0 && (
             <Stack direction="row" spacing={1} sx={{ overflowX: 'auto' }}>

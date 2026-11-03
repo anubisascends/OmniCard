@@ -107,11 +107,16 @@
       "capturedCount": "Captured: {{count}}",
       "captureAlt": "Capture {{number}}",
       "captureNow": "Capture now",
+      "multiple": "Multiple cards",
+      "multipleHint": "Lay the cards flat with a finger-width gap between them. Each card becomes its own scan.",
+      "tooSmall": "The cards look small to the camera. Move it closer for sharper scans.",
       "status": {
         "starting": "Starting camera…",
         "searching": "Point a card at the camera",
+        "searchingMulti": "Point the camera at the cards",
         "stabilizing": "Hold steady…",
         "captured": "Captured ✓  —  present the next card",
+        "capturedMulti": "Captured ✓  —  swap in the next cards",
         "error": "Camera unavailable"
       },
       "errors": {
