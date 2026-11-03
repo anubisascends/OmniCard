@@ -27,6 +27,8 @@
         "allSets": "all sets"
       },
       "withKey": "{{label}} ({{key}})",
+      "foilRuleChecking": "Checking the foil rule…",
+      "foilRuleApplied": "Foil: matches the binder’s foil rule",
       "pickedKeys": {
         "add": "add",
         "addAndClose": "add & close",

@@ -124,6 +124,8 @@ function KeyHints({ hints, sx }: { hints: [string[], string][]; sx?: SxProps<The
 
 /** The caller's chosen sets (the binder's set filter), for the game they belong to. */
 export type AddCardSetFilter = { game: string; sets: SetInfoDto[] };
+/** The caller's foil rule (the binder's): a picked printing matching `query` starts out foil, in `foilType`. */
+export type AddCardFoilRule = { query: string; foilType: string | null };
 
 /**
  * The one "add a card" dialog, for a location, a binder pocket, a list or a Buy List (see {@link AddCardTarget}).
@@ -144,6 +146,9 @@ export type AddCardSetFilter = { game: string; sets: SetInfoDto[] };
  * `setFilter` (the binder's) adds a Sets picker that starts on the caller's sets and limits both searches to
  * them. Changing it only affects this sitting; text in the Set box wins over it; F2 moves between the picker
  * and the Name box, Alt+A searches all sets.
+ *
+ * `foilRule` (the binder's) checks each picked printing against a search query on the server; a match turns
+ * Foil on with the rule's finish. Changing Foil by hand wins, and an add waits for the check to answer.
  */
 export function AddCardDialog({
   open,
@@ -152,6 +157,7 @@ export function AddCardDialog({
   simplified = false,
   initialName = '',
   setFilter,
+  foilRule,
   onClose,
   onDone,
 }: {
@@ -164,6 +170,8 @@ export function AddCardDialog({
   initialName?: string;
   /** Offers a set filter, starting on these sets while the dialog is on their game. */
   setFilter?: AddCardSetFilter;
+  /** Printings matching this rule start out foil. */
+  foilRule?: AddCardFoilRule;
   onClose: () => void;
   /** Called after each add (and undo) so the caller can refresh. */
   onDone?: () => void;
@@ -214,6 +222,12 @@ export function AddCardDialog({
   const canHover = useCanHover();
   // Simplified: an Enter pressed while the search is still running picks the top result once it lands.
   const pendingEnter = useRef(false);
+  // The foil rule's verdict on the picked printing ('checking' until the server answers). A Foil change by
+  // hand clears it and wins over a late answer; an add asked for while checking waits for it.
+  const [ruleFoil, setRuleFoil] = useState<'checking' | 'foil' | 'nonFoil' | null>(null);
+  const foilTouched = useRef(false);
+  const pickToken = useRef(0);
+  const pendingSubmit = useRef<boolean | null>(null);
   const recentKey = useRef(0);
   // Last known quantity of each list line this sitting touched (adds of the same printing merge).
   const listQuantities = useRef(new Map<number, number>());
@@ -243,6 +257,8 @@ export function AddCardDialog({
     setSearchSets(setFilter?.game === startGame ? setFilter.sets : []);
     listQuantities.current.clear();
     pendingEnter.current = false;
+    setRuleFoil(null);
+    pendingSubmit.current = null;
   }
   if (!open && wasOpen) setWasOpen(false);
 
@@ -437,7 +453,43 @@ export function AddCardDialog({
     // The copy defaults to the printing's language; it can still be changed (e.g. a French copy of a
     // card whose catalog only has the English row).
     setLanguage(r.language || ENGLISH);
+    checkFoilRule(r);
   };
+  const checkFoilRule = (r: ScanSearchResultDto | null) => {
+    const token = ++pickToken.current;
+    foilTouched.current = false;
+    pendingSubmit.current = null;
+    const rule = foilRule?.query.trim();
+    if (!r || !rule || buyList) {
+      setRuleFoil(null);
+      return;
+    }
+    setRuleFoil('checking');
+    api
+      .binderFoilRuleCheck(game, rule, r)
+      .then((matches) => {
+        if (token !== pickToken.current || foilTouched.current) return;
+        setIsFoil(matches);
+        setFoilType(matches ? foilRule!.foilType : null);
+        setRuleFoil(matches ? 'foil' : 'nonFoil');
+      })
+      // A rule the server can't check just doesn't apply.
+      .catch(() => token === pickToken.current && setRuleFoil(null));
+  };
+  /** Foil set by hand: the rule's answer no longer applies. */
+  const touchFoil = (on: boolean) => {
+    foilTouched.current = true;
+    setRuleFoil(null);
+    setIsFoil(on);
+  };
+  // An add asked for while the rule was checking goes ahead once it has answered.
+  useEffect(() => {
+    if (ruleFoil === 'checking' || pendingSubmit.current == null) return;
+    const close = pendingSubmit.current;
+    pendingSubmit.current = null;
+    submit(close);
+    // submit is re-created each render; the verdict landing is what matters.
+  }, [ruleFoil]);
   // Done searching: once the picked card is on screen, the keyboard moves to it (Enter adds, single keys
   // set its details). An effect, because a pick can come from an effect too (an early Enter).
   useEffect(() => {
@@ -446,6 +498,7 @@ export function AddCardDialog({
   /** Back from a picked printing to the results, keeping the picked row highlighted. */
   const unpick = () => {
     setSelected(null);
+    checkFoilRule(null);
     focusName();
   };
 
@@ -482,6 +535,10 @@ export function AddCardDialog({
 
   const submit = (close: boolean) => {
     if (!selected || busy) return;
+    if (ruleFoil === 'checking') {
+      pendingSubmit.current = close;
+      return;
+    }
     const s = selected;
     const qty = target.kind === 'pocket' ? 1 : Math.max(1, quantity);
     // Blank ⇒ the server applies the game's basic foil finish.
@@ -673,7 +730,7 @@ export function AddCardDialog({
     else if (hasQuantity && key === 'q') focusField(quantityRef);
     else if (hasFoil && key === 'f') {
       // Foil on goes straight to its finish; foil off stays here.
-      setIsFoil(!isFoil);
+      touchFoil(!isFoil);
       if (!isFoil) focusField(foilTypeRef);
     } else return;
     e.preventDefault();
@@ -1106,9 +1163,14 @@ export function AddCardDialog({
               ) : (
                 <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
                   <FormControlLabel
-                    control={<Switch checked={isFoil} onChange={(e) => setIsFoil(e.target.checked)} />}
+                    control={<Switch checked={isFoil} onChange={(e) => touchFoil(e.target.checked)} />}
                     label={keyLabel(t('common.labels.foil'), 'F')}
                   />
+                  {(ruleFoil === 'checking' || ruleFoil === 'foil') && (
+                    <Typography variant="caption" color="text.secondary">
+                      {t(ruleFoil === 'checking' ? 'dialogs.addCard.foilRuleChecking' : 'dialogs.addCard.foilRuleApplied')}
+                    </Typography>
+                  )}
                   {isFoil && (
                     <Autocomplete
                       freeSolo

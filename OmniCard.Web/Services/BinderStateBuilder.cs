@@ -88,12 +88,18 @@ public sealed class BinderStateBuilder
         var leftSlots = BuildSlots(leftCards, leftReverse, slotsPerPage, columns, tcg, listings);
         var rightSlots = BuildSlots(rightCards, rightReverse, slotsPerPage, columns, tcg, listings);
 
+        // A card left on a page past the end (or a pocket past a shrunk layout) can't be turned to.
+        var last = _binderCards.LastPlacedPocket(containerId);
+        var lastPocket = last is { } pocket
+            ? new BinderPocketDto(Math.Min(pocket.Page, totalPages), Math.Min(pocket.Slot, slotsPerPage - 1))
+            : null;
+
         return new BinderStateDto(
             name, slotsPerPage, columns, totalPages,
             spreadIndex, TotalSpreads(totalPages),
             leftPage, rightPage, PageRangeLabel(leftPage, rightPage),
             leftSlots, rightSlots, BuildTabs(spreadIndex, totalPages),
-            sheetLayout.Sides.ToList());
+            sheetLayout.Sides.ToList(), lastPocket);
     }
 
     public List<BinderCardDto> BuildUnplaced(int containerId, string? filter)
@@ -250,4 +256,8 @@ public sealed record BinderStateDto(
     List<SpreadTabDto> SpreadTabs,
     // Side count (1 or 2) of each physical sheet in reading order — lets the client tell a sheet's
     // front from its back (a new sheet can only go in after a back, like a real binder).
-    List<int> SheetSides);
+    List<int> SheetSides,
+    // The furthest-placed card's pocket (null when the binder has none) — where "Last" turns to.
+    BinderPocketDto? LastPlacedPocket = null);
+
+public sealed record BinderPocketDto(int Page, int Slot);

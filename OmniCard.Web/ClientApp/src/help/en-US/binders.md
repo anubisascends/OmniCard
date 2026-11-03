@@ -66,7 +66,7 @@ If you don't see **Edit**, the binder is in a site you can only view. If changes
 
 In edit mode you get:
 
-- An edit toolbar with **Add page**, **Layout** and **Remove page** buttons, the **Sets** filter, and the **Simplified** switch. See [Search only some sets](#search-only-some-sets) and [Fill a binder from the keyboard](#fill-a-binder-from-the-keyboard).
+- An edit toolbar with **Add page**, **Layout** and **Remove page** buttons, the **Sets** filter, the **Foil if** box, and the **Simplified** switch. See [Search only some sets](#search-only-some-sets), [Make cards foil automatically](#make-cards-foil-automatically) and [Fill a binder from the keyboard](#fill-a-binder-from-the-keyboard).
 - The **Unplaced cards** panel on the left, listing cards that are in this binder but not in a pocket yet.
 - Dashed pocket outlines highlighting where you can drop cards.
 
@@ -123,9 +123,17 @@ Once you've picked a printing, the keyboard moves to the picked card: press Ente
 
 The card is added to your collection in that pocket, the dialog closes, and the cursor moves on to the next pocket, ready for the next card.
 
-![Simplified editing: one page with the cursor on a pocket](binders-simplified.webp)
+![Simplified editing: one page with the cursor on a pocket, and the Unplaced cards panel beside it](binders-simplified.webp)
 
 Above the page, next to the page number, OmniCard shows which side of which physical sheet you're on, for example *Page 2 of 4 · back of sheet 1*. A single-sided sheet shows as *sheet 3, one side*.
+
+The buttons beside it turn the pages:
+
+- **« First** goes to the front of page 1.
+- **‹ Prev** and **Next ›** go back or on one page.
+- **Last »** goes to the last page that has a card on it, whether that's the front or the back of its sheet, and puts the cursor on the pocket after the last card there, ready for the next one. Empty pages after it are skipped. If the last card is in the page's final pocket, the cursor goes on that card.
+
+While the binder has cards that aren't in a pocket yet, the **Unplaced cards** panel is shown to the left of the page. It works as in normal edit mode: drag a card from it onto a pocket to place it, or drag a placed card onto the panel to take it out. When every card is placed, the panel goes away. The page stays in the same place whether the panel is shown or not. In a narrow window, the panel is below the page instead.
 
 The line under the page names the selected pocket and what's in it, for example *Page 2 · pocket 1 — empty*. Below it is a reminder of the keys:
 
@@ -134,14 +142,28 @@ The line under the page names the selected pocket and what's in it, for example 
 | ← ↑ ↓ → | Move the cursor. → at the right edge of a page goes on to the next page, ← at the left edge goes back. |
 | PgUp, PgDn | Go to the previous or next page. **‹ Prev** and **Next ›** above the page do the same. |
 | Home, End | Go to the first or last pocket on the page. |
+| Ctrl+Home, Ctrl+End | Go to the front of page 1, or to the last page with a card on it. **« First** and **Last »** do the same. |
 | Enter | Search for a card for this pocket. If the pocket holds a card, the new one replaces it. |
 | A–Z | Start typing a name: the search opens with it. |
 | F2 | Choose the sets searches are limited to. See [Search only some sets](#search-only-some-sets). |
 | Del | Take the card out of the pocket. It goes back to the Unplaced pool and stays in the binder. |
+| Ctrl+C | Copy the card in this pocket. See [Copy a card into the next pockets](#copy-a-card-into-the-next-pockets). |
+| Ctrl+V | Add a new copy of the copied card to this pocket, then move on to the next pocket. |
 | + | Insert a new double-sided sheet (two pages) right after the sheet you're on, and move the cursor to its front. This only works from the back of a sheet (or a single-sided sheet), like slipping a new sheet into a real binder: on a front page, OmniCard tells you to turn to the back first. To add a sheet at the end, go to the last page and press +. |
 | − | Remove the page the cursor is on. OmniCard asks first: press Enter to remove it or Esc to keep it. As with **Remove page**, the whole sheet goes, and its cards return to the Unplaced pool. |
 
 You can use the mouse too: click a pocket to move the cursor to it, or double-click it to search. Right-click still opens the pocket menu.
+
+### Copy a card into the next pockets
+
+When several identical cards sit next to each other, enter the first one, then copy it into the rest:
+
+1. Move the cursor to the card and press Ctrl+C. The line under the page shows what you copied, for example *Copied: The One Ring (LTR #697)*.
+2. Move the cursor to the next pocket and press Ctrl+V. A new copy of the card is added to your collection in that pocket, with the same printing, foil and finish, condition, language and purchase price. The cursor moves on to the next pocket, so you can keep pressing Ctrl+V.
+
+If the pocket already holds a card, the pasted card takes its place and the old one goes back to the Unplaced pool.
+
+The card goes on your computer's clipboard, so Ctrl+V uses whatever you copied last. If you've copied some text since, OmniCard says *The clipboard doesn't hold a binder card.*: copy the card again. Ctrl+C and Ctrl+V in a text box, such as **Foil if** or the Unplaced cards search, copy and paste text as usual.
 
 ### The search dialog in Simplified editing
 
@@ -156,7 +178,7 @@ The dialog works as described in [Add or replace a card in a pocket](#add-or-rep
 ![The search dialog in Simplified editing, with the key reminder](binders-simplified-search.webp)
 
 > [!TIP]
-> To place a copy from the Unplaced pool, or one from another location, turn **Simplified** off and drag it from the Unplaced cards panel, or right-click the pocket in normal edit mode.
+> To place a copy from the Unplaced pool, drag it from the **Unplaced cards** panel beside the page. To place one from another location, turn **Simplified** off and right-click the pocket.
 
 ## Search only some sets
 
@@ -177,6 +199,24 @@ You can change the sets for one card without changing the filter:
 - Type a code in the **Set** box next to **Name**. It is used instead of the chosen sets.
 
 The next pocket starts with the toolbar's sets again.
+
+## Make cards foil automatically
+
+If you keep foils of some cards in a binder, for example only the commons and uncommons, you can have OmniCard set **Foil** for you on every card you add to a pocket.
+
+1. In edit mode, type a search in **Foil if** in the edit toolbar. It uses the same syntax as card searches, for example `r<rare` for Magic, or `r:common or r:uncommon` for any game. See [Search syntax](help:search-syntax).
+2. Choose the **Finish** these cards get. The list shows the finishes of the game on screen. The first one is the game's usual foil.
+
+![A picked common card, turned foil by the binder's foil rule](binders-foil-rule.webp)
+
+When you pick a printing in the Add card dialog, OmniCard checks it against the search. If it matches, **Foil** is turned on with that finish, and the dialog says *Foil: matches the binder's foil rule*. If it doesn't match, **Foil** stays off. Either way you can still change **Foil** (or press F) before you add the card.
+
+The check takes a moment. If you press Enter to add the card before it's done, the dialog says *Checking the foil rule…* and adds the card as soon as it knows.
+
+OmniCard remembers the rule for this binder in this browser. To stop using it, clear the **Foil if** box.
+
+> [!NOTE]
+> The rule is checked against the exact printing you pick. Promotional printings can have a different rarity from the usual ones. For example, Magic's prerelease promos are listed as rare.
 
 ## Pages and layout
 
@@ -227,5 +267,7 @@ Removing a page removes the whole physical sheet it's on. For a double-sided she
 - **The arrow keys don't move the cursor.** Simplified editing has to be on, and the keyboard mustn't be in a box or menu. Click the page, then try again.
 - **Pressing + says the page is the front of its sheet.** A new sheet goes in after a sheet's back. Press PgDn to turn to the back, then press + again.
 - **The search doesn't find a card I know exists.** The **Sets** filter may be leaving its set out. Press Alt+A in the dialog to search all sets, or clear the filter in the edit toolbar.
-- **I can't see the Unplaced cards panel.** Turn **Simplified** off in the edit toolbar.
+- **I can't see the Unplaced cards panel.** In Simplified editing it's only shown while some of the binder's cards aren't in a pocket. In a narrow window, scroll down: it's below the page.
+- **Ctrl+V says the clipboard doesn't hold a binder card.** You copied something else after the card. Go back to the card, press Ctrl+C, and try again.
+- **A card wasn't made foil.** Check the **Foil if** search against the printing you picked, for example its rarity. Promotional printings often differ.
 - **A card I'm looking for isn't in the Unplaced panel.** Clear the panel's search box. If it still isn't there, it may be in another location; use **Add card to this pocket…** and look under **In your collection**.

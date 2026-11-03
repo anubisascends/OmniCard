@@ -861,6 +861,8 @@ export interface BinderStateDto {
   spreadTabs: SpreadTabDto[];
   /** Side count (1 or 2) of each physical sheet, in reading order. */
   sheetSides: number[];
+  /** The furthest-placed card's pocket (highest page, then slot); null when no card is placed. */
+  lastPlacedPocket?: { page: number; slot: number } | null;
 }
 
 // --- Scan (server-side image matching; mirrors OmniCard.Api.Contracts scan DTOs) ---

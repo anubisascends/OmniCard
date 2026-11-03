@@ -15,6 +15,7 @@ import {
   DialogContentText,
   DialogTitle,
   FormControlLabel,
+  InputAdornment,
   Link,
   Menu,
   MenuItem,
@@ -28,6 +29,7 @@ import {
   Tooltip,
   Typography,
   alpha,
+  type SxProps,
   type Theme,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
@@ -35,12 +37,13 @@ import AddIcon from '@mui/icons-material/Add';
 import SellIcon from '@mui/icons-material/Sell';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { api } from '../api/client';
 import type { BinderCardDto, BinderSlotDto, SetInfoDto } from '../api/types';
 import { CardImage } from '../components/CardImage';
 import { ListForSaleDialog } from '../components/dialogs/ListForSaleDialog';
 import { CardEditDrawer } from '../components/dialogs/CardEditDrawer';
-import { AddCardDialog } from '../components/dialogs/AddCardDialog';
+import { AddCardDialog, type AddCardFoilRule } from '../components/dialogs/AddCardDialog';
 import { SearchBox } from '../components/SearchBox';
 import { SetMultiSelect } from '../components/SetMultiSelect';
 import { Kbd } from '../components/Kbd';
@@ -265,6 +268,8 @@ function UnplacedSidebar({
   onDropUnassign,
   onCardContextMenu,
   onCardClick,
+  autoFocus = true,
+  sx,
 }: {
   cards: BinderCardDto[];
   loading: boolean;
@@ -274,6 +279,10 @@ function UnplacedSidebar({
   onDropUnassign: () => void;
   onCardContextMenu: (e: React.MouseEvent, card: BinderCardDto) => void;
   onCardClick: (card: BinderCardDto) => void;
+  /** Focus the search box on mount (not in simplified editing, where the keyboard drives the pockets). */
+  autoFocus?: boolean;
+  /** Placement overrides (simplified editing docks the list in the page's left margin). */
+  sx?: SxProps<Theme>;
 }) {
   const { t } = useTranslation();
   const { money } = useFormatters();
@@ -282,19 +291,22 @@ function UnplacedSidebar({
       variant="outlined"
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDropUnassign}
-      sx={{
-        width: { xs: '100%', sm: 300 },
-        flexShrink: 0,
-        alignSelf: 'flex-start',
-        position: { xs: 'static', sm: 'sticky' },
-        top: 8,
-        maxHeight: { xs: 360, sm: 'calc(100vh - 32px)' },
-        boxSizing: 'border-box',
-        display: 'flex',
-        flexDirection: 'column',
-        p: 1,
-        bgcolor: 'background.default',
-      }}
+      sx={[
+        {
+          width: { xs: '100%', sm: 300 },
+          flexShrink: 0,
+          alignSelf: 'flex-start',
+          position: { xs: 'static', sm: 'sticky' },
+          top: 8,
+          maxHeight: { xs: 360, sm: 'calc(100vh - 32px)' },
+          boxSizing: 'border-box',
+          display: 'flex',
+          flexDirection: 'column',
+          p: 1,
+          bgcolor: 'background.default',
+        },
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
     >
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
         <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
@@ -303,7 +315,7 @@ function UnplacedSidebar({
         {loading && <CircularProgress size={14} />}
       </Stack>
       <Box sx={{ mb: 0.5 }}>
-        <SearchBox value={filter} onChange={onFilter} autoFocus />
+        <SearchBox value={filter} onChange={onFilter} autoFocus={autoFocus} />
       </Box>
       <Typography variant="caption" color="text.secondary" sx={{ mb: 1 }}>
         {t('binder.dragHint')}
@@ -397,6 +409,46 @@ const writeSimplified = (on: boolean) => {
   }
 };
 
+// The foil rule ("cards matching this search are foil") belongs to the binder, so it's remembered per
+// binder in this browser.
+const foilRuleKey = (binderId: number) => `omnicard.binder.foilRule.${binderId}`;
+const readFoilRule = (binderId: number): AddCardFoilRule => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(foilRuleKey(binderId)) ?? 'null');
+    if (saved && typeof saved.query === 'string')
+      return { query: saved.query, foilType: typeof saved.foilType === 'string' ? saved.foilType : null };
+  } catch {
+    // Unreadable or blocked storage — start without a rule.
+  }
+  return { query: '', foilType: null };
+};
+const writeFoilRule = (binderId: number, rule: AddCardFoilRule) => {
+  try {
+    if (rule.query.trim() || rule.foilType) localStorage.setItem(foilRuleKey(binderId), JSON.stringify(rule));
+    else localStorage.removeItem(foilRuleKey(binderId));
+  } catch {
+    // Storage blocked — the rule just isn't remembered.
+  }
+};
+
+/** What Ctrl+C on a pocket puts on the clipboard: the lot to copy, plus enough to say what it is. */
+type CopiedCard = {
+  kind: 'omnicard/binder-card';
+  lotId: number;
+  name: string;
+  setCode: string;
+  number: string;
+};
+const COPIED_KIND = 'omnicard/binder-card';
+const parseCopied = (text: string): CopiedCard | null => {
+  try {
+    const v = JSON.parse(text);
+    return v && v.kind === COPIED_KIND && typeof v.lotId === 'number' ? (v as CopiedCard) : null;
+  } catch {
+    return null;
+  }
+};
+
 /** Page 1 stands alone on spread 0; after that pages pair up two per spread (2–3, 4–5, …). */
 const spreadOfPage = (page: number) => Math.floor(page / 2);
 const firstPageOfSpread = (spread: number) => (spread === 0 ? 1 : spread * 2);
@@ -423,10 +475,13 @@ const SIMPLIFIED_KEYS: [string[], string][] = [
   [['←', '↑', '↓', '→'], 'binder.keys.move'],
   [['PgUp', 'PgDn'], 'binder.keys.page'],
   [['Home', 'End'], 'binder.keys.firstLast'],
+  [['Ctrl+Home', 'Ctrl+End'], 'binder.keys.firstLastPage'],
   [['Enter'], 'binder.keys.search'],
   [['A–Z'], 'binder.keys.type'],
   [['F2'], 'binder.keys.sets'],
   [['Del'], 'binder.keys.remove'],
+  [['Ctrl+C'], 'binder.keys.copy'],
+  [['Ctrl+V'], 'binder.keys.paste'],
   [['+'], 'binder.keys.addPage'],
   [['−'], 'binder.keys.removePage'],
 ];
@@ -481,6 +536,16 @@ export function BinderPage() {
   const [setsAnchor, setSetsAnchor] = useState<HTMLElement | null>(null);
   const setsButtonRef = useRef<HTMLButtonElement>(null);
   const games = useQuery({ queryKey: ['games'], queryFn: api.games, enabled: editMode });
+  // The binder's foil rule, handed to the Add card dialog.
+  const [foilRule, setFoilRule] = useState<AddCardFoilRule>(() => readFoilRule(binderId));
+  useEffect(() => setFoilRule(readFoilRule(binderId)), [binderId]);
+  const updateFoilRule = (patch: Partial<AddCardFoilRule>) => {
+    const next = { ...foilRule, ...patch };
+    setFoilRule(next);
+    writeFoilRule(binderId, next);
+  };
+  // Simplified editing: the card Ctrl+C last copied (it's on the clipboard too; Ctrl+V reads it from there).
+  const [copied, setCopied] = useState<CopiedCard | null>(null);
 
   const openCardMenu = (e: React.MouseEvent, card: BinderCardDto) => {
     e.preventDefault();
@@ -502,6 +567,14 @@ export function BinderPage() {
     queryKey: ['binder', binderId, viewSpread],
     queryFn: () => api.binder(binderId, viewSpread),
     placeholderData: keepPreviousData,
+  });
+  // Without a chosen game, the set filter (and the foil rule's finishes) are for the game of the cards on screen.
+  const spreadGame = gameName(data?.leftSlots.concat(data.rightSlots).find((s) => s.card)?.card?.game);
+  const setsGame = filterGame ?? spreadGame;
+  const foilTypes = useQuery({
+    queryKey: ['scan-foil-types', setsGame],
+    queryFn: () => api.scanFoilTypes(setsGame),
+    enabled: editMode,
   });
   // Site access: a binder in a site the user can only view can be flipped through but not edited.
   const locQuery = useQuery({ queryKey: ['location', binderId], queryFn: () => api.location(binderId) });
@@ -602,6 +675,18 @@ export function BinderPage() {
     );
   };
 
+  /** Simplified editing's Last: the last page holding a card, on the pocket after its last card (the next
+   *  one to fill) — or the card itself when it's in the page's final pocket. An empty binder: page 1. */
+  const lastCursor = (): Cursor => {
+    const p = data?.lastPlacedPocket;
+    return p ? { page: p.page, slot: Math.min(p.slot + 1, slotsPerPage - 1) } : { page: 1, slot: 0 };
+  };
+  /** Turn to a pocket from a button, keeping the keyboard on the page. */
+  const turnTo = (c: Cursor) => {
+    setCursor(c);
+    gridRef.current?.focus({ preventScroll: true });
+  };
+
   /** Next pocket in reading order, on to the next page. */
   const advance = () =>
     setCursor((c) =>
@@ -612,10 +697,17 @@ export function BinderPage() {
   useEffect(() => {
     if (!quick || !data) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.defaultPrevented || e.ctrlKey || e.altKey || e.metaKey) return;
+      if (e.defaultPrevented) return;
       if (addSlot || detailCardId != null || listCard || slotMenu || cardMenu || addAnchor || setsAnchor || confirmRemove != null) return;
       const el = e.target instanceof HTMLElement ? e.target : null;
       if (el?.closest(EDITABLE)) return;
+      // Ctrl+Home / Ctrl+End: the front of page 1 / the last page with a card.
+      if (e.ctrlKey && !e.altKey && !e.metaKey && (e.key === 'Home' || e.key === 'End')) {
+        e.preventDefault();
+        setCursor(e.key === 'Home' ? { page: 1, slot: 0 } : lastCursor());
+        return;
+      }
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
       const cols = data.columns;
       const col = cursor.slot % cols;
       let next: Cursor | null = null;
@@ -683,6 +775,54 @@ export function BinderPage() {
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  // Simplified editing's copy/paste: Ctrl+C on a pocket copies its card, Ctrl+V pastes a new copy of it into
+  // the cursor's pocket (a card already there goes back to Unplaced) and moves on. These are clipboard
+  // events rather than keys, so the browser asks no clipboard permission, and text boxes keep their own.
+  useEffect(() => {
+    if (!quick || !data) return;
+    const ignore = (e: ClipboardEvent) =>
+      !!(addSlot || detailCardId != null || listCard || slotMenu || cardMenu || addAnchor || setsAnchor || confirmRemove != null) ||
+      (e.target instanceof HTMLElement && !!e.target.closest(EDITABLE));
+    const onCopy = (e: ClipboardEvent) => {
+      // Text selected on the page copies as usual.
+      if (ignore(e) || !cursorCard || window.getSelection()?.toString()) return;
+      const card: CopiedCard = {
+        kind: COPIED_KIND,
+        lotId: cursorCard.id,
+        name: cursorCard.name,
+        setCode: cursorCard.setCode,
+        number: cursorCard.number,
+      };
+      e.preventDefault();
+      e.clipboardData?.setData('text/plain', JSON.stringify(card));
+      setCopied(card);
+    };
+    const onPaste = (e: ClipboardEvent) => {
+      if (ignore(e)) return;
+      e.preventDefault();
+      // Whatever is on the clipboard wins: text copied since the card means there's no card to paste.
+      // (An empty text clipboard falls back to the card copied here.)
+      const text = e.clipboardData?.getData('text/plain') ?? '';
+      const card = text ? parseCopied(text) : copied;
+      if (!card) {
+        setNotice(t('binder.clipboardNotCard'));
+        return;
+      }
+      setCopied(card);
+      // Its own pocket already holds it.
+      if (cursorCard?.id === card.lotId) return;
+      run(api.binderPaste(card.lotId, binderId, cursor.page, cursor.slot));
+      // On at once, so a quick second Ctrl+V fills the next pocket rather than replacing this one.
+      advance();
+    };
+    window.addEventListener('copy', onCopy);
+    window.addEventListener('paste', onPaste);
+    return () => {
+      window.removeEventListener('copy', onCopy);
+      window.removeEventListener('paste', onPaste);
+    };
+  });
+
   const openSets = () => setSetsAnchor(setsButtonRef.current);
   const closeSets = () => {
     setSetsAnchor(null);
@@ -705,9 +845,6 @@ export function BinderPage() {
 
   if (isLoading || !data) return <CircularProgress />;
 
-  // Without a chosen game, the filter is for the game of the cards on screen.
-  const spreadGame = gameName(data.leftSlots.concat(data.rightSlots).find((s) => s.card)?.card?.game);
-  const setsGame = filterGame ?? spreadGame;
   const setsLabel =
     filterSets.length === 0
       ? t('common.labels.allSets')
@@ -715,6 +852,18 @@ export function BinderPage() {
           .slice(0, 3)
           .map((s) => s.setCode.toUpperCase())
           .join(', ') + (filterSets.length > 3 ? ` ${t('binder.setFilter.more', { n: fmt.number(filterSets.length - 3) })}` : '');
+
+  // The rule's finish, when the game on screen offers it (otherwise the game's basic foil).
+  const finishes = foilTypes.data ?? [];
+  const ruleFinish = foilRule.foilType && finishes.includes(foilRule.foilType) ? foilRule.foilType : finishes[0] ?? '';
+  const dialogFoilRule: AddCardFoilRule | undefined = foilRule.query.trim()
+    ? { query: foilRule.query, foilType: ruleFinish || null }
+    : undefined;
+  // Simplified editing lists the binder's unplaced cards beside the page only while there are some.
+  const showUnplaced = (unplaced.data?.length ?? 0) > 0 || filter.trim() !== '';
+  // The page's width: the window's height decides (pocket aspect 0.72, so a page of c × r pockets is about
+  // c·0.72 / r as wide as it is tall), never wider than the room there is.
+  const pageWidth = `min(100%, max(320px, calc((100vh - 470px) * ${(data.columns * 0.72) / (data.slotsPerPage / data.columns)})))`;
 
   const dropOnSlot = (page: number, slot: number) => {
     if (dragLotId != null) run(assign.mutateAsync({ page, slot }));
@@ -858,6 +1007,48 @@ export function BinderPage() {
                 </Stack>
               </Stack>
             </Popover>
+            <Tooltip title={t('binder.foilRule.tooltip')}>
+              <TextField
+                size="small"
+                label={t('binder.foilRule.label')}
+                placeholder={t('binder.foilRule.placeholder')}
+                value={foilRule.query}
+                onChange={(e) => updateFoilRule({ query: e.target.value })}
+                onKeyDown={(e) => {
+                  // Done with the rule: back to the pockets.
+                  if (quick && (e.key === 'Enter' || e.key === 'Escape')) {
+                    e.preventDefault();
+                    gridRef.current?.focus({ preventScroll: true });
+                  }
+                }}
+                sx={{ width: 220 }}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <AutoAwesomeIcon fontSize="small" color={foilRule.query.trim() ? 'primary' : 'disabled'} />
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+              />
+            </Tooltip>
+            {foilRule.query.trim() && finishes.length > 0 && (
+              <TextField
+                select
+                size="small"
+                label={t('binder.foilRule.finish')}
+                value={ruleFinish}
+                onChange={(e) => updateFoilRule({ foilType: e.target.value })}
+                sx={{ minWidth: 150 }}
+              >
+                {finishes.map((f) => (
+                  <MenuItem key={f} value={f}>
+                    {f}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
             <Box sx={{ flexGrow: 1 }} />
             <Tooltip title={t('binder.simplifiedTooltip')}>
               <FormControlLabel
@@ -876,14 +1067,14 @@ export function BinderPage() {
         <>
           {/* Simplified editing: page navigation (the keyboard does the same with PgUp/PgDn). */}
           <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
-            <Button
-              size="small"
-              disabled={cursor.page <= 1}
-              onClick={() => {
-                setCursor((c) => ({ ...c, page: c.page - 1 }));
-                gridRef.current?.focus({ preventScroll: true });
-              }}
-            >
+            <Tooltip title={t('binder.firstTooltip')}>
+              <span>
+                <Button size="small" disabled={cursor.page <= 1 && cursor.slot === 0} onClick={() => turnTo({ page: 1, slot: 0 })}>
+                  {t('binder.first')}
+                </Button>
+              </span>
+            </Tooltip>
+            <Button size="small" disabled={cursor.page <= 1} onClick={() => turnTo({ ...cursor, page: cursor.page - 1 })}>
               {t('binder.prev')}
             </Button>
             <Typography variant="subtitle2" sx={{ minWidth: 120, textAlign: 'center' }}>
@@ -895,47 +1086,66 @@ export function BinderPage() {
                 </Typography>
               )}
             </Typography>
-            <Button
-              size="small"
-              disabled={cursor.page >= data.totalPages}
-              onClick={() => {
-                setCursor((c) => ({ ...c, page: c.page + 1 }));
-                gridRef.current?.focus({ preventScroll: true });
-              }}
-            >
+            <Button size="small" disabled={cursor.page >= data.totalPages} onClick={() => turnTo({ ...cursor, page: cursor.page + 1 })}>
               {t('binder.next')}
             </Button>
+            <Tooltip title={t('binder.lastTooltip')}>
+              <Button size="small" onClick={() => turnTo(lastCursor())}>
+                {t('binder.last')}
+              </Button>
+            </Tooltip>
           </Stack>
 
-          {/* The cursor's page alone, centred and sized to fit the window. */}
-          <Box
-            ref={gridRef}
-            tabIndex={0}
-            sx={{
-              alignSelf: 'center',
-              width: {
-                xs: '100%',
-                // Pocket aspect 0.72, so a page of c × r pockets is about c·0.72 / r as wide as it is tall.
-                sm: `min(100%, max(320px, calc((100vh - 470px) * ${(data.columns * 0.72) / (data.slotsPerPage / data.columns)})))`,
-              },
-              borderRadius: 1,
-              outline: 'none',
-              '&:focus-visible': { boxShadow: (th) => `0 0 0 2px ${th.palette.primary.main}` },
-            }}
-          >
-            <SlotGrid
-              slots={cursorSlots ?? Array.from({ length: data.slotsPerPage }, (_, i) => ({ slotIndex: i, card: null }))}
-              columns={data.columns}
-              pageNumber={cursor.page}
-              editMode={editMode}
-              onDragCard={setDragLotId}
-              onDropSlot={dropOnSlot}
-              onSlotContextMenu={openSlotMenu}
-              onCardClick={(c) => setDetailCardId(c.id)}
-              cursorSlot={cursor.slot}
-              onSlotSelect={(slot) => setCursor((c) => ({ ...c, slot }))}
-              onSlotOpen={(slot) => openSearch(slot)}
-            />
+          {/* The cursor's page alone, centred and sized to fit the window. The unplaced cards sit in the margin
+              to its left on a wide screen (below it otherwise) and take no room of their own, so the page
+              doesn't move when they come and go. */}
+          <Box sx={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <Box
+              ref={gridRef}
+              tabIndex={0}
+              sx={{
+                width: { xs: '100%', sm: pageWidth },
+                borderRadius: 1,
+                outline: 'none',
+                '&:focus-visible': { boxShadow: (th) => `0 0 0 2px ${th.palette.primary.main}` },
+              }}
+            >
+              <SlotGrid
+                slots={cursorSlots ?? Array.from({ length: data.slotsPerPage }, (_, i) => ({ slotIndex: i, card: null }))}
+                columns={data.columns}
+                pageNumber={cursor.page}
+                editMode={editMode}
+                onDragCard={setDragLotId}
+                onDropSlot={dropOnSlot}
+                onSlotContextMenu={openSlotMenu}
+                onCardClick={(c) => setDetailCardId(c.id)}
+                cursorSlot={cursor.slot}
+                onSlotSelect={(slot) => setCursor((c) => ({ ...c, slot }))}
+                onSlotOpen={(slot) => openSearch(slot)}
+              />
+            </Box>
+            {showUnplaced && (
+              <UnplacedSidebar
+                cards={unplaced.data ?? []}
+                loading={unplaced.isFetching}
+                filter={filter}
+                onFilter={setFilter}
+                onDragCard={setDragLotId}
+                onDropUnassign={dropUnassign}
+                onCardContextMenu={openCardMenu}
+                onCardClick={(c) => setDetailCardId(c.id)}
+                autoFocus={false}
+                sx={{
+                  position: { xs: 'static', lg: 'absolute' },
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  alignSelf: { xs: 'stretch', lg: 'auto' },
+                  width: { xs: '100%', lg: `min(300px, calc((100% - ${pageWidth}) / 2 - 16px))` },
+                  maxHeight: { xs: 360, lg: 'none' },
+                }}
+              />
+            )}
           </Box>
           <Stack spacing={1} alignItems="center">
             <Typography variant="body2" color="text.secondary">
@@ -949,6 +1159,11 @@ export function BinderPage() {
                   })
                 : t('binder.cursorEmpty', { page: cursor.page, slot: cursor.slot + 1 })}
             </Typography>
+            {copied && (
+              <Typography variant="caption" color="text.secondary">
+                {t('binder.copiedCard', { name: copied.name, set: copied.setCode.toUpperCase(), number: copied.number })}
+              </Typography>
+            )}
             <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" useFlexGap>
               {SIMPLIFIED_KEYS.map(([keys, label]) => (
                 <Stack key={label} direction="row" spacing={0.5} alignItems="center">
@@ -1111,6 +1326,7 @@ export function BinderPage() {
           simplified={addSlot.quick}
           initialName={addSlot.initialName}
           setFilter={{ game: setsGame, sets: filterSets }}
+          foilRule={dialogFoilRule}
           onClose={() => setAddSlot(null)}
           onDone={() => {
             refresh();
