@@ -972,8 +972,9 @@ export interface AuditCommitResultDto {
 
 // --- Scan batches (watched scan folders, matched in the background) ---
 
-/** Collecting = files still untouched in the watched folder; Starting = Run pressed (or timer up), files being taken in. */
-export type ScanBatchStatus = 'Collecting' | 'Starting' | 'Matching' | 'Ready' | 'Committed' | 'Discarded';
+/** Collecting = files still untouched in the watched folder; Starting = Run pressed (or timer up), files being taken in.
+ * Uploading = being saved from the Scan page (never listed). */
+export type ScanBatchStatus = 'Uploading' | 'Collecting' | 'Starting' | 'Matching' | 'Ready' | 'Committed' | 'Discarded';
 
 export interface ScanBatchSummaryDto {
   id: number;
@@ -1061,6 +1062,34 @@ export interface ScanBatchItemEdit {
   purchasePrice?: number | null;
   tags: string[];
   note?: string | null;
+}
+
+/** Start saving the Scan page's scans as a batch (blank name = the user's name and the time). */
+export interface ScanBatchUploadStartRequest {
+  name?: string | null;
+  game: string;
+  isFoil: boolean;
+  condition?: string | null;
+  /** The session's card language; blank = auto. */
+  language?: string | null;
+  setCodes: string[];
+  defaultContainerId?: number | null;
+}
+
+/** One scan sent to a batch being saved: its list position, the browser's match (null = the server
+ * matches it) and its per-copy properties (`id` unused). */
+export interface ScanBatchUploadItem {
+  sequence: number;
+  match?: ScanMatchDto | null;
+  props: ScanBatchItemEdit;
+}
+
+/** A saved batch, released for review: `items` scans, `duplicates` exact copies set aside. */
+export interface ScanBatchUploadFinishedDto {
+  id: number;
+  name: string;
+  items: number;
+  duplicates: number;
 }
 
 export interface ScanBatchCommitResultDto {

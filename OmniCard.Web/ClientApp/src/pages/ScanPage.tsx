@@ -40,6 +40,7 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
@@ -71,7 +72,7 @@ import {
 import { ScanSessionStore } from '../lib/scanSessionStore';
 import { BatchItemStore } from '../lib/batchItemStore';
 import { usePermissions } from '../context/usePermissions';
-import { ScanBatchesPanel } from '../components/ScanBatchesPanel';
+import { ScanBatchesPanel, invalidateScanBatches } from '../components/ScanBatchesPanel';
 import { ScanValidationBar, type ScanValidationResult } from '../components/ScanValidationBar';
 import { BuyListHitChip, buyListFrameSx } from '../components/BuyListBadge';
 import type {
@@ -82,6 +83,8 @@ import type {
   ScanBatchDto,
   ScanBatchItemDto,
   ScanBatchItemEdit,
+  ScanBatchUploadFinishedDto,
+  ScanBatchUploadItem,
   ScanCommitItem,
   ScanCommitResultDto,
   ScanMatchDto,
@@ -344,9 +347,23 @@ function fromBatchItem(dto: ScanBatchItemDto): ScanItem {
 /** The reviewer-editable fields of a batch item, as saved to the server (match results never are). */
 function toBatchEdit(it: ScanItem): ScanBatchItemEdit | null {
   if (it.batchItemId == null) return null;
+  return batchProps(it, it.batchItemId);
+}
+
+/** A local scan as sent when the list is saved as a batch: the browser's match goes with it (a scan
+ * still matching, or that failed, goes without one and the server matches it). */
+function toUploadItem(it: ScanItem, sequence: number): ScanBatchUploadItem {
+  return {
+    sequence,
+    match: it.status === 'done' && it.match ? { ...it.match, scanPreviewDataUri: null } : null,
+    props: batchProps(it, 0),
+  };
+}
+
+function batchProps(it: ScanItem, id: number): ScanBatchItemEdit {
   const price = it.purchasePrice.trim() === '' ? null : Number(it.purchasePrice);
   return {
-    id: it.batchItemId,
+    id,
     include: it.include,
     verified: !!it.verified,
     override: it.override ?? null,
@@ -1700,6 +1717,7 @@ export interface ScanBatchMode {
 
 export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitted, batch, intake }: ScanPageProps = {}) {
   const { t } = useTranslation();
+  const fmt = useFormatters();
   const qc = useQueryClient();
   const { game: contextGame } = useGame();
   const batchId = batch?.data.summary.id;
@@ -2422,6 +2440,72 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     );
   };
 
+  // --- Save as batch: store every local scan on the server as a scan batch, released for anyone to
+  // review, and clear them from this page. Images go up one per request (each under the server's
+  // request limit); if any fails, the half-sent batch is thrown away and the scans stay here. ---
+  const canSaveBatch = !auditMode && !batch && !intake;
+  const savableItems = useMemo(() => items.filter((it) => it.file), [items]);
+  const [saveBatchOpen, setSaveBatchOpen] = useState(false);
+  const [saveBatchName, setSaveBatchName] = useState('');
+  const [saveProgress, setSaveProgress] = useState<{ done: number; total: number } | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedBatch, setSavedBatch] = useState<ScanBatchUploadFinishedDto | null>(null);
+  const saveAsBatch = async () => {
+    // A snapshot: scans added while it uploads stay on the page.
+    const toSave = itemsRef.current.filter((it) => it.file);
+    if (toSave.length === 0) return;
+    setSaveError(null);
+    setSavedBatch(null);
+    setSaveProgress({ done: 0, total: toSave.length });
+    let batchIdSaving: number | null = null;
+    try {
+      const started = await api.scanBatchUploadStart({
+        name: saveBatchName.trim() || null,
+        game,
+        isFoil,
+        condition,
+        language: language || null,
+        setCodes: artSets.map((s) => s.setCode),
+        defaultContainerId: containerId === '' ? null : containerId,
+      });
+      batchIdSaving = started.id;
+      // The list's order (newest first) becomes the batch's order.
+      const queue = toSave.map((it, i) => ({ it, sequence: i + 1 }));
+      let done = 0;
+      let failure: unknown = null;
+      const worker = async () => {
+        for (;;) {
+          const next = queue.shift();
+          if (!next) return;
+          try {
+            await api.scanBatchUploadItem(started.id, next.it.file!, toUploadItem(next.it, next.sequence));
+            setSaveProgress({ done: ++done, total: toSave.length });
+          } catch (e) {
+            // Stop the other workers too, and only cancel once nothing is still in flight.
+            failure ??= e;
+            queue.length = 0;
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(3, queue.length) }, worker));
+      if (failure) throw failure;
+      const result = await api.scanBatchUploadFinish(started.id);
+      batchIdSaving = null;
+      const saved = new Set(toSave.map((it) => it.key));
+      dropItems((it) => saved.has(it.key));
+      setSelectedKey((cur) => (cur && saved.has(cur) ? null : cur));
+      setSavedBatch(result);
+      setSaveBatchOpen(false);
+      setSaveBatchName('');
+      invalidateScanBatches(qc);
+    } catch (e) {
+      if (batchIdSaving != null) void api.scanBatchUploadCancel(batchIdSaving).catch(() => undefined);
+      setSaveError((e as Error).message);
+    } finally {
+      setSaveProgress(null);
+    }
+  };
+
   // --- Keyboard review: Enter confirms the selected card and moves to the next one still to review;
   // ↑/↓ (K/J) move, S or / opens the catalog search, X excludes and moves on, Ctrl+Z undoes. ---
   // The card whose catalog search is open. Keyed to the card (not a flag reset by an effect) so moving
@@ -2821,6 +2905,85 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         </Alert>
       )}
 
+      {savedBatch && (
+        <Alert severity="success" onClose={() => setSavedBatch(null)}>
+          {t('scan.saveBatch.success', { count: savedBatch.items, name: savedBatch.name })}
+          {savedBatch.duplicates > 0 && <> {t('scan.saveBatch.duplicates', { count: savedBatch.duplicates })}</>}
+        </Alert>
+      )}
+
+      <Dialog
+        open={saveBatchOpen}
+        onClose={() => saveProgress == null && setSaveBatchOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>{t('scan.saveBatch.title')}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2}>
+            <DialogContentText>
+              {t('scan.saveBatch.body', {
+                count: savableItems.length,
+                game: gamesQuery.data?.find((g) => g.id === game)?.displayName ?? game,
+              })}{' '}
+              {t('scan.saveBatch.released')}
+            </DialogContentText>
+            {savableItems.some((it) => it.status !== 'done') && (
+              <Typography variant="body2" color="text.secondary">
+                {t('scan.saveBatch.stillMatching', {
+                  count: savableItems.filter((it) => it.status !== 'done').length,
+                })}
+              </Typography>
+            )}
+            {selectedLocationName && (
+              <Typography variant="body2" color="text.secondary">
+                {t('scan.saveBatch.location', { location: selectedLocationName })}
+              </Typography>
+            )}
+            <TextField
+              autoFocus
+              label={t('scan.saveBatch.name')}
+              helperText={t('scan.saveBatch.nameHelp')}
+              value={saveBatchName}
+              disabled={saveProgress != null}
+              onChange={(e) => setSaveBatchName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && saveProgress == null) void saveAsBatch();
+              }}
+              slotProps={{ htmlInput: { maxLength: 190 } }}
+            />
+            {saveProgress && (
+              <Box>
+                <LinearProgress
+                  variant="determinate"
+                  value={saveProgress.total ? (saveProgress.done / saveProgress.total) * 100 : 0}
+                />
+                <Typography variant="caption" color="text.secondary">
+                  {t('scan.saveBatch.saving', {
+                    done: fmt.number(saveProgress.done),
+                    total: fmt.number(saveProgress.total),
+                  })}
+                </Typography>
+              </Box>
+            )}
+            {saveError && <Alert severity="error">{t('scan.saveBatch.failed', { error: saveError })}</Alert>}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={saveProgress != null} onClick={() => setSaveBatchOpen(false)}>
+            {t('common.actions.cancel')}
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<CloudUploadIcon />}
+            disabled={saveProgress != null || savableItems.length === 0}
+            onClick={() => void saveAsBatch()}
+          >
+            {t('scan.saveBatch.save')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {items.length > 0 && (
         <Paper variant="outlined" sx={{ p: 2, position: { xs: 'static', sm: 'sticky' }, top: 56, zIndex: 1 }}>
           <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
@@ -2959,6 +3122,23 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                   onExport={exportFormats}
                 />
               </>
+            )}
+            {canSaveBatch && (
+              <Tooltip title={t('scan.saveBatch.hint')}>
+                <span>
+                  <Button
+                    variant="outlined"
+                    startIcon={<CloudUploadIcon />}
+                    disabled={savableItems.length === 0 || saveProgress != null}
+                    onClick={() => {
+                      setSaveError(null);
+                      setSaveBatchOpen(true);
+                    }}
+                  >
+                    {t('scan.saveBatch.button')}
+                  </Button>
+                </span>
+              </Tooltip>
             )}
             <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
               {auditMode

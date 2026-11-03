@@ -1492,6 +1492,39 @@ public sealed record ScanBatchCommitResultDto(int Imported, bool BatchClosed, Bu
 
 public sealed record ScanBatchCountDto(int Unclaimed);
 
+/// <summary>Start saving the Scan page's scans as a batch: its game and the scan session's settings
+/// (kept as the batch's settings; <see cref="DefaultContainerId"/> is pre-selected at review). A blank
+/// <see cref="Name"/> becomes the user's name and the time.</summary>
+public sealed record ScanBatchUploadStartRequest
+{
+    public string? Name { get; init; }
+    public string Game { get; init; } = "";
+    public bool IsFoil { get; init; }
+    public string? Condition { get; init; }
+    /// <summary>The session's card language; blank = auto.</summary>
+    public string? Language { get; init; }
+    public IReadOnlyList<string> SetCodes { get; init; } = [];
+    public int? DefaultContainerId { get; init; }
+}
+
+public sealed record ScanBatchUploadStartedDto(int Id, string Name);
+
+/// <summary>One scan sent with its image to a batch being saved: its place in the list, the browser's
+/// match (null = not matched yet; the server matches it) and the per-copy properties (<c>Id</c> unused).</summary>
+public sealed record ScanBatchUploadItem
+{
+    public int Sequence { get; init; }
+    public ScanMatchDto? Match { get; init; }
+    public ScanBatchItemEdit Props { get; init; } = new();
+}
+
+/// <summary>Whether an uploaded scan was set aside as an exact copy of one already in a batch.</summary>
+public sealed record ScanBatchUploadItemResultDto(bool Duplicate);
+
+/// <summary>A saved batch, now released for review: <see cref="Items"/> scans, <see cref="Duplicates"/>
+/// exact copies set aside.</summary>
+public sealed record ScanBatchUploadFinishedDto(int Id, string Name, int Items, int Duplicates);
+
 /// <summary>Watched scan folder configuration (Settings ▸ Scan, admin only).</summary>
 public sealed record ScanFolderSettingsDto
 {

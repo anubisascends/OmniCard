@@ -50,7 +50,7 @@ public sealed class CardScanController(
         new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".tif", ".tiff" };
     // TIFF scans (e.g. from a flatbed) are far larger than JPEG/PNG phone photos, so the cap is
     // generous. GDI+ still has to decode the whole thing, so it isn't unbounded.
-    private const long MaxFileSize = 30 * 1024 * 1024; // 30 MB
+    internal const long MaxFileSize = 30 * 1024 * 1024; // 30 MB
 
     /// <summary>An upload is accepted when its content type OR file extension is a known image format.
     /// The extension fallback matters because some OSes hand a <c>.tif</c> up as
