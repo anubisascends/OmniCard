@@ -67,7 +67,7 @@ The sidebar on the left lists the sections you have access to. You might not see
 
 | Section | What it's for | Learn more |
 |---|---|---|
-| **Dashboard** | Totals for your collection's cost, market value and profit | [Dashboard](help:dashboard) |
+| **Dashboard** | Totals, tables and charts of your collection's cost, market value and profit, arranged the way you like | [Dashboard](help:dashboard) |
 | **Scan** | Photograph or upload cards and add them to a location | [Scanning cards](help:scanning) |
 | **Collection** | Search, edit, move, export and sell cards you own | [Collection](help:collection) |
 | **Locations** | Binders, boxes, deck boxes and display cases | [Locations](help:locations) |

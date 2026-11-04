@@ -66,7 +66,8 @@ public static class TagRuleQueryValidator
         {
             var v = f.Value.Trim();
             if (OwnedIsFlags.Contains(v)) return null;
-            if (v.Equals("missing", StringComparison.OrdinalIgnoreCase) || v.Equals("missingdb", StringComparison.OrdinalIgnoreCase))
+            if (v.Equals("missing", StringComparison.OrdinalIgnoreCase) || v.Equals("missingdb", StringComparison.OrdinalIgnoreCase)
+                || v.Equals("buylist", StringComparison.OrdinalIgnoreCase))
                 return $"Rules can't use is:{v}.";
             return game == CardGame.Mtg && ScryfallCardFilter.IsFlags.Contains(v) ? null : $"Unknown flag 'is:{v}'.";
         }

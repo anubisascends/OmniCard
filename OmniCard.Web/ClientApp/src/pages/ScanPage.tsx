@@ -40,6 +40,7 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
@@ -47,6 +48,7 @@ import FolderZipIcon from '@mui/icons-material/FolderZip';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
 import EditIcon from '@mui/icons-material/Edit';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import TrackChangesIcon from '@mui/icons-material/TrackChanges';
 import LockIcon from '@mui/icons-material/Lock';
 import PlaceIcon from '@mui/icons-material/Place';
 import ReplayIcon from '@mui/icons-material/Replay';
@@ -58,6 +60,8 @@ import { useFormatters } from '../i18n/format';
 import { useGame } from '../context/GameContext';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import { WebcamScanDialog } from '../components/dialogs/WebcamScanDialog';
+import { splitPhotoIntoCards } from '../utils/cardCapture';
+import { ensureCvReady } from '../utils/cvWorker';
 import { ScanValueBadges, ListReprintChip } from '../lib/scanBadges';
 import { ENGLISH, LanguageChip, LanguageSelect, languageName } from '../lib/cardLanguages';
 import {
@@ -70,15 +74,19 @@ import {
 import { ScanSessionStore } from '../lib/scanSessionStore';
 import { BatchItemStore } from '../lib/batchItemStore';
 import { usePermissions } from '../context/usePermissions';
-import { ScanBatchesPanel } from '../components/ScanBatchesPanel';
+import { ScanBatchesPanel, invalidateScanBatches } from '../components/ScanBatchesPanel';
 import { ScanValidationBar, type ScanValidationResult } from '../components/ScanValidationBar';
+import { BuyListHitChip, buyListFrameSx } from '../components/BuyListBadge';
 import type {
+  BuyListHitDto,
   AuditCommitResultDto,
   ScanBadgeSettingsDto,
   ScanBatchCommitResultDto,
   ScanBatchDto,
   ScanBatchItemDto,
   ScanBatchItemEdit,
+  ScanBatchUploadFinishedDto,
+  ScanBatchUploadItem,
   ScanCommitItem,
   ScanCommitResultDto,
   ScanMatchDto,
@@ -132,6 +140,10 @@ interface ScanItem extends ItemProps {
   dismissedRuleTags?: string[];
   /** The {@link ruleSignature} the item's rule tags were last worked out for. */
   ruleSig?: string;
+  /** Set when the card is on the game's Buy List. */
+  buyList?: BuyListHitDto;
+  /** The {@link buyListSignature} {@link buyList} was last worked out for. */
+  buyListSig?: string;
 }
 
 let seq = 0;
@@ -228,6 +240,13 @@ function ruleSignature(it: ScanItem, game: string): string | null {
   const id = identityOf(it);
   if (!id) return null;
   return [game, id.gameCardId, it.isFoil ? (it.foilType ?? 'foil') : '', it.condition, it.language].join('|');
+}
+
+/** What the Buy List looks at for an item, so a hand-corrected card is checked again. Null while the
+ * item has no identity. */
+function buyListSignature(it: ScanItem, game: string): string | null {
+  const id = identityOf(it);
+  return id ? [game, id.gameCardId, id.name, it.isFoil ? 'foil' : ''].join('|') : null;
 }
 
 /** Fold freshly computed rule tags into an item: rule tags that no longer apply come off, new ones go
@@ -330,9 +349,23 @@ function fromBatchItem(dto: ScanBatchItemDto): ScanItem {
 /** The reviewer-editable fields of a batch item, as saved to the server (match results never are). */
 function toBatchEdit(it: ScanItem): ScanBatchItemEdit | null {
   if (it.batchItemId == null) return null;
+  return batchProps(it, it.batchItemId);
+}
+
+/** A local scan as sent when the list is saved as a batch: the browser's match goes with it (a scan
+ * still matching, or that failed, goes without one and the server matches it). */
+function toUploadItem(it: ScanItem, sequence: number): ScanBatchUploadItem {
+  return {
+    sequence,
+    match: it.status === 'done' && it.match ? { ...it.match, scanPreviewDataUri: null } : null,
+    props: batchProps(it, 0),
+  };
+}
+
+function batchProps(it: ScanItem, id: number): ScanBatchItemEdit {
   const price = it.purchasePrice.trim() === '' ? null : Number(it.purchasePrice);
   return {
-    id: it.batchItemId,
+    id,
     include: it.include,
     verified: !!it.verified,
     override: it.override ?? null,
@@ -422,6 +455,8 @@ interface ScanListControls {
   sortDir: SortDir;
   /** Show only the scans that failed the last validation. */
   failedOnly: boolean;
+  /** Show only the scans on the Buy List. */
+  buyListOnly: boolean;
 }
 
 const DEFAULT_CONTROLS: ScanListControls = {
@@ -432,12 +467,14 @@ const DEFAULT_CONTROLS: ScanListControls = {
   sortKey: 'none',
   sortDir: 'asc',
   failedOnly: false,
+  buyListOnly: false,
 };
 
 /** Apply the filter half of the list controls to a single item. `failed` holds the keys that failed
  * the last validation. */
 function passesFilter(item: ScanItem, c: ScanListControls, failed?: ReadonlySet<string>): boolean {
   if (c.failedOnly && !failed?.has(item.key)) return false;
+  if (c.buyListOnly && !item.buyList) return false;
   if (c.checked === 'checked' && !item.include) return false;
   if (c.checked === 'unchecked' && item.include) return false;
   if (c.name.trim()) {
@@ -731,6 +768,7 @@ function propsSummary(item: ScanItem, t: TFunction): string {
  * key-based callbacks) so moving the selection re-renders two rows, not the whole list. */
 const MasterRow = memo(function MasterRow({
   item,
+  number,
   selected,
   badgeSettings,
   onSelect,
@@ -739,6 +777,8 @@ const MasterRow = memo(function MasterRow({
   failedValidation = false,
 }: {
   item: ScanItem;
+  /** The scan's place in the whole list (filters and sorts don't change it). */
+  number: number;
   selected: boolean;
   badgeSettings?: ScanBadgeSettingsDto;
   onSelect: (key: string) => void;
@@ -772,6 +812,7 @@ const MasterRow = memo(function MasterRow({
   return (
     <Box
       ref={rowRef}
+      data-scan-row={item.key}
       onClick={() => onSelect(item.key)}
       sx={{
         p: { xs: 1, sm: 1.5 },
@@ -783,10 +824,18 @@ const MasterRow = memo(function MasterRow({
         borderColor: selected ? 'primary.main' : 'transparent',
         // Inset so the frame doesn't shift the layout or get clipped by the list.
         ...(failedValidation && { outline: '2px solid', outlineColor: 'error.main', outlineOffset: '-2px' }),
+        ...buyListFrameSx(item.buyList?.priority),
         bgcolor: selected ? 'action.selected' : 'transparent',
         '&:hover': { bgcolor: selected ? 'action.selected' : 'action.hover' },
       }}
     >
+      <Typography
+        variant="caption"
+        color={selected ? 'primary' : 'text.secondary'}
+        sx={{ minWidth: 28, textAlign: 'right', fontWeight: selected ? 700 : 400, fontVariantNumeric: 'tabular-nums' }}
+      >
+        {t('scan.master.rowNumber', { number })}
+      </Typography>
       <Checkbox
         checked={item.include}
         disabled={readOnly}
@@ -824,6 +873,7 @@ const MasterRow = memo(function MasterRow({
           {propsSummary(item, t)}
         </Typography>
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+          {item.buyList && <BuyListHitChip hit={item.buyList} />}
           {failedValidation && (
             <Chip size="small" color="error" icon={<ErrorOutlineIcon />} label={t('scan.validation.failedChip')} />
           )}
@@ -985,6 +1035,54 @@ function PropertyFields({
   );
 }
 
+/** The selected scan's number, and a box to jump to another one: a long review on a phone can pick up
+ * where it left off. Enter (or the phone keyboard's Go) jumps; a number past the end does nothing. */
+function GoToScan({
+  selected,
+  total,
+  onGo,
+}: {
+  selected: number | null;
+  total: number;
+  onGo: (number: number) => void;
+}) {
+  const { t } = useTranslation();
+  const [text, setText] = useState('');
+  const number = Math.floor(Number(text));
+  const valid = text.trim() !== '' && number >= 1 && number <= total;
+  const go = () => {
+    if (!valid) return;
+    onGo(number);
+    setText('');
+  };
+  return (
+    <Stack direction="row" spacing={0.5} alignItems="center">
+      {selected != null && (
+        <Typography variant="caption" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+          {t('scan.master.selectedNumber', { number: selected, total })}
+        </Typography>
+      )}
+      <TextField
+        size="small"
+        type="number"
+        placeholder={t('scan.master.goToPlaceholder')}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          // Enter here must not confirm the selected card.
+          e.stopPropagation();
+          if (e.key === 'Enter') go();
+        }}
+        inputProps={{ min: 1, max: total, inputMode: 'numeric', enterKeyHint: 'go', 'aria-label': t('scan.master.goTo') }}
+        sx={{ width: 92, '& input': { py: 0.5, px: 1 } }}
+      />
+      <Button size="small" disabled={!valid} onClick={go} sx={{ minWidth: 0 }}>
+        {t('scan.master.go')}
+      </Button>
+    </Stack>
+  );
+}
+
 /** Detail panel for the selected scan: compare + verify/correct/remove + per-copy properties. */
 function DetailPanel({
   item,
@@ -1002,6 +1100,7 @@ function DetailPanel({
   onCorrectingChange,
   readOnly = false,
   failedValidationQuery = null,
+  intake = false,
 }: {
   item: ScanItem;
   game: string;
@@ -1021,6 +1120,8 @@ function DetailPanel({
   readOnly?: boolean;
   /** The validation query this card failed (null = it didn't fail, or wasn't validated). */
   failedValidationQuery?: string | null;
+  /** On the intake page, where cards are bought rather than added. */
+  intake?: boolean;
 }) {
   const { t } = useTranslation();
   const setCorrecting = onCorrectingChange;
@@ -1075,6 +1176,27 @@ function DetailPanel({
           </Box>
         ) : (
           <Alert severity="warning">{t('scan.detail.noConfidentMatch')}</Alert>
+        )}
+
+        {item.buyList && (
+          <Alert severity="warning" icon={<TrackChangesIcon />}>
+            <Typography variant="subtitle2">
+              {t('buyList.scan.detailTitle', { count: item.buyList.wantedQuantity })} ·{' '}
+              {t(`buyList.priority.${item.buyList.priority}`)}
+            </Typography>
+            {item.buyList.note && (
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
+                {item.buyList.note}
+              </Typography>
+            )}
+            {item.buyList.setAsideLocationName && (
+              <Typography variant="body2">
+                {t(intake ? 'buyList.scan.setAsideIntake' : 'buyList.scan.setAside', {
+                  location: item.buyList.setAsideLocationName,
+                })}
+              </Typography>
+            )}
+          </Alert>
         )}
 
         {failedValidationQuery !== null && (
@@ -1597,6 +1719,7 @@ export interface ScanBatchMode {
 
 export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitted, batch, intake }: ScanPageProps = {}) {
   const { t } = useTranslation();
+  const fmt = useFormatters();
   const qc = useQueryClient();
   const { game: contextGame } = useGame();
   const batchId = batch?.data.summary.id;
@@ -1615,6 +1738,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [webcamOpen, setWebcamOpen] = useState(false);
+  const [findingCards, setFindingCards] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [items, setItems] = useState<ScanItem[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -1651,9 +1775,14 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     [items, controls, validation],
   );
   const visibleKeys = useMemo(() => new Set(visibleItems.map((it) => it.key)), [visibleItems]);
+  // Each scan's number: its place in the whole list, so a card keeps its number through a filter, a
+  // sort, or a refresh (which clears them).
+  const scanNumbers = useMemo(() => new Map(items.map((it, i) => [it.key, i + 1])), [items]);
+  const selectedNumber = selectedKey === null ? null : (scanNumbers.get(selectedKey) ?? null);
   const controlsActive =
     controls.checked !== 'all' ||
     controls.failedOnly ||
+    controls.buyListOnly ||
     controls.name.trim() !== '' ||
     controls.minConfidence.trim() !== '' ||
     controls.minPrice.trim() !== '';
@@ -1666,6 +1795,22 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
       setSelectedKey(items[0].key);
     }
   }, [items, selectedKey]);
+
+  // Bring a row on screen in the list: Go to, and the card restored after a refresh. Asked for by key so
+  // it runs once the row has rendered (the filters may just have been cleared to show it).
+  const [scrollToKey, setScrollToKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (!scrollToKey || !visibleKeys.has(scrollToKey)) return;
+    document.querySelector(`[data-scan-row="${scrollToKey}"]`)?.scrollIntoView({ block: 'center' });
+    setScrollToKey(null);
+  }, [scrollToKey, visibleKeys]);
+  const goToNumber = (number: number) => {
+    const item = items[number - 1];
+    if (!item) return;
+    if (!visibleKeys.has(item.key)) setControls(DEFAULT_CONTROLS);
+    setSelectedKey(item.key);
+    setScrollToKey(item.key);
+  };
 
   const updateItem = (key: string, patch: Partial<ScanItem>) =>
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
@@ -1716,6 +1861,8 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     if (!boughtKeys?.length) return;
     const bought = new Set(boughtKeys);
     dropItems((it) => bought.has(it.key));
+    // The buy counted copies off the Buy List, so what's left is checked again.
+    setItems((prev) => prev.map((it) => ({ ...it, buyListSig: undefined })));
     // dropItems only wraps setItems; re-run solely when a new set of bought keys arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boughtKeys]);
@@ -1783,7 +1930,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
       // Audit mode reconciles the location against the scan; normal mode appends lots.
       return auditMode
         ? api.auditCommit(containerId as number, payload)
-        : api.scanCommit(containerId as number, payload);
+        : api.scanCommit(containerId as number, payload, false, true);
     },
     onSuccess: (res) => {
       // Drop the cards that were just committed; keep everything else (unchecked or unconfirmed).
@@ -1791,6 +1938,8 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
       qc.invalidateQueries({ queryKey: ['collection'] });
       qc.invalidateQueries({ queryKey: ['locations'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: ['buy-list'] });
+      setItems((prev) => prev.map((it) => ({ ...it, buyListSig: undefined })));
       if (auditMode) {
         // The audited location's card lists change wholesale — refresh its detail view too.
         qc.invalidateQueries({ queryKey: ['location'] });
@@ -1846,6 +1995,21 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
 
   function handleFiles(files: FileList | null) {
     return stageFiles(Array.from(files ?? []));
+  }
+
+  // A camera photo is cut into one scanner-style image per card in it (one card, or several laid out
+  // with gaps) before matching; a photo with no card found goes through untouched.
+  async function handlePhotos(files: FileList | null) {
+    const chosen = Array.from(files ?? []);
+    if (chosen.length === 0) return;
+    setFindingCards(true);
+    const cards: File[] = [];
+    try {
+      for (const file of chosen) cards.push(...(await splitPhotoIntoCards(file, game)));
+    } finally {
+      setFindingCards(false);
+    }
+    await stageFiles(cards);
   }
 
   // Stage a set of images and match them with bounded concurrency. Shared by the file-input paths and
@@ -1958,6 +2122,9 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         const revived = restored.items.map((it) => ({
           ...it,
           key: taken.has(it.key) ? `s${seq++}` : it.key,
+          // The Buy List may have changed since.
+          buyList: undefined,
+          buyListSig: undefined,
           // Blob URLs die with the tab; TIFFs never had one (their preview is the server's data URI).
           previewUrl:
             !it.file || isTiff(it.file) ? (it.match?.scanPreviewDataUri ?? '') : URL.createObjectURL(it.file),
@@ -1965,6 +2132,10 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         setGame(restored.game);
         setItems((prev) => [...prev, ...revived]);
         setRestoredKeys(new Set(revived.map((it) => it.key)));
+        if (restored.selectedKey && revived.some((it) => it.key === restored.selectedKey)) {
+          setSelectedKey(restored.selectedKey);
+          setScrollToKey(restored.selectedKey);
+        }
         // Scans that were still matching when the page went away get matched again.
         const pending = revived.filter((it) => it.status === 'matching');
         if (pending.length > 0) void matchItems(pending, restored.game);
@@ -1979,15 +2150,18 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   }, [sessionStore]);
   useEffect(() => {
     if (!sessionStore || !restoreDone.current) return;
-    const handle = window.setTimeout(() => void sessionStore.sync(game, items), 400);
+    const handle = window.setTimeout(() => void sessionStore.sync(game, items, selectedKey), 400);
     return () => window.clearTimeout(handle);
-  }, [items, game, sessionStore]);
+  }, [items, game, selectedKey, sessionStore]);
   // Flush on unmount (e.g. the audit navigates away right after committing) — the debounce would drop it.
   const gameRef = useRef(game);
   gameRef.current = game;
+  const selectedKeyRef = useRef(selectedKey);
+  selectedKeyRef.current = selectedKey;
   useEffect(
     () => () => {
-      if (sessionStore && restoreDone.current) void sessionStore.sync(gameRef.current, itemsRef.current);
+      if (sessionStore && restoreDone.current)
+        void sessionStore.sync(gameRef.current, itemsRef.current, selectedKeyRef.current);
     },
     [sessionStore],
   );
@@ -2078,6 +2252,53 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     }, 300);
     return () => window.clearTimeout(handle);
   }, [items, game, applyTagRules, readOnly]);
+  // --- Buy List: flag the cards on the game's list, checked by identity so a hand-corrected card counts.
+  // The server decides which copies are really wanted when the cards are committed or bought. ---
+  const buyListInFlight = useRef(new Set<string>());
+  useEffect(() => {
+    if (auditMode) return;
+    const pending = items.flatMap((it) => {
+      const sig = buyListSignature(it, game);
+      return sig !== null && sig !== it.buyListSig && !buyListInFlight.current.has(`${it.key}|${sig}`) ? [{ it, sig }] : [];
+    });
+    if (pending.length === 0) return;
+    const handle = window.setTimeout(() => {
+      for (let i = 0; i < pending.length; i += 200) {
+        const chunk = pending.slice(i, i + 200);
+        const sigs = new Map(chunk.map(({ it, sig }) => [it.key, sig]));
+        chunk.forEach(({ it, sig }) => buyListInFlight.current.add(`${it.key}|${sig}`));
+        // Apply only to items still showing the card that was checked. A failed check marks the item as
+        // checked anyway, so it isn't retried in a loop.
+        const settle = (hits: Map<string, BuyListHitDto>) =>
+          setItems((prev) =>
+            prev.map((it) => {
+              const sig = sigs.get(it.key);
+              if (sig === undefined || buyListSignature(it, game) !== sig) return it;
+              return { ...it, buyList: hits.get(it.key), buyListSig: sig };
+            }),
+          );
+        api
+          .scanBuyList(
+            game,
+            chunk.map(({ it }) => toRuleItem(it)),
+          )
+          .then((res) => settle(new Map(res.map((r) => [r.key, r.hit]))))
+          .catch((e) => {
+            console.warn('Checking the Buy List failed', e);
+            settle(new Map());
+          })
+          .finally(() => chunk.forEach(({ it, sig }) => buyListInFlight.current.delete(`${it.key}|${sig}`)));
+      }
+    }, 300);
+    return () => window.clearTimeout(handle);
+  }, [items, game, auditMode]);
+  const buyListCount = useMemo(() => items.filter((it) => it.buyList).length, [items]);
+  // Nothing left to show: don't leave the list filtered down to nothing.
+  useEffect(() => {
+    if (buyListCount === 0) setControls((c) => (c.buyListOnly ? { ...c, buyListOnly: false } : c));
+  }, [buyListCount]);
+  const commitBuyList = (commit.data as ScanCommitResultDto | undefined)?.buyList;
+
   // Hold the commit until every card about to be added has its rule tags.
   const rulesPending =
     applyTagRules && !readOnly && items.some((it) => isVisibleCommittable(it) && ruleSignature(it, game) !== it.ruleSig);
@@ -2237,6 +2458,72 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     );
   };
 
+  // --- Save as batch: store every local scan on the server as a scan batch, released for anyone to
+  // review, and clear them from this page. Images go up one per request (each under the server's
+  // request limit); if any fails, the half-sent batch is thrown away and the scans stay here. ---
+  const canSaveBatch = !auditMode && !batch && !intake;
+  const savableItems = useMemo(() => items.filter((it) => it.file), [items]);
+  const [saveBatchOpen, setSaveBatchOpen] = useState(false);
+  const [saveBatchName, setSaveBatchName] = useState('');
+  const [saveProgress, setSaveProgress] = useState<{ done: number; total: number } | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedBatch, setSavedBatch] = useState<ScanBatchUploadFinishedDto | null>(null);
+  const saveAsBatch = async () => {
+    // A snapshot: scans added while it uploads stay on the page.
+    const toSave = itemsRef.current.filter((it) => it.file);
+    if (toSave.length === 0) return;
+    setSaveError(null);
+    setSavedBatch(null);
+    setSaveProgress({ done: 0, total: toSave.length });
+    let batchIdSaving: number | null = null;
+    try {
+      const started = await api.scanBatchUploadStart({
+        name: saveBatchName.trim() || null,
+        game,
+        isFoil,
+        condition,
+        language: language || null,
+        setCodes: artSets.map((s) => s.setCode),
+        defaultContainerId: containerId === '' ? null : containerId,
+      });
+      batchIdSaving = started.id;
+      // The list's order (newest first) becomes the batch's order.
+      const queue = toSave.map((it, i) => ({ it, sequence: i + 1 }));
+      let done = 0;
+      let failure: unknown = null;
+      const worker = async () => {
+        for (;;) {
+          const next = queue.shift();
+          if (!next) return;
+          try {
+            await api.scanBatchUploadItem(started.id, next.it.file!, toUploadItem(next.it, next.sequence));
+            setSaveProgress({ done: ++done, total: toSave.length });
+          } catch (e) {
+            // Stop the other workers too, and only cancel once nothing is still in flight.
+            failure ??= e;
+            queue.length = 0;
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(3, queue.length) }, worker));
+      if (failure) throw failure;
+      const result = await api.scanBatchUploadFinish(started.id);
+      batchIdSaving = null;
+      const saved = new Set(toSave.map((it) => it.key));
+      dropItems((it) => saved.has(it.key));
+      setSelectedKey((cur) => (cur && saved.has(cur) ? null : cur));
+      setSavedBatch(result);
+      setSaveBatchOpen(false);
+      setSaveBatchName('');
+      invalidateScanBatches(qc);
+    } catch (e) {
+      if (batchIdSaving != null) void api.scanBatchUploadCancel(batchIdSaving).catch(() => undefined);
+      setSaveError((e as Error).message);
+    } finally {
+      setSaveProgress(null);
+    }
+  };
+
   // --- Keyboard review: Enter confirms the selected card and moves to the next one still to review;
   // ↑/↓ (K/J) move, S or / opens the catalog search, X excludes and moves on, Ctrl+Z undoes. ---
   // The card whose catalog search is open. Keyed to the card (not a flag reset by an effect) so moving
@@ -2369,6 +2656,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
       onProps={(patch) => updateProps(item.key, patch)}
       readOnly={readOnly}
       failedValidationQuery={validation?.failed.has(item.key) ? validation.query : null}
+      intake={!!intake}
     />
   );
 
@@ -2553,10 +2841,13 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
             />
             <Button
               variant="contained"
-              startIcon={<CameraAltIcon />}
+              startIcon={findingCards ? <CircularProgress size={18} color="inherit" /> : <CameraAltIcon />}
+              disabled={findingCards}
+              // Warm up the card finder while the camera app is open.
+              onPointerDown={() => void ensureCvReady().catch(() => undefined)}
               onClick={() => cameraInput.current?.click()}
             >
-              {t('scan.controls.takePhoto')}
+              {findingCards ? t('scan.controls.findingCards') : t('scan.controls.takePhoto')}
             </Button>
             <Button
               variant="outlined"
@@ -2581,7 +2872,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
               capture="environment"
               hidden
               onChange={(e) => {
-                void handleFiles(e.target.files);
+                void handlePhotos(e.target.files);
                 e.target.value = '';
               }}
             />
@@ -2634,6 +2925,85 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
           {t('scan.session.restored', { count: restoredStillPresent })}
         </Alert>
       )}
+
+      {savedBatch && (
+        <Alert severity="success" onClose={() => setSavedBatch(null)}>
+          {t('scan.saveBatch.success', { count: savedBatch.items, name: savedBatch.name })}
+          {savedBatch.duplicates > 0 && <> {t('scan.saveBatch.duplicates', { count: savedBatch.duplicates })}</>}
+        </Alert>
+      )}
+
+      <Dialog
+        open={saveBatchOpen}
+        onClose={() => saveProgress == null && setSaveBatchOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>{t('scan.saveBatch.title')}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2}>
+            <DialogContentText>
+              {t('scan.saveBatch.body', {
+                count: savableItems.length,
+                game: gamesQuery.data?.find((g) => g.id === game)?.displayName ?? game,
+              })}{' '}
+              {t('scan.saveBatch.released')}
+            </DialogContentText>
+            {savableItems.some((it) => it.status !== 'done') && (
+              <Typography variant="body2" color="text.secondary">
+                {t('scan.saveBatch.stillMatching', {
+                  count: savableItems.filter((it) => it.status !== 'done').length,
+                })}
+              </Typography>
+            )}
+            {selectedLocationName && (
+              <Typography variant="body2" color="text.secondary">
+                {t('scan.saveBatch.location', { location: selectedLocationName })}
+              </Typography>
+            )}
+            <TextField
+              autoFocus
+              label={t('scan.saveBatch.name')}
+              helperText={t('scan.saveBatch.nameHelp')}
+              value={saveBatchName}
+              disabled={saveProgress != null}
+              onChange={(e) => setSaveBatchName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && saveProgress == null) void saveAsBatch();
+              }}
+              slotProps={{ htmlInput: { maxLength: 190 } }}
+            />
+            {saveProgress && (
+              <Box>
+                <LinearProgress
+                  variant="determinate"
+                  value={saveProgress.total ? (saveProgress.done / saveProgress.total) * 100 : 0}
+                />
+                <Typography variant="caption" color="text.secondary">
+                  {t('scan.saveBatch.saving', {
+                    done: fmt.number(saveProgress.done),
+                    total: fmt.number(saveProgress.total),
+                  })}
+                </Typography>
+              </Box>
+            )}
+            {saveError && <Alert severity="error">{t('scan.saveBatch.failed', { error: saveError })}</Alert>}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={saveProgress != null} onClick={() => setSaveBatchOpen(false)}>
+            {t('common.actions.cancel')}
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<CloudUploadIcon />}
+            disabled={saveProgress != null || savableItems.length === 0}
+            onClick={() => void saveAsBatch()}
+          >
+            {t('scan.saveBatch.save')}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {items.length > 0 && (
         <Paper variant="outlined" sx={{ p: 2, position: { xs: 'static', sm: 'sticky' }, top: 56, zIndex: 1 }}>
@@ -2774,6 +3144,23 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                 />
               </>
             )}
+            {canSaveBatch && (
+              <Tooltip title={t('scan.saveBatch.hint')}>
+                <span>
+                  <Button
+                    variant="outlined"
+                    startIcon={<CloudUploadIcon />}
+                    disabled={savableItems.length === 0 || saveProgress != null}
+                    onClick={() => {
+                      setSaveError(null);
+                      setSaveBatchOpen(true);
+                    }}
+                  >
+                    {t('scan.saveBatch.button')}
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
             <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
               {auditMode
                 ? t('scan.audit.commitHint')
@@ -2792,10 +3179,46 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
             {!auditMode && commit.data && (
               <Alert severity="success">
                 {t('scan.commit.success', { count: (commit.data as { imported: number }).imported })}
+                {commitBuyList && commitBuyList.matchedCopies > 0 && (
+                  <>
+                    {' '}
+                    {t('buyList.scan.committed', { count: commitBuyList.matchedCopies })}
+                  </>
+                )}
+                {commitBuyList && commitBuyList.setAsideCopies > 0 && (
+                  <>
+                    {' '}
+                    {t('buyList.scan.setAsideDone', {
+                      count: commitBuyList.setAsideCopies,
+                      locations: commitBuyList.setAsideLocations.join(', '),
+                    })}
+                  </>
+                )}
               </Alert>
+            )}
+            {!auditMode && commitBuyList && commitBuyList.notSetAside > 0 && (
+              <Alert severity="warning">{t('buyList.scan.notSetAside', { count: commitBuyList.notSetAside })}</Alert>
             )}
           </Stack>
         </Paper>
+      )}
+
+      {buyListCount > 0 && (
+        <Alert
+          severity="warning"
+          icon={<TrackChangesIcon />}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              onClick={() => setControls((c) => ({ ...c, buyListOnly: !c.buyListOnly }))}
+            >
+              {controls.buyListOnly ? t('buyList.scan.showAll') : t('buyList.scan.showOnly')}
+            </Button>
+          }
+        >
+          {t('buyList.scan.banner', { count: buyListCount })}
+        </Alert>
       )}
 
       {items.length > 0 && isPhone && !filtersOpen && (
@@ -2997,6 +3420,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                 {t('scan.master.invert')}
               </Button>
               <Box sx={{ flexGrow: 1 }} />
+              <GoToScan selected={selectedNumber} total={items.length} onGo={goToNumber} />
               <Typography variant="caption" color="text.secondary">
                 {t('scan.master.checkedCount', { count: checkedCount })}
               </Typography>
@@ -3025,6 +3449,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                 <MasterRow
                   key={item.key}
                   item={item}
+                  number={scanNumbers.get(item.key) ?? 0}
                   selected={item.key === selectedKey}
                   badgeSettings={badgeSettings}
                   onSelect={openRow}
@@ -3069,10 +3494,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
               <CloseIcon />
             </IconButton>
             <Typography variant="subtitle1" sx={{ flexGrow: 1 }} noWrap>
-              {t('scan.detail.position', {
-                index: visibleItems.findIndex((it) => it.key === selectedKey) + 1,
-                total: visibleItems.length,
-              })}
+              {t('scan.detail.position', { index: selectedNumber ?? 0, total: items.length })}
             </Typography>
             <IconButton aria-label={t('scan.detail.previous')} onClick={() => moveSelection(-1)}>
               <ArrowUpwardIcon />
@@ -3127,6 +3549,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
       )}
       <WebcamScanDialog
         open={webcamOpen}
+        game={game}
         onCapture={(file) => void stageFiles([file])}
         onClose={() => setWebcamOpen(false)}
       />

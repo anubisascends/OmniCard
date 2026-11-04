@@ -13,6 +13,10 @@
     "removePage": "Remove page {{page}}",
     "prev": "‹ Prev",
     "next": "Next ›",
+    "first": "« First",
+    "last": "Last »",
+    "firstTooltip": "The front of page 1 (Ctrl+Home)",
+    "lastTooltip": "The last page with a card on it, at the pocket after its last card (Ctrl+End)",
     "page": "Page {{page}}",
     "foilSuffix": " · Foil",
     "slotTooltip": "{{name}} · {{condition}}{{foilSuffix}} — click for details, right-click for actions",
@@ -40,9 +44,13 @@
       "move": "move",
       "page": "previous / next page",
       "firstLast": "first / last pocket",
+      "firstLastPage": "page 1 / last page with cards",
       "search": "search for this pocket",
       "type": "start typing a name to search",
+      "sets": "choose the sets to search",
       "remove": "take the card out (back to Unplaced)",
+      "copy": "copy this pocket’s card",
+      "paste": "paste a copy of it here",
       "addPage": "new sheet after this one (from a back page)",
       "removePage": "remove this page"
     },
@@ -51,6 +59,21 @@
       "back": "back of sheet {{sheet}}",
       "only": "sheet {{sheet}}, one side"
     },
+    "setFilter": {
+      "button": "Sets: {{sets}}",
+      "more": "+{{n}}",
+      "tooltip": "Search only these sets when adding a card (F2)",
+      "title": "Search these sets",
+      "help": "Card searches start limited to these sets until you leave this page. In the Add card dialog you can change them for one card, or press Alt+A to search all sets."
+    },
+    "foilRule": {
+      "label": "Foil if",
+      "placeholder": "e.g. r<rare",
+      "tooltip": "Cards matching this search are added as foil, in the finish beside it. Use the same syntax as card searches, e.g. r<rare (Magic) or r:common or r:uncommon. You can still change Foil for each card. Remembered for this binder.",
+      "finish": "Finish"
+    },
+    "copiedCard": "Copied: {{name}} ({{set}} #{{number}}) · Ctrl+V pastes a copy into a pocket",
+    "clipboardNotCard": "The clipboard doesn’t hold a binder card. Choose a pocket with a card and press Ctrl+C to copy it.",
     "sheetAfterPage": "Double-sided sheet after page {{page}}",
     "insertFromBack": "Page {{page}} is the front of its sheet, and a new sheet can't go between a sheet's two sides. Turn to the back (page {{back}}) and press + to add a sheet after it.",
     "removePageTitle": "Remove page {{page}}?",

@@ -145,6 +145,7 @@ public static class CollectionCardMatcher
         "nonfoil" => !c.IsFoil,
         "missing" => c.IsMissing,
         "missingdb" => c.FlagReason == FlagReason.MissingFromDatabase,
+        "buylist" => c.OnBuyList,
         _ => null,
     };
 

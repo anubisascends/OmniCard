@@ -5,6 +5,9 @@
       "lockedHelper": "Locked to this deck box’s game",
       "noCatalogMatches": "No matches in the {{game}} catalog.",
       "noCatalogMatchesInLanguages": "No {{languages}} matches in the {{game}} catalog.",
+      "noCatalogMatchesInSets": "No matches in {{sets}}.",
+      "searchAllSets": "Search all sets",
+      "setBoxOverrides": "The Set box is used instead",
       "added_one": "Added {{count}} card to {{location}}.",
       "added_other": "Added {{count}} cards to {{location}}.",
       "recentLine": "{{quantity}}× {{name}} · {{set}} #{{number}}",
@@ -20,7 +23,21 @@
         "choose": "choose",
         "pickThenAdd": "pick, then Enter again to add",
         "back": "back to the results",
-        "details": "condition, language, foil"
+        "sets": "sets",
+        "allSets": "all sets"
+      },
+      "withKey": "{{label}} ({{key}})",
+      "foilRuleChecking": "Checking the foil rule…",
+      "foilRuleApplied": "Foil: matches the binder’s foil rule",
+      "pickedKeys": {
+        "add": "add",
+        "addAndClose": "add & close",
+        "back": "back to the search",
+        "condition": "condition",
+        "language": "language",
+        "foil": "foil",
+        "price": "price",
+        "quantity": "quantity"
       }
     },
     "addToSlot": {
@@ -92,11 +109,16 @@
       "capturedCount": "Captured: {{count}}",
       "captureAlt": "Capture {{number}}",
       "captureNow": "Capture now",
+      "multiple": "Multiple cards",
+      "multipleHint": "Lay the cards flat with a finger-width gap between them. Each card becomes its own scan.",
+      "tooSmall": "The cards look small to the camera. Move it closer for sharper scans.",
       "status": {
         "starting": "Starting camera…",
         "searching": "Point a card at the camera",
+        "searchingMulti": "Point the camera at the cards",
         "stabilizing": "Hold steady…",
         "captured": "Captured ✓  —  present the next card",
+        "capturedMulti": "Captured ✓  —  swap in the next cards",
         "error": "Camera unavailable"
       },
       "errors": {

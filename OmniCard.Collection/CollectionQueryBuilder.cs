@@ -1,6 +1,8 @@
 using LinqExpression = System.Linq.Expressions.Expression;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query;
 using OmniCard.Data;
+using OmniCard.Shared.BuyList;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Games;
@@ -158,14 +160,25 @@ public static class CollectionQueryBuilder
                 card.Tags = tagsByLot.GetValueOrDefault(card.Id) ?? [];
         }
 
+        if (UsesBuyList(filter))
+        {
+            var entries = context.BuyListEntries.AsNoTracking().Where(e => e.WantedQuantity > 0).ToList();
+            foreach (var card in loaded)
+                card.OnBuyList = entries.Any(e => e.Game == card.Game
+                    && BuyListMatcher.Matches(e, card.Name, card.GameCardId, card.IsFoil));
+        }
+
         var resolve = CollectionCardMatcher.CreateResolver(gameServices, loaded);
         var matching = loaded.Where(c => CollectionCardMatcher.Matches(c, filter, resolve)).Select(c => c.Id).ToList();
         return cards.Where(c => EF.Parameter(matching).Contains(c.Id));
     }
 
-    /// <summary>The ownership <c>is:</c> flags, read from the lot (see <see cref="BuildIsExpression"/>).</summary>
+    /// <summary>The ownership <c>is:</c> flags, read from the lot (see <see cref="BuildIsExpression"/>) or,
+    /// for <c>buylist</c>, the unified store (see <see cref="BuildBuyListExpression"/>).</summary>
     private static readonly HashSet<string> OwnedIsFlags = new(StringComparer.OrdinalIgnoreCase)
-        { "foil", "nonfoil", "missing", "missingdb" };
+        { "foil", "nonfoil", "missing", "missingdb", BuyListFlag };
+
+    private const string BuyListFlag = "buylist";
 
     /// <summary>Whether <paramref name="f"/> is answered from the game catalog rather than the collection.</summary>
     private static bool IsCatalogField(FieldFilter f, CardGame? gameFilter, IReadOnlyDictionary<CardGame, ICardGameService> gameServices)
@@ -196,6 +209,17 @@ public static class CollectionQueryBuilder
         NotFilter n => UsesField(n.Inner, field),
         _ => false,
     };
+
+    private static bool UsesBuyList(FilterNode node) => node switch
+    {
+        FieldFilter f => f.Field == "is" && IsBuyListFlag(f.Value),
+        AndFilter a => a.Children.Any(UsesBuyList),
+        OrFilter o => o.Children.Any(UsesBuyList),
+        NotFilter n => UsesBuyList(n.Inner),
+        _ => false,
+    };
+
+    private static bool IsBuyListFlag(string value) => value.Equals(BuyListFlag, StringComparison.OrdinalIgnoreCase);
 
     private static readonly System.Reflection.MethodInfo LikeMethod =
         typeof(DbFunctionsExtensions).GetMethod(
@@ -257,6 +281,7 @@ public static class CollectionQueryBuilder
             "type" => BuildNullableStringExpression(param, nameof(CollectionCard.CardType), filter.Op, filter.Value),
             "rarity" => BuildRarityExpression(param, filter.Op, filter.Value),
             "color" => BuildColorExpression(param, filter.Op, filter.Value),
+            "is" when IsBuyListFlag(filter.Value) => BuildBuyListExpression(param, context),
             "is" => BuildIsExpression(param, filter.Value)!, // an ownership flag (catalog flags returned above)
             "foil" => BuildLegacyFoilExpression(param, filter.Value),
             "condition" or "cond" => BuildStringExpression(param, nameof(CollectionCard.Condition), filter.Op, filter.Value),
@@ -526,6 +551,22 @@ public static class CollectionQueryBuilder
                 LinqExpression.Constant((FlagReason?)FlagReason.MissingFromDatabase, typeof(FlagReason?))),
             _ => null,
         };
+    }
+
+    /// <summary><c>is:buylist</c>: the copy matches an entry still wanted — <see cref="BuyListMatcher.Matches"/>
+    /// in SQL, with the name test widened for the printing details <see cref="BuyListMatcher.BaseName"/> strips
+    /// (a correlated subquery, so it's safe under OR and NOT, unlike an id list).</summary>
+    private static LinqExpression BuildBuyListExpression(System.Linq.Expressions.ParameterExpression param, OmniCardDbContext context)
+    {
+        var entries = context.BuyListEntries.AsNoTracking();
+        System.Linq.Expressions.Expression<Func<CollectionCard, bool>> onList = c => entries.Any(e =>
+            e.WantedQuantity > 0
+            && e.Game == c.Game
+            && (e.Foil == null || e.Foil == c.IsFoil)
+            && (e.GameCardId == c.GameCardId
+                || (!e.PinPrinting
+                    && (c.Name == e.MatchName || c.Name.StartsWith(e.MatchName + " (") || c.Name.StartsWith(e.MatchName + " - ")))));
+        return ReplacingExpressionVisitor.Replace(onList.Parameters[0], param, onList.Body);
     }
 
     private static LinqExpression BuildLegacyFoilExpression(System.Linq.Expressions.ParameterExpression param, string value)

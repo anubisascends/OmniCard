@@ -202,6 +202,31 @@ License:     Apache License 2.0 (@zxing/library); MIT License (@zxing/browser)
 Copyright (c) ZXing authors; zxing-js contributors.
 
 --------------------------------------------------------------------------------
+Microsoft.SqlServer.TransactSql.ScriptDom 180.140.0 — MIT License
+--------------------------------------------------------------------------------
+Components:  The T-SQL parser used to check the Dashboard's SQL widgets (one
+             read-only SELECT) before they run.
+Homepage:    https://github.com/microsoft/SqlScriptDOM
+Copyright (c) Microsoft Corporation.
+
+--------------------------------------------------------------------------------
+MUI X Charts (@mui/x-charts) 7.29.1 — MIT License
+--------------------------------------------------------------------------------
+Components:  Bar, line, area and pie charts on the SPA's Dashboard widgets.
+Homepage:    https://mui.com/x/react-charts/
+             https://github.com/mui/mui-x
+Copyright (c) 2020 Material-UI SAS.
+
+--------------------------------------------------------------------------------
+React-Grid-Layout 1.5.4 and react-resizable 3.2.0 — MIT License
+--------------------------------------------------------------------------------
+Components:  The Dashboard's drag-and-resize widget grid (react-resizable is
+             its resize-handle dependency).
+Homepage:    https://github.com/react-grid-layout/react-grid-layout
+             https://github.com/react-grid-layout/react-resizable
+Copyright (c) 2016 Samuel Reed.
+
+--------------------------------------------------------------------------------
 pdfme 6.2.6 — MIT License (@pdfme/ui, @pdfme/generator, @pdfme/schemas,
 @pdfme/common, @pdfme/pdf-lib)
 --------------------------------------------------------------------------------

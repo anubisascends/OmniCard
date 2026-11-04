@@ -98,6 +98,7 @@ public sealed class MetaController(IEnumerable<ICardGameService> gameServices) :
             new("Backend", "Serilog.Sinks.File", "6.0.0", "Apache-2.0", "https://github.com/serilog/serilog-sinks-file", apache2),
             new("Backend", "Serilog.Extensions.Logging", "10.0.0", "Apache-2.0", "https://github.com/serilog/serilog-extensions-logging", apache2),
             new("Backend", "CommunityToolkit.Mvvm", "8.4.2", "MIT", "https://github.com/CommunityToolkit/dotnet", mit),
+            new("Backend", "Microsoft.SqlServer.TransactSql.ScriptDom (SQL widget checks)", "180.140.0", "MIT", "https://github.com/microsoft/SqlScriptDOM", mit),
             new("Backend", "CsvHelper", "33.1.0", "MS-PL OR Apache-2.0", "https://github.com/JoshClose/CsvHelper", apache2),
             new("Backend", "AdysTech.CredentialManager", "3.1.0", "Apache-2.0", "https://github.com/mnottale/AdysTech.CredentialManager", apache2),
 
@@ -115,6 +116,9 @@ public sealed class MetaController(IEnumerable<ICardGameService> gameServices) :
             new("Frontend", "React Router", "6.27.0", "MIT", "https://reactrouter.com", mit),
             new("Frontend", "MUI (Material UI)", "6.1.6", "MIT", "https://mui.com", mit),
             new("Frontend", "MUI X Data Grid", "7.22.2", "MIT", "https://mui.com/x/react-data-grid", mit),
+            new("Frontend", "MUI X Charts (dashboard charts)", "7.29.1", "MIT", "https://mui.com/x/react-charts", mit),
+            new("Frontend", "React-Grid-Layout (dashboard grid)", "1.5.4", "MIT", "https://github.com/react-grid-layout/react-grid-layout", mit),
+            new("Frontend", "react-resizable", "3.2.0", "MIT", "https://github.com/react-grid-layout/react-resizable", mit),
             new("Frontend", "Emotion", "11.x", "MIT", "https://emotion.sh", mit),
             new("Frontend", "TanStack Query", "5.59.16", "MIT", "https://tanstack.com/query", mit),
             new("Frontend", "ZXing (@zxing/library)", "0.23.0", "Apache-2.0", "https://github.com/zxing-js/library", apache2),

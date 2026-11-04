@@ -475,6 +475,22 @@ public class ScryfallServiceTests : IDisposable
         Assert.Equal(["Lightning Bolt"], Names(svc.SearchCards("!\"Lightning Bolt\"")));
     }
 
+    [Theory]
+    // The binder's foil rule: one printing (by set + collector number + id) against a query.
+    [InlineData("Lightning Bolt", "r<rare", true)]
+    [InlineData("Shivan Dragon", "r<rare", false)]
+    [InlineData("Shivan Dragon", "r>=rare", true)]
+    [InlineData("Lightning Bolt", "r:mythic or t:instant", true)]
+    [InlineData("Shivan Dragon", "r:mythic or t:instant", false)]
+    public void FoilRule_PrintingMatches(string name, string rule, bool expected)
+    {
+        SeedSearchCatalog();
+        var svc = CreateServiceWithLanguages();
+        var card = svc.SearchCards($"!\"{name}\"").Single();
+        Assert.Equal(expected, OmniCard.Web.Api.Controllers.BinderEditController.PrintingMatches(
+            svc, rule, card.GameSpecificId, card.SetCode, card.CollectorNumber));
+    }
+
     // --- Test helpers ---
 
     private class MockHttpMessageHandler : HttpMessageHandler

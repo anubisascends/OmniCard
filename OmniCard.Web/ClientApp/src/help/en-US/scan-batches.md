@@ -2,6 +2,8 @@
 
 Scan batches let a scanner drop images into a watched folder on the server, where OmniCard matches them in the background. You then review each batch on the Scan page and add it to a location, just like an interactive scan.
 
+You can also turn the scans you're working on in the browser into a batch with **Save as batch** on the Scan page. See [Save scans as a batch](help:scanning#save-scans-as-a-batch). Those batches skip the watched folder and the waiting steps below: they appear in the panel as soon as they're saved, already matching (or **Ready**), with nobody reviewing them.
+
 ## How scan batches work
 
 With interactive scanning you upload pictures from your browser and wait while they match (see [Scanning cards](help:scanning)). Scan batches turn that around:
@@ -73,7 +75,7 @@ Each batch shows:
 4. Check that **Add to location…** shows the right location. If the folder has a default location it is already selected; you can change it.
 5. Click **Add N confirmed cards**.
 
-The bar at the top of the batch shows the game and the batch's fixed settings (*Sets*, *Condition*, *Language*, *Foil*) taken from the folder. You can't add more pictures to a batch from the browser; save more files into the folder instead.
+The bar at the top of the batch shows the game and the batch's fixed settings (*Sets*, *Condition*, *Language*, *Foil*) taken from the folder, or from the Scan page session it was saved from. You can't add more pictures to a batch from the browser; save more files into the folder, or save another batch, instead.
 
 Your changes are saved to the server as you work. You don't have to finish in one sitting: leave the page and come back later with **Continue**.
 

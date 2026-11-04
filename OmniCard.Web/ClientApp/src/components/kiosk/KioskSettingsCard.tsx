@@ -135,6 +135,16 @@ export function KioskSettingsCard() {
             label={t('kiosk.settings.showPrices')}
           />
 
+          <Box>
+            <FormControlLabel
+              control={<Switch checked={draft.showBuyList} onChange={(e) => update({ showBuyList: e.target.checked })} />}
+              label={t('kiosk.settings.showBuyList')}
+            />
+            <Typography variant="caption" color="text.secondary" component="div">
+              {t('kiosk.settings.showBuyListHelp')}
+            </Typography>
+          </Box>
+
           <TextField
             label={t('kiosk.settings.welcomeMessage')}
             helperText={t('kiosk.settings.welcomeMessageHelp')}

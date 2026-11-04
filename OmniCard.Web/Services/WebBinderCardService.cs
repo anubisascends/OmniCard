@@ -612,6 +612,68 @@ public sealed class WebBinderCardService
         return lot.Id;
     }
 
+    /// <summary>Adds a new single copy of <paramref name="sourceLotId"/>'s card — the same printing and
+    /// finish (its Product), condition, language and cost — to the binder pocket at
+    /// (<paramref name="containerId"/>, <paramref name="page"/>, <paramref name="slot"/>), displacing any
+    /// occupant to the Unplaced pool like <see cref="AddMissingCardToSlot"/>. Drives the binder editor's
+    /// copy/paste (Ctrl+C on a pocket, Ctrl+V on another). Returns the new lot's id.</summary>
+    public int PasteCopyToSlot(int sourceLotId, int containerId, int page, int slot)
+    {
+        using var context = _dbFactory.CreateDbContext();
+        var source = context.Lots.AsNoTracking().Include(l => l.Product)
+            .FirstOrDefault(l => l.Id == sourceLotId && l.Product.Category == ProductCategory.Single)
+            ?? throw new InvalidOperationException("The copied card is no longer in your collection.");
+
+        DeckBoxGameGuard.ValidateIncoming(context, containerId, [source.Product.Game]);
+
+        var occupant = context.Lots.FirstOrDefault(l =>
+            l.LocationId == containerId && l.Page == page && l.Slot == slot);
+        if (occupant is not null)
+        {
+            occupant.Page = null;
+            occupant.Slot = null;
+        }
+
+        var lot = new InventoryLot
+        {
+            ProductId = source.ProductId,
+            Quantity = 1,
+            Condition = source.Condition,
+            Language = source.Language,
+            UnitCost = source.UnitCost,
+            LocationId = containerId,
+            Page = page,
+            Slot = slot,
+        };
+        context.Lots.Add(lot);
+        context.SaveChanges();
+
+        context.Movements.Add(new InventoryMovement
+        {
+            ProductId = lot.ProductId,
+            LotId = lot.Id,
+            Type = MovementType.Acquire,
+            Quantity = 1,
+            UnitValue = lot.UnitCost,
+        });
+        context.SaveChanges();
+        return lot.Id;
+    }
+
+    /// <summary>The pocket of the binder's furthest-placed card (highest page, then highest slot), or
+    /// null when no card is placed — the binder editor's "Last" button turns to it.</summary>
+    public (int Page, int Slot)? LastPlacedPocket(int containerId)
+    {
+        using var context = _dbFactory.CreateDbContext();
+        var last = context.Lots.AsNoTracking()
+            .Where(l => l.LocationId == containerId && l.Page != null && l.Slot != null
+                && l.Product.Category == ProductCategory.Single)
+            .OrderByDescending(l => l.Page).ThenByDescending(l => l.Slot)
+            .Select(l => new { Page = l.Page!.Value, Slot = l.Slot!.Value })
+            .FirstOrDefault();
+        return last is null ? null : (last.Page, last.Slot);
+    }
+
     /// <summary>Moves one owned copy of <paramref name="lotId"/> into the binder pocket at
     /// (<paramref name="containerId"/>, <paramref name="page"/>, <paramref name="slot"/>). A single copy
     /// is split off a multi-copy lot so the remainder stays where it was; any card already in that pocket

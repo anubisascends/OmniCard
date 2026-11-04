@@ -1322,11 +1322,16 @@ public sealed record ScanCommitRequest
     /// (its review already shows the rule tags, and the user may have removed some); one-step adds such
     /// as the location "Add card" dialog turn it on.</summary>
     public bool ApplyTagRules { get; init; }
+    /// <summary>Count these cards against the Buy List and send wanted copies to its set-aside location.
+    /// The Scan page turns this on; one-step adds such as the location "Add card" dialog leave it off, so
+    /// a card added to a location by hand stays there.</summary>
+    public bool ApplyBuyList { get; init; }
 }
 
-/// <summary>Outcome of a scan commit. <paramref name="LotIds"/> are the created lots in input order (lets the
-/// Add card dialog undo an add).</summary>
-public sealed record ScanCommitResultDto(int Imported, int RuleTagged = 0, IReadOnlyList<int>? LotIds = null);
+/// <summary>Outcome of a scan commit. <paramref name="LotIds"/> are the created lots, in input order unless
+/// the Buy List moved some (lets the Add card dialog undo an add, which never uses the Buy List).</summary>
+public sealed record ScanCommitResultDto(
+    int Imported, int RuleTagged = 0, IReadOnlyList<int>? LotIds = null, BuyListCommitResultDto? BuyList = null);
 
 /// <summary>Export staged (not-yet-committed) scans as files without writing anything to the
 /// collection. One format ⇒ that file; several ⇒ a zip with one file per format.
@@ -1483,9 +1488,42 @@ public sealed record ScanBatchCommitRequest
 }
 
 /// <summary>Result of a batch commit; <see cref="BatchClosed"/> is true once no open items remain.</summary>
-public sealed record ScanBatchCommitResultDto(int Imported, bool BatchClosed);
+public sealed record ScanBatchCommitResultDto(int Imported, bool BatchClosed, BuyListCommitResultDto? BuyList = null);
 
 public sealed record ScanBatchCountDto(int Unclaimed);
+
+/// <summary>Start saving the Scan page's scans as a batch: its game and the scan session's settings
+/// (kept as the batch's settings; <see cref="DefaultContainerId"/> is pre-selected at review). A blank
+/// <see cref="Name"/> becomes the user's name and the time.</summary>
+public sealed record ScanBatchUploadStartRequest
+{
+    public string? Name { get; init; }
+    public string Game { get; init; } = "";
+    public bool IsFoil { get; init; }
+    public string? Condition { get; init; }
+    /// <summary>The session's card language; blank = auto.</summary>
+    public string? Language { get; init; }
+    public IReadOnlyList<string> SetCodes { get; init; } = [];
+    public int? DefaultContainerId { get; init; }
+}
+
+public sealed record ScanBatchUploadStartedDto(int Id, string Name);
+
+/// <summary>One scan sent with its image to a batch being saved: its place in the list, the browser's
+/// match (null = not matched yet; the server matches it) and the per-copy properties (<c>Id</c> unused).</summary>
+public sealed record ScanBatchUploadItem
+{
+    public int Sequence { get; init; }
+    public ScanMatchDto? Match { get; init; }
+    public ScanBatchItemEdit Props { get; init; } = new();
+}
+
+/// <summary>Whether an uploaded scan was set aside as an exact copy of one already in a batch.</summary>
+public sealed record ScanBatchUploadItemResultDto(bool Duplicate);
+
+/// <summary>A saved batch, now released for review: <see cref="Items"/> scans, <see cref="Duplicates"/>
+/// exact copies set aside.</summary>
+public sealed record ScanBatchUploadFinishedDto(int Id, string Name, int Items, int Duplicates);
 
 /// <summary>Watched scan folder configuration (Settings ▸ Scan, admin only).</summary>
 public sealed record ScanFolderSettingsDto
@@ -1812,6 +1850,112 @@ public sealed record ScanTagRulesRequest
 /// <summary>The rule tags for one scanned card (empty when no rule matches).</summary>
 public sealed record ScanTagRuleResultDto(string Key, IReadOnlyList<string> Tags);
 
+// ---- Buy List (cards the collection's owner wants to buy, one list per game) ----
+
+/// <summary>One Buy List entry as staff see it. <see cref="Foil"/>: true = foil only, false = non-foil only,
+/// null = either. <see cref="OwnedCopies"/> counts copies in the collection this user can see that match
+/// an active entry; fulfilled entries show 0.</summary>
+public sealed record BuyListEntryDto
+{
+    public int Id { get; init; }
+    public string Game { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string GameCardId { get; init; } = "";
+    public string? SetCode { get; init; }
+    public string? SetName { get; init; }
+    public string? CollectorNumber { get; init; }
+    public string? ImageUri { get; init; }
+    /// <summary>Only the printing above matches, rather than any printing of the card.</summary>
+    public bool PinPrinting { get; init; }
+    public bool? Foil { get; init; }
+    public int WantedQuantity { get; init; }
+    public int AcquiredQuantity { get; init; }
+    public string Priority { get; init; } = "Normal";
+    public string? Note { get; init; }
+    public int OwnedCopies { get; init; }
+    public DateTime CreatedAt { get; init; }
+    /// <summary>On a create: the card was already on the list, so its wanted quantity went up instead.</summary>
+    public bool Merged { get; init; }
+}
+
+/// <summary>Add a card to its game's Buy List. The printing fields say which card was picked; it is only
+/// pinned to that printing when <see cref="PinPrinting"/> is on.</summary>
+public sealed record BuyListEntryCreateRequest
+{
+    public string Game { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string GameCardId { get; init; } = "";
+    public string? SetCode { get; init; }
+    public string? SetName { get; init; }
+    public string? CollectorNumber { get; init; }
+    public string? ImageUri { get; init; }
+    public bool PinPrinting { get; init; }
+    public bool? Foil { get; init; }
+    public int WantedQuantity { get; init; } = 1;
+    public string Priority { get; init; } = "Normal";
+    public string? Note { get; init; }
+}
+
+/// <summary>Edit an entry. <see cref="WantedQuantity"/> 0 marks it fulfilled; raising it again puts it back
+/// on the active list.</summary>
+public sealed record BuyListEntryUpdateRequest
+{
+    public bool PinPrinting { get; init; }
+    public bool? Foil { get; init; }
+    public int WantedQuantity { get; init; } = 1;
+    public string Priority { get; init; } = "Normal";
+    public string? Note { get; init; }
+}
+
+/// <summary>The Buy List page: entries (all games when none was asked for) plus the asked-for game's
+/// set-aside location.</summary>
+public sealed record BuyListPageDto
+{
+    public IReadOnlyList<BuyListEntryDto> Items { get; init; } = [];
+    public int ActiveCount { get; init; }
+    public int FulfilledCount { get; init; }
+    public int? SetAsideLocationId { get; init; }
+    public string? SetAsideLocationName { get; init; }
+}
+
+/// <summary>Choose where a game's wanted copies are set aside; null = they stay with the rest.</summary>
+public sealed record BuyListSetAsideRequest(string Game, int? LocationId);
+
+/// <summary>Why a card is flagged: the best matching entry, and the copies wanted across every match.</summary>
+public sealed record BuyListHitDto
+{
+    public int EntryId { get; init; }
+    public string Priority { get; init; } = "Normal";
+    public int WantedQuantity { get; init; }
+    /// <summary>The staff note. Staff-only: never sent to customers.</summary>
+    public string? Note { get; init; }
+    /// <summary>Where wanted copies go when committed; null = no set-aside location.</summary>
+    public string? SetAsideLocationName { get; init; }
+}
+
+/// <summary>A scanned card that's on the Buy List. <see cref="Key"/> echoes the client's item id.</summary>
+public sealed record ScanBuyListResultDto(string Key, BuyListHitDto Hit);
+
+/// <summary>What a commit did with the Buy List. <see cref="SetAsideCopies"/> went to
+/// <see cref="SetAsideLocations"/>; <see cref="NotSetAside"/> copies stayed with the rest because the user
+/// can't write to the set-aside location's site.</summary>
+public sealed record BuyListCommitResultDto(
+    int MatchedCopies, int SetAsideCopies, IReadOnlyList<string> SetAsideLocations, int NotSetAside);
+
+/// <summary>A Buy List card as customers see it: no quantities, prices or notes.</summary>
+public sealed record KioskBuyListEntryDto
+{
+    public string Game { get; init; } = "";
+    public string GameName { get; init; } = "";
+    public string Name { get; init; } = "";
+    /// <summary>Filled only when a specific printing is wanted.</summary>
+    public string? SetName { get; init; }
+    public string? SetCode { get; init; }
+    public string? ImageUri { get; init; }
+    public bool? Foil { get; init; }
+    public string Priority { get; init; } = "Normal";
+}
+
 // ---- Scan validation (Scan page: flag scanned cards that don't match a search) ----
 
 /// <summary>A saved validation rule: a named search query for one game, shared by everyone who scans.</summary>
@@ -1939,6 +2083,7 @@ public sealed record KioskStatusDto
     /// <summary>False when no browsable location is configured (nothing to show customers).</summary>
     public bool HasLocations { get; init; }
     public bool ShowPrices { get; init; }
+    public bool ShowBuyList { get; init; }
     public int IdleTimeoutMinutes { get; init; }
     public string? WelcomeMessage { get; init; }
     /// <summary>The customer currently browsing on this device, if any.</summary>
@@ -2061,6 +2206,7 @@ public sealed record KioskSettingsDto
     public IReadOnlyList<int> LocationIds { get; init; } = [];
     public int IdleTimeoutMinutes { get; init; } = 15;
     public bool ShowPrices { get; init; } = true;
+    public bool ShowBuyList { get; init; } = true;
     public string? WelcomeMessage { get; init; }
 }
 
@@ -2087,6 +2233,9 @@ public sealed record IntakeSettingsDto
 {
     public decimal CashPercent { get; init; } = 70m;
     public decimal TradePercent { get; init; } = 80m;
+    /// <summary>Percentages for copies still wanted on the Buy List; null = the regular percentage.</summary>
+    public decimal? BuyListCashPercent { get; init; }
+    public decimal? BuyListTradePercent { get; init; }
     public IReadOnlyDictionary<string, decimal> ConditionPercents { get; init; } = new Dictionary<string, decimal>();
     public decimal BulkThreshold { get; init; }
     public string BulkMode { get; init; } = "FlatRate";
@@ -2118,7 +2267,9 @@ public sealed record IntakeQuoteRequest
     public IReadOnlyList<IntakeQuoteLineRequest> Lines { get; init; } = [];
 }
 
-/// <summary>A priced quote line (amounts per copy), parallel to the request's lines.</summary>
+/// <summary>A priced quote line (amounts per copy, averaged when only some copies get the Buy List rate),
+/// parallel to the request's lines. <see cref="BuyList"/> and <see cref="BuyListCopies"/> are for staff:
+/// the customer view never shows them.</summary>
 public sealed record IntakeQuoteLineDto
 {
     public decimal? MarketPrice { get; init; }
@@ -2132,6 +2283,10 @@ public sealed record IntakeQuoteLineDto
     public bool NeedsPrice { get; init; }
     public decimal CashUnit { get; init; }
     public decimal TradeUnit { get; init; }
+    /// <summary>The Buy List entry this card matches, if any.</summary>
+    public BuyListHitDto? BuyList { get; init; }
+    /// <summary>Copies on this line still wanted on the Buy List. The rest are ordinary copies.</summary>
+    public int BuyListCopies { get; init; }
 }
 
 public sealed record IntakeQuoteDto
@@ -2149,6 +2304,8 @@ public sealed record IntakeQuoteDto
     public bool SingleOffer { get; init; }
     /// <summary>Some included card still has no price; it must get one (or be excluded) before buying.</summary>
     public bool NeedsPrices { get; init; }
+    /// <summary>Some included copy pays the Buy List rate, so the offers aren't a flat percentage.</summary>
+    public bool BuyListRateApplied { get; init; }
 }
 
 /// <summary>Buy the quoted cards: price them again on the server, put them in the intake location, record
@@ -2165,7 +2322,9 @@ public sealed record IntakeAcceptRequest
     public decimal ExpectedTradePaid { get; init; }
 }
 
-public sealed record IntakeAcceptResultDto(int IntakeId, int CardCount, decimal CashPaid, decimal TradePaid, decimal? CustomerCreditBalance);
+public sealed record IntakeAcceptResultDto(
+    int IntakeId, int CardCount, decimal CashPaid, decimal TradePaid, decimal? CustomerCreditBalance,
+    BuyListCommitResultDto? BuyList = null);
 
 public sealed record IntakeSummaryDto
 {
@@ -2205,6 +2364,8 @@ public sealed record IntakeLineDto
     public string Payout { get; init; } = "Cash";
     public decimal UnitPaid { get; init; }
     public int? LotId { get; init; }
+    public bool OnBuyList { get; init; }
+    public string? SetAsideLocationName { get; init; }
 }
 
 public sealed record IntakeDetailDto
@@ -2237,3 +2398,117 @@ public sealed record StoreCreditAdjustRequest
     public decimal Amount { get; init; }
     public string Reason { get; init; } = "";
 }
+
+// --- Dashboard widgets ---
+
+/// <summary>A Dashboard: its widgets on a <see cref="Columns"/>-column grid.</summary>
+public sealed record DashboardLayoutDto
+{
+    /// <summary>Grid width every widget's <see cref="DashboardWidgetDto.X"/>/<see cref="DashboardWidgetDto.W"/> is measured in.</summary>
+    public const int Columns = 60;
+
+    public int Version { get; init; } = 1;
+    public List<DashboardWidgetDto> Widgets { get; init; } = [];
+}
+
+/// <summary>
+/// One Dashboard widget: where it sits, where its data comes from and how it's drawn. One flat record
+/// for every <see cref="Type"/>; fields a type doesn't use are null.
+/// <list type="bullet">
+/// <item><c>metric</c> — one holdings / sales total (<see cref="Metric"/>).</item>
+/// <item><c>breakdown</c> — holdings by game or category, or sales by game (<see cref="GroupBy"/>).</item>
+/// <item><c>search</c> — owned cards matching a search (<see cref="Query"/>) in one game or all
+/// (<see cref="Game"/>), as a <see cref="Output"/> of summary / cards / groups.</item>
+/// <item><c>sql</c> — a read-only SELECT (<see cref="Sql"/>) against the main store or a game's catalog
+/// (<see cref="Database"/>).</item>
+/// <item><c>note</c> — Markdown text (<see cref="Text"/>).</item>
+/// </list>
+/// Every data widget yields a table (<see cref="DashboardDataDto"/>) that <see cref="Display"/> draws as
+/// a stat, a table or a chart.
+/// </summary>
+public sealed record DashboardWidgetDto
+{
+    public string Id { get; init; } = "";
+    public string Type { get; init; } = "";
+
+    /// <summary>Shown in the widget's header; null = a title derived from its settings.</summary>
+    public string? Title { get; init; }
+
+    public int X { get; init; }
+    public int Y { get; init; }
+    public int W { get; init; }
+    public int H { get; init; }
+
+    // --- data source ---------------------------------------------------------------------------
+    public string? Metric { get; init; }
+    public string? GroupBy { get; init; }
+    public string? Game { get; init; }
+    public string? Query { get; init; }
+    public string? Output { get; init; }
+    public string? Sort { get; init; }
+    public int? Limit { get; init; }
+    public string? Sql { get; init; }
+    public string? Database { get; init; }
+    public string? Text { get; init; }
+
+    // --- display -------------------------------------------------------------------------------
+    /// <summary><c>stat</c>, <c>table</c> or <c>chart</c>.</summary>
+    public string? Display { get; init; }
+
+    /// <summary><c>bar</c>, <c>horizontalBar</c>, <c>line</c>, <c>area</c> or <c>pie</c>.</summary>
+    public string? Chart { get; init; }
+
+    /// <summary>The column naming each chart point; null = the first text column.</summary>
+    public string? LabelColumn { get; init; }
+
+    /// <summary>The columns charted (or shown, for a table); null/empty = every number column (every column).</summary>
+    public List<string>? ValueColumns { get; init; }
+
+    /// <summary>The column a stat shows (from the first row); null = the first number column.</summary>
+    public string? StatColumn { get; init; }
+
+    /// <summary>Per-column display format overrides: <c>number</c>, <c>money</c>, <c>percent</c>, <c>text</c>, <c>date</c>.</summary>
+    public Dictionary<string, string>? Formats { get; init; }
+
+    /// <summary>Stat shown green when ≥ 0 and red when negative.</summary>
+    public bool ColorBySign { get; init; }
+}
+
+/// <summary>One column of widget data. <see cref="Kind"/>: <c>text</c>, <c>number</c>, <c>money</c>,
+/// <c>percent</c>, <c>date</c> or <c>bool</c>.</summary>
+public sealed record DashboardColumnDto(string Key, string Kind);
+
+/// <summary>A widget's data as a table. <see cref="Truncated"/> = more rows matched than were returned.</summary>
+public sealed record DashboardDataDto
+{
+    public List<DashboardColumnDto> Columns { get; init; } = [];
+    public List<List<object?>> Rows { get; init; } = [];
+    public bool Truncated { get; init; }
+}
+
+/// <summary>A database a SQL widget can query: the main store (<c>main</c>) or a game's catalog (the game id).</summary>
+public sealed record DashboardSqlDatabaseDto(string Key, string Label);
+
+/// <summary>
+/// What the Dashboard page needs: the layout to show (<see cref="Source"/>: <c>personal</c>,
+/// <c>default</c> or <c>builtIn</c>) and everyone's default (<see cref="DefaultSource"/>: <c>default</c>
+/// or <c>builtIn</c>) to start editing from, plus what the user may change.
+/// </summary>
+public sealed record DashboardStateDto
+{
+    public DashboardLayoutDto Layout { get; init; } = new();
+    public string Source { get; init; } = "builtIn";
+    public DashboardLayoutDto DefaultLayout { get; init; } = new();
+    public string DefaultSource { get; init; } = "builtIn";
+    public bool CanEditDefault { get; init; }
+    public bool CanWriteSql { get; init; }
+    public bool CanSearchCollection { get; init; }
+    public List<DashboardSqlDatabaseDto> SqlDatabases { get; init; } = [];
+}
+
+/// <summary>The tables (and their columns) a SQL widget may read in one database.</summary>
+public sealed record DashboardSqlSchemaDto(List<DashboardSqlTableDto> Tables);
+
+public sealed record DashboardSqlTableDto(string Name, List<DashboardSqlColumnDto> Columns);
+
+public sealed record DashboardSqlColumnDto(string Name, string Type);

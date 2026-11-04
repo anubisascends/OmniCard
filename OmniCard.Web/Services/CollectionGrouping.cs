@@ -198,8 +198,9 @@ public static class CollectionGrouping
     }
 
     /// <summary>A card's group for one column: raw key, display label, and an ordering rank that
-    /// precedes the label (grade order for condition, non-foil before foil, English first…).</summary>
-    private static (string Key, string Label, int Rank) KeyOf(string field, CollectionCard c)
+    /// precedes the label (grade order for condition, non-foil before foil, English first…). Also used
+    /// by the Dashboard's grouped card-search widgets.</summary>
+    internal static (string Key, string Label, int Rank) KeyOf(string field, CollectionCard c)
     {
         switch (field)
         {

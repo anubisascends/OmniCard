@@ -191,6 +191,17 @@ function IntakeDetailDialog({ id, onClose }: { id: number | null; onClose: () =>
                           <Chip size="small" label={t('intake.historyPage.manual')} sx={{ ml: 0.5 }} />
                         )}
                         {l.isBulk && <Chip size="small" label={t('intake.historyPage.bulk')} sx={{ ml: 0.5 }} />}
+                        {l.onBuyList && (
+                          <Chip size="small" color="warning" label={t('buyList.intake.historyChip')} sx={{ ml: 0.5 }} />
+                        )}
+                        {l.setAsideLocationName && (
+                          <Chip
+                            size="small"
+                            variant="outlined"
+                            label={t('buyList.intake.historySetAside', { location: l.setAsideLocationName })}
+                            sx={{ ml: 0.5 }}
+                          />
+                        )}
                       </TableCell>
                       <TableCell align="right">{fmt.money(l.unitPaid)}</TableCell>
                       <TableCell>

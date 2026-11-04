@@ -48,8 +48,9 @@ public sealed class ScanBatchService(
         using var ctx = dbFactory.CreateDbContext();
         var closedSince = Now - ClosedVisibleFor;
         var batches = ctx.ScanBatches.AsNoTracking()
-            .Where(b => (b.Status != ScanBatchStatus.Committed && b.Status != ScanBatchStatus.Discarded)
-                        || b.ClosedUtc >= closedSince)
+            .Where(b => b.Status != ScanBatchStatus.Uploading
+                        && ((b.Status != ScanBatchStatus.Committed && b.Status != ScanBatchStatus.Discarded)
+                            || b.ClosedUtc >= closedSince))
             .OrderByDescending(b => b.Id)
             .ToList();
         var counts = ItemCounts(ctx, batches.Select(b => b.Id).ToList());
@@ -79,6 +80,7 @@ public sealed class ScanBatchService(
     {
         using var ctx = dbFactory.CreateDbContext();
         return ctx.ScanBatches.Count(b => b.ClaimedByUserId == null
+                                          && b.Status != ScanBatchStatus.Uploading
                                           && b.Status != ScanBatchStatus.Committed
                                           && b.Status != ScanBatchStatus.Discarded);
     }
@@ -174,6 +176,7 @@ public sealed class ScanBatchService(
         var now = Now;
         var updated = ctx.ScanBatches
             .Where(b => b.Id == id
+                        && b.Status != ScanBatchStatus.Uploading
                         && b.Status != ScanBatchStatus.Committed && b.Status != ScanBatchStatus.Discarded
                         && (force || b.ClaimedByUserId == null || b.ClaimedByUserId == userId))
             .ExecuteUpdate(u => u
@@ -185,6 +188,8 @@ public sealed class ScanBatchService(
             var batch = ctx.ScanBatches.AsNoTracking().FirstOrDefault(b => b.Id == id) ?? throw NotFound();
             if (!batch.IsOpen)
                 throw new ScanBatchException(ScanBatchErrorKind.Conflict, "This batch is already closed.");
+            if (batch.Status == ScanBatchStatus.Uploading)
+                throw new ScanBatchException(ScanBatchErrorKind.Conflict, "This batch is still being saved from the Scan page.");
             throw new ScanBatchException(ScanBatchErrorKind.Conflict,
                 $"This batch is being reviewed by {batch.ClaimedByName}.", batch.ClaimedByName);
         }
@@ -279,8 +284,10 @@ public sealed class ScanBatchService(
 
     /// <summary>Write the listed items into <paramref name="containerId"/> from the server's saved copy.
     /// The items are marked committed first (so a double submit can't create duplicate lots) and put
-    /// back if the write fails.</summary>
-    public ScanBatchCommitResultDto Commit(int id, int userId, int containerId, IReadOnlyList<int> itemIds)
+    /// back if the write fails. Copies wanted on the Buy List are counted off and set aside unless
+    /// <paramref name="canWriteLocation"/> refuses that location.</summary>
+    public ScanBatchCommitResultDto Commit(int id, int userId, int containerId, IReadOnlyList<int> itemIds,
+        Func<int, bool>? canWriteLocation = null)
     {
         if (containerId <= 0)
             throw new ScanBatchException(ScanBatchErrorKind.BadRequest, "A target location is required.");
@@ -311,10 +318,10 @@ public sealed class ScanBatchService(
             throw new ScanBatchException(ScanBatchErrorKind.Conflict, "Some of these cards were already committed. Reload the batch.");
         }
 
-        IReadOnlyList<int> lotIds;
+        ScanCommitOutcome outcome;
         try
         {
-            lotIds = commits.Commit(containerId, commitItems);
+            outcome = commits.CommitWithBuyList(containerId, commitItems, canWriteLocation);
         }
         catch
         {
@@ -324,8 +331,8 @@ public sealed class ScanBatchService(
 
         var closed = CloseIfEmpty(ctx, id);
         logger.LogInformation("Committed {Count} card(s) from scan batch {Batch} to location {LocationId}",
-            lotIds.Count, batch.Name, containerId);
-        return new ScanBatchCommitResultDto(lotIds.Count, closed);
+            commitItems.Count, batch.Name, containerId);
+        return new ScanBatchCommitResultDto(commitItems.Count, closed, outcome.BuyList);
     }
 
     /// <summary>Throw away every open item and close the batch. The reviewer or an admin may discard;
@@ -361,14 +368,17 @@ public sealed class ScanBatchService(
         logger.LogInformation("Discarded scan batch {Batch}", batch.Name);
     }
 
-    /// <summary>Delete closed batches (rows + stored images) older than <paramref name="retentionDays"/>.</summary>
+    /// <summary>Delete closed batches (rows + stored images) older than <paramref name="retentionDays"/>,
+    /// and batches whose save from the Scan page was abandoned part-way.</summary>
     public int PurgeExpired(int retentionDays)
     {
         using var ctx = dbFactory.CreateDbContext();
         var cutoff = Now - TimeSpan.FromDays(retentionDays);
+        var abandoned = Now - ScanBatchUploadService.AbandonedAfter;
         var expired = ctx.ScanBatches
-            .Where(b => (b.Status == ScanBatchStatus.Committed || b.Status == ScanBatchStatus.Discarded)
-                        && b.ClosedUtc < cutoff)
+            .Where(b => ((b.Status == ScanBatchStatus.Committed || b.Status == ScanBatchStatus.Discarded)
+                         && b.ClosedUtc < cutoff)
+                        || (b.Status == ScanBatchStatus.Uploading && b.LastFileUtc < abandoned))
             .Select(b => b.Id)
             .ToList();
         if (expired.Count == 0)
@@ -540,7 +550,8 @@ public sealed class ScanBatchService(
         Note = i.Note,
     };
 
-    private static void Apply(ScanBatchItem item, ScanBatchItemEdit e)
+    /// <summary>Copy the reviewer-editable fields onto an item (also used for a batch saved from the Scan page).</summary>
+    internal static void Apply(ScanBatchItem item, ScanBatchItemEdit e)
     {
         item.Include = e.Include;
         item.Verified = e.Verified;

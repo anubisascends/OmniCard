@@ -51,6 +51,8 @@ On the [Scan](/scan) page, tap **Take photo** to photograph a card with your pho
 
 Tap a card in the list to open it full screen. **Confirm match** confirms it and moves on to the next card that needs review. See [Reviewing on a phone](help:scanning#reviewing-on-a-phone).
 
+If the page reloads by accident, your scans come back and OmniCard returns to the card you were on. To jump to a card yourself, type its number in **Go to #** above the list. See [Pick up where you left off](help:scanning#pick-up-where-you-left-off).
+
 ## Good to know
 
 - Wide dialogs open full screen on a phone. Close them with their **Cancel**, **Close** or **Done** button.

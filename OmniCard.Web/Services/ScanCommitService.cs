@@ -5,8 +5,12 @@ using OmniCard.CardMatching;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.Tags;
 using OmniCard.Web.Api.Controllers;
+using OmniCard.Web.Services.BuyList;
 
 namespace OmniCard.Web.Services;
+
+/// <summary>Lots from a commit that went through the Buy List, and what it did with them.</summary>
+public sealed record ScanCommitOutcome(IReadOnlyList<int> LotIds, BuyListCommitResultDto? BuyList);
 
 /// <summary>
 /// Writes confirmed scans into a storage location as owned lots — shared by the interactive scan commit
@@ -17,8 +21,63 @@ public sealed class ScanCommitService(
     ICardService cardService,
     WebBinderCardService binderCards,
     ITagService tags,
+    BuyListService buyList,
     ILogger<ScanCommitService> logger)
 {
+    /// <summary><see cref="Commit"/>, plus the Buy List: copies still wanted count down and go to the
+    /// game's set-aside location, a stack splitting when only some of it is wanted. A copy stays in
+    /// <paramref name="containerId"/> when <paramref name="canWriteLocation"/> refuses the set-aside
+    /// location (null allows everything).</summary>
+    /// <exception cref="UnknownScanGameException">An item names an unknown game (nothing is written).</exception>
+    /// <exception cref="DeckBoxGameMismatchException">The location is a deck box for another game.</exception>
+    public ScanCommitOutcome CommitWithBuyList(int containerId, IReadOnlyList<ScanCommitItem> items, Func<int, bool>? canWriteLocation = null)
+    {
+        var candidates = items
+            .Select(i => new BuyListCandidate(LocationsController.ParseGame(i.Game) ?? throw new UnknownScanGameException(i.Game),
+                i.Name, i.GameCardId, i.IsFoil, Math.Max(1, i.Quantity)))
+            .ToList();
+        var allocations = buyList.Allocate(candidates);
+        var setAside = candidates.Select(c => c.Game).Distinct().ToDictionary(g => g, buyList.SetAsideLocation);
+
+        var stay = new List<ScanCommitItem>(items.Count);
+        var moved = new Dictionary<int, List<ScanCommitItem>>();
+        var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        int setAsideCopies = 0, notSetAside = 0;
+        for (var i = 0; i < items.Count; i++)
+        {
+            var copies = allocations[i].Copies;
+            var target = copies > 0 ? setAside[candidates[i].Game] : null;
+            if (target is not { } location || location.Id == containerId)
+            {
+                stay.Add(items[i]);
+                continue;
+            }
+            if (canWriteLocation?.Invoke(location.Id) == false)
+            {
+                stay.Add(items[i]);
+                notSetAside += copies;
+                continue;
+            }
+
+            if (!moved.TryGetValue(location.Id, out var group)) moved[location.Id] = group = [];
+            group.Add(items[i] with { Quantity = copies });
+            if (candidates[i].Quantity > copies) stay.Add(items[i] with { Quantity = candidates[i].Quantity - copies });
+            names.Add(location.Name);
+            setAsideCopies += copies;
+        }
+
+        // The chosen location first: it is the one a mismatch can refuse, and nothing has been written yet.
+        var lotIds = new List<int>(items.Count);
+        if (stay.Count > 0) lotIds.AddRange(Commit(containerId, stay));
+        foreach (var (locationId, group) in moved) lotIds.AddRange(Commit(locationId, group));
+
+        buyList.Consume(allocations);
+        var matched = allocations.Sum(a => a.Copies);
+        return new ScanCommitOutcome(lotIds, matched == 0 && notSetAside == 0
+            ? null
+            : new BuyListCommitResultDto(matched, setAsideCopies, names.ToList(), notSetAside));
+    }
+
     /// <summary>Create one lot per item in <paramref name="containerId"/>, tag each, and teach the
     /// matcher from the confirmed identities. Returns the created lot ids in input order.</summary>
     /// <exception cref="UnknownScanGameException">An item names an unknown game (nothing is written).</exception>

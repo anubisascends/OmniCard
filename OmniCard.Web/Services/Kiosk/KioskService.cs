@@ -130,6 +130,7 @@ public sealed class KioskService(
             Enabled = settings.Enabled,
             HasLocations = settings.LocationIds.Count > 0,
             ShowPrices = settings.ShowPrices,
+            ShowBuyList = settings.ShowBuyList,
             IdleTimeoutMinutes = settings.IdleTimeoutMinutes,
             WelcomeMessage = settings.WelcomeMessage,
             Session = GetSession(device.Id),

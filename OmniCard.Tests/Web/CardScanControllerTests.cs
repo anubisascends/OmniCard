@@ -53,8 +53,11 @@ public class CardScanControllerTests : IDisposable
     private CardScanController CreateController() =>
         new(matcher: null!, _cardService.Object, _binderCards, _tagService.Object,
             new CsvExportImportService(null, null, NullLogger<CsvExportImportService>.Instance),
-            new ScanCommitService(_cardService.Object, _binderCards, _tagService.Object, NullLogger<ScanCommitService>.Instance),
+            new ScanCommitService(_cardService.Object, _binderCards, _tagService.Object, BuyListServices.Create(new MockFactory(_opts)),
+                NullLogger<ScanCommitService>.Instance),
             TagRuleServices.Create(new MockFactory(_opts)),
+            BuyListServices.Create(new MockFactory(_opts)),
+            siteAccess: null!, // only read when a commit asks for the Buy List; these don't
             NullLogger<CardScanController>.Instance);
 
     private static IFormFile CreateFormFile(byte[]? content = null, string contentType = "image/jpeg",
@@ -200,7 +203,8 @@ public class CardScanControllerTests : IDisposable
 
         CreateController().Search("Mtg", "bolt", set: ["m10", "lea"], lang: ["en", "ja"]);
 
-        foreach (var q in new[] { "bolt set:m10 lang:en", "bolt set:m10 lang:ja", "bolt set:lea lang:en", "bolt set:lea lang:ja" })
+        // set= is the exact code — set: would also take sets whose name contains it.
+        foreach (var q in new[] { "bolt set=m10 lang:en", "bolt set=m10 lang:ja", "bolt set=lea lang:en", "bolt set=lea lang:ja" })
             game.Verify(s => s.SearchCards(q, 500), Times.Once);
     }
 

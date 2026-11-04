@@ -31,25 +31,41 @@ Only cards that are both **confirmed** and **checked** are added. Everything els
 
 | Button | Best for | What happens |
 |---|---|---|
-| **Take photo** | Phones and tablets | Opens the device's rear camera so you can photograph one card. On a computer it opens a normal file picker instead. |
-| **Use webcam** | A computer with a webcam | Opens a live camera view that finds the card and captures it automatically. |
+| **Take photo** | Phones and tablets | Opens the device's rear camera. Photograph one card, or several laid out side by side. Each card in the photo becomes its own scan. On a computer it opens a normal file picker instead. |
+| **Use webcam** | A computer with a webcam, or a phone | Opens a live camera view that finds cards and captures them automatically. |
 | **Add images** | Scanner output or saved photos | Lets you pick one or many image files at once. JPEG, PNG and TIFF files are supported. |
 
 You can mix all three in one session. New scans appear at the top of the list.
+
+Pictures from **Take photo** and **Use webcam** are straightened and cropped to look like the output of a document scanner: the card upright, at scanner resolution, with a thin white margin. That's the layout OmniCard reads set codes and collector numbers from, so camera scans match as well as scanner scans.
+
+### Several cards in one photo
+
+**Take photo** can scan a whole spread of cards at once:
+
+1. Lay the cards flat on a plain surface that contrasts with their borders, with a finger-width gap between them. Cards that touch or overlap can't be told apart.
+2. Tap **Take photo** and photograph them, keeping every card fully in view.
+3. While **Finding cards…** shows on the button, OmniCard cuts the photo into one scan per card. They appear in the list in reading order: left to right, top row first.
+
+The fewer cards in the photo, the more detail each one keeps. If a card comes back unmatched, photograph it on its own. A photo with no card found is added as it is.
 
 ### Scanning with a webcam
 
 1. Click **Use webcam**. The **Scan with webcam** window opens. If your browser asks for permission to use the camera, allow it.
 2. If you have more than one camera, choose it from the **Camera** list.
 3. Hold a card in front of the camera on a plain, contrasting background. An outline appears around the card when it is found.
-4. Keep the card still. The status changes from **Point a card at the camera** to **Hold steady…**, and after about a second the card is captured: the frame flashes and the status reads **Captured ✓ — present the next card**.
-5. Take the card away and present the next one. A card left sitting in view is captured only once.
-6. To capture the same card again, click **Capture now**.
+4. Keep the card still. The status changes from **Point a card at the camera** to **Hold steady…**. About a third of a second later, once the picture is in focus, the card is captured: the frame flashes, the outline turns green and the status reads **Captured ✓ — present the next card**.
+5. Present the next card. You can swap it straight in where the last one was. A card left sitting in view is captured only once.
+6. To capture the same card again, click **Capture now**, or take it away for a moment and present it again.
 7. Click **Done** when you are finished.
 
-The window shows how many cards you have captured and thumbnails of the last few. Each capture is straightened and cropped automatically, then sent for matching just like an uploaded image.
+To capture several cards at a time, turn on **Multiple cards** and lay the cards out with a finger-width gap between them. Every card in view is captured as its own scan. Swap in the next cards; only the ones that changed are captured again. OmniCard remembers this switch.
 
-![The Scan with webcam window with a card outlined and the captured count below](scanning-webcam.png)
+If **The cards look small to the camera** appears, move the camera closer (or use fewer cards). Small cards in the picture carry less detail for reading the set code and collector number.
+
+The window shows how many cards you have captured and thumbnails of the last few. Each capture is sent for matching just like an uploaded image.
+
+![The Scan with webcam window with Multiple cards on and four cards outlined and captured](scanning-webcam.png)
 
 > [!TIP]
 > Most browsers only allow webcam access when OmniCard is opened over a secure (https) address or on the same computer that runs it. If the camera won't start, use **Take photo** on a phone or **Add images** instead, or ask your administrator.
@@ -87,7 +103,9 @@ Matched cards are checked automatically; unmatched ones are not. When you confir
 
 On a wide screen the review list is on the left and the selected card's details are on the right. On a phone, tap a card in the list to open its details full screen (see [Reviewing on a phone](#reviewing-on-a-phone)).
 
-Each row shows the scan thumbnail next to the matched artwork, the card name, set and collector number, a one-line summary of its properties (condition, language, foil, quantity and a note icon), its badges and its tags. Tags added by a [tag rule](help:tag-rules) have a sparkle icon. A green check mark before the name means you have confirmed it.
+Each row shows the card's number (see [Go to a card](#go-to-a-card)), the scan thumbnail next to the matched artwork, the card name, set and collector number, a one-line summary of its properties (condition, language, foil, quantity and a note icon), its badges and its tags. Tags added by a [tag rule](help:tag-rules) have a sparkle icon. A green check mark before the name means you have confirmed it.
+
+A card on the game's [Buy List](help:buy-list) also gets a gold frame and a chip such as **Buy List Grail: want 2**, and a banner above the list counts these cards. Select **Show only these** to filter the list down to them.
 
 Click a row to see it in the detail panel:
 
@@ -146,6 +164,12 @@ The checkbox on each row decides whether the card is included when you add or ex
 - **Delete** in the list header removes every checked scan from the list, including scans that didn't match or are still matching. OmniCard asks you to confirm first, because this can't be undone.
 - **Confirm N checked** in the action bar confirms every checked, matched card at once. Use it after you have eyeballed a batch of strong matches.
 
+### Go to a card
+
+Every card in the list has a number, shown at the start of its row, and the selected card's number shows above the list as, for example, **#143 of 300**. The first row is #1. A card keeps its number when you filter or sort the list; numbers only change when cards are added to or removed from the list.
+
+To jump to a card, type its number in **Go to #** above the list and press Enter or select **Go**. If a filter is hiding that card, the filter is cleared so you can see it.
+
 ## Correct a wrong match
 
 1. Select the card and click **Search catalog**.
@@ -195,7 +219,7 @@ When the list is long, use the filter bar above it:
 While a filter or sort is on, you'll see *Showing X of Y* and a **Clear** button.
 
 > [!NOTE]
-> Everything in the action bar works only on the cards you can currently see. **Confirm**, **Add**, **Export**, check-all, bulk **Edit** and **Delete** all ignore rows hidden by a filter.
+> Everything in the action bar works only on the cards you can currently see. **Confirm**, **Add**, **Export**, check-all, bulk **Edit** and **Delete** all ignore rows hidden by a filter. The one exception is **Save as batch**, which always saves the whole list.
 
 ## Validate the list
 
@@ -302,9 +326,32 @@ Exported scans stay in the list, so you can still add them to a location later.
 > [!NOTE]
 > If you don't see **Export**, ask an administrator for access.
 
+## Save scans as a batch
+
+To finish a review later, on another device, or to hand it to someone else, save your scans to the server as a scan batch. For example, take photos with your phone, save them as a batch, then review them at a desktop.
+
+1. Add your pictures as usual: **Take photo**, **Use webcam** or **Add images**.
+2. Click **Save as batch**.
+3. Optionally type a **Batch name**. Leave it blank to use your name and the current time.
+4. Click **Save batch**. A progress bar shows the images being saved.
+
+When it's done, every scan in the list is stored on the server and cleared from this page, and *Saved N scans as the batch "name"* appears. The batch shows up in the **Scan batches** panel with nobody reviewing it, so anyone can open it, including you from another device. See [Scan batches](help:scan-batches#review-a-batch).
+
+What goes with the batch:
+
+- Every scan in the list, even ones hidden by a filter.
+- Matches, corrections, **Confirm match** marks, card properties and tags you've set.
+- Scans that are still matching (or failed to match) are matched on the server instead, so you don't have to wait for them.
+- The session's game, **Sets (art fallback)**, **Condition**, **Card language** and **Foil**. If you've chosen a location in **Add to location…**, it's pre-selected when the batch is reviewed.
+
+If saving fails part-way (for example the connection drops), nothing is saved and your scans stay in the list, so you can try again.
+
+> [!NOTE]
+> An image that is an exact copy of one already in a batch for the same game is skipped, as it is for watched folders. See [Duplicate images are skipped](help:scan-batches#duplicate-images-are-skipped).
+
 ## Pick up where you left off
 
-Your scan list is saved in this browser as you work. If you refresh the page, close the tab or your browser crashes, the next visit to Scan shows *Restored N scans from your last session*. Scans that were still matching are matched again automatically. Click **Discard** in that message to throw the restored scans away.
+Your scan list is saved in this browser as you work. If you refresh the page, close the tab or your browser crashes, the next visit to Scan shows *Restored N scans from your last session* and scrolls back to the card you had selected. Scans that were still matching are matched again automatically. Filters and sorting aren't saved, so they're cleared. Click **Discard** in that message to throw the restored scans away.
 
 The saved list belongs to this browser on this device only. It isn't kept in a private or incognito window, and another person or device won't see it.
 

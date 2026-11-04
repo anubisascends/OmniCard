@@ -343,6 +343,45 @@ public sealed class BinderEditController : ControllerBase
         return Ok(new { status = "ok" });
     }
 
+    public sealed record PasteRequest(int SourceLotId, int ContainerId, int Page, int Slot);
+
+    /// <summary>Paste a copied card into a binder pocket (the editor's Ctrl+C / Ctrl+V): a new copy of the
+    /// source lot's card, finish, condition and language. Displaces any current occupant to the pool.</summary>
+    [HttpPost("card/paste")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Lots = "SourceLotId", Location = "ContainerId")]
+    public IActionResult Paste([FromBody] PasteRequest r)
+    {
+        int lotId;
+        try { lotId = _binderCards.PasteCopyToSlot(r.SourceLotId, r.ContainerId, r.Page, r.Slot); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+        _tagRules.ApplyToNewLots([lotId]);
+        return Ok(new { status = "ok" });
+    }
+
+    /// <summary>Whether one catalog printing matches a search query — the binder editor's foil rule
+    /// ("cards matching this are foil"), checked when a printing is picked. Runs the rule scoped to the
+    /// printing's exact set + collector number through the game's own search, so every field and
+    /// operator the catalog search knows works here too.</summary>
+    [HttpGet("foil-rule/check")]
+    public IActionResult FoilRuleCheck(string game, string? rule, string? id, string? set = null, string? cn = null)
+    {
+        if (LocationsController.ParseGame(game) is not { } parsedGame)
+            return BadRequest(new { error = $"Unknown game '{game}'" });
+        if (string.IsNullOrWhiteSpace(rule) || string.IsNullOrWhiteSpace(id))
+            return Ok(new { matches = false });
+        var matches = PrintingMatches(_cardService.GetGameService(parsedGame), rule, id, set, cn);
+        return Ok(new { matches });
+    }
+
+    internal static bool PrintingMatches(ICardGameService svc, string rule, string id, string? set, string? cn)
+    {
+        // The rule is grouped so its own `or`s stay inside; quotes keep codes like "OP01-001" in one token.
+        var query = $"({rule.Trim()})";
+        if (!string.IsNullOrWhiteSpace(set)) query += $" set=\"{set.Replace("\"", "")}\"";
+        if (!string.IsNullOrWhiteSpace(cn)) query += $" cn=\"{cn.Replace("\"", "")}\"";
+        return svc.SearchCards(query, 500).Any(m => m.GameSpecificId == id);
+    }
+
     // ---------------------------------------------------------------- Pickers / lookups
 
     [HttpGet("locations")]

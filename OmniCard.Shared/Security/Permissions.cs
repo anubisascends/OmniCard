@@ -16,6 +16,9 @@ public static class Permissions
 {
     // Dashboard
     public const string DashboardView = "dashboard.view";
+    /// <summary>Write SQL widgets: read-only SELECTs over the whole database (except user accounts).
+    /// Without it a user can still show the SQL widgets on everyone's default dashboard.</summary>
+    public const string DashboardSql = "dashboard.sql";
 
     // Scan
     public const string ScanView = "scan.view";
@@ -132,6 +135,7 @@ public static class Permissions
         new("dashboard", "Dashboard",
         [
             new(DashboardView, "view", "View"),
+            new(DashboardSql, "sql", "Write SQL widgets"),
         ]),
         new("scan", "Scan",
         [

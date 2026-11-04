@@ -32,6 +32,17 @@
         "start": "Start browsing",
         "nameTaken": "Someone is already using \"{{name}}\". Try adding an initial or a nickname."
       },
+      "buyList": {
+        "open": "Cards we're looking for",
+        "title": "Cards we're looking for",
+        "body": "Have one of these? Bring it to the counter and ask about selling it to us.",
+        "foilOnly": "Foil only",
+        "nonFoilOnly": "Non-foil only",
+        "priority": {
+          "High": "Really want",
+          "Grail": "Most wanted"
+        }
+      },
       "browse": {
         "greeting": "Hi, {{name}}",
         "myList": "My list",
@@ -142,6 +153,8 @@
       "idleTimeout": "Idle timeout (minutes)",
       "idleTimeoutHelp": "A customer who stops using the kiosk for this long loses their unsent list. Lists sent to the counter never expire.",
       "showPrices": "Show prices to customers",
+      "showBuyList": "Show the Buy List to customers",
+      "showBuyListHelp": "Adds a \"Cards we're looking for\" button. Customers see the card, any wanted printing or finish, and its priority. They never see quantities, prices or notes.",
       "welcomeMessage": "Welcome message",
       "welcomeMessageHelp": "Optional text on the kiosk's welcome screen.",
       "saved": "Kiosk settings saved.",

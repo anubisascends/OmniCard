@@ -25,6 +25,7 @@ public sealed class KioskSettingsController(IKioskSettingsService settings, Kios
             LocationIds = request.LocationIds?.ToList() ?? [],
             IdleTimeoutMinutes = request.IdleTimeoutMinutes,
             ShowPrices = request.ShowPrices,
+            ShowBuyList = request.ShowBuyList,
             WelcomeMessage = request.WelcomeMessage,
         });
         return ToDto(settings.Get());
@@ -58,6 +59,7 @@ public sealed class KioskSettingsController(IKioskSettingsService settings, Kios
         LocationIds = s.LocationIds,
         IdleTimeoutMinutes = s.IdleTimeoutMinutes,
         ShowPrices = s.ShowPrices,
+        ShowBuyList = s.ShowBuyList,
         WelcomeMessage = s.WelcomeMessage,
     };
 }

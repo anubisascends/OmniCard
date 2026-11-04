@@ -1,0 +1,108 @@
+{
+  "buyList": {
+    "title": "Buy List",
+    "intro": "Cards the collection's owner wants to buy. They're flagged when they turn up in a scan or an intake, and customers can see them on the kiosk.",
+    "introAdmin": "Cards the collection's owner wants to buy. They're flagged when they turn up in a scan or an intake, and customers can see them on the kiosk. Each game has its own list.",
+    "addCard": "Add card",
+    "findInCollection": "Find in collection",
+    "search": "Search the Buy List",
+    "tabs": {
+      "active": "Wanted ({{count}})",
+      "fulfilled": "Fulfilled ({{count}})"
+    },
+    "empty": "Nothing on this Buy List yet.",
+    "emptyFulfilled": "No fulfilled cards yet.",
+    "noMatches": "No cards match that search.",
+    "setAside": {
+      "label": "Set-aside location",
+      "none": "None: keep them with the rest",
+      "help": "Wanted copies of this game go here when they're added from a scan or bought in an intake, instead of the location they would normally go to.",
+      "current": "Wanted copies go to {{location}}.",
+      "pickGame": "Choose a game in the top bar to set where its wanted copies go."
+    },
+    "row": {
+      "anyPrinting": "Any printing",
+      "wanted": "Want {{count}}",
+      "acquired": "{{count}} acquired",
+      "owned": "{{count}} in collection",
+      "foilOnly": "Foil only",
+      "nonFoilOnly": "Non-foil only"
+    },
+    "edit": {
+      "title": "Edit {{name}}",
+      "wanted": "Copies wanted",
+      "wantedHelp": "0 moves it to Fulfilled.",
+      "printing": "Printing",
+      "printingAny": "Any printing",
+      "printingOne": "Only {{set}} #{{number}}",
+      "finish": "Finish",
+      "finishAny": "Any finish",
+      "finishFoil": "Foil only",
+      "finishNonFoil": "Non-foil only",
+      "priority": "Priority",
+      "note": "Note for staff",
+      "noteHelp": "Shown in scans and intakes. Customers never see it."
+    },
+    "priority": {
+      "Normal": "Normal",
+      "High": "High",
+      "Grail": "Grail"
+    },
+    "delete": {
+      "title": "Remove {{name}}?",
+      "body": "It comes off the Buy List and stops being flagged.",
+      "confirm": "Remove"
+    },
+    "add": {
+      "title": "Add to the Buy List",
+      "button": "Add to Buy List",
+      "addedSoFar_one": "{{count}} card added",
+      "addedSoFar_other": "{{count}} cards added"
+    },
+    "marker": {
+      "Normal": "Buy List",
+      "High": "Buy List: High",
+      "Grail": "Buy List: Grail",
+      "wantedNormal_one": "Buy List: want {{count}}",
+      "wantedNormal_other": "Buy List: want {{count}}",
+      "wantedHigh_one": "Buy List High: want {{count}}",
+      "wantedHigh_other": "Buy List High: want {{count}}",
+      "wantedGrail_one": "Buy List Grail: want {{count}}",
+      "wantedGrail_other": "Buy List Grail: want {{count}}"
+    },
+    "scan": {
+      "banner_one": "{{count}} Buy List card in this scan. Don't pass it up.",
+      "banner_other": "{{count}} Buy List cards in this scan. Don't pass them up.",
+      "showOnly": "Show only these",
+      "showAll": "Show all",
+      "detailTitle_one": "On the Buy List: {{count}} copy wanted",
+      "detailTitle_other": "On the Buy List: {{count}} copies wanted",
+      "setAside": "Wanted copies go to {{location}} when added.",
+      "setAsideIntake": "Wanted copies go to {{location}} when bought.",
+      "committed_one": "{{count}} copy counted off the Buy List.",
+      "committed_other": "{{count}} copies counted off the Buy List.",
+      "setAsideDone_one": "{{count}} copy set aside in {{locations}}.",
+      "setAsideDone_other": "{{count}} copies set aside in {{locations}}.",
+      "notSetAside_one": "{{count}} copy stayed here: you can't add cards to the set-aside location.",
+      "notSetAside_other": "{{count}} copies stayed here: you can't add cards to the set-aside location."
+    },
+    "intake": {
+      "banner_one": "{{count}} Buy List card on this quote. Don't pass it up.",
+      "banner_other": "{{count}} Buy List cards on this quote. Don't pass them up.",
+      "rateApplied": "Includes the Buy List rate",
+      "noCopiesLeft": "All wanted copies are taken by other lines",
+      "partial": "Buy List rate on {{copies}} of {{total}} copies",
+      "setAsideBuy_one": "{{count}} Buy List copy goes to {{location}}.",
+      "setAsideBuy_other": "{{count}} Buy List copies go to {{location}}.",
+      "historyChip": "Buy List",
+      "historySetAside": "Set aside: {{location}}"
+    },
+    "settings": {
+      "title": "Buy List rate",
+      "help": "What to pay for copies still wanted on the Buy List. Leave blank to pay the regular percentage. Condition still applies, and wanted cards are never treated as bulk.",
+      "cash": "Cash % for Buy List cards",
+      "trade": "Trade % for Buy List cards",
+      "customerHint": "Sellers can see a higher per-card offer if the customer view shows card offers."
+    }
+  }
+}

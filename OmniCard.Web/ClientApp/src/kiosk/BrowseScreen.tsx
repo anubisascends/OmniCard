@@ -37,6 +37,7 @@ import { useTranslation } from 'react-i18next';
 import type { KioskCardDto, KioskSessionDto, KioskSessionItemDto, KioskStatusDto, KioskSubmitResultDto } from '../api/types';
 import { CardImage } from '../components/CardImage';
 import { useFormatters } from '../i18n/format';
+import { BuyListButton } from './BuyListButton';
 import { kioskApi, KioskApiError } from './kioskApi';
 
 const PAGE_SIZE = 48;
@@ -137,6 +138,7 @@ export function BrowseScreen({
           <Button color="inherit" onClick={() => setConfirmLeave(true)}>
             {t('kiosk.app.browse.startOver')}
           </Button>
+          {status.showBuyList && <BuyListButton inline />}
           <Button
             variant="contained"
             size="large"

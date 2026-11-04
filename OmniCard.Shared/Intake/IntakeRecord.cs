@@ -81,4 +81,11 @@ public class IntakeLine
 
     /// <summary>The inventory lot the copies became.</summary>
     public int? LotId { get; set; }
+
+    /// <summary>These copies were bought for the Buy List, at its rate if one was set.</summary>
+    public bool OnBuyList { get; set; }
+
+    /// <summary>The Buy List set-aside location these copies went to instead of the intake location
+    /// (its name at the time), or null when they stayed with the rest of the buy.</summary>
+    public string? SetAsideLocationName { get; set; }
 }

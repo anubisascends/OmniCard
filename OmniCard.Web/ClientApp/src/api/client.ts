@@ -1,4 +1,9 @@
 import type {
+  BuyListEntryCreateRequest,
+  BuyListEntryDto,
+  BuyListEntryUpdateRequest,
+  BuyListPageDto,
+  ScanBuyListResultDto,
   CollectionResetCountsDto,
   AccountDto,
   ActiveListingDto,
@@ -38,6 +43,11 @@ import type {
   IntakeSettingsDto,
   StoreCreditDto,
   DashboardDto,
+  DashboardDataDto,
+  DashboardLayoutDto,
+  DashboardSqlSchemaDto,
+  DashboardStateDto,
+  DashboardWidgetDto,
   DeckBoxNeedsGameDto,
   DeckLegalityDto,
   DeckBoxMissingCardDto,
@@ -88,6 +98,9 @@ import type {
   ScanBatchCommitResultDto,
   ScanBatchDto,
   ScanBatchItemEdit,
+  ScanBatchUploadFinishedDto,
+  ScanBatchUploadItem,
+  ScanBatchUploadStartRequest,
   ScanBatchSummaryDto,
   ScanFolderSettingsDto,
   ScanFolderSettingsResponse,
@@ -382,6 +395,17 @@ export const api = {
 
   // Dashboard
   dashboard: () => request<DashboardDto>('/api/dashboard'),
+  dashboardState: () => request<DashboardStateDto>('/api/dashboard/layout'),
+  saveDashboardLayout: (layout: DashboardLayoutDto) =>
+    request<DashboardLayoutDto>('/api/dashboard/layout', { method: 'PUT', body: JSON.stringify(layout) }),
+  resetDashboardLayout: () => request<void>('/api/dashboard/layout', { method: 'DELETE' }),
+  saveDefaultDashboardLayout: (layout: DashboardLayoutDto) =>
+    request<DashboardLayoutDto>('/api/dashboard/layout/default', { method: 'PUT', body: JSON.stringify(layout) }),
+  resetDefaultDashboardLayout: () => request<void>('/api/dashboard/layout/default', { method: 'DELETE' }),
+  dashboardWidgetData: (widget: DashboardWidgetDto, signal?: AbortSignal) =>
+    request<DashboardDataDto>('/api/dashboard/data', { method: 'POST', body: JSON.stringify(widget), signal }),
+  dashboardSqlSchema: (database: string) =>
+    request<DashboardSqlSchemaDto>(`/api/dashboard/sql/schema?database=${encodeURIComponent(database)}`),
 
   // Locations
   /** Locations in the sites the user can read; `siteId` narrows to one site. */
@@ -498,6 +522,17 @@ export const api = {
     foilType?: string | null;
     purchasePrice?: number | null;
   }) => request<void>('/api/binder/card/add-missing', { method: 'POST', body: JSON.stringify(body) }),
+  /** Paste a copied card into a pocket: a new copy of the source lot's card, finish, condition and language. */
+  binderPaste: (sourceLotId: number, containerId: number, page: number, slot: number) =>
+    request<void>('/api/binder/card/paste', {
+      method: 'POST',
+      body: JSON.stringify({ sourceLotId, containerId, page, slot }),
+    }),
+  /** Whether a catalog printing matches the binder's foil rule (a search query). */
+  binderFoilRuleCheck: (game: string, rule: string, printing: { gameCardId: string; setCode: string; collectorNumber: string }) =>
+    request<{ matches: boolean }>(
+      `/api/binder/foil-rule/check${qs({ game, rule, id: printing.gameCardId, set: printing.setCode, cn: printing.collectorNumber })}`,
+    ).then((r) => r.matches),
 
   // Collection
   collection: (opts: {
@@ -1087,10 +1122,18 @@ export const api = {
   scanFoilTypes: (game: string) => request<string[]>(`/api/scan/foil-types${qs({ game })}`),
   // `applyTagRules` has the server apply the tag rules to the new cards — for one-step adds with no
   // review. The Scan page leaves it off: its review already shows (and lets the user remove) rule tags.
-  scanCommit: (containerId: number, items: ScanCommitItem[], applyTagRules = false) =>
+  // `applyBuyList` counts the cards against the Buy List and sets wanted copies aside: the Scan page
+  // turns it on; one-step adds leave it off, so a card added to a location stays there.
+  scanCommit: (containerId: number, items: ScanCommitItem[], applyTagRules = false, applyBuyList = false) =>
     request<ScanCommitResultDto>('/api/scan/commit', {
       method: 'POST',
-      body: JSON.stringify({ containerId, items, applyTagRules }),
+      body: JSON.stringify({ containerId, items, applyTagRules, applyBuyList }),
+    }),
+  /** Which scanned, not-yet-saved cards of one game are on its Buy List. */
+  scanBuyList: (game: string, items: ScanTagRuleItem[]) =>
+    request<ScanBuyListResultDto[]>('/api/scan/buy-list', {
+      method: 'POST',
+      body: JSON.stringify({ game, items }),
     }),
   /** The enabled tag rules' tags for scanned, not-yet-saved cards of one game. */
   scanTagRules: (game: string, items: ScanTagRuleItem[]) =>
@@ -1168,7 +1211,30 @@ export const api = {
       body: JSON.stringify({ containerId, itemIds }),
     }),
   scanBatchDiscard: (id: number) => request<void>(`/api/scan/batches/${id}/discard`, { method: 'POST' }),
+  // Save the Scan page's scans as a batch: start (hidden, claimed by you), one upload per image, then
+  // finish (released for anyone to review) — or cancel to throw a half-sent one away.
+  scanBatchUploadStart: (req: ScanBatchUploadStartRequest) =>
+    request<{ id: number; name: string }>('/api/scan/batches/upload', { method: 'POST', body: JSON.stringify(req) }),
+  scanBatchUploadItem: (id: number, image: File, item: ScanBatchUploadItem) => {
+    const form = new FormData();
+    form.append('image', image);
+    form.append('item', JSON.stringify(item));
+    return postForm<{ duplicate: boolean }>(`/api/scan/batches/${id}/upload`, form);
+  },
+  scanBatchUploadFinish: (id: number) =>
+    request<ScanBatchUploadFinishedDto>(`/api/scan/batches/${id}/upload/finish`, { method: 'POST' }),
+  scanBatchUploadCancel: (id: number) => request<void>(`/api/scan/batches/${id}/upload/cancel`, { method: 'POST' }),
   // Tag rules (admin only).
+  buyList: (game: string | undefined, fulfilled: boolean) =>
+    request<BuyListPageDto>(`/api/buy-list${qs({ game, fulfilled })}`),
+  buyListCreate: (body: BuyListEntryCreateRequest) =>
+    request<BuyListEntryDto>('/api/buy-list', { method: 'POST', body: JSON.stringify(body) }),
+  buyListUpdate: (id: number, body: BuyListEntryUpdateRequest) =>
+    request<BuyListEntryDto>(`/api/buy-list/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  buyListDelete: (id: number) => request<void>(`/api/buy-list/${id}`, { method: 'DELETE' }),
+  buyListSetAside: (game: string, locationId: number | null) =>
+    request<void>('/api/buy-list/set-aside', { method: 'PUT', body: JSON.stringify({ game, locationId }) }),
+
   tagRules: (game?: string) => request<TagRuleDto[]>(`/api/tag-rules${qs({ game })}`),
   tagRuleCreate: (body: TagRuleInput) =>
     request<TagRuleDto>('/api/tag-rules', { method: 'POST', body: JSON.stringify(body) }),

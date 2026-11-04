@@ -63,7 +63,8 @@ public sealed class IntakeController(
             return StatusCode(403, new { error = "You can't add cards to the intake location's site." });
         try
         {
-            return intake.Accept(request, AppAuthGate.CurrentUserId(HttpContext), AppAuthGate.CurrentUsername(HttpContext) ?? "");
+            return intake.Accept(request, AppAuthGate.CurrentUserId(HttpContext), AppAuthGate.CurrentUsername(HttpContext) ?? "",
+                siteAccess.CanWriteLocation);
         }
         catch (IntakeException ex)
         {

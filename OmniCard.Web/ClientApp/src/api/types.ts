@@ -337,6 +337,80 @@ export interface DashboardDto {
   realized: RealizedDto;
 }
 
+// --- Dashboard widgets (mirror OmniCard.Api.Contracts DashboardLayoutDto & co.) ---
+
+export type DashboardWidgetType = 'metric' | 'breakdown' | 'search' | 'sql' | 'note';
+export type DashboardDisplay = 'stat' | 'table' | 'chart';
+export type DashboardChart = 'bar' | 'horizontalBar' | 'line' | 'area' | 'pie';
+export type DashboardFormat = 'number' | 'money' | 'percent' | 'text' | 'date';
+export type DashboardColumnKind = DashboardFormat | 'bool';
+
+/** One widget: grid position (x/w in `DASHBOARD_COLUMNS` columns, y/h in rows), source and display. */
+export interface DashboardWidgetDto {
+  id: string;
+  type: DashboardWidgetType;
+  /** Null = a title derived from the widget's settings (translated). */
+  title?: string | null;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  metric?: string | null;
+  groupBy?: string | null;
+  /** Card search: a game id, or null for every game. Never the top-bar game. */
+  game?: string | null;
+  query?: string | null;
+  output?: 'summary' | 'cards' | 'groups' | null;
+  sort?: string | null;
+  limit?: number | null;
+  sql?: string | null;
+  database?: string | null;
+  text?: string | null;
+  display?: DashboardDisplay | null;
+  chart?: DashboardChart | null;
+  labelColumn?: string | null;
+  valueColumns?: string[] | null;
+  statColumn?: string | null;
+  formats?: Record<string, DashboardFormat> | null;
+  colorBySign?: boolean;
+}
+
+export interface DashboardLayoutDto {
+  version: number;
+  widgets: DashboardWidgetDto[];
+}
+
+export interface DashboardColumnDto {
+  key: string;
+  kind: DashboardColumnKind;
+}
+
+export interface DashboardDataDto {
+  columns: DashboardColumnDto[];
+  rows: (string | number | boolean | null)[][];
+  truncated: boolean;
+}
+
+export interface DashboardSqlDatabaseDto {
+  key: string;
+  label: string;
+}
+
+export interface DashboardStateDto {
+  layout: DashboardLayoutDto;
+  source: 'personal' | 'default' | 'builtIn';
+  defaultLayout: DashboardLayoutDto;
+  defaultSource: 'default' | 'builtIn';
+  canEditDefault: boolean;
+  canWriteSql: boolean;
+  canSearchCollection: boolean;
+  sqlDatabases: DashboardSqlDatabaseDto[];
+}
+
+export interface DashboardSqlSchemaDto {
+  tables: { name: string; columns: { name: string; type: string }[] }[];
+}
+
 export interface AuthStatusDto {
   authRequired: boolean;
   authenticated: boolean;
@@ -787,6 +861,8 @@ export interface BinderStateDto {
   spreadTabs: SpreadTabDto[];
   /** Side count (1 or 2) of each physical sheet, in reading order. */
   sheetSides: number[];
+  /** The furthest-placed card's pocket (highest page, then slot); null when no card is placed. */
+  lastPlacedPocket?: { page: number; slot: number } | null;
 }
 
 // --- Scan (server-side image matching; mirrors OmniCard.Api.Contracts scan DTOs) ---
@@ -871,8 +947,10 @@ export interface ScanCommitResultDto {
   imported: number;
   /** Cards the tag rules tagged (only when the commit asked for `applyTagRules`). */
   ruleTagged?: number;
-  /** The created lots, in input order. */
+  /** The created lots, in input order unless the Buy List moved some. */
   lotIds?: number[] | null;
+  /** What the commit did with the Buy List (when asked to apply it and a card was on it). */
+  buyList?: BuyListCommitResultDto | null;
 }
 
 /** One card line in an audit summary bucket. */
@@ -896,8 +974,9 @@ export interface AuditCommitResultDto {
 
 // --- Scan batches (watched scan folders, matched in the background) ---
 
-/** Collecting = files still untouched in the watched folder; Starting = Run pressed (or timer up), files being taken in. */
-export type ScanBatchStatus = 'Collecting' | 'Starting' | 'Matching' | 'Ready' | 'Committed' | 'Discarded';
+/** Collecting = files still untouched in the watched folder; Starting = Run pressed (or timer up), files being taken in.
+ * Uploading = being saved from the Scan page (never listed). */
+export type ScanBatchStatus = 'Uploading' | 'Collecting' | 'Starting' | 'Matching' | 'Ready' | 'Committed' | 'Discarded';
 
 export interface ScanBatchSummaryDto {
   id: number;
@@ -987,10 +1066,39 @@ export interface ScanBatchItemEdit {
   note?: string | null;
 }
 
+/** Start saving the Scan page's scans as a batch (blank name = the user's name and the time). */
+export interface ScanBatchUploadStartRequest {
+  name?: string | null;
+  game: string;
+  isFoil: boolean;
+  condition?: string | null;
+  /** The session's card language; blank = auto. */
+  language?: string | null;
+  setCodes: string[];
+  defaultContainerId?: number | null;
+}
+
+/** One scan sent to a batch being saved: its list position, the browser's match (null = the server
+ * matches it) and its per-copy properties (`id` unused). */
+export interface ScanBatchUploadItem {
+  sequence: number;
+  match?: ScanMatchDto | null;
+  props: ScanBatchItemEdit;
+}
+
+/** A saved batch, released for review: `items` scans, `duplicates` exact copies set aside. */
+export interface ScanBatchUploadFinishedDto {
+  id: number;
+  name: string;
+  items: number;
+  duplicates: number;
+}
+
 export interface ScanBatchCommitResultDto {
   imported: number;
   /** True once the batch has no open items left. */
   batchClosed: boolean;
+  buyList?: BuyListCommitResultDto | null;
 }
 
 export interface ScanFolderConfigDto {
@@ -1603,9 +1711,104 @@ export interface KioskStatusDto {
   enabled: boolean;
   hasLocations: boolean;
   showPrices: boolean;
+  showBuyList: boolean;
   idleTimeoutMinutes: number;
   welcomeMessage?: string | null;
   session?: KioskSessionDto | null;
+}
+
+export type BuyListPriority = 'Normal' | 'High' | 'Grail';
+
+/** One Buy List entry. `foil`: true = foil only, false = non-foil only, null = either. */
+export interface BuyListEntryDto {
+  id: number;
+  game: string;
+  name: string;
+  gameCardId: string;
+  setCode?: string | null;
+  setName?: string | null;
+  collectorNumber?: string | null;
+  imageUri?: string | null;
+  /** Only the printing above matches, rather than any printing of the card. */
+  pinPrinting: boolean;
+  foil?: boolean | null;
+  wantedQuantity: number;
+  acquiredQuantity: number;
+  priority: BuyListPriority;
+  note?: string | null;
+  /** Copies in the collection this user can see that match an active entry. */
+  ownedCopies: number;
+  createdAt: string;
+  /** On a create: the card was already listed, so its wanted quantity went up instead. */
+  merged?: boolean;
+}
+
+export interface BuyListEntryCreateRequest {
+  game: string;
+  name: string;
+  gameCardId: string;
+  setCode?: string | null;
+  setName?: string | null;
+  collectorNumber?: string | null;
+  imageUri?: string | null;
+  pinPrinting: boolean;
+  foil?: boolean | null;
+  wantedQuantity: number;
+  priority: BuyListPriority;
+  note?: string | null;
+}
+
+export interface BuyListEntryUpdateRequest {
+  pinPrinting: boolean;
+  foil?: boolean | null;
+  wantedQuantity: number;
+  priority: BuyListPriority;
+  note?: string | null;
+}
+
+export interface BuyListPageDto {
+  items: BuyListEntryDto[];
+  activeCount: number;
+  fulfilledCount: number;
+  setAsideLocationId?: number | null;
+  setAsideLocationName?: string | null;
+}
+
+/** Why a card is flagged: the best matching entry and the copies wanted across every match. */
+export interface BuyListHitDto {
+  entryId: number;
+  priority: BuyListPriority;
+  wantedQuantity: number;
+  /** Staff only: never sent to customers. */
+  note?: string | null;
+  setAsideLocationName?: string | null;
+}
+
+export interface ScanBuyListResultDto {
+  key: string;
+  hit: BuyListHitDto;
+}
+
+/** What a commit did with the Buy List. */
+export interface BuyListCommitResultDto {
+  matchedCopies: number;
+  setAsideCopies: number;
+  setAsideLocations: string[];
+  /** Copies left with the rest because the user can't write to the set-aside location's site. */
+  notSetAside: number;
+}
+
+/** A Buy List card as customers see it: no quantities, prices or notes. */
+export interface KioskBuyListEntryDto {
+  game: string;
+  gameName: string;
+  name: string;
+  /** Filled only when a specific printing is wanted. */
+  setName?: string | null;
+  setCode?: string | null;
+  imageUri?: string | null;
+  foil?: boolean | null;
+  priority: BuyListPriority;
 }
 
 export interface KioskGameDto {
@@ -1687,6 +1890,7 @@ export interface KioskSettingsDto {
   locationIds: number[];
   idleTimeoutMinutes: number;
   showPrices: boolean;
+  showBuyList: boolean;
   welcomeMessage?: string | null;
 }
 
@@ -1718,6 +1922,9 @@ export interface IntakeCustomerViewDto {
 export interface IntakeSettingsDto {
   cashPercent: number;
   tradePercent: number;
+  /** Percentages for copies still wanted on the Buy List; null = the regular percentage. */
+  buyListCashPercent?: number | null;
+  buyListTradePercent?: number | null;
   /** Percent of the price paid per condition code (NM, LP, MP, HP, DMG). */
   conditionPercents: Record<string, number>;
   bulkThreshold: number;
@@ -1751,8 +1958,13 @@ export interface IntakeQuoteLineDto {
   isBulk: boolean;
   excluded: boolean;
   needsPrice: boolean;
+  /** Per copy, averaged when only some copies get the Buy List rate. */
   cashUnit: number;
   tradeUnit: number;
+  /** The Buy List entry this card matches. Staff only: the customer view never shows it. */
+  buyList?: BuyListHitDto | null;
+  /** Copies on this line still wanted on the Buy List. */
+  buyListCopies: number;
 }
 
 export interface IntakeQuoteDto {
@@ -1767,6 +1979,8 @@ export interface IntakeQuoteDto {
   tradePercent: number;
   /** Cash and trade pay the same percentage — show one offer. */
   singleOffer: boolean;
+  /** Some included copy pays the Buy List rate, so the offers aren't a flat percentage. */
+  buyListRateApplied: boolean;
   needsPrices: boolean;
 }
 
@@ -1785,6 +1999,7 @@ export interface IntakeAcceptResultDto {
   cashPaid: number;
   tradePaid: number;
   customerCreditBalance?: number | null;
+  buyList?: BuyListCommitResultDto | null;
 }
 
 export interface IntakeSummaryDto {
@@ -1823,6 +2038,8 @@ export interface IntakeLineDto {
   payout: IntakePayout;
   unitPaid: number;
   lotId?: number | null;
+  onBuyList: boolean;
+  setAsideLocationName?: string | null;
 }
 
 export interface IntakeDetailDto {

@@ -1,10 +1,21 @@
 // opencv.js runs entirely in this worker so the ~10 MB wasm runtime never parses/executes on the main
 // thread (doing so freezes the tab). The main thread (utils/cvWorker.ts) sends raw frame pixels and gets
-// back the detected card quad, or a cropped JPEG. This is a CLASSIC worker (no `type: 'module'`) so
+// back the detected card(s), or a cropped JPEG. This is a CLASSIC worker (no `type: 'module'`) so
 // opencv.js correctly detects a Web Worker environment (`typeof importScripts === 'function'`).
 
 import cvImport from '@techstark/opencv-js';
-import { orderCorners, quadArea, type Point } from '../utils/cardDetect';
+import {
+  centroid,
+  insetQuad,
+  orderCorners,
+  pointInQuad,
+  quadArea,
+  readingOrder,
+  refineQuad,
+  type DetectedCard,
+  type Point,
+  type ScanLayout,
+} from '../utils/cardDetect';
 
 // opencv typings are loose (a big Emscripten module); treat it as `any` at the boundary.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -20,10 +31,15 @@ const post = (message: unknown, transfer?: Transferable[]) =>
 // --- Detection/crop tuning. ---
 const CARD_RATIO_MIN = 0.55; // trading card short/long ≈ 0.716; accept a generous band (perspective/skew).
 const CARD_RATIO_MAX = 0.9;
-const MIN_AREA_FRACTION = 0.08; // card must fill ≥ this fraction of the frame.
+const MIN_AREA_FRACTION = 0.08; // single-card mode: the card must fill ≥ this fraction of the frame.
+const MULTI_MIN_AREA_FRACTION = 0.012; // multi-card mode: a 4×4 layout still clears this.
+const MULTI_MIN_RELATIVE_AREA = 0.35; // multi-card mode: cards share one physical size, so drop blobs < 35% of the biggest.
+const MAX_CARDS = 16;
 const RECTANGULARITY_MIN = 0.7; // contour area / its min-area-rect area — filters non-rectangular blobs.
-const BORDER_EXPAND = 0.015; // grow the quad ~1.5% so the crop keeps a thin (~1mm) open border.
-const OUTPUT_LONG_SIDE = 880; // normalized output height (portrait).
+const CANNY_INSET = 3; // the 7×7 dilation grows an edge contour ~3 px outward; undo it so no background leaks in.
+const SIG_W = 9; // difference hash: 9×8 samples → 8×8 = 64 bits.
+const SIG_H = 8;
+const JPEG_QUALITY = 0.95;
 
 function dist(a: Point, b: Point): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
@@ -32,6 +48,7 @@ function dist(a: Point, b: Point): number {
 interface Candidate {
   pts: Point[];
   area: number;
+  inset: number;
 }
 
 /** Four corners of an opencv RotatedRect ({center, size, angle°}), independent of angle convention. */
@@ -50,13 +67,15 @@ function rectCorners(rect: { center: { x: number; y: number }; size: { width: nu
 
 /** Find card-shaped quads in a binary/edge mat. For each large external contour, prefer a clean
  *  convex-hull quad (preserves perspective); fall back to its min-area rectangle when the outline is
- *  ragged or rounded (dark/borderless cards). Filters by aspect ratio; the caller picks the largest. */
-function collectCandidates(binary: Cv, minArea: number): Candidate[] {
+ *  ragged or rounded (dark/borderless cards). Either is then snapped onto the straight sides
+ *  (refineQuad) and filtered by aspect ratio; the caller picks among them. */
+function collectCandidates(binary: Cv, minArea: number, inset: number): Candidate[] {
   const contours = new cv.MatVector();
   const hierarchy = new cv.Mat();
   const out: Candidate[] = [];
   try {
-    cv.findContours(binary, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+    // Every contour point (not just segment ends) so each side can be line-fit in refineQuad.
+    cv.findContours(binary, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_NONE);
     for (let i = 0; i < contours.size(); i++) {
       const c = contours.get(i);
       const cArea = cv.contourArea(c);
@@ -84,11 +103,14 @@ function collectCandidates(binary: Cv, minArea: number): Candidate[] {
         approx.delete();
       }
       if (pts) {
+        const outline: Point[] = [];
+        for (let k = 0; k < c.data32S.length; k += 2) outline.push({ x: c.data32S[k], y: c.data32S[k + 1] });
+        pts = refineQuad(outline, pts);
         const [tl, tr, br, bl] = orderCorners(pts);
         const w = (dist(tl, tr) + dist(bl, br)) / 2;
         const h = (dist(tl, bl) + dist(tr, br)) / 2;
         const ratio = Math.min(w, h) / Math.max(w, h);
-        if (ratio >= CARD_RATIO_MIN && ratio <= CARD_RATIO_MAX) out.push({ pts, area: quadArea(pts) });
+        if (ratio >= CARD_RATIO_MIN && ratio <= CARD_RATIO_MAX) out.push({ pts, area: quadArea(pts), inset });
       }
       c.delete();
     }
@@ -99,8 +121,79 @@ function collectCandidates(binary: Cv, minArea: number): Candidate[] {
   return out;
 }
 
-function detect(imageData: ImageData): Point[] | null {
-  const minArea = imageData.width * imageData.height * MIN_AREA_FRACTION;
+/** 64-bit difference hash of the quad's content (warped flat, so it holds while the card sits still
+ *  and changes completely when a different card takes its place). */
+function signature(gray: Cv, q: [Point, Point, Point, Point]): number[] {
+  const srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [q[0].x, q[0].y, q[1].x, q[1].y, q[2].x, q[2].y, q[3].x, q[3].y]);
+  const dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, SIG_W * 4, 0, SIG_W * 4, SIG_H * 4, 0, SIG_H * 4]);
+  const M = cv.getPerspectiveTransform(srcTri, dstTri);
+  const warped = new cv.Mat();
+  const small = new cv.Mat();
+  try {
+    cv.warpPerspective(gray, warped, M, new cv.Size(SIG_W * 4, SIG_H * 4), cv.INTER_LINEAR, cv.BORDER_REPLICATE);
+    cv.resize(warped, small, new cv.Size(SIG_W, SIG_H), 0, 0, cv.INTER_AREA);
+    const bytes: number[] = [];
+    for (let y = 0; y < SIG_H; y++) {
+      let b = 0;
+      for (let x = 0; x < SIG_W - 1; x++) {
+        if (small.ucharAt(y, x) > small.ucharAt(y, x + 1)) b |= 1 << x;
+      }
+      bytes.push(b);
+    }
+    return bytes;
+  } finally {
+    srcTri.delete();
+    dstTri.delete();
+    M.delete();
+    warped.delete();
+    small.delete();
+  }
+}
+
+/** Focus score: variance of the Laplacian over the quad's bounding box. Drops sharply with motion blur
+ *  or a lens still hunting for focus. */
+function sharpness(gray: Cv, q: Point[]): number {
+  const xs = q.map((p) => p.x);
+  const ys = q.map((p) => p.y);
+  const x0 = Math.max(0, Math.floor(Math.min(...xs)));
+  const y0 = Math.max(0, Math.floor(Math.min(...ys)));
+  const x1 = Math.min(gray.cols, Math.ceil(Math.max(...xs)));
+  const y1 = Math.min(gray.rows, Math.ceil(Math.max(...ys)));
+  if (x1 - x0 < 8 || y1 - y0 < 8) return 0;
+  const roi = gray.roi(new cv.Rect(x0, y0, x1 - x0, y1 - y0));
+  const lap = new cv.Mat();
+  const mean = new cv.Mat();
+  const std = new cv.Mat();
+  try {
+    cv.Laplacian(roi, lap, cv.CV_64F);
+    cv.meanStdDev(lap, mean, std);
+    const s = std.doubleAt(0, 0);
+    return s * s;
+  } finally {
+    roi.delete();
+    lap.delete();
+    mean.delete();
+    std.delete();
+  }
+}
+
+/** Largest card in single mode; in multi mode every card-sized quad (overlaps merged, reading order). */
+function pick(candidates: Candidate[], multi: boolean): Candidate[] {
+  const bySize = [...candidates].sort((a, b) => b.area - a.area);
+  if (!multi) return bySize.slice(0, 1);
+  const kept: Candidate[] = [];
+  for (const cand of bySize) {
+    if (cand.area < bySize[0].area * MULTI_MIN_RELATIVE_AREA) break;
+    const c = centroid(cand.pts);
+    if (kept.some((k) => pointInQuad(c, k.pts) || pointInQuad(centroid(k.pts), cand.pts))) continue;
+    kept.push(cand);
+    if (kept.length === MAX_CARDS) break;
+  }
+  return readingOrder(kept);
+}
+
+function detect(imageData: ImageData, multi: boolean): DetectedCard[] {
+  const minArea = imageData.width * imageData.height * (multi ? MULTI_MIN_AREA_FRACTION : MIN_AREA_FRACTION);
 
   const src = cv.matFromImageData(imageData);
   const gray = new cv.Mat();
@@ -108,7 +201,6 @@ function detect(imageData: ImageData): Point[] | null {
   const edges = new cv.Mat();
   const mask = new cv.Mat();
   const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(7, 7));
-  let best: Candidate | null = null;
 
   try {
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
@@ -118,17 +210,20 @@ function detect(imageData: ImageData): Point[] | null {
     // boundary still closes into a loop.
     cv.Canny(blurred, edges, 40, 120);
     cv.dilate(edges, edges, kernel);
-    let candidates = collectCandidates(edges, minArea);
+    let candidates = collectCandidates(edges, minArea, CANNY_INSET);
 
     // Fallback: when edges are too faint to yield anything (dark/foil card on a low-contrast surface),
     // segment the card as a blob via adaptive threshold.
     if (candidates.length === 0) {
       cv.adaptiveThreshold(blurred, mask, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV, 51, 10);
       cv.morphologyEx(mask, mask, cv.MORPH_CLOSE, kernel);
-      candidates = collectCandidates(mask, minArea);
+      candidates = collectCandidates(mask, minArea, 0);
     }
 
-    for (const cand of candidates) if (!best || cand.area > best.area) best = cand;
+    return pick(candidates, multi).map((cand) => {
+      const q = insetQuad(cand.pts, cand.inset);
+      return { pts: q, sig: signature(blurred, q), sharpness: sharpness(gray, q) };
+    });
   } finally {
     src.delete();
     gray.delete();
@@ -137,67 +232,62 @@ function detect(imageData: ImageData): Point[] | null {
     mask.delete();
     kernel.delete();
   }
-
-  return best?.pts ?? null;
 }
 
-function expandQuad(corners: [Point, Point, Point, Point], w: number, h: number): [Point, Point, Point, Point] {
-  const cx = (corners[0].x + corners[1].x + corners[2].x + corners[3].x) / 4;
-  const cy = (corners[0].y + corners[1].y + corners[2].y + corners[3].y) / 4;
-  return corners.map((p) => ({
-    x: Math.max(0, Math.min(w, cx + (p.x - cx) * (1 + BORDER_EXPAND))),
-    y: Math.max(0, Math.min(h, cy + (p.y - cy) * (1 + BORDER_EXPAND))),
-  })) as [Point, Point, Point, Point];
-}
+/** Deskew the quad into the ADF scanner's geometry (see ScanLayout): the card body at 300 DPI on a flat
+ *  bed-colored margin, rounded corners filled with bed, portrait, as a JPEG. */
+async function crop(imageData: ImageData, quad: Point[], layout: ScanLayout): Promise<ArrayBuffer> {
+  let [tl, tr, br, bl] = orderCorners(quad);
+  // A card lying landscape is turned clockwise to portrait (its left edge becomes the top).
+  if (dist(tl, tr) + dist(bl, br) > dist(tl, bl) + dist(tr, br)) [tl, tr, br, bl] = [bl, tl, tr, br];
+  const srcW = (dist(tl, tr) + dist(bl, br)) / 2;
+  const { cardW, cardH } = layout;
 
-async function crop(imageData: ImageData, quad: Point[]): Promise<ArrayBuffer> {
-  const [tl, tr, br, bl] = expandQuad(orderCorners(quad), imageData.width, imageData.height);
-  const cardW = Math.round(Math.max(dist(tl, tr), dist(bl, br)));
-  const cardH = Math.round(Math.max(dist(tl, bl), dist(tr, br)));
+  // warpPerspective has no area filter: shrinking a 4K card straight to 300 DPI would alias the fine
+  // print OCR reads, so a big downscale warps at native size first and then area-resamples.
+  const bigDownscale = srcW / cardW > 1.5;
+  const warpW = bigDownscale ? Math.round(srcW) : cardW;
+  const warpH = bigDownscale ? Math.round((srcW * cardH) / cardW) : cardH;
 
   const src = cv.matFromImageData(imageData);
   const warped = new cv.Mat();
   const srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y]);
-  const dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, cardW, 0, cardW, cardH, 0, cardH]);
+  const dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, warpW, 0, warpW, warpH, 0, warpH]);
   const M = cv.getPerspectiveTransform(srcTri, dstTri);
-  let rotated: Cv | null = null;
   let resized: Cv | null = null;
 
   try {
-    cv.warpPerspective(src, warped, M, new cv.Size(cardW, cardH), cv.INTER_LINEAR, cv.BORDER_REPLICATE);
-
-    // Rotate to portrait if the card came in landscape (wider than tall).
-    let outMat: Cv = warped;
-    if (cardW > cardH) {
-      rotated = new cv.Mat();
-      cv.rotate(warped, rotated, cv.ROTATE_90_CLOCKWISE);
-      outMat = rotated;
-    }
-
-    // Normalize size (keep aspect) so we don't ship an oversized blob.
-    const longSide = Math.max(outMat.rows, outMat.cols);
-    if (longSide > OUTPUT_LONG_SIDE) {
-      const scale = OUTPUT_LONG_SIDE / longSide;
+    cv.warpPerspective(src, warped, M, new cv.Size(warpW, warpH), cv.INTER_CUBIC, cv.BORDER_REPLICATE);
+    let cardMat: Cv = warped;
+    if (bigDownscale) {
       resized = new cv.Mat();
-      cv.resize(
-        outMat,
-        resized,
-        new cv.Size(Math.round(outMat.cols * scale), Math.round(outMat.rows * scale)),
-        0,
-        0,
-        cv.INTER_AREA,
-      );
-      outMat = resized;
+      cv.resize(warped, resized, new cv.Size(cardW, cardH), 0, 0, cv.INTER_AREA);
+      cardMat = resized;
     }
 
-    // matFromImageData produced RGBA, and warp/rotate/resize preserve channel count → build ImageData
+    // matFromImageData produced RGBA, and warp/resize preserve channel count → build ImageData
     // directly (copies the pixels) before releasing the mats.
-    const out = new ImageData(new Uint8ClampedArray(outMat.data), outMat.cols, outMat.rows);
-    const canvas = new OffscreenCanvas(out.width, out.height);
-    const ctx = canvas.getContext('2d');
+    const card = new OffscreenCanvas(cardW, cardH);
+    const cardCtx = card.getContext('2d');
+    if (!cardCtx) throw new Error('OffscreenCanvas 2D context unavailable');
+    cardCtx.putImageData(new ImageData(new Uint8ClampedArray(cardMat.data), cardW, cardH), 0, 0);
+
+    const out = new OffscreenCanvas(layout.padL + cardW + layout.padR, layout.padT + cardH + layout.padB);
+    const ctx = out.getContext('2d');
     if (!ctx) throw new Error('OffscreenCanvas 2D context unavailable');
-    ctx.putImageData(out, 0, 0);
-    const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.92 });
+    ctx.fillStyle = `rgb(${layout.bed}, ${layout.bed}, ${layout.bed})`;
+    ctx.fillRect(0, 0, out.width, out.height);
+    // The quad's corners are the card's virtual square corners; outside its rounded corners is table,
+    // which an ADF shows as bed. (Browsers without roundRect keep square corners.)
+    ctx.save();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.beginPath();
+      ctx.roundRect(layout.padL, layout.padT, cardW, cardH, layout.cornerRadius);
+      ctx.clip();
+    }
+    ctx.drawImage(card, layout.padL, layout.padT);
+    ctx.restore();
+    const blob = await out.convertToBlob({ type: 'image/jpeg', quality: JPEG_QUALITY });
     return await blob.arrayBuffer();
   } finally {
     src.delete();
@@ -205,7 +295,6 @@ async function crop(imageData: ImageData, quad: Point[]): Promise<ArrayBuffer> {
     srcTri.delete();
     dstTri.delete();
     M.delete();
-    rotated?.delete();
     resized?.delete();
   }
 }
@@ -236,8 +325,16 @@ function initCv(): Promise<void> {
   });
 }
 
-interface DetectMsg { type: 'detect'; id: number; width: number; height: number; buffer: ArrayBuffer }
-interface CropMsg { type: 'crop'; id: number; width: number; height: number; buffer: ArrayBuffer; quad: Point[] }
+interface DetectMsg { type: 'detect'; id: number; width: number; height: number; buffer: ArrayBuffer; multi: boolean }
+interface CropMsg {
+  type: 'crop';
+  id: number;
+  width: number;
+  height: number;
+  buffer: ArrayBuffer;
+  quad: Point[];
+  layout: ScanLayout;
+}
 type InMsg = DetectMsg | CropMsg;
 
 initCv().then(
@@ -254,9 +351,9 @@ onmessage = async (e: MessageEvent<InMsg>) => {
   try {
     const imageData = new ImageData(new Uint8ClampedArray(msg.buffer), msg.width, msg.height);
     if (msg.type === 'detect') {
-      post({ type: 'result', id: msg.id, quad: detect(imageData) });
+      post({ type: 'result', id: msg.id, cards: detect(imageData, msg.multi) });
     } else {
-      const buffer = await crop(imageData, msg.quad);
+      const buffer = await crop(imageData, msg.quad, msg.layout);
       post({ type: 'result', id: msg.id, buffer }, [buffer]);
     }
   } catch (err) {
