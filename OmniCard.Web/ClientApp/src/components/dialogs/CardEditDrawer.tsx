@@ -315,6 +315,10 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
               </Tooltip>
             )}
 
+            {/* A failed save or delete says so (e.g. no permission to delete), rather than doing nothing. */}
+            {(save.error || del.error) && (
+              <Alert severity="error">{((save.error ?? del.error) as Error).message}</Alert>
+            )}
             <Stack direction="row" spacing={1} justifyContent="space-between">
               <Button
                 color="error"

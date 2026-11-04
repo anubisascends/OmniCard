@@ -127,20 +127,32 @@ public sealed class CardScanController(
     /// look through). Empty ⇒ all sets. Each term folds into the same <c>set:</c>/<c>cn:</c> query
     /// grammar every game's <c>SearchCards</c> already understands. <paramref name="lang"/> likewise keeps
     /// only catalog rows in those languages (empty ⇒ every language); it's applied in the query rather than
-    /// to the capped results so a narrow language choice isn't starved by other languages' rows.</summary>
+    /// to the capped results so a narrow language choice isn't starved by other languages' rows.
+    /// <paramref name="nameOrNumber"/> (the Add card dialog's one search box): a <paramref name="q"/> that
+    /// reads as a collector number (<see cref="CollectorNumberQuery"/> — "0019", "LOB-EN019", "OP01-019")
+    /// also finds the printings carrying that number, listed ahead of any name matches, in the same sets
+    /// and languages. With several sets chosen, results come set by set in the order given.
+    /// <paramref name="setQuery"/> (the dialog's Set box — a code or part of a set name, as <c>set:</c>
+    /// reads it) overrides <paramref name="set"/>: the search runs in the sets it names instead, number
+    /// search included.</summary>
     [HttpGet("search")]
     [RequirePermission(Permissions.ScanView, Permissions.IntakeQuote)]
     public ActionResult<IReadOnlyList<ScanSearchResultDto>> Search(
         [FromQuery] string game, [FromQuery] string? q = null, [FromQuery] string[]? set = null, [FromQuery] string? cn = null,
-        [FromQuery] string[]? lang = null)
+        [FromQuery] string[]? lang = null, [FromQuery] bool nameOrNumber = false, [FromQuery] string? setQuery = null)
     {
         if (LocationsController.ParseGame(game) is not { } parsedGame)
             return BadRequest(new { error = $"Unknown game '{game}'" });
 
-        var setCodes = (set ?? [])
-            .Where(s => !string.IsNullOrWhiteSpace(s))
-            .Select(s => s.Trim())
-            .ToArray();
+        // A typed set wins over the chosen ones (the two would otherwise AND to nothing).
+        var typedSet = SetTerm(setQuery);
+        var setCodes = typedSet is not null
+            ? []
+            : (set ?? [])
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Select(s => s.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         var langCodes = (lang ?? [])
             .Select(CardLanguages.Normalize)
             .OfType<string>()
@@ -151,6 +163,7 @@ public sealed class CardScanController(
         var baseTerms = new List<string>();
         if (!string.IsNullOrWhiteSpace(q)) baseTerms.Add(q.Trim());
         if (!string.IsNullOrWhiteSpace(cn)) baseTerms.Add($"cn:{cn.Trim()}");
+        if (typedSet is not null) baseTerms.Add(typedSet);
 
         // With no set constraint AND nothing to search on, return empty without touching the catalog.
         // (A bare set list is still a valid search — it lists the whole set.)
@@ -160,40 +173,34 @@ public sealed class CardScanController(
         var gameService = cardService.GetGameService(parsedGame);
         // A catalog that doesn't track language (Riftbound) has no lang: field to filter on.
         if (gameService is not ICatalogLanguageAware) langCodes = [];
-        List<CardMatch> matches;
-        if (setCodes.Length == 0 && langCodes.Length <= 1)
+
+        var matches = SearchScoped(gameService, baseTerms, setCodes, langCodes, MaxSearchResults);
+
+        // One box for a name or a number: the printings with that number come first, then name matches.
+        if (nameOrNumber && string.IsNullOrWhiteSpace(cn) && CollectorNumberQuery.TryParse(q, out var number))
         {
-            // No set constraint (no art-fallback sets chosen) — search across all sets, as before.
-            var terms = new List<string>(baseTerms);
-            if (langCodes.Length == 1) terms.Add($"lang:{langCodes[0]}");
-            matches = gameService.SearchCards(string.Join(' ', terms), MaxSearchResults);
-        }
-        else
-        {
-            // The query grammar ANDs its terms, so several set:s (or lang:s) can't be ORed in a single
-            // query. Run one search per chosen set × language and union the results — a bare set (no
-            // name/cn) simply lists that whole set. This keeps the correction search scoped to exactly
-            // the same art-fallback sets that constrain auto-matching.
-            string?[] setScopes = setCodes.Length == 0 ? [null] : [.. setCodes];
-            string?[] langScopes = langCodes.Length == 0 ? [null] : [.. langCodes];
             var seen = new HashSet<string>();
-            var union = new List<CardMatch>();
-            foreach (var code in setScopes)
-            foreach (var language in langScopes)
+            var byNumber = new List<CardMatch>();
+            foreach (var term in number.CandidateTerms())
             {
-                var terms = new List<string>(baseTerms);
-                // set= (exact code): set: would also take every set whose *name* contains the code
-                // ("dom" → Dominaria United, Alchemy: Dominaria, …).
-                if (code is not null) terms.Add($"set={code}");
-                if (language is not null) terms.Add($"lang:{language}");
-                foreach (var m in gameService.SearchCards(string.Join(' ', terms), MaxSearchResults))
+                // The candidate terms can be loose (a substring match in some games), so ask for many and
+                // keep only the printings that really carry the number.
+                List<string> terms = typedSet is null ? [term] : [term, typedSet];
+                foreach (var m in SearchScoped(gameService, terms, setCodes, langCodes, NumberCandidateLimit))
                 {
-                    if (seen.Add($"{m.SetCode}|{m.CollectorNumber}|{m.GameSpecificId}"))
-                        union.Add(m);
+                    if (number.Matches(m.SetCode, m.CollectorNumber) && seen.Add(MatchKey(m)))
+                        byNumber.Add(m);
                 }
             }
-            matches = union
-                .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
+            var setRank = SetRank(setCodes);
+            // Set by set in the chosen order; within a set the number's printings come before name matches
+            // (OrderBy is stable, so the concatenated order survives inside each set).
+            matches = byNumber
+                .OrderBy(setRank)
+                .ThenBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(m => m.SetName, StringComparer.OrdinalIgnoreCase)
+                .Concat(matches.Where(m => !seen.Contains(MatchKey(m))))
+                .OrderBy(setRank)
                 .Take(MaxSearchResults)
                 .ToList();
         }
@@ -201,6 +208,69 @@ public sealed class CardScanController(
         var results = matches.Select(m => new ScanSearchResultDto(
             m.GameSpecificId, m.Name, m.SetCode, m.SetName, m.CollectorNumber, m.Rarity, m.ImageUri, m.Language)).ToList();
         return Ok(results);
+    }
+
+    /// <summary>How many rows one collector-number candidate search may return before they're narrowed to
+    /// the exact number (<c>cn:19</c> is a substring match in some catalogs, so it finds 119, 190, …).</summary>
+    private const int NumberCandidateLimit = 5000;
+
+    private static string MatchKey(CardMatch m) => $"{m.SetCode}|{m.CollectorNumber}|{m.GameSpecificId}";
+
+    /// <summary>A <c>set:</c> term for the Set box's text (quoted when it holds a space — a set name).</summary>
+    private static string? SetTerm(string? setQuery)
+    {
+        var t = setQuery?.Trim().Replace("\"", "");
+        if (string.IsNullOrEmpty(t)) return null;
+        return t.Any(char.IsWhiteSpace) ? $"set:\"{t}\"" : $"set:{t}";
+    }
+
+    /// <summary>A result's place in the chosen set order (sets not in the list after them all).</summary>
+    private static Func<CardMatch, int> SetRank(string[] setCodes)
+    {
+        if (setCodes.Length < 2) return _ => 0;
+        var rank = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < setCodes.Length; i++) rank.TryAdd(setCodes[i], i);
+        return m => m.SetCode is { } code && rank.TryGetValue(code, out var r) ? r : setCodes.Length;
+    }
+
+    /// <summary>Runs <paramref name="terms"/> through the game's search, scoped to the chosen sets and
+    /// languages. The query grammar ANDs its terms, so several set:s (or lang:s) can't be ORed in a single
+    /// query: one search runs per chosen set × language and the results are unioned (a bare set — no other
+    /// terms — simply lists that whole set), set by set in the order the sets were chosen.</summary>
+    private static List<CardMatch> SearchScoped(
+        ICardGameService gameService, IReadOnlyList<string> terms, string[] setCodes, string[] langCodes, int limit)
+    {
+        if (setCodes.Length == 0 && langCodes.Length <= 1)
+        {
+            // No set constraint (no art-fallback sets chosen) — search across all sets, as before.
+            var all = new List<string>(terms);
+            if (langCodes.Length == 1) all.Add($"lang:{langCodes[0]}");
+            return gameService.SearchCards(string.Join(' ', all), limit);
+        }
+
+        string?[] setScopes = setCodes.Length == 0 ? [null] : [.. setCodes];
+        string?[] langScopes = langCodes.Length == 0 ? [null] : [.. langCodes];
+        var seen = new HashSet<string>();
+        var union = new List<CardMatch>();
+        foreach (var code in setScopes)
+        foreach (var language in langScopes)
+        {
+            var scoped = new List<string>(terms);
+            // set= (exact code): set: would also take every set whose *name* contains the code
+            // ("dom" → Dominaria United, Alchemy: Dominaria, …).
+            if (code is not null) scoped.Add($"set={code}");
+            if (language is not null) scoped.Add($"lang:{language}");
+            foreach (var m in gameService.SearchCards(string.Join(' ', scoped), limit))
+            {
+                if (seen.Add(MatchKey(m)))
+                    union.Add(m);
+            }
+        }
+        return union
+            .OrderBy(SetRank(setCodes))
+            .ThenBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
+            .Take(limit)
+            .ToList();
     }
 
     /// <summary>Curated foil-finish presets for a game, for the scan bulk/per-item foil-type picker.</summary>

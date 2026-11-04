@@ -1,4 +1,4 @@
-import type { Ref } from 'react';
+import { useState, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Autocomplete, Chip, TextField, createFilterOptions, type SxProps, type Theme } from '@mui/material';
@@ -20,7 +20,8 @@ const filterOptions: typeof matchCodeOrName = (options, state) => {
 };
 
 /** Pick any number of a game's sets. Options read "Name (CODE)"; chips show just the code, to stay narrow.
- *  Nothing picked means every set. */
+ *  Nothing picked means every set. The list only opens once something is typed — a game has hundreds of
+ *  sets, and the whole list dropping open on focus covered whatever came after the box. */
 export function SetMultiSelect({
   game,
   value,
@@ -42,11 +43,22 @@ export function SetMultiSelect({
 }) {
   const { t } = useTranslation();
   const sets = useQuery({ queryKey: ['sets', game], queryFn: () => api.sets(game), enabled: !!game });
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState('');
   return (
     <Autocomplete
       multiple
       size="small"
-      openOnFocus
+      open={open && typed.trim() !== ''}
+      onOpen={() => setOpen(true)}
+      onClose={() => setOpen(false)}
+      inputValue={typed}
+      onInputChange={(_, v) => {
+        setTyped(v);
+        // Typing (again, after a pick or Esc) opens the list.
+        if (v.trim()) setOpen(true);
+      }}
+      forcePopupIcon={false}
       autoHighlight
       disableCloseOnSelect
       limitTags={4}
