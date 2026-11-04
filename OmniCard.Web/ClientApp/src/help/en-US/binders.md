@@ -77,7 +77,7 @@ Cards end up in the Unplaced pool when you move or import them into a binder wit
 - The heading shows how many unplaced cards there are, for example *Unplaced cards (14)*.
 - Each entry shows the card's set, number, condition, foil, market price and sale status.
 - Use the search box to filter the list. It accepts the full search syntax, such as `set:mh3`, `t:dragon` or `tag:trade`. See [Search syntax](help:search-syntax).
-- Click an entry to open its details, or right-click it for **Card details** and **List for sale**.
+- Click an entry to open its details, or right-click it for **Card details**, **List for sale** and **Delete from collection…**. Deleting asks first, then removes that copy from your collection for good. To keep a card but take it out of the binder, move it to another location instead.
 
 When everything is placed, the panel says *Everything in this binder is placed.*
 
@@ -98,7 +98,7 @@ You can fill a specific pocket with a card from anywhere in your collection, or 
 
 1. Right-click a pocket and choose **Add card to this pocket…** (or **Replace card in this pocket…** if it already holds a card).
 2. The dialog shows the page and slot, and which card will be replaced.
-3. Choose the **Game**, then search by **Name**, and optionally **Set** and **Collector #**. For games whose catalog holds more than one language, each result shows its language, and **Languages** limits the results, as in [Add cards to a location](help:locations#add-cards-to-a-location).
+3. Choose the **Game**, then type the card's name or its collector number in **Name or number**, and optionally fill in **Set** and **Collector #**. See [Search by collector number](#search-by-collector-number). For games whose catalog holds more than one language, each result shows its language, and **Languages** limits the results, as in [Add cards to a location](help:locations#add-cards-to-a-location).
 4. Pick a result. Point at it to see a larger picture, or use ↓, ↑ and Enter from the search boxes:
    - **In your collection** lists copies you own in other locations, with the location each is in. Click one to move a single copy into the pocket right away. If it's part of a stack, only one copy moves.
    - **In the catalog** lists every matching printing. Click one, set **Condition**, **Language**, **Purchase price** and **Foil** (with its **Foil type**), then click **Add to pocket** to add a new card to your collection in this pocket.
@@ -112,13 +112,25 @@ Once you've picked a printing, the keyboard moves to the picked card: press Ente
 > [!NOTE]
 > **In your collection** only lists copies in other locations. To place a copy that's already in this binder, drag it from the Unplaced cards panel.
 
+### Search by collector number
+
+Instead of a name, you can type the number printed on the card into **Name or number**. You don't need the **Collector #** box. The printings with that number are listed first, still limited by **Languages** and the sets you've chosen, so with the card's set chosen you usually get exactly the card in your hand.
+
+- **Just digits**, such as `0019` or `19`: every printing whose own number is 19, however the game writes it, with or without leading zeros. That includes `19`, `019/165`, `OP01-019`, `2-019R` and `LOB-EN019`, but not `119` or `190`.
+- **With letters**, such as `LOB-EN019`, `EN019`, `OP01-019`, `2-019R` or `OGN-019`: that number as printed. Capitals and leading zeros don't matter, and you can leave off a final rarity letter (`2-019` finds `2-019R`).
+
+A card whose name looks like a number, such as *Porygon2*, is still found by its name.
+
+> [!TIP]
+> Choose the set first with the **Sets** filter (F2), then type the number from each card. See [Search only some sets](#search-only-some-sets).
+
 ## Fill a binder from the keyboard
 
 **Simplified** editing is for filling a binder pocket by pocket without reaching for the mouse. It shows one page at a time, centered, and a cursor marks the selected pocket.
 
 1. Click **Edit**, then turn on **Simplified** at the right of the edit toolbar. OmniCard remembers the switch in this browser, so next time **Edit** opens straight into it.
 2. Move the cursor to a pocket with the arrow keys.
-3. Start typing the card's name. The search dialog opens with what you typed. You can also press Enter to open it empty.
+3. Start typing the card's name, or the collector number printed on it (see [Search by collector number](#search-by-collector-number)). The search dialog opens with what you typed. On an empty pocket you can also press Enter to open it empty.
 4. Press Enter to pick the highlighted printing. To change its details, press C (condition), L (language), F (foil) or P (price), and Enter when you're done with each. Then press Enter again to add it.
 
 The card is added to your collection in that pocket, the dialog closes, and the cursor moves on to the next pocket, ready for the next card.
@@ -143,8 +155,8 @@ The line under the page names the selected pocket and what's in it, for example 
 | PgUp, PgDn | Go to the previous or next page. **‹ Prev** and **Next ›** above the page do the same. |
 | Home, End | Go to the first or last pocket on the page. |
 | Ctrl+Home, Ctrl+End | Go to the front of page 1, or to the last page with a card on it. **« First** and **Last »** do the same. |
-| Enter | Search for a card for this pocket. If the pocket holds a card, the new one replaces it. |
-| A–Z | Start typing a name: the search opens with it. |
+| Enter | On a card: open its details, to correct its condition, language, foil and so on, or to delete it. On an empty pocket: search for a card. |
+| A–Z, 0–9 | Start typing a name or collector number: the search opens with it. On a pocket that holds a card, the card you pick replaces it. |
 | F2 | Choose the sets searches are limited to. See [Search only some sets](#search-only-some-sets). |
 | Del | Take the card out of the pocket. It goes back to the Unplaced pool and stays in the binder. |
 | Ctrl+C | Copy the card in this pocket. See [Copy a card into the next pockets](#copy-a-card-into-the-next-pockets). |
@@ -152,7 +164,7 @@ The line under the page names the selected pocket and what's in it, for example 
 | + | Insert a new double-sided sheet (two pages) right after the sheet you're on, and move the cursor to its front. This only works from the back of a sheet (or a single-sided sheet), like slipping a new sheet into a real binder: on a front page, OmniCard tells you to turn to the back first. To add a sheet at the end, go to the last page and press +. |
 | − | Remove the page the cursor is on. OmniCard asks first: press Enter to remove it or Esc to keep it. As with **Remove page**, the whole sheet goes, and its cards return to the Unplaced pool. |
 
-You can use the mouse too: click a pocket to move the cursor to it, or double-click it to search. Right-click still opens the pocket menu.
+You can use the mouse too: click a pocket to move the cursor to it. If the pocket holds a card, its details open too. Double-click an empty pocket to search. Right-click still opens the pocket menu, with **Replace card in this pocket…**.
 
 ### Copy a card into the next pockets
 
@@ -185,18 +197,18 @@ The dialog works as described in [Add or replace a card in a pocket](#add-or-rep
 When you're filling a binder from a few sets, you can limit card searches to those sets instead of typing a set code for every card. The filter works in normal and Simplified editing.
 
 1. In edit mode, click **Sets: All sets** in the edit toolbar, or press F2.
-2. Check the **Game**, then type a set's code or name in **Sets** and press Enter to add it. Add as many sets as you like.
+2. Check the **Game**, then start typing a set's code or name in **Sets**: the matching sets are listed as you type. Press Enter to add the highlighted one. Add as many sets as you like.
 3. Click **Done**, or press F2 again.
 
 ![Choosing the sets to search: two chosen, more matching what's typed](binders-set-filter.webp)
 
-The button now lists the sets, for example **Sets: M21, DOM**. Every pocket search then starts limited to them: the dialog shows them as chips in **Sets**, and only cards from those sets are listed. The filter lasts until you leave the binder page. To go back to every set, open the filter and click **Clear**.
+The button now lists the sets, for example **Sets: M21, DOM**. Every pocket search then starts limited to them: the dialog shows them as chips in **Sets**, and only cards from those sets are listed. The results come set by set, in the order you added the sets: with **M21, DOM**, every M21 card is listed before any DOM card. The filter lasts until you leave the binder page. To go back to every set, open the filter and click **Clear**.
 
 You can change the sets for one card without changing the filter:
 
-- Remove or add chips in the dialog's **Sets** box. Press F2 to move between **Name** and **Sets**.
+- Remove or add chips in the dialog's **Sets** box. Press F2 to move between **Name or number** and **Sets**.
 - Press Alt+A, or click **Search all sets**, to search every set. When nothing matches in the chosen sets, the dialog says so, for example *No matches in M21, DOM.*, and offers **Search all sets**.
-- Type a code in the **Set** box next to **Name**. It is used instead of the chosen sets.
+- Type a set code in the **Set** box next to **Name or number**. It is used instead of the chosen sets, and finds only that set, for a collector number too. If what you type isn't a set code, sets whose name contains it are searched, for example *Eclipsed*.
 
 The next pocket starts with the toolbar's sets again.
 
