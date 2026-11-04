@@ -1825,6 +1825,10 @@ namespace OmniCard.Web.Migrations
                     b.Property<int?>("DeckTypeId")
                         .HasColumnType("int");
 
+                    b.Property<string>("DefaultSets")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<bool>("ExcludeFromDeckCheck")
                         .HasColumnType("bit");
 

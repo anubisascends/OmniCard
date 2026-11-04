@@ -200,9 +200,11 @@ When you're filling a binder from a few sets, you can limit card searches to tho
 2. Check the **Game**, then start typing a set's code or name in **Sets**: the matching sets are listed as you type. Press Enter to add the highlighted one. Add as many sets as you like.
 3. Click **Done**, or press F2 again.
 
+If the binder has default sets, the filter starts on them each time you open the binder, and **Binder's sets** puts them back after a change. To change the defaults, see [Game and default sets](help:locations#game-and-default-sets). If the binder is kept to one game, the filter's **Game** is locked to it (*This binder only holds this game*).
+
 ![Choosing the sets to search: two chosen, more matching what's typed](binders-set-filter.webp)
 
-The button now lists the sets, for example **Sets: M21, DOM**. Every pocket search then starts limited to them: the dialog shows them as chips in **Sets**, and only cards from those sets are listed. The results come set by set, in the order you added the sets: with **M21, DOM**, every M21 card is listed before any DOM card. The filter lasts until you leave the binder page. To go back to every set, open the filter and click **Clear**.
+The button now lists the sets, for example **Sets: M21, DOM**. Every pocket search then starts limited to them: the dialog shows them as chips in **Sets**, and only cards from those sets are listed. The results come set by set, in the order you added the sets: with **M21, DOM**, every M21 card is listed before any DOM card. A change to the filter lasts until you leave the binder page. To go back to every set, open the filter and click **Clear**.
 
 You can change the sets for one card without changing the filter:
 

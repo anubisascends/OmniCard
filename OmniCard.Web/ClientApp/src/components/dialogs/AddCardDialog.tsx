@@ -53,12 +53,21 @@ const RECENT_LIMIT = 5;
 
 /** Where the dialog adds cards — each target decides which results and fields it offers. */
 export type AddCardTarget =
-  /** New copies into a location (catalog only). `lockGame` fixes the game — a game-locked deck box, so a
-   * card of another game can't be added (the server hard-blocks it too). */
+  /** New copies into a location (catalog only). `lockGame` fixes the game — a location fixed to one game
+   * (a deck box, or a binder/box given a game), so a card of another game can't be added (the server
+   * hard-blocks it too). */
   | { kind: 'location'; locationId: number; locationName: string; lockGame?: boolean }
   /** One card into a binder pocket: an owned copy from elsewhere is moved in, a catalog card is created
    * there. A pocket holds one card, so the dialog closes after a successful add. */
-  | { kind: 'pocket'; containerId: number; page: number; slot: number; occupantName?: string | null }
+  | {
+      kind: 'pocket';
+      containerId: number;
+      page: number;
+      slot: number;
+      occupantName?: string | null;
+      /** The binder is fixed to `defaultGame`. */
+      lockGame?: boolean;
+    }
   /** A list line: an owned copy is referenced (moved only when the list is put away), a catalog printing
    * is recorded as wholly new. `language` is the list's forced card language, which the search starts on. */
   | { kind: 'list'; listId: number; language?: string | null }
@@ -189,7 +198,7 @@ export function AddCardDialog({
   const multiAdd = target.kind !== 'pocket';
   const showOwned = (target.kind === 'pocket' || target.kind === 'list') && !simplified;
   const buyList = target.kind === 'buyList';
-  const lockGame = target.kind === 'location' && !!target.lockGame;
+  const lockGame = (target.kind === 'location' || target.kind === 'pocket') && !!target.lockGame;
   const listLanguage = target.kind === 'list' ? target.language || null : null;
 
   const [game, setGame] = useState(startGame);

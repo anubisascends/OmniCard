@@ -206,6 +206,8 @@ public static class UnifiedMigrationService
             AddColumnIfMissing(cmd, "StorageContainers", "AlwaysAvailable", "INTEGER NOT NULL DEFAULT 0");
             // Sites: every location belongs to a site; legacy rows land in the default site (id 1).
             AddColumnIfMissing(cmd, "StorageContainers", "SiteId", "INTEGER NOT NULL DEFAULT 1");
+            // Default sets a location's card searches start on (comma-separated set codes).
+            AddColumnIfMissing(cmd, "StorageContainers", "DefaultSets", "TEXT");
         }
 
         // Sites (major physical locations) + per-user/role access grants. The SQL Server store gets

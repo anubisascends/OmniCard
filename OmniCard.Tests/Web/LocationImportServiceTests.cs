@@ -221,6 +221,17 @@ public class LocationImportServiceTests : IDisposable
     }
 
     [Fact]
+    public void Csv_OtherGameIntoGameFixedBinder_Rejected()
+    {
+        var binder = NewLocation("Pikachu Binder", ContainerType.Binder, CardGame.Pokemon);
+
+        var outcome = ImportCsv(NativeHeader + "Mtg,bolt-2x2,Lightning Bolt,,,,,NM,False,,,,,,,,,\n", binder);
+
+        Assert.Empty(Lots());
+        Assert.Contains("\"Pikachu Binder\" holds only Pokémon cards", Assert.Single(outcome.Failure!.Errors).Message);
+    }
+
+    [Fact]
     public void Csv_NeverSkipsCopiesAlreadyInCollection()
     {
         const string csv = NativeHeader + "Mtg,sol-scd,Sol Ring,,SCD,276,,NM,False,,,,,,,,,\n";

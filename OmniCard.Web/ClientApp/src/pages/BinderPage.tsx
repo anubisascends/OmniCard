@@ -48,6 +48,7 @@ import { CardEditDrawer } from '../components/dialogs/CardEditDrawer';
 import { AddCardDialog, type AddCardFoilRule } from '../components/dialogs/AddCardDialog';
 import { SearchBox } from '../components/SearchBox';
 import { SetMultiSelect } from '../components/SetMultiSelect';
+import { useDefaultSets } from '../components/locationCardFilter';
 import { Kbd } from '../components/Kbd';
 import { useFormatters } from '../i18n/format';
 
@@ -534,8 +535,9 @@ export function BinderPage() {
     quick?: boolean;
     initialName?: string;
   } | null>(null);
-  // The sets card searches start limited to, for this sitting only. `filterGame` is null until chosen
-  // (the filter then follows the game of the cards on screen).
+  // The sets card searches start limited to. They start on the binder's default sets (seeded below) and a
+  // change lasts for this sitting only. `filterGame` is null until chosen (the filter then follows the game
+  // of the cards on screen), unless the binder is fixed to a game.
   const [filterGame, setFilterGame] = useState<string | null>(null);
   const [filterSets, setFilterSets] = useState<SetInfoDto[]>([]);
   const [setsAnchor, setSetsAnchor] = useState<HTMLElement | null>(null);
@@ -573,17 +575,29 @@ export function BinderPage() {
     queryFn: () => api.binder(binderId, viewSpread),
     placeholderData: keepPreviousData,
   });
-  // Without a chosen game, the set filter (and the foil rule's finishes) are for the game of the cards on screen.
+  // Site access: a binder in a site the user can only view can be flipped through but not edited.
+  const locQuery = useQuery({ queryKey: ['location', binderId], queryFn: () => api.location(binderId) });
+  const canWrite = locQuery.data?.canWrite !== false;
+  // A binder fixed to a game keeps the set filter (and the add dialog) on that game, and the filter starts
+  // on the binder's default sets. Otherwise, without a chosen game, the set filter (and the foil rule's
+  // finishes) are for the game of the cards on screen.
+  const locGame = locQuery.data?.game ?? null;
+  const locSets = useDefaultSets(locGame, locQuery.data?.defaultSets);
+  const seededFilterFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (!locQuery.data || !locSets.ready || seededFilterFor.current === binderId) return;
+    seededFilterFor.current = binderId;
+    setFilterGame(locGame);
+    setFilterSets(locSets.sets);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [binderId, locQuery.data, locSets.ready]);
   const spreadGame = gameName(data?.leftSlots.concat(data.rightSlots).find((s) => s.card)?.card?.game);
-  const setsGame = filterGame ?? spreadGame;
+  const setsGame = locGame ?? filterGame ?? spreadGame;
   const foilTypes = useQuery({
     queryKey: ['scan-foil-types', setsGame],
     queryFn: () => api.scanFoilTypes(setsGame),
     enabled: editMode,
   });
-  // Site access: a binder in a site the user can only view can be flipped through but not edited.
-  const locQuery = useQuery({ queryKey: ['location', binderId], queryFn: () => api.location(binderId) });
-  const canWrite = locQuery.data?.canWrite !== false;
   const unplaced = useQuery({
     queryKey: ['binder-unplaced', binderId, debouncedFilter],
     queryFn: () => api.binderUnplaced(binderId, debouncedFilter || undefined),
@@ -980,6 +994,8 @@ export function BinderPage() {
                   size="small"
                   label={t('common.labels.game')}
                   value={setsGame}
+                  disabled={!!locGame}
+                  helperText={locGame ? t('binder.setFilter.gameFixed') : undefined}
                   onChange={(e) => {
                     setFilterGame(e.target.value);
                     setFilterSets([]);
@@ -1005,6 +1021,17 @@ export function BinderPage() {
                   {t('binder.setFilter.help')}
                 </Typography>
                 <Stack direction="row" spacing={1} justifyContent="flex-end">
+                  {locSets.sets.length > 0 && (
+                    <Button
+                      size="small"
+                      disabled={
+                        filterSets.map((s) => s.setCode).join(',') === locSets.sets.map((s) => s.setCode).join(',')
+                      }
+                      onClick={() => setFilterSets(locSets.sets)}
+                    >
+                      {t('binder.setFilter.useDefaults')}
+                    </Button>
+                  )}
                   <Button size="small" disabled={filterSets.length === 0} onClick={() => setFilterSets([])}>
                     {t('common.actions.clear')}
                   </Button>
@@ -1345,8 +1372,9 @@ export function BinderPage() {
             page: addSlot.page,
             slot: addSlot.slot,
             occupantName: addSlot.card?.name,
+            lockGame: !!locGame,
           }}
-          defaultGame={addSlot.card ? gameName(addSlot.card.game) : setsGame}
+          defaultGame={locGame ?? (addSlot.card ? gameName(addSlot.card.game) : setsGame)}
           simplified={addSlot.quick}
           initialName={addSlot.initialName}
           setFilter={{ game: setsGame, sets: filterSets }}

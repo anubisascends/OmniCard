@@ -35,6 +35,8 @@ import { PrintLabelsDialog } from '../components/dialogs/PrintLabelsDialog';
 import { AuditSummaryDialog } from '../components/dialogs/AuditSummaryDialog';
 import type { AuditReturnState } from './AuditPage';
 import { DeckBoxPanel } from '../components/DeckBoxPanel';
+import { LocationCardFilterPanel } from '../components/LocationCardFilterPanel';
+import { useDefaultSets } from '../components/locationCardFilter';
 import { DeckStackView } from '../components/deckstack/DeckStackView';
 import { SearchBox } from '../components/SearchBox';
 import { SavedViewPicker } from '../components/views/SavedViewPicker';
@@ -71,11 +73,14 @@ export function LocationDetailPage() {
   const isDeckBox = locQuery.data?.type === 'Deck Box';
   // Locations in a site the user can only view hide every write action (the server enforces it too).
   const canWrite = locQuery.data?.canWrite !== false;
-  // A game-locked deck box forces its game onto the add dialog.
-  const deckBoxGame = isDeckBox ? locQuery.data?.game ?? undefined : undefined;
+  // A location fixed to a game (every deck box, any binder/box given one) forces it onto the add dialog,
+  // which starts on the location's default sets.
+  const fixedGame = locQuery.data?.game ?? undefined;
+  const defaultSets = useDefaultSets(fixedGame, locQuery.data?.defaultSets);
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['location', locationId] });
     qc.invalidateQueries({ queryKey: ['locations'] });
+    qc.invalidateQueries({ queryKey: ['location-outside-sets', locationId] });
   };
 
   // Header actions besides Add card: outlined buttons, or a ⋮ menu on a phone.
@@ -183,6 +188,16 @@ export function LocationDetailPage() {
         </Typography>
       )}
       {isDeckBox && locQuery.data && <DeckBoxPanel loc={locQuery.data} onChanged={refresh} />}
+      {locQuery.data && (
+        <LocationCardFilterPanel
+          loc={locQuery.data}
+          onChanged={refresh}
+          onShowOutside={(q) => {
+            setSearch(q);
+            sv.setState({ q });
+          }}
+        />
+      )}
       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
         <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', sm: 0 } }}>
           <SearchBox value={search} onChange={setSearch} onSubmit={(q) => sv.setState({ q })} />
@@ -221,9 +236,10 @@ export function LocationDetailPage() {
           kind: 'location',
           locationId,
           locationName: locQuery.data?.name ?? t('locations.detail.thisLocation'),
-          lockGame: isDeckBox && !!deckBoxGame,
+          lockGame: !!fixedGame,
         }}
-        defaultGame={deckBoxGame ?? game}
+        defaultGame={fixedGame ?? game}
+        setFilter={fixedGame ? { game: fixedGame, sets: defaultSets.sets } : undefined}
         onClose={() => setAddOpen(false)}
       />
       <LocationImportDialog

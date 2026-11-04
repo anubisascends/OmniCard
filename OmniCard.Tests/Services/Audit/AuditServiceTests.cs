@@ -339,9 +339,10 @@ public class AuditServiceTests : IDisposable
         public List<StorageContainer> GetAll() => [];
         public StorageContainer GetBulk() => throw new NotImplementedException();
         public bool NameExists(string name, int? excludeId = null) => false;
-        public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9, CardGame? game = null, int? deckTypeId = null, int? siteId = null) => throw new NotImplementedException();
+        public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9, CardGame? game = null, int? deckTypeId = null, int? siteId = null, IEnumerable<string>? defaultSets = null) => throw new NotImplementedException();
         public void SetSite(int containerId, int siteId) => throw new NotImplementedException();
         public void SetDeckBox(int containerId, CardGame game, int? deckTypeId) => throw new NotImplementedException();
+        public void SetCardFilter(int containerId, CardGame? game, IEnumerable<string>? defaultSets) => throw new NotImplementedException();
         public List<DeckBoxNeedsGame> GetDeckBoxesMissingGame() => throw new NotImplementedException();
         public void Rename(int id, string newName) => throw new NotImplementedException();
         public void Delete(int id, bool moveCardsToBulk = true) => throw new NotImplementedException();

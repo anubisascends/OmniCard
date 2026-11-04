@@ -584,7 +584,15 @@ export const api = {
     deckTypeId?: number | null;
     /** Site to create the location in (omitted = the default site). */
     siteId?: number | null;
+    /** Set codes the location's card searches start on (needs `game`). */
+    defaultSets?: string[] | null;
   }) => request<LocationSummaryDto>('/api/locations', { method: 'POST', body: JSON.stringify(body) }),
+  /** Fix a location to one game (null = any game) and set the sets its card searches start on. */
+  locationSetCardFilter: (id: number, game: string | null, defaultSets: string[]) =>
+    request<void>(`/api/locations/${id}/card-filter`, {
+      method: 'PUT',
+      body: JSON.stringify({ game, defaultSets }),
+    }),
   locationRename: (id: number, name: string) =>
     request<void>(`/api/locations/${id}`, { method: 'PUT', body: JSON.stringify({ name }) }),
   locationDelete: (id: number, moveToBulk: boolean) =>

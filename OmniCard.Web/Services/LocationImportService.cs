@@ -34,8 +34,13 @@ public sealed class LocationImportService(
 
     private sealed record Target(int Id, string Name, ContainerType Type, CardGame? Game)
     {
-        /// <summary>A deck box with an assigned game only accepts that game's cards.</summary>
-        public CardGame? LockedGame => Type == ContainerType.DeckBox ? Game : null;
+        /// <summary>A location fixed to a game (a deck box, or a binder/box given one) only accepts that
+        /// game's cards.</summary>
+        public CardGame? LockedGame => Game;
+
+        /// <summary>"a Magic: The Gathering deck box" / "for Magic: The Gathering cards only", for errors.</summary>
+        public string LockedLabel(CardGame game) =>
+            Type == ContainerType.DeckBox ? $"is a {GameName(game)} deck box" : $"holds only {GameName(game)} cards";
     }
 
     /// <summary>The app's condition codes, plus the spellings people type in hand-edited files.</summary>
@@ -97,7 +102,7 @@ public sealed class LocationImportService(
 
             if (target.LockedGame is { } lockedGame && card.Game != lockedGame)
             {
-                Error($"This is a {GameName(card.Game)} card, but \"{target.Name}\" is a {GameName(lockedGame)} deck box.");
+                Error($"This is a {GameName(card.Game)} card, but \"{target.Name}\" {target.LockedLabel(lockedGame)}.");
                 continue;
             }
 
@@ -166,7 +171,7 @@ public sealed class LocationImportService(
         if (NormalizeCondition(request.Condition ?? "NM") is not { } condition)
             return Fail($"Unrecognized condition '{request.Condition}'. Use NM, LP, MP, HP or DMG.", []);
         if (target.LockedGame is { } lockedGame && lockedGame != game)
-            return Fail($"Nothing was imported. \"{target.Name}\" is a {GameName(lockedGame)} deck box, but Moxfield and Archidekt decks are {GameName(game)}.", []);
+            return Fail($"Nothing was imported. \"{target.Name}\" {target.LockedLabel(lockedGame)}, but Moxfield and Archidekt decks are {GameName(game)}.", []);
         if (GameService(game) is not { } gs)
             return Fail($"Nothing was imported. The {GameName(game)} catalog isn't available.", []);
 
@@ -243,7 +248,7 @@ public sealed class LocationImportService(
         {
             lotIds = binderCards.ImportCollectionCardLots(singles, skipDuplicates: false);
         }
-        catch (DeckBoxGameMismatchException ex)
+        catch (LocationGameMismatchException ex)
         {
             return Fail($"Nothing was imported. {ex.Message}", []);
         }

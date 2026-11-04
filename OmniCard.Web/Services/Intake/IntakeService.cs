@@ -265,7 +265,7 @@ public sealed class IntakeService(
             db.Intakes.Where(i => i.Id == record.Id).ExecuteDelete();
             var written = lotIds.Where(id => id != 0).ToList();
             db.Lots.Where(l => written.Contains(l.Id)).ExecuteDelete();
-            if (ex is DeckBoxGameMismatchException)
+            if (ex is LocationGameMismatchException)
                 throw new IntakeException(ex.Message, 409);
             throw;
         }

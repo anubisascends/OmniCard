@@ -585,16 +585,137 @@ public class StorageContainerServiceTests : IDisposable
     }
 
     [Fact]
-    public void Create_NonDeckBox_IgnoresGameAndDeckType()
+    public void Create_NonDeckBox_KeepsGameAndSets_IgnoresDeckType()
     {
         var service = CreateService();
 
-        // A game/deckType passed for a non-deck-box type must not leak onto the row.
-        var box = service.Create("Just a Box", ContainerType.Box, game: CardGame.Mtg, deckTypeId: 3);
+        // Any type may be fixed to a game with default sets; a deck type only means something on a deck box.
+        var binder = service.Create("Marvel", ContainerType.Binder, game: CardGame.Mtg, deckTypeId: 3,
+            defaultSets: ["msh", " msc ", "MSH", "", "mar"]);
+
+        var saved = new OmniCardDbContext(_options).StorageContainers.Single(c => c.Id == binder.Id);
+        Assert.Equal(CardGame.Mtg, saved.Game);
+        Assert.Null(saved.DeckTypeId);
+        Assert.Equal("msh,msc,mar", saved.DefaultSets);
+        Assert.Equal(["msh", "msc", "mar"], saved.DefaultSetCodes);
+    }
+
+    [Fact]
+    public void Create_SetsWithoutGame_AreDropped()
+    {
+        var service = CreateService();
+        var box = service.Create("Any Box", ContainerType.Box, defaultSets: ["msh"]);
 
         var saved = new OmniCardDbContext(_options).StorageContainers.Single(c => c.Id == box.Id);
         Assert.Null(saved.Game);
+        Assert.Null(saved.DefaultSets);
+    }
+
+    private void AddCard(int containerId, CardGame game)
+    {
+        using var ctx = new OmniCardDbContext(_options);
+        var product = new Product { Game = game, Category = ProductCategory.Single, Name = game + " card" };
+        ctx.Products.Add(product);
+        ctx.SaveChanges();
+        ctx.Lots.Add(new InventoryLot { ProductId = product.Id, Quantity = 1, LocationId = containerId });
+        ctx.SaveChanges();
+    }
+
+    [Fact]
+    public void SetCardFilter_SetsGameAndSets_ThenClearsBoth()
+    {
+        var service = CreateService();
+        var binder = service.Create("Marvel", ContainerType.Binder);
+
+        service.SetCardFilter(binder.Id, CardGame.Mtg, ["msh", "msc"]);
+        var saved = new OmniCardDbContext(_options).StorageContainers.Single(c => c.Id == binder.Id);
+        Assert.Equal(CardGame.Mtg, saved.Game);
+        Assert.Equal("msh,msc", saved.DefaultSets);
+
+        // Any game again: the sets (that game's codes) go too.
+        service.SetCardFilter(binder.Id, null, ["msh"]);
+        saved = new OmniCardDbContext(_options).StorageContainers.Single(c => c.Id == binder.Id);
+        Assert.Null(saved.Game);
+        Assert.Null(saved.DefaultSets);
+    }
+
+    [Fact]
+    public void SetCardFilter_CardsOutsideTheSets_AreKept()
+    {
+        // The sets are only a search default, so cards from other sets of the same game don't block it.
+        var service = CreateService();
+        var binder = service.Create("Marvel", ContainerType.Binder);
+        AddCard(binder.Id, CardGame.Mtg);
+
+        service.SetCardFilter(binder.Id, CardGame.Mtg, ["msh"]);
+
+        Assert.Equal(1, service.GetCardCount(binder.Id));
+    }
+
+    [Fact]
+    public void SetCardFilter_CardsOfAnotherGame_Throws()
+    {
+        var service = CreateService();
+        var binder = service.Create("Marvel", ContainerType.Binder);
+        AddCard(binder.Id, CardGame.Pokemon);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => service.SetCardFilter(binder.Id, CardGame.Mtg, []));
+        Assert.Contains("another game", ex.Message);
+    }
+
+    [Fact]
+    public void SetCardFilter_DeckBoxWithoutGame_Throws()
+    {
+        var service = CreateService();
+        var box = service.Create("Deck", ContainerType.DeckBox, game: CardGame.Mtg);
+
+        Assert.Throws<InvalidOperationException>(() => service.SetCardFilter(box.Id, null, []));
+    }
+
+    [Fact]
+    public void SetCardFilter_DeckBoxGameChange_ClearsDeckType()
+    {
+        var service = CreateService();
+        var deckTypeId = SeedDeckType(CardGame.Mtg, "Commander");
+        var box = service.Create("Deck", ContainerType.DeckBox, game: CardGame.Mtg, deckTypeId: deckTypeId);
+
+        service.SetCardFilter(box.Id, CardGame.Mtg, ["msh"]);
+        Assert.Equal(deckTypeId, new OmniCardDbContext(_options).StorageContainers.Single(c => c.Id == box.Id).DeckTypeId);
+
+        service.SetCardFilter(box.Id, CardGame.Pokemon, []);
+        var saved = new OmniCardDbContext(_options).StorageContainers.Single(c => c.Id == box.Id);
+        Assert.Equal(CardGame.Pokemon, saved.Game);
         Assert.Null(saved.DeckTypeId);
+    }
+
+    [Fact]
+    public void SetCardFilter_Bulk_Throws()
+    {
+        using (var ctx = new OmniCardDbContext(_options))
+        {
+            if (!ctx.StorageContainers.Any(c => c.IsSystem))
+            {
+                ctx.StorageContainers.Add(new StorageContainer { Name = "Bulk", ContainerType = ContainerType.Bulk, IsSystem = true });
+                ctx.SaveChanges();
+            }
+        }
+        var service = CreateService();
+        var bulk = service.GetBulk();
+
+        Assert.Throws<InvalidOperationException>(() => service.SetCardFilter(bulk.Id, CardGame.Mtg, []));
+    }
+
+    [Fact]
+    public void SetDeckBox_GameChange_ClearsDefaultSets()
+    {
+        var service = CreateService();
+        var box = service.Create("Deck", ContainerType.DeckBox, game: CardGame.Mtg, defaultSets: ["msh"]);
+
+        service.SetDeckBox(box.Id, CardGame.Mtg, null);
+        Assert.Equal("msh", new OmniCardDbContext(_options).StorageContainers.Single(c => c.Id == box.Id).DefaultSets);
+
+        service.SetDeckBox(box.Id, CardGame.Pokemon, null);
+        Assert.Null(new OmniCardDbContext(_options).StorageContainers.Single(c => c.Id == box.Id).DefaultSets);
     }
 
     [Fact]

@@ -29,7 +29,7 @@ public sealed class ScanCommitService(
     /// <paramref name="containerId"/> when <paramref name="canWriteLocation"/> refuses the set-aside
     /// location (null allows everything).</summary>
     /// <exception cref="UnknownScanGameException">An item names an unknown game (nothing is written).</exception>
-    /// <exception cref="DeckBoxGameMismatchException">The location is a deck box for another game.</exception>
+    /// <exception cref="LocationGameMismatchException">The location is a deck box for another game.</exception>
     public ScanCommitOutcome CommitWithBuyList(int containerId, IReadOnlyList<ScanCommitItem> items, Func<int, bool>? canWriteLocation = null)
     {
         var candidates = items
@@ -81,7 +81,7 @@ public sealed class ScanCommitService(
     /// <summary>Create one lot per item in <paramref name="containerId"/>, tag each, and teach the
     /// matcher from the confirmed identities. Returns the created lot ids in input order.</summary>
     /// <exception cref="UnknownScanGameException">An item names an unknown game (nothing is written).</exception>
-    /// <exception cref="DeckBoxGameMismatchException">The location is a deck box for another game.</exception>
+    /// <exception cref="LocationGameMismatchException">The location is a deck box for another game.</exception>
     public IReadOnlyList<int> Commit(int containerId, IReadOnlyList<ScanCommitItem> items)
     {
         var cards = new List<CollectionCard>(items.Count);

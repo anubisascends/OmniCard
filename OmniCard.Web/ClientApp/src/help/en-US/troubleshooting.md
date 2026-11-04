@@ -173,7 +173,7 @@ Scans from a watched scanner folder work differently. They're stored on the serv
 
 A card that's listed for sale is locked against changes that would affect the listing, such as splitting its stack. Remove the listing on **Sales ▸ Listings** first. See [Sales](help:sales).
 
-*This deck box only holds … cards.* A deck box is tied to one game, so you can't put another game's cards in it. See [Deck boxes](help:deck-boxes).
+*This location only holds … cards.* or *"…" holds only … cards and can't take … cards.* The location is kept to one game (every deck box is), so you can't put another game's cards in it. See [Game and default sets](help:locations#game-and-default-sets).
 
 ## Imports fail
 

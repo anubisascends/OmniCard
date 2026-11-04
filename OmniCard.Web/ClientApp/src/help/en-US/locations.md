@@ -66,7 +66,7 @@ Click a group heading to collapse or expand it. Collapsed groups stay collapsed 
 |---|---|
 | **Name** | Click it to open the location. Binders open straight into the binder view. An **Ignored** chip means lists don't take cards from it. A link icon means the deck box is linked to an online deck; click the icon to open the deck in a new tab. |
 | **Site** | Shown when you're viewing **All Sites** and more than one site exists. A lock icon means view only. |
-| **Type** | The location type. Deck boxes also show their deck type and game. |
+| **Type** | The location type. A location that holds one game shows that game under it, and deck boxes also show their deck type. |
 | **Cards** | Total copies in the location. |
 | **Unique** | Number of distinct printings. |
 | **Market** | Current market value of the cards. |
@@ -89,18 +89,19 @@ The search follows the **Site** filter and the game selector, so with a game sel
 The game selected at the top of the app affects this page:
 
 - **Cards**, **Unique**, **Market** and **Cost** count only cards from that game. Choose **All Games** to count everything.
-- Deck boxes that belong to a different game are hidden.
+- Locations that hold a different game are hidden: deck boxes, and any binder or box you've set to one game. See [Game and default sets](#game-and-default-sets).
 - Always-available locations are always shown, whatever game is selected.
 
 ## Create a location
 
 1. On the [Locations](/locations) page, type a name in **New location name**. Names must be unique. If the name is already used, you'll see *This name is already in use*.
 2. Pick a **Type**.
-3. If you picked **Deck Box**, choose a **Game** (required) and optionally a **Deck type**. See [Deck boxes](help:deck-boxes).
-4. If you can write to more than one site, choose the site in **Create in site**. By default, new locations go into the site you're filtering by, or the Default site.
-5. Click **Add**.
+3. If you picked **Deck Box**, choose a **Game** (required) and optionally a **Deck type**. See [Deck boxes](help:deck-boxes). For any other type, leave **Game** on **Any game**, or pick a game to keep the location to that game.
+4. If you picked a game, you can also pick **Default sets**: card searches for this location start on them. See [Game and default sets](#game-and-default-sets).
+5. If you can write to more than one site, choose the site in **Create in site**. By default, new locations go into the site you're filtering by, or the Default site.
+6. Click **Add**.
 
-![Creating a new deck box from the add bar](locations-add-bar.png)
+![Creating a binder kept to one game, with two default sets, from the add bar](locations-add-bar.png)
 
 > [!TIP]
 > You don't have to come to this page to make a new location. Most "move to location" pickers in OmniCard have a **New location** button that creates one and selects it in one step.
@@ -118,6 +119,31 @@ Choose **Rename…**, type the new name, and confirm.
 ### Change a deck box's game or deck type
 
 For deck boxes, choose **Game & deck type…**. See [Deck boxes](help:deck-boxes#set-the-game-and-deck-type).
+
+### Change a location's game and default sets
+
+Choose **Game & sets…** (**Default sets…** for a deck box). See [Game and default sets](#game-and-default-sets).
+
+## Game and default sets
+
+Any location except Bulk can be kept to one game, and can have default sets for its card searches. For example, a binder for one Magic block can hold only Magic cards, with searches that start on that block's sets.
+
+To set them, choose **Game & sets…** in the location's **⋮** menu on the Locations page, or click **Game & sets** on the location's page. Then:
+
+1. Pick the **Game**, or **Any game** to allow every game. A deck box always has a game. Change it with **Game & deck type…**.
+2. With a game picked, type set codes or names in **Default sets** and press Enter to add each one. Leave it empty for no default sets.
+3. Click **Save**.
+
+![The Game & sets dialog with two default sets](locations-card-filter.png)
+
+The game and the sets work differently:
+
+- **The game is a rule.** Cards from other games can't be added to the location by any route: **Add card**, binder pockets, moving cards, scanning, importing or syncing a deck. **Add card** is locked to the game (*Locked to this location's game*), and location pickers grey out the location for cards of other games (*This location only holds … cards*). You can't give a location a game while it holds cards of another game. Move those cards out first.
+- **The default sets are only a starting point.** **Add card** on the location's page and the binder's **Sets** filter start on them, but you can still search every set (Alt+A, or remove the chips). Nothing outside the sets is refused or moved.
+
+The location's page shows its game (for example *Magic: The Gathering only*) and its default sets under the title. If it holds cards from other sets, a note says how many, for example *3 cards here aren't in this location's default sets.* Click **Show them** to search for them.
+
+![A location's game and default sets, with the note about cards from other sets](locations-card-filter-panel.png)
 
 ### Move to another site
 
@@ -164,6 +190,7 @@ The location page shows:
 - **Print labels**, which prints a label for every card the page shows. See [Labels](help:labels).
 - **Audit**, **Import** and **Add card** buttons (when you're allowed to change this location).
 - A summary line with the number of cards and their market value.
+- The location's game and default sets, with **Game & sets**. See [Game and default sets](#game-and-default-sets).
 - For deck boxes, a panel with the game, deck type and legality warnings, plus the deck link and **Sync from URL** for a linked deck box. See [Deck boxes](help:deck-boxes).
 - A search box, the view button for [saved views](help:saved-views), and the card list.
 
@@ -185,7 +212,7 @@ Click any card to open its details, where you can edit condition, foil, quantity
 ## Add cards to a location
 
 1. Click **Add card**.
-2. Choose the **Game** (a deck box is locked to its own game).
+2. Choose the **Game**. A location kept to one game, such as a deck box, is locked to it. If the location has default sets, they're shown as chips in **Sets** and the search starts limited to them. Remove the chips, or press Alt+A, to search every set.
 3. Search by **Name or number** (the card's name, or the collector number printed on it, such as `0019`; see [Search by collector number](help:binders#search-by-collector-number)), and optionally narrow with **Set** and **Collector #**.
 4. For games whose catalog holds more than one language, such as Magic, each result shows its language, for example **EN** or **JA**. To see only some languages, tick them in **Languages**. Leave it on **All languages** to see every one. OmniCard remembers your choice for each game.
 5. Point at a result to see a larger picture of the card. On a phone, press and hold it. Click the printing you want. From the keyboard, press ↓ and ↑ in the search boxes to move through the results, then Enter to pick one. If there's only one result, Enter picks it straight away.
@@ -251,14 +278,15 @@ There are several ways to move cards:
 - **A whole location to another site**: use **Move to site…** in the Locations page menu.
 - **From the collection**: the same **Select ▸ Move to…** tools work on the [Collection](/collection) page. See [Collection](help:collection).
 
-The location picker groups locations by type, with **Always Available** first. Type in **Search locations…** to filter, or click **New location** to create one on the spot with **Create & select**. Deck boxes for a different game appear greyed out (*This deck box only holds … cards*), and locations in sites you can only view aren't listed.
+The location picker groups locations by type, with **Always Available** first. Type in **Search locations…** to filter, or click **New location** to create one on the spot with **Create & select**. Locations for a different game appear greyed out (*This location only holds … cards*), and locations in sites you can only view aren't listed.
 
 In selection mode you can also use **Bulk edit**, **List for sale**, **Export CSV** and **Delete** on the selected cards.
 
 ## Troubleshooting
 
-- **A location is missing.** Check the **Site** filter (try **All Sites**), click **Clear search**, turn off **Hide empty locations**, and check the game selector. Deck boxes for other games are hidden. If it's in a site you haven't been given access to, ask an administrator.
+- **A location is missing.** Check the **Site** filter (try **All Sites**), click **Clear search**, turn off **Hide empty locations**, and check the game selector. Locations for other games are hidden. If it's in a site you haven't been given access to, ask an administrator.
 - **I can't change a location.** A lock icon or *view only* means you only have read access to its site. Ask an administrator for write access.
 - **Audit or Import buttons are missing.** These need extra permissions. Ask an administrator.
 - **Import says nothing was imported.** That's expected when any line has a problem. Fix every listed row and import again.
 - **I can't move a card into a deck box.** The deck box holds a different game. See [Deck boxes](help:deck-boxes#one-game-per-deck-box).
+- **I can't move a card into a binder or box.** The location is kept to a different game. See [Game and default sets](#game-and-default-sets).

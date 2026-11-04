@@ -18,12 +18,41 @@ public class StorageContainer
     /// Controls who can see/edit this location and its cards (see <see cref="Sites.SiteAccessGrant"/>).</summary>
     public int SiteId { get; set; } = Sites.Site.DefaultSiteId;
 
-    /// <summary>The game system this location holds. Only meaningful for
-    /// <see cref="ContainerType.DeckBox"/> — a deck box is assigned one game and rejects cards from
-    /// other games (see the deck-box game guard). Null on every other container type and on legacy
-    /// deck boxes created before this field existed. Stored on all rows for schema simplicity, like
-    /// <see cref="SlotsPerPage"/>.</summary>
+    /// <summary>The game system this location holds, or null for any game. A location with a game
+    /// rejects cards from other games on every card-in path (see <c>LocationGameGuard</c>). Required for
+    /// a <see cref="ContainerType.DeckBox"/> (null only on legacy deck boxes); optional on binders, boxes
+    /// and display cases; never set on the system Bulk location.</summary>
     public CardGame? Game { get; set; }
+
+    /// <summary>Comma-separated set codes (catalog spelling, e.g. <c>"msh,msc,mar"</c>) that card searches
+    /// for this location start limited to — the binder edit Sets filter and the location's Add card. Only
+    /// a default: it is never enforced, and the user can search every set. Only kept while
+    /// <see cref="Game"/> is set (the codes are that game's). Null = no default sets.</summary>
+    public string? DefaultSets { get; set; }
+
+    /// <summary>Longest <see cref="DefaultSets"/> accepted.</summary>
+    public const int MaxDefaultSetsLength = 1000;
+
+    /// <summary><see cref="DefaultSets"/> as a list (empty when unset).</summary>
+    public IReadOnlyList<string> DefaultSetCodes => ParseSetCodes(DefaultSets);
+
+    /// <summary>Splits a stored <see cref="DefaultSets"/> value into its codes.</summary>
+    public static IReadOnlyList<string> ParseSetCodes(string? stored) =>
+        string.IsNullOrWhiteSpace(stored)
+            ? []
+            : stored.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    /// <summary>Normalizes set codes for <see cref="DefaultSets"/>: trimmed, blanks dropped, de-duplicated
+    /// case-insensitively (first spelling kept); null when none are left.</summary>
+    public static string? JoinSetCodes(IEnumerable<string>? codes)
+    {
+        var list = (codes ?? [])
+            .Select(c => (c ?? "").Trim().Replace(",", ""))
+            .Where(c => c.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return list.Count == 0 ? null : string.Join(",", list);
+    }
 
     /// <summary>FK to the <see cref="DeckType"/> (format) this deck box is built for — Commander,
     /// Standard, etc. Only meaningful for <see cref="ContainerType.DeckBox"/>. Null when unset or when

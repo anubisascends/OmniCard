@@ -168,7 +168,7 @@ public sealed class BuyListService(
             var container = ctx.StorageContainers.AsNoTracking().FirstOrDefault(c => c.Id == id)
                 ?? throw new BuyListException("That location doesn't exist.", 404);
             if (!Accepts(container, game))
-                throw new BuyListException("That deck box is for another game.");
+                throw new BuyListException("That location is for another game.");
             settings.SetAsideLocationIds[game] = id;
         }
         else
@@ -177,7 +177,7 @@ public sealed class BuyListService(
     }
 
     /// <summary>The game's set-aside location, or null when none is set or it can't take this game's cards
-    /// any more (deleted, or now a deck box for another game).</summary>
+    /// any more (deleted, or now fixed to another game).</summary>
     public (int Id, string Name)? SetAsideLocation(CardGame game)
     {
         using var ctx = dbFactory.CreateDbContext();
@@ -192,7 +192,7 @@ public sealed class BuyListService(
     }
 
     private static bool Accepts(StorageContainer container, CardGame game) =>
-        container.ContainerType != ContainerType.DeckBox || container.Game is null || container.Game == game;
+        container.Game is null || container.Game == game;
 
     /// <summary>Flags the scanned cards that are on the game's Buy List, so review can show them.</summary>
     public IReadOnlyList<ScanBuyListResultDto> Evaluate(CardGame game, IReadOnlyList<ScanTagRuleItem> items)

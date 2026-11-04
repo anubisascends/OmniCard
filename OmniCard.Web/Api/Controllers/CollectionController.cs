@@ -490,7 +490,7 @@ public sealed class CollectionController(
         {
             binderCards.MoveCardsToContainer(req.CardIds, req.ContainerId, req.Section);
         }
-        catch (DeckBoxGameMismatchException ex)
+        catch (LocationGameMismatchException ex)
         {
             return Conflict(new { error = ex.Message });
         }
