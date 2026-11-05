@@ -85,7 +85,7 @@ public sealed class DecklistController(
                 req.Picks.Select(p => (p.LotId, p.Quantity)).ToList(), req.ContainerId);
             return new DecklistMoveResultDto(moved);
         }
-        catch (DeckBoxGameMismatchException ex)
+        catch (LocationGameMismatchException ex)
         {
             return Conflict(new { error = ex.Message });
         }

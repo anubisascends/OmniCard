@@ -22,6 +22,21 @@
       "DisplayCase": "Display Case"
     },
     "deckBoxLabel": "Deck Box",
+    "cardFilter": {
+      "dialogTitle": "Game & sets for \"{{name}}\"",
+      "anyGame": "Any game",
+      "onlyGame": "{{game}} only",
+      "gameHelp": "Only cards of this game can be added here.",
+      "deckBoxGameHelp": "Change a deck box's game with Game & deck type.",
+      "defaultSets": "Default sets",
+      "defaultSetsLabel": "Default sets:",
+      "setsHelp": "Card searches for this location start on these sets. You can still search all sets.",
+      "setsNeedGame": "Choose a game to pick default sets.",
+      "edit": "Game & sets",
+      "outsideSets_one": "{{countText}} card here isn't in this location's default sets.",
+      "outsideSets_other": "{{countText}} cards here aren't in this location's default sets.",
+      "showOutside": "Show them"
+    },
     "groups": {
       "alwaysAvailable": "Always Available",
       "headings": {
@@ -36,6 +51,8 @@
       "rename": "Rename…",
       "renamePrompt": "Rename location",
       "gameDeckType": "Game & deck type…",
+      "gameSets": "Game & sets…",
+      "defaultSets": "Default sets…",
       "setAlwaysAvailable": "Set always-available",
       "unsetAlwaysAvailable": "Unset always-available",
       "ignoreForLists": "Ignore for lists",

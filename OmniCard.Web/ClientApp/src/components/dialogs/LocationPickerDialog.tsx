@@ -188,10 +188,13 @@ export function LocationPickerDialog({
   const { t } = useTranslation();
   const fmt = useFormatters();
   const { multiSite } = useSites();
-  // A deck box locked to a game that none of the moving cards share can't receive them.
+  // A location fixed to a game (a deck box, or a binder/box given one) that the moving cards don't share
+  // can't receive them.
   const gameBlocked = (locGame?: string | null) =>
     !!locGame && cardGames != null && cardGames.length > 0 && !cardGames.includes(locGame);
   const { data, isLoading } = useQuery({ queryKey: ['locations', undefined], queryFn: () => api.locations(), enabled: open });
+  const games = useQuery({ queryKey: ['games'], queryFn: () => api.games(), enabled: open && !!cardGames?.length });
+  const gameName = (id?: string | null) => games.data?.find((g) => g.id === id)?.displayName ?? id;
   const [search, setSearch] = useState('');
 
   const groups = useMemo(() => {
@@ -251,7 +254,7 @@ export function LocationPickerDialog({
                         disabled={blocked}
                         onClick={() => onPick(l.id)}
                         sx={{ borderRadius: 1 }}
-                        title={blocked ? t('dialogs.locationPicker.gameBlocked', { game: l.game }) : undefined}
+                        title={blocked ? t('dialogs.locationPicker.gameBlocked', { game: gameName(l.game) }) : undefined}
                       >
                         <Stack direction="row" spacing={1} alignItems="center" sx={{ width: '100%' }}>
                           <Stack sx={{ flexGrow: 1, minWidth: 0 }}>

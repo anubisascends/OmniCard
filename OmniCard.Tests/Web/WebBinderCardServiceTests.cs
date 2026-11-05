@@ -227,9 +227,9 @@ public class WebBinderCardServiceTests : IDisposable
         // A deck box locked to Magic must reject the Pokémon card.
         var deckBox = _containers.Create("MTG Deck", ContainerType.DeckBox, game: CardGame.Mtg);
 
-        var ex = Assert.Throws<DeckBoxGameMismatchException>(() =>
+        var ex = Assert.Throws<LocationGameMismatchException>(() =>
             _service.MoveCardsToContainer([lotId], deckBox.Id));
-        Assert.Equal(CardGame.Mtg, ex.DeckBoxGame);
+        Assert.Equal(CardGame.Mtg, ex.LocationGame);
         Assert.Equal(CardGame.Pokemon, ex.OffendingGame);
 
         // The lot stays put — nothing was moved.
@@ -287,7 +287,7 @@ public class WebBinderCardServiceTests : IDisposable
         var lotId = AddLot("Pikachu", quantity: 2);
         var deckBox = _containers.Create("MTG Deck", ContainerType.DeckBox, game: CardGame.Mtg);
 
-        Assert.Throws<DeckBoxGameMismatchException>(() =>
+        Assert.Throws<LocationGameMismatchException>(() =>
             _service.MoveQuantitiesToContainer([(lotId, 1)], deckBox.Id));
 
         using var ctx = new OmniCardDbContext(_opts);
@@ -613,7 +613,7 @@ public class WebBinderCardServiceTests : IDisposable
         var lotId = AddLotIn(boxId, "Pikachu"); // Pokémon
         var deckBox = _containers.Create("MTG Deck", ContainerType.DeckBox, game: CardGame.Mtg);
 
-        Assert.Throws<DeckBoxGameMismatchException>(() =>
+        Assert.Throws<LocationGameMismatchException>(() =>
             _service.PlaceOwnedCardInSlot(lotId, deckBox.Id, 1, 0));
 
         using var ctx = new OmniCardDbContext(_opts);
@@ -759,7 +759,7 @@ public class WebBinderCardServiceTests : IDisposable
         var deckBox = _containers.Create("MTG Deck", ContainerType.DeckBox, game: CardGame.Mtg);
 
         // ScanCard builds Pokémon cards; the Magic-locked deck box must reject them.
-        Assert.Throws<DeckBoxGameMismatchException>(() =>
+        Assert.Throws<LocationGameMismatchException>(() =>
             _service.ReconcileLocationAudit(deckBox.Id, [ScanCard("Pikachu")]));
     }
 

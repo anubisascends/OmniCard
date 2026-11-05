@@ -446,10 +446,10 @@ public sealed class ListsController(
 
         try
         {
-            if (moveTo is int m && picks.Count > 0) binderCards.ValidateDeckBoxGame(m, list.Game);
-            if (addTo is int a && toAdd.Count > 0) binderCards.ValidateDeckBoxGame(a, list.Game);
+            if (moveTo is int m && picks.Count > 0) binderCards.ValidateLocationGame(m, list.Game);
+            if (addTo is int a && toAdd.Count > 0) binderCards.ValidateLocationGame(a, list.Game);
         }
-        catch (DeckBoxGameMismatchException ex)
+        catch (LocationGameMismatchException ex)
         {
             return Conflict(new { error = ex.Message });
         }

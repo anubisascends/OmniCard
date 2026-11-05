@@ -94,13 +94,13 @@ public sealed class WebBinderCardService
             .ToHashSet();
     }
 
-    /// <summary>Throws <see cref="DeckBoxGameMismatchException"/> when <paramref name="containerId"/> is a deck
+    /// <summary>Throws <see cref="LocationGameMismatchException"/> when <paramref name="containerId"/> is a deck
     /// box locked to a game other than <paramref name="game"/> — lets a multi-step write check every target
     /// before it changes anything.</summary>
-    public void ValidateDeckBoxGame(int containerId, CardGame game)
+    public void ValidateLocationGame(int containerId, CardGame game)
     {
         using var context = _dbFactory.CreateDbContext();
-        DeckBoxGameGuard.ValidateIncoming(context, containerId, [game]);
+        LocationGameGuard.ValidateIncoming(context, containerId, [game]);
     }
 
     public void MoveCardsToContainer(IEnumerable<int> cardIds, int containerId, string? section = null)
@@ -110,8 +110,8 @@ public sealed class WebBinderCardService
         var lots = context.Lots.Include(l => l.Product)
             .Where(l => ids.Contains(l.Id) && l.Product.Category == ProductCategory.Single).ToList();
 
-        // Hard block: a game-locked deck box rejects cards from other games (see DeckBoxGameGuard).
-        DeckBoxGameGuard.ValidateIncoming(context, containerId, lots.Select(l => l.Product.Game).Distinct());
+        // Hard block: a game-locked deck box rejects cards from other games (see LocationGameGuard).
+        LocationGameGuard.ValidateIncoming(context, containerId, lots.Select(l => l.Product.Game).Distinct());
 
         foreach (var lot in lots)
         {
@@ -146,7 +146,7 @@ public sealed class WebBinderCardService
             .Where(l => ids.Contains(l.Id) && l.Product.Category == ProductCategory.Single)
             .ToDictionary(l => l.Id);
 
-        DeckBoxGameGuard.ValidateIncoming(context, containerId, lots.Values.Select(l => l.Product.Game).Distinct());
+        LocationGameGuard.ValidateIncoming(context, containerId, lots.Values.Select(l => l.Product.Game).Distinct());
 
         var moved = 0;
         var movements = new List<(InventoryLot Lot, int Quantity)>();
@@ -253,7 +253,7 @@ public sealed class WebBinderCardService
         // Hard block: reject an import that would place a card into a game-locked deck box of another
         // game. Imported cards can target different locations, so validate each target's games.
         foreach (var group in cardList.Where(c => c.ContainerId != null).GroupBy(c => c.ContainerId))
-            DeckBoxGameGuard.ValidateIncoming(context, group.Key, group.Select(c => c.Game).Distinct());
+            LocationGameGuard.ValidateIncoming(context, group.Key, group.Select(c => c.Game).Distinct());
 
         var productCache = new Dictionary<(CardGame Game, string GameCardId, bool Foil, string? FoilType), Product>();
         var lots = new List<InventoryLot>(cardList.Count);
@@ -310,7 +310,7 @@ public sealed class WebBinderCardService
 
         // Hard block: scanning into a game-locked deck box rejects cards from other games. All scanned
         // cards target the same location, so validate the batch's games up front.
-        DeckBoxGameGuard.ValidateIncoming(context,
+        LocationGameGuard.ValidateIncoming(context,
             cards.Select(c => c.ContainerId).FirstOrDefault(id => id != null),
             cards.Select(c => c.Game).Distinct());
 
@@ -385,7 +385,7 @@ public sealed class WebBinderCardService
         using var context = _dbFactory.CreateDbContext();
 
         // Same hard block as scanning: a game-locked deck box rejects cards from other games.
-        DeckBoxGameGuard.ValidateIncoming(context, containerId, scanned.Select(c => c.Game).Distinct());
+        LocationGameGuard.ValidateIncoming(context, containerId, scanned.Select(c => c.Game).Distinct());
 
         var expectedLots = context.Lots
             .Include(l => l.Product)
@@ -624,7 +624,7 @@ public sealed class WebBinderCardService
             .FirstOrDefault(l => l.Id == sourceLotId && l.Product.Category == ProductCategory.Single)
             ?? throw new InvalidOperationException("The copied card is no longer in your collection.");
 
-        DeckBoxGameGuard.ValidateIncoming(context, containerId, [source.Product.Game]);
+        LocationGameGuard.ValidateIncoming(context, containerId, [source.Product.Game]);
 
         var occupant = context.Lots.FirstOrDefault(l =>
             l.LocationId == containerId && l.Page == page && l.Slot == slot);
@@ -689,7 +689,7 @@ public sealed class WebBinderCardService
             ?? throw new InvalidOperationException($"Card {lotId} was not found in your collection.");
 
         // Hard block: a game-locked deck box rejects cards from other games (shared with the desktop path).
-        DeckBoxGameGuard.ValidateIncoming(context, containerId, [lot.Product.Game]);
+        LocationGameGuard.ValidateIncoming(context, containerId, [lot.Product.Game]);
 
         // Displace any current occupant of the target pocket back to the Unplaced pool.
         var occupant = context.Lots.FirstOrDefault(l =>
@@ -844,7 +844,7 @@ public sealed class WebBinderCardService
             return 0;
 
         // Hard block: a game-locked deck box rejects cards from other games (shared with the desktop path).
-        DeckBoxGameGuard.ValidateIncoming(context, containerId, [lot.Product.Game]);
+        LocationGameGuard.ValidateIncoming(context, containerId, [lot.Product.Game]);
 
         var move = Math.Clamp(quantity, 1, lot.Quantity);
 

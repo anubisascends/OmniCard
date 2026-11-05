@@ -1006,7 +1006,7 @@ public sealed class CardService : ICardService
         using var context = _omniDbContextFactory.CreateDbContext();
 
         // Hard block: a game-locked deck box rejects cards from other games (shared with the web path).
-        DeckBoxGameGuard.ValidateIncoming(context, container?.Id, [game]);
+        LocationGameGuard.ValidateIncoming(context, container?.Id, [game]);
 
         var product = FindOrCreateProduct(context, game, match.GameSpecificId, isFoil, foilType,
             match.Name, match.SetCode, match.SetName, match.CollectorNumber, match.Rarity, match.ImageUri,
@@ -1698,7 +1698,7 @@ public sealed class CardService : ICardService
             .Where(l => ids.Contains(l.Id) && l.Product.Category == ProductCategory.Single).ToList();
 
         // Hard block: a game-locked deck box rejects cards from other games (shared with the web path).
-        DeckBoxGameGuard.ValidateIncoming(context, containerId, lots.Select(l => l.Product.Game).Distinct());
+        LocationGameGuard.ValidateIncoming(context, containerId, lots.Select(l => l.Product.Game).Distinct());
 
         foreach (var lot in lots)
         {
@@ -1729,7 +1729,7 @@ public sealed class CardService : ICardService
         if (lot is null) return 0;
 
         // Hard block: a game-locked deck box rejects cards from other games (shared with the web path).
-        DeckBoxGameGuard.ValidateIncoming(context, containerId, [lot.Product.Game]);
+        LocationGameGuard.ValidateIncoming(context, containerId, [lot.Product.Game]);
 
         // Whole-lot move: no split needed.
         if (quantity >= lot.Quantity)

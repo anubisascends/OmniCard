@@ -21,7 +21,7 @@ Deck boxes are ordinary [locations](help:locations) with a few extras:
 5. Optionally choose a **Deck type**, or leave it as **None**. The list only shows formats for the game you picked.
 6. Click **Add**.
 
-![Creating a deck box with a game and deck type](locations-add-bar.png)
+![Creating a deck box with a game and deck type](deck-boxes-add-bar.png)
 
 You can also create a deck box from any "move to location" picker by clicking **New location**.
 
@@ -48,11 +48,13 @@ Deck boxes created before games were required may not have one. When that happen
 
 Once a deck box has a game, OmniCard keeps other games out of it:
 
-- **Add card** on the deck box's page is locked to the deck box's game (*Locked to this deck box's game*).
-- In "move to location" pickers, deck boxes for a different game are greyed out, with the note *This deck box only holds … cards*.
+- **Add card** on the deck box's page is locked to the deck box's game (*Locked to this location's game*).
+- In "move to location" pickers, deck boxes for a different game are greyed out, with the note *This location only holds … cards*.
 - Any other attempt to move a card from another game into the deck box is refused.
 
 The game selector at the top of the app also hides deck boxes that belong to other games on the Locations page. Choose **All Games** to see them all.
+
+Binders and boxes can be kept to one game in the same way, and any location can have default sets for its searches. See [Game and default sets](help:locations#game-and-default-sets).
 
 ## The deck panel
 

@@ -468,7 +468,7 @@ Import / Export page:
   be placed, listed or moved on its own.
 - **All or nothing.** Every line has to parse cleanly and match a real catalog card before anything is
   written. Rows with an ID (OmniCard, ManaBox) are checked by ID. Other rows are matched by name plus
-  set/collector number (TCGplayer by set name). Game-locked deck boxes reject other games. If any line
+  set/collector number (TCGplayer by set name). A location fixed to a game (every deck box, and any binder/box given one) rejects other games. If any line
   fails, including an unrecognized condition or a bad quantity, nothing is imported. The user sees every
   problem, with its CSV row number, card name and a fix.
 

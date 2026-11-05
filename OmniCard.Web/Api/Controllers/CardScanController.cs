@@ -305,7 +305,7 @@ public sealed class CardScanController(
         {
             return BadRequest(new { error = ex.Message });
         }
-        catch (DeckBoxGameMismatchException ex)
+        catch (LocationGameMismatchException ex)
         {
             return Conflict(new { error = ex.Message });
         }
@@ -435,7 +435,7 @@ public sealed class CardScanController(
         {
             result = binderCards.ReconcileLocationAudit(request.ContainerId, cards);
         }
-        catch (DeckBoxGameMismatchException ex)
+        catch (LocationGameMismatchException ex)
         {
             return Conflict(new { error = ex.Message });
         }

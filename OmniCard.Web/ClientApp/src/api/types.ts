@@ -111,8 +111,12 @@ export interface LocationSummaryDto {
   priceDelta: number;
   priceDeltaPercent: number;
   coverImageUri?: string | null;
-  /** Assigned game system (enum id, e.g. "Mtg"); only ever set for deck boxes. */
+  /** The game this location is fixed to (enum id, e.g. "Mtg"), or null for any game. Cards of other games
+   * can't be added. Always set on deck boxes (except legacy ones); optional on other types. */
   game?: string | null;
+  /** Set codes the location's card searches start on (binder Sets filter, Add card) — only a default,
+   * never enforced. Empty without a game. */
+  defaultSets: string[];
   /** Assigned deck type (format) id; only ever set for deck boxes. */
   deckTypeId?: number | null;
   /** Assigned deck type display name. */

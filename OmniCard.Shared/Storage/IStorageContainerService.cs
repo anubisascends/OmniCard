@@ -14,14 +14,15 @@ public interface IStorageContainerService
     /// (e.g. the one being renamed). Used to keep location names globally unique.</summary>
     bool NameExists(string name, int? excludeId = null);
 
-    /// <summary>Creates a location. <paramref name="game"/> and <paramref name="deckTypeId"/> are
-    /// applied only when <paramref name="type"/> is <see cref="ContainerType.DeckBox"/> (ignored
-    /// otherwise). A deck box may be created without a game (legacy/unassigned), but callers that
-    /// require one should validate before calling. <paramref name="siteId"/> is the
-    /// <see cref="Sites.Site"/> the location is created in (null = the default site); callers check
-    /// the user may write to it.</summary>
+    /// <summary>Creates a location. <paramref name="game"/> fixes the location to one game (any type but
+    /// Bulk; a deck box may be created without one, but callers that require it should validate first).
+    /// <paramref name="deckTypeId"/> applies only to a <see cref="ContainerType.DeckBox"/>.
+    /// <paramref name="defaultSets"/> are the set codes the location's card searches start on (kept only
+    /// with a game). <paramref name="siteId"/> is the <see cref="Sites.Site"/> the location is created in
+    /// (null = the default site); callers check the user may write to it.</summary>
     StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9,
-        CardGame? game = null, int? deckTypeId = null, int? siteId = null);
+        CardGame? game = null, int? deckTypeId = null, int? siteId = null,
+        IEnumerable<string>? defaultSets = null);
     void Rename(int id, string newName);
 
     /// <summary>Moves a location (and therefore every card in it) to another <see cref="Sites.Site"/>.
@@ -33,6 +34,13 @@ public interface IStorageContainerService
     /// <see cref="InvalidOperationException"/> if the container isn't a deck box, or if the box
     /// already holds cards from a different game (which would violate the single-game invariant).</summary>
     void SetDeckBox(int containerId, CardGame game, int? deckTypeId);
+
+    /// <summary>Sets a location's game (null = any game) and default sets (the set codes its card searches
+    /// start on; dropped when there's no game). Throws <see cref="InvalidOperationException"/> for the
+    /// system Bulk location, for clearing a deck box's game, or when the location already holds cards
+    /// from a game other than <paramref name="game"/>. Changing a deck box's game clears its deck type.
+    /// Cards outside the default sets are left where they are — the sets are only a search default.</summary>
+    void SetCardFilter(int containerId, CardGame? game, IEnumerable<string>? defaultSets);
 
     /// <summary>Deck boxes that have no game assigned yet (legacy, pre-feature), each with the game
     /// inferred from the cards currently inside it when unambiguous. Backs the "assign game" prompt.</summary>

@@ -67,7 +67,9 @@
       "more": "+{{n}}",
       "tooltip": "Search only these sets when adding a card (F2)",
       "title": "Search these sets",
-      "help": "Card searches start limited to these sets until you leave this page. In the Add card dialog you can change them for one card, or press Alt+A to search all sets."
+      "help": "Card searches start limited to these sets until you leave this page. In the Add card dialog you can change them for one card, or press Alt+A to search all sets.",
+      "gameFixed": "This binder only holds this game",
+      "useDefaults": "Binder's sets"
     },
     "foilRule": {
       "label": "Foil if",

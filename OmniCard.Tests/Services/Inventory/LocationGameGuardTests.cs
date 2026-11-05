@@ -7,12 +7,12 @@ using OmniCard.Shared.Storage;
 
 namespace OmniCard.Tests.Services.Inventory;
 
-public class DeckBoxGameGuardTests : IDisposable
+public class LocationGameGuardTests : IDisposable
 {
     private readonly SqliteConnection _connection;
     private readonly DbContextOptions<OmniCardDbContext> _options;
 
-    public DeckBoxGameGuardTests()
+    public LocationGameGuardTests()
     {
         _connection = new SqliteConnection("Data Source=:memory:");
         _connection.Open();
@@ -38,7 +38,7 @@ public class DeckBoxGameGuardTests : IDisposable
         var id = NewContainer(ContainerType.DeckBox, CardGame.Mtg);
         using var ctx = new OmniCardDbContext(_options);
         // Does not throw.
-        DeckBoxGameGuard.ValidateIncoming(ctx, id, [CardGame.Mtg]);
+        LocationGameGuard.ValidateIncoming(ctx, id, [CardGame.Mtg]);
     }
 
     [Fact]
@@ -46,9 +46,9 @@ public class DeckBoxGameGuardTests : IDisposable
     {
         var id = NewContainer(ContainerType.DeckBox, CardGame.Mtg);
         using var ctx = new OmniCardDbContext(_options);
-        var ex = Assert.Throws<DeckBoxGameMismatchException>(() =>
-            DeckBoxGameGuard.ValidateIncoming(ctx, id, [CardGame.Mtg, CardGame.Pokemon]));
-        Assert.Equal(CardGame.Mtg, ex.DeckBoxGame);
+        var ex = Assert.Throws<LocationGameMismatchException>(() =>
+            LocationGameGuard.ValidateIncoming(ctx, id, [CardGame.Mtg, CardGame.Pokemon]));
+        Assert.Equal(CardGame.Mtg, ex.LocationGame);
         Assert.Equal(CardGame.Pokemon, ex.OffendingGame);
     }
 
@@ -57,21 +57,35 @@ public class DeckBoxGameGuardTests : IDisposable
     {
         var id = NewContainer(ContainerType.DeckBox, null);
         using var ctx = new OmniCardDbContext(_options);
-        DeckBoxGameGuard.ValidateIncoming(ctx, id, [CardGame.Mtg, CardGame.Pokemon]);
+        LocationGameGuard.ValidateIncoming(ctx, id, [CardGame.Mtg, CardGame.Pokemon]);
     }
 
     [Fact]
-    public void NonDeckBox_AllowsAnything()
+    public void LocationWithoutGame_AllowsAnything()
     {
         var id = NewContainer(ContainerType.Box, null);
         using var ctx = new OmniCardDbContext(_options);
-        DeckBoxGameGuard.ValidateIncoming(ctx, id, [CardGame.Pokemon]);
+        LocationGameGuard.ValidateIncoming(ctx, id, [CardGame.Pokemon]);
+    }
+
+    [Theory]
+    [InlineData(ContainerType.Binder)]
+    [InlineData(ContainerType.Box)]
+    [InlineData(ContainerType.DisplayCase)]
+    public void GameFixedLocation_OfAnyType_RejectsOtherGames(ContainerType type)
+    {
+        var id = NewContainer(type, CardGame.Mtg);
+        using var ctx = new OmniCardDbContext(_options);
+        LocationGameGuard.ValidateIncoming(ctx, id, [CardGame.Mtg]);
+        var ex = Assert.Throws<LocationGameMismatchException>(() =>
+            LocationGameGuard.ValidateIncoming(ctx, id, [CardGame.Riftbound]));
+        Assert.Equal(CardGame.Riftbound, ex.OffendingGame);
     }
 
     [Fact]
     public void NullTarget_AllowsAnything()
     {
         using var ctx = new OmniCardDbContext(_options);
-        DeckBoxGameGuard.ValidateIncoming(ctx, null, [CardGame.Pokemon]);
+        LocationGameGuard.ValidateIncoming(ctx, null, [CardGame.Pokemon]);
     }
 }

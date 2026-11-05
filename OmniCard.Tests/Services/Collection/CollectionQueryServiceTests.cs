@@ -206,6 +206,22 @@ public class CollectionQueryServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetLocationOverviews_GameFilter_HidesOtherGameBinders()
+    {
+        // Any location fixed to a game is hidden under another game, not just deck boxes.
+        var mtgBinder = new StorageContainer { Name = "Marvel Binder", ContainerType = ContainerType.Binder, Game = CardGame.Mtg };
+        var pkmBinder = new StorageContainer { Name = "Pokemon Binder", ContainerType = ContainerType.Binder, Game = CardGame.Pokemon };
+        var anyBinder = new StorageContainer { Name = "Trade Binder", ContainerType = ContainerType.Binder };
+        var svc = CreateService([mtgBinder, pkmBinder, anyBinder]);
+
+        var names = (await svc.GetLocationOverviewsAsync(CardGame.Mtg)).Select(r => r.Container.Name).ToHashSet();
+
+        Assert.Contains("Marvel Binder", names);
+        Assert.Contains("Trade Binder", names);
+        Assert.DoesNotContain("Pokemon Binder", names);
+    }
+
+    [Fact]
     public async Task GetLocationOverviews_NoGameFilter_ShowsAllDeckBoxes()
     {
         var mtgDeck = new StorageContainer { Name = "MTG Deck", ContainerType = ContainerType.DeckBox, Game = CardGame.Mtg };

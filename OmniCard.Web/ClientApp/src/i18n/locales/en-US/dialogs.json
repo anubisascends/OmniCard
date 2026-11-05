@@ -3,7 +3,7 @@
     "addCard": {
       "title": "Add card to {{location}}",
       "nameOrNumber": "Name or number",
-      "lockedHelper": "Locked to this deck box’s game",
+      "lockedHelper": "Locked to this location’s game",
       "noCatalogMatches": "No matches in the {{game}} catalog.",
       "noCatalogMatchesInLanguages": "No {{languages}} matches in the {{game}} catalog.",
       "noCatalogMatchesInSets": "No matches in {{sets}}.",
@@ -96,7 +96,7 @@
       "defaultTitle": "Move to location",
       "searchPlaceholder": "Search locations…",
       "noMatches": "No matching locations.",
-      "gameBlocked": "This deck box only holds {{game}} cards",
+      "gameBlocked": "This location only holds {{game}} cards",
       "newLocationName": "New location name",
       "nameTaken": "This name is already in use",
       "createAndSelect": "Create & select",
