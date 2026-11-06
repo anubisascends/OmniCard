@@ -49,7 +49,7 @@ To add a whole deck to the list that's already open, paste its address into **Ad
 ## Add cards by hand
 
 1. Open the list and click **Add card**.
-2. In the **Add card to list** dialog, check the **Game**, then search by **Name**. You can narrow the search with **Set** and **Collector #**. Each result shows its language. Tick languages in **Languages** to see only those. If the list has a card language, **Languages** starts on it. Choose **All languages** to see every one.
+2. In the **Add card to list** dialog, check the **Game**, then search by **Name or number** (a name, or a collector number such as `0019`). You can narrow the search with **Set** and **Collector #**. Each result shows its language. Tick languages in **Languages** to see only those. If the list has a card language, **Languages** starts on it. Choose **All languages** to see every one.
 3. Results come in two groups. Point at a result to see a larger picture, or use ↓, ↑ and Enter from the search boxes:
    - **In your collection**: copies you already own. Each shows its set, number, condition, language and location. Click one to add that copy to the list. The copy doesn't move yet. When you put the list away, that copy is the one that gets moved.
    - **In the catalog**: every printing in the game's catalog, including ones you don't own. Click one, set the **Quantity** and **Foil** (with its **Foil type**), then click **Add to list** or press Enter.

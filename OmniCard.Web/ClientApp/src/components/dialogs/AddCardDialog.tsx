@@ -22,6 +22,7 @@ import {
   TextField,
   Tooltip,
   Typography,
+  createFilterOptions,
   type SxProps,
   type Theme,
 } from '@mui/material';
@@ -52,12 +53,21 @@ const RECENT_LIMIT = 5;
 
 /** Where the dialog adds cards — each target decides which results and fields it offers. */
 export type AddCardTarget =
-  /** New copies into a location (catalog only). `lockGame` fixes the game — a game-locked deck box, so a
-   * card of another game can't be added (the server hard-blocks it too). */
+  /** New copies into a location (catalog only). `lockGame` fixes the game — a location fixed to one game
+   * (a deck box, or a binder/box given a game), so a card of another game can't be added (the server
+   * hard-blocks it too). */
   | { kind: 'location'; locationId: number; locationName: string; lockGame?: boolean }
   /** One card into a binder pocket: an owned copy from elsewhere is moved in, a catalog card is created
    * there. A pocket holds one card, so the dialog closes after a successful add. */
-  | { kind: 'pocket'; containerId: number; page: number; slot: number; occupantName?: string | null }
+  | {
+      kind: 'pocket';
+      containerId: number;
+      page: number;
+      slot: number;
+      occupantName?: string | null;
+      /** The binder is fixed to `defaultGame`. */
+      lockGame?: boolean;
+    }
   /** A list line: an owned copy is referenced (moved only when the list is put away), a catalog printing
    * is recorded as wholly new. `language` is the list's forced card language, which the search starts on. */
   | { kind: 'list'; listId: number; language?: string | null }
@@ -90,6 +100,9 @@ type AddRequest = {
 type ResultRow = { kind: 'owned'; card: CardDto } | { kind: 'catalog'; result: ScanSearchResultDto };
 
 const rowId = (i: number) => `add-card-result-${i}`;
+
+/** Foil finishes starting with what's typed ("r" → Reverse Holofoil). */
+const filterFinishes = createFilterOptions<string>({ matchFrom: 'start' });
 
 /** The keys the simplified dialog lists under its search boxes, as [keys, i18n key of what they do]. */
 const KEY_HINTS: [string[], string][] = [
@@ -129,7 +142,8 @@ export type AddCardFoilRule = { query: string; foilType: string | null };
 
 /**
  * The one "add a card" dialog, for a location, a binder pocket, a list or a Buy List (see {@link AddCardTarget}).
- * Search the game's catalog by name and/or set code + collector number, optionally limited to some
+ * Search the game's catalog by name and/or set code + collector number — the Name box also takes a
+ * collector number on its own ("0019", "LOB-EN019"), whose printings are listed first — optionally limited to some
  * languages (remembered per game; a list with a language starts on it). Pockets and lists also show
  * matching copies already in your collection. Pick a printing — hover (or long-press) a row for the art,
  * ↑/↓ + Enter from the search boxes — then set condition/language/foil (+ finish)/quantity/price as the
@@ -184,7 +198,7 @@ export function AddCardDialog({
   const multiAdd = target.kind !== 'pocket';
   const showOwned = (target.kind === 'pocket' || target.kind === 'list') && !simplified;
   const buyList = target.kind === 'buyList';
-  const lockGame = target.kind === 'location' && !!target.lockGame;
+  const lockGame = (target.kind === 'location' || target.kind === 'pocket') && !!target.lockGame;
   const listLanguage = target.kind === 'list' ? target.language || null : null;
 
   const [game, setGame] = useState(startGame);
@@ -289,15 +303,38 @@ export function AddCardDialog({
 
   // Debounce so each keystroke doesn't hit the server.
   const [debounced, setDebounced] = useState('');
+  // The same three boxes apart, for the catalog search (it takes the Set box as its own scope).
+  const [debouncedParts, setDebouncedParts] = useState({ name: '', set: '', cn: '' });
   useEffect(() => {
-    const h = setTimeout(() => setDebounced(composed), 250);
+    const h = setTimeout(() => {
+      setDebounced(composed);
+      setDebouncedParts({ name: name.trim(), set: set.trim(), cn: cn.trim() });
+    }, 250);
     return () => clearTimeout(h);
+    // composed changes exactly when one of the boxes does.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [composed]);
 
-  const canSearch = open && !selected && debounced.trim().length >= 2;
+  // Two characters before a name search, but a collector number can be one digit.
+  const canSearch = open && !selected && (debounced.trim().length >= 2 || /^\d$/.test(debounced.trim()));
 
   // A code typed in the Set box overrides the chosen sets (the two would otherwise AND to nothing).
-  const scopeSets = setFilter && !set.trim() ? searchSets.map((s) => s.setCode) : [];
+  // A code typed in the Set box overrides the chosen sets (the two would otherwise AND to nothing). A real set
+  // code means exactly that set; anything else is looked up by code or name (set:, e.g. "Dominaria").
+  const gameSets = useQuery({ queryKey: ['sets', game], queryFn: () => api.sets(game), enabled: open && !!game });
+  const typedSet = debouncedParts.set;
+  const typedSetCode = typedSet
+    ? gameSets.data?.find((s) => s.setCode.toLowerCase() === typedSet.toLowerCase())?.setCode
+    : undefined;
+  const setQuery = typedSet && !typedSetCode ? typedSet : undefined;
+  // Results come set by set in the order the sets were chosen.
+  const scopeSets = typedSet
+    ? typedSetCode
+      ? [typedSetCode]
+      : []
+    : setFilter
+      ? searchSets.map((s) => s.setCode)
+      : [];
   const scopeKey = scopeSets.join(',');
   const anyOf = (field: string, values: string[]) =>
     values.length === 0
@@ -314,12 +351,28 @@ export function AddCardDialog({
   });
   // A pocket only offers copies that live somewhere *else* — a lot already in this binder has nothing to
   // relocate (place unplaced-pool copies by dragging them from the sidebar instead).
-  const ownedItems = (owned.data?.items ?? []).filter(
-    (c) => target.kind !== 'pocket' || c.containerId !== target.containerId,
-  );
+  const setOrder = (code: string) => {
+    const i = scopeSets.findIndex((s) => s.toLowerCase() === code.toLowerCase());
+    return i < 0 ? scopeSets.length : i;
+  };
+  const ownedItems = (owned.data?.items ?? [])
+    .filter((c) => target.kind !== 'pocket' || c.containerId !== target.containerId)
+    // Array sort is stable: the server's order stays within each set.
+    .sort((a, b) => (scopeSets.length > 1 ? setOrder(a.setCode) - setOrder(b.setCode) : 0));
   const catalog = useQuery({
-    queryKey: ['catalog-search', game, debounced, languageFilter, scopeSets],
-    queryFn: () => api.scanSearch(game, debounced, scopeSets, undefined, languageFilter),
+    queryKey: ['catalog-search', game, debouncedParts.name, debouncedParts.cn, setQuery, languageFilter, scopeSets],
+    // The Name box takes a collector number too ("0019", "LOB-EN019"): its printings come first. The Set box
+    // goes on its own so it overrides the chosen sets — for a number search too.
+    queryFn: () =>
+      api.scanSearch(
+        game,
+        debouncedParts.name,
+        scopeSets,
+        debouncedParts.cn || undefined,
+        languageFilter,
+        true,
+        setQuery,
+      ),
     enabled: canSearch,
     // The catalog doesn't change while the dialog is open — going back from a picked printing (Esc/↑/↓)
     // should show the same results at once, not search again.
@@ -660,9 +713,14 @@ export function AddCardDialog({
       return;
     }
     if (e.key === 'Enter' && simplified && (composed !== debounced || catalog.isFetching)) {
-      // Typed ahead of the search — pick the top result when it arrives.
+      // Typed ahead of the search — pick the top result when it arrives, and search now rather than
+      // after the typing pause.
       e.preventDefault();
       pendingEnter.current = true;
+      if (composed !== debounced) {
+        setDebounced(composed);
+        setDebouncedParts({ name: name.trim(), set: set.trim(), cn: cn.trim() });
+      }
       return;
     }
     if (rows.length === 0) return;
@@ -766,6 +824,8 @@ export function AddCardDialog({
   /** Drop the set filter for this sitting (the card is in a set that wasn't chosen). */
   const searchAllSets = () => {
     changeSearchSets([]);
+    // The Set box too — it would otherwise still hold the search to its set.
+    setSet('');
     focusName();
   };
 
@@ -917,7 +977,7 @@ export function AddCardDialog({
           <Stack direction="row" spacing={1} onKeyDown={onSearchKeyDown}>
             <TextField
               size="small"
-              label={t('common.labels.name')}
+              label={t('dialogs.addCard.nameOrNumber')}
               value={name}
               onChange={(e) => editSearch(setName)(e.target.value)}
               fullWidth
@@ -1174,9 +1234,15 @@ export function AddCardDialog({
                   {isFoil && (
                     <Autocomplete
                       freeSolo
+                      autoHighlight
                       size="small"
                       options={foilTypes.data ?? []}
-                      value={foilType ?? ''}
+                      // The finish lives in the text: with no selected value, the list always filters by
+                      // what's typed (a value equal to the text made MUI list every finish), from the start
+                      // of each finish, and Enter takes the top one (or the typed text when none match).
+                      value={null}
+                      inputValue={foilType ?? ''}
+                      filterOptions={filterFinishes}
                       onChange={(_, v) => setFoilType(v || null)}
                       onInputChange={(_, v) => setFoilType(v || null)}
                       sx={{ minWidth: 220 }}

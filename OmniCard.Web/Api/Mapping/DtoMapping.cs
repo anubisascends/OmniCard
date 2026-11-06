@@ -16,16 +16,7 @@ public static class DtoMapping
 {
     public static string GameId(CardGame game) => game.ToString();
 
-    public static string GameDisplayName(CardGame game) => game switch
-    {
-        CardGame.Mtg => "Magic: The Gathering",
-        CardGame.OnePiece => "One Piece TCG",
-        CardGame.Riftbound => "Riftbound",
-        CardGame.Pokemon => "Pokémon",
-        CardGame.YuGiOh => "Yu-Gi-Oh!",
-        CardGame.FinalFantasy => "Final Fantasy TCG",
-        _ => game.ToString(),
-    };
+    public static string GameDisplayName(CardGame game) => game.DisplayName();
 
     public static GameDto ToDto(CardGame game) => new(GameId(game), GameDisplayName(game));
 
@@ -104,8 +95,9 @@ public static class DtoMapping
         PriceDeltaPercent = s.PriceDeltaPercent,
         CoverImageUri = s.CoverImageUri,
         // Game is surfaced as the enum id ("Mtg"), consistent with the rest of the API — the client
-        // maps it to a display name. Only deck boxes ever carry these.
+        // maps it to a display name.
         Game = s.Container.Game is { } g ? GameId(g) : null,
+        DefaultSets = s.Container.Game is null ? [] : s.Container.DefaultSetCodes,
         DeckTypeId = s.Container.DeckTypeId,
         DeckTypeName = s.DeckTypeName,
         IgnoredForLists = s.Container.ExcludeFromDeckCheck,

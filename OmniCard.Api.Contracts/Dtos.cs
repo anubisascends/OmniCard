@@ -91,8 +91,12 @@ public sealed record LocationSummaryDto
     public double PriceDeltaPercent { get; init; }
     public string? CoverImageUri { get; init; }
 
-    /// <summary>Assigned game system (enum id, e.g. "Mtg"), or null. Only ever set for deck boxes.</summary>
+    /// <summary>The game this location is fixed to (enum id, e.g. "Mtg"), or null for any game. Cards of
+    /// other games can't be added. Always set on deck boxes (except legacy ones); optional elsewhere.</summary>
     public string? Game { get; init; }
+    /// <summary>Set codes the location's card searches start on (binder Sets filter, Add card); empty for
+    /// none. Only a default — never enforced. Only present with <see cref="Game"/>.</summary>
+    public IReadOnlyList<string> DefaultSets { get; init; } = [];
     /// <summary>Assigned deck type (format) id, or null. Only ever set for deck boxes.</summary>
     public int? DeckTypeId { get; init; }
     /// <summary>Assigned deck type display name, or null.</summary>
@@ -195,10 +199,13 @@ public sealed record CreateLocationRequest
     /// <summary>ContainerType name: Binder, Box, DeckBox, DisplayCase (Bulk not allowed).</summary>
     public string Type { get; init; } = "Box";
     public int SlotsPerPage { get; init; } = 9;
-    /// <summary>Required when <see cref="Type"/> is DeckBox: the game system (enum id, e.g. "Mtg").</summary>
+    /// <summary>The game the location is fixed to (enum id, e.g. "Mtg"). Required when <see cref="Type"/>
+    /// is DeckBox; optional (null = any game) for the other types.</summary>
     public string? Game { get; init; }
     /// <summary>Optional deck type (format) id for a DeckBox.</summary>
     public int? DeckTypeId { get; init; }
+    /// <summary>Set codes the location's card searches start on; ignored without <see cref="Game"/>.</summary>
+    public IReadOnlyList<string>? DefaultSets { get; init; }
     /// <summary>The site to create the location in (null = the default site). The user needs write
     /// access to it.</summary>
     public int? SiteId { get; init; }
@@ -210,6 +217,15 @@ public sealed record SetDeckBoxRequest
     /// <summary>Game system enum id, e.g. "Mtg".</summary>
     public string Game { get; init; } = "";
     public int? DeckTypeId { get; init; }
+}
+
+/// <summary>Fix a location to one game (or any game) and choose the sets its card searches start on.</summary>
+public sealed record SetLocationCardFilterRequest
+{
+    /// <summary>Game enum id (e.g. "Mtg"), or null/blank for any game. A deck box needs one.</summary>
+    public string? Game { get; init; }
+    /// <summary>Set codes of <see cref="Game"/>; ignored without a game.</summary>
+    public IReadOnlyList<string>? DefaultSets { get; init; }
 }
 
 // --- Deck types ---

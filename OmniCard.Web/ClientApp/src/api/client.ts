@@ -584,7 +584,15 @@ export const api = {
     deckTypeId?: number | null;
     /** Site to create the location in (omitted = the default site). */
     siteId?: number | null;
+    /** Set codes the location's card searches start on (needs `game`). */
+    defaultSets?: string[] | null;
   }) => request<LocationSummaryDto>('/api/locations', { method: 'POST', body: JSON.stringify(body) }),
+  /** Fix a location to one game (null = any game) and set the sets its card searches start on. */
+  locationSetCardFilter: (id: number, game: string | null, defaultSets: string[]) =>
+    request<void>(`/api/locations/${id}/card-filter`, {
+      method: 'PUT',
+      body: JSON.stringify({ game, defaultSets }),
+    }),
   locationRename: (id: number, name: string) =>
     request<void>(`/api/locations/${id}`, { method: 'PUT', body: JSON.stringify({ name }) }),
   locationDelete: (id: number, moveToBulk: boolean) =>
@@ -1111,12 +1119,25 @@ export const api = {
   // `sets` scopes the correction search to the chosen "Sets (art fallback)" (empty ⇒ all sets); the
   // server unions them, mirroring the set constraint used for auto-matching. `langs` likewise keeps only
   // catalog rows in those languages (empty ⇒ every language).
-  scanSearch: (game: string, q: string, sets?: string[], cn?: string, langs?: string[]) => {
+  /** `nameOrNumber`: a `q` that reads as a collector number ("0019", "LOB-EN019") also finds the printings
+   *  with that number, listed first. */
+  // `setQuery` (a typed set code/name) overrides `sets`; with several `sets`, results come set by set in order.
+  scanSearch: (
+    game: string,
+    q: string,
+    sets?: string[],
+    cn?: string,
+    langs?: string[],
+    nameOrNumber?: boolean,
+    setQuery?: string,
+  ) => {
     const sp = new URLSearchParams({ game });
     if (q) sp.set('q', q);
     if (cn) sp.set('cn', cn);
+    if (setQuery) sp.set('setQuery', setQuery);
     for (const s of sets ?? []) if (s) sp.append('set', s);
     for (const l of langs ?? []) if (l) sp.append('lang', l);
+    if (nameOrNumber) sp.set('nameOrNumber', 'true');
     return request<ScanSearchResultDto[]>(`/api/scan/search?${sp.toString()}`);
   },
   scanFoilTypes: (game: string) => request<string[]>(`/api/scan/foil-types${qs({ game })}`),

@@ -38,7 +38,9 @@ import SellIcon from '@mui/icons-material/Sell';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { api } from '../api/client';
+import { usePermissions } from '../context/usePermissions';
 import type { BinderCardDto, BinderSlotDto, SetInfoDto } from '../api/types';
 import { CardImage } from '../components/CardImage';
 import { ListForSaleDialog } from '../components/dialogs/ListForSaleDialog';
@@ -46,6 +48,7 @@ import { CardEditDrawer } from '../components/dialogs/CardEditDrawer';
 import { AddCardDialog, type AddCardFoilRule } from '../components/dialogs/AddCardDialog';
 import { SearchBox } from '../components/SearchBox';
 import { SetMultiSelect } from '../components/SetMultiSelect';
+import { useDefaultSets } from '../components/locationCardFilter';
 import { Kbd } from '../components/Kbd';
 import { useFormatters } from '../i18n/format';
 
@@ -180,9 +183,9 @@ function SlotGrid({
   onCardClick: (card: BinderCardDto) => void;
   /** Simplified editing: the pocket under the keyboard cursor. */
   cursorSlot?: number;
-  /** Simplified editing: a click moves the cursor (instead of opening the card's details)… */
+  /** Simplified editing: a click moves the cursor (the caller also opens a card's details)… */
   onSlotSelect?: (slot: number) => void;
-  /** …and a double-click searches for the pocket's card. */
+  /** …and a double-click on an empty pocket searches for its card. */
   onSlotOpen?: (slot: number) => void;
 }) {
   const { t } = useTranslation();
@@ -199,7 +202,7 @@ function SlotGrid({
             onDrop={editMode ? () => onDropSlot(pageNumber, s.slotIndex) : undefined}
             onContextMenu={(e) => onSlotContextMenu(e, pageNumber, s.slotIndex, s.card ?? null)}
             onClick={onSlotSelect ? () => onSlotSelect(s.slotIndex) : undefined}
-            onDoubleClick={onSlotOpen ? () => onSlotOpen(s.slotIndex) : undefined}
+            onDoubleClick={onSlotOpen && !s.card ? () => onSlotOpen(s.slotIndex) : undefined}
             sx={{
               position: 'relative',
               aspectRatio: '0.72',
@@ -494,6 +497,7 @@ const PRESSABLE = 'button, a, [role="button"], [role="tab"]';
 export function BinderPage() {
   const { t } = useTranslation();
   const fmt = useFormatters();
+  const { can } = usePermissions();
   const { id } = useParams();
   const binderId = Number(id);
   const qc = useQueryClient();
@@ -520,6 +524,8 @@ export function BinderPage() {
   const [slotMenu, setSlotMenu] = useState<{ x: number; y: number; page: number; slot: number; card: BinderCardDto | null } | null>(null);
   const [listCard, setListCard] = useState<BinderCardDto | null>(null);
   const [detailCardId, setDetailCardId] = useState<number | null>(null);
+  // An unplaced card asked to be deleted from the collection, awaiting confirmation.
+  const [deleteCard, setDeleteCard] = useState<BinderCardDto | null>(null);
   // `quick`: opened from the simplified editor (catalog-only search, cursor advances after the add);
   // `initialName`: the keystroke(s) that opened it.
   const [addSlot, setAddSlot] = useState<{
@@ -529,8 +535,9 @@ export function BinderPage() {
     quick?: boolean;
     initialName?: string;
   } | null>(null);
-  // The sets card searches start limited to, for this sitting only. `filterGame` is null until chosen
-  // (the filter then follows the game of the cards on screen).
+  // The sets card searches start limited to. They start on the binder's default sets (seeded below) and a
+  // change lasts for this sitting only. `filterGame` is null until chosen (the filter then follows the game
+  // of the cards on screen), unless the binder is fixed to a game.
   const [filterGame, setFilterGame] = useState<string | null>(null);
   const [filterSets, setFilterSets] = useState<SetInfoDto[]>([]);
   const [setsAnchor, setSetsAnchor] = useState<HTMLElement | null>(null);
@@ -568,17 +575,29 @@ export function BinderPage() {
     queryFn: () => api.binder(binderId, viewSpread),
     placeholderData: keepPreviousData,
   });
-  // Without a chosen game, the set filter (and the foil rule's finishes) are for the game of the cards on screen.
+  // Site access: a binder in a site the user can only view can be flipped through but not edited.
+  const locQuery = useQuery({ queryKey: ['location', binderId], queryFn: () => api.location(binderId) });
+  const canWrite = locQuery.data?.canWrite !== false;
+  // A binder fixed to a game keeps the set filter (and the add dialog) on that game, and the filter starts
+  // on the binder's default sets. Otherwise, without a chosen game, the set filter (and the foil rule's
+  // finishes) are for the game of the cards on screen.
+  const locGame = locQuery.data?.game ?? null;
+  const locSets = useDefaultSets(locGame, locQuery.data?.defaultSets);
+  const seededFilterFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (!locQuery.data || !locSets.ready || seededFilterFor.current === binderId) return;
+    seededFilterFor.current = binderId;
+    setFilterGame(locGame);
+    setFilterSets(locSets.sets);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [binderId, locQuery.data, locSets.ready]);
   const spreadGame = gameName(data?.leftSlots.concat(data.rightSlots).find((s) => s.card)?.card?.game);
-  const setsGame = filterGame ?? spreadGame;
+  const setsGame = locGame ?? filterGame ?? spreadGame;
   const foilTypes = useQuery({
     queryKey: ['scan-foil-types', setsGame],
     queryFn: () => api.scanFoilTypes(setsGame),
     enabled: editMode,
   });
-  // Site access: a binder in a site the user can only view can be flipped through but not edited.
-  const locQuery = useQuery({ queryKey: ['location', binderId], queryFn: () => api.location(binderId) });
-  const canWrite = locQuery.data?.canWrite !== false;
   const unplaced = useQuery({
     queryKey: ['binder-unplaced', binderId, debouncedFilter],
     queryFn: () => api.binderUnplaced(binderId, debouncedFilter || undefined),
@@ -698,7 +717,7 @@ export function BinderPage() {
     if (!quick || !data) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.defaultPrevented) return;
-      if (addSlot || detailCardId != null || listCard || slotMenu || cardMenu || addAnchor || setsAnchor || confirmRemove != null) return;
+      if (addSlot || detailCardId != null || listCard || slotMenu || cardMenu || addAnchor || setsAnchor || confirmRemove != null || deleteCard) return;
       const el = e.target instanceof HTMLElement ? e.target : null;
       if (el?.closest(EDITABLE)) return;
       // Ctrl+Home / Ctrl+End: the front of page 1 / the last page with a card.
@@ -740,7 +759,9 @@ export function BinderPage() {
         case 'Enter':
           if (el?.closest(PRESSABLE)) return;
           e.preventDefault();
-          openSearch(cursor.slot);
+          // A card's details (to correct it); an empty pocket searches. Typing replaces a card.
+          if (cursorCard) setDetailCardId(cursorCard.id);
+          else openSearch(cursor.slot);
           return;
         case '+':
         case '=':
@@ -781,7 +802,7 @@ export function BinderPage() {
   useEffect(() => {
     if (!quick || !data) return;
     const ignore = (e: ClipboardEvent) =>
-      !!(addSlot || detailCardId != null || listCard || slotMenu || cardMenu || addAnchor || setsAnchor || confirmRemove != null) ||
+      !!(addSlot || detailCardId != null || listCard || slotMenu || cardMenu || addAnchor || setsAnchor || confirmRemove != null || deleteCard) ||
       (e.target instanceof HTMLElement && !!e.target.closest(EDITABLE));
     const onCopy = (e: ClipboardEvent) => {
       // Text selected on the page copies as usual.
@@ -834,7 +855,7 @@ export function BinderPage() {
     if (!editMode) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key !== 'F2' || e.defaultPrevented) return;
-      if (addSlot || detailCardId != null || listCard || confirmRemove != null) return;
+      if (addSlot || detailCardId != null || listCard || confirmRemove != null || deleteCard) return;
       e.preventDefault();
       if (setsAnchor) closeSets();
       else openSets();
@@ -973,6 +994,8 @@ export function BinderPage() {
                   size="small"
                   label={t('common.labels.game')}
                   value={setsGame}
+                  disabled={!!locGame}
+                  helperText={locGame ? t('binder.setFilter.gameFixed') : undefined}
                   onChange={(e) => {
                     setFilterGame(e.target.value);
                     setFilterSets([]);
@@ -998,6 +1021,17 @@ export function BinderPage() {
                   {t('binder.setFilter.help')}
                 </Typography>
                 <Stack direction="row" spacing={1} justifyContent="flex-end">
+                  {locSets.sets.length > 0 && (
+                    <Button
+                      size="small"
+                      disabled={
+                        filterSets.map((s) => s.setCode).join(',') === locSets.sets.map((s) => s.setCode).join(',')
+                      }
+                      onClick={() => setFilterSets(locSets.sets)}
+                    >
+                      {t('binder.setFilter.useDefaults')}
+                    </Button>
+                  )}
                   <Button size="small" disabled={filterSets.length === 0} onClick={() => setFilterSets([])}>
                     {t('common.actions.clear')}
                   </Button>
@@ -1120,7 +1154,12 @@ export function BinderPage() {
                 onSlotContextMenu={openSlotMenu}
                 onCardClick={(c) => setDetailCardId(c.id)}
                 cursorSlot={cursor.slot}
-                onSlotSelect={(slot) => setCursor((c) => ({ ...c, slot }))}
+                onSlotSelect={(slot) => {
+                  setCursor((c) => ({ ...c, slot }));
+                  // Clicking a card opens its details, ready to correct.
+                  const card = cursorSlots?.[slot]?.card;
+                  if (card) setDetailCardId(card.id);
+                }}
                 onSlotOpen={(slot) => openSearch(slot)}
               />
             </Box>
@@ -1270,6 +1309,18 @@ export function BinderPage() {
           <SellIcon fontSize="small" sx={{ mr: 1 }} />
           {t('binder.listForSale')}
         </MenuItem>
+        {can('collection.delete') && (
+          <MenuItem
+            onClick={() => {
+              setDeleteCard(cardMenu!.card);
+              setCardMenu(null);
+            }}
+            sx={{ color: 'error.main' }}
+          >
+            <DeleteOutlineIcon fontSize="small" sx={{ mr: 1 }} />
+            {t('binder.deleteCard')}
+          </MenuItem>
+        )}
       </Menu>
 
       {/* Binder-pocket menu */}
@@ -1321,8 +1372,9 @@ export function BinderPage() {
             page: addSlot.page,
             slot: addSlot.slot,
             occupantName: addSlot.card?.name,
+            lockGame: !!locGame,
           }}
-          defaultGame={addSlot.card ? gameName(addSlot.card.game) : setsGame}
+          defaultGame={locGame ?? (addSlot.card ? gameName(addSlot.card.game) : setsGame)}
           simplified={addSlot.quick}
           initialName={addSlot.initialName}
           setFilter={{ game: setsGame, sets: filterSets }}
@@ -1353,6 +1405,36 @@ export function BinderPage() {
             }}
           >
             {t('binder.removePage', { page: confirmRemove })}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteCard != null} onClose={() => setDeleteCard(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>{t('binder.deleteCardTitle', { name: deleteCard?.name })}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {t('binder.deleteCardConfirm', { set: deleteCard?.setCode.toUpperCase(), number: deleteCard?.number })}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteCard(null)}>{t('common.actions.cancel')}</Button>
+          <Button
+            color="error"
+            variant="contained"
+            autoFocus
+            onClick={() => {
+              const card = deleteCard!;
+              setDeleteCard(null);
+              run(
+                api.cardDelete(card.id).then(() => {
+                  qc.invalidateQueries({ queryKey: ['collection'] });
+                  qc.invalidateQueries({ queryKey: ['location-cards'] });
+                  qc.invalidateQueries({ queryKey: ['locations'] });
+                }),
+              );
+            }}
+          >
+            {t('common.actions.delete')}
           </Button>
         </DialogActions>
       </Dialog>

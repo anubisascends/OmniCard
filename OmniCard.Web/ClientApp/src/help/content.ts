@@ -24,7 +24,7 @@ export const HELP_GROUPS: { key: string; topics: string[] }[] = [
   { key: 'organizing', topics: ['locations', 'binders', 'deck-boxes', 'labels'] },
   { key: 'lists', topics: ['lists', 'buy-list', 'importing', 'trades'] },
   { key: 'selling', topics: ['inventory', 'sales', 'intake', 'kiosk', 'shipping', 'ebay'] },
-  { key: 'admin', topics: ['account', 'administration', 'troubleshooting'] },
+  { key: 'admin', topics: ['account', 'administration', 'troubleshooting', 'support'] },
 ];
 
 export const HELP_TOPIC_ORDER = HELP_GROUPS.flatMap((g) => g.topics);

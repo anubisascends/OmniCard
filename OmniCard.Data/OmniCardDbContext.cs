@@ -129,8 +129,9 @@ public class OmniCardDbContext : DbContext
             e.Property(s => s.ContainerType).HasConversion<string>();
             e.HasIndex(s => s.Name).IsUnique();
 
-            // Assigned game for deck boxes; nullable enum stored as string (like InventoryLot.FlagReason).
+            // The location's fixed game (any type but Bulk); nullable enum stored as string (like InventoryLot.FlagReason).
             e.Property(s => s.Game).HasConversion<string?>();
+            e.Ignore(s => s.DefaultSetCodes);
 
             // Deck boxes may reference a DeckType (format). Deleting the type unsets the reference
             // rather than the box (SetNull), matching how a lot survives losing its container.
@@ -138,6 +139,7 @@ public class OmniCardDbContext : DbContext
                 .OnDelete(DeleteBehavior.SetNull);
             e.HasIndex(s => s.DeckTypeId);
             e.Property(s => s.SourceUrl).HasMaxLength(StorageContainer.MaxSourceUrlLength);
+            e.Property(s => s.DefaultSets).HasMaxLength(StorageContainer.MaxDefaultSetsLength);
 
             // Every location belongs to a site (major physical location). The column defaults to the
             // seeded default site so the AddSites migration backfills pre-existing rows; Restrict so a

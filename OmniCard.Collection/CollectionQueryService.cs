@@ -20,14 +20,12 @@ public sealed class CollectionQueryService(
         {
             var containers = containerService.GetAll();
 
-            // Deck boxes are game-specific, so the active game filter hides the ones that belong to
-            // another game. Everything else stays visible: non-deck-box containers are game-agnostic,
-            // an unassigned (legacy) deck box has no game to filter on, and an always-available
-            // location is never hidden by the game filter (by definition).
+            // A location fixed to a game (every deck box, and any binder/box given one) is hidden by the
+            // active game filter when it's for another game. A location with no game holds any game, and an
+            // always-available location is never hidden by the game filter (by definition).
             if (gameFilter is { } filterGame)
                 containers = containers
-                    .Where(c => c.ContainerType != ContainerType.DeckBox
-                        || c.Game is null
+                    .Where(c => c.Game is null
                         || c.Game == filterGame
                         || c.IsAlwaysAvailable)
                     .ToList();

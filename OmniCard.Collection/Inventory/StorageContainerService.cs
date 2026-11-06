@@ -40,7 +40,8 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
     }
 
     public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9,
-        CardGame? game = null, int? deckTypeId = null, int? siteId = null)
+        CardGame? game = null, int? deckTypeId = null, int? siteId = null,
+        IEnumerable<string>? defaultSets = null)
     {
         var trimmed = (name ?? "").Trim();
         if (NameExists(trimmed))
@@ -61,13 +62,15 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
             SiteId = siteId ?? Site.DefaultSiteId,
         };
 
-        // Game + deck type are only meaningful for deck boxes; ignore them on every other type so a
-        // stray value can't leak onto a binder/box.
-        if (type == ContainerType.DeckBox)
+        // Any location but Bulk may be fixed to a game; the deck type only means something on a deck
+        // box, and default sets only alongside a game (they're that game's codes).
+        if (type != ContainerType.Bulk)
         {
             container.Game = game;
-            container.DeckTypeId = deckTypeId;
+            container.DefaultSets = game is null ? null : StorageContainer.JoinSetCodes(defaultSets);
         }
+        if (type == ContainerType.DeckBox)
+            container.DeckTypeId = deckTypeId;
 
         // New binders start with one double-sided sheet (front + back), the default the user asked
         // for; non-binder containers ignore this and keep the single-page default.
@@ -104,8 +107,47 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
                 $"This deck box already contains cards from another game ({string.Join(", ", conflicting)}). " +
                 "Move those cards out before assigning a different game.");
 
+        // Default sets are the old game's codes; a new game starts with none.
+        if (container.Game != game)
+            container.DefaultSets = null;
         container.Game = game;
         container.DeckTypeId = deckTypeId;
+        context.SaveChanges();
+    }
+
+    public void SetCardFilter(int containerId, CardGame? game, IEnumerable<string>? defaultSets)
+    {
+        using var context = dbContextFactory.CreateDbContext();
+        var container = context.StorageContainers.Find(containerId)
+            ?? throw new InvalidOperationException($"Container {containerId} not found");
+        if (container.IsSystem || container.ContainerType == ContainerType.Bulk)
+            throw new InvalidOperationException("Bulk holds every game, so it can't be given a game or sets.");
+        if (container.ContainerType == ContainerType.DeckBox && game is null)
+            throw new InvalidOperationException("A deck box must be assigned a game.");
+
+        if (game is CardGame fixedGame && container.Game != fixedGame)
+        {
+            // The game is a hard rule, so it can't be set over cards that already break it.
+            var conflicting = context.Lots
+                .Where(l => l.LocationId == containerId
+                    && l.Product.Category == ProductCategory.Single
+                    && l.Product.Game != fixedGame)
+                .Select(l => l.Product.Game)
+                .Distinct()
+                .ToList();
+            if (conflicting.Count > 0)
+                throw new InvalidOperationException(
+                    $"This location already holds cards from another game ({string.Join(", ", conflicting.Select(g => g.DisplayName()))}). " +
+                    "Move those cards out before fixing it to one game.");
+
+            // A deck type belongs to one game, so it can't survive a game change.
+            container.DeckTypeId = null;
+        }
+
+        container.Game = game;
+        container.DefaultSets = game is null ? null : StorageContainer.JoinSetCodes(defaultSets);
+        if (container.DefaultSets is { Length: > StorageContainer.MaxDefaultSetsLength })
+            throw new InvalidOperationException("Too many default sets.");
         context.SaveChanges();
     }
 

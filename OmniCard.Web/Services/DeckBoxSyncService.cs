@@ -332,7 +332,7 @@ public sealed class DeckBoxSyncService(
                         throw new DeckSyncException("Choose where the removed cards should go.");
                     if (!access.CanWrite(destination.SiteId))
                         throw new DeckSyncException($"You can't move cards into \"{destination.Name}\".");
-                    if (destination.ContainerType == ContainerType.DeckBox && destination.Game is { } destGame && destGame != game)
+                    if (destination.Game is { } destGame && destGame != game)
                         throw new DeckSyncException($"\"{destination.Name}\" only holds {GameName(destGame)} cards.");
                 }
                 else if (!IsAction(cut.Action, "Sideboard"))

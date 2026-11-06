@@ -171,7 +171,7 @@ public sealed class ImportController(
                 imported = cards.Values.Sum(c => c.Quantity);
             }
         }
-        catch (DeckBoxGameMismatchException ex)
+        catch (LocationGameMismatchException ex)
         {
             return Conflict(new { error = ex.Message });
         }

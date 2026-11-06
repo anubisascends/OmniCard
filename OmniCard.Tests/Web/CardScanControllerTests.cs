@@ -223,6 +223,145 @@ public class CardScanControllerTests : IDisposable
     }
 
     [Fact]
+    public void Search_NameOrNumber_PrintedNumberFindsThePrintingsWithThatNumber()
+    {
+        var game = LanguageAwareGame();
+        game.Setup(s => s.SearchCards(It.IsAny<string>(), It.IsAny<int>())).Returns([]);
+        // cn: is a substring match in some catalogs, so the candidates include 119 and 190 too.
+        game.Setup(s => s.SearchCards("cn:\"19\" set=dsk lang:en", It.IsAny<int>())).Returns([
+            new CardMatch { Name = "Keep Out", SetCode = "dsk", SetName = "Duskmourn", CollectorNumber = "19", GameSpecificId = "k" },
+            new CardMatch { Name = "Other", SetCode = "dsk", SetName = "Duskmourn", CollectorNumber = "119", GameSpecificId = "o1" },
+            new CardMatch { Name = "Another", SetCode = "dsk", SetName = "Duskmourn", CollectorNumber = "190", GameSpecificId = "o2" },
+        ]);
+        _cardService.Setup(c => c.GetGameService(CardGame.Mtg)).Returns(game.Object);
+
+        var result = CreateController().Search("Mtg", "0019", set: ["dsk"], lang: ["en"], nameOrNumber: true);
+        var list = Assert.IsAssignableFrom<IReadOnlyList<ScanSearchResultDto>>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal("k", Assert.Single(list).GameCardId);
+        // Still scoped to the chosen sets and languages, and the name search still ran.
+        game.Verify(s => s.SearchCards("0019 set=dsk lang:en", 500), Times.Once);
+        game.Verify(s => s.SearchCards(It.Is<string>(q => !q.Contains("set=dsk") || !q.Contains("lang:en")), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public void Search_NameOrNumber_ListsNumberMatchesBeforeNameMatches()
+    {
+        var game = new Mock<ICardGameService>();
+        game.Setup(s => s.SearchCards(It.IsAny<string>(), It.IsAny<int>())).Returns([]);
+        game.Setup(s => s.SearchCards("Porygon2", 500)).Returns([
+            new CardMatch { Name = "Porygon2", SetCode = "neo", CollectorNumber = "33/111", GameSpecificId = "p2" },
+        ]);
+        game.Setup(s => s.SearchCards("cn:\"Porygon2\"", It.IsAny<int>())).Returns([]);
+        _cardService.Setup(c => c.GetGameService(CardGame.Pokemon)).Returns(game.Object);
+
+        // A name that looks like a number still finds the card by name.
+        var result = CreateController().Search("Pokemon", "Porygon2", nameOrNumber: true);
+        var list = Assert.IsAssignableFrom<IReadOnlyList<ScanSearchResultDto>>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal("p2", Assert.Single(list).GameCardId);
+    }
+
+    [Fact]
+    public void Search_NameOrNumber_TextNumberMatchesTheWholeNumber()
+    {
+        var game = new Mock<ICardGameService>();
+        game.Setup(s => s.SearchCards(It.IsAny<string>(), It.IsAny<int>())).Returns([]);
+        // A substring catalog search: "EN019" also finds LOB-EN0190-style neighbours, which are dropped.
+        game.Setup(s => s.SearchCards("cn:\"lob-en019\"", It.IsAny<int>())).Returns([
+            new CardMatch { Name = "Kuriboh", SetCode = "LOB", CollectorNumber = "LOB-EN019", GameSpecificId = "y" },
+            new CardMatch { Name = "Not it", SetCode = "LOB", CollectorNumber = "LOB-EN0190", GameSpecificId = "n" },
+        ]);
+        _cardService.Setup(c => c.GetGameService(CardGame.YuGiOh)).Returns(game.Object);
+
+        var result = CreateController().Search("YuGiOh", "lob-en019", nameOrNumber: true);
+        var list = Assert.IsAssignableFrom<IReadOnlyList<ScanSearchResultDto>>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal("y", Assert.Single(list).GameCardId);
+    }
+
+    [Fact]
+    public void Search_WithoutNameOrNumber_SearchesTheNameOnly()
+    {
+        var game = new Mock<ICardGameService>();
+        game.Setup(s => s.SearchCards(It.IsAny<string>(), It.IsAny<int>())).Returns([]);
+        _cardService.Setup(c => c.GetGameService(CardGame.Mtg)).Returns(game.Object);
+
+        CreateController().Search("Mtg", "0019");
+
+        game.Verify(s => s.SearchCards("0019", 500), Times.Once);
+        game.Verify(s => s.SearchCards(It.Is<string>(q => q.Contains("cn:")), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public void Search_SeveralSets_ListsSetBySetInTheChosenOrder()
+    {
+        var game = new Mock<ICardGameService>();
+        game.Setup(s => s.SearchCards(It.IsAny<string>(), It.IsAny<int>())).Returns([]);
+        game.Setup(s => s.SearchCards("spider set=msh", 500)).Returns([
+            new CardMatch { Name = "Alpha Spider", SetCode = "msh", CollectorNumber = "1", GameSpecificId = "h1" },
+        ]);
+        game.Setup(s => s.SearchCards("spider set=msc", 500)).Returns([
+            new CardMatch { Name = "Zeta Spider", SetCode = "msc", CollectorNumber = "2", GameSpecificId = "c2" },
+            new CardMatch { Name = "Beta Spider", SetCode = "msc", CollectorNumber = "1", GameSpecificId = "c1" },
+        ]);
+        _cardService.Setup(c => c.GetGameService(CardGame.Mtg)).Returns(game.Object);
+
+        static string[] Ids(ActionResult<IReadOnlyList<ScanSearchResultDto>> r) =>
+            [.. Assert.IsAssignableFrom<IReadOnlyList<ScanSearchResultDto>>(Assert.IsType<OkObjectResult>(r.Result).Value)
+                .Select(x => x.GameCardId)];
+
+        // Every MSC card before MSH (by name within a set) — and the other way round.
+        Assert.Equal(["c1", "c2", "h1"], Ids(CreateController().Search("Mtg", "spider", set: ["msc", "msh"])));
+        Assert.Equal(["h1", "c1", "c2"], Ids(CreateController().Search("Mtg", "spider", set: ["msh", "msc"])));
+    }
+
+    [Fact]
+    public void Search_NameOrNumber_SeveralSets_NumberMatchesStaySetBySet()
+    {
+        var game = new Mock<ICardGameService>();
+        game.Setup(s => s.SearchCards(It.IsAny<string>(), It.IsAny<int>())).Returns([]);
+        game.Setup(s => s.SearchCards("cn:\"19\" set=msc", It.IsAny<int>())).Returns([
+            new CardMatch { Name = "Ant", SetCode = "msc", CollectorNumber = "19", GameSpecificId = "c19" },
+        ]);
+        game.Setup(s => s.SearchCards("cn:\"19\" set=msh", It.IsAny<int>())).Returns([
+            new CardMatch { Name = "Aardvark", SetCode = "msh", CollectorNumber = "19", GameSpecificId = "h19" },
+        ]);
+        _cardService.Setup(c => c.GetGameService(CardGame.Mtg)).Returns(game.Object);
+
+        var result = CreateController().Search("Mtg", "19", set: ["msc", "msh"], nameOrNumber: true);
+        var list = Assert.IsAssignableFrom<IReadOnlyList<ScanSearchResultDto>>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal(["c19", "h19"], list.Select(x => x.GameCardId));
+    }
+
+    [Fact]
+    public void Search_TypedSet_OverridesTheChosenSets_NumberSearchIncluded()
+    {
+        var game = new Mock<ICardGameService>();
+        game.Setup(s => s.SearchCards(It.IsAny<string>(), It.IsAny<int>())).Returns([]);
+        game.Setup(s => s.SearchCards("cn:\"19\" set:ecl", It.IsAny<int>())).Returns([
+            new CardMatch { Name = "Keep Out", SetCode = "ecl", CollectorNumber = "19", GameSpecificId = "k" },
+        ]);
+        _cardService.Setup(c => c.GetGameService(CardGame.Mtg)).Returns(game.Object);
+
+        var result = CreateController().Search("Mtg", "0019", set: ["msc", "msh"], nameOrNumber: true, setQuery: "ecl");
+        var list = Assert.IsAssignableFrom<IReadOnlyList<ScanSearchResultDto>>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal("k", Assert.Single(list).GameCardId);
+        // The chosen sets aren't searched at all.
+        game.Verify(s => s.SearchCards("0019 set:ecl", 500), Times.Once);
+        game.Verify(s => s.SearchCards(It.Is<string>(q => q.Contains("msc") || q.Contains("msh")), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public void Search_TypedSetName_IsQuoted()
+    {
+        var game = new Mock<ICardGameService>();
+        game.Setup(s => s.SearchCards(It.IsAny<string>(), It.IsAny<int>())).Returns([]);
+        _cardService.Setup(c => c.GetGameService(CardGame.Mtg)).Returns(game.Object);
+
+        CreateController().Search("Mtg", "bolt", setQuery: "Time Spiral");
+
+        game.Verify(s => s.SearchCards("bolt set:\"Time Spiral\"", 500), Times.Once);
+    }
+
+    [Fact]
     public void Commit_NoLocation_Returns400()
     {
         var req = new ScanCommitRequest { ContainerId = 0, Items = [new ScanCommitItem { Game = "Mtg", GameCardId = "x" }] };

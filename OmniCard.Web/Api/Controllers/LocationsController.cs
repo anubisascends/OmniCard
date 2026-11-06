@@ -133,9 +133,9 @@ public sealed class LocationsController(
     public ActionResult<NameAvailableDto> NameAvailable([FromQuery] string name, [FromQuery] int? excludeId) =>
         new NameAvailableDto(!containers.NameExists(name ?? "", excludeId));
 
-    /// <summary>Create a new location in <c>req.SiteId</c> (default: the default site). 409 if the name
-    /// is taken, 400 for an invalid/Bulk type, a deck box without a valid game or an unknown site, 403
-    /// without write access to the site.</summary>
+    /// <summary>Create a new location in <c>req.SiteId</c> (default: the default site), optionally fixed
+    /// to a game with default sets. 409 if the name is taken, 400 for an invalid/Bulk type, an unknown
+    /// game, a deck box without a game or an unknown site, 403 without write access to the site.</summary>
     [HttpPost]
     [RequirePermission(Permissions.LocationsCreate)]
     public ActionResult<LocationSummaryDto> Create([FromBody] CreateLocationRequest req)
@@ -153,21 +153,25 @@ public sealed class LocationsController(
         if (!Enum.TryParse<ContainerType>(req.Type, ignoreCase: true, out var type) || type == ContainerType.Bulk)
             return BadRequest(new { error = $"Invalid location type '{req.Type}'." });
 
-        CardGame? game = null;
+        // Any type may be fixed to a game; a deck box must be.
+        var game = ParseGame(req.Game);
+        if (!string.IsNullOrWhiteSpace(req.Game) && game is null)
+            return BadRequest(new { error = $"Unknown game '{req.Game}'." });
         if (type == ContainerType.DeckBox)
         {
-            game = ParseGame(req.Game);
             if (game is null)
                 return BadRequest(new { error = "A deck box must be assigned a game." });
             if (req.DeckTypeId is int dt && !DeckTypeBelongsToGame(dt, game.Value))
                 return BadRequest(new { error = "The selected deck type doesn't belong to that game." });
         }
+        if (DefaultSetsTooLong(req.DefaultSets))
+            return BadRequest(new { error = "Too many default sets." });
 
         if (containers.NameExists(name))
             return Conflict(new { error = $"A location named \"{name}\" already exists." });
 
         var created = containers.Create(name, type, req.SlotsPerPage, game,
-            type == ContainerType.DeckBox ? req.DeckTypeId : null, siteId);
+            type == ContainerType.DeckBox ? req.DeckTypeId : null, siteId, req.DefaultSets);
         return DtoMapping.ToDto(new LocationTileSummary
         {
             Container = created,
@@ -219,6 +223,39 @@ public sealed class LocationsController(
         }
         return NoContent();
     }
+
+    /// <summary>Fix a location to one game (null = any game) and set the sets its card searches start on.
+    /// The game is enforced on every card-in path; the sets are only a search default. 400 for Bulk, for
+    /// clearing a deck box's game or an unknown game; 409 if the location holds cards of another game.</summary>
+    [HttpPut("{id:int}/card-filter")]
+    [RequirePermission(Permissions.LocationsEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "id")]
+    public IActionResult SetCardFilter(int id, [FromBody] SetLocationCardFilterRequest req)
+    {
+        var container = containers.GetAll().FirstOrDefault(c => c.Id == id);
+        if (container is null) return NotFound();
+        var game = ParseGame(req.Game);
+        if (!string.IsNullOrWhiteSpace(req.Game) && game is null)
+            return BadRequest(new { error = $"Unknown game '{req.Game}'." });
+        if (container.IsSystem)
+            return BadRequest(new { error = "Bulk holds every game, so it can't be given a game or sets." });
+        if (container.ContainerType == ContainerType.DeckBox && game is null)
+            return BadRequest(new { error = "A deck box must be assigned a game." });
+        if (DefaultSetsTooLong(req.DefaultSets))
+            return BadRequest(new { error = "Too many default sets." });
+        try
+        {
+            containers.SetCardFilter(id, game, req.DefaultSets);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+        return NoContent();
+    }
+
+    private static bool DefaultSetsTooLong(IEnumerable<string>? sets) =>
+        StorageContainer.JoinSetCodes(sets) is { Length: > StorageContainer.MaxDefaultSetsLength };
 
     /// <summary>Deck boxes with no game assigned yet (legacy), each with the game inferred from the
     /// cards inside. Backs the "assign game" prompt on the Locations page.</summary>
@@ -307,7 +344,7 @@ public sealed class LocationsController(
         {
             return DeckSyncError(ex);
         }
-        catch (DeckBoxGameMismatchException ex)
+        catch (LocationGameMismatchException ex)
         {
             return Conflict(new { error = ex.Message });
         }

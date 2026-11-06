@@ -38,7 +38,7 @@ const COLLAPSED_KEY = 'omnicard.locations.collapsed';
 const HIDE_EMPTY_KEY = 'omnicard.locations.hideEmpty';
 const SITE_KEY = 'omnicard.locations.site';
 import { api, ApiError } from '../api/client';
-import type { LocationSummaryDto, SiteDto } from '../api/types';
+import type { LocationSummaryDto, SetInfoDto, SiteDto } from '../api/types';
 import { useSites } from '../context/useSites';
 import { ALL_SITES, SiteSelect, type SiteFilterValue } from '../components/SiteSelect';
 import { useGame } from '../context/GameContext';
@@ -50,6 +50,8 @@ import { LOCATION_TYPES, isDeckBoxType } from '../lib/locationTypes';
 import { DeckBoxGamePicker } from '../components/DeckBoxGamePicker';
 import { DeckBoxGameBanner } from '../components/DeckBoxGameBanner';
 import { DeckBoxGameDialog } from '../components/dialogs/DeckBoxGameDialog';
+import { LocationCardFilterDialog } from '../components/dialogs/LocationCardFilterDialog';
+import { SetMultiSelect } from '../components/SetMultiSelect';
 import { IgnoredLocationsDialog } from '../components/dialogs/IgnoredLocationsDialog';
 import { useIsPhone } from '../lib/responsive';
 
@@ -73,6 +75,8 @@ function AddLocationBar({ onAdded, siteFilter }: { onAdded: () => void; siteFilt
   const [type, setType] = useState('Box');
   const [game, setGame] = useState('');
   const [deckTypeId, setDeckTypeId] = useState<number | null>(null);
+  const [defaultSets, setDefaultSets] = useState<SetInfoDto[]>([]);
+  const games = useQuery({ queryKey: ['games'], queryFn: () => api.games() });
 
   const isDeckBox = isDeckBoxType(type);
   const trimmed = name.trim();
@@ -89,14 +93,17 @@ function AddLocationBar({ onAdded, siteFilter }: { onAdded: () => void; siteFilt
       api.locationCreate({
         name: trimmed,
         type,
-        game: isDeckBox ? game : null,
+        // Any type may be fixed to a game ("" = any game); a deck box must be.
+        game: game || null,
         deckTypeId: isDeckBox ? deckTypeId : null,
         siteId: siteId ?? null,
+        defaultSets: game ? defaultSets.map((s) => s.setCode) : null,
       }),
     onSuccess: () => {
       setName('');
       setGame('');
       setDeckTypeId(null);
+      setDefaultSets([]);
       onAdded();
     },
   });
@@ -135,12 +142,47 @@ function AddLocationBar({ onAdded, siteFilter }: { onAdded: () => void; siteFilt
           </MenuItem>
         ))}
       </TextField>
-      {isDeckBox && (
+      {isDeckBox ? (
         <DeckBoxGamePicker
           game={game}
           deckTypeId={deckTypeId}
-          onGameChange={setGame}
+          onGameChange={(g) => {
+            setGame(g);
+            setDefaultSets([]);
+          }}
           onDeckTypeChange={setDeckTypeId}
+        />
+      ) : (
+        <TextField
+          select
+          size="small"
+          label={t('common.labels.game')}
+          value={game}
+          onChange={(e) => {
+            setGame(e.target.value);
+            setDefaultSets([]);
+          }}
+          helperText=" "
+          sx={{ width: 200 }}
+        >
+          <MenuItem value="">
+            <em>{t('locations.cardFilter.anyGame')}</em>
+          </MenuItem>
+          {(games.data ?? []).map((g) => (
+            <MenuItem key={g.id} value={g.id}>
+              {g.displayName}
+            </MenuItem>
+          ))}
+        </TextField>
+      )}
+      {game && (
+        <SetMultiSelect
+          game={game}
+          value={defaultSets}
+          onChange={setDefaultSets}
+          label={t('locations.cardFilter.defaultSets')}
+          helperText=" "
+          sx={{ width: 260 }}
         />
       )}
       <Button
@@ -221,6 +263,7 @@ function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: 
   const { writable } = useSites();
   const [anchor, setAnchor] = useState<null | HTMLElement>(null);
   const [editingDeckBox, setEditingDeckBox] = useState(false);
+  const [editingFilter, setEditingFilter] = useState(false);
   const [movingSite, setMovingSite] = useState(false);
   const canMoveSite = !loc.isSystem && writable.some((s) => s.id !== loc.siteId);
   const close = () => setAnchor(null);
@@ -276,6 +319,16 @@ function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: 
             {t('locations.menu.gameDeckType')}
           </MenuItem>
         )}
+        {!loc.isSystem && (
+          <MenuItem
+            onClick={() => {
+              close();
+              setEditingFilter(true);
+            }}
+          >
+            {isDeckBox ? t('locations.menu.defaultSets') : t('locations.menu.gameSets')}
+          </MenuItem>
+        )}
         {canMoveSite && (
           <MenuItem
             onClick={() => {
@@ -327,6 +380,9 @@ function LocationMenu({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: 
           onClose={() => setEditingDeckBox(false)}
           onSaved={onChanged}
         />
+      )}
+      {editingFilter && (
+        <LocationCardFilterDialog open loc={loc} onClose={() => setEditingFilter(false)} onSaved={onChanged} />
       )}
       {movingSite && (
         <MoveToSiteDialog loc={loc} sites={writable} onClose={() => setMovingSite(false)} onMoved={onChanged} />
@@ -427,9 +483,12 @@ function buildColumns(
       headerName: t('common.labels.type'),
       width: 200,
       renderCell: (p) => {
-        // Deck boxes show their game + deck type inline; other types show just the type name.
-        if (p.row.type === 'Deck Box' && (p.row.game || p.row.deckTypeName)) {
-          const bits = [p.row.deckTypeName, t('locations.deckBoxLabel')].filter(Boolean).join(' · ');
+        // A location fixed to a game shows it under the type; deck boxes add their deck type.
+        if (p.row.game || (p.row.type === 'Deck Box' && p.row.deckTypeName)) {
+          const bits =
+            p.row.type === 'Deck Box'
+              ? [p.row.deckTypeName, t('locations.deckBoxLabel')].filter(Boolean).join(' · ')
+              : p.row.type;
           return (
             <Stack spacing={0} sx={{ lineHeight: 1.2 }}>
               <Typography variant="body2" noWrap>

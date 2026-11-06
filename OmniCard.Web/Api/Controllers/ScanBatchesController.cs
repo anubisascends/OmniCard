@@ -176,7 +176,7 @@ public sealed class ScanBatchesController(
         {
             return BadRequest(new { error = ex.Message });
         }
-        catch (DeckBoxGameMismatchException ex)
+        catch (LocationGameMismatchException ex)
         {
             return Conflict(new { error = ex.Message });
         }
