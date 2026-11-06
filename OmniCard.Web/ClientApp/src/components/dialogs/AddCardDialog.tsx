@@ -713,9 +713,14 @@ export function AddCardDialog({
       return;
     }
     if (e.key === 'Enter' && simplified && (composed !== debounced || catalog.isFetching)) {
-      // Typed ahead of the search — pick the top result when it arrives.
+      // Typed ahead of the search — pick the top result when it arrives, and search now rather than
+      // after the typing pause.
       e.preventDefault();
       pendingEnter.current = true;
+      if (composed !== debounced) {
+        setDebounced(composed);
+        setDebouncedParts({ name: name.trim(), set: set.trim(), cn: cn.trim() });
+      }
       return;
     }
     if (rows.length === 0) return;

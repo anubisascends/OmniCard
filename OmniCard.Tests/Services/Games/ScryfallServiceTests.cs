@@ -467,6 +467,24 @@ public class ScryfallServiceTests : IDisposable
         Assert.Equal(["Shivan Dragon", "Teferi, Hero of Dominaria", "Lightning Bolt"], results.Select(m => m.Name).ToList());
     }
 
+    [Theory]
+    // set=/set:/lang: now narrow in SQL too — the results must be what the in-memory matcher alone gave.
+    [InlineData("set=dom", "Teferi, Hero of Dominaria")]
+    [InlineData("set=DOM", "Teferi, Hero of Dominaria")]
+    [InlineData("set:m19", "Shivan Dragon")]
+    [InlineData("set:alph", "Lightning Bolt")]
+    [InlineData("cn:\"207\" set=dom lang:en", "Teferi, Hero of Dominaria")]
+    [InlineData("cn:\"207\" set=lea", "")]
+    [InlineData("set=dom lang:ja", "")]
+    [InlineData("set=dom lang:english", "Teferi, Hero of Dominaria")]
+    [InlineData("-set=dom r:rare", "Shivan Dragon")]
+    public void SearchCards_SetAndLanguageScopes(string query, string expected)
+    {
+        SeedSearchCatalog();
+        var svc = CreateServiceWithLanguages();
+        Assert.Equal(expected.Length == 0 ? [] : [expected], Names(svc.SearchCards(query)));
+    }
+
     [Fact]
     public void SearchCards_ExactName()
     {
