@@ -581,10 +581,25 @@ public static class ScryfallCardFilter
 
         Expression Substr(string prop) => Like(prop, $"%{f.Value}%");
 
+        // A LIKE with no wildcards is a case-insensitive equality (SQLite, SQL Server's default collation)
+        // that still seeks the index — the in-memory matcher compares set codes and languages ignoring case.
+        bool literal = f.Value.IndexOfAny(['%', '_', '[']) < 0;
+
         switch (f.Field)
         {
             case "name": return f.Op == ComparisonOp.Exact ? Like("Name", f.Value)
                                 : f.Op == ComparisonOp.NotEqual ? null : Substr("Name");
+            // set= is the code; set: is the code or part of the set name (as the matcher reads them). Without
+            // this every set-scoped search (the Add card dialog runs one per chosen set) scanned the catalog.
+            case "set" when literal: return f.Op switch
+            {
+                ComparisonOp.Exact => Like("SetCode", f.Value),
+                ComparisonOp.Contains => Expression.OrElse(Like("SetCode", f.Value), Substr("SetName")),
+                _ => null,
+            };
+            case "lang" when literal: return f.Op is ComparisonOp.Exact or ComparisonOp.Contains
+                ? Like("Lang", NormalizeLang(f.Value))
+                : null;
             case "type": return f.Op == ComparisonOp.NotEqual ? null : Substr("TypeLine");
             case "oracle" or "fulloracle": return f.Op == ComparisonOp.NotEqual ? null : Substr("OracleText");
             case "flavor": return f.Op == ComparisonOp.NotEqual ? null : Substr("FlavorText");
