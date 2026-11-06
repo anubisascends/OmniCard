@@ -53,6 +53,8 @@ public class ImportControllerUrlTests : IDisposable
         var cardService = new RecordingCardService(gs);
         _controller = new ImportController(null!, binderCards, _decklists, cardService, null!, TagRuleServices.Create(factory),
             new DeckBoxSyncService(factory, _decklists, cardService, binderCards, new TagService(factory),
+                new DeckReturnService(factory, new OmniCard.Collection.Lists.ListService(factory, cardService),
+                    NullLogger<DeckReturnService>.Instance),
                 NullLogger<DeckBoxSyncService>.Instance));
         _containers = new StorageContainerService(factory);
         _boxId = _containers.Create("Deck Box", ContainerType.Box).Id;

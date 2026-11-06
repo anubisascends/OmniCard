@@ -35,6 +35,8 @@ import { PrintLabelsDialog } from '../components/dialogs/PrintLabelsDialog';
 import { AuditSummaryDialog } from '../components/dialogs/AuditSummaryDialog';
 import type { AuditReturnState } from './AuditPage';
 import { DeckBoxPanel } from '../components/DeckBoxPanel';
+import { DeckReturnDialog } from '../components/dialogs/DeckReturnDialog';
+import CallSplitIcon from '@mui/icons-material/CallSplit';
 import { LocationCardFilterPanel } from '../components/LocationCardFilterPanel';
 import { useDefaultSets } from '../components/locationCardFilter';
 import { DeckStackView } from '../components/deckstack/DeckStackView';
@@ -59,6 +61,8 @@ export function LocationDetailPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [labelsOpen, setLabelsOpen] = useState(false);
+  // Deck box: the selected lots being returned to where they came from.
+  const [returning, setReturning] = useState<number[] | null>(null);
   // An audit commit returns here with its summary in router state (see AuditPage).
   const location = useLocation();
   const navigate = useNavigate();
@@ -227,7 +231,24 @@ export function LocationDetailPage() {
           onGroupModeChange={(groupBy) => sv.setState({ groupBy })}
         />
       ) : (
-        <CardTable game={game} containerId={locationId} view={sv.state} onViewChange={sv.setState} />
+        <CardTable
+          game={game}
+          containerId={locationId}
+          view={sv.state}
+          onViewChange={sv.setState}
+          extraSelectionActions={
+            isDeckBox && canWrite && can('collection.edit')
+              ? [
+                  {
+                    key: 'return',
+                    icon: <CallSplitIcon />,
+                    label: t('deckbox.return.returnSelected'),
+                    onClick: (lotIds) => setReturning(lotIds),
+                  },
+                ]
+              : undefined
+          }
+        />
       )}
 
       <AddCardDialog
@@ -254,6 +275,17 @@ export function LocationDetailPage() {
         title={t('labels.printDialog.titleLocation', { name: locQuery.data?.name ?? t('locations.detail.thisLocation') })}
         onClose={() => setLabelsOpen(false)}
       />
+      {returning && locQuery.data && (
+        <DeckReturnDialog
+          open
+          loc={locQuery.data}
+          lotIds={returning}
+          onClose={() => {
+            setReturning(null);
+            refresh();
+          }}
+        />
+      )}
       <AuditSummaryDialog
         open={auditSummary != null}
         result={auditSummary}

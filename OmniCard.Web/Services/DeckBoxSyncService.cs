@@ -23,6 +23,7 @@ public sealed class DeckBoxSyncService(
     ICardService cardService,
     WebBinderCardService binderCards,
     ITagService tags,
+    DeckReturnService returns,
     ILogger<DeckBoxSyncService> logger)
 {
     public const string SideboardTag = DeckCardClassifier.SideboardTag;
@@ -212,7 +213,20 @@ public sealed class DeckBoxSyncService(
         foreach (var (key, held) in boxByName.Where(b => !wanted.ContainsKey(b.Key)).OrderBy(b => b.Value[0].Name, StringComparer.OrdinalIgnoreCase))
             cuts.AddRange(TakeCuts(held, held.Sum(l => l.Quantity), sideboard));
 
-        return new DeckSyncPreviewDto(box.Id, box.Name, box.SourceUrl!, deckName, entries.Sum(e => e.Quantity), keepCount, adds, cuts);
+        return new DeckSyncPreviewDto(box.Id, box.Name, box.SourceUrl!, deckName, entries.Sum(e => e.Quantity), keepCount, adds,
+            WithOrigins(ctx, cuts));
+    }
+
+    /// <summary>Names where each cut copy came from before it went into a deck box (for the "Return" action).</summary>
+    private static List<DeckSyncCutDto> WithOrigins(OmniCardDbContext ctx, List<DeckSyncCutDto> cuts)
+    {
+        var ids = cuts.Select(c => c.LotId).Distinct().ToList();
+        if (ids.Count == 0) return cuts;
+        var origins = (from l in ctx.Lots.AsNoTracking()
+                       join c in ctx.StorageContainers.AsNoTracking() on l.OriginLocationId equals c.Id
+                       where ids.Contains(l.Id)
+                       select new { l.Id, c.Name }).ToDictionary(x => x.Id, x => x.Name);
+        return cuts.Select(c => origins.TryGetValue(c.LotId, out var name) ? c with { OriginName = name } : c).ToList();
     }
 
     private static IEnumerable<DeckSyncCutDto> TakeCuts(IEnumerable<OwnedLot> lots, int quantity, HashSet<int> sideboard)
@@ -281,7 +295,7 @@ public sealed class DeckBoxSyncService(
     /// copies must be of the box's game, outside it, in writable sites and not listed for sale; cut lots must
     /// be in the box; move destinations must be writable. Then copies move in (splitting stacks), cut copies
     /// move out or get the sideboard tag, and the "not in collection" list is replaced.</summary>
-    public DeckSyncResultDto Apply(int deckBoxId, DeckSyncApplyRequest request, SiteAccess access)
+    public DeckSyncResultDto Apply(int deckBoxId, DeckSyncApplyRequest request, SiteAccess access, string? userName = null)
     {
         var box = LoadLinkedBox(deckBoxId);
         var game = box.Game!.Value;
@@ -335,6 +349,17 @@ public sealed class DeckBoxSyncService(
                     if (destination.Game is { } destGame && destGame != game)
                         throw new DeckSyncException($"\"{destination.Name}\" only holds {GameName(destGame)} cards.");
                 }
+                else if (IsAction(cut.Action, "Return"))
+                {
+                    try
+                    {
+                        returns.Validate(deckBoxId, cut.DestinationId, access);
+                    }
+                    catch (DeckReturnService.DeckReturnException ex)
+                    {
+                        throw new DeckSyncException(ex.Message);
+                    }
+                }
                 else if (!IsAction(cut.Action, "Sideboard"))
                     throw new DeckSyncException($"Unknown action '{cut.Action}' for a removed card.");
             }
@@ -345,6 +370,17 @@ public sealed class DeckBoxSyncService(
         var removed = 0;
         foreach (var group in cuts.Where(c => IsAction(c.Action, "Move")).GroupBy(c => c.DestinationId!.Value))
             removed += binderCards.MoveQuantitiesToContainer(group.Select(c => (c.LotId, c.Quantity)).ToList(), group.Key);
+
+        // Cut copies sent back where they came from (copies with no known origin go to the chosen location,
+        // or Bulk), with a put-back report.
+        int? returnReportId = null;
+        foreach (var group in cuts.Where(c => IsAction(c.Action, "Return")).GroupBy(c => c.DestinationId))
+        {
+            var result = returns.ReturnCuts(deckBoxId,
+                group.Select(c => new DeckSyncPickDto(c.LotId, c.Quantity)).ToList(), group.Key, access, userName);
+            removed += result.CardCount;
+            returnReportId ??= result.ReportId;
+        }
 
         var sideboarded = 0;
         foreach (var cut in cuts.Where(c => IsAction(c.Action, "Sideboard")))
@@ -364,7 +400,7 @@ public sealed class DeckBoxSyncService(
         var notInCollection = SaveSyncState(deckBoxId, request.NotInCollection);
         logger.LogInformation("Synced deck box {Box} from {Url}: {Added} added, {Removed} removed, {Sideboarded} sideboarded, {Missing} not in collection",
             box.Name, box.SourceUrl, added, removed, sideboarded, notInCollection);
-        return new DeckSyncResultDto(added, removed, sideboarded, notInCollection);
+        return new DeckSyncResultDto(added, removed, sideboarded, notInCollection) { ReturnReportId = returnReportId };
     }
 
     /// <summary>Replaces the box's "not in collection" list and stamps the sync time. Returns the copies listed.</summary>

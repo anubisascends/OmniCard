@@ -54,6 +54,11 @@ import type {
   DeckSyncApplyRequest,
   DeckSyncPreviewDto,
   DeckSyncResultDto,
+  DeckReturnLineDto,
+  DeckReturnPreviewDto,
+  DeckReturnReportSummaryDto,
+  DeckReturnRequest,
+  DeckReturnResultDto,
   DeckSyncSourceDto,
   DeckTypeDto,
   DeckTypeUpsertRequest,
@@ -630,6 +635,18 @@ export const api = {
     request<DeckBoxMissingCardDto[]>(`/api/locations/${id}/deck-sync/not-in-collection`),
   removeDeckNotInCollection: (id: number, cardName: string) =>
     request<void>(`/api/locations/${id}/deck-sync/not-in-collection${qs({ cardName })}`, { method: 'DELETE' }),
+  /** Deconstruct a deck box (no `lots`) or return some of its cards to where they came from — preview only. */
+  deckReturnPreview: (id: number, body: DeckReturnRequest) =>
+    request<DeckReturnPreviewDto>(`/api/locations/${id}/deck-return/preview`, { method: 'POST', body: JSON.stringify(body) }),
+  deckReturnApply: (id: number, body: DeckReturnRequest) =>
+    request<DeckReturnResultDto>(`/api/locations/${id}/deck-return/apply`, { method: 'POST', body: JSON.stringify(body) }),
+  /** The deck box's saved put-back reports, newest first. */
+  deckReturnReports: (id: number) =>
+    request<DeckReturnReportSummaryDto[]>(`/api/locations/${id}/deck-return/reports`),
+  deckReturnReport: (id: number, reportId: number) =>
+    request<DeckReturnLineDto[]>(`/api/locations/${id}/deck-return/reports/${reportId}`),
+  deckReturnReportPdf: (id: number, reportId: number) =>
+    download(`/api/locations/${id}/deck-return/reports/${reportId}.pdf`, 'put-back.pdf'),
 
   // Deck types (per-game formats): built-ins + custom
   deckTypes: (game: string) => request<DeckTypeDto[]>(`/api/deck-types${qs({ game })}`),

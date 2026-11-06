@@ -25,6 +25,19 @@ public class InventoryLot
     public int? Page { get; set; }
     public int? Slot { get; set; }
     public string? Section { get; set; }
+
+    /// <summary>Where this copy was before it went into a deck box — the location id, and the pocket
+    /// (<see cref="OriginPage"/>/<see cref="OriginSlot"/>) and <see cref="OriginSection"/> it held there. Set
+    /// when the copy moves from any non-deck location into a deck box, carried along when it moves from one
+    /// deck box to another, and cleared when it leaves the deck boxes. Read when a deck is deconstructed (or
+    /// a card is returned) so the copy can go back where it came from (see <c>DeckOrigin</c>). Null = no
+    /// known origin (added straight into the deck, or there before origins were tracked). No FK: the
+    /// location may since have been deleted, which the return handles.</summary>
+    public int? OriginLocationId { get; set; }
+    public int? OriginPage { get; set; }
+    public int? OriginSlot { get; set; }
+    public string? OriginSection { get; set; }
+
     // Added in the Phase 2a unified-store migration (Task 2) to carry over
     // CollectionCard.IsMissing/FlagReason faithfully.
     public bool IsMissing { get; set; }

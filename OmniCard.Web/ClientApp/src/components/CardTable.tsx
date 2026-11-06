@@ -107,12 +107,16 @@ export function CardTable({
   showLocation = false,
   view,
   onViewChange,
+  extraSelectionActions,
 }: {
   game?: string;
   containerId?: number;
   showLocation?: boolean;
   view: ViewState;
   onViewChange: (patch: Partial<ViewState>) => void;
+  /** More Select-mode actions (e.g. a deck box's "Return to where it came from"), placed before Delete;
+   * each gets the selected lot ids. */
+  extraSelectionActions?: { key: string; icon: ReactNode; label: string; onClick: (lotIds: number[]) => void }[];
 }) {
   const { t } = useTranslation();
   const fmt = useFormatters();
@@ -544,6 +548,7 @@ export function CardTable({
     ...(can('labels.print')
       ? [{ key: 'labels', icon: <PrintIcon />, label: t('labels.print'), onClick: () => setLabelsOpen(true) }]
       : []),
+    ...(extraSelectionActions ?? []).map((a) => ({ ...a, onClick: () => a.onClick(selectedLotIds) })),
     {
       key: 'delete',
       icon: <DeleteIcon />,

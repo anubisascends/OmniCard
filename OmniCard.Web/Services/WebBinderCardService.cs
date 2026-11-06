@@ -115,6 +115,7 @@ public sealed class WebBinderCardService
 
         foreach (var lot in lots)
         {
+            DeckOrigin.BeforeMove(context, lot, containerId);
             lot.LocationId = containerId;
             lot.Page = null;
             lot.Slot = null;
@@ -158,6 +159,7 @@ public sealed class WebBinderCardService
 
             if (quantity >= lot.Quantity)
             {
+                DeckOrigin.BeforeMove(context, lot, containerId);
                 lot.LocationId = containerId;
                 lot.Page = null;
                 lot.Slot = null;
@@ -179,6 +181,7 @@ public sealed class WebBinderCardService
                 Language = lot.Language,
                 LocationId = containerId,
             };
+            DeckOrigin.ForSplit(context, lot, split, containerId);
             context.Lots.Add(split);
             movements.Add((split, quantity));
             moved += quantity;
@@ -703,6 +706,7 @@ public sealed class WebBinderCardService
         if (lot.Quantity <= 1)
         {
             // Whole-lot move into the pocket.
+            DeckOrigin.BeforeMove(context, lot, containerId);
             lot.LocationId = containerId;
             lot.Page = page;
             lot.Slot = slot;
@@ -734,6 +738,7 @@ public sealed class WebBinderCardService
             Page = page,
             Slot = slot,
         };
+        DeckOrigin.ForSplit(context, lot, placed, containerId);
         context.Lots.Add(placed);
         context.SaveChanges();
 
@@ -810,6 +815,11 @@ public sealed class WebBinderCardService
 
     private static InventoryLot NewSplitLot(InventoryLot lot, int quantity) => new()
     {
+        // Same location, so the new copies keep the stack's deck origin.
+        OriginLocationId = lot.OriginLocationId,
+        OriginPage = lot.OriginPage,
+        OriginSlot = lot.OriginSlot,
+        OriginSection = lot.OriginSection,
         ProductId = lot.ProductId,
         Quantity = quantity,
         UnitCost = lot.UnitCost,
@@ -851,6 +861,7 @@ public sealed class WebBinderCardService
         if (move >= lot.Quantity)
         {
             // Whole-lot relocation.
+            DeckOrigin.BeforeMove(context, lot, containerId);
             lot.LocationId = containerId;
             lot.Page = null;
             lot.Slot = null;
@@ -880,6 +891,7 @@ public sealed class WebBinderCardService
             Language = lot.Language,
             LocationId = containerId,
         };
+        DeckOrigin.ForSplit(context, lot, moved, containerId);
         context.Lots.Add(moved);
         context.SaveChanges();
 
@@ -982,6 +994,7 @@ public sealed class WebBinderCardService
         lot.Language = CardLanguages.ToStored(card.Language);
         lot.Note = card.Note;
         lot.UnitCost = card.PurchasePrice;
+        DeckOrigin.BeforeMove(context, lot, card.ContainerId);
         lot.LocationId = card.ContainerId;
         lot.Page = card.Page;
         lot.Slot = card.Slot;

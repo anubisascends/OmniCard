@@ -251,6 +251,9 @@ builder.Services.AddSingleton(sp =>
 builder.Services.AddSingleton<LocationImportService>();
 // Deck box ↔ Moxfield/Archidekt link + "Sync from URL" (LocationsController deck-link / deck-sync).
 builder.Services.AddSingleton<DeckBoxSyncService>();
+// Deck deconstruct / "return to where it came from" + saved put-back reports (LocationsController deck-return).
+builder.Services.AddSingleton<DeckReturnService>();
+builder.Services.AddSingleton<IDeckReturnPdfExporter, DeckReturnPdfExporter>();
 // Buy Lists: per-game cards the owner wants (flagged in scan + intake, shown on the kiosk). Singleton so
 // its count-down lock is shared.
 builder.Services.AddSingleton<OmniCard.Shared.BuyList.IBuyListSettingsService, OmniCard.Web.Services.BuyList.BuyListSettingsService>();

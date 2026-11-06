@@ -11,6 +11,7 @@ Deck boxes are ordinary [locations](help:locations) with a few extras:
 - **Deck panel.** The deck box's page shows the game, deck type, card count and any legality warnings.
 - **Stacked view.** The deck can be shown as overlapping card stacks grouped by type, like a deck-building site.
 - **Deck link.** A Magic deck box can be linked to its deck on Moxfield or Archidekt, then kept up to date with **Sync from URL**.
+- **Where each card came from.** OmniCard remembers where every card was before it went into a deck box, so you can [deconstruct the deck](#deconstruct-a-deck) and put each card back where it was.
 
 ## Create a deck box
 
@@ -69,6 +70,8 @@ The panel shows:
 - How many commanders the deck has, when it has any.
 - The total card count, for example *100 cards (99 + commander)*.
 - The **Game & deck type** button.
+- **Deconstruct deck**, when the deck box holds cards. See [Deconstruct a deck](#deconstruct-a-deck).
+- **Put-back reports**, once cards have been returned from the deck box.
 - Any legality warnings, under **Deck legality (*deck type*)**.
 - The deck link, if the deck box has one. See [Link a deck box to an online deck](#link-a-deck-box-to-an-online-deck).
 
@@ -175,8 +178,14 @@ Once linked, the deck panel shows **Linked to Moxfield** (or **Archidekt**), whi
 3. Deal with every card that is still short:
    - Click **Find a copy…** to search your collection by name and choose a copy with **Use**. Use this when OmniCard didn't find the card, for example when your copy is spelled differently.
    - Or tick **Not in collection** for the card. **Mark the rest as not in collection** ticks every card that's still short.
-4. Review **Cards to remove**. These are cards in the deck box that the deck no longer has. For each one choose **Move out**, **Keep as sideboard** (leaves it in the deck box and tags it `sideboard`) or **Leave in box**. Choose where moved cards go in **Move removed cards to**; it starts at Bulk.
-5. Click **Apply sync**.
+4. Review **Cards to remove**. These are cards in the deck box that the deck no longer has. **Came from** shows where each one was before it went into a deck. For each one choose:
+   - **Return where it came from** puts it back in that location and binder pocket. This is the default when OmniCard knows where the card came from. See [Deconstruct a deck](#deconstruct-a-deck) for what happens when it can't go back.
+   - **Move out** moves it to the location in **Move removed cards to**, which starts at Bulk.
+   - **Keep as sideboard** leaves it in the deck box and tags it `sideboard`.
+   - **Leave in box** leaves it alone.
+
+   When only **Return where it came from** is chosen, the location box is called **Cards with no known origin go to**.
+5. Click **Apply sync**. If any cards were returned, click **Download put-back list (PDF)** to print where they go.
 
 A few things to know:
 
@@ -194,6 +203,44 @@ On the next sync these cards are checked again. A card you've since added to you
 > [!TIP]
 > To make a shopping list for the missing cards, import the same deck URL into [Lists](help:lists).
 
+## Deconstruct a deck
+
+OmniCard remembers where each card was before it went into a deck box: the location, the binder page and slot, and the section. It does this for every way of moving a card into a deck box, such as **Move to**, **Move to deck box…**, **Sync from URL**, list **Fulfill** and editing a card's location. Moving a card from one deck box to another keeps the place it came from before the first deck. Moving it anywhere other than a deck box forgets it.
+
+When you're done with a deck, you can send every card back where it came from:
+
+1. Open the deck box and click **Deconstruct deck** in the deck panel. OmniCard shows where every card will go, grouped by location and listed by page and slot. Nothing changes yet.
+2. Check **Cards with no known origin go to**. It starts at Bulk.
+3. Leave **Save the deck as a card list first, so it can be rebuilt** ticked to keep the decklist in [Lists](help:lists) under the name in **List name**. To rebuild the deck later, use the list's **Fulfill** to move the cards back into the deck box.
+4. Click **Deconstruct deck**.
+5. Click **Download put-back list (PDF)** to print a checklist of where every card goes, then put the cards away.
+
+The deck box is left empty. It keeps its game, deck type and deck link, so a linked deck can also be rebuilt with **Sync from URL**.
+
+To return only some cards, open the deck box, click **Select**, tick the cards and click **Return to where it came from**.
+
+### When a card can't go back
+
+The put-back list highlights each card that can't go back where it came from, with the reason:
+
+| Reason | Where the card goes |
+|---|---|
+| Where it came from isn't known. The card was added straight into the deck box, or was there before OmniCard started remembering. | The location in **Cards with no known origin go to** |
+| The location it came from was deleted. | Bulk |
+| It came from a site you can't edit. | Bulk |
+| It came from a location that now only holds another game. | Bulk |
+| The binder pocket it came from now holds a different card. That card stays where it is. | Bulk |
+
+A few things to know:
+
+- A card that came from a stack in a box joins that stack again, as long as the stack is still there and the copies match (same condition, language, note and tags). The put-back list says **Joins the stack there**.
+- The `commander` and `sideboard` tags are removed from returned cards, because they only mean something in a deck.
+- A card listed for sale can be returned with all its copies, but not just some of them. Unlist it first.
+
+### Put-back reports
+
+Every deconstruction or return is saved. The deck panel shows a **Put-back reports** button once there's at least one. Click it to see each report, open it again, or click **Download put-back list (PDF)** to print it again.
+
 ## Troubleshooting
 
 - **A deck box is missing from the Locations page.** The game selector is set to a different game. Choose that game or **All Games**.
@@ -203,4 +250,6 @@ On the next sync these cards are checked again. A card you've since added to you
 - **The deck says it needs a commander.** Tag your commander card `commander` in its details.
 - **There's no Link to deck URL button.** Only Magic: The Gathering deck boxes can be linked, and you need permission to edit locations.
 - **Sync from URL says it couldn't download the deck.** Check that the link opens the deck and that the deck is public on Moxfield or Archidekt.
+- **Deconstruct deck sent a card to Bulk.** The put-back list says why. See [When a card can't go back](#when-a-card-can-t-go-back).
+- **A card has no known origin.** OmniCard only remembers where a card came from when it's moved into a deck box. Cards that were already in deck boxes, or were scanned or imported straight into one, go to the **Cards with no known origin go to** location.
 - **Apply sync is greyed out.** A card is still short and isn't ticked **Not in collection**, a copy is used more times than it has, or no **Move removed cards to** location is chosen.

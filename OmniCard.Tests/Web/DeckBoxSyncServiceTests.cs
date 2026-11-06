@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Api.Contracts;
 using OmniCard.Collection.Inventory;
+using OmniCard.Collection.Lists;
 using OmniCard.Data;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Inventory;
@@ -43,8 +44,11 @@ public class DeckBoxSyncServiceTests : IDisposable
 
         _containers = new StorageContainerService(factory);
         _tags = new TagService(factory);
-        _service = new DeckBoxSyncService(factory, _decklists, new RecordingCardService(new ConfigurableGameService()),
-            new WebBinderCardService(factory, new StubDataPath()), _tags, NullLogger<DeckBoxSyncService>.Instance);
+        var cardService = new RecordingCardService(new ConfigurableGameService());
+        _service = new DeckBoxSyncService(factory, _decklists, cardService,
+            new WebBinderCardService(factory, new StubDataPath()), _tags,
+            new DeckReturnService(factory, new ListService(factory, cardService), NullLogger<DeckReturnService>.Instance),
+            NullLogger<DeckBoxSyncService>.Instance);
 
         _deckBoxId = _containers.Create("Commander", ContainerType.DeckBox, game: CardGame.Mtg).Id;
         _bulkId = _containers.Create("Spare Bulk", ContainerType.Box).Id;
