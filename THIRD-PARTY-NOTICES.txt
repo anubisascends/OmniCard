@@ -129,6 +129,8 @@ SkiaSharp 4.150.1 — MIT License
 Homepage:    https://github.com/mono/SkiaSharp
 Copyright (c) Microsoft Corporation. (Wraps Google's Skia graphics library,
 BSD-3-Clause, Copyright (c) Google Inc.)
+Includes SkiaSharp.NativeAssets.Linux.NoDependencies 4.150.1 (same license) for
+the Linux build of the native library.
 
 --------------------------------------------------------------------------------
 QuestPDF 2026.7.0 — QuestPDF Community MIT License (dual-licensed)
@@ -168,10 +170,12 @@ Homepage:    https://github.com/wieslawsoltes/Svg.Skia
 Copyright (c) Wiesław Šoltés.
 
 --------------------------------------------------------------------------------
-System.Drawing.Common 10.0.9 — MIT License
+BitMiracle.LibTiff.NET 2.4.660 — BSD 3-Clause ("New BSD") License
 --------------------------------------------------------------------------------
-Homepage:    https://github.com/dotnet/winforms
-Copyright (c) .NET Foundation and Contributors.
+Homepage:    https://bitmiracle.com/libtiff/
+License:     https://github.com/BitMiracle/libtiff.net/blob/master/license.txt
+Copyright (c) Bit Miracle. Based on LibTiff, Copyright (c) 1988-1997 Sam Leffler,
+Copyright (c) 1991-1997 Silicon Graphics, Inc.
 
 --------------------------------------------------------------------------------
 VirtualizingWrapPanel 2.5.3 — MIT License

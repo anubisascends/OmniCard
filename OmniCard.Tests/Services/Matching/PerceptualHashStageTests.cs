@@ -1,8 +1,8 @@
-using System.Drawing;
-using System.Drawing.Imaging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Imaging;
 using OmniCard.Shared.Matching;
+using OmniCard.Tests.Fakes;
+using SkiaSharp;
 
 namespace OmniCard.Tests.Services.Matching;
 
@@ -30,8 +30,7 @@ public class PerceptualHashStageTests
             Assert.NotNull(stage.ImageData);
             Assert.True(stage.ImageData.Length > 0);
             // Verify it's a valid image by loading it
-            using var ms = new MemoryStream(stage.ImageData);
-            using var bmp = new Bitmap(ms);
+            using var bmp = ImageOps.Decode(stage.ImageData);
             Assert.True(bmp.Width > 0);
         }
     }
@@ -64,16 +63,12 @@ public class PerceptualHashStageTests
     private static MemoryStream CreateTestImage()
     {
         // Create a simple 64x64 test image with some variation
-        using var bmp = new Bitmap(64, 64, PixelFormat.Format24bppRgb);
-        using (var g = Graphics.FromImage(bmp))
+        return new MemoryStream(TestImages.Png(64, 64, SKColors.White, g =>
         {
-            g.Clear(Color.White);
-            g.FillRectangle(Brushes.Blue, 10, 10, 30, 30);
-            g.FillEllipse(Brushes.Red, 25, 25, 30, 30);
-        }
-        var ms = new MemoryStream();
-        bmp.Save(ms, ImageFormat.Png);
-        ms.Position = 0;
-        return ms;
+            using var blue = TestImages.Fill(SKColors.Blue);
+            g.DrawRect(SKRect.Create(10, 10, 30, 30), blue);
+            using var red = TestImages.Fill(SKColors.Red);
+            g.DrawOval(SKRect.Create(25, 25, 30, 30), red);
+        }));
     }
 }

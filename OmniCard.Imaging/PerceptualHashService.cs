@@ -1,7 +1,5 @@
 using System.Diagnostics;
 using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.Numerics;
 using Microsoft.Extensions.Logging;
 using SkiaSharp;
@@ -26,27 +24,27 @@ public sealed class PerceptualHashService : IPerceptualHashService
 
     public ulong ComputeHash(Stream imageStream, Action<HashStageResult>? onStage = null)
     {
-        using var original = LoadBitmap(imageStream);
+        using var original = ImageOps.Decode(imageStream);
         return ComputeHash(original, onStage);
     }
 
     /// <summary>pHash of an already-decoded image. Lets a caller that hashes several crops of one scan
     /// decode it once instead of round-tripping each crop through an encoded stream.</summary>
-    public ulong ComputeHash(Bitmap original, Action<HashStageResult>? onStage = null)
+    public ulong ComputeHash(SKBitmap original, Action<HashStageResult>? onStage = null)
     {
         var sw = Stopwatch.StartNew();
-        onStage?.Invoke(new HashStageResult("Original", BitmapToPng(original)));
+        onStage?.Invoke(new HashStageResult("Original", ImageOps.EncodePng(original)));
 
         // Grayscale + resize to 32x32 for DCT input
-        using var grayscale = ToGrayscaleResized(original, ImageSize, ImageSize);
-        onStage?.Invoke(new HashStageResult("Grayscale 32x32", BitmapToPng(grayscale)));
+        var grayscale = ToGrayscaleResized(original, ImageSize, ImageSize);
+        onStage?.Invoke(new HashStageResult("Grayscale 32x32", GrayToPng(grayscale)));
 
         // Histogram equalization on the grayscale image to normalize lighting.
         // magic-card-detector applies CLAHE to the L channel in LAB;
         // global histogram equalization is sufficient for scanner-captured cards
         // where lighting is uniform across the image.
         HistogramEqualize(grayscale);
-        onStage?.Invoke(new HashStageResult("Histogram Equalized", BitmapToPng(grayscale)));
+        onStage?.Invoke(new HashStageResult("Histogram Equalized", GrayToPng(grayscale)));
 
         // Extract pixel luminance as doubles
         var pixels = ExtractPixels(grayscale);
@@ -97,20 +95,20 @@ public sealed class PerceptualHashService : IPerceptualHashService
 
     public ulong ComputeEdgeHash(Stream imageStream, Action<HashStageResult>? onStage = null)
     {
-        using var original = LoadBitmap(imageStream);
+        using var original = ImageOps.Decode(imageStream);
         return ComputeEdgeHash(original, onStage);
     }
 
-    /// <summary>Edge hash of an already-decoded image (see <see cref="ComputeHash(Bitmap, Action{HashStageResult}?)"/>).</summary>
-    public ulong ComputeEdgeHash(Bitmap original, Action<HashStageResult>? onStage = null)
+    /// <summary>Edge hash of an already-decoded image (see <see cref="ComputeHash(SKBitmap, Action{HashStageResult}?)"/>).</summary>
+    public ulong ComputeEdgeHash(SKBitmap original, Action<HashStageResult>? onStage = null)
     {
         var sw = Stopwatch.StartNew();
-        onStage?.Invoke(new HashStageResult("Original", BitmapToPng(original)));
+        onStage?.Invoke(new HashStageResult("Original", ImageOps.EncodePng(original)));
 
         // Grayscale + resize to 32x32, then gradient magnitude — captures structure
         // (shape boundaries) and discards color/brightness, so a foil color shift barely
         // moves the hash.
-        using var grayscale = ToGrayscaleResized(original, ImageSize, ImageSize);
+        var grayscale = ToGrayscaleResized(original, ImageSize, ImageSize);
         var pixels = ExtractPixels(grayscale);
         var gradient = GradientMagnitude(pixels);
 
@@ -147,13 +145,13 @@ public sealed class PerceptualHashService : IPerceptualHashService
 
     public ulong[] ComputeArtHash(Stream imageStream, (double X, double Y, double W, double H)[] cropRegions, Action<HashStageResult>? onStage = null)
     {
-        using var original = new Bitmap(imageStream);
+        using var original = ImageOps.Decode(imageStream);
         return ComputeArtHash(original, cropRegions, onStage);
     }
 
     /// <summary>Art-region hashes of an already-decoded image. Each crop is hashed in memory — PNG is
     /// lossless, so this yields the same hashes the old encode-then-decode round trip did, far faster.</summary>
-    public ulong[] ComputeArtHash(Bitmap original, (double X, double Y, double W, double H)[] cropRegions, Action<HashStageResult>? onStage = null)
+    public ulong[] ComputeArtHash(SKBitmap original, (double X, double Y, double W, double H)[] cropRegions, Action<HashStageResult>? onStage = null)
     {
         var hashes = new ulong[cropRegions.Length];
 
@@ -171,7 +169,7 @@ public sealed class PerceptualHashService : IPerceptualHashService
                 continue;
             }
 
-            using var cropped = original.Clone(new Rectangle(x, y, w, h), PixelFormat.Format32bppArgb);
+            using var cropped = ImageOps.Crop(original, new Rectangle(x, y, w, h));
             hashes[i] = ComputeHash(cropped, onStage is not null ? stage => onStage(new HashStageResult($"Art[{i}] {stage.StageName}", stage.ImageData)) : null);
         }
 
@@ -185,71 +183,36 @@ public sealed class PerceptualHashService : IPerceptualHashService
     public static int HammingDistance(ulong a, ulong b)
         => BitOperations.PopCount(a ^ b);
 
-    private static Bitmap ToGrayscaleResized(Bitmap source, int width, int height)
+    // 8-bit luminance raster (row-major, stride = Width) standing in for the old 8bpp indexed Bitmap.
+    private sealed record Gray(byte[] Pixels, int Width, int Height);
+
+    private static Gray ToGrayscaleResized(SKBitmap source, int width, int height)
     {
-        var result = new Bitmap(width, height, PixelFormat.Format8bppIndexed);
-
-        // Set grayscale palette
-        var palette = result.Palette;
-        for (int i = 0; i < 256; i++)
-            palette.Entries[i] = Color.FromArgb(i, i, i);
-        result.Palette = palette;
-
-        // Draw source into a 32bpp intermediate, then extract luminance
-        using var temp = new Bitmap(width, height, PixelFormat.Format32bppArgb);
-        using (var g = Graphics.FromImage(temp))
+        // Scale exactly as GDI+ HighQualityBicubic DrawImage onto a transparent 32bpp bitmap did,
+        // then extract luminance (alpha ignored, as before).
+        var src = ImageOps.GetBgra(source);
+        var temp = GdiPlusResampler.Resize(src, source.Width, source.Height, source.Width * 4, width, height);
+        var result = new byte[width * height];
+        for (int i = 0; i < result.Length; i++)
         {
-            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            g.DrawImage(source, 0, 0, width, height);
+            int b = temp[i * 4];
+            int g = temp[i * 4 + 1];
+            int r = temp[i * 4 + 2];
+            // ITU-R BT.601 luminance
+            result[i] = (byte)(0.299 * r + 0.587 * g + 0.114 * b);
         }
-
-        var srcData = temp.LockBits(new Rectangle(0, 0, width, height),
-            ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
-        var dstData = result.LockBits(new Rectangle(0, 0, width, height),
-            ImageLockMode.WriteOnly, PixelFormat.Format8bppIndexed);
-
-        unsafe
-        {
-            for (int y = 0; y < height; y++)
-            {
-                byte* srcRow = (byte*)srcData.Scan0 + y * srcData.Stride;
-                byte* dstRow = (byte*)dstData.Scan0 + y * dstData.Stride;
-                for (int x = 0; x < width; x++)
-                {
-                    int b = srcRow[x * 4];
-                    int g = srcRow[x * 4 + 1];
-                    int r = srcRow[x * 4 + 2];
-                    // ITU-R BT.601 luminance
-                    dstRow[x] = (byte)(0.299 * r + 0.587 * g + 0.114 * b);
-                }
-            }
-        }
-
-        temp.UnlockBits(srcData);
-        result.UnlockBits(dstData);
-        return result;
+        return new Gray(result, width, height);
     }
 
-    private static void HistogramEqualize(Bitmap grayscale)
+    private static void HistogramEqualize(Gray grayscale)
     {
-        int width = grayscale.Width;
-        int height = grayscale.Height;
-        int totalPixels = width * height;
-
-        var data = grayscale.LockBits(new Rectangle(0, 0, width, height),
-            ImageLockMode.ReadWrite, PixelFormat.Format8bppIndexed);
+        var pixels = grayscale.Pixels;
+        int totalPixels = pixels.Length;
 
         // Build histogram
         var histogram = new int[256];
-        unsafe
-        {
-            for (int y = 0; y < height; y++)
-            {
-                byte* row = (byte*)data.Scan0 + y * data.Stride;
-                for (int x = 0; x < width; x++)
-                    histogram[row[x]]++;
-            }
-        }
+        foreach (var v in pixels)
+            histogram[v]++;
 
         // Build cumulative distribution function and map
         var map = new byte[256];
@@ -265,39 +228,16 @@ public sealed class PerceptualHashService : IPerceptualHashService
         }
 
         // Apply mapping
-        unsafe
-        {
-            for (int y = 0; y < height; y++)
-            {
-                byte* row = (byte*)data.Scan0 + y * data.Stride;
-                for (int x = 0; x < width; x++)
-                    row[x] = map[row[x]];
-            }
-        }
-
-        grayscale.UnlockBits(data);
+        for (int i = 0; i < pixels.Length; i++)
+            pixels[i] = map[pixels[i]];
     }
 
-    private static double[,] ExtractPixels(Bitmap grayscale)
+    private static double[,] ExtractPixels(Gray grayscale)
     {
-        int width = grayscale.Width;
-        int height = grayscale.Height;
-        var pixels = new double[height, width];
-
-        var data = grayscale.LockBits(new Rectangle(0, 0, width, height),
-            ImageLockMode.ReadOnly, PixelFormat.Format8bppIndexed);
-
-        unsafe
-        {
-            for (int y = 0; y < height; y++)
-            {
-                byte* row = (byte*)data.Scan0 + y * data.Stride;
-                for (int x = 0; x < width; x++)
-                    pixels[y, x] = row[x] / 255.0;
-            }
-        }
-
-        grayscale.UnlockBits(data);
+        var pixels = new double[grayscale.Height, grayscale.Width];
+        for (int y = 0; y < grayscale.Height; y++)
+            for (int x = 0; x < grayscale.Width; x++)
+                pixels[y, x] = grayscale.Pixels[y * grayscale.Width + x] / 255.0;
         return pixels;
     }
 
@@ -336,51 +276,11 @@ public sealed class PerceptualHashService : IPerceptualHashService
         return result;
     }
 
-    private static byte[] BitmapToPng(Bitmap bitmap)
+    private static byte[] GrayToPng(Gray gray)
     {
-        using var ms = new MemoryStream();
-        bitmap.Save(ms, ImageFormat.Png);
-        return ms.ToArray();
-    }
-
-    // Loads an image into a System.Drawing.Bitmap. GDI+ handles PNG/JPEG/BMP directly but
-    // throws ArgumentException ("Parameter is not valid") for formats it lacks a codec for
-    // (notably WebP, which the poneglyph CDN serves for scan images). For those we fall back
-    // to SkiaSharp, which bundles its own codecs (no OS/WIC dependency, so it works on CI and
-    // Windows editions without the WebP codec), transcoding to PNG so the pipeline is unchanged.
-    private static Bitmap LoadBitmap(Stream imageStream)
-    {
-        byte[] bytes;
-        if (imageStream is MemoryStream ms)
-        {
-            bytes = ms.ToArray();
-        }
-        else
-        {
-            using var buffer = new MemoryStream();
-            imageStream.CopyTo(buffer);
-            bytes = buffer.ToArray();
-        }
-
-        try
-        {
-            return new Bitmap(new MemoryStream(bytes));
-        }
-        catch (ArgumentException)
-        {
-            // GDI+ cannot decode this format — transcode via SkiaSharp (handles WebP, etc.).
-            var png = TranscodeToPng(bytes);
-            return new Bitmap(new MemoryStream(png));
-        }
-    }
-
-    private static byte[] TranscodeToPng(byte[] input)
-    {
-        using var skBitmap = SKBitmap.Decode(input)
-            ?? throw new ArgumentException("Unsupported or corrupt image data — SkiaSharp could not decode it.");
-        using var image = SKImage.FromBitmap(skBitmap);
-        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-        return data.ToArray();
+        using var bmp = new SKBitmap(new SKImageInfo(gray.Width, gray.Height, SKColorType.Gray8, SKAlphaType.Opaque));
+        System.Runtime.InteropServices.Marshal.Copy(gray.Pixels, 0, bmp.GetPixels(), gray.Pixels.Length);
+        return ImageOps.EncodePng(bmp);
     }
 
     private static byte[] RenderDctHeatmap(double[,] dct)
@@ -401,33 +301,30 @@ public sealed class PerceptualHashService : IPerceptualHashService
         double range = max - min;
         if (range == 0) range = 1;
 
-        using var bmp = new Bitmap(size, size, PixelFormat.Format24bppRgb);
+        var pixels = new byte[size * size];
         for (int y = 0; y < size; y++)
         {
             for (int x = 0; x < size; x++)
-            {
-                int intensity = (int)((dct[y, x] - min) / range * 255);
-                bmp.SetPixel(x, y, Color.FromArgb(intensity, intensity, intensity));
-            }
+                pixels[y * size + x] = (byte)(int)((dct[y, x] - min) / range * 255);
         }
 
-        return BitmapToPng(bmp);
+        return GrayToPng(new Gray(pixels, size, size));
     }
 
     private static byte[] RenderHashGrid(ulong hash)
     {
         int size = HashSize;
-        using var bmp = new Bitmap(size, size, PixelFormat.Format24bppRgb);
+        var pixels = new byte[size * size];
         for (int y = 0; y < size; y++)
         {
             for (int x = 0; x < size; x++)
             {
                 bool bit = (hash & (1UL << (y * size + x))) != 0;
-                bmp.SetPixel(x, y, bit ? Color.White : Color.Black);
+                pixels[y * size + x] = bit ? (byte)255 : (byte)0;
             }
         }
 
-        return BitmapToPng(bmp);
+        return GrayToPng(new Gray(pixels, size, size));
     }
 
     private static double Median(double[] values)

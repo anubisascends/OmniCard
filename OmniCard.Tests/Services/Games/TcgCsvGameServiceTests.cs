@@ -240,9 +240,8 @@ public class TcgCsvDownloadTests : IDisposable
     [Fact]
     public async Task ComputeImageHashes_DownloadsAndHashes()
     {
-        // 2x2 PNG bytes (base64) served for any image URL.
-        var pngBytes = Convert.FromBase64String(
-            "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD8GO2jAAAAE0lEQVR4nGP8z8Dwn4EIwDiqEAD6/AeR6qKYFwAAAABJRU5ErkJggg==");
+        // Valid 2x2 PNG served for any image URL.
+        var pngBytes = OmniCard.Tests.Fakes.TestImages.Png(2, 2, SkiaSharp.SKColors.Teal);
 
         using (var seed = _factory.CreateDbContext())
         {

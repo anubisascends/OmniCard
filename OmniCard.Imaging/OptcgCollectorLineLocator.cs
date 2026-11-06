@@ -1,7 +1,5 @@
 using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
-using System.Runtime.InteropServices;
+using SkiaSharp;
 
 namespace OmniCard.Imaging;
 
@@ -42,7 +40,7 @@ internal static class OptcgCollectorLineLocator
 
     /// <summary>Candidate text lines, right-most first (at most <paramref name="max"/>). The caller owns
     /// and disposes the bitmaps.</summary>
-    public static List<Bitmap> Locate(Bitmap scan, int max = 2)
+    public static List<SKBitmap> Locate(SKBitmap scan, int max = 2)
     {
         var region = new Rectangle(
             (int)(SearchRegion.X * scan.Width), (int)(SearchRegion.Y * scan.Height),
@@ -54,7 +52,7 @@ internal static class OptcgCollectorLineLocator
         var threshold = Otsu(lum);
         double minH = MinGlyphHeight * scan.Height, maxH = MaxGlyphHeight * scan.Height;
 
-        var rows = new List<(int Right, Bitmap Line)>();
+        var rows = new List<(int Right, SKBitmap Line)>();
         foreach (var darkText in new[] { true, false })
         {
             var ink = new bool[lum.Length];
@@ -105,7 +103,7 @@ internal static class OptcgCollectorLineLocator
 
     // Renders only the row's own components (plus the small marks between them — the dash) from the
     // grey levels, normalised to dark-on-white and upscaled bicubically, so glyph edges stay smooth.
-    private static Bitmap Render(byte[] lum, int[] labels, List<Component> all, List<Component> row, int threshold, int w, int h)
+    private static SKBitmap Render(byte[] lum, int[] labels, List<Component> all, List<Component> row, int threshold, int w, int h)
     {
         int x0 = row.Min(c => c.X), x1 = row.Max(c => c.Right), y0 = row.Min(c => c.Y), y1 = row.Max(c => c.Bottom);
         var glyphHeight = row.Average(c => c.H);
@@ -148,42 +146,26 @@ internal static class OptcgCollectorLineLocator
                 pixels[o + 3] = 255;
             }
 
-        using var small = new Bitmap(cw, ch, PixelFormat.Format32bppArgb);
-        var data = small.LockBits(new Rectangle(0, 0, cw, ch), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
-        try
-        {
-            for (int y = 0; y < ch; y++)
-                Marshal.Copy(pixels, y * cw * 4, data.Scan0 + y * data.Stride, cw * 4);
-        }
-        finally { small.UnlockBits(data); }
+        using var small = ImageOps.FromBgra(pixels, cw, ch);
 
+        // HighQualityBicubic DrawImage onto a white canvas: the scaled strip's partially covered edge
+        // pixels blend into the white margin, as GDI+'s source-over draw did.
         var scale = RenderGlyphHeight / glyphHeight;
         int sw = Math.Max(1, (int)(cw * scale)), sh = Math.Max(1, (int)(ch * scale));
-        var line = new Bitmap(sw + 2 * RenderMargin, sh + 2 * RenderMargin, PixelFormat.Format32bppArgb);
-        using var g = Graphics.FromImage(line);
-        g.Clear(Color.White);
-        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-        g.DrawImage(small, new Rectangle(RenderMargin, RenderMargin, sw, sh), 0, 0, cw, ch, GraphicsUnit.Pixel);
+        var line = ImageOps.Create(sw + 2 * RenderMargin, sh + 2 * RenderMargin, SKColors.White);
+        using var scaled = ImageOps.Resize(small, sw, sh);
+        ImageOps.DrawOver(line, scaled, RenderMargin, RenderMargin);
         return line;
     }
 
-    private static (byte[] Lum, int W, int H) Luminance(Bitmap scan, Rectangle region)
+    private static (byte[] Lum, int W, int H) Luminance(SKBitmap scan, Rectangle region)
     {
-        using var crop = scan.Clone(region, PixelFormat.Format32bppArgb);
+        using var crop = ImageOps.Crop(scan, region);
         int w = crop.Width, h = crop.Height;
-        var data = crop.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
-        var raw = new byte[w * 4];
+        var raw = ImageOps.GetBgra(crop);
         var lum = new byte[w * h];
-        try
-        {
-            for (int y = 0; y < h; y++)
-            {
-                Marshal.Copy(data.Scan0 + y * data.Stride, raw, 0, raw.Length);
-                for (int x = 0; x < w; x++)
-                    lum[y * w + x] = (byte)(0.114 * raw[x * 4] + 0.587 * raw[x * 4 + 1] + 0.299 * raw[x * 4 + 2]);
-            }
-        }
-        finally { crop.UnlockBits(data); }
+        for (int i = 0; i < lum.Length; i++)
+            lum[i] = (byte)(0.114 * raw[i * 4] + 0.587 * raw[i * 4 + 1] + 0.299 * raw[i * 4 + 2]);
         return (lum, w, h);
     }
 

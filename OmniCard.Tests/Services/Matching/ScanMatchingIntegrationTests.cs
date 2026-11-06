@@ -167,14 +167,19 @@ public class ScanMatchingIntegrationTests : IDisposable
 
     /// <summary>
     /// Known pipeline limitations — scans that exceed the Hamming distance threshold.
-    /// Key: (setCode lowercase, collectorNumber)
+    /// Key: scan path relative to TestData/scans, '/'-separated.
     /// </summary>
-    private static readonly HashSet<(string Set, string Num)> KnownMismatchCards =
+    private static readonly HashSet<string> KnownMismatchScans =
     [
-        // Vulshok Battlegear [CMM] #418: scan hashes 0x29A2F3DA0B0BDCC9 / 0x29A2F3FA090BDCC9,
-        // DB hash 0x18FCF2FE092B5E01 — Hamming distances 18 and 16 exceed threshold of 14.
-        ("cmm", "418"),
+        // Vulshok Battlegear [CMM] #418: DB hash 0x18FCF2FE092B5E01. The 200 dpi scan (0x29A2F3DA0B0BDCC9) is
+        // at Hamming distance 18, over the threshold of 14. The 1200 dpi scan hashed 0x29A2F3FA090BDCC9
+        // (distance 16) under GDI+; the cross-platform resampler gives 0x39A2F3FA090BDCC1 (2 bits away), which
+        // lands exactly on the threshold, so it now matches (confidence 0) and runs with the expected matches.
+        "200 dpi/Vulshok Battlegear [CMM] #418.png",
     ];
+
+    private static bool IsKnownMismatch(string scansDir, string file) =>
+        KnownMismatchScans.Contains(Path.GetRelativePath(scansDir, file).Replace('\\', '/'));
 
     /// <summary>
     /// Auto-discovers all scan images in TestData/scans/ and yields test cases,
@@ -195,7 +200,7 @@ public class ScanMatchingIntegrationTests : IDisposable
             var setCode = match.Groups["set"].Value.ToLowerInvariant();
             var collectorNumber = match.Groups["num"].Value;
 
-            if (KnownMismatchCards.Contains((setCode, collectorNumber))) continue;
+            if (IsKnownMismatch(scansDir, file)) continue;
 
             var relativePath = Path.GetRelativePath(AppContext.BaseDirectory, file);
             yield return [relativePath, setCode, collectorNumber];
@@ -219,7 +224,7 @@ public class ScanMatchingIntegrationTests : IDisposable
             var setCode = match.Groups["set"].Value.ToLowerInvariant();
             var collectorNumber = match.Groups["num"].Value;
 
-            if (!KnownMismatchCards.Contains((setCode, collectorNumber))) continue;
+            if (!IsKnownMismatch(scansDir, file)) continue;
 
             var relativePath = Path.GetRelativePath(AppContext.BaseDirectory, file);
             yield return [relativePath, setCode, collectorNumber];

@@ -1,7 +1,7 @@
-using System.Drawing;
-using System.Drawing.Imaging;
 using Microsoft.Extensions.Logging.Abstractions;
+using SkiaSharp;
 using OmniCard.Imaging;
+using OmniCard.Tests.Fakes;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Collection;
 using OmniCard.Shared.Games;
@@ -21,14 +21,7 @@ public class WebScanFoilMarkerTests
 {
     private const decimal FoilPrice = 9m, NonFoilPrice = 1m;
 
-    private static byte[] PortraitPng()
-    {
-        using var bmp = new Bitmap(320, 440);
-        using (var g = Graphics.FromImage(bmp)) g.Clear(Color.White);
-        using var ms = new MemoryStream();
-        bmp.Save(ms, ImageFormat.Png);
-        return ms.ToArray();
-    }
+    private static byte[] PortraitPng() => TestImages.Png(320, 440, SKColors.White);
 
     private static Task<OmniCard.Api.Contracts.ScanMatchDto> Match(bool? printed, bool isFoil) =>
         new WebScanMatchingService(new PerceptualHashService(NullLogger<PerceptualHashService>.Instance),

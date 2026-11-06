@@ -46,7 +46,8 @@ public sealed class ScanFolderIngestorTests : IDisposable
 
     private string DropBytes(string relative, byte[] content)
     {
-        var path = Path.Combine(_mtg, relative);
+        // Relative paths are written Windows-style ("Box 12\a.jpg"); map them to this OS's separator.
+        var path = Path.Combine(_mtg, relative.Replace('\\', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllBytes(path, content);
         return path;

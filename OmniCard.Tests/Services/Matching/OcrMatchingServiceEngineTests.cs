@@ -1,8 +1,7 @@
-using System.Drawing;
-using System.Drawing.Imaging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniCard.Imaging;
 using OmniCard.CardMatching.Games;
+using OmniCard.Tests.Fakes;
 
 namespace OmniCard.Tests.Services.Matching;
 
@@ -18,30 +17,13 @@ public class OcrMatchingServiceEngineTests
         new(new PerceptualHashService(NullLogger<PerceptualHashService>.Instance),
             NullLogger<OcrMatchingService>.Instance);
 
-    /// <summary>Renders a white card with a single black text string placed inside the given
-    /// percentage region, matching how the service crops before OCR.</summary>
-    private static byte[] RenderCard(int width, int height,
-        (double X, double Y, double W, double H) region, string text, int fontSize)
-    {
-        using var bmp = new Bitmap(width, height);
-        using (var g = Graphics.FromImage(bmp))
-        {
-            g.Clear(Color.White);
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            var rect = OcrMatchingService.ToPixelRect(region, width, height);
-            using var font = new Font("Arial", fontSize, FontStyle.Bold, GraphicsUnit.Pixel);
-            g.DrawString(text, font, Brushes.Black, new PointF(rect.X, rect.Y));
-        }
-        using var ms = new MemoryStream();
-        bmp.Save(ms, ImageFormat.Png);
-        return ms.ToArray();
-    }
+    // White cards with Arial Bold text inside the crop region the service reads, pre-rendered by the
+    // original System.Drawing helper (see TestData/Baseline/OcrRendered) so every OS OCRs the same pixels.
 
     [Fact]
     public async Task DetectOptcgCollectorNumberAsync_ReadsCollectorNumber()
     {
-        var image = RenderCard(600, 840, OcrMatchingService.OptcgCollectorNumberRegion, "OP15-043", fontSize: 30);
+        var image = TestImages.OcrRendered("optcg-OP15-043");
 
         using var service = CreateService();
         var (collectorNumber, confidence) = await service.DetectOptcgCollectorNumberAsync(image);
@@ -56,8 +38,7 @@ public class OcrMatchingServiceEngineTests
         // Spec-driven collector-number OCR (the newer path used by FFTCG/Pokémon/Yu-Gi-Oh!), which
         // no other engine test exercised. Render the code into FFTCG's real crop region and confirm
         // the multi-line block + tightened regex reads it.
-        var region = FinalFantasyService.OcrSpec.PortraitRegion;
-        var image = RenderCard(600, 840, region, "29-048C", fontSize: 26);
+        var image = TestImages.OcrRendered("fftcg-29-048C");
 
         using var service = CreateService();
         var (collectorNumber, confidence) = await service.DetectCollectorNumberAsync(image, FinalFantasyService.OcrSpec);
@@ -71,8 +52,7 @@ public class OcrMatchingServiceEngineTests
     {
         // Render the modern MTG two-line corner block into the real crop region and confirm the
         // set code + collector number are read back. This is the MTG OCR-first ground-truth path.
-        var region = OcrMatchingService.MtgCollectorRegion;
-        var image = RenderCard(717, 1001, region, "66\nMKC EN", fontSize: 20);
+        var image = TestImages.OcrRendered("mtg-66-MKC");
 
         using var service = CreateService();
         var (setCode, collectorNumber, confidence) = await service.DetectMtgSetAndNumberAsync(image);
@@ -85,7 +65,7 @@ public class OcrMatchingServiceEngineTests
     [Fact]
     public async Task AnalyzeCardAsync_ReadsCardName()
     {
-        var image = RenderCard(600, 840, OcrMatchingService.NameCropRegions[0], "Lightning Bolt", fontSize: 32);
+        var image = TestImages.OcrRendered("mtg-name-lightning-bolt");
 
         using var service = CreateService();
         var result = await service.AnalyzeCardAsync(image);
@@ -101,7 +81,7 @@ public class OcrMatchingServiceEngineTests
     public async Task DetectOptcgCollectorNumberAsync_ReturnsNull_WhenNoNumberPresent()
     {
         // Blank card — nothing to read in the collector-number region.
-        var image = RenderCard(600, 840, OcrMatchingService.OptcgCollectorNumberRegion, "", fontSize: 30);
+        var image = TestImages.OcrRendered("optcg-blank");
 
         using var service = CreateService();
         var (collectorNumber, confidence) = await service.DetectOptcgCollectorNumberAsync(image);

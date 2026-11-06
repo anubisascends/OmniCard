@@ -63,11 +63,10 @@ public class MtgListSymbolDetectionTests
     public void LandscapeImage_IsRejected()
     {
         using var service = CreateService();
-        using var ms = new MemoryStream();
-        using (var bmp = new System.Drawing.Bitmap(600, 400))
-            bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+        // A blank landscape image (transparent, like a fresh 600x400 bitmap).
+        var png = OmniCard.Tests.Fakes.TestImages.Png(600, 400, SkiaSharp.SKColors.Transparent);
 
-        var (present, _) = service.DetectMtgListSymbol(ms.ToArray());
+        var (present, _) = service.DetectMtgListSymbol(png);
         Assert.False(present); // glyph position is only defined for upright portrait scans
     }
 }

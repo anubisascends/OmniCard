@@ -45,7 +45,7 @@ public class ScannerProfileService : IScannerProfileService
     /// <summary>Sanitize a raw scanner name into a filesystem/dictionary-safe key
     /// (same idiom used elsewhere for scan filenames).</summary>
     private static string KeyFor(string scannerName)
-        => string.Join("_", (scannerName ?? "").Split(Path.GetInvalidFileNameChars()));
+        => string.Join("_", (scannerName ?? "").Split(OmniCard.Shared.PortableFileName.InvalidChars));
 
     private ScannerProfilesDocument Load()
     {

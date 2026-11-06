@@ -1,0 +1,71 @@
+# OmniCard on Docker: the web app + SQL Server 2022.
+#
+#   cp .env.example .env      # then set MSSQL_SA_PASSWORD (and the optional keys)
+#   docker compose up -d --build
+#
+# The web app creates/migrates its databases on startup (OmniCard + one catalog DB per game).
+# See README.md ▸ "Docker / Linux" for backups, reverse proxy/HTTPS and known limits.
+
+name: omnicard
+
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    # SQL Server for Linux is x64-only (no ARM64 image).
+    platform: linux/amd64
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?set MSSQL_SA_PASSWORD in .env}
+      MSSQL_PID: ${MSSQL_PID:-Express}
+      TZ: ${TZ:-Etc/UTC}
+    volumes:
+      - mssql-data:/var/opt/mssql
+    # Not published to the host by default; uncomment to reach it with SSMS/Azure Data Studio.
+    # ports:
+    #   - "127.0.0.1:1433:1433"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' -b -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  omnicard-web:
+    build:
+      context: .
+      args:
+        APP_VERSION: ${OMNICARD_VERSION:-0.0.0}
+    image: omnicard-web:${OMNICARD_VERSION:-latest}
+    depends_on:
+      mssql:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__OmniCard: ${ConnectionStrings__OmniCard:?set ConnectionStrings__OmniCard in .env}
+      DataDirectory: ${DataDirectory:-/data}
+      Logging__File__Enabled: ${Logging__File__Enabled:-true}
+      # EF Core logs every SQL command at Information; keep it out of the console/log files by default.
+      Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command: ${EF_SQL_LOG_LEVEL:-Warning}
+      # Per-request hosting logs (incl. the 30 s health check) — the ASP.NET Core template default.
+      Logging__LogLevel__Microsoft.AspNetCore: ${ASPNETCORE_LOG_LEVEL:-Warning}
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: ${ASPNETCORE_FORWARDEDHEADERS_ENABLED:-false}
+      Mcp__AllowRemote: ${Mcp__AllowRemote:-false}
+      eBay__AppId: ${eBay__AppId:-}
+      eBay__CertId: ${eBay__CertId:-}
+      eBay__DevId: ${eBay__DevId:-}
+      eBay__RuName: ${eBay__RuName:-}
+      eBay__AcceptUrl: ${eBay__AcceptUrl:-}
+      eBay__Environment: ${eBay__Environment:-sandbox}
+      TZ: ${TZ:-Etc/UTC}
+    ports:
+      - "${OMNICARD_HTTP_PORT:-8080}:8080"
+    volumes:
+      - omnicard-data:/data
+      # Watched scan folders (Administration ▸ Scan): mount the scanner's output here and configure
+      # per-game folders such as /scans/Mtg. They must be writable by UID 1654 (originals move to _processed).
+      # - ./scans-inbox:/scans
+    restart: unless-stopped
+
+volumes:
+  mssql-data:
+  omnicard-data:
