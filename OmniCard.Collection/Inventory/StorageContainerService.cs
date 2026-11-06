@@ -226,6 +226,7 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
             var bulkId = context.StorageContainers.First(c => c.IsSystem).Id;
             foreach (var lot in lots)
             {
+                DeckOrigin.BeforeMove(context, lot, bulkId);
                 lot.LocationId = bulkId;
                 lot.Page = null;
                 lot.Slot = null;

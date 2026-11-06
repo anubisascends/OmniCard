@@ -29,6 +29,7 @@ import {
 import DoNotDisturbOnOutlinedIcon from '@mui/icons-material/DoNotDisturbOnOutlined';
 import SearchIcon from '@mui/icons-material/Search';
 import SyncIcon from '@mui/icons-material/Sync';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { api } from '../../api/client';
 import { useFormatters } from '../../i18n/format';
 import { LanguageChip } from '../../lib/cardLanguages';
@@ -42,7 +43,7 @@ import type {
   LocationSummaryDto,
 } from '../../api/types';
 
-const CUT_ACTIONS: DeckSyncCutAction[] = ['Move', 'Sideboard', 'Keep'];
+const CUT_ACTIONS: DeckSyncCutAction[] = ['Return', 'Move', 'Sideboard', 'Keep'];
 
 /** Shows the card image when hovering a printing label. */
 function HoverImage({ src, children }: { src: string | null; children: ReactElement }) {
@@ -66,7 +67,8 @@ function printingLabel(setCode: string | null, collectorNumber: string | null, i
  * Cards the deck wants more of are pulled from elsewhere in the collection — suggested copies come
  * pre-filled (exact printing first), "Find a copy…" searches the collection for any other copy, and
  * whatever is still short must be marked "not in collection" before applying. Cards the deck dropped are
- * moved out, kept as sideboard, or left in the box. Nothing changes until Apply.
+ * returned to where they came from (with a put-back list), moved out, kept as sideboard, or left in the box.
+ * Nothing changes until Apply.
  */
 export function DeckSyncDialog({
   open,
@@ -112,7 +114,13 @@ export function DeckSyncDialog({
         ),
         cuts: plan.cuts.map((c) => {
           const action = cutActions[c.lotId] ?? 'Move';
-          return { lotId: c.lotId, quantity: c.quantity, action, destinationId: action === 'Move' ? moveTo : null };
+          // Return: the destination is only where copies with no known origin go (null = Bulk).
+          return {
+            lotId: c.lotId,
+            quantity: c.quantity,
+            action,
+            destinationId: action === 'Move' ? moveTo : action === 'Return' ? (moveTo ?? null) : null,
+          };
         }),
         notInCollection: plan.adds
           .filter((a) => shortBy(a) > 0 && missing[a.cardName])
@@ -125,8 +133,10 @@ export function DeckSyncDialog({
       qc.invalidateQueries({ queryKey: ['location', loc.id] });
       qc.invalidateQueries({ queryKey: ['deck-legality', loc.id] });
       qc.invalidateQueries({ queryKey: ['deck-not-in-collection', loc.id] });
+      qc.invalidateQueries({ queryKey: ['deck-return-reports', loc.id] });
     },
   });
+  const pdf = useMutation({ mutationFn: (reportId: number) => api.deckReturnReportPdf(loc.id, reportId) });
   const { reset } = apply;
 
   // Fresh choices for every preview: suggested copies, previous "not in collection" marks, and cuts moved
@@ -144,7 +154,12 @@ export function DeckSyncDialog({
     setPicks(initialPicks);
     setMissing(initialMissing);
     setExtra({});
-    setCutActions(Object.fromEntries(preview.data.cuts.map((c) => [c.lotId, c.isSideboard ? 'Keep' : 'Move'])));
+    // Cuts go back where they came from when that's known, else they're moved out.
+    setCutActions(
+      Object.fromEntries(
+        preview.data.cuts.map((c) => [c.lotId, c.isSideboard ? 'Keep' : c.originName ? 'Return' : 'Move']),
+      ),
+    );
     reset();
   }, [preview.data, reset]);
 
@@ -186,6 +201,7 @@ export function DeckSyncDialog({
   const unresolved = adds.filter((a) => shortBy(a) > 0 && !missing[a.cardName]);
   const overNeeded = adds.some((a) => chosen(a) > a.needed);
   const movingOut = (plan?.cuts ?? []).some((c) => (cutActions[c.lotId] ?? 'Move') === 'Move');
+  const returning = (plan?.cuts ?? []).some((c) => cutActions[c.lotId] === 'Return');
   const nothingToDo = !!plan && plan.adds.length === 0 && plan.cuts.length === 0;
   const canApply =
     !!plan &&
@@ -408,10 +424,10 @@ export function DeckSyncDialog({
                 <Typography variant="caption" color="text.secondary">
                   {t('deckbox.sync.sideboardHint')}
                 </Typography>
-                {movingOut && (
+                {(movingOut || returning) && (
                   <LocationPickerField
                     size="small"
-                    label={t('deckbox.sync.moveTo')}
+                    label={movingOut ? t('deckbox.sync.moveTo') : t('deckbox.return.fallback')}
                     value={destination}
                     onChange={setMoveTo}
                     cardGames={loc.game ? [loc.game] : undefined}
@@ -429,6 +445,7 @@ export function DeckSyncDialog({
                       <TableCell>{t('common.labels.name')}</TableCell>
                       <TableCell>{t('deckbox.sync.columns.printing')}</TableCell>
                       <TableCell align="right">{t('common.labels.quantity')}</TableCell>
+                      <TableCell>{t('deckbox.return.cameFrom')}</TableCell>
                       <TableCell />
                     </TableRow>
                   </TableHead>
@@ -442,6 +459,13 @@ export function DeckSyncDialog({
                           </HoverImage>
                         </TableCell>
                         <TableCell align="right">{fmt.number(c.quantity)}</TableCell>
+                        <TableCell>
+                          {c.originName ?? (
+                            <Typography variant="body2" color="text.secondary" component="span">
+                              {t('deckbox.return.unknownOrigin')}
+                            </Typography>
+                          )}
+                        </TableCell>
                         <TableCell align="right">
                           <TextField
                             select
@@ -475,9 +499,20 @@ export function DeckSyncDialog({
       </DialogContent>
       <DialogActions>
         {result ? (
-          <Button variant="contained" onClick={onClose}>
-            {t('common.actions.done')}
-          </Button>
+          <>
+            {result.returnReportId != null && (
+              <Button
+                startIcon={<PictureAsPdfIcon />}
+                disabled={pdf.isPending}
+                onClick={() => pdf.mutate(result.returnReportId!)}
+              >
+                {t('deckbox.return.downloadPdf')}
+              </Button>
+            )}
+            <Button variant="contained" onClick={onClose}>
+              {t('common.actions.done')}
+            </Button>
+          </>
         ) : (
           <>
             <Button onClick={onClose} disabled={apply.isPending}>

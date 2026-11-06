@@ -89,14 +89,15 @@
       "moveTo": "Move removed cards to",
       "moveToRequired": "Choose where the removed cards go.",
       "actions": {
+        "Return": "Return where it came from",
         "Move": "Move out",
         "Sideboard": "Keep as sideboard",
         "Keep": "Leave in box"
       },
-      "sideboardHint": "Keep as sideboard leaves the card in the box and tags it \"sideboard\". Cards already tagged sideboard are left in the box by default.",
+      "sideboardHint": "Return where it came from puts the card back in the location (and binder pocket) it was in before it went into a deck; cards with no known origin go to the location below. Keep as sideboard leaves the card in the box and tags it \"sideboard\". Cards already tagged sideboard are left in the box by default.",
       "apply": "Apply sync",
       "applying": "Applying…",
-      "result": "Sync applied: {{added}} added, {{removed}} moved out, {{sideboarded}} kept as sideboard, {{missing}} not in collection."
+      "result": "Sync applied: {{added}} added, {{removed}} removed, {{sideboarded}} kept as sideboard, {{missing}} not in collection."
     },
     "findCopy": {
       "title": "Find a copy — {{name}}",
@@ -105,6 +106,54 @@
       "minChars": "Type at least 2 characters.",
       "noResults": "No matching cards in your collection.",
       "use": "Use"
+    },
+    "return": {
+      "deconstructButton": "Deconstruct deck",
+      "returnSelected": "Return to where it came from",
+      "reportsButton_one": "{{count}} put-back report",
+      "reportsButton_other": "{{count}} put-back reports",
+      "titleDeconstruct": "Deconstruct deck — {{name}}",
+      "titleReturn": "Return cards — {{name}}",
+      "introDeconstruct": "Every card in this deck box goes back to the location it came from — the same binder pocket, or the same box or section. The deck box is left empty and keeps its deck link.",
+      "introReturn": "The selected cards go back to the location they came from — the same binder pocket, or the same box or section.",
+      "fallback": "Cards with no known origin go to",
+      "saveAsList": "Save the deck as a card list first, so it can be rebuilt",
+      "listName": "List name",
+      "defaultListName": "{{name}} (deconstructed {{date}})",
+      "summary_one": "{{countText}} card goes to {{locations}} location(s).",
+      "summary_other": "{{countText}} cards go to {{locations}} location(s).",
+      "flagged_one": "{{countText}} card can't go back where it came from and goes to Bulk (or the location above) instead — see the highlighted rows.",
+      "flagged_other": "{{countText}} cards can't go back where they came from and go to Bulk (or the location above) instead — see the highlighted rows.",
+      "groupTitle": "{{name}} ({{copies}})",
+      "where": "Where",
+      "loose": "Loose",
+      "rejoins": "Joins the stack there",
+      "cameFrom": "Came from",
+      "unknownOrigin": "Unknown",
+      "nothing": "There are no cards to return.",
+      "applyDeconstruct": "Deconstruct deck",
+      "applyReturn_one": "Return {{count}} card",
+      "applyReturn_other": "Return {{count}} cards",
+      "applying": "Returning…",
+      "done_one": "{{countText}} card returned. Print the put-back list to put it away.",
+      "done_other": "{{countText}} cards returned. Print the put-back list to put them away.",
+      "listSaved": "Saved as the list \"{{name}}\".",
+      "downloadPdf": "Download put-back list (PDF)",
+      "reportsTitle": "Put-back reports — {{name}}",
+      "noReports": "No cards have been returned from this deck box yet.",
+      "reportDeconstructed_one": "Deconstructed — {{countText}} card",
+      "reportDeconstructed_other": "Deconstructed — {{countText}} cards",
+      "reportReturned_one": "Returned {{countText}} card",
+      "reportReturned_other": "Returned {{countText}} cards",
+      "reportWhenBy": "{{date}} · {{user}}",
+      "allReports": "All reports",
+      "issues": {
+        "NoOrigin": "Where it came from isn't known.",
+        "LocationGone": "The location it came from was deleted.",
+        "NoAccess": "Came from {{origin}}, in a site you can't edit.",
+        "WrongGame": "Came from {{origin}}, which now only holds another game.",
+        "SlotTaken": "Came from {{origin}}; that pocket now holds {{card}}."
+      }
     }
   }
 }

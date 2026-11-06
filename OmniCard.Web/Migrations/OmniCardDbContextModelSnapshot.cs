@@ -416,6 +416,18 @@ namespace OmniCard.Web.Migrations
                     b.Property<string>("Note")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("OriginLocationId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("OriginPage")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OriginSection")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("OriginSlot")
+                        .HasColumnType("int");
+
                     b.Property<int?>("Page")
                         .HasColumnType("int");
 
@@ -1743,6 +1755,46 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("DeckBoxMissingCards");
                 });
 
+            modelBuilder.Entity("OmniCard.Shared.Storage.DeckReturnReport", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CardCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DeckBoxId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DeckBoxName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("LinesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("WholeDeck")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeckBoxId", "CreatedUtc");
+
+                    b.ToTable("DeckReturnReports");
+                });
+
             modelBuilder.Entity("OmniCard.Shared.Storage.DeckType", b =>
                 {
                     b.Property<int>("Id")
@@ -2260,6 +2312,15 @@ namespace OmniCard.Web.Migrations
                     b.HasOne("OmniCard.Shared.Storage.StorageContainer", null)
                         .WithMany()
                         .HasForeignKey("ContainerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OmniCard.Shared.Storage.DeckReturnReport", b =>
+                {
+                    b.HasOne("OmniCard.Shared.Storage.StorageContainer", null)
+                        .WithMany()
+                        .HasForeignKey("DeckBoxId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

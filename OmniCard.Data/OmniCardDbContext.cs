@@ -31,6 +31,7 @@ public class OmniCardDbContext : DbContext
     public DbSet<StorageContainer> StorageContainers => Set<StorageContainer>();
     public DbSet<DeckType> DeckTypes => Set<DeckType>();
     public DbSet<DeckBoxMissingCard> DeckBoxMissingCards => Set<DeckBoxMissingCard>();
+    public DbSet<DeckReturnReport> DeckReturnReports => Set<DeckReturnReport>();
     public DbSet<EbayListing> EbayListings => Set<EbayListing>();
     public DbSet<Listing> Listings => Set<Listing>();
     public DbSet<Customer> Customers => Set<Customer>();
@@ -210,6 +211,19 @@ public class OmniCardDbContext : DbContext
             e.Property(m => m.CollectorNumber).HasMaxLength(32);
             e.HasIndex(m => new { m.ContainerId, m.CardName }).IsUnique();
             e.HasOne<StorageContainer>().WithMany().HasForeignKey(m => m.ContainerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Saved put-back reports of deck deconstructions; the lines are a JSON snapshot.
+        modelBuilder.Entity<DeckReturnReport>(e =>
+        {
+            e.HasKey(r => r.Id);
+            e.Property(r => r.Id).ValueGeneratedOnAdd();
+            e.Property(r => r.DeckBoxName).IsRequired().HasMaxLength(DeckReturnReport.MaxNameLength);
+            e.Property(r => r.CreatedBy).HasMaxLength(DeckReturnReport.MaxNameLength);
+            e.Property(r => r.LinesJson).IsRequired();
+            e.HasIndex(r => new { r.DeckBoxId, r.CreatedUtc });
+            e.HasOne<StorageContainer>().WithMany().HasForeignKey(r => r.DeckBoxId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

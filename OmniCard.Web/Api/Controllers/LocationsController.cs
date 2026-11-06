@@ -34,6 +34,8 @@ public sealed class LocationsController(
     RequestSiteAccess siteAccess,
     SavedViewService savedViews,
     DeckBoxSyncService deckSync,
+    DeckReturnService deckReturns,
+    IDeckReturnPdfExporter deckReturnPdf,
     IDbContextFactory<OmniCardDbContext> dbFactory,
     IEnumerable<ICardGameService> gameServices) : ApiControllerBase
 {
@@ -308,7 +310,68 @@ public sealed class LocationsController(
     [RequirePermission(Permissions.CollectionEdit)]
     [RequireSiteAccess(SiteAccessLevel.Write, Location = "id")]
     public ActionResult<DeckSyncResultDto> DeckSyncApply(int id, [FromBody] DeckSyncApplyRequest req) =>
-        GuardDeckSync(() => Ok(deckSync.Apply(id, req, siteAccess.Current)));
+        GuardDeckSync(() => Ok(deckSync.Apply(id, req, siteAccess.Current, User.Identity?.Name)));
+
+    // --- deck deconstruct / return to where it came from ---
+
+    /// <summary>What deconstructing the deck box (no <see cref="DeckReturnRequest.Lots"/>) or returning some of
+    /// its cards would do: where each copy goes and which can't go back where they came from. Changes nothing.</summary>
+    [HttpPost("{id:int}/deck-return/preview")]
+    [RequirePermission(Permissions.CollectionEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "id")]
+    public ActionResult<DeckReturnPreviewDto> DeckReturnPreview(int id, [FromBody] DeckReturnRequest req) =>
+        GuardDeckReturn(() => Ok(deckReturns.Preview(id, req, siteAccess.Current)));
+
+    /// <summary>Sends the copies back where they came from and saves a put-back report (printable at
+    /// <c>deck-return/reports/{reportId}.pdf</c>).</summary>
+    [HttpPost("{id:int}/deck-return/apply")]
+    [RequirePermission(Permissions.CollectionEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "id")]
+    public ActionResult<DeckReturnResultDto> DeckReturnApply(int id, [FromBody] DeckReturnRequest req) =>
+        GuardDeckReturn(() => Ok(deckReturns.Apply(id, req, siteAccess.Current, User.Identity?.Name)));
+
+    /// <summary>The deck box's saved put-back reports, newest first.</summary>
+    [HttpGet("{id:int}/deck-return/reports")]
+    [RequirePermission(Permissions.LocationsView)]
+    [RequireSiteAccess(SiteAccessLevel.Read, Location = "id")]
+    public ActionResult<IReadOnlyList<DeckReturnReportSummaryDto>> DeckReturnReports(int id) =>
+        Ok(deckReturns.Reports(id));
+
+    /// <summary>A saved put-back report's lines.</summary>
+    [HttpGet("{id:int}/deck-return/reports/{reportId:int}")]
+    [RequirePermission(Permissions.LocationsView)]
+    [RequireSiteAccess(SiteAccessLevel.Read, Location = "id")]
+    public ActionResult<IReadOnlyList<DeckReturnLineDto>> DeckReturnReport(int id, int reportId) =>
+        deckReturns.Report(id, reportId) is { } found
+            ? Ok(found.Lines.Select(DeckReturnService.ToDto).ToList())
+            : NotFound();
+
+    /// <summary>A saved put-back report as a printable PDF.</summary>
+    [HttpGet("{id:int}/deck-return/reports/{reportId:int}.pdf")]
+    [RequirePermission(Permissions.LocationsView)]
+    [RequireSiteAccess(SiteAccessLevel.Read, Location = "id")]
+    public IActionResult DeckReturnReportPdf(int id, int reportId)
+    {
+        if (deckReturns.Report(id, reportId) is not { } found) return NotFound();
+        var bytes = TempFile.Produce(".pdf", p => deckReturnPdf.Export(found.Report, found.Lines, p));
+        return File(bytes, "application/pdf", $"put-back-{DecklistController.SafeFileName(found.Report.DeckBoxName)}.pdf");
+    }
+
+    private ActionResult GuardDeckReturn(Func<ActionResult> action)
+    {
+        try
+        {
+            return action();
+        }
+        catch (DeckReturnService.DeckReturnException ex)
+        {
+            return ex.NotFound ? NotFound(new { error = ex.Message }) : BadRequest(new { error = ex.Message });
+        }
+        catch (LocationGameMismatchException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+    }
 
     /// <summary>"Find a copy": owned cards of the box's game, by name, that could be moved into it.</summary>
     [HttpGet("{id:int}/deck-sync/search")]

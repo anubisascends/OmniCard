@@ -191,6 +191,8 @@ export interface DeckSyncCutDto {
   /** Already tagged sideboard (kept by default). */
   isSideboard: boolean;
   imageUri: string | null;
+  /** Where the copy was before it went into a deck box, when known ("Return" sends it back there). */
+  originName?: string | null;
 }
 
 export interface DeckSyncPreviewDto {
@@ -204,7 +206,7 @@ export interface DeckSyncPreviewDto {
   cuts: DeckSyncCutDto[];
 }
 
-export type DeckSyncCutAction = 'Move' | 'Sideboard' | 'Keep';
+export type DeckSyncCutAction = 'Return' | 'Move' | 'Sideboard' | 'Keep';
 
 export interface DeckBoxMissingCardDto {
   cardName: string;
@@ -224,6 +226,76 @@ export interface DeckSyncResultDto {
   removed: number;
   sideboarded: number;
   notInCollection: number;
+  /** The put-back report written for cards returned to where they came from, if any. */
+  returnReportId?: number | null;
+}
+
+/** Why a returned copy didn't go back where it came from (`None` = it did). */
+export type DeckReturnIssue = 'None' | 'NoOrigin' | 'LocationGone' | 'NoAccess' | 'WrongGame' | 'SlotTaken';
+
+/** Body of a deck-return preview/apply. No `lots` and no `lotIds` = the whole deck (deconstruct). */
+export interface DeckReturnRequest {
+  lots?: { lotId: number; quantity: number }[] | null;
+  /** Whole lots to return (every copy). */
+  lotIds?: number[] | null;
+  /** Where copies with no known origin go (null = Bulk). */
+  fallbackLocationId?: number | null;
+  /** Whole deck only: save the deck's cards as a card list of this name first. */
+  saveAsListName?: string | null;
+}
+
+/** One put-back line: copies of a card and where they go (position at the destination). */
+export interface DeckReturnLineDto {
+  lotId: number;
+  cardName: string;
+  setCode: string | null;
+  collectorNumber: string | null;
+  isFoil: boolean;
+  condition: string | null;
+  language: string | null;
+  quantity: number;
+  destinationId: number;
+  destinationName: string;
+  destinationType: string | null;
+  siteName: string | null;
+  page: number | null;
+  slot: number | null;
+  section: string | null;
+  /** Added to an identical stack already there. */
+  rejoinedStack: boolean;
+  issue: DeckReturnIssue;
+  /** When there's an issue: where it would have gone. */
+  originName: string | null;
+  originPage: number | null;
+  originSlot: number | null;
+  originSection: string | null;
+  /** SlotTaken: the card now in that pocket. */
+  slotTakenBy: string | null;
+}
+
+export interface DeckReturnPreviewDto {
+  deckBoxId: number;
+  deckBoxName: string;
+  wholeDeck: boolean;
+  fallbackLocationId: number;
+  fallbackLocationName: string;
+  cardCount: number;
+  lines: DeckReturnLineDto[];
+}
+
+export interface DeckReturnResultDto {
+  reportId: number;
+  cardCount: number;
+  listId: number | null;
+  lines: DeckReturnLineDto[];
+}
+
+export interface DeckReturnReportSummaryDto {
+  id: number;
+  createdUtc: string;
+  createdBy: string | null;
+  wholeDeck: boolean;
+  cardCount: number;
 }
 
 /** A site: a MAJOR physical location (a home, a shop) holding many storage locations. `access` is

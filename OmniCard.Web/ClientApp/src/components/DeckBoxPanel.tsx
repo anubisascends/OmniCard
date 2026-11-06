@@ -6,6 +6,8 @@ import EditIcon from '@mui/icons-material/Edit';
 import CasinoIcon from '@mui/icons-material/Casino';
 import LinkIcon from '@mui/icons-material/Link';
 import SyncIcon from '@mui/icons-material/Sync';
+import CallSplitIcon from '@mui/icons-material/CallSplit';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
 import { api } from '../api/client';
 import type { LocationSummaryDto } from '../api/types';
@@ -15,13 +17,16 @@ import { DeckBoxGameDialog } from './dialogs/DeckBoxGameDialog';
 import { DeckLinkDialog } from './dialogs/DeckLinkDialog';
 import { DeckSyncDialog } from './dialogs/DeckSyncDialog';
 import { DeckNotInCollectionDialog } from './dialogs/DeckNotInCollectionDialog';
+import { DeckReturnDialog } from './dialogs/DeckReturnDialog';
+import { DeckReturnReportsDialog } from './dialogs/DeckReturnReportsDialog';
 
 /**
  * Deck-box header panel: shows the assigned game system + deck type, a commander/leader indicator,
  * and the advisory (non-blocking) legality warnings for the box's contents against its deck type's
  * rules. Editing the game/type opens the assign dialog. A deck box whose game a deck site serves can be
  * linked to its online deck (Moxfield/Archidekt) and synced from it; the cards the last sync marked
- * "not in collection" are listed from here.
+ * "not in collection" are listed from here. The deck can be deconstructed — every card sent back to where it
+ * came from, with a put-back report — and earlier put-back reports reopened.
  */
 export function DeckBoxPanel({ loc, onChanged }: { loc: LocationSummaryDto; onChanged: () => void }) {
   const { t } = useTranslation();
@@ -32,6 +37,13 @@ export function DeckBoxPanel({ loc, onChanged }: { loc: LocationSummaryDto; onCh
   const [linking, setLinking] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [missingOpen, setMissingOpen] = useState(false);
+  const [deconstructing, setDeconstructing] = useState(false);
+  const [reportsOpen, setReportsOpen] = useState(false);
+  const reports = useQuery({
+    queryKey: ['deck-return-reports', loc.id],
+    queryFn: () => api.deckReturnReports(loc.id),
+  });
+  const reportCount = reports.data?.length ?? 0;
   const notInCollection = useQuery({
     queryKey: ['deck-not-in-collection', loc.id],
     queryFn: () => api.deckNotInCollection(loc.id),
@@ -78,9 +90,21 @@ export function DeckBoxPanel({ loc, onChanged }: { loc: LocationSummaryDto; onCh
                 : t('deckbox.panel.cardsCount', { count: legality.data.totalDeckCount })}
             </Typography>
           )}
-          <Button size="small" startIcon={<EditIcon />} onClick={() => setEditing(true)} sx={{ ml: 'auto' }}>
-            {t('deckbox.panel.gameAndDeckType')}
-          </Button>
+          <Stack direction="row" spacing={1} sx={{ ml: 'auto' }} flexWrap="wrap" useFlexGap>
+            {reportCount > 0 && (
+              <Button size="small" startIcon={<ReceiptLongIcon />} onClick={() => setReportsOpen(true)}>
+                {t('deckbox.return.reportsButton', { count: reportCount })}
+              </Button>
+            )}
+            {canSync && loc.cardCount > 0 && (
+              <Button size="small" color="warning" startIcon={<CallSplitIcon />} onClick={() => setDeconstructing(true)}>
+                {t('deckbox.return.deconstructButton')}
+              </Button>
+            )}
+            <Button size="small" startIcon={<EditIcon />} onClick={() => setEditing(true)}>
+              {t('deckbox.panel.gameAndDeckType')}
+            </Button>
+          </Stack>
         </Stack>
 
         {(loc.sourceUrl || (loc.deckLinkSupported && canLink)) && (
@@ -169,6 +193,22 @@ export function DeckBoxPanel({ loc, onChanged }: { loc: LocationSummaryDto; onCh
         }}
       />
       {syncing && <DeckSyncDialog open loc={loc} onClose={() => setSyncing(false)} />}
+      {deconstructing && (
+        <DeckReturnDialog
+          open
+          loc={loc}
+          onClose={() => {
+            setDeconstructing(false);
+            onChanged();
+          }}
+        />
+      )}
+      <DeckReturnReportsDialog
+        open={reportsOpen}
+        deckBoxId={loc.id}
+        deckBoxName={loc.name}
+        onClose={() => setReportsOpen(false)}
+      />
       <DeckNotInCollectionDialog
         open={missingOpen}
         deckBoxId={loc.id}

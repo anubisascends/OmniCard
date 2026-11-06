@@ -312,7 +312,12 @@ public sealed record DeckSyncAddDto(
 /// tagged sideboard, so it's kept by default.</summary>
 public sealed record DeckSyncCutDto(
     int LotId, string CardName, string? SetCode, string? CollectorNumber, bool IsFoil, int Quantity,
-    bool IsSideboard, string? ImageUri);
+    bool IsSideboard, string? ImageUri)
+{
+    /// <summary>The location the copy came from before it went into a deck box, when known — the
+    /// <c>"Return"</c> action sends it back there.</summary>
+    public string? OriginName { get; init; }
+}
 
 /// <summary>The reconciliation between a deck box and its linked deck. <see cref="KeepCount"/> copies are
 /// already in the box; <see cref="Adds"/> are short; <see cref="Cuts"/> are surplus.</summary>
@@ -323,8 +328,9 @@ public sealed record DeckSyncPreviewDto(
 /// <summary>Copies of an owned lot to move into the deck box.</summary>
 public sealed record DeckSyncPickDto(int LotId, int Quantity);
 
-/// <summary>What to do with a cut lot: <c>"Move"</c> (to <see cref="DestinationId"/>), <c>"Sideboard"</c>
-/// (tag it, leave it in the box) or <c>"Keep"</c> (leave it alone).</summary>
+/// <summary>What to do with a cut lot: <c>"Move"</c> (to <see cref="DestinationId"/>), <c>"Return"</c> (back to
+/// where it came from; <see cref="DestinationId"/> is where copies with no known origin go, null = Bulk),
+/// <c>"Sideboard"</c> (tag it, leave it in the box) or <c>"Keep"</c> (leave it alone).</summary>
 public sealed record DeckSyncCutDecisionDto(int LotId, int Quantity, string Action, int? DestinationId);
 
 /// <summary>A card short in the deck box that the user doesn't own.</summary>
@@ -339,7 +345,52 @@ public sealed record DeckSyncApplyRequest
     public IReadOnlyList<DeckBoxMissingCardDto> NotInCollection { get; init; } = [];
 }
 
-public sealed record DeckSyncResultDto(int Added, int Removed, int Sideboarded, int NotInCollection);
+public sealed record DeckSyncResultDto(int Added, int Removed, int Sideboarded, int NotInCollection)
+{
+    /// <summary>The put-back report written when some removed cards were returned to where they came from
+    /// (the <c>"Return"</c> cut action), or null.</summary>
+    public int? ReturnReportId { get; init; }
+}
+
+// --- deck deconstruct / return to origin ---
+
+/// <summary>Body of <c>POST /api/locations/{id}/deck-return/preview</c> and <c>…/apply</c>.
+/// <see cref="Lots"/>: the copies to return (lot + quantity) and/or <see cref="LotIds"/>: whole lots to return;
+/// both empty returns every card in the deck box (deconstruct). <see cref="FallbackLocationId"/>: where copies with no known origin go (null = Bulk).
+/// <see cref="SaveAsListName"/>: when set on a whole-deck apply, the deck's cards are saved as a card list of
+/// that name first, so the deck can be rebuilt with the list's Fulfill.</summary>
+public sealed record DeckReturnRequest
+{
+    public IReadOnlyList<DeckSyncPickDto>? Lots { get; init; }
+    public IReadOnlyList<int>? LotIds { get; init; }
+    public int? FallbackLocationId { get; init; }
+    public string? SaveAsListName { get; init; }
+}
+
+/// <summary>One put-back line: copies of a card and where they go. <see cref="Issue"/> is <c>"None"</c> when
+/// they go back where they came from, else why not (<c>NoOrigin</c>, <c>LocationGone</c>, <c>NoAccess</c>,
+/// <c>WrongGame</c>, <c>SlotTaken</c>); then <see cref="OriginName"/> and the <c>Origin*</c> position say
+/// where they would have gone and <see cref="SlotTakenBy"/> names the card now in that pocket.</summary>
+public sealed record DeckReturnLineDto(
+    int LotId, string CardName, string? SetCode, string? CollectorNumber, bool IsFoil, string? Condition,
+    string? Language, int Quantity,
+    int DestinationId, string DestinationName, string? DestinationType, string? SiteName,
+    int? Page, int? Slot, string? Section, bool RejoinedStack,
+    string Issue, string? OriginName, int? OriginPage, int? OriginSlot, string? OriginSection, string? SlotTakenBy);
+
+/// <summary>What a return would do (nothing is changed yet).</summary>
+public sealed record DeckReturnPreviewDto(
+    int DeckBoxId, string DeckBoxName, bool WholeDeck, int FallbackLocationId, string FallbackLocationName,
+    int CardCount, IReadOnlyList<DeckReturnLineDto> Lines);
+
+/// <summary>What a return did: the saved report (<see cref="ReportId"/>, printable at
+/// <c>…/deck-return/reports/{reportId}.pdf</c>) and the card list saved for rebuilding, if any.</summary>
+public sealed record DeckReturnResultDto(
+    int ReportId, int CardCount, int? ListId, IReadOnlyList<DeckReturnLineDto> Lines);
+
+/// <summary>A saved put-back report of a deck box, newest first in listings.</summary>
+public sealed record DeckReturnReportSummaryDto(
+    int Id, DateTime CreatedUtc, string? CreatedBy, bool WholeDeck, int CardCount);
 
 public sealed record RenameRequest
 {
