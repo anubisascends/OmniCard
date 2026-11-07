@@ -233,6 +233,8 @@ builder.Services.AddSingleton<IDecklistPrintExporter, DecklistPrintExporter>();
 var writableFactory = new WritableOmniCardDbContextFactory(connectionString);
 builder.Services.AddSingleton(writableFactory);
 builder.Services.AddSingleton<IStorageContainerService>(_ => new StorageContainerService(writableFactory));
+// Binder section dividers (named bookmarks; BinderEditController divider/*, shown in the binder state).
+builder.Services.AddSingleton(_ => new BinderDividerService(writableFactory));
 builder.Services.AddSingleton<IDeckTypeService>(_ => new DeckTypeService(writableFactory));
 builder.Services.AddSingleton<IDeckLegalityService>(sp =>
     new DeckLegalityService(writableFactory, sp.GetRequiredService<IDeckTypeService>()));

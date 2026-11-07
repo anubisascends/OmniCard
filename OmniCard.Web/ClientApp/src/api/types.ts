@@ -939,6 +939,17 @@ export interface BinderStateDto {
   sheetSides: number[];
   /** The furthest-placed card's pocket (highest page, then slot); null when no card is placed. */
   lastPlacedPocket?: { page: number; slot: number } | null;
+  /** The binder's named dividers (section bookmarks), in page order. */
+  dividers?: BinderDividerDto[] | null;
+}
+
+/** A named divider: a tab that sits just before `page` (its section's first page). Never touches a card. */
+export interface BinderDividerDto {
+  id: number;
+  page: number;
+  name: string;
+  /** A BinderDivider.Colors key ("red", "blue", …), or null for the default tab color. */
+  color?: string | null;
 }
 
 // --- Scan (server-side image matching; mirrors OmniCard.Api.Contracts scan DTOs) ---
