@@ -7,6 +7,7 @@ using OmniCard.Shared.Settings;
 using OmniCard.Shared.Storage;
 using OmniCard.Shared.Tags;
 using OmniCard.Data.Catalogs;
+using OmniCard.Collection.Inventory;
 using OmniCard.Web.Helpers;
 
 namespace OmniCard.Web.Services;
@@ -28,6 +29,7 @@ public sealed class BinderStateBuilder
     private readonly ICardService _cardService;
     private readonly IDataPathService _dataPath;
     private readonly IDbContextFactory<ScryfallDbContext>? _scryfallFactory;
+    private readonly BinderDividerService? _dividers;
 
     public BinderStateBuilder(
         IStorageContainerService containers,
@@ -36,8 +38,10 @@ public sealed class BinderStateBuilder
         IListingService listings,
         ICardService cardService,
         IDataPathService dataPath,
-        IDbContextFactory<ScryfallDbContext>? scryfallFactory = null)
+        IDbContextFactory<ScryfallDbContext>? scryfallFactory = null,
+        BinderDividerService? dividers = null)
     {
+        _dividers = dividers;
         _containers = containers;
         _binderCards = binderCards;
         _tags = tags;
@@ -99,8 +103,15 @@ public sealed class BinderStateBuilder
             spreadIndex, TotalSpreads(totalPages),
             leftPage, rightPage, PageRangeLabel(leftPage, rightPage),
             leftSlots, rightSlots, BuildTabs(spreadIndex, totalPages),
-            sheetLayout.Sides.ToList(), lastPocket);
+            sheetLayout.Sides.ToList(), lastPocket, BuildDividers(containerId, totalPages));
     }
+
+    /// <summary>Every divider in the binder (a binder holds few), page order. A divider left past the end
+    /// is shown on the last page.</summary>
+    private List<BinderDividerDto> BuildDividers(int containerId, int totalPages)
+        => _dividers?.GetForBinder(containerId)
+            .Select(d => new BinderDividerDto(d.Id, Math.Min(d.Page, totalPages), d.Name, d.Color))
+            .ToList() ?? [];
 
     public List<BinderCardDto> BuildUnplaced(int containerId, string? filter)
     {
@@ -258,6 +269,10 @@ public sealed record BinderStateDto(
     // front from its back (a new sheet can only go in after a back, like a real binder).
     List<int> SheetSides,
     // The furthest-placed card's pocket (null when the binder has none) — where "Last" turns to.
-    BinderPocketDto? LastPlacedPocket = null);
+    BinderPocketDto? LastPlacedPocket = null,
+    // The binder's named dividers (section bookmarks), in page order. Each sits just before its page.
+    List<BinderDividerDto>? Dividers = null);
+
+public sealed record BinderDividerDto(int Id, int Page, string Name, string? Color);
 
 public sealed record BinderPocketDto(int Page, int Slot);

@@ -458,6 +458,9 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
             }
         }
 
+        // Dividers follow their page the same way (a removed page hands its divider to the next page).
+        BinderDividerService.ApplyRemap(context, containerId, pageRemap, newLayout.TotalPages);
+
         container.SheetSides = newLayout.Serialize();
         container.TotalPages = newLayout.TotalPages;
         context.SaveChanges();
@@ -520,6 +523,9 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
 
         foreach (var lot in moving)
             lot.Page = lot.Page!.Value + deltaPages;
+
+        // A divider on a shifted page goes with its cards, so its section still starts where they are.
+        BinderDividerService.ApplyShift(context, containerId, IsMoving, deltaPages, totalPages);
 
         context.SaveChanges();
     }

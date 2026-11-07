@@ -22,6 +22,36 @@ namespace OmniCard.Web.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("OmniCard.Shared.Binder.BinderDivider", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("ContainerId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<int>("Page")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContainerId", "Page");
+
+                    b.ToTable("BinderDividers");
+                });
+
             modelBuilder.Entity("OmniCard.Shared.BuyList.BuyListEntry", b =>
                 {
                     b.Property<int>("Id")
@@ -2208,6 +2238,15 @@ namespace OmniCard.Web.Migrations
                         .IsUnique();
 
                     b.ToTable("SavedViewDefaults");
+                });
+
+            modelBuilder.Entity("OmniCard.Shared.Binder.BinderDivider", b =>
+                {
+                    b.HasOne("OmniCard.Shared.Storage.StorageContainer", null)
+                        .WithMany()
+                        .HasForeignKey("ContainerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("OmniCard.Shared.Dashboard.DashboardLayout", b =>

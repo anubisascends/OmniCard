@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Web.Services;
+using OmniCard.Collection.Inventory;
 using OmniCard.Shared.Binder;
 using OmniCard.Shared.Cards;
 using OmniCard.Shared.Games;
@@ -38,6 +39,7 @@ public sealed class BinderEditController : ControllerBase
     private readonly BinderStateBuilder _state;
     private readonly RequestSiteAccess _siteAccess;
     private readonly TagRuleService _tagRules;
+    private readonly BinderDividerService _dividers;
 
     public BinderEditController(
         IStorageContainerService containers,
@@ -47,8 +49,10 @@ public sealed class BinderEditController : ControllerBase
         ICardService cardService,
         BinderStateBuilder state,
         RequestSiteAccess siteAccess,
-        TagRuleService tagRules)
+        TagRuleService tagRules,
+        BinderDividerService dividers)
     {
+        _dividers = dividers;
         _siteAccess = siteAccess;
         _tagRules = tagRules;
         _containers = containers;
@@ -188,6 +192,43 @@ public sealed class BinderEditController : ControllerBase
         }
         return Ok(new { status = "ok" });
     }
+
+    // ---------------------------------------------------------------- Dividers (section bookmarks)
+
+    public sealed record AddDividerRequest(int ContainerId, int Page, string Name, string? Color);
+
+    /// <summary>Adds a named divider in front of <c>Page</c>. Dividers never touch a card.</summary>
+    [HttpPost("divider/add")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "ContainerId")]
+    public IActionResult AddDivider([FromBody] AddDividerRequest r)
+        => DividerAction(() => ToDto(_dividers.Add(r.ContainerId, r.Page, r.Name, r.Color)));
+
+    public sealed record UpdateDividerRequest(int ContainerId, int Id, string? Name, string? Color, int? Page);
+
+    /// <summary>Renames, recolors or moves a divider (null fields are kept; an empty color clears it).</summary>
+    [HttpPost("divider/update")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "ContainerId")]
+    public IActionResult UpdateDivider([FromBody] UpdateDividerRequest r)
+        => DividerAction(() => ToDto(_dividers.Update(r.ContainerId, r.Id, r.Name, r.Color, r.Page)));
+
+    public sealed record RemoveDividerRequest(int ContainerId, int Id);
+
+    [HttpPost("divider/remove")]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "ContainerId")]
+    public IActionResult RemoveDivider([FromBody] RemoveDividerRequest r)
+    {
+        _dividers.Remove(r.ContainerId, r.Id);
+        return Ok(new { status = "ok" });
+    }
+
+    private IActionResult DividerAction(Func<BinderDividerDto> action)
+    {
+        try { return Ok(action()); }
+        catch (KeyNotFoundException ex) { return NotFound(new { error = ex.Message }); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    private static BinderDividerDto ToDto(BinderDivider d) => new(d.Id, d.Page, d.Name, d.Color);
 
     // ---------------------------------------------------------------- Card actions
 
