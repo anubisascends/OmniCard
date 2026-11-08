@@ -44,7 +44,9 @@ interface Pose {
   c: Point;
   area: number;
 }
-/** A card already captured and still sitting in view — not captured again until it leaves or changes. */
+/** A card already captured and still sitting in view — not captured again until it leaves or changes.
+ *  `sig` is the content signature AT CAPTURE and never follows later frames: if it did, a new card slid
+ *  over the old one would drag it along a few bits per frame and be taken for the captured card. */
 interface Tracked extends Pose {
   sig: number[];
   lastSeen: number;
@@ -178,10 +180,16 @@ export function WebcamScanDialog({
       cctx.drawImage(video, 0, 0, vw, vh);
       const regions = readRegions(cap, cards.map((card) => card.pts.map((p) => ({ x: p.x * scale, y: p.y * scale }))));
 
-      // Remember them now so the frames that follow don't capture them again while the crops run.
+      // Remember them now so the frames that follow don't capture them again while the crops run. A card
+      // captured again ("Capture now" on a card already taken) replaces its old entry rather than adding a
+      // second one for the same spot.
       const now = performance.now();
       for (const card of cards) {
-        trackedRef.current.push({ c: centroid(card.pts), area: quadArea(card.pts), sig: card.sig, lastSeen: now });
+        const c = centroid(card.pts);
+        trackedRef.current = trackedRef.current.filter(
+          (tr) => Math.hypot(c.x - tr.c.x, c.y - tr.c.y) / work.width >= SAME_CARD_MOVE_FRAC,
+        );
+        trackedRef.current.push({ c, area: quadArea(card.pts), sig: card.sig, lastSeen: now });
       }
       setStatus('captured');
       setFlash(true);
@@ -244,7 +252,8 @@ export function WebcamScanDialog({
       );
       if (hit) {
         claimed.add(hit);
-        Object.assign(hit, { c, area, sig: card.sig, lastSeen: now });
+        // Follow the card's position, but keep the signature it was captured with (see Tracked).
+        Object.assign(hit, { c, area, lastSeen: now });
         known.add(card);
       }
     }
@@ -371,7 +380,12 @@ export function WebcamScanDialog({
     runningRef.current = true;
     const tick = async () => {
       if (!runningRef.current) return;
-      await detectOnce();
+      try {
+        await detectOnce();
+      } catch {
+        // One bad frame (or a capture that threw) must never stop the loop — it would silently stop
+        // capturing for the rest of the session.
+      }
       if (runningRef.current) setTimeout(tick, DETECT_INTERVAL_MS);
     };
     void tick();

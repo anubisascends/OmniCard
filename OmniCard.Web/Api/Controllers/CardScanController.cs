@@ -205,8 +205,13 @@ public sealed class CardScanController(
                 .ToList();
         }
 
-        var results = matches.Select(m => new ScanSearchResultDto(
-            m.GameSpecificId, m.Name, m.SetCode, m.SetName, m.CollectorNumber, m.Rarity, m.ImageUri, m.Language)).ToList();
+        var results = matches.Select(m =>
+        {
+            var (foil, foilType) = PrintingFinish.Of(m.Source);
+            return new ScanSearchResultDto(
+                m.GameSpecificId, m.Name, m.SetCode, m.SetName, m.CollectorNumber, m.Rarity, m.ImageUri, m.Language,
+                foil, foilType);
+        }).ToList();
         return Ok(results);
     }
 

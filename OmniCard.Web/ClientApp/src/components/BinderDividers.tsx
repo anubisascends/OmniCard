@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Box,
@@ -47,7 +47,12 @@ export const sectionOf = (dividers: BinderDividerDto[], page: number): BinderDiv
   return found;
 };
 
-/** The binder's dividers as a row of index tabs. The section you're in is the raised, filled tab. */
+const TAB_GAP = 4; // px between tabs (theme.spacing(0.5))
+
+/** The binder's dividers as index tabs, in binder order. Tabs that don't fit on one line wrap onto more
+ *  rows (no scrolling), and they stay put: selecting a tab only fills it with its color, so no tab ever
+ *  changes size or row. Arrow keys / Home / End move between tabs (and turn to them); a click, Enter or
+ *  Space turns to the divider and hands the keyboard back to the pages (`how: 'activate'`). */
 export function BinderDividerTabs({
   dividers,
   activeId,
@@ -58,7 +63,7 @@ export function BinderDividerTabs({
 }: {
   dividers: BinderDividerDto[];
   activeId: number | null;
-  onSelect: (d: BinderDividerDto) => void;
+  onSelect: (d: BinderDividerDto, how: 'activate' | 'arrow') => void;
   /** Edit mode: each tab gets a remove (×) button and a right-click menu. */
   editable: boolean;
   onRemove: (d: BinderDividerDto) => void;
@@ -67,36 +72,61 @@ export function BinderDividerTabs({
   const { t } = useTranslation();
   const fmt = useFormatters();
   const theme = useTheme();
+  const buttonRefs = useRef(new Map<number, HTMLElement>());
+  const activeIndex = dividers.findIndex((d) => d.id === activeId);
+  // Roving focus: Tab reaches the active tab (or the first one); the arrows move between them.
+  const focusIndex = activeIndex >= 0 ? activeIndex : 0;
+
+  const onKeyDown = (e: React.KeyboardEvent, index: number) => {
+    let next: number | null = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (index + 1) % dividers.length;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (index - 1 + dividers.length) % dividers.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = dividers.length - 1;
+    if (next == null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    buttonRefs.current.get(dividers[next].id)?.focus();
+    onSelect(dividers[next], 'arrow');
+  };
+
   return (
     <Box
       role="tablist"
       aria-label={t('binder.dividers.stripLabel')}
       sx={{
         display: 'flex',
+        flexWrap: 'wrap',
         alignItems: 'flex-end',
-        gap: 0.5,
-        overflowX: 'auto',
+        columnGap: `${TAB_GAP}px`,
+        rowGap: 0.25,
         px: 0.5,
         pt: 0.5,
         borderBottom: 2,
         borderColor: 'divider',
       }}
     >
-      {dividers.map((d) => {
+      {dividers.map((d, index) => {
         const bg = tabColor(theme, d.color);
         const active = d.id === activeId;
         const fg = active ? theme.palette.getContrastText(bg) : theme.palette.text.primary;
         return (
-          <Box key={d.id} sx={{ position: 'relative', flexShrink: 0, display: 'flex' }}>
+          <Box key={d.id} sx={{ position: 'relative', flexShrink: 0, display: 'flex', maxWidth: '100%' }}>
             <Tooltip describeChild title={t('binder.dividers.tabTooltip', { name: d.name, page: fmt.number(d.page) })}>
               <ButtonBase
+                ref={(el: HTMLButtonElement | null) => {
+                  if (el) buttonRefs.current.set(d.id, el);
+                  else buttonRefs.current.delete(d.id);
+                }}
                 role="tab"
                 aria-selected={active}
-                onClick={() => onSelect(d)}
+                tabIndex={index === focusIndex ? 0 : -1}
+                onClick={() => onSelect(d, 'activate')}
+                onKeyDown={(e) => onKeyDown(e, index)}
                 onContextMenu={editable ? (e) => onTabContextMenu(e, d) : undefined}
                 sx={{
                   maxWidth: 240,
-                  minHeight: active ? 38 : 32,
+                  minHeight: 34,
                   pl: 1.5,
                   pr: editable ? 3.5 : 1.5,
                   borderTopLeftRadius: 8,
@@ -105,14 +135,21 @@ export function BinderDividerTabs({
                   bgcolor: active ? bg : alpha(bg, 0.16),
                   color: fg,
                   boxShadow: active ? 3 : 0,
-                  transition: theme.transitions.create(['background-color', 'min-height', 'box-shadow']),
+                  transition: theme.transitions.create(['background-color', 'box-shadow']),
                   '&:hover': { bgcolor: active ? bg : alpha(bg, 0.3) },
                   '&.Mui-focusVisible': { outline: `2px solid ${theme.palette.text.primary}`, outlineOffset: 1 },
                 }}
               >
-                <Typography variant="body2" noWrap sx={{ fontWeight: active ? 700 : 500 }}>
-                  {d.name}
-                </Typography>
+                {/* The name is laid over a hidden bold copy of itself, so the tab is always as wide as its
+                    bold (selected) look and selecting it never re-wraps the rows. */}
+                <Box component="span" sx={{ display: 'inline-grid', gridTemplateColumns: 'minmax(0, auto)', minWidth: 0 }}>
+                  <Typography component="span" variant="body2" noWrap sx={{ gridArea: '1 / 1', fontWeight: active ? 700 : 500 }}>
+                    {d.name}
+                  </Typography>
+                  <Typography component="span" variant="body2" noWrap aria-hidden sx={{ gridArea: '1 / 1', fontWeight: 700, visibility: 'hidden' }}>
+                    {d.name}
+                  </Typography>
+                </Box>
                 <Typography variant="caption" sx={{ ml: 0.75, opacity: 0.75, flexShrink: 0 }}>
                   {t('binder.dividers.tabPage', { page: fmt.number(d.page) })}
                 </Typography>

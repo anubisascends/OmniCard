@@ -12,6 +12,8 @@ let worker: Worker | null = null;
 let readyPromise: Promise<void> | null = null;
 let seq = 0;
 const pending = new Map<number, Pending>();
+// A detection normally takes tens of ms; one that hasn't come back in this long never will.
+const DETECT_TIMEOUT_MS = 5000;
 
 function ensureWorker(): Worker {
   if (worker) return worker;
@@ -34,9 +36,28 @@ function ensureWorker(): Worker {
       if (m.type === 'error') p.reject(new Error(m.message));
       else p.resolve(m);
     };
-    worker!.onerror = (e) => reject(new Error(e.message || 'opencv worker failed to load'));
+    worker!.onerror = (e) => {
+      const err = new Error(e.message || 'opencv worker failed');
+      reject(err);
+      // A worker that died after loading (e.g. out of memory on a 4K crop) answers nothing more: fail
+      // what it still owed and drop it, so the next call starts a fresh one instead of waiting forever.
+      for (const p of pending.values()) p.reject(err);
+      pending.clear();
+      worker?.terminate();
+      worker = null;
+    };
   });
   return worker;
+}
+
+/** Give up on a request the worker never answers, so a caller's loop can carry on. */
+function expireAfter(id: number, ms: number) {
+  setTimeout(() => {
+    const p = pending.get(id);
+    if (!p) return;
+    pending.delete(id);
+    p.reject(new Error('opencv worker timed out'));
+  }, ms);
 }
 
 /** Create the worker (if needed) and resolve once opencv is initialized, or reject on load failure. */
@@ -55,6 +76,7 @@ export async function detectCards(imageData: ImageData, multi: boolean): Promise
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve: (m) => resolve(m.cards ?? []), reject });
     w.postMessage({ type: 'detect', id, width: imageData.width, height: imageData.height, buffer, multi }, [buffer]);
+    expireAfter(id, DETECT_TIMEOUT_MS);
   });
 }
 

@@ -95,6 +95,7 @@ import type {
 } from '../api/types';
 import { CardHoverPreview, type CardHover } from '../components/CardHoverPreview';
 import { Kbd } from '../components/Kbd';
+import { SetMultiSelect } from '../components/SetMultiSelect';
 import { LONG_PRESS_SX, useIsPhone, useLongPress } from '../lib/responsive';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
@@ -1890,7 +1891,6 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   const badgeSettings = badgeSettingsQuery.data;
   const foilTypeOptions = foilTypesQuery.data ?? [];
   const tagOptions = useMemo(() => (tagsQuery.data ?? []).map((t) => t.name), [tagsQuery.data]);
-  const sets = setsQuery.data ?? [];
 
   // Reset the set filter whenever the game changes (a set only belongs to one game). Validation rules
   // are per game too.
@@ -2565,7 +2565,14 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   const decide = (item: ScanItem, patch: Partial<ScanItem>, skip = false) => {
     undoStack.current.push({
       key: item.key,
-      before: { verified: item.verified, include: item.include, override: item.override, language: item.language },
+      before: {
+        verified: item.verified,
+        include: item.include,
+        override: item.override,
+        language: item.language,
+        isFoil: item.isFoil,
+        foilType: item.foilType,
+      },
       wasSkipped: skippedKeys.has(item.key),
     });
     if (undoStack.current.length > 200) undoStack.current.shift();
@@ -2576,13 +2583,26 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   };
 
   const confirmItem = (item: ScanItem) => decide(item, { verified: true, include: true });
-  const correctItem = (item: ScanItem, r: ScanSearchResultDto) =>
-    decide(item, {
-      override: r,
-      include: true,
-      verified: true,
-      ...(r.language && r.language !== ENGLISH ? { language: r.language } : {}),
-    });
+  // Picking a printing also fixes what the copy says about it: the copy takes the printing's language
+  // (so a scan matched to a Japanese row and corrected to the English one becomes English), and a printing
+  // made in one finish only sets the foil flag. A catalog that doesn't track language leaves the copy's
+  // language alone; so does an English row while the session is set to another language (that language's
+  // rows may simply not be downloaded).
+  const correctItem = (item: ScanItem, r: ScanSearchResultDto) => {
+    const sessionLanguage = batch?.data.language || language;
+    const keepSessionLanguage = r.language === ENGLISH && !!sessionLanguage && sessionLanguage !== ENGLISH;
+    const patch: Partial<ScanItem> = { override: r, include: true, verified: true };
+    if (r.language && !keepSessionLanguage) patch.language = r.language;
+    else if (r.language === ENGLISH && keepSessionLanguage) patch.language = sessionLanguage;
+    if (r.foil === true) {
+      patch.isFoil = true;
+      patch.foilType = r.foilType ?? (item.isFoil ? item.foilType : null);
+    } else if (r.foil === false) {
+      patch.isFoil = false;
+      patch.foilType = null;
+    }
+    decide(item, patch);
+  };
   const excludeItem = (item: ScanItem) => decide(item, { include: false }, true);
   const includeItem = (item: ScanItem) => {
     if (identityOf(item)) updateItem(item.key, { include: true });
@@ -2793,22 +2813,12 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                 </MenuItem>
               ))}
             </TextField>
-            <Autocomplete
-              multiple
-              size="small"
-              options={sets}
-              getOptionLabel={(s) => s.setName}
-              isOptionEqualToValue={(a, b) => a.setCode === b.setCode}
+            <SetMultiSelect
+              game={game}
               value={artSets}
-              onChange={(_, v) => setArtSets(v)}
+              onChange={setArtSets}
+              label={t('scan.controls.artSets')}
               sx={{ minWidth: { xs: '100%', sm: 260 }, flex: '1 1 260px' }}
-              renderInput={(p) => (
-                <TextField
-                  {...p}
-                  label={t('scan.controls.artSets')}
-                  placeholder={artSets.length ? '' : t('scan.controls.allSets')}
-                />
-              )}
             />
             <TextField
               select

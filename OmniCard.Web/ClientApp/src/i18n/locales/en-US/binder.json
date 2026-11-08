@@ -117,6 +117,18 @@
       "removed": "Divider “{{name}}” removed",
       "undo": "Undo"
     },
-    "removePageConfirm": "The whole sheet this page is on is removed — for a double-sided sheet, both sides. Its cards go back to the Unplaced pool, and the pages after it move up."
+    "removePageConfirm": "The whole sheet this page is on is removed — for a double-sided sheet, both sides. Its cards go back to the Unplaced pool, and the pages after it move up.",
+    "navKeys": {
+      "move": "move between pockets, on across the pages",
+      "spread": "previous / next spread",
+      "details": "card details (while editing, an empty pocket adds a card)",
+      "menu": "the pocket's actions",
+      "tab": "between the divider tabs, the spread tabs and the pages (← → switch tabs)",
+      "pickUp": "pick up the card / drop it here (a card here swaps places)",
+      "cancel": "put the picked-up card back",
+      "help": "show / hide these keys",
+      "toggle": "Keyboard shortcuts (?)",
+      "holding": "Moving {{name}}: choose a pocket with the arrow keys, then Space to drop it there (a card already there swaps places). Esc cancels."
+    }
   }
 }
