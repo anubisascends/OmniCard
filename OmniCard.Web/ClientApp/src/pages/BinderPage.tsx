@@ -21,6 +21,7 @@ import {
   MenuItem,
   Paper,
   Popover,
+  Snackbar,
   Stack,
   Switch,
   Tab,
@@ -39,9 +40,12 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import BookmarkAddIcon from '@mui/icons-material/BookmarkAdd';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import LowPriorityIcon from '@mui/icons-material/LowPriority';
 import { api } from '../api/client';
 import { usePermissions } from '../context/usePermissions';
-import type { BinderCardDto, BinderSlotDto, SetInfoDto } from '../api/types';
+import type { BinderCardDto, BinderDividerDto, BinderSlotDto, SetInfoDto } from '../api/types';
 import { CardImage } from '../components/CardImage';
 import { ListForSaleDialog } from '../components/dialogs/ListForSaleDialog';
 import { CardEditDrawer } from '../components/dialogs/CardEditDrawer';
@@ -50,6 +54,7 @@ import { SearchBox } from '../components/SearchBox';
 import { SetMultiSelect } from '../components/SetMultiSelect';
 import { useDefaultSets } from '../components/locationCardFilter';
 import { Kbd } from '../components/Kbd';
+import { BinderDividerDialog, BinderDividerMarker, BinderDividerTabs, sectionOf } from '../components/BinderDividers';
 import { useFormatters } from '../i18n/format';
 
 const CARD_BACK_SLUGS = ['mtg', 'optcg', 'riftbound', 'pokemon', 'yugioh', 'fftcg'];
@@ -479,6 +484,7 @@ const SIMPLIFIED_KEYS: [string[], string][] = [
   [['PgUp', 'PgDn'], 'binder.keys.page'],
   [['Home', 'End'], 'binder.keys.firstLast'],
   [['Ctrl+Home', 'Ctrl+End'], 'binder.keys.firstLastPage'],
+  [['Alt+PgUp', 'Alt+PgDn'], 'binder.keys.dividers'],
   [['Enter'], 'binder.keys.search'],
   [['A–Z'], 'binder.keys.type'],
   [['F2'], 'binder.keys.sets'],
@@ -553,6 +559,16 @@ export function BinderPage() {
   };
   // Simplified editing: the card Ctrl+C last copied (it's on the clipboard too; Ctrl+V reads it from there).
   const [copied, setCopied] = useState<CopiedCard | null>(null);
+  // Dividers: the add / edit dialog, a tab's right-click menu, the one waiting on a remove confirmation,
+  // the one just removed (for Undo), and the tab last clicked — when another divider shares its spread /
+  // page, the clicked one is the one highlighted while that view is on screen.
+  const [dividerDialog, setDividerDialog] = useState<
+    { mode: 'add'; page: number } | { mode: 'edit'; divider: BinderDividerDto } | null
+  >(null);
+  const [dividerMenu, setDividerMenu] = useState<{ x: number; y: number; divider: BinderDividerDto } | null>(null);
+  const [confirmRemoveDivider, setConfirmRemoveDivider] = useState<BinderDividerDto | null>(null);
+  const [removedDivider, setRemovedDivider] = useState<BinderDividerDto | null>(null);
+  const [pinnedDivider, setPinnedDivider] = useState<{ id: number; view: string } | null>(null);
 
   const openCardMenu = (e: React.MouseEvent, card: BinderCardDto) => {
     e.preventDefault();
@@ -706,6 +722,44 @@ export function BinderPage() {
     gridRef.current?.focus({ preventScroll: true });
   };
 
+  // Dividers. "Here" is the page a new divider goes in front of: the page on screen in simplified editing,
+  // otherwise the right-hand page of the spread (the gap between the facing pages), or the one page
+  // showing when there's only one.
+  const dividers = data?.dividers ?? [];
+  const herePage = quick ? cursor.page : data?.rightPageNumber ?? data?.leftPageNumber ?? 1;
+  const viewKey = quick ? `p${cursor.page}` : `s${spread}`;
+  // A tab is highlighted only while its divider is on screen: on the page in Simplified editing, otherwise
+  // on either page of the spread. Between dividers no tab is highlighted; the header still names the section.
+  const visiblePages = quick
+    ? [cursor.page]
+    : [data?.leftPageNumber, data?.rightPageNumber].filter((p): p is number => p != null);
+  const dividersInView = dividers.filter((d) => visiblePages.includes(d.page));
+  const activeDivider =
+    (pinnedDivider?.view === viewKey ? dividersInView.find((d) => d.id === pinnedDivider.id) : undefined) ??
+    dividersInView[dividersInView.length - 1] ??
+    null;
+  const sectionDivider = sectionOf(dividers, herePage);
+  /** Turn to a divider: its page in simplified editing, otherwise the spread it sits in. */
+  const goToDivider = (d: BinderDividerDto) => {
+    if (quick) turnTo({ page: d.page, slot: 0 });
+    else setSpread(spreadOfPage(d.page));
+    setPinnedDivider({ id: d.id, view: quick ? `p${d.page}` : `s${spreadOfPage(d.page)}` });
+  };
+  const closeDividerUi = () => {
+    setDividerDialog(null);
+    setDividerMenu(null);
+    if (quick) requestAnimationFrame(() => gridRef.current?.focus({ preventScroll: true }));
+  };
+  const cancelRemoveDivider = () => {
+    setConfirmRemoveDivider(null);
+    closeDividerUi();
+  };
+  /** Remove a divider once the user has confirmed it (see confirmRemoveDivider). */
+  const removeDivider = (d: BinderDividerDto) => {
+    run(api.binderDividerRemove(binderId, d.id));
+    setRemovedDivider(d);
+  };
+
   /** Next pocket in reading order, on to the next page. */
   const advance = () =>
     setCursor((c) =>
@@ -717,13 +771,23 @@ export function BinderPage() {
     if (!quick || !data) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.defaultPrevented) return;
-      if (addSlot || detailCardId != null || listCard || slotMenu || cardMenu || addAnchor || setsAnchor || confirmRemove != null || deleteCard) return;
+      if (addSlot || detailCardId != null || listCard || slotMenu || cardMenu || addAnchor || setsAnchor || confirmRemove != null || deleteCard || dividerDialog || dividerMenu || confirmRemoveDivider) return;
       const el = e.target instanceof HTMLElement ? e.target : null;
       if (el?.closest(EDITABLE)) return;
       // Ctrl+Home / Ctrl+End: the front of page 1 / the last page with a card.
       if (e.ctrlKey && !e.altKey && !e.metaKey && (e.key === 'Home' || e.key === 'End')) {
         e.preventDefault();
         setCursor(e.key === 'Home' ? { page: 1, slot: 0 } : lastCursor());
+        return;
+      }
+      // Alt+PgUp / Alt+PgDn: the previous / next divider.
+      if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'PageUp' || e.key === 'PageDown')) {
+        e.preventDefault();
+        const target =
+          e.key === 'PageDown'
+            ? dividers.find((d) => d.page > cursor.page)
+            : [...dividers].reverse().find((d) => d.page < cursor.page);
+        if (target) goToDivider(target);
         return;
       }
       if (e.ctrlKey || e.altKey || e.metaKey) return;
@@ -802,7 +866,7 @@ export function BinderPage() {
   useEffect(() => {
     if (!quick || !data) return;
     const ignore = (e: ClipboardEvent) =>
-      !!(addSlot || detailCardId != null || listCard || slotMenu || cardMenu || addAnchor || setsAnchor || confirmRemove != null || deleteCard) ||
+      !!(addSlot || detailCardId != null || listCard || slotMenu || cardMenu || addAnchor || setsAnchor || confirmRemove != null || deleteCard || dividerDialog || dividerMenu || confirmRemoveDivider) ||
       (e.target instanceof HTMLElement && !!e.target.closest(EDITABLE));
     const onCopy = (e: ClipboardEvent) => {
       // Text selected on the page copies as usual.
@@ -855,7 +919,7 @@ export function BinderPage() {
     if (!editMode) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key !== 'F2' || e.defaultPrevented) return;
-      if (addSlot || detailCardId != null || listCard || confirmRemove != null || deleteCard) return;
+      if (addSlot || detailCardId != null || listCard || confirmRemove != null || deleteCard || dividerDialog || confirmRemoveDivider) return;
       e.preventDefault();
       if (setsAnchor) closeSets();
       else openSets();
@@ -909,6 +973,7 @@ export function BinderPage() {
         <Typography variant="h4">{data.containerName}</Typography>
         <Typography variant="body2" color="text.secondary">
           {quick ? t('binder.page', { page: cursor.page }) : data.pageRangeLabel} · {t('binder.pages', { count: data.totalPages })}
+          {sectionDivider && ` · ${sectionDivider.name}`}
         </Typography>
         {isFetching && <CircularProgress size={16} />}
         <Box sx={{ flexGrow: 1 }} />
@@ -944,6 +1009,11 @@ export function BinderPage() {
                 </MenuItem>
               )}
             </Menu>
+            <Tooltip describeChild title={t('binder.dividers.addTooltip')}>
+              <Button size="small" startIcon={<BookmarkAddIcon />} onClick={() => setDividerDialog({ mode: 'add', page: herePage })}>
+                {t('binder.dividers.add')}
+              </Button>
+            </Tooltip>
             <TextField
               select
               size="small"
@@ -1097,6 +1167,21 @@ export function BinderPage() {
       {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
       {quick && notice && <Alert severity="info" onClose={() => setNotice(null)}>{notice}</Alert>}
 
+      {/* Dividers: always-there tabs that jump to their section; the one you're in stands out. */}
+      {dividers.length > 0 && (
+        <BinderDividerTabs
+          dividers={dividers}
+          activeId={activeDivider?.id ?? null}
+          onSelect={goToDivider}
+          editable={editMode && canWrite}
+          onRemove={setConfirmRemoveDivider}
+          onTabContextMenu={(e, d) => {
+            e.preventDefault();
+            setDividerMenu({ x: e.clientX, y: e.clientY, divider: d });
+          }}
+        />
+      )}
+
       {quick ? (
         <>
           {/* Simplified editing: page navigation (the keyboard does the same with PgUp/PgDn). */}
@@ -1144,6 +1229,9 @@ export function BinderPage() {
                 '&:focus-visible': { boxShadow: (th) => `0 0 0 2px ${th.palette.primary.main}` },
               }}
             >
+              {dividers.some((d) => d.page === cursor.page) && (
+                <BinderDividerMarker horizontal dividers={dividers.filter((d) => d.page === cursor.page)} sx={{ mb: 1 }} />
+              )}
               <SlotGrid
                 slots={cursorSlots ?? Array.from({ length: data.slotsPerPage }, (_, i) => ({ slotIndex: i, card: null }))}
                 columns={data.columns}
@@ -1249,6 +1337,11 @@ export function BinderPage() {
               />
             )}
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ flexGrow: 1, minWidth: 0 }}>
+              {/* A divider sits in front of its page: at the left edge for the left page, between the
+                  facing pages for the right one. */}
+              {data.leftPageNumber != null && dividers.some((d) => d.page === data.leftPageNumber) && (
+                <BinderDividerMarker dividers={dividers.filter((d) => d.page === data.leftPageNumber)} />
+              )}
               {data.leftPageNumber != null ? (
                 <SlotGrid
                   slots={data.leftSlots}
@@ -1262,6 +1355,9 @@ export function BinderPage() {
                 />
               ) : (
                 <Box sx={{ flex: 1, display: { xs: 'none', sm: 'block' } }} />
+              )}
+              {data.rightPageNumber != null && dividers.some((d) => d.page === data.rightPageNumber) && (
+                <BinderDividerMarker dividers={dividers.filter((d) => d.page === data.rightPageNumber)} />
               )}
               {data.rightPageNumber != null ? (
                 <SlotGrid
@@ -1363,6 +1459,85 @@ export function BinderPage() {
         )}
       </Menu>
 
+      {/* Divider tab menu (edit mode) */}
+      <Menu
+        open={dividerMenu != null}
+        onClose={closeDividerUi}
+        anchorReference="anchorPosition"
+        anchorPosition={dividerMenu ? { top: dividerMenu.y, left: dividerMenu.x } : undefined}
+      >
+        <MenuItem
+          onClick={() => {
+            setDividerDialog({ mode: 'edit', divider: dividerMenu!.divider });
+            setDividerMenu(null);
+          }}
+        >
+          <EditOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
+          {t('binder.dividers.edit')}
+        </MenuItem>
+        <MenuItem
+          disabled={dividerMenu?.divider.page === herePage}
+          onClick={() => {
+            run(api.binderDividerUpdate(binderId, dividerMenu!.divider.id, { page: herePage }));
+            closeDividerUi();
+          }}
+        >
+          <LowPriorityIcon fontSize="small" sx={{ mr: 1 }} />
+          {t('binder.dividers.moveHere', { page: fmt.number(herePage) })}
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setConfirmRemoveDivider(dividerMenu!.divider);
+            setDividerMenu(null);
+          }}
+          sx={{ color: 'error.main' }}
+        >
+          <DeleteOutlineIcon fontSize="small" sx={{ mr: 1 }} />
+          {t('binder.dividers.remove')}
+        </MenuItem>
+      </Menu>
+
+      <BinderDividerDialog
+        open={dividerDialog != null}
+        title={
+          dividerDialog?.mode === 'edit'
+            ? t('binder.dividers.editTitle')
+            : t('binder.dividers.addTitle', { page: fmt.number(dividerDialog?.page ?? herePage) })
+        }
+        initialName={dividerDialog?.mode === 'edit' ? dividerDialog.divider.name : ''}
+        initialColor={dividerDialog?.mode === 'edit' ? dividerDialog.divider.color : null}
+        onClose={closeDividerUi}
+        onSave={(name, color) => {
+          const dlg = dividerDialog!;
+          run(
+            dlg.mode === 'add'
+              ? api.binderDividerAdd(binderId, dlg.page, name, color)
+              : api.binderDividerUpdate(binderId, dlg.divider.id, { name, color: color ?? '' }),
+          );
+          closeDividerUi();
+        }}
+      />
+
+      <Snackbar
+        open={removedDivider != null}
+        autoHideDuration={6000}
+        onClose={(_, reason) => reason !== 'clickaway' && setRemovedDivider(null)}
+        message={t('binder.dividers.removed', { name: removedDivider?.name })}
+        action={
+          <Button
+            color="inherit"
+            size="small"
+            onClick={() => {
+              const d = removedDivider!;
+              setRemovedDivider(null);
+              run(api.binderDividerAdd(binderId, d.page, d.name, d.color ?? null));
+            }}
+          >
+            {t('binder.dividers.undo')}
+          </Button>
+        }
+      />
+
       {addSlot && (
         <AddCardDialog
           open
@@ -1405,6 +1580,31 @@ export function BinderPage() {
             }}
           >
             {t('binder.removePage', { page: confirmRemove })}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={confirmRemoveDivider != null} onClose={cancelRemoveDivider} maxWidth="xs" fullWidth>
+        <DialogTitle>{t('binder.dividers.removeTitle', { name: confirmRemoveDivider?.name })}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {t('binder.dividers.removeConfirm', { page: fmt.number(confirmRemoveDivider?.page ?? 0) })}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={cancelRemoveDivider}>{t('common.actions.cancel')}</Button>
+          <Button
+            color="error"
+            variant="contained"
+            autoFocus
+            onClick={() => {
+              const d = confirmRemoveDivider!;
+              setConfirmRemoveDivider(null);
+              removeDivider(d);
+              closeDividerUi();
+            }}
+          >
+            {t('binder.dividers.remove')}
           </Button>
         </DialogActions>
       </Dialog>

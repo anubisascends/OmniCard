@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using OmniCard.Shared.Binder;
 using OmniCard.Shared.BuyList;
 using OmniCard.Shared.Dashboard;
 using OmniCard.Shared.Ebay;
@@ -31,6 +32,7 @@ public class OmniCardDbContext : DbContext
     public DbSet<StorageContainer> StorageContainers => Set<StorageContainer>();
     public DbSet<DeckType> DeckTypes => Set<DeckType>();
     public DbSet<DeckBoxMissingCard> DeckBoxMissingCards => Set<DeckBoxMissingCard>();
+    public DbSet<BinderDivider> BinderDividers => Set<BinderDivider>();
     public DbSet<DeckReturnReport> DeckReturnReports => Set<DeckReturnReport>();
     public DbSet<EbayListing> EbayListings => Set<EbayListing>();
     public DbSet<Listing> Listings => Set<Listing>();
@@ -211,6 +213,18 @@ public class OmniCardDbContext : DbContext
             e.Property(m => m.CollectorNumber).HasMaxLength(32);
             e.HasIndex(m => new { m.ContainerId, m.CardName }).IsUnique();
             e.HasOne<StorageContainer>().WithMany().HasForeignKey(m => m.ContainerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Named section dividers (bookmarks) in a binder; they go with the binder.
+        modelBuilder.Entity<BinderDivider>(e =>
+        {
+            e.HasKey(d => d.Id);
+            e.Property(d => d.Id).ValueGeneratedOnAdd();
+            e.Property(d => d.Name).IsRequired().HasMaxLength(BinderDivider.MaxNameLength);
+            e.Property(d => d.Color).HasMaxLength(20);
+            e.HasIndex(d => new { d.ContainerId, d.Page });
+            e.HasOne<StorageContainer>().WithMany().HasForeignKey(d => d.ContainerId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

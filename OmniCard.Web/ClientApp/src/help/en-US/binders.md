@@ -25,7 +25,53 @@ To move around:
 - Click **‹ Prev** or **Next ›** to turn one spread at a time.
 - Click a tab in the page strip (labelled *1*, *2–3*, *4–5*…) to jump straight to that spread. On narrow screens the strip scrolls; use its arrows to see more tabs. On a phone, the two pages of a spread are shown one above the other.
 
-The heading shows which pages you're looking at and how many pages the binder has, for example *Pages 2-3 · 12 pages*.
+The heading shows which pages you're looking at and how many pages the binder has, for example *Pages 2-3 · 12 pages*. Once the binder has dividers, it also shows the section you're in, for example *Pages 4-5 · 12 pages · Showcase*.
+
+## Dividers
+
+Dividers work like the tabbed dividers in a real binder: each one has a name and marks where a section starts, so you can jump straight to it. For example, split a Magic binder into *Borderless*, *Showcase* and *Extended art*, then by color inside each.
+
+A divider is only a bookmark in the binder. It never moves or changes a card.
+
+![A binder with two dividers: the Showcase tab is highlighted and its divider sits between the facing pages](binders-dividers.webp)
+
+### Add a divider
+
+1. Click **Edit**, then turn to where the section starts. If you need room, add a page first (see [Pages and layout](#pages-and-layout)).
+2. Click **Add divider** in the edit toolbar.
+3. Type a name, for example *Borderless · Blue*, and choose a **Tab color** if you like.
+4. Click **Save**, or press Enter.
+
+Where the divider goes:
+
+- **In the two-page view**, it goes between the two facing pages, in front of the right-hand page. On the first spread (page 1 on its own) or a last spread with only a left page, it goes in front of that one page.
+- **In Simplified editing**, it goes in front of the page you're on.
+
+### Jump to a divider
+
+The dividers are shown as a row of tabs above the pages, in binder order, each with the page its section starts on (for example *p. 12*). They stay there whichever page you're on, in edit mode and out of it.
+
+- Click a tab to turn to it. In the two-page view you see the spread the divider sits in; in Simplified editing you see the divider's page itself.
+- A tab is raised and filled with its color while its divider is on screen: on either page of the spread, or on the page you're on in Simplified editing. Turn past it and the tab goes back to normal. The name of the section you're in still shows next to the page number at the top.
+- On the page, a divider shows as a colored strip with its name: between the facing pages, at the left edge of a left-hand page, or across the top of the page in Simplified editing.
+- In Simplified editing, Alt+PgUp and Alt+PgDn go to the previous and next divider.
+
+### Rename, move or remove a divider
+
+In edit mode:
+
+- Click the **×** on a tab to remove the divider. OmniCard asks first: click **Remove divider** to remove it, or **Cancel** to keep it. If you change your mind afterwards, click **Undo** in the message that appears.
+- Right-click a tab for more:
+  - **Rename or recolor…** changes its name or tab color.
+  - **Move to page**, for example **Move to page 12**, moves it to where you are now (the same spot **Add divider** would use).
+  - **Remove divider** removes it, after asking you to confirm.
+
+### When pages change
+
+Dividers stay with their page:
+
+- Inserting a sheet moves the dividers after it along with their pages. A sheet inserted just before a divider joins the section in front of it.
+- Removing the sheet a divider is on moves the divider to the next page, where its section now starts. If it was on the last sheet, it moves to the new last page.
 
 ## What the pockets show
 
@@ -155,6 +201,7 @@ The line under the page names the selected pocket and what's in it, for example 
 | PgUp, PgDn | Go to the previous or next page. **‹ Prev** and **Next ›** above the page do the same. |
 | Home, End | Go to the first or last pocket on the page. |
 | Ctrl+Home, Ctrl+End | Go to the front of page 1, or to the last page with a card on it. **« First** and **Last »** do the same. |
+| Alt+PgUp, Alt+PgDn | Go to the previous or next divider. See [Dividers](#dividers). |
 | Enter | On a card: open its details, to correct its condition, language, foil and so on, or to delete it. On an empty pocket: search for a card. |
 | A–Z, 0–9 | Start typing a name or collector number: the search opens with it. On a pocket that holds a card, the card you pick replaces it. |
 | F2 | Choose the sets searches are limited to. See [Search only some sets](#search-only-some-sets). |
@@ -284,4 +331,5 @@ Removing a page removes the whole physical sheet it's on. For a double-sided she
 - **I can't see the Unplaced cards panel.** In Simplified editing it's only shown while some of the binder's cards aren't in a pocket. In a narrow window, scroll down: it's below the page.
 - **Ctrl+V says the clipboard doesn't hold a binder card.** You copied something else after the card. Go back to the card, press Ctrl+C, and try again.
 - **A card wasn't made foil.** Check the **Foil if** search against the printing you picked, for example its rarity. Promotional printings often differ.
+- **Add divider put the divider in the wrong place.** In the two-page view it goes in front of the right-hand page. Turn to the right page, then right-click its tab and choose **Move to page**, or use Simplified editing to put it in front of one exact page.
 - **A card I'm looking for isn't in the Unplaced panel.** Clear the panel's search box. If it still isn't there, it may be in another location; use **Add card to this pocket…** and look under **In your collection**.

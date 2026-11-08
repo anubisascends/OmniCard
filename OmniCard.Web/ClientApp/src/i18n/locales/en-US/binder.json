@@ -55,7 +55,8 @@
       "copy": "copy this pocket’s card",
       "paste": "paste a copy of it here",
       "addPage": "new sheet after this one (from a back page)",
-      "removePage": "remove this page"
+      "removePage": "remove this page",
+      "dividers": "previous / next divider"
     },
     "side": {
       "front": "front of sheet {{sheet}}",
@@ -82,6 +83,40 @@
     "sheetAfterPage": "Double-sided sheet after page {{page}}",
     "insertFromBack": "Page {{page}} is the front of its sheet, and a new sheet can't go between a sheet's two sides. Turn to the back (page {{back}}) and press + to add a sheet after it.",
     "removePageTitle": "Remove page {{page}}?",
+    "dividers": {
+      "add": "Add divider",
+      "addTooltip": "Add a named divider: a tab that jumps straight to this spot. It goes in front of the right-hand page (in Simplified, in front of the page you're on). Dividers don't move or change any cards.",
+      "addTitle": "Add divider before page {{page}}",
+      "editTitle": "Edit divider",
+      "namePlaceholder": "e.g. Borderless · Blue",
+      "color": "Tab color",
+      "defaultColor": "Default",
+      "colors": {
+        "red": "Red",
+        "orange": "Orange",
+        "yellow": "Yellow",
+        "green": "Green",
+        "teal": "Teal",
+        "blue": "Blue",
+        "purple": "Purple",
+        "pink": "Pink",
+        "brown": "Brown",
+        "gray": "Gray"
+      },
+      "help": "A divider is only a bookmark in this binder. Adding, inserting or removing sheets keeps it with its page.",
+      "stripLabel": "Dividers",
+      "tabTooltip": "{{name}} — starts on page {{page}}",
+      "tabPage": "p. {{page}}",
+      "markerTooltip": "Divider: {{name}}",
+      "edit": "Rename or recolor…",
+      "moveHere": "Move to page {{page}}",
+      "remove": "Remove divider",
+      "removeNamed": "Remove divider {{name}}",
+      "removeTitle": "Remove divider “{{name}}”?",
+      "removeConfirm": "The divider and its tab are removed from page {{page}}. No cards move or change.",
+      "removed": "Divider “{{name}}” removed",
+      "undo": "Undo"
+    },
     "removePageConfirm": "The whole sheet this page is on is removed — for a double-sided sheet, both sides. Its cards go back to the Unplaced pool, and the pages after it move up."
   }
 }

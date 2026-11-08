@@ -11,6 +11,7 @@ import type {
   AuthStatusDto,
   BinderCardDto,
   BinderStateDto,
+  BinderDividerDto,
   CardDto,
   GroupedCardRowDto,
   ComponentDto,
@@ -499,6 +500,24 @@ export const api = {
     }),
   binderRemovePage: (containerId: number, page: number) =>
     request<void>('/api/binder/page/remove', { method: 'POST', body: JSON.stringify({ containerId, page }) }),
+  /** Binder dividers (named section bookmarks). They never move or change a card. */
+  binderDividerAdd: (containerId: number, page: number, name: string, color: string | null) =>
+    request<BinderDividerDto>('/api/binder/divider/add', {
+      method: 'POST',
+      body: JSON.stringify({ containerId, page, name, color }),
+    }),
+  /** Null fields are kept; color '' clears it to the default. */
+  binderDividerUpdate: (
+    containerId: number,
+    id: number,
+    patch: { name?: string | null; color?: string | null; page?: number | null },
+  ) =>
+    request<BinderDividerDto>('/api/binder/divider/update', {
+      method: 'POST',
+      body: JSON.stringify({ containerId, id, name: patch.name ?? null, color: patch.color ?? null, page: patch.page ?? null }),
+    }),
+  binderDividerRemove: (containerId: number, id: number) =>
+    request<void>('/api/binder/divider/remove', { method: 'POST', body: JSON.stringify({ containerId, id }) }),
   binderLayout: (containerId: number, slotsPerPage: number, columns: number) =>
     request<void>('/api/binder/layout', { method: 'POST', body: JSON.stringify({ containerId, slotsPerPage, columns }) }),
   /** Relocate one owned copy of a lot from wherever it lives into a binder pocket (splits a stack). */
