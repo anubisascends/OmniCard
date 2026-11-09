@@ -32,6 +32,7 @@ import {
   alpha,
   type SxProps,
   type Theme,
+  IconButton,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
@@ -43,6 +44,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import BookmarkAddIcon from '@mui/icons-material/BookmarkAdd';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import LowPriorityIcon from '@mui/icons-material/LowPriority';
+import KeyboardIcon from '@mui/icons-material/Keyboard';
 import { api } from '../api/client';
 import { usePermissions } from '../context/usePermissions';
 import type { BinderCardDto, BinderDividerDto, BinderSlotDto, SetInfoDto } from '../api/types';
@@ -177,6 +179,8 @@ function SlotGrid({
   cursorSlot,
   onSlotSelect,
   onSlotOpen,
+  heldSlot,
+  onSlotPointer,
 }: {
   slots: BinderSlotDto[];
   columns: number;
@@ -192,6 +196,10 @@ function SlotGrid({
   onSlotSelect?: (slot: number) => void;
   /** …and a double-click on an empty pocket searches for its card. */
   onSlotOpen?: (slot: number) => void;
+  /** Spread view: the pocket whose card is being moved from the keyboard (drawn faded). */
+  heldSlot?: number;
+  /** Spread view: a press on a pocket puts the keyboard cursor there. */
+  onSlotPointer?: (slot: number) => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -203,6 +211,8 @@ function SlotGrid({
         {slots.map((s) => (
           <Box
             key={s.slotIndex}
+            data-pocket={`${pageNumber}-${s.slotIndex}`}
+            onMouseDown={onSlotPointer ? () => onSlotPointer(s.slotIndex) : undefined}
             onDragOver={editMode ? (e) => e.preventDefault() : undefined}
             onDrop={editMode ? () => onDropSlot(pageNumber, s.slotIndex) : undefined}
             onContextMenu={(e) => onSlotContextMenu(e, pageNumber, s.slotIndex, s.card ?? null)}
@@ -210,6 +220,9 @@ function SlotGrid({
             onDoubleClick={onSlotOpen && !s.card ? () => onSlotOpen(s.slotIndex) : undefined}
             sx={{
               position: 'relative',
+              // Scrolled to by the keyboard cursor: stay clear of the fixed app bar (and a phone's bottom bar).
+              scrollMarginTop: 72,
+              scrollMarginBottom: { xs: 80, sm: 16 },
               aspectRatio: '0.72',
               border: '1px dashed',
               borderColor: editMode ? 'primary.light' : 'divider',
@@ -224,6 +237,12 @@ function SlotGrid({
                 outlineColor: 'primary.main',
                 outlineOffset: 2,
                 boxShadow: (th: Theme) => `0 0 0 7px ${alpha(th.palette.primary.main, 0.25)}`,
+              }),
+              ...(heldSlot === s.slotIndex && {
+                opacity: 0.45,
+                borderStyle: 'solid',
+                borderWidth: 2,
+                borderColor: 'warning.main',
               }),
             }}
           >
@@ -276,6 +295,8 @@ function UnplacedSidebar({
   onDropUnassign,
   onCardContextMenu,
   onCardClick,
+  onCardPickUp,
+  onLeave,
   autoFocus = true,
   sx,
 }: {
@@ -287,6 +308,10 @@ function UnplacedSidebar({
   onDropUnassign: () => void;
   onCardContextMenu: (e: React.MouseEvent, card: BinderCardDto) => void;
   onCardClick: (card: BinderCardDto) => void;
+  /** Keyboard placing (spread view): Space on a card picks it up to drop into a pocket. */
+  onCardPickUp?: (card: BinderCardDto) => void;
+  /** Esc in the list: back to the pages. */
+  onLeave?: () => void;
   /** Focus the search box on mount (not in simplified editing, where the keyboard drives the pockets). */
   autoFocus?: boolean;
   /** Placement overrides (simplified editing docks the list in the page's left margin). */
@@ -294,11 +319,46 @@ function UnplacedSidebar({
 }) {
   const { t } = useTranslation();
   const { money } = useFormatters();
+  // The list's keyboard: ↑ ↓ between cards (↑ from the first one back to the search box), Enter for a
+  // card's details, Space to pick it up for a pocket, Shift+F10 for its menu, Esc back to the pages.
+  const onRowKey = (e: React.KeyboardEvent<HTMLElement>, card: BinderCardDto) => {
+    const row = e.currentTarget;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const sibling = (e.key === 'ArrowDown' ? row.nextElementSibling : row.previousElementSibling) as HTMLElement | null;
+      if (sibling) sibling.focus();
+      else if (e.key === 'ArrowUp') row.closest('[data-unplaced]')?.querySelector<HTMLInputElement>('input')?.focus();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      onCardClick(card);
+    } else if (e.key === ' ' && onCardPickUp) {
+      e.preventDefault();
+      onCardPickUp(card);
+    } else if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
+      e.preventDefault();
+      const r = row.getBoundingClientRect();
+      onCardContextMenu({ preventDefault: () => {}, clientX: r.left + 24, clientY: r.top + r.height / 2 } as React.MouseEvent, card);
+    }
+  };
   return (
     <Paper
       variant="outlined"
+      data-unplaced
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDropUnassign}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && onLeave && !e.defaultPrevented) {
+          e.preventDefault();
+          onLeave();
+        } else if (e.key === 'ArrowDown' && e.target instanceof HTMLInputElement) {
+          // From the search box down into the cards.
+          const first = e.currentTarget.querySelector<HTMLElement>('[data-unplaced-card]');
+          if (first) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }}
       sx={[
         {
           width: { xs: '100%', sm: 300 },
@@ -342,14 +402,18 @@ function UnplacedSidebar({
                 spacing={1}
                 alignItems="center"
                 draggable
+                tabIndex={0}
+                data-unplaced-card
                 onDragStart={() => onDragCard(c.id)}
                 onClick={() => onCardClick(c)}
                 onContextMenu={(e) => onCardContextMenu(e, c)}
+                onKeyDown={(e) => onRowKey(e, c)}
                 sx={{
                   p: 0.5,
                   borderRadius: 1,
                   cursor: 'grab',
                   '&:hover': { bgcolor: 'action.hover' },
+                  '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', bgcolor: 'action.selected' },
                 }}
               >
                 <CardImage
@@ -495,6 +559,27 @@ const SIMPLIFIED_KEYS: [string[], string][] = [
   [['−'], 'binder.keys.removePage'],
 ];
 
+/** The spread view's keys, as [keys, i18n key, only while editing]. */
+const SPREAD_KEYS: [string[], string, boolean][] = [
+  [['←', '↑', '↓', '→'], 'binder.navKeys.move', false],
+  [['PgUp', 'PgDn'], 'binder.navKeys.spread', false],
+  [['Home', 'End'], 'binder.keys.firstLast', false],
+  [['Ctrl+Home', 'Ctrl+End'], 'binder.keys.firstLastPage', false],
+  [['Alt+PgUp', 'Alt+PgDn'], 'binder.keys.dividers', false],
+  [['Enter'], 'binder.navKeys.details', false],
+  [['Shift+F10'], 'binder.navKeys.menu', false],
+  [['Tab', 'Shift+Tab'], 'binder.navKeys.tab', false],
+  [['Space'], 'binder.navKeys.pickUp', true],
+  [['Esc'], 'binder.navKeys.cancel', true],
+  [['Del'], 'binder.keys.remove', true],
+  [['F2'], 'binder.keys.sets', true],
+  [['?'], 'binder.navKeys.help', false],
+];
+
+/** The pages a spread shows: page 1 alone on spread 0, then pairs (the last may be alone). */
+const pagesOfSpread = (spread: number, totalPages: number) =>
+  (spread === 0 ? [1] : [spread * 2, spread * 2 + 1]).filter((p) => p <= totalPages);
+
 /** Keys typed into these belong to them, not to the binder cursor. */
 const EDITABLE = 'input, textarea, select, [contenteditable="true"], [role="combobox"], [role="menu"], [role="listbox"], [role="dialog"]';
 /** Enter/Space on a focused control presses it. */
@@ -569,6 +654,15 @@ export function BinderPage() {
   const [confirmRemoveDivider, setConfirmRemoveDivider] = useState<BinderDividerDto | null>(null);
   const [removedDivider, setRemovedDivider] = useState<BinderDividerDto | null>(null);
   const [pinnedDivider, setPinnedDivider] = useState<{ id: number; view: string } | null>(null);
+  // The spread view's keyboard: a pocket cursor across both pages (`navCursor`, drawn only while the keyboard
+  // is in use and on the pages), a card picked up with Space to drop into another pocket (`held`; `from` is
+  // null for one picked from Unplaced), and the key list (?).
+  const spreadRef = useRef<HTMLDivElement>(null);
+  const [navCursor, setNavCursor] = useState<Cursor>({ page: 1, slot: 0 });
+  const [navKeys, setNavKeys] = useState(false);
+  const [navFocus, setNavFocus] = useState(false);
+  const [held, setHeld] = useState<{ lotId: number; name: string; from: Cursor | null } | null>(null);
+  const [showKeys, setShowKeys] = useState(false);
 
   const openCardMenu = (e: React.MouseEvent, card: BinderCardDto) => {
     e.preventDefault();
@@ -648,11 +742,10 @@ export function BinderPage() {
   // Turning pages should feel instant: fetch the spreads either side of the cursor's.
   const totalSpreads = data?.totalSpreads ?? 1;
   useEffect(() => {
-    if (!quick) return;
     for (const s of [viewSpread - 1, viewSpread + 1])
       if (s >= 0 && s < totalSpreads)
         qc.prefetchQuery({ queryKey: ['binder', binderId, s], queryFn: () => api.binder(binderId, s), staleTime: 30_000 });
-  }, [quick, viewSpread, totalSpreads, binderId, qc]);
+  }, [viewSpread, totalSpreads, binderId, qc]);
 
   // Entering simplified editing puts the keyboard on the page (off the switch / Edit button).
   useEffect(() => {
@@ -908,6 +1001,198 @@ export function BinderPage() {
     };
   });
 
+  // --- The spread view's keyboard (everything but Simplified editing). ---
+  // The cursor lives on a page of the spread on screen; after a turn with the mouse it starts again on the
+  // spread's first page. The spread's pages come from its number, not the loaded data, so a key pressed
+  // while the next spread is still loading already counts from the right place.
+  const spreadPages = pagesOfSpread(spread, totalPages);
+  const nav: Cursor = spreadPages.includes(navCursor.page)
+    ? { page: navCursor.page, slot: Math.min(navCursor.slot, slotsPerPage - 1) }
+    : { page: spreadPages[0] ?? 1, slot: 0 };
+  const navSlots =
+    data?.leftPageNumber === nav.page ? data.leftSlots : data?.rightPageNumber === nav.page ? data.rightSlots : null;
+  const navCard = navSlots?.[nav.slot]?.card ?? null;
+  const showNav = !quick && navKeys && navFocus;
+  const canArrange = editMode && canWrite;
+  useEffect(() => {
+    if (!editMode) setHeld(null);
+  }, [editMode]);
+
+  const pocketEl = (c: Cursor) => spreadRef.current?.querySelector<HTMLElement>(`[data-pocket="${c.page}-${c.slot}"]`) ?? null;
+  /** Put the cursor on a pocket (turning to its spread) and the keyboard on the pages. */
+  const moveNav = (c: Cursor) => {
+    setNavCursor(c);
+    setSpread(spreadOfPage(c.page));
+    setNavKeys(true);
+    spreadRef.current?.focus({ preventScroll: true });
+  };
+  /** After a divider tab or a spread tab is chosen, the keyboard goes back to the pages (from that page's
+   *  first pocket), so the arrows and PgUp/PgDn carry on there instead of in the tab strip. */
+  const focusPages = (page?: number) => {
+    if (page != null) setNavCursor({ page, slot: 0 });
+    requestAnimationFrame(() => (quick ? gridRef : spreadRef).current?.focus({ preventScroll: true }));
+  };
+  /** The pocket's actions, opened from the keyboard (Shift+F10 / the menu key) beside the pocket. */
+  const openNavMenu = () => {
+    const r = pocketEl(nav)?.getBoundingClientRect();
+    if (!r) return;
+    setSlotMenu({ x: r.left + r.width / 2, y: r.top + r.height / 2, page: nav.page, slot: nav.slot, card: navCard });
+  };
+  /** Space while editing: pick up the pocket's card, or drop the one held here (a card already here swaps
+   *  places with it, or goes back to Unplaced when the held card came from there). */
+  const pickUpOrDrop = () => {
+    if (held) {
+      const fromHere = held.from?.page === nav.page && held.from.slot === nav.slot;
+      if (!fromHere) run(api.binderAssign(held.lotId, binderId, nav.page, nav.slot));
+      setHeld(null);
+    } else if (navCard) {
+      setHeld({ lotId: navCard.id, name: navCard.name, from: nav });
+    }
+  };
+  const overlayOpen = !!(
+    addSlot || detailCardId != null || listCard || slotMenu || cardMenu || addAnchor || setsAnchor ||
+    confirmRemove != null || deleteCard || dividerDialog || dividerMenu || confirmRemoveDivider
+  );
+
+  // Keep the cursor's pocket on screen, in both views. It's scrolled to once per move, as soon as it is
+  // drawn — a turned-to spread may still be loading when the key is pressed, so this runs after every
+  // render until the pocket is there. (Pockets keep a scroll margin clear of the app bar.)
+  const scrollTarget = quick ? `${cursor.page}-${cursor.slot}` : showNav ? `${nav.page}-${nav.slot}` : null;
+  const scrolledTo = useRef<string | null>(null);
+  useEffect(() => {
+    if (!scrollTarget) {
+      scrolledTo.current = null;
+      return;
+    }
+    if (scrolledTo.current === scrollTarget) return;
+    const el = document.querySelector<HTMLElement>(`[data-pocket="${scrollTarget}"]`);
+    if (!el) return;
+    scrolledTo.current = scrollTarget;
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  });
+
+  // Re-bound each render so it always sees the current cursor and spread.
+  useEffect(() => {
+    if (quick || !data) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.defaultPrevented || overlayOpen) return;
+      const el = e.target instanceof HTMLElement ? e.target : null;
+      if (el?.closest(EDITABLE)) return;
+      const onPages = !!el && !!spreadRef.current?.contains(el);
+      const mods = e.ctrlKey || e.altKey || e.metaKey;
+
+      if (e.key === '?' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        setShowKeys((v) => !v);
+        return;
+      }
+      // Alt+PgUp / Alt+PgDn: the previous / next divider.
+      if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'PageUp' || e.key === 'PageDown')) {
+        e.preventDefault();
+        const target =
+          e.key === 'PageDown'
+            ? dividers.find((d) => d.page > Math.max(...spreadPages))
+            : [...dividers].reverse().find((d) => d.page < Math.min(...spreadPages));
+        if (target) {
+          goToDivider(target);
+          moveNav({ page: target.page, slot: 0 });
+        }
+        return;
+      }
+      // The tab strips (spreads, dividers) and the Unplaced list have their own arrows / Home / End.
+      if (el?.closest('[role="tablist"], [data-unplaced]') && !onPages) return;
+      // PgUp / PgDn: turn the spread, keeping the cursor's side and pocket where the next spread has it.
+      if (!mods && (e.key === 'PageUp' || e.key === 'PageDown')) {
+        e.preventDefault();
+        const to = Math.min(totalSpreads - 1, Math.max(0, spread + (e.key === 'PageDown' ? 1 : -1)));
+        if (to === spread) return;
+        const pages = pagesOfSpread(to, totalPages);
+        const right = nav.page === spreadPages[spreadPages.length - 1] && spreadPages.length > 1;
+        moveNav({ page: (right ? pages[pages.length - 1] : pages[0]) ?? 1, slot: nav.slot });
+        return;
+      }
+      // Ctrl+Home / Ctrl+End: the front of page 1 / the pocket after the last card.
+      if (e.ctrlKey && !e.altKey && !e.metaKey && (e.key === 'Home' || e.key === 'End')) {
+        e.preventDefault();
+        moveNav(e.key === 'Home' ? { page: 1, slot: 0 } : lastCursor());
+        return;
+      }
+      // Anywhere else (the page itself, a button such as Prev or Next) the arrows drive the pages; Enter and
+      // Space still press a focused button (see below).
+      if (mods) return;
+      // While the cursor is hidden (after a click, or a tab), the first arrow only shows it where it is.
+      if (!showNav && ['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+        e.preventDefault();
+        moveNav(nav);
+        return;
+      }
+      const cols = data.columns;
+      const col = nav.slot % cols;
+      let next: Cursor;
+      switch (e.key) {
+        case 'ArrowRight':
+          // Off a page's right edge onto the next page, same row — across the spread, then on to the next.
+          next = col < cols - 1 ? { ...nav, slot: nav.slot + 1 } : nav.page < totalPages ? { page: nav.page + 1, slot: nav.slot - col } : nav;
+          break;
+        case 'ArrowLeft':
+          next = col > 0 ? { ...nav, slot: nav.slot - 1 } : nav.page > 1 ? { page: nav.page - 1, slot: nav.slot + cols - 1 } : nav;
+          break;
+        case 'ArrowDown':
+          next = nav.slot + cols < slotsPerPage ? { ...nav, slot: nav.slot + cols } : nav;
+          break;
+        case 'ArrowUp':
+          next = nav.slot - cols >= 0 ? { ...nav, slot: nav.slot - cols } : nav;
+          break;
+        case 'Home':
+          next = { ...nav, slot: 0 };
+          break;
+        case 'End':
+          next = { ...nav, slot: slotsPerPage - 1 };
+          break;
+        case 'Enter':
+          if (!onPages && el?.closest(PRESSABLE)) return;
+          e.preventDefault();
+          setNavKeys(true);
+          // A card's details; an empty pocket (while editing) adds a card to it.
+          if (navCard) setDetailCardId(navCard.id);
+          else if (canArrange) setAddSlot({ page: nav.page, slot: nav.slot, card: null });
+          return;
+        case ' ':
+          if (!canArrange || (!onPages && el?.closest(PRESSABLE))) return;
+          e.preventDefault();
+          setNavKeys(true);
+          pickUpOrDrop();
+          return;
+        case 'Escape':
+          if (!held) return;
+          e.preventDefault();
+          setHeld(null);
+          return;
+        case 'Delete':
+        case 'Backspace':
+          if (!canArrange || !navCard) return;
+          e.preventDefault();
+          run(api.binderUnassign(navCard.id));
+          return;
+        case 'F10':
+          if (!e.shiftKey) return;
+          e.preventDefault();
+          openNavMenu();
+          return;
+        case 'ContextMenu':
+          e.preventDefault();
+          openNavMenu();
+          return;
+        default:
+          return;
+      }
+      e.preventDefault();
+      moveNav(next);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   const openSets = () => setSetsAnchor(setsButtonRef.current);
   const closeSets = () => {
     setSetsAnchor(null);
@@ -956,6 +1241,15 @@ export function BinderPage() {
   const dropUnassign = () => {
     if (dragLotId != null) run(unassign.mutateAsync());
   };
+  /** A spread page's keyboard cursor + held card, and a press that moves the cursor there. */
+  const navGridProps = (page: number) => ({
+    cursorSlot: showNav && nav.page === page ? nav.slot : undefined,
+    heldSlot: held?.from?.page === page ? held.from.slot : undefined,
+    onSlotPointer: (slot: number) => {
+      setNavCursor({ page, slot });
+      setNavKeys(false);
+    },
+  });
 
   return (
     <Stack spacing={2}>
@@ -1172,7 +1466,10 @@ export function BinderPage() {
         <BinderDividerTabs
           dividers={dividers}
           activeId={activeDivider?.id ?? null}
-          onSelect={goToDivider}
+          onSelect={(d, how) => {
+            goToDivider(d);
+            if (how === 'activate') focusPages(d.page);
+          }}
           editable={editMode && canWrite}
           onRemove={setConfirmRemoveDivider}
           onTabContextMenu={(e, d) => {
@@ -1312,7 +1609,7 @@ export function BinderPage() {
             <Button size="small" disabled={spread <= 0} onClick={() => setSpread((s) => Math.max(0, s - 1))}>
               {t('binder.prev')}
             </Button>
-            <Tabs value={data.spreadIndex} onChange={(_, v) => setSpread(v)} variant="scrollable" scrollButtons="auto" sx={{ flexGrow: 1, minHeight: 36 }}>
+            <Tabs value={data.spreadIndex} onChange={(_, v) => { setSpread(v); focusPages(); }} variant="scrollable" scrollButtons="auto" sx={{ flexGrow: 1, minHeight: 36 }}>
               {data.spreadTabs.map((t) => (
                 <Tab key={t.index} value={t.index} label={t.label} sx={{ minHeight: 36 }} />
               ))}
@@ -1320,6 +1617,17 @@ export function BinderPage() {
             <Button size="small" disabled={spread >= data.totalSpreads - 1} onClick={() => setSpread((s) => Math.min(data.totalSpreads - 1, s + 1))}>
               {t('binder.next')}
             </Button>
+            <Tooltip title={t('binder.navKeys.toggle')}>
+              <IconButton
+                size="small"
+                aria-label={t('binder.navKeys.toggle')}
+                aria-pressed={showKeys}
+                color={showKeys ? 'primary' : 'default'}
+                onClick={() => setShowKeys((v) => !v)}
+              >
+                <KeyboardIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Stack>
 
           {/* Spread (+ unplaced sidebar in edit mode). A phone shows the spread's pages one above the other. */}
@@ -1334,9 +1642,48 @@ export function BinderPage() {
                 onDropUnassign={dropUnassign}
                 onCardContextMenu={openCardMenu}
                 onCardClick={(c) => setDetailCardId(c.id)}
+                onCardPickUp={
+                  canWrite
+                    ? (c) => {
+                        setHeld({ lotId: c.id, name: c.name, from: null });
+                        moveNav(nav);
+                      }
+                    : undefined
+                }
+                onLeave={() => moveNav(nav)}
               />
             )}
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ flexGrow: 1, minWidth: 0 }}>
+            {/* The pages take the keyboard (Tab stops here); the cursor shows once keys are used. */}
+            <Stack
+              ref={spreadRef}
+              tabIndex={0}
+              role="group"
+              aria-label={data.pageRangeLabel}
+              aria-describedby="binder-nav-status"
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={2}
+              onFocus={(e) => {
+                setNavFocus(true);
+                if (e.target === e.currentTarget && e.currentTarget.matches(':focus-visible')) setNavKeys(true);
+              }}
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setNavFocus(false);
+              }}
+              onMouseDown={() => setNavKeys(false)}
+              onContextMenu={(e) => {
+                // The menu key / Shift+F10 on the pages themselves: the cursor's pocket menu.
+                if (e.target !== e.currentTarget) return;
+                e.preventDefault();
+                openNavMenu();
+              }}
+              sx={{
+                flexGrow: 1,
+                minWidth: 0,
+                borderRadius: 1,
+                outline: 'none',
+                '&:focus-visible': { boxShadow: (th) => `0 0 0 2px ${th.palette.primary.main}` },
+              }}
+            >
               {/* A divider sits in front of its page: at the left edge for the left page, between the
                   facing pages for the right one. */}
               {data.leftPageNumber != null && dividers.some((d) => d.page === data.leftPageNumber) && (
@@ -1352,6 +1699,7 @@ export function BinderPage() {
                   onDropSlot={dropOnSlot}
                   onSlotContextMenu={openSlotMenu}
                   onCardClick={(c) => setDetailCardId(c.id)}
+                  {...navGridProps(data.leftPageNumber)}
                 />
               ) : (
                 <Box sx={{ flex: 1, display: { xs: 'none', sm: 'block' } }} />
@@ -1369,6 +1717,7 @@ export function BinderPage() {
                   onDropSlot={dropOnSlot}
                   onSlotContextMenu={openSlotMenu}
                   onCardClick={(c) => setDetailCardId(c.id)}
+                  {...navGridProps(data.rightPageNumber)}
                 />
               ) : (
                 // Keep the empty half reserved so a lone left page (e.g. an odd last page / a single
@@ -1376,6 +1725,45 @@ export function BinderPage() {
                 <Box sx={{ flex: 1, display: { xs: 'none', sm: 'block' } }} />
               )}
             </Stack>
+          </Stack>
+
+          {/* Where the keyboard is (read out by screen readers too), and the keys. */}
+          <Stack spacing={1} alignItems="center">
+            <Typography
+              id="binder-nav-status"
+              role="status"
+              variant="body2"
+              color={held ? 'warning.main' : 'text.secondary'}
+              sx={{ minHeight: '1.5em', textAlign: 'center' }}
+            >
+              {held
+                ? t('binder.navKeys.holding', { name: held.name })
+                : showNav
+                  ? navCard
+                    ? t('binder.cursorCard', {
+                        page: nav.page,
+                        slot: nav.slot + 1,
+                        name: navCard.name,
+                        set: navCard.setCode.toUpperCase(),
+                        number: navCard.number,
+                      })
+                    : t('binder.cursorEmpty', { page: nav.page, slot: nav.slot + 1 })
+                  : ''}
+            </Typography>
+            {showKeys && (
+              <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" useFlexGap>
+                {SPREAD_KEYS.filter(([, , editing]) => !editing || canArrange).map(([keys, label]) => (
+                  <Stack key={label} direction="row" spacing={0.5} alignItems="center">
+                    {keys.map((k) => (
+                      <Kbd key={k}>{k}</Kbd>
+                    ))}
+                    <Typography variant="caption" color="text.secondary">
+                      {t(label)}
+                    </Typography>
+                  </Stack>
+                ))}
+              </Stack>
+            )}
           </Stack>
         </>
       )}

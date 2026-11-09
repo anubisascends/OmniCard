@@ -75,7 +75,7 @@ The window shows how many cards you have captured and thumbnails of the last few
 The top panel controls apply to every scan you add **after** you set them:
 
 - **Game** — which game's catalog to match against. Changing the game clears the set and language choices.
-- **Sets (art fallback)** — pick one or more sets if you know what you are scanning. Matching is limited to those sets, and so is the catalog search when you correct a card. Leave it on **All sets** to search everything.
+- **Sets (art fallback)** — pick one or more sets if you know what you are scanning. Type a set code (for example `MH3`) or part of a set name to find a set; a matching code is listed first, so typing the code and pressing Enter picks it. Chosen sets are shown by their codes. Matching is limited to those sets, and so is the catalog search when you correct a card. Leave it on **All sets** to search everything.
 - **Condition** — NM, LP, MP, HP or DMG.
 - **Card language** — **Auto (detect)** reads the language printed on Magic: The Gathering and Yu-Gi-Oh! cards. For other games, pick the language of the cards you are scanning.
 - **Foil** — tick this before scanning foil cards. It marks the new scans as foil, helps matching cope with foil shine, and shows the foil market value. Magic: The Gathering cards from Magic 2015 on print their finish themselves: a star (★) between the set code and the language means foil, a dot (•) means non-foil. OmniCard reads that mark and sets **Foil** on each scan to match, whatever this switch says, so you can scan foils and non-foils together.
@@ -178,6 +178,13 @@ To jump to a card, type its number in **Go to #** above the list and press Enter
 4. Click the correct result.
 
 The card is now marked **Corrected**, and it is confirmed and checked. The next card that needs review is selected. Click **Cancel** to close the search without changing anything.
+
+Picking a result also updates the copy's details to match that printing:
+
+- **Language** changes to the result's language. For example, a scan matched to a Japanese card and corrected to the English one becomes English. If the session's **Card language** is set to another language and you pick an English result, the session's language is kept. In games whose catalog doesn't list languages, the language isn't changed.
+- **Foil** turns on when the printing is made only in foil, and off when it is made only in non-foil. For a Magic card made only in etched foil, the **Foil type** is set to *Etched*. Otherwise the foil setting stays as it was.
+
+Press **Ctrl+Z** to undo a correction, including these changes.
 
 The search looks only in the sets chosen in **Sets (art fallback)**; the line under the search box says which. If the right card isn't listed, clear that set selection at the top of the page and search again.
 

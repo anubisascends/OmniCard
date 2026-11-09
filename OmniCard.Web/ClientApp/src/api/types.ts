@@ -1005,6 +1005,10 @@ export interface ScanSearchResultDto {
   imageUri?: string | null;
   /** Catalog row language, for catalogs that hold several (MTG / One Piece / Pokémon Japan). */
   language?: string | null;
+  /** The printing comes in one finish only: true = foil only, false = non-foil only; null = both / unknown. */
+  foil?: boolean | null;
+  /** That finish's foil type, when it is specific (MTG "Etched"). */
+  foilType?: string | null;
 }
 
 export interface ScanCommitItem {

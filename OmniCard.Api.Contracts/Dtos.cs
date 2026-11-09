@@ -1348,9 +1348,13 @@ public sealed record ScanMatchDto
 }
 
 /// <summary>One catalog card returned by the correction search (<c>GET /api/scan/search</c>).</summary>
+/// <remarks><c>Foil</c>: the printing comes in one finish only — true = foil only, false = non-foil only,
+/// null = both or unknown; <c>FoilType</c> names that finish when it is specific (e.g. MTG "Etched").
+/// Picking the result as a correction sets the copy's foil flag to match.</remarks>
 public sealed record ScanSearchResultDto(
     string GameCardId, string Name, string SetCode, string SetName,
-    string CollectorNumber, string Rarity, string? ImageUri, string? Language = null);
+    string CollectorNumber, string Rarity, string? ImageUri, string? Language = null,
+    bool? Foil = null, string? FoilType = null);
 
 /// <summary>One card the user confirmed from a scan, to be written to inventory as an owned lot.</summary>
 public sealed record ScanCommitItem

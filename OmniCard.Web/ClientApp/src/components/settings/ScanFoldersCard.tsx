@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
-  Autocomplete,
   Box,
   Button,
   Chip,
@@ -22,6 +21,7 @@ import type { ScanFolderConfigDto, ScanFolderSettingsDto, ScanFolderStatusDto } 
 import { usePermissions } from '../../context/usePermissions';
 import { LanguageSelect } from '../../lib/cardLanguages';
 import { LocationPickerDialog } from '../dialogs/LocationPickerDialog';
+import { SetMultiSelect } from '../SetMultiSelect';
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
@@ -234,22 +234,12 @@ function FolderRow({
       )}
       {hasPath && (
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
-          <Autocomplete
-            multiple
-            size="small"
-            options={sets}
-            getOptionLabel={(s) => s.setName}
-            isOptionEqualToValue={(a, b) => a.setCode === b.setCode}
+          <SetMultiSelect
+            game={game}
             value={chosenSets}
-            onChange={(_, v) => onChange({ setCodes: v.map((s) => s.setCode) })}
+            onChange={(v) => onChange({ setCodes: v.map((s) => s.setCode) })}
+            label={t('scan.controls.artSets')}
             sx={{ minWidth: 260, flex: '1 1 260px' }}
-            renderInput={(p) => (
-              <TextField
-                {...p}
-                label={t('scan.controls.artSets')}
-                placeholder={chosenSets.length ? '' : t('scan.controls.allSets')}
-              />
-            )}
           />
           <TextField
             select

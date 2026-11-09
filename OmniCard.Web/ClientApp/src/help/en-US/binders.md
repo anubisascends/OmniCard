@@ -27,6 +27,26 @@ To move around:
 
 The heading shows which pages you're looking at and how many pages the binder has, for example *Pages 2-3 · 12 pages*. Once the binder has dividers, it also shows the section you're in, for example *Pages 4-5 · 12 pages · Showcase*.
 
+### Flip through from the keyboard
+
+The two-page view can be used entirely from the keyboard. Press an arrow key (or Tab to the pages) and a cursor appears on a pocket; the line under the pages names the page, the pocket and the card in it.
+
+| Key | What it does |
+|---|---|
+| ← ↑ ↓ → | Move between pockets. Off the edge of a page, the cursor carries on to the next or previous page, turning the spread when it needs to. |
+| PgUp, PgDn | Turn to the previous or next spread. The cursor keeps its pocket. |
+| Home, End | Go to the first or last pocket on the page. |
+| Ctrl+Home, Ctrl+End | Go to page 1, or to the pocket after the last card in the binder. |
+| Alt+PgUp, Alt+PgDn | Go to the previous or next divider. See [Dividers](#dividers). |
+| Enter | Open the card's details. In edit mode, on an empty pocket, add a card to it. |
+| Shift+F10 (or the menu key) | Open the pocket's menu, the same one you get by right-clicking it. |
+| Tab, Shift+Tab | Move between the divider tabs, the spread tabs and the pages. In a row of tabs, ← and → switch tabs. |
+| ? | Show or hide the list of keys under the pages. You can also click the keyboard button beside **Next ›**. |
+
+Edit mode adds keys for arranging cards. See [Place, move and remove cards](#place-move-and-remove-cards).
+
+The cursor only shows while you're using the keyboard. Click anywhere on the pages and it hides again, ready to pick up from the pocket you clicked. When it's hidden, the first arrow key just shows it again, without moving it. The page scrolls as the cursor moves, so the pocket it's on is always in view.
+
 ## Dividers
 
 Dividers work like the tabbed dividers in a real binder: each one has a name and marks where a section starts, so you can jump straight to it. For example, split a Magic binder into *Borderless*, *Showcase* and *Extended art*, then by color inside each.
@@ -49,12 +69,15 @@ Where the divider goes:
 
 ### Jump to a divider
 
-The dividers are shown as a row of tabs above the pages, in binder order, each with the page its section starts on (for example *p. 12*). They stay there whichever page you're on, in edit mode and out of it.
+The dividers are shown as tabs above the pages, in binder order, each with the page its section starts on (for example *p. 12*). They stay there whichever page you're on, in edit mode and out of it.
 
-- Click a tab to turn to it. In the two-page view you see the spread the divider sits in; in Simplified editing you see the divider's page itself.
+When there are more tabs than fit across the window, they wrap onto more rows instead of scrolling. The tabs always stay in binder order and never move when you choose one.
+
+- Click a tab to turn to it. In the two-page view you see the spread the divider sits in; in Simplified editing you see the divider's page itself. The keyboard then goes to the pages, so the arrow keys and PgUp/PgDn carry on from the divider's page.
+- From the keyboard, Tab to the tabs and use ← and → (Home and End for the first and last); each tab turns to its divider as you reach it. Press Enter or Space to stay on that divider and go back to the pages.
 - A tab is raised and filled with its color while its divider is on screen: on either page of the spread, or on the page you're on in Simplified editing. Turn past it and the tab goes back to normal. The name of the section you're in still shows next to the page number at the top.
 - On the page, a divider shows as a colored strip with its name: between the facing pages, at the left edge of a left-hand page, or across the top of the page in Simplified editing.
-- In Simplified editing, Alt+PgUp and Alt+PgDn go to the previous and next divider.
+- Alt+PgUp and Alt+PgDn go to the previous and next divider, in the two-page view and in Simplified editing.
 
 ### Rename, move or remove a divider
 
@@ -136,7 +159,18 @@ When everything is placed, the panel says *Everything in this binder is placed.*
 - **Remove a card from its pocket**: drag it from the pocket onto the Unplaced cards panel. The card stays in the binder; it just no longer has a pocket.
 
 > [!TIP]
-> To move a card to a pocket on a different spread, drag it to the Unplaced cards panel first, turn to the spread you want, then drag it into the pocket.
+> To move a card to a pocket on a different spread, drag it to the Unplaced cards panel first, turn to the spread you want, then drag it into the pocket. Or use the keyboard, which can carry a card across spreads.
+
+From the keyboard (see [Flip through from the keyboard](#flip-through-from-the-keyboard) for moving the cursor):
+
+| Key | What it does |
+|---|---|
+| Space | Pick up the card under the cursor. It fades and the line under the pages says *Moving …*. Move the cursor to any pocket, on any spread, and press Space again to drop it there. A card already there swaps places with it. |
+| Esc | Put a picked-up card back where it was. |
+| Delete | Take the card out of its pocket, back to the Unplaced pool. |
+| F2 | Open the **Sets** filter. |
+
+In the **Unplaced cards** panel, press ↓ in the search box to move into the list, then ↑ and ↓ between cards. Enter opens a card's details, Shift+F10 opens its menu, and Space picks it up and puts the keyboard on the pages: move to a pocket and press Space to place it there. A card already in that pocket goes back to the Unplaced pool. Esc anywhere in the panel goes back to the pages.
 
 ## Add or replace a card in a pocket
 
@@ -325,7 +359,7 @@ Removing a page removes the whole physical sheet it's on. For a double-sided she
 - **There's no Edit button.** The binder is in a site you can only view. Ask an administrator for write access.
 - **Editing shows an error.** You may not have permission to edit binders. Ask an administrator.
 - **A card I added isn't showing in a pocket.** It's in the Unplaced pool. Click **Edit** and look in the **Unplaced cards** panel.
-- **The arrow keys don't move the cursor.** Simplified editing has to be on, and the keyboard mustn't be in a box or menu. Click the page, then try again.
+- **The arrow keys don't move the cursor.** The keyboard mustn't be in a box, a menu or a row of tabs. Click the page (or Tab to it), then try again. (In the edit mode's two-page view, the keyboard starts in the Unplaced cards search box; press Esc to go to the pages.)
 - **Pressing + says the page is the front of its sheet.** A new sheet goes in after a sheet's back. Press PgDn to turn to the back, then press + again.
 - **The search doesn't find a card I know exists.** The **Sets** filter may be leaving its set out. Press Alt+A in the dialog to search all sets, or clear the filter in the edit toolbar.
 - **I can't see the Unplaced cards panel.** In Simplified editing it's only shown while some of the binder's cards aren't in a pocket. In a narrow window, scroll down: it's below the page.
