@@ -10,7 +10,6 @@ import {
   DialogTitle,
   MenuItem,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material';
 import { api } from '../../api/client';
@@ -18,6 +17,7 @@ import type { LocationSummaryDto, SetInfoDto } from '../../api/types';
 import { SetMultiSelect } from '../SetMultiSelect';
 import { useDefaultSets } from '../locationCardFilter';
 
+import { SelectField } from '../SelectField';
 /**
  * Fixes a location to one game (or any game) and picks the sets its card searches start on. The game is a
  * hard rule: cards of other games can't be added, and the server refuses (409) a game the location's cards
@@ -69,8 +69,7 @@ export function LocationCardFilterDialog({
       <DialogTitle>{t('locations.cardFilter.dialogTitle', { name: loc.name })}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <TextField
-            select
+          <SelectField
             size="small"
             label={t('common.labels.game')}
             value={game}
@@ -91,7 +90,7 @@ export function LocationCardFilterDialog({
                 {g.displayName}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
           {game ? (
             <SetMultiSelect
               game={game}

@@ -64,6 +64,7 @@ import { ColumnLayoutMenu } from './views/ColumnLayoutMenu';
 import { GROUPABLE_FIELDS, GroupByMenu } from './views/GroupByMenu';
 import { useIsPhone } from '../lib/responsive';
 
+import { SelectField } from './SelectField';
 /** A grid row: a card, or (in grouped mode) a group header dressed as an empty card with a negative id. */
 type TableRow = CardDto & { group?: CardGroupDto };
 
@@ -809,11 +810,11 @@ export function CardTable({
                 {t('collection.bulkList.alreadyListed', { count: alreadyListedCount })}
               </Typography>
             )}
-            <TextField select label={t('common.labels.channel')} value={bulkChannel} onChange={(e) => setBulkChannel(e.target.value)}>
+            <SelectField label={t('common.labels.channel')} value={bulkChannel} onChange={(e) => setBulkChannel(e.target.value)}>
               {(['Manual', 'TcgPlayer', 'Ebay'] as const).map((c) => (
                 <MenuItem key={c} value={c}>{t(`common.channels.${c}`)}</MenuItem>
               ))}
-            </TextField>
+            </SelectField>
             <TextField label={t('common.labels.note')} value={bulkNote} onChange={(e) => setBulkNote(e.target.value)} multiline minRows={2} />
             {bulkList.error && <Typography color="error" variant="body2">{(bulkList.error as Error).message}</Typography>}
           </Stack>

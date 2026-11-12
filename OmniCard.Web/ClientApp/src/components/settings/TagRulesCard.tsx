@@ -40,6 +40,7 @@ import type { TagRuleDto, TagRuleInput, TagRulePreviewDto } from '../../api/type
 import { useFormatters } from '../../i18n/format';
 import { SearchBox } from '../SearchBox';
 
+import { SelectField } from '../SelectField';
 const emptyRule = (game: string): TagRuleInput => ({ name: '', game, query: '', tags: [], enabled: true });
 
 /** `value`, settled for `delay` ms — keeps the live preview from querying on every keystroke. */
@@ -325,8 +326,7 @@ export function TagRulesCard() {
       </Typography>
 
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1, mb: 1 }}>
-        <TextField
-          select
+        <SelectField
           size="small"
           label={t('common.labels.game')}
           value={game}
@@ -338,7 +338,7 @@ export function TagRulesCard() {
               {g.displayName}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
         <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setDialog({ open: true, existing: null })}>
           {t('settings.tagRules.addRule')}
         </Button>

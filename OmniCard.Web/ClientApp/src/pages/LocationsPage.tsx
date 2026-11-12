@@ -55,6 +55,7 @@ import { SetMultiSelect } from '../components/SetMultiSelect';
 import { IgnoredLocationsDialog } from '../components/dialogs/IgnoredLocationsDialog';
 import { useIsPhone } from '../lib/responsive';
 
+import { SelectField } from '../components/SelectField';
 // The columns a phone keeps: the location, how many cards (or search matches) it holds and their value.
 const PHONE_COLUMNS: Record<string, { width?: number; minWidth?: number }> = {
   name: { minWidth: 120 },
@@ -128,8 +129,7 @@ function AddLocationBar({ onAdded, siteFilter }: { onAdded: () => void; siteFilt
         helperText={taken ? t('locations.addBar.nameTaken') : ' '}
         sx={{ width: 260 }}
       />
-      <TextField
-        select
+      <SelectField
         size="small"
         label={t('common.labels.type')}
         value={type}
@@ -141,7 +141,7 @@ function AddLocationBar({ onAdded, siteFilter }: { onAdded: () => void; siteFilt
             {t(`locations.types.${lt.value}`)}
           </MenuItem>
         ))}
-      </TextField>
+      </SelectField>
       {isDeckBox ? (
         <DeckBoxGamePicker
           game={game}
@@ -153,8 +153,7 @@ function AddLocationBar({ onAdded, siteFilter }: { onAdded: () => void; siteFilt
           onDeckTypeChange={setDeckTypeId}
         />
       ) : (
-        <TextField
-          select
+        <SelectField
           size="small"
           label={t('common.labels.game')}
           value={game}
@@ -173,7 +172,7 @@ function AddLocationBar({ onAdded, siteFilter }: { onAdded: () => void; siteFilt
               {g.displayName}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
       )}
       {game && (
         <SetMultiSelect

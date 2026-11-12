@@ -35,6 +35,7 @@ import { CardImage } from '../CardImage';
 import { LocationPickerDialog } from './LocationPickerDialog';
 import { ListForSaleDialog } from './ListForSaleDialog';
 
+import { SelectField } from '../SelectField';
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
 export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onClose: () => void }) {
@@ -198,8 +199,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
             </Stack>
             <Divider />
 
-            <TextField
-              select
+            <SelectField
               label={t('common.labels.condition')}
               size="small"
               value={condition}
@@ -210,7 +210,7 @@ export function CardEditDrawer({ cardId, onClose }: { cardId: number | null; onC
                   {t(`common.conditions.${c}`)}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
 
             <LanguageSelect game={card.game} value={language} onChange={setLanguage} fullWidth sx={{}} />
 

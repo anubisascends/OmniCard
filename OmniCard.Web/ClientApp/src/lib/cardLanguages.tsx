@@ -1,10 +1,11 @@
-import { useCallback, useState } from 'react';
-import { Checkbox, Chip, ListItemText, MenuItem, TextField, Tooltip, type SelectProps, type SxProps, type Theme } from '@mui/material';
+import { useCallback, useState, type Ref } from 'react';
+import { Checkbox, Chip, ListItemText, MenuItem, Tooltip, type SxProps, type Theme } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
 
+import { SelectField } from '../components/SelectField';
 /** English — the implied language of every copy that isn't tagged otherwise. */
 export const ENGLISH = 'en';
 
@@ -95,8 +96,7 @@ export function LanguageFilterSelect({
 }) {
   const { t } = useTranslation();
   return (
-    <TextField
-      select
+    <SelectField
       size="small"
       label={t('common.labels.languages')}
       value={value}
@@ -127,7 +127,7 @@ export function LanguageFilterSelect({
           <ListItemText primary={languageName(t, code)} />
         </MenuItem>
       ))}
-    </TextField>
+    </SelectField>
   );
 }
 
@@ -147,7 +147,8 @@ export function LanguageSelect({
   sx,
   helperText,
   disabled,
-  selectProps,
+  inputRef,
+  openOnFocus,
 }: {
   game: string | null | undefined;
   value: string;
@@ -160,15 +161,16 @@ export function LanguageSelect({
   sx?: SxProps<Theme>;
   helperText?: string;
   disabled?: boolean;
-  /** Passed to the underlying Select (e.g. to open it from the keyboard). */
-  selectProps?: Partial<SelectProps>;
+  /** The text input, e.g. to focus it from a shortcut key. */
+  inputRef?: Ref<HTMLInputElement>;
+  /** Open the list as soon as the field gets focus. */
+  openOnFocus?: boolean;
 }) {
   const { t } = useTranslation();
   const languages = useCardLanguages(game);
   const options = value && !languages.includes(value) ? [...languages, value] : languages;
   return (
-    <TextField
-      select
+    <SelectField
       size="small"
       label={label ?? t('common.labels.language')}
       value={value}
@@ -177,7 +179,8 @@ export function LanguageSelect({
       helperText={helperText}
       disabled={disabled}
       sx={sx ?? { minWidth: 150 }}
-      slotProps={selectProps ? { select: selectProps } : undefined}
+      inputRef={inputRef}
+      openOnFocus={openOnFocus}
     >
       {allowAuto && <MenuItem value="">{emptyLabel ?? t('scan.controls.languageAuto')}</MenuItem>}
       {options.map((code) => (
@@ -185,7 +188,7 @@ export function LanguageSelect({
           {languageName(t, code)}
         </MenuItem>
       ))}
-    </TextField>
+    </SelectField>
   );
 }
 

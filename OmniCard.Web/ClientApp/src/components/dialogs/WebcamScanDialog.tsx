@@ -13,7 +13,6 @@ import {
   MenuItem,
   Stack,
   Switch,
-  TextField,
   Typography,
 } from '@mui/material';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
@@ -22,6 +21,7 @@ import { centroid, quadArea, sigDistance, type DetectedCard, type Point } from '
 import { cardWidthPx, cropRegion, readRegions } from '../../utils/cardCapture';
 import { detectCards, ensureCvReady } from '../../utils/cvWorker';
 
+import { SelectField } from '../SelectField';
 // --- Tuning constants for the detect → hold steady → capture loop. ---
 const DETECT_INTERVAL_MS = 30; // pause between detections; the worker's own detect time sets the real pace.
 const DETECT_WIDTH = 720; // downscale frames for detection (fast + small worker transfer); capture is full-res.
@@ -426,8 +426,7 @@ export function WebcamScanDialog({
 
           <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
             {devices.length > 1 && (
-              <TextField
-                select
+              <SelectField
                 size="small"
                 label={t('dialogs.webcam.camera')}
                 value={deviceId}
@@ -442,7 +441,7 @@ export function WebcamScanDialog({
                     {d.label || t('dialogs.webcam.cameraN', { number: i + 1 })}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
             )}
             <FormControlLabel
               control={<Switch checked={multi} onChange={(e) => toggleMulti(e.target.checked)} />}

@@ -52,6 +52,7 @@ import { useFormatters } from '../i18n/format';
 import { LanguageSelect } from '../lib/cardLanguages';
 import type { CardListDto, CardListItemDto, ListExportScope } from '../api/types';
 
+import { SelectField } from '../components/SelectField';
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
 type PickerTarget = 'move' | 'add';
@@ -525,8 +526,7 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (messag
               >
                 {locationName(addTo)}
               </Button>
-              <TextField
-                select
+              <SelectField
                 size="small"
                 label={t('lists.detail.conditionLabel')}
                 value={condition}
@@ -539,7 +539,7 @@ function ListDetail({ list, onDeleted }: { list: CardListDto; onDeleted: (messag
                     {t(`common.conditions.${c}`)}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
             </Stack>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
               <Button
@@ -724,8 +724,7 @@ export function ListsPage() {
 
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
-          <TextField
-            select
+          <SelectField
             size="small"
             label={t('common.labels.game')}
             value={game}
@@ -740,7 +739,7 @@ export function ListsPage() {
                 {g.displayName}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
           <Box sx={{ flexGrow: 1 }} />
           <TextField
             size="small"

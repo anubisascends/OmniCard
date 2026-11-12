@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import { api } from '../../api/client';
 
+import { SelectField } from '../SelectField';
 const CHANNELS = ['Manual', 'TcgPlayer', 'Ebay'];
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 const AUCTION_DURATIONS = [1, 3, 5, 7, 10];
@@ -201,11 +202,11 @@ export function ListForSaleDialog({
             }}
             autoFocus={!target || target.quantity <= 1}
           />
-          <TextField select label={t('common.labels.channel')} value={channel} onChange={(e) => setChannel(e.target.value)}>
+          <SelectField label={t('common.labels.channel')} value={channel} onChange={(e) => setChannel(e.target.value)}>
             {CHANNELS.map((c) => (
               <MenuItem key={c} value={c}>{t(`common.channels.${c}`)}</MenuItem>
             ))}
-          </TextField>
+          </SelectField>
           <TextField label={t('common.labels.note')} value={note} onChange={(e) => setNote(e.target.value)} multiline minRows={2} />
 
           {isEbay && (
@@ -232,8 +233,7 @@ export function ListForSaleDialog({
                 multiline
                 minRows={2}
               />
-              <TextField
-                select
+              <SelectField
                 label={t('sales.listForSale.ebay.condition')}
                 value={condition}
                 onChange={(e) => setCondition(e.target.value)}
@@ -241,19 +241,17 @@ export function ListForSaleDialog({
                 {CONDITIONS.map((c) => (
                   <MenuItem key={c} value={c}>{t(`common.conditions.${c}`, c)}</MenuItem>
                 ))}
-              </TextField>
-              <TextField
-                select
+              </SelectField>
+              <SelectField
                 label={t('sales.listForSale.ebay.listingType')}
                 value={listingType}
                 onChange={(e) => setListingType(e.target.value)}
               >
                 <MenuItem value="FixedPrice">{t('sales.listForSale.ebay.fixedPrice')}</MenuItem>
                 <MenuItem value="Auction">{t('sales.listForSale.ebay.auction')}</MenuItem>
-              </TextField>
+              </SelectField>
               {listingType === 'Auction' && (
-                <TextField
-                  select
+                <SelectField
                   label={t('sales.listForSale.ebay.auctionDuration')}
                   value={auctionDuration}
                   onChange={(e) => setAuctionDuration(Number(e.target.value))}
@@ -261,10 +259,9 @@ export function ListForSaleDialog({
                   {AUCTION_DURATIONS.map((d) => (
                     <MenuItem key={d} value={d}>{t('sales.listForSale.ebay.days', { count: d })}</MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
               )}
-              <TextField
-                select
+              <SelectField
                 label={t('sales.listForSale.ebay.category')}
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
@@ -281,7 +278,7 @@ export function ListForSaleDialog({
                 {draft.data?.categories.map((c) => (
                   <MenuItem key={c.categoryId} value={c.categoryId}>{c.title}</MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
 
               {ebayError && <Alert severity="error">{t('sales.listForSale.ebay.listedLocallyError', { error: ebayError })}</Alert>}
             </>

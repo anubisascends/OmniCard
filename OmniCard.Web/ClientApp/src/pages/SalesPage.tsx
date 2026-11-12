@@ -53,6 +53,7 @@ import { usePermissions } from '../context/usePermissions';
 import { KioskQueue } from '../components/kiosk/KioskQueue';
 import { StoreCreditDialog } from '../components/intake/StoreCreditDialog';
 
+import { SelectField } from '../components/SelectField';
 function laneOf(order: OrderDto, lanes: WorkflowLaneDto[]): string {
   const byKey = lanes.find((l) => l.key === order.stageKey);
   if (byKey) return byKey.key;
@@ -82,8 +83,7 @@ function CreateOrderDialog({ open, onClose, onCreated }: { open: boolean; onClos
       <DialogTitle>{t('sales.createOrder.title')}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <TextField
-            select
+          <SelectField
             label={t('sales.createOrder.customer')}
             required
             value={customerId}
@@ -92,12 +92,12 @@ function CreateOrderDialog({ open, onClose, onCreated }: { open: boolean; onClos
             {customers.data?.map((c) => (
               <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
             ))}
-          </TextField>
-          <TextField select label={t('common.labels.channel')} value={channel} onChange={(e) => setChannel(e.target.value)}>
+          </SelectField>
+          <SelectField label={t('common.labels.channel')} value={channel} onChange={(e) => setChannel(e.target.value)}>
             {['Manual', 'TcgPlayer', 'Ebay'].map((c) => (
               <MenuItem key={c} value={c}>{t(`common.channels.${c}`)}</MenuItem>
             ))}
-          </TextField>
+          </SelectField>
           <TextField label={t('sales.createOrder.orderNumberOptional')} value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} />
           {create.error && <Typography color="error" variant="body2">{(create.error as Error).message}</Typography>}
         </Stack>
@@ -309,8 +309,7 @@ function ListingDialog({
             }}
             autoFocus
           />
-          <TextField
-            select
+          <SelectField
             label={t('common.labels.channel')}
             value={fields.channel}
             onChange={(e) => setFields((f) => ({ ...f, channel: e.target.value }))}
@@ -318,7 +317,7 @@ function ListingDialog({
             {LISTING_CHANNELS.map((c) => (
               <MenuItem key={c} value={c}>{t(`common.channels.${c}`)}</MenuItem>
             ))}
-          </TextField>
+          </SelectField>
           <TextField
             label={t('common.labels.quantity')}
             type="number"

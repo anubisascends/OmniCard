@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { MenuItem, TextField, type SxProps, type Theme } from '@mui/material';
+import { MenuItem, type SxProps, type Theme } from '@mui/material';
 import type { SiteDto } from '../api/types';
 
+import { SelectField } from './SelectField';
 /** Value of the "All Sites" entry when `includeAll` is set. */
 export const ALL_SITES = 'all' as const;
 export type SiteFilterValue = typeof ALL_SITES | number;
@@ -34,8 +35,7 @@ export function SiteSelect({
   const current = known ? value : includeAll ? ALL_SITES : (sites[0]?.id ?? '');
 
   return (
-    <TextField
-      select
+    <SelectField
       size="small"
       label={label ?? t('locations.sites.label')}
       value={current}
@@ -53,6 +53,6 @@ export function SiteSelect({
           {s.access === 'Read' ? ` (${t('locations.sites.readOnly')})` : ''}
         </MenuItem>
       ))}
-    </TextField>
+    </SelectField>
   );
 }

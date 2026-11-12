@@ -57,6 +57,7 @@ import {
   displaysFor,
 } from './widgetModel';
 
+import { SelectField } from '../SelectField';
 interface WidgetEditorDialogProps {
   open: boolean;
   widget: DashboardWidgetDto | null;
@@ -183,8 +184,7 @@ function SourceFields({
     case 'metric':
       return (
         <>
-          <TextField
-            select
+          <SelectField
             label={t('dashboard.editor.metric')}
             value={draft.metric ?? 'totalMarket'}
             onChange={(e) => set({ metric: e.target.value })}
@@ -203,7 +203,7 @@ function SourceFields({
                 {t(`dashboard.metrics.${m}`)}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
           <FormControlLabel
             control={<Switch checked={!!draft.colorBySign} onChange={(e) => set({ colorBySign: e.target.checked })} />}
             label={t('dashboard.editor.colorBySign')}
@@ -212,8 +212,7 @@ function SourceFields({
       );
     case 'breakdown':
       return (
-        <TextField
-          select
+        <SelectField
           label={t('dashboard.editor.breakdown')}
           value={draft.groupBy ?? 'game'}
           onChange={(e) => set({ groupBy: e.target.value, valueColumns: null, labelColumn: null })}
@@ -225,7 +224,7 @@ function SourceFields({
               {t(`dashboard.breakdowns.${b}`)}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
       );
     case 'search':
       return <SearchFields draft={draft} set={set} games={games} />;
@@ -259,8 +258,7 @@ function SearchFields({ draft, set, games }: { draft: DashboardWidgetDto; set: S
   const output = draft.output ?? 'summary';
   return (
     <>
-      <TextField
-        select
+      <SelectField
         label={t('dashboard.editor.game')}
         value={draft.game ?? ''}
         onChange={(e) => set({ game: e.target.value || null })}
@@ -275,15 +273,14 @@ function SearchFields({ draft, set, games }: { draft: DashboardWidgetDto; set: S
             {g.displayName}
           </MenuItem>
         ))}
-      </TextField>
+      </SelectField>
       <Box>
         <SearchBox value={query} onChange={setQuery} game={draft.game ?? ''} />
         <Typography variant="caption" color="text.secondary">
           {t('dashboard.editor.queryHint')}
         </Typography>
       </Box>
-      <TextField
-        select
+      <SelectField
         label={t('dashboard.editor.output')}
         value={output}
         onChange={(e) =>
@@ -303,10 +300,9 @@ function SearchFields({ draft, set, games }: { draft: DashboardWidgetDto; set: S
             {t(`dashboard.outputs.${o}`)}
           </MenuItem>
         ))}
-      </TextField>
+      </SelectField>
       {output === 'groups' && (
-        <TextField
-          select
+        <SelectField
           label={t('dashboard.editor.groupBy')}
           value={draft.groupBy ?? 'setCode'}
           onChange={(e) => set({ groupBy: e.target.value })}
@@ -318,12 +314,11 @@ function SearchFields({ draft, set, games }: { draft: DashboardWidgetDto; set: S
               {t(`dashboard.groupFields.${f}`)}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
       )}
       {output !== 'summary' && (
         <Stack direction="row" spacing={2}>
-          <TextField
-            select
+          <SelectField
             label={t('dashboard.editor.sort')}
             value={draft.sort ?? 'value'}
             onChange={(e) => set({ sort: e.target.value })}
@@ -335,7 +330,7 @@ function SearchFields({ draft, set, games }: { draft: DashboardWidgetDto; set: S
                 {t(`dashboard.sorts.${s}`)}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
           <TextField
             type="number"
             label={t('dashboard.editor.limit')}
@@ -390,8 +385,7 @@ function SqlFields({
   return (
     <>
       {locked && <Alert severity="info">{t('dashboard.editor.sqlReadOnly')}</Alert>}
-      <TextField
-        select
+      <SelectField
         label={t('dashboard.editor.database')}
         value={database}
         onChange={(e) => set({ database: e.target.value })}
@@ -404,7 +398,7 @@ function SqlFields({
             {d.label}
           </MenuItem>
         ))}
-      </TextField>
+      </SelectField>
       <TextField
         label={t('dashboard.editor.sql')}
         value={draft.sql ?? ''}
@@ -512,8 +506,7 @@ function DisplayFields({
         </ToggleButtonGroup>
       )}
       {display === 'chart' && (
-        <TextField
-          select
+        <SelectField
           label={t('dashboard.editor.chart')}
           value={draft.chart ?? 'bar'}
           onChange={(e) => set({ chart: e.target.value as DashboardWidgetDto['chart'] })}
@@ -525,11 +518,10 @@ function DisplayFields({
               {t(`dashboard.charts.${c}`)}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
       )}
       {columns.length > 0 && display === 'stat' && (
-        <TextField
-          select
+        <SelectField
           label={t('dashboard.editor.statColumn')}
           value={draft.statColumn ?? ''}
           onChange={(e) => set({ statColumn: e.target.value || null })}
@@ -543,11 +535,10 @@ function DisplayFields({
               {label(c.key)}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
       )}
       {columns.length > 0 && display === 'chart' && (
-        <TextField
-          select
+        <SelectField
           label={t('dashboard.editor.labelColumn')}
           value={draft.labelColumn ?? ''}
           onChange={(e) => set({ labelColumn: e.target.value || null })}
@@ -561,11 +552,10 @@ function DisplayFields({
               {label(c.key)}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
       )}
       {columns.length > 0 && display !== 'stat' && (
-        <TextField
-          select
+        <SelectField
           label={display === 'chart' ? t('dashboard.editor.valueColumns') : t('dashboard.editor.tableColumns')}
           value={draft.valueColumns ?? []}
           onChange={(e) => {
@@ -598,7 +588,7 @@ function DisplayFields({
               {label(c.key)}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
       )}
       {display === 'stat' && draft.type !== 'metric' && (
         <FormControlLabel
@@ -614,9 +604,8 @@ function DisplayFields({
           <AccordionDetails>
             <Stack spacing={1}>
               {columns.map((c) => (
-                <TextField
+                <SelectField
                   key={c.key}
-                  select
                   label={label(c.key)}
                   value={draft.formats?.[c.key] ?? ''}
                   onChange={(e) => {
@@ -634,7 +623,7 @@ function DisplayFields({
                       {t(`dashboard.formats.${f}`)}
                     </MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
               ))}
             </Stack>
           </AccordionDetails>

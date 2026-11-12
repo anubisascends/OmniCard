@@ -23,6 +23,7 @@ import { LanguageSelect } from '../../lib/cardLanguages';
 import { LocationPickerDialog } from '../dialogs/LocationPickerDialog';
 import { SetMultiSelect } from '../SetMultiSelect';
 
+import { SelectField } from '../SelectField';
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
 const blankFolder = (game: string): ScanFolderConfigDto => ({
@@ -241,8 +242,7 @@ function FolderRow({
             label={t('scan.controls.artSets')}
             sx={{ minWidth: 260, flex: '1 1 260px' }}
           />
-          <TextField
-            select
+          <SelectField
             size="small"
             label={t('common.labels.condition')}
             value={folder.condition}
@@ -254,7 +254,7 @@ function FolderRow({
                 {c}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
           <LanguageSelect
             game={game}
             allowAuto

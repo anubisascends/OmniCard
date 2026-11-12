@@ -34,6 +34,7 @@ import { api } from '../../api/client';
 import type { OrderImportPreviewDto, OrderImportRowDto, OrderImportTemplateDto } from '../../api/types';
 import { useFormatters } from '../../i18n/format';
 
+import { SelectField } from '../SelectField';
 const CHANNELS = ['Manual', 'TcgPlayer', 'Ebay'];
 const REQUIRED_FIELD = 'OrderNumber';
 const NONE = '';
@@ -203,8 +204,7 @@ export function ImportOrdersDialog({
         {step === 1 && (
           <Stack spacing={2}>
             <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-              <TextField
-                select
+              <SelectField
                 size="small"
                 label={t('sales.orderImport.template')}
                 value={templateId}
@@ -219,9 +219,8 @@ export function ImportOrdersDialog({
                     {tp.name}{tp.isBuiltIn ? ` (${t('sales.orderImport.builtIn')})` : ''}
                   </MenuItem>
                 ))}
-              </TextField>
-              <TextField
-                select
+              </SelectField>
+              <SelectField
                 size="small"
                 label={t('common.labels.channel')}
                 value={channel}
@@ -231,7 +230,7 @@ export function ImportOrdersDialog({
                 {CHANNELS.map((c) => (
                   <MenuItem key={c} value={c}>{t(`common.channels.${c}`)}</MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
               {selectedTemplate && !selectedTemplate.isBuiltIn && (
                 <Tooltip title={t('sales.orderImport.deleteTemplate')}>
                   <span>
@@ -255,9 +254,8 @@ export function ImportOrdersDialog({
               {(fields.data ?? []).map((field) => {
                 const required = field === REQUIRED_FIELD;
                 return (
-                  <TextField
+                  <SelectField
                     key={field}
-                    select
                     size="small"
                     required={required}
                     error={required && !mappings[field]}
@@ -271,7 +269,7 @@ export function ImportOrdersDialog({
                     {headers.map((h) => (
                       <MenuItem key={h} value={h}>{h}</MenuItem>
                     ))}
-                  </TextField>
+                  </SelectField>
                 );
               })}
             </Box>

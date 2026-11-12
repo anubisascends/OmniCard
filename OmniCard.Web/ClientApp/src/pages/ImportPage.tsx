@@ -21,6 +21,7 @@ import { LocationPickerField } from '../components/LocationPickerField';
 import { useGame } from '../context/GameContext';
 import { useFormatters } from '../i18n/format';
 
+import { SelectField } from '../components/SelectField';
 // Server format identifiers — not translated. Display labels resolve via importing.export.formats.
 // The full-collection export omits the Card Price Ticker (a per-video list, not a collection format).
 const EXPORT_FORMATS = ALL_EXPORT_FORMATS.filter((f) => f !== 'ticker');
@@ -182,8 +183,7 @@ function UrlImportSection() {
             cardGames={['Mtg']}
             sx={{ flex: 1 }}
           />
-          <TextField
-            select
+          <SelectField
             size="small"
             label={t('common.labels.condition')}
             value={condition}
@@ -195,7 +195,7 @@ function UrlImportSection() {
                 {t(`common.conditions.${c}`)}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
         </Stack>
         <FormControlLabel
           control={<Checkbox checked={skipDuplicates} onChange={(e) => setSkipDuplicates(e.target.checked)} />}

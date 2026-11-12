@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { MenuItem, Stack, TextField } from '@mui/material';
+import { MenuItem, Stack } from '@mui/material';
 import { api } from '../api/client';
 
+import { SelectField } from './SelectField';
 /**
  * The Game + Deck Type pickers a deck box requires. Reused by the Locations add bar, the move
  * picker's inline create section, and the deck-box assign dialog. Fetches the games list and the
@@ -39,8 +40,7 @@ export function DeckBoxGamePicker({
 
   return (
     <Stack direction={direction} spacing={1}>
-      <TextField
-        select
+      <SelectField
         size="small"
         label={t('common.labels.game')}
         required
@@ -55,9 +55,8 @@ export function DeckBoxGamePicker({
             {g.displayName}
           </MenuItem>
         ))}
-      </TextField>
-      <TextField
-        select
+      </SelectField>
+      <SelectField
         size="small"
         label={t('deckbox.picker.deckType')}
         value={deckTypeId ?? ''}
@@ -74,7 +73,7 @@ export function DeckBoxGamePicker({
             {d.name}
           </MenuItem>
         ))}
-      </TextField>
+      </SelectField>
     </Stack>
   );
 }

@@ -98,6 +98,7 @@ import { Kbd } from '../components/Kbd';
 import { SetMultiSelect } from '../components/SetMultiSelect';
 import { LONG_PRESS_SX, useIsPhone, useLongPress } from '../lib/responsive';
 
+import { SelectField } from '../components/SelectField';
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
 type ItemStatus = 'matching' | 'done' | 'error';
@@ -922,8 +923,7 @@ function PropertyFields({
   return (
     <Stack spacing={2}>
       <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-        <TextField
-          select
+        <SelectField
           size="small"
           label={t('common.labels.condition')}
           value={props.condition}
@@ -936,7 +936,7 @@ function PropertyFields({
               {c}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
         <LanguageSelect
           game={game}
           value={props.language}
@@ -1454,8 +1454,7 @@ function BulkEditDialog({
           {row(
             state.setCondition,
             (v) => setState((s) => ({ ...s, setCondition: v })),
-            <TextField
-              select
+            <SelectField
               size="small"
               fullWidth
               label={t('common.labels.condition')}
@@ -1467,7 +1466,7 @@ function BulkEditDialog({
                   {c}
                 </MenuItem>
               ))}
-            </TextField>,
+            </SelectField>,
           )}
           {row(
             state.setLanguage,
@@ -1536,8 +1535,7 @@ function BulkEditDialog({
             state.setTags,
             (v) => setState((s) => ({ ...s, setTags: v })),
             <Stack direction="row" spacing={1} alignItems="flex-start">
-              <TextField
-                select
+              <SelectField
                 size="small"
                 label={t('scan.bulk.mode')}
                 value={state.tagsMode}
@@ -1546,7 +1544,7 @@ function BulkEditDialog({
               >
                 <MenuItem value="add">{t('scan.bulk.modeAdd')}</MenuItem>
                 <MenuItem value="replace">{t('scan.bulk.modeReplace')}</MenuItem>
-              </TextField>
+              </SelectField>
               <Autocomplete
                 multiple
                 freeSolo
@@ -2799,8 +2797,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
       ) : (
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap alignItems="center">
-            <TextField
-              select
+            <SelectField
               size="small"
               label={t('common.labels.game')}
               value={game}
@@ -2812,7 +2809,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                   {g.displayName}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
             <SetMultiSelect
               game={game}
               value={artSets}
@@ -2820,8 +2817,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
               label={t('scan.controls.artSets')}
               sx={{ minWidth: { xs: '100%', sm: 260 }, flex: '1 1 260px' }}
             />
-            <TextField
-              select
+            <SelectField
               size="small"
               label={t('common.labels.condition')}
               value={condition}
@@ -2833,7 +2829,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                   {c}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
             <Tooltip title={t('scan.controls.languageHelp')}>
               <Box>
                 <LanguageSelect
@@ -3260,8 +3256,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
               InputProps={{ startAdornment: <SearchIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} /> }}
               sx={{ flex: '1 1 200px', minWidth: 180 }}
             />
-            <TextField
-              select
+            <SelectField
               size="small"
               label={t('scan.filter.show')}
               value={controls.checked}
@@ -3271,7 +3266,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
               <MenuItem value="all">{t('scan.filter.all')}</MenuItem>
               <MenuItem value="checked">{t('scan.filter.checkedOnly')}</MenuItem>
               <MenuItem value="unchecked">{t('scan.filter.uncheckedOnly')}</MenuItem>
-            </TextField>
+            </SelectField>
             <TextField
               size="small"
               type="number"
@@ -3291,8 +3286,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
               sx={{ width: 130 }}
             />
             <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
-            <TextField
-              select
+            <SelectField
               size="small"
               label={t('scan.filter.sortBy')}
               value={controls.sortKey}
@@ -3303,7 +3297,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
               <MenuItem value="name">{t('common.labels.name')}</MenuItem>
               <MenuItem value="confidence">{t('scan.filter.sortConfidence')}</MenuItem>
               <MenuItem value="value">{t('scan.filter.sortValue')}</MenuItem>
-            </TextField>
+            </SelectField>
             <Tooltip title={controls.sortDir === 'asc' ? t('scan.filter.ascending') : t('scan.filter.descending')}>
               <span>
                 <IconButton
