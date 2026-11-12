@@ -148,7 +148,7 @@ public class ScryfallLanguageTests : IDisposable
     public void CatalogLanguages_AlwaysKeepsEnglish_AndDropsUnsupported()
     {
         var svc = CreateService();
-        svc.CatalogLanguages = ["jp", "klingon"];
+        svc.CatalogLanguages = ["jp", "elvish"];
         Assert.Equal(["en", "ja"], svc.CatalogLanguages);
     }
 

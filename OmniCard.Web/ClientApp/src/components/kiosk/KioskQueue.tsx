@@ -35,6 +35,7 @@ import { useFormatters } from '../../i18n/format';
 import { usePermissions } from '../../context/usePermissions';
 import { CardImage } from '../CardImage';
 import { OrderDetailDrawer } from '../dialogs/OrderDetailDrawer';
+import { languageName } from '../../lib/languageName';
 
 const QUEUE_KEY = ['kiosk-queue'];
 
@@ -241,7 +242,7 @@ function QueueEntry({
                   </TableCell>
                   <TableCell>
                     {t(`common.conditions.${line.condition}`, { defaultValue: line.condition })}
-                    {line.language !== 'en' && ` · ${t(`common.languages.${line.language}`, { defaultValue: line.language })}`}
+                    {line.language !== 'en' && ` · ${languageName(t, line.language)}`}
                   </TableCell>
                   <TableCell>
                     <WhereText line={line} />

@@ -41,6 +41,7 @@ import { BuyListButton } from './BuyListButton';
 import { kioskApi, KioskApiError } from './kioskApi';
 
 import { SelectField } from '../components/SelectField';
+import { languageName } from '../lib/languageName';
 const PAGE_SIZE = 48;
 
 type Sort = 'name' | 'price-desc' | 'price-asc';
@@ -350,7 +351,7 @@ function CardChips({ card }: { card: { condition: string; language: string; isFo
       <Chip size="small" label={t(`common.conditions.${card.condition}`, { defaultValue: card.condition })} />
       {card.isFoil && <Chip size="small" color="secondary" label={t('kiosk.app.browse.foil')} />}
       {card.language !== 'en' && (
-        <Chip size="small" variant="outlined" label={t(`common.languages.${card.language}`, { defaultValue: card.language })} />
+        <Chip size="small" variant="outlined" label={languageName(t, card.language)} />
       )}
     </Stack>
   );
@@ -381,7 +382,7 @@ function CardDialog({
     [t('kiosk.app.card.number'), card.number],
     [t('kiosk.app.card.rarity'), card.rarity],
     [t('kiosk.app.card.condition'), t(`common.conditions.${card.condition}`, { defaultValue: card.condition })],
-    [t('kiosk.app.card.language'), t(`common.languages.${card.language}`, { defaultValue: card.language })],
+    [t('kiosk.app.card.language'), languageName(t, card.language)],
   ];
   if (showPrice) rows.push([t('kiosk.app.card.price'), card.price != null ? fmt.money(card.price) : t('kiosk.app.browse.noPrice')]);
 

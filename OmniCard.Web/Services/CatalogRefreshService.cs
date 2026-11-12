@@ -162,6 +162,15 @@ public sealed class CatalogRefreshService
                     await DownloadImagesAsync(service, job.Game, SetMessage, ct);
                     break;
             }
+            // A language the source serves that the built-in list doesn't know yet: remember it so it
+            // can be downloaded, tagged and searched from now on (and after a restart).
+            if (_languages is not null && service is ICatalogLanguageAware aware && aware.DiscoveredLanguages.Count > 0)
+            {
+                var added = _languages.AddDiscoveredLanguages(job.Game, aware.DiscoveredLanguages);
+                if (added.Count > 0)
+                    _logger.LogInformation("New {Game} card languages found in the catalog source: {Languages}",
+                        job.Game, string.Join(", ", added));
+            }
             // Keep the job's last progress line (e.g. "prices updated (N cards)") as its result.
             string message;
             lock (_lock)

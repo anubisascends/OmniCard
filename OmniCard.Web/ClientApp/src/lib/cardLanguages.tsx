@@ -1,9 +1,9 @@
 import { useCallback, useState, type Ref } from 'react';
 import { Checkbox, Chip, ListItemText, MenuItem, Tooltip, type SxProps, type Theme } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
+import { languageName } from './languageName';
 
 import { SelectField } from '../components/SelectField';
 /** English — the implied language of every copy that isn't tagged otherwise. */
@@ -192,10 +192,7 @@ export function LanguageSelect({
   );
 }
 
-/** Localized display name for a language code (falls back to the upper-cased code). */
-export function languageName(t: TFunction, code: string): string {
-  return t(`common.languages.${code}`, { defaultValue: code.toUpperCase() });
-}
+export { languageName };
 
 /** Small "JA"-style chip for a non-English copy; renders nothing for English unless `showEnglish` (for
  * lists that mix languages, where an unlabelled row would be ambiguous). */

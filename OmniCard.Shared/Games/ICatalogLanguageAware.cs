@@ -23,6 +23,12 @@ public interface ICatalogLanguageAware
     /// <summary>The languages the next download should fetch. English is always included.</summary>
     IReadOnlyCollection<string> CatalogLanguages { get; set; }
 
+    /// <summary>Languages the last refresh found in the source that <see cref="CardLanguages"/> doesn't
+    /// know yet (e.g. Scryfall adding Klingon). The catalog-refresh job persists them
+    /// (<see cref="Settings.ICatalogLanguageSettingsService.AddDiscoveredLanguages"/>), which registers them
+    /// with <see cref="CardLanguages.RegisterDiscovered"/> so they can be downloaded and tagged.</summary>
+    IReadOnlyCollection<string> DiscoveredLanguages => [];
+
     /// <summary>The catalog language of <paramref name="gameCardId"/>, or null when the id is unknown.</summary>
     string? GetCardLanguage(string gameCardId);
 

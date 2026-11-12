@@ -131,7 +131,7 @@ public class ListsControllerTests : IDisposable
         Assert.Equal(1, Value(_controller.Items(list.Id))[0].OwnedQuantity);
         Assert.Equal("ja", Value(_controller.Get("Mtg"))[0].Language);
 
-        Assert.IsType<BadRequestObjectResult>(_controller.SetLanguage(list.Id, new SetListLanguageRequest { Language = "klingon" }));
+        Assert.IsType<BadRequestObjectResult>(_controller.SetLanguage(list.Id, new SetListLanguageRequest { Language = "elvish" }));
     }
 
     [Fact]

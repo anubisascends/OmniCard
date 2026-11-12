@@ -22,7 +22,13 @@ public class CardLanguagesTests
     [InlineData("zh-TW", "zht")]
     [InlineData("English", "en")]
     [InlineData("  de ", "de")]
-    [InlineData("klingon", null)]
+    [InlineData("klingon", "tlh")]
+    [InlineData("Dwarven", "dw")]
+    [InlineData("Quenya", "qya")]
+    [InlineData("grc", "grc")]
+    [InlineData("hebrew", "he")]
+    [InlineData("tchinese", "zht")]
+    [InlineData("elvish", null)]
     [InlineData("", null)]
     [InlineData(null, null)]
     public void Normalize_MapsPrintedAndIsoSpellings(string? input, string? expected) =>
@@ -55,6 +61,73 @@ public class CardLanguagesTests
             Assert.All(CardLanguages.DownloadableFor(game), l => Assert.Contains(l, CardLanguages.ForGame(game)));
         }
         Assert.Contains("ja", CardLanguages.ForGame(CardGame.FinalFantasy));
+    }
+
+    [Fact]
+    public void Mtg_ListsEveryScryfallLanguage()
+    {
+        // Scryfall's all_cards languages as of 2026-11, including the one-off product languages.
+        string[] scryfall = ["en", "ja", "fr", "de", "es", "it", "zhs", "pt", "zht", "ru", "ko",
+                             "ph", "tlh", "qya", "dw", "grc", "sa", "la", "he", "ar"];
+        Assert.All(scryfall, l => Assert.Contains(l, CardLanguages.ForGame(CardGame.Mtg)));
+        Assert.All(scryfall, l => Assert.Contains(l, CardLanguages.DownloadableFor(CardGame.Mtg)));
+        Assert.Equal(["en", "dw", "tlh"], CardLanguages.SanitizeCatalogSelection(CardGame.Mtg, ["Dwarven", "klingon"]));
+    }
+
+    // The registry is process-wide, so each test registers codes no other test uses.
+    [Fact]
+    public void RegisterDiscovered_MakesCodeKnownForThatGame()
+    {
+        Assert.Null(CardLanguages.Normalize("zzqa"));
+
+        Assert.Equal(["zzqa"], CardLanguages.RegisterDiscovered(CardGame.Mtg, ["ZZQA", "zzqa", "en", "not a code", "x"]));
+
+        Assert.Equal("zzqa", CardLanguages.Normalize(" ZZQA "));
+        Assert.Equal("zzqa", CardLanguages.ToStored("zzqa"));
+        Assert.Equal("zzqa", CardLanguages.ForGame(CardGame.Mtg)[^1]);
+        Assert.Contains("zzqa", CardLanguages.DownloadableFor(CardGame.Mtg));
+        Assert.Contains("zzqa", CardLanguages.All);
+        Assert.Contains("zzqa", CardLanguages.SanitizeCatalogSelection(CardGame.Mtg, ["zzqa"]));
+        Assert.DoesNotContain("zzqa", CardLanguages.ForGame(CardGame.Riftbound));
+        Assert.Empty(CardLanguages.RegisterDiscovered(CardGame.Mtg, ["zzqa"])); // already known
+    }
+
+    [Fact]
+    public void RegisterDiscovered_EnglishOnlySource_StaysEnglishOnlyForDownload()
+    {
+        Assert.Equal(["zzqb"], CardLanguages.RegisterDiscovered(CardGame.Riftbound, ["zzqb"]));
+        Assert.Contains("zzqb", CardLanguages.ForGame(CardGame.Riftbound));
+        Assert.Equal(["en"], CardLanguages.DownloadableFor(CardGame.Riftbound));
+    }
+
+    [Fact]
+    public void CatalogLanguageSettings_PersistDiscoveredLanguages_AndRegisterOnLoad()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "catlang-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var dataPath = new Moq.Mock<OmniCard.Shared.Settings.IDataPathService>();
+            dataPath.Setup(d => d.DataDirectory).Returns(dir);
+
+            // A file written by an earlier run is registered when the service starts.
+            File.WriteAllText(Path.Combine(dir, "catalog-languages-discovered.json"), """{ "Mtg": ["zzqc"] }""");
+            var svc = new CatalogLanguageSettingsService(dataPath.Object);
+            Assert.Equal("zzqc", CardLanguages.Normalize("zzqc"));
+
+            // A ticked discovered language survives sanitizing.
+            Assert.Equal(["en", "zzqc"], svc.SetLanguages(CardGame.Mtg, ["zzqc"]));
+
+            Assert.Equal(["zzqd"], svc.AddDiscoveredLanguages(CardGame.Mtg, ["zzqc", "zzqd", "en"]));
+            Assert.Empty(svc.AddDiscoveredLanguages(CardGame.Mtg, ["zzqd"]));
+            var saved = File.ReadAllText(Path.Combine(dir, "catalog-languages-discovered.json"));
+            Assert.Contains("zzqc", saved);
+            Assert.Contains("zzqd", saved);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
     }
 
     [Fact]

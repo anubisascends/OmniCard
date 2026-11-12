@@ -455,6 +455,10 @@ builder.Services.AddSession(options =>
 
 var app = builder.Build();
 
+// Register card languages a catalog source was found to serve beyond the built-in list (e.g. a new
+// Scryfall language) before any request reads CardLanguages — the settings service loads them.
+app.Services.GetRequiredService<ICatalogLanguageSettingsService>();
+
 // Apply any pending SQL Server migrations to the unified store on startup (creates the DB on first
 // run). The catalog SQLite DBs are unaffected.
 using (var scope = app.Services.CreateScope())
