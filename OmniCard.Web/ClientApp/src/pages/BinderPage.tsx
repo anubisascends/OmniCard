@@ -59,6 +59,7 @@ import { Kbd } from '../components/Kbd';
 import { BinderDividerDialog, BinderDividerMarker, BinderDividerTabs, sectionOf } from '../components/BinderDividers';
 import { useFormatters } from '../i18n/format';
 
+import { SelectField } from '../components/SelectField';
 const CARD_BACK_SLUGS = ['mtg', 'optcg', 'riftbound', 'pokemon', 'yugioh', 'fftcg'];
 const cardBackSrc = (game: number): string | undefined => {
   const slug = CARD_BACK_SLUGS[game];
@@ -1308,8 +1309,7 @@ export function BinderPage() {
                 {t('binder.dividers.add')}
               </Button>
             </Tooltip>
-            <TextField
-              select
+            <SelectField
               size="small"
               label={t('binder.layout')}
               value={data.slotsPerPage}
@@ -1324,7 +1324,7 @@ export function BinderPage() {
                   {t('binder.layoutGrid', { cols: l.cols, rows: l.slots / l.cols, count: l.slots })}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
             {(quick ? [cursor.page] : [data.leftPageNumber, data.rightPageNumber]).map(
               (p) =>
                 p != null && (
@@ -1353,8 +1353,7 @@ export function BinderPage() {
             >
               <Stack spacing={1.5} sx={{ p: 2, width: { xs: 'calc(100vw - 32px)', sm: 380 } }}>
                 <Typography variant="subtitle2">{t('binder.setFilter.title')}</Typography>
-                <TextField
-                  select
+                <SelectField
                   size="small"
                   label={t('common.labels.game')}
                   value={setsGame}
@@ -1370,7 +1369,7 @@ export function BinderPage() {
                       {g.displayName}
                     </MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
                 <SetMultiSelect
                   game={setsGame}
                   value={filterSets}
@@ -1432,8 +1431,7 @@ export function BinderPage() {
               />
             </Tooltip>
             {foilRule.query.trim() && finishes.length > 0 && (
-              <TextField
-                select
+              <SelectField
                 size="small"
                 label={t('binder.foilRule.finish')}
                 value={ruleFinish}
@@ -1445,7 +1443,7 @@ export function BinderPage() {
                     {f}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
             )}
             <Box sx={{ flexGrow: 1 }} />
             <Tooltip title={t('binder.simplifiedTooltip')}>

@@ -21,6 +21,7 @@ import {
 import { api } from '../../api/client';
 import { ENGLISH, LanguageSelect } from '../../lib/cardLanguages';
 
+import { SelectField } from '../SelectField';
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
 /**
@@ -131,8 +132,7 @@ export function BulkEditCardsDialog({
             setCondition,
             setSetCondition,
             t('common.labels.condition'),
-            <TextField
-              select
+            <SelectField
               size="small"
               fullWidth
               value={condition}
@@ -143,7 +143,7 @@ export function BulkEditCardsDialog({
                   {t(`common.conditions.${c}`)}
                 </MenuItem>
               ))}
-            </TextField>,
+            </SelectField>,
           )}
           {row(
             setLanguage,
@@ -205,8 +205,7 @@ export function BulkEditCardsDialog({
             setSetTags,
             t('common.labels.tags'),
             <Stack spacing={1}>
-              <TextField
-                select
+              <SelectField
                 size="small"
                 value={tagsMode}
                 onChange={(e) => setTagsMode(e.target.value as 'add' | 'replace')}
@@ -214,7 +213,7 @@ export function BulkEditCardsDialog({
               >
                 <MenuItem value="add">{t('dialogs.bulkEdit.tagsAdd')}</MenuItem>
                 <MenuItem value="replace">{t('dialogs.bulkEdit.tagsReplace')}</MenuItem>
-              </TextField>
+              </SelectField>
               <Autocomplete
                 multiple
                 freeSolo

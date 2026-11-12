@@ -29,6 +29,7 @@ import { useFormatters } from '../../i18n/format';
 import { isDeckBoxType } from '../../lib/locationTypes';
 import { LocationPickerDialog } from './LocationPickerDialog';
 
+import { SelectField } from '../SelectField';
 /** "Binder A · Reds · Pg 3 · Slot 5" — only the parts the pick has. */
 function usePickWhere() {
   const { t } = useTranslation();
@@ -193,8 +194,7 @@ export function DecklistCheckDialog({ open, onClose }: { open: boolean; onClose:
             {t('collection.decklist.description')}
           </Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
-              select
+            <SelectField
               size="small"
               label={t('common.labels.game')}
               value={game}
@@ -206,7 +206,7 @@ export function DecklistCheckDialog({ open, onClose }: { open: boolean; onClose:
                   {g.displayName}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
             <TextField
               size="small"
               fullWidth

@@ -26,6 +26,7 @@ import { api, ApiError } from '../../api/client';
 import type { LocationImportFailureDto, LocationImportIssueDto, LocationImportResultDto } from '../../api/types';
 import { useFormatters } from '../../i18n/format';
 
+import { SelectField } from '../SelectField';
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 /** Long error lists are capped in the UI; the summary still states the full count. */
 const MAX_LISTED = 200;
@@ -206,8 +207,7 @@ export function LocationImportDialog({
                   }}
                   autoFocus
                 />
-                <TextField
-                  select
+                <SelectField
                   size="small"
                   label={t('common.labels.condition')}
                   value={condition}
@@ -219,7 +219,7 @@ export function LocationImportDialog({
                       {t(`common.conditions.${c}`)}
                     </MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
               </Stack>
             )}
             {failure ? (

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Box, IconButton, MenuItem, Stack, TextField, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, IconButton, MenuItem, Stack, Tooltip, Typography } from '@mui/material';
 import FlashlightOnIcon from '@mui/icons-material/FlashlightOn';
 import FlashlightOffIcon from '@mui/icons-material/FlashlightOff';
 import { BrowserMultiFormatReader, type IScannerControls } from '@zxing/browser';
 import { BarcodeFormat, DecodeHintType } from '@zxing/library';
 import { EnhancedBarcodeDecoder, GUIDE } from './barcodeEnhance';
 
+import { SelectField } from './SelectField';
 const CAMERA_KEY = 'omnicard.barcode.camera';
 /** How often the sharpened 1D pass runs alongside zxing's own (raw-frame) decode loop. */
 const ENHANCED_INTERVAL_MS = 250;
@@ -215,11 +216,10 @@ export function BarcodeScanner({
         {t('sales.ship.camera.hint')}
       </Typography>
       {devices.length > 1 && (
-        <TextField
-          select
+        <SelectField
           size="small"
           label={t('sales.ship.camera.device')}
-          value={devices.some((d) => d.deviceId === activeId) ? activeId : ''}
+          value={activeId && devices.some((d) => d.deviceId === activeId) ? activeId : ''}
           onChange={(e) => {
             setDeviceId(e.target.value);
             saveCamera(e.target.value);
@@ -230,7 +230,7 @@ export function BarcodeScanner({
               {d.label || t('sales.ship.camera.unnamed', { n: i + 1 })}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
       )}
     </Stack>
   );

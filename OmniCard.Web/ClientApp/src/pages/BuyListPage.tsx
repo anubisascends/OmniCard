@@ -39,6 +39,7 @@ import { useGame } from '../context/GameContext';
 import { usePermissions } from '../context/usePermissions';
 import { useIsPhone } from '../lib/responsive';
 
+import { SelectField } from '../components/SelectField';
 const BUY_LIST_PRIORITIES: BuyListPriority[] = ['Normal', 'High', 'Grail'];
 
 /** "any" | "foil" | "nonfoil" ⇄ the entry's nullable foil flag, for a select. */
@@ -328,24 +329,24 @@ function EntryDialog({ entry, onClose, onSaved }: { entry: BuyListEntryDto; onCl
             onChange={(e) => setWanted(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
             inputProps={{ min: 0, step: 1 }}
           />
-          <TextField select label={t('buyList.edit.printing')} value={pin ? 'one' : 'any'} onChange={(e) => setPin(e.target.value === 'one')}>
+          <SelectField label={t('buyList.edit.printing')} value={pin ? 'one' : 'any'} onChange={(e) => setPin(e.target.value === 'one')}>
             <MenuItem value="any">{t('buyList.edit.printingAny')}</MenuItem>
             <MenuItem value="one">
               {t('buyList.edit.printingOne', { set: entry.setCode?.toUpperCase() ?? '', number: entry.collectorNumber ?? '' })}
             </MenuItem>
-          </TextField>
-          <TextField select label={t('buyList.edit.finish')} value={finish} onChange={(e) => setFinish(e.target.value)}>
+          </SelectField>
+          <SelectField label={t('buyList.edit.finish')} value={finish} onChange={(e) => setFinish(e.target.value)}>
             <MenuItem value="any">{t('buyList.edit.finishAny')}</MenuItem>
             <MenuItem value="foil">{t('buyList.edit.finishFoil')}</MenuItem>
             <MenuItem value="nonfoil">{t('buyList.edit.finishNonFoil')}</MenuItem>
-          </TextField>
-          <TextField select label={t('buyList.edit.priority')} value={priority} onChange={(e) => setPriority(e.target.value as BuyListPriority)}>
+          </SelectField>
+          <SelectField label={t('buyList.edit.priority')} value={priority} onChange={(e) => setPriority(e.target.value as BuyListPriority)}>
             {BUY_LIST_PRIORITIES.map((p) => (
               <MenuItem key={p} value={p}>
                 {t(`buyList.priority.${p}`)}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
           <TextField
             label={t('buyList.edit.note')}
             helperText={t('buyList.edit.noteHelp')}

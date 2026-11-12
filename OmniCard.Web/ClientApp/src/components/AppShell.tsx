@@ -9,7 +9,6 @@ import {
   Paper,
   Divider,
   Drawer,
-  FormControl,
   IconButton,
   List,
   ListItemButton,
@@ -17,7 +16,6 @@ import {
   ListItemText,
   Menu,
   MenuItem,
-  Select,
   Toolbar,
   Typography,
   useMediaQuery,
@@ -48,6 +46,7 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
 import { useGame } from '../context/GameContext';
 import { usePermissions } from '../context/usePermissions';
+import { SelectField } from './SelectField';
 
 const DRAWER_WIDTH = 200;
 
@@ -197,20 +196,28 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             {t('common.app.name')}
           </Typography>
-          <FormControl size="small" sx={{ minWidth: { xs: 130, sm: 200 } }}>
-            <Select
-              value={game ?? '__all__'}
-              onChange={(e) => setGame(e.target.value === '__all__' ? undefined : e.target.value)}
-              sx={{ color: 'inherit', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' } }}
-            >
-              <MenuItem value="__all__">{t('nav.allGames')}</MenuItem>
-              {gamesQuery.data?.map((g) => (
-                <MenuItem key={g.id} value={g.id}>
-                  {g.displayName}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <SelectField
+            size="small"
+            value={game ?? '__all__'}
+            onChange={(e) => setGame(e.target.value === '__all__' ? undefined : e.target.value)}
+            slotProps={{ htmlInput: { 'aria-label': t('common.labels.game') } }}
+            sx={{
+              width: { xs: 150, sm: 220 },
+              '& .MuiInputBase-root, & .MuiAutocomplete-popupIndicator': { color: 'inherit' },
+              '& .MuiOutlinedInput-root': {
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.8)' },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#fff' },
+              },
+            }}
+          >
+            <MenuItem value="__all__">{t('nav.allGames')}</MenuItem>
+            {gamesQuery.data?.map((g) => (
+              <MenuItem key={g.id} value={g.id}>
+                {g.displayName}
+              </MenuItem>
+            ))}
+          </SelectField>
 
           <IconButton
             color="inherit"

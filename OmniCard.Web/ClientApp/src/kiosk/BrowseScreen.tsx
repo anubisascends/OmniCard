@@ -40,6 +40,7 @@ import { useFormatters } from '../i18n/format';
 import { BuyListButton } from './BuyListButton';
 import { kioskApi, KioskApiError } from './kioskApi';
 
+import { SelectField } from '../components/SelectField';
 const PAGE_SIZE = 48;
 
 type Sort = 'name' | 'price-desc' | 'price-asc';
@@ -191,8 +192,7 @@ export function BrowseScreen({
               ) : undefined,
             }}
           />
-          <TextField
-            select
+          <SelectField
             label={t('kiosk.app.browse.sort')}
             value={sort}
             onChange={(e) => setSort(e.target.value as Sort)}
@@ -201,7 +201,7 @@ export function BrowseScreen({
             <MenuItem value="name">{t('kiosk.app.browse.sortName')}</MenuItem>
             {status.showPrices && <MenuItem value="price-desc">{t('kiosk.app.browse.sortPriceDesc')}</MenuItem>}
             {status.showPrices && <MenuItem value="price-asc">{t('kiosk.app.browse.sortPriceAsc')}</MenuItem>}
-          </TextField>
+          </SelectField>
         </Stack>
 
         {cards.isSuccess && (

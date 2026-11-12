@@ -32,6 +32,7 @@ import { api, ApiError } from '../../api/client';
 import type { SiteDto, SiteGrantDto } from '../../api/types';
 import { useFormatters } from '../../i18n/format';
 
+import { SelectField } from '../SelectField';
 type Level = SiteGrantDto['level'];
 
 /**
@@ -219,8 +220,7 @@ function DeleteSiteDialog({
             {t('settings.sites.deleteHelp', { count: site.locationCount })}
           </Typography>
           {site.locationCount > 0 && (
-            <TextField
-              select
+            <SelectField
               size="small"
               label={t('settings.sites.moveLocationsTo')}
               value={target}
@@ -231,7 +231,7 @@ function DeleteSiteDialog({
                   {s.name}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
           )}
           {del.error instanceof ApiError && <Alert severity="error">{del.error.message}</Alert>}
         </Stack>

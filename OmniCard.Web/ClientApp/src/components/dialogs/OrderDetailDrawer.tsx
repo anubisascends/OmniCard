@@ -35,6 +35,7 @@ import type { SellableListingDto } from '../../api/types';
 import { useGame } from '../../context/GameContext';
 import { useFormatters } from '../../i18n/format';
 
+import { SelectField } from '../SelectField';
 const CHANNELS = ['Manual', 'TcgPlayer', 'Ebay'];
 
 // The barcode decoder is sizeable — only fetched when a label scan is opened.
@@ -231,7 +232,7 @@ export function OrderDetailDrawer({ orderId, onClose }: { orderId: number | null
   const status = detail.data?.order.status;
   const editable = status === 'Created' || status === 'Packed';
 
-  const set = (k: keyof HeaderForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const set = (k: keyof HeaderForm) => (e: { target: { value: string } }) =>
     setForm((f) => (f ? { ...f, [k]: e.target.value } : f));
   const setNum = (k: keyof HeaderForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => (f ? { ...f, [k]: Number(e.target.value) } : f));
@@ -261,11 +262,11 @@ export function OrderDetailDrawer({ orderId, onClose }: { orderId: number | null
 
             {/* Header */}
             <Stack direction="row" spacing={2}>
-              <TextField select size="small" label={t('common.labels.channel')} value={form.channel} onChange={set('channel')} disabled={!editable} sx={{ minWidth: 130 }}>
+              <SelectField size="small" label={t('common.labels.channel')} value={form.channel} onChange={set('channel')} disabled={!editable} sx={{ minWidth: 130 }}>
                 {CHANNELS.map((c) => (
                   <MenuItem key={c} value={c}>{t(`common.channels.${c}`)}</MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
               <TextField size="small" label={t('sales.orderDetail.orderNumberShort')} value={form.orderNumber} onChange={set('orderNumber')} disabled={!editable} fullWidth />
             </Stack>
             <Stack direction="row" spacing={2}>

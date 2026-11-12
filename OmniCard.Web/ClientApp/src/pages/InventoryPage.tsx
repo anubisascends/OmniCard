@@ -36,6 +36,7 @@ import { useFormatters } from '../i18n/format';
 import { useIsPhone } from '../lib/responsive';
 import type { TFunction } from 'i18next';
 
+import { SelectField } from '../components/SelectField';
 // Sealed categories (Single is managed in the Collection). Server identifiers — not translated.
 const CATEGORIES = ['Case', 'Box', 'Pack', 'Deck', 'Bundle', 'Other'];
 
@@ -145,8 +146,7 @@ function ProductDialog({
             autoFocus
           />
           <Stack direction="row" spacing={2}>
-            <TextField
-              select
+            <SelectField
               label={t('common.labels.game')}
               value={fields.game}
               onChange={(e) => setFields((f) => ({ ...f, game: e.target.value }))}
@@ -157,9 +157,8 @@ function ProductDialog({
                   {g.displayName}
                 </MenuItem>
               ))}
-            </TextField>
-            <TextField
-              select
+            </SelectField>
+            <SelectField
               label={t('common.labels.type')}
               value={fields.category}
               onChange={(e) => setFields((f) => ({ ...f, category: e.target.value }))}
@@ -170,7 +169,7 @@ function ProductDialog({
                   {t(`inventory.categories.${c}`)}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
           </Stack>
           <Stack direction="row" spacing={2}>
             <TextField

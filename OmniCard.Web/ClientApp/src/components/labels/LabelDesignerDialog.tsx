@@ -42,6 +42,7 @@ import {
   type SheetLayout,
 } from '../../lib/labels/sheet';
 
+import { SelectField } from '../SelectField';
 // The Label Designer (Settings ▸ Labels): the sheet layout on the left — page, margins, grid,
 // spacing — and the pdfme designer for one label on the right. pdfme is the open-source WYSIWYG
 // editor (drag, resize, fonts, QR codes and barcodes); OmniCard only adds the sheet and the card
@@ -325,8 +326,7 @@ export default function LabelDesignerDialog({ initial, onClose, onSaved }: Label
                 <ToggleButton value="mm">{t('labels.designer.unitMm')}</ToggleButton>
               </ToggleButtonGroup>
             </Stack>
-            <TextField
-              select
+            <SelectField
               size="small"
               label={t('labels.presets.title')}
               value=""
@@ -340,9 +340,8 @@ export default function LabelDesignerDialog({ initial, onClose, onSaved }: Label
                   {t(`labels.presets.${p.key}`)}
                 </MenuItem>
               ))}
-            </TextField>
-            <TextField
-              select
+            </SelectField>
+            <SelectField
               size="small"
               label={t('labels.designer.pageSize')}
               value={pageKey}
@@ -359,7 +358,7 @@ export default function LabelDesignerDialog({ initial, onClose, onSaved }: Label
               <MenuItem value="custom" disabled>
                 {t('labels.pageSizes.custom')}
               </MenuItem>
-            </TextField>
+            </SelectField>
             <Stack direction="row" spacing={1}>
               <LengthField label={t('labels.designer.pageWidth')} mm={sheet.pageWidthMm} unit={unit} onChange={(v) => update({ pageWidthMm: v })} />
               <LengthField label={t('labels.designer.pageHeight')} mm={sheet.pageHeightMm} unit={unit} onChange={(v) => update({ pageHeightMm: v })} />

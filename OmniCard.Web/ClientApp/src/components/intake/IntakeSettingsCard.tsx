@@ -21,6 +21,7 @@ import type { IntakeCustomerViewDto, IntakeSettingsDto } from '../../api/types';
 import { useFormatters } from '../../i18n/format';
 import { LocationPickerField } from '../LocationPickerField';
 
+import { SelectField } from '../SelectField';
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 const ROUNDING_STEPS = [0, 0.05, 0.1, 0.25, 0.5, 1];
 const VIEW_FIELDS: (keyof IntakeCustomerViewDto)[] = [
@@ -170,8 +171,7 @@ export function IntakeSettingsCard() {
               inputProps={{ min: 0, step: 0.01 }}
               InputProps={moneyAdornment}
             />
-            <TextField
-              select
+            <SelectField
               label={t('intake.settings.bulkMode')}
               value={draft.bulkMode}
               onChange={(e) => update({ bulkMode: e.target.value as IntakeSettingsDto['bulkMode'] })}
@@ -179,7 +179,7 @@ export function IntakeSettingsCard() {
             >
               <MenuItem value="FlatRate">{t('intake.settings.bulkFlatRate')}</MenuItem>
               <MenuItem value="Exclude">{t('intake.settings.bulkExclude')}</MenuItem>
-            </TextField>
+            </SelectField>
             {draft.bulkMode === 'FlatRate' && (
               <TextField
                 type="number"
@@ -195,8 +195,7 @@ export function IntakeSettingsCard() {
           <Divider />
           <Typography variant="subtitle2">{t('intake.settings.rounding')}</Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
-              select
+            <SelectField
               label={t('intake.settings.roundingStep')}
               value={draft.roundingStep}
               onChange={(e) => update({ roundingStep: Number(e.target.value) })}
@@ -207,9 +206,8 @@ export function IntakeSettingsCard() {
                   {step === 0 ? t('intake.settings.roundingCents') : fmt.money(step)}
                 </MenuItem>
               ))}
-            </TextField>
-            <TextField
-              select
+            </SelectField>
+            <SelectField
               label={t('intake.settings.roundingScope')}
               value={draft.roundingScope}
               onChange={(e) => update({ roundingScope: e.target.value as IntakeSettingsDto['roundingScope'] })}
@@ -217,7 +215,7 @@ export function IntakeSettingsCard() {
             >
               <MenuItem value="PerCard">{t('intake.settings.roundingPerCard')}</MenuItem>
               <MenuItem value="Total">{t('intake.settings.roundingTotal')}</MenuItem>
-            </TextField>
+            </SelectField>
           </Stack>
 
           <Divider />

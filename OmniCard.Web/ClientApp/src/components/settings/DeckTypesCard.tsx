@@ -28,6 +28,7 @@ import DeleteIcon from '@mui/icons-material/DeleteOutline';
 import { api } from '../../api/client';
 import type { DeckTypeDto, DeckTypeUpsertRequest } from '../../api/types';
 
+import { SelectField } from '../SelectField';
 const emptyRules = (game: string): DeckTypeUpsertRequest => ({
   game,
   name: '',
@@ -217,8 +218,7 @@ export function DeckTypesCard() {
       </Typography>
 
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1, mb: 1 }}>
-        <TextField
-          select
+        <SelectField
           size="small"
           label={t('common.labels.game')}
           value={game}
@@ -230,7 +230,7 @@ export function DeckTypesCard() {
               {g.displayName}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
         <Button
           variant="outlined"
           startIcon={<AddIcon />}

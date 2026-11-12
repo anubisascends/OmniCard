@@ -47,6 +47,7 @@ import {
 } from '../../lib/cardLanguages';
 import { LONG_PRESS_SX, useCanHover, useLongPress } from '../../lib/responsive';
 
+import { SelectField } from '../SelectField';
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 /** How many of this sitting's adds the dialog lists back. */
 const RECENT_LIMIT = 5;
@@ -232,7 +233,8 @@ export function AddCardDialog({
   const priceRef = useRef<HTMLInputElement>(null);
   const quantityRef = useRef<HTMLInputElement>(null);
   const foilTypeRef = useRef<HTMLInputElement>(null);
-  const [openSelect, setOpenSelect] = useState<'condition' | 'language' | null>(null);
+  const conditionRef = useRef<HTMLInputElement>(null);
+  const languageRef = useRef<HTMLInputElement>(null);
   const canHover = useCanHover();
   // Simplified: an Enter pressed while the search is still running picks the top result once it lands.
   const pendingEnter = useRef(false);
@@ -783,7 +785,7 @@ export function AddCardDialog({
     }
     if (e.ctrlKey || e.altKey || e.metaKey) return;
     const key = e.key.toLowerCase();
-    if (hasCopyDetails && (key === 'c' || key === 'l')) setOpenSelect(key === 'c' ? 'condition' : 'language');
+    if (hasCopyDetails && (key === 'c' || key === 'l')) focusField(key === 'c' ? conditionRef : languageRef);
     else if (hasCopyDetails && key === 'p') focusField(priceRef);
     else if (hasQuantity && key === 'q') focusField(quantityRef);
     else if (hasFoil && key === 'f') {
@@ -793,16 +795,6 @@ export function AddCardDialog({
     } else return;
     e.preventDefault();
   };
-  /** A shortcut-opened list (condition, language) hands the keyboard back to the picked card when it closes. */
-  const selectProps = (which: 'condition' | 'language') => ({
-    open: openSelect === which,
-    onOpen: () => setOpenSelect(which),
-    onClose: () => {
-      setOpenSelect(null);
-      focusPicked();
-    },
-    MenuProps: { disableRestoreFocus: true },
-  });
   /** "Condition (C)": a field's label with its shortcut key, where there's a keyboard to press it. */
   const keyLabel = (label: string, key: string) => (canHover ? t('dialogs.addCard.withKey', { label, key }) : label);
   // [keys, what they do, whether this target has it]
@@ -925,8 +917,7 @@ export function AddCardDialog({
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <TextField
-              select
+            <SelectField
               size="small"
               label={t('common.labels.game')}
               value={game}
@@ -948,7 +939,7 @@ export function AddCardDialog({
                   {g.displayName}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
             {multiLanguage && (
               <LanguageFilterSelect languages={filterLanguages} value={languageFilter} onChange={setLanguageFilter} />
             )}
@@ -1120,25 +1111,26 @@ export function AddCardDialog({
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                 {hasCopyDetails && (
                   <>
-                    <TextField
-                      select
+                    <SelectField
                       size="small"
                       label={keyLabel(t('common.labels.condition'), 'C')}
                       value={condition}
                       onChange={(e) => setCondition(e.target.value)}
-                      slotProps={{ select: selectProps('condition') }}
+                      inputRef={conditionRef}
+                      openOnFocus
                       sx={{ width: 140 }}
                     >
                       {CONDITIONS.map((c) => (
                         <MenuItem key={c} value={c}>{t(`common.conditions.${c}`)}</MenuItem>
                       ))}
-                    </TextField>
+                    </SelectField>
                     <LanguageSelect
                       game={game}
                       value={language}
                       onChange={setLanguage}
                       label={keyLabel(t('common.labels.language'), 'L')}
-                      selectProps={selectProps('language')}
+                      inputRef={languageRef}
+                      openOnFocus
                       sx={{ width: 160 }}
                     />
                   </>
@@ -1171,8 +1163,7 @@ export function AddCardDialog({
               {buyList ? (
                 <>
                   <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    <TextField
-                      select
+                    <SelectField
                       size="small"
                       label={t('buyList.edit.printing')}
                       value={pinPrinting ? 'one' : 'any'}
@@ -1183,9 +1174,8 @@ export function AddCardDialog({
                       <MenuItem value="one">
                         {t('buyList.edit.printingOne', { set: selected.setCode.toUpperCase(), number: selected.collectorNumber })}
                       </MenuItem>
-                    </TextField>
-                    <TextField
-                      select
+                    </SelectField>
+                    <SelectField
                       size="small"
                       label={t('buyList.edit.finish')}
                       value={finishChoice}
@@ -1195,9 +1185,8 @@ export function AddCardDialog({
                       <MenuItem value="any">{t('buyList.edit.finishAny')}</MenuItem>
                       <MenuItem value="foil">{t('buyList.edit.finishFoil')}</MenuItem>
                       <MenuItem value="nonfoil">{t('buyList.edit.finishNonFoil')}</MenuItem>
-                    </TextField>
-                    <TextField
-                      select
+                    </SelectField>
+                    <SelectField
                       size="small"
                       label={t('buyList.edit.priority')}
                       value={priority}
@@ -1209,7 +1198,7 @@ export function AddCardDialog({
                           {t(`buyList.priority.${p}`)}
                         </MenuItem>
                       ))}
-                    </TextField>
+                    </SelectField>
                   </Stack>
                   <TextField
                     size="small"

@@ -43,6 +43,7 @@ import type {
   LocationSummaryDto,
 } from '../../api/types';
 
+import { SelectField } from '../SelectField';
 const CUT_ACTIONS: DeckSyncCutAction[] = ['Return', 'Move', 'Sideboard', 'Keep'];
 
 /** Shows the card image when hovering a printing label. */
@@ -467,8 +468,7 @@ export function DeckSyncDialog({
                           )}
                         </TableCell>
                         <TableCell align="right">
-                          <TextField
-                            select
+                          <SelectField
                             size="small"
                             value={cutActions[c.lotId] ?? 'Move'}
                             onChange={(e) =>
@@ -481,7 +481,7 @@ export function DeckSyncDialog({
                                 {t(`deckbox.sync.actions.${action}`)}
                               </MenuItem>
                             ))}
-                          </TextField>
+                          </SelectField>
                         </TableCell>
                       </TableRow>
                     ))}

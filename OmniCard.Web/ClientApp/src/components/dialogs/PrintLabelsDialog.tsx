@@ -26,6 +26,7 @@ import { useFormatters } from '../../i18n/format';
 import { defaultLinkBase, isLocalOnlyBase, labelValues } from '../../lib/labels/fields';
 import { labelsPerSheet } from '../../lib/labels/sheet';
 
+import { SelectField } from '../SelectField';
 // Remembered per browser: the last template and the address card-page QR codes point at.
 const TEMPLATE_KEY = 'omnicard.labels.template';
 const LINK_BASE_KEY = 'omnicard.labels.linkBase';
@@ -148,8 +149,7 @@ export function PrintLabelsDialog({
           </Alert>
         ) : (
           <Stack spacing={2} sx={{ pt: 1 }}>
-            <TextField
-              select
+            <SelectField
               label={t('labels.printDialog.template')}
               value={templateId}
               onChange={(e) => setTemplateId(Number(e.target.value))}
@@ -159,7 +159,7 @@ export function PrintLabelsDialog({
                   {x.name}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
             <RadioGroup row value={perCopy ? 'copy' : 'card'} onChange={(e) => setPerCopy(e.target.value === 'copy')}>
               <FormControlLabel value="copy" control={<Radio />} label={t('labels.printDialog.perCopy')} />
               <FormControlLabel value="card" control={<Radio />} label={t('labels.printDialog.perCard')} />

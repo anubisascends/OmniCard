@@ -6,7 +6,6 @@ import {
   CircularProgress,
   MenuItem,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material';
 import { api } from '../../api/client';
@@ -14,6 +13,7 @@ import { groupDeckCards, totalDeckCards, type DeckGroupMode } from '../../lib/de
 import { CardEditDrawer } from '../dialogs/CardEditDrawer';
 import { DeckStack } from './DeckStack';
 
+import { SelectField } from '../SelectField';
 // One page big enough to hold any real deck, so the whole thing groups in a single fetch.
 const DECK_PAGE_SIZE = 500;
 const CARD_WIDTH = 170;
@@ -82,8 +82,7 @@ export function DeckStackView({
           })}
         </Typography>
         <Box sx={{ flexGrow: 1 }} />
-        <TextField
-          select
+        <SelectField
           size="small"
           label={t('deckbox.stackView.groupBy')}
           value={groupMode}
@@ -92,7 +91,7 @@ export function DeckStackView({
         >
           <MenuItem value="type">{t('deckbox.stackView.groupType')}</MenuItem>
           <MenuItem value="tag">{t('deckbox.stackView.groupTags')}</MenuItem>
-        </TextField>
+        </SelectField>
       </Stack>
       <Box
         sx={{

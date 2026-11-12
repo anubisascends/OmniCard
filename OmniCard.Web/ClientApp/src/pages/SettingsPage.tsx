@@ -69,6 +69,7 @@ import { KioskSettingsCard } from '../components/kiosk/KioskSettingsCard';
 import { IntakeSettingsCard } from '../components/intake/IntakeSettingsCard';
 import { useIsPhone } from '../lib/responsive';
 
+import { SelectField } from '../components/SelectField';
 const OPERATIONS: { key: 'prices' | 'bulk' | 'hashes' | 'images' }[] = [
   { key: 'prices' },
   { key: 'bulk' },
@@ -187,8 +188,7 @@ function CatalogCard() {
 
       <Stack spacing={2} sx={{ mt: 1 }}>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
-          <TextField
-            select
+          <SelectField
             size="small"
             label={t('common.labels.game')}
             value={game}
@@ -201,7 +201,7 @@ function CatalogCard() {
                 {g.displayName}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
           {OPERATIONS.map((o) => (
             <Button
               key={o.key}
@@ -519,9 +519,8 @@ function EbaySellingCard() {
                 inputProps={{ min: 0, max: 30, step: 1 }}
                 sx={{ width: 180 }}
               />
-              <TextField
+              <SelectField
                 size="small"
-                select
                 label={t('settings.ebay.selling.shippingService')}
                 value={form.shippingServiceCode}
                 disabled={!canManage}
@@ -532,7 +531,7 @@ function EbaySellingCard() {
                 <MenuItem value="USPSGroundAdvantage">USPS Ground Advantage</MenuItem>
                 <MenuItem value="USPSFirstClass">USPS First Class</MenuItem>
                 <MenuItem value="USPSMediaMail">USPS Media Mail</MenuItem>
-              </TextField>
+              </SelectField>
             </Stack>
           </Box>
 
@@ -562,9 +561,8 @@ function EbaySellingCard() {
                 inputProps={{ min: 1, max: 90, step: 1 }}
                 sx={{ width: 180 }}
               />
-              <TextField
+              <SelectField
                 size="small"
-                select
                 label={t('settings.ebay.selling.returnShippingPaidBy')}
                 value={form.returnShippingPaidBy}
                 disabled={!canManage || !form.returnsAccepted}
@@ -573,7 +571,7 @@ function EbaySellingCard() {
               >
                 <MenuItem value="Buyer">{t('settings.ebay.selling.payerBuyer')}</MenuItem>
                 <MenuItem value="Seller">{t('settings.ebay.selling.payerSeller')}</MenuItem>
-              </TextField>
+              </SelectField>
             </Stack>
           </Box>
 
@@ -919,8 +917,7 @@ function CreateUserDialog({
           />
           <SetupKeyField value={setupKey} onChange={setSetupKey} />
           {roles && !isAdmin && (
-            <TextField
-              select
+            <SelectField
               label={t('settings.users.role')}
               size="small"
               value={roleId}
@@ -933,7 +930,7 @@ function CreateUserDialog({
                   {r.name}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
           )}
           <FormControlLabel
             control={<Checkbox checked={isAdmin} onChange={(e) => setIsAdmin(e.target.checked)} />}
@@ -1073,8 +1070,7 @@ function UserEditDialog({
           />
           {!isAdmin && (
             <>
-              <TextField
-                select
+              <SelectField
                 label={t('settings.users.role')}
                 size="small"
                 value={roleId}
@@ -1087,7 +1083,7 @@ function UserEditDialog({
                     {r.name}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
               <Box>
                 <Typography variant="subtitle2" gutterBottom>
                   {t('settings.users.grantHeading')}
@@ -1875,13 +1871,13 @@ export function SettingsPage() {
       <Typography variant="h4">{t('settings.title')}</Typography>
       {/* A dozen tabs don't fit a phone: pick the section from a list there instead. */}
       {isPhone ? (
-        <TextField select fullWidth label={t('settings.section')} value={active} onChange={(e) => select(Number(e.target.value))}>
+        <SelectField fullWidth label={t('settings.section')} value={active} onChange={(e) => select(Number(e.target.value))}>
           {tabs.map((tab, i) => (
             <MenuItem key={tab.key} value={i}>
               {t(tab.labelKey)}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
       ) : (
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs value={active} onChange={(_, v) => select(v)} variant="scrollable" scrollButtons="auto">

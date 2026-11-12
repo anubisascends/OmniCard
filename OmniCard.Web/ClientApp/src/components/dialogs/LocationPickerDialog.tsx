@@ -28,6 +28,7 @@ import { DeckBoxGamePicker } from '../DeckBoxGamePicker';
 import { useSites } from '../../context/useSites';
 import { ALL_SITES, SiteSelect } from '../SiteSelect';
 
+import { SelectField } from '../SelectField';
 /** Inline "create a new location" section, revealed from the picker so callers never have to leave. */
 function CreateLocationSection({
   onCreated,
@@ -108,13 +109,13 @@ function CreateLocationSection({
               label={t('locations.sites.createIn')}
             />
           )}
-          <TextField select size="small" label={t('common.labels.type')} value={type} onChange={(e) => setType(e.target.value)}>
+          <SelectField size="small" label={t('common.labels.type')} value={type} onChange={(e) => setType(e.target.value)}>
             {typeOptions.map((t) => (
               <MenuItem key={t.value} value={t.value}>
                 {t.label}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
           {isDeckBox && (
             <DeckBoxGamePicker
               game={game}
