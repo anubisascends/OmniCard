@@ -77,7 +77,7 @@ These fields work in collection search for every game.
 ### Details
 
 - **Rarity order.** For Magic, `r>=rare` finds rares and mythics, and `r<rare` finds commons and uncommons. The order is common, uncommon, rare, mythic. For other games, use the rarity name, for example `r:"super rare"`.
-- **Language.** Use a code such as `en`, `ja`, `de`, `fr`, `it`, `es`, `pt`, `ko`, `ru`, `zhs` or `zht`. Many spellings also work, such as `lang:jp` or `lang:japanese`. Cards with no language set count as English.
+- **Language.** Use a code such as `en`, `ja`, `de`, `fr`, `it`, `es`, `pt`, `ko`, `ru`, `zhs` or `zht`. Magic's one-off languages work too, such as `lang:tlh` (Klingon), `lang:dw` (Dwarven) and `lang:qya` (Quenya). Many spellings also work, such as `lang:jp`, `lang:japanese` or `lang:klingon`. Cards with no language set count as English.
 - **Tags.** `tag:foo` matches any tag containing "foo". `tag=foo` matches the tag "foo" exactly. `-tag:foo` finds cards without it.
 - **Location.** `loc:binder` matches every location with "binder" in its name. Use `loc="Red Binder"` for one exact location.
 

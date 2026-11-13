@@ -49,7 +49,7 @@ import { ListUpdateDialog } from '../components/dialogs/ListUpdateDialog';
 import { LocationPickerDialog } from '../components/dialogs/LocationPickerDialog';
 import { useGame } from '../context/GameContext';
 import { useFormatters } from '../i18n/format';
-import { LanguageSelect } from '../lib/cardLanguages';
+import { LanguageSelect, languageName } from '../lib/cardLanguages';
 import type { CardListDto, CardListItemDto, ListExportScope } from '../api/types';
 
 import { SelectField } from '../components/SelectField';
@@ -250,15 +250,15 @@ function ListItemsSection({
                       {listLanguage && it.language && it.language !== listLanguage && (
                         <Tooltip
                           title={t('lists.detail.notInLanguageTooltip', {
-                            language: t(`common.languages.${listLanguage}`),
-                            printing: t(`common.languages.${it.language}`),
+                            language: languageName(t, listLanguage),
+                            printing: languageName(t, it.language),
                           })}
                         >
                           <Chip
                             size="small"
                             color="warning"
                             variant="outlined"
-                            label={t('lists.detail.notInLanguage', { language: t(`common.languages.${listLanguage}`) })}
+                            label={t('lists.detail.notInLanguage', { language: languageName(t, listLanguage) })}
                           />
                         </Tooltip>
                       )}

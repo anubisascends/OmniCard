@@ -462,7 +462,16 @@ public class CsvExportImportService(
         "th" => "Thai",
         "id" => "Indonesian",
         "ph" => "Phyrexian",
-        _ => "English",
+        "he" => "Hebrew",
+        "la" => "Latin",
+        "grc" => "Ancient Greek",
+        "ar" => "Arabic",
+        "sa" => "Sanskrit",
+        "qya" => "Quenya",
+        "dw" => "Dwarven",
+        "tlh" => "Klingon",
+        "en" => "English",
+        var other => other, // a language discovered after this list was written: its code
     };
 
     public void ExportManaboxScans(string filePath, IEnumerable<ScannedCard> scans)

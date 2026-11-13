@@ -226,13 +226,9 @@ public static class ScryfallCardFilter
         return value.Replace("~", shortName, StringComparison.Ordinal);
     }
 
-    private static string NormalizeLang(string v) => v.ToLowerInvariant() switch
-    {
-        "english" => "en", "spanish" => "es", "french" => "fr", "german" => "de",
-        "italian" => "it", "portuguese" => "pt", "japanese" => "ja", "korean" => "ko",
-        "russian" => "ru", "chinese" or "schinese" => "zhs", "tchinese" => "zht",
-        _ => v,
-    };
+    // Names and printed spellings ("japanese", "jp", "klingon", …) → Scryfall codes; anything else as typed.
+    private static string NormalizeLang(string v) =>
+        OmniCard.Shared.Games.CardLanguages.Normalize(v) ?? v.ToLowerInvariant();
 
     private static bool NumMatch(double actual, ComparisonOp op, string v) =>
         double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var n) && CompareNum(actual, op, n);

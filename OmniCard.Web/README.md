@@ -312,6 +312,15 @@ the catalog holds. English is always included; changes apply on the next **Downl
 also prunes rows for languages that were un-ticked. The selection is stored in
 `{dataDir}/catalog-languages.json`.
 
+New languages are picked up automatically. Every MTG bulk/price refresh notes each `lang` in the file it
+streams, and it also runs one Scryfall search that excludes every known language (`-lang:en -lang:ja …`,
+usually a 404). Any language not in `CardLanguages`' built-in list (which already has Scryfall's one-off
+`ph`, `he`, `la`, `grc`, `ar`, `sa`, `qya`, `dw` and `tlh`) is saved to
+`{dataDir}/catalog-languages-discovered.json` and registered at startup. It then becomes downloadable,
+taggable and searchable. The SPA shows its translated name if there is one, else the browser's name for
+the code (`Intl.DisplayNames`), else the code itself. Add a translation to `common.languages` in
+`locales/en-US/common.json` to give it a proper name.
+
 | Game | Downloadable | Source | Notes |
 |---|---|---|---|
 | MTG | all Scryfall languages | Scryfall `all_cards` (~400 MB gz) instead of `default_cards` once any non-English language is ticked | Same set + collector number as English; prices fall back to the English printing; placeholder scans borrow English art |

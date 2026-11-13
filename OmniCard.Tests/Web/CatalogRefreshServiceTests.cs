@@ -133,10 +133,30 @@ public class CatalogRefreshServiceTests
         Assert.Equal("succeeded", svc.Status().Recent[0].State);
     }
 
+    [Fact]
+    public async Task Refresh_PersistsLanguagesTheSourceDiscovered()
+    {
+        var game = new LanguageRecordingGameService { Discovered = ["tlhx"] };
+        var settings = new FixedLanguageSettings(["en"]);
+        var svc = new CatalogRefreshService([game], ImageCache(), NullLogger<CatalogRefreshService>.Instance, settings);
+
+        Assert.True(svc.TryStart(CardGame.Mtg, "bulk", out _));
+        await WaitUntil(() => svc.Status().Running is null);
+
+        Assert.Equal([(CardGame.Mtg, "tlhx")], settings.Discovered);
+    }
+
     private sealed class FixedLanguageSettings(IReadOnlyList<string> languages) : ICatalogLanguageSettingsService
     {
+        public readonly List<(CardGame Game, string Code)> Discovered = [];
         public IReadOnlyList<string> GetLanguages(CardGame game) => languages;
         public IReadOnlyList<string> SetLanguages(CardGame game, IEnumerable<string> langs) => languages;
+        public IReadOnlyList<string> AddDiscoveredLanguages(CardGame game, IEnumerable<string> langs)
+        {
+            var list = langs.ToList();
+            Discovered.AddRange(list.Select(l => (game, l)));
+            return list;
+        }
     }
 
     /// <summary>A language-aware game whose bulk download records the languages it was told to fetch.</summary>
@@ -145,6 +165,8 @@ public class CatalogRefreshServiceTests
         public IReadOnlyCollection<string>? LanguagesAtDownload;
         public IReadOnlyList<string> DownloadableLanguages => ["en", "ja"];
         public IReadOnlyCollection<string> CatalogLanguages { get; set; } = ["en"];
+        public IReadOnlyCollection<string> Discovered { get; init; } = [];
+        public IReadOnlyCollection<string> DiscoveredLanguages => Discovered;
         public string? GetCardLanguage(string gameCardId) => null;
         public CardMatch? FindLanguageVariant(string gameCardId, string language) => null;
 

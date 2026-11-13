@@ -169,11 +169,11 @@ public class CsvImportTests : IDisposable
     public void PreviewImport_UnknownLanguage_ReadsEnglishAndWarns()
     {
         var csv = "Name,Set code,Set name,Collector number,Foil,Rarity,Quantity,Scryfall ID,Purchase price,Misprint,Altered,Condition,Language,Purchase price currency,Added\n"
-                + "Lightning Bolt,lea,Alpha,1,normal,common,1,abc-123,5.99,false,false,near_mint,klingon,USD,2026-01-01T00:00:00.0000000Z\n";
+                + "Lightning Bolt,lea,Alpha,1,normal,common,1,abc-123,5.99,false,false,near_mint,elvish,USD,2026-01-01T00:00:00.0000000Z\n";
         var preview = CreateService().PreviewImport(WriteCsv("manabox-bad-lang.csv", csv));
 
         Assert.Equal("en", Assert.Single(preview.Cards).Language);
-        Assert.Contains(preview.Issues, i => i.Message.Contains("klingon"));
+        Assert.Contains(preview.Issues, i => i.Message.Contains("elvish"));
     }
 
     [Fact]

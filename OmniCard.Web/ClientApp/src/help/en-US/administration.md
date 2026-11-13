@@ -227,6 +227,7 @@ Under the buttons, **Languages to download** controls which non-English printing
 - **English** is always included.
 - Tick or untick languages. Your choice saves straight away, but only takes effect the next time you click **Download catalog**. Unticked languages are removed from the catalog then.
 - For Magic: The Gathering, adding any non-English language switches to a much larger download (about 400 MB).
+- Magic: The Gathering also lists the languages of special one-off cards: Phyrexian, Hebrew, Latin, Ancient Greek, Arabic, Sanskrit, Quenya, Dwarven and Klingon. When Scryfall adds a new language, OmniCard finds it during the next catalog update and adds it to this list and to the card language pickers.
 - Non-English cards rarely have their own prices, so they're valued at the English printing's price. Japanese Pokémon cards are the exception: they have real prices.
 - Some games' sources only provide English cards (every game except Magic: The Gathering and Pokémon). For those games you'll see a note instead of checkboxes. You can still record a foreign copy's language when you scan or edit it. Japanese and French One Piece cards downloaded before are kept.
 

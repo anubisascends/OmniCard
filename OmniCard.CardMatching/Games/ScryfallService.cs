@@ -136,6 +136,12 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, ILowPr
         set => _catalogLanguages = CardLanguages.SanitizeCatalogSelection(CardGame.Mtg, value);
     }
 
+    private IReadOnlyCollection<string> _discoveredLanguages = [];
+
+    /// <summary>Languages the last bulk/price run found on Scryfall that <see cref="CardLanguages"/>
+    /// doesn't list yet (see <see cref="FindUnlistedLanguagesAsync"/>).</summary>
+    public IReadOnlyCollection<string> DiscoveredLanguages => _discoveredLanguages;
+
     /// <summary>The languages a bulk download keeps: the saved selection plus any configured ones.</summary>
     private HashSet<string> EffectiveLanguages()
     {
@@ -1623,6 +1629,9 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, ILowPr
         var updated = 0;
         var batch = new List<Card>(1000);
         var seenIds = new HashSet<Guid>();
+        // Every language in the file, selected or not — how a language Scryfall adds gets noticed.
+        var sourceLanguages = new HashSet<string>(StringComparer.Ordinal);
+        _discoveredLanguages = [];
 
         string? line;
         while ((line = await reader.ReadLineAsync(ct)) != null)
@@ -1631,6 +1640,9 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, ILowPr
 
             var card = JsonSerializer.Deserialize<Card>(line, ScryfallJsonOptions);
             if (card is null) continue;
+
+            if (!string.IsNullOrEmpty(card.Lang))
+                sourceLanguages.Add(card.Lang);
 
             // Filter by the selected languages
             if (!languages.Contains(card.Lang))
@@ -1656,6 +1668,15 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, ILowPr
             inserted += ins;
             updated += upd;
         }
+
+        // New languages: default_cards only holds a language's cards when they have no English printing,
+        // so also ask Scryfall directly for any card outside the languages we know.
+        sourceLanguages.UnionWith(await FindUnlistedLanguagesAsync(client, sourceLanguages, ct));
+        var known = CardLanguages.ForGame(CardGame.Mtg);
+        _discoveredLanguages = sourceLanguages.Where(l => CardLanguages.IsValidCode(l) && !known.Contains(l)).Order().ToList();
+        if (_discoveredLanguages.Count > 0)
+            _logger.LogInformation("Scryfall serves card languages not in the built-in list: {Languages}",
+                string.Join(", ", _discoveredLanguages));
 
         // Un-ticked languages: drop non-English rows this full download no longer delivered (English rows
         // are never pruned — existing behaviour keeps them even if Scryfall retires one).
@@ -1699,6 +1720,50 @@ public sealed class ScryfallService : IScryfallService, ICardGameService, ILowPr
             _logger.LogInformation("Auto-computing hashes for new/changed cards ({Count} inserted this run)", inserted);
             await ComputeImageHashesAsync(forceAll: false, progress, ct);
         }
+    }
+
+    /// <summary>
+    /// Asks Scryfall for any printing in a language outside <see cref="CardLanguages.ForGame"/> and
+    /// <paramref name="alsoKnown"/> (<c>-lang:en -lang:ja …</c>, all languages, every print) and returns
+    /// the languages those printings are in. Usually a single request that finds nothing (404). Repeats
+    /// with each found language excluded, so several new languages are all picked up. Failures are
+    /// logged and swallowed — discovery never fails a catalog refresh.
+    /// </summary>
+    private async Task<IReadOnlyCollection<string>> FindUnlistedLanguagesAsync(HttpClient client, IReadOnlyCollection<string> alsoKnown, CancellationToken ct)
+    {
+        var excluded = new HashSet<string>(CardLanguages.ForGame(CardGame.Mtg).Concat(alsoKnown), StringComparer.Ordinal);
+        var found = new List<string>();
+        try
+        {
+            for (var round = 0; round < 5; round++)
+            {
+                var query = string.Join(' ', excluded.Where(CardLanguages.IsValidCode).Order().Select(l => $"-lang:{l}"));
+                var url = "https://api.scryfall.com/cards/search?unique=prints&include_multilingual=true&q="
+                    + Uri.EscapeDataString(query);
+                using var response = await client.GetAsync(url, ct);
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound) break; // no such cards
+                response.EnsureSuccessStatusCode();
+
+                using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+                var langs = doc.RootElement.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array
+                    ? data.EnumerateArray()
+                        .Select(c => c.TryGetProperty("lang", out var l) ? l.GetString() : null)
+                        .OfType<string>()
+                        .Where(l => CardLanguages.IsValidCode(l) && !excluded.Contains(l))
+                        .Distinct()
+                        .ToList()
+                    : [];
+                if (langs.Count == 0) break;
+                found.AddRange(langs);
+                excluded.UnionWith(langs);
+                await Task.Delay(100, ct); // Scryfall asks for 50–100 ms between requests
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Could not check Scryfall for new card languages");
+        }
+        return found;
     }
 
     private static async Task<int> PruneUnseenNonEnglishAsync(ScryfallDbContext context, HashSet<Guid> seenIds, CancellationToken ct)

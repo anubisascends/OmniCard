@@ -88,7 +88,15 @@
       "zht": "Chinese (Traditional)",
       "th": "Thai",
       "id": "Indonesian",
-      "ph": "Phyrexian"
+      "ph": "Phyrexian",
+      "he": "Hebrew",
+      "la": "Latin",
+      "grc": "Ancient Greek",
+      "ar": "Arabic",
+      "sa": "Sanskrit",
+      "qya": "Quenya",
+      "dw": "Dwarven",
+      "tlh": "Klingon"
     },
     "channels": {
       "Manual": "Manual",
