@@ -225,10 +225,11 @@ if ($ServerHasSettings) {
 # otherwise pile up), except the ASP.NET Core Module's logs\ folder.
 if ($Method -eq 'Share') {
     # app_offline.htm makes the ASP.NET Core Module stop the app and release its DLL locks. A Windows-
-    # service install (install-service.ps1) honors it too: the service stops, and starts again by itself
-    # once the file is removed. robocopy's retries cover the app's shutdown either way.
-    # -InstallService stops the service outright first instead (install-service.ps1 starts it again), so
-    # its restart helper isn't involved; app_offline.htm still covers a first deploy over a live IIS site.
+    # service install (install-service.ps1) honors it too: the app exits with a failure code and Windows'
+    # recovery actions restart it ~10 s after the file is removed (each restart before that exits again).
+    # robocopy's retries cover the app's shutdown either way; step 6 checks it came back.
+    # -InstallService stops the service outright first instead (install-service.ps1 starts it again);
+    # app_offline.htm still covers a first deploy over a live IIS site.
     if ($InstallService) {
         Write-Host "Stopping service $ServiceName on the server" -ForegroundColor Cyan
         try {
@@ -281,4 +282,18 @@ if ($Method -eq 'Share') {
 
 Close-Share
 Remove-Item -LiteralPath $Staging -Recurse -Force -ErrorAction SilentlyContinue
+
+# ---- 6. Check the app came back (a service install restarts ~10 s after app_offline.htm goes) ----
+# curl.exe (built into Windows 10+) because the site's certificate is usually self-signed. Any status
+# below 500 means the app answered; 5xx is IIS's app_offline / startup page.
+Write-Host "Waiting for $SiteUrl to answer" -ForegroundColor Cyan
+$up = $false
+foreach ($i in 1..40) {
+    $status = & curl.exe -sk -o NUL --max-time 5 -w '%{http_code}' $SiteUrl 2>$null
+    if ("$status" -match '^[1-4]\d\d$') { $up = $true; break }
+    Start-Sleep -Seconds 3
+}
+if (-not $up) {
+    Fail "The new build is in place, but $SiteUrl didn't answer within 2 minutes. On the server, check the service (Get-Service OmniCard; Start-Service OmniCard) and the System event log (Service Control Manager)."
+}
 Write-Host "DONE - $SiteUrl" -ForegroundColor Green

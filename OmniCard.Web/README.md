@@ -239,9 +239,12 @@ certificate; it updates the existing service.
   `Kestrel__Endpoints__Https__Url`, `HttpsCertificateThumbprint` (a `LocalMachine\My` certificate, loaded
   by `WindowsServiceHosting`) and `WindowsService__Name`.
 - **Deploys work unchanged** with the `Share` method. The service honors `app_offline.htm` like the
-  ASP.NET Core Module does (`AppOfflineWatcher`): it stops so its DLLs can be replaced, and a detached
-  helper starts it again once the file is removed. The installer lets the service account start its
-  own service for this. `WebDeploy` needs IIS, so use `Share`.
+  ASP.NET Core Module does (`AppOfflineWatcher`): the app exits with a failure code so its DLLs can be
+  replaced, and the service's recovery actions (restart after 10 s, every time) bring it back. A restart
+  that still finds the file exits again before touching the database, so the service is back about
+  10 s after the deploy removes the file. The deploy task then waits for the site to answer and fails
+  if it doesn't within 2 minutes. Each of these exits is logged as an expected "terminated
+  unexpectedly" (event 7034) in the System log. `WebDeploy` needs IIS, so use `Share`.
 - **Publish to Remote Server (service)** deploys and (re)installs the service in one step, without
   logging in on the server. It connects first over PowerShell remoting as `ServiceAdminUserName`, so a
   bad setting fails before the build. Then it stops the service, mirrors the build over the share, and

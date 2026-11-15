@@ -1,6 +1,4 @@
-using System.Diagnostics;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
 
 namespace OmniCard.Web.Services;
 
@@ -29,22 +27,32 @@ public static class WindowsServiceHosting
 
 /// <summary>
 /// Gives a Windows-service install the same app_offline.htm deploy contract the ASP.NET Core Module
-/// gives IIS, so the remote deploy script works unchanged: when app_offline.htm appears in the app
-/// folder, the service stops (releasing its DLLs for the copy), and a detached helper starts it again
-/// once the file is removed. Only registered when running as a service.
+/// gives IIS, so the remote deploy script works unchanged: while app_offline.htm is in the app folder
+/// the service stays down (its DLLs unlocked for the copy), and it comes back once the file is removed.
+/// Only registered when running as a service.
+///
+/// <para>The restart is the Service Control Manager's own: the process exits with
+/// <see cref="RestartExitCode"/> (not a clean stop), which counts as a failure, so the service's recovery
+/// actions (install-service.ps1: restart after a few seconds, every time) start it again. A restart
+/// that still finds the file exits again before touching anything (see <c>Program.cs</c>), until the
+/// deploy removes it. This replaced a detached restart-helper process that could die or be refused
+/// without a trace, leaving the service stopped after a deploy.</para>
 /// </summary>
-public sealed class AppOfflineWatcher(
-    IHostEnvironment env,
-    IHostApplicationLifetime lifetime,
-    IConfiguration config,
-    ILogger<AppOfflineWatcher> logger) : IHostedService, IDisposable
+public sealed class AppOfflineWatcher(IHostEnvironment env, ILogger<AppOfflineWatcher> logger) : IHostedService, IDisposable
 {
     public const string FileName = "app_offline.htm";
 
+    /// <summary>Non-zero, so the SCM treats the exit as a failure and applies the recovery actions.</summary>
+    public const int RestartExitCode = 1;
+
+    /// <summary>True while a deploy is replacing the files in <paramref name="appDirectory"/>.</summary>
+    public static bool IsOffline(string appDirectory) => File.Exists(Path.Combine(appDirectory, FileName));
+
+    /// <summary>Ends the process. Replaced in tests.</summary>
+    internal Action<int> Exit { get; init; } = Environment.Exit;
+
     private FileSystemWatcher? _watcher;
     private int _offline;
-
-    private string MarkerPath => Path.Combine(env.ContentRootPath, FileName);
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -52,9 +60,8 @@ public sealed class AppOfflineWatcher(
         _watcher.Created += (_, _) => GoOffline();
         _watcher.Renamed += (_, _) => GoOffline();
         _watcher.EnableRaisingEvents = true;
-        // Started (by a reboot, or by hand) while a deploy is still copying: stay offline.
-        if (File.Exists(MarkerPath))
-            GoOffline();
+        // The file appeared after Program.cs checked for it: go offline now.
+        GoOffline();
         return Task.CompletedTask;
     }
 
@@ -64,45 +71,13 @@ public sealed class AppOfflineWatcher(
 
     private void GoOffline()
     {
-        if (!File.Exists(MarkerPath) || Interlocked.Exchange(ref _offline, 1) != 0)
+        if (!IsOffline(env.ContentRootPath) || Interlocked.Exchange(ref _offline, 1) != 0)
             return;
 
-        var serviceName = config["WindowsService:Name"] ?? "OmniCard";
-        logger.LogWarning("{File} found: stopping service {Service} for an update. It restarts once the file is removed.",
-            FileName, serviceName);
-        try
-        {
-            StartRestartHelper(serviceName);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Couldn't start the restart helper. Start service {Service} by hand after the update.", serviceName);
-        }
-        lifetime.StopApplication();
-    }
-
-    /// <summary>
-    /// Launches a detached PowerShell process (from System32, so it locks nothing in the app folder) that
-    /// waits for this process to exit, then for the marker to go, then starts the service. It runs as
-    /// the service account, which install-service.ps1 allows to start its own service.
-    /// </summary>
-    private void StartRestartHelper(string serviceName)
-    {
-        static string Quote(string s) => "'" + s.Replace("'", "''") + "'";
-        var script = $$"""
-            Wait-Process -Id {{Environment.ProcessId}} -ErrorAction SilentlyContinue
-            while (Test-Path -LiteralPath {{Quote(MarkerPath)}}) { Start-Sleep -Seconds 2 }
-            Start-Sleep -Seconds 2
-            Start-Service -Name {{Quote(serviceName)}}
-            """;
-        var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
-        Process.Start(new ProcessStartInfo
-        {
-            FileName = Path.Combine(Environment.SystemDirectory, @"WindowsPowerShell\v1.0\powershell.exe"),
-            Arguments = $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {encoded}",
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            WorkingDirectory = Environment.SystemDirectory,
-        })?.Dispose();
+        logger.LogWarning("{File} found: exiting so an update can replace the app's files. Windows restarts the service "
+            + "(its recovery actions) once the file is removed.", FileName);
+        // Off the caller's thread (a FileSystemWatcher callback, or host startup): Environment.Exit waits for
+        // shutdown handlers, so it shouldn't run on a thread the host may be waiting on.
+        _ = Task.Run(() => Exit(RestartExitCode));
     }
 }
