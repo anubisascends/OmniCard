@@ -12,14 +12,15 @@
 #   - finds the IIS site that serves this folder (or -IisSiteName) and reuses its ports and HTTPS certificate
 #     (or takes -HttpPort/-HttpsPort/-CertificateThumbprint)
 #   - stops the IIS site + its app pool and turns off their auto-start (so the ports are free)
-#   - creates the service under its own virtual account (NT SERVICE\<name>), auto-start, restart on crash,
-#     and lets that account restart its own service (needed for app_offline.htm deploys)
+#   - creates the service under its own virtual account (NT SERVICE\<name>), auto-start, restart 10 s after
+#     any failure (which is also how it comes back after an app_offline.htm deploy)
 #   - grants that account: read on this folder, modify on DataDirectory + watched scan folders, the HTTPS
 #     certificate's private key, and db_owner on the OmniCard SQL databases (+ dbcreator)
 #   - opens the ports in Windows Firewall for the local subnet, starts the service and checks it answers
 #
-# Deploys keep working: the remote deploy task's app_offline.htm stops the service, and it starts again
-# by itself when the copy is done.
+# Deploys keep working: the remote deploy task's app_offline.htm makes the app exit with a failure code,
+# and Windows' recovery actions keep restarting it; each restart exits again while the file is there, so
+# the service is back about 10 s after the copy is done.
 
 [CmdletBinding()]
 param(
@@ -184,8 +185,10 @@ if ($existing) {
 }
 sc.exe config $ServiceName obj= $Account start= delayed-auto | Out-Null
 if ($LASTEXITCODE -ne 0) { Fail "Couldn't set the service account to $Account." }
-# Restart after a crash: 1 minute, every time (the failure count resets daily).
-sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/60000 | Out-Null
+# Restart 10 s after any failure, every time (the last action repeats; the count resets daily). This is
+# also the app_offline.htm restart: the app exits with a failure code while the file is there.
+sc.exe failure $ServiceName reset= 86400 actions= restart/10000/restart/10000/restart/10000 | Out-Null
+if ($LASTEXITCODE -ne 0) { Fail "Couldn't set the service's recovery actions (needed to come back after a deploy)." }
 
 # Start after a LOCAL SQL Server instance named in the connection string.
 $sqlHost = $null; $sqlInstance = $null
@@ -207,17 +210,6 @@ if ($HttpsPort) {
     $environment += "HttpsCertificateThumbprint=$CertificateThumbprint"
 }
 New-ItemProperty -LiteralPath $SvcKey -Name Environment -PropertyType MultiString -Value $environment -Force | Out-Null
-
-# Let the service account start/stop its own service (the app_offline.htm restart helper runs as it).
-$sid = (New-Object Security.Principal.NTAccount $Account).Translate([Security.Principal.SecurityIdentifier]).Value
-$sddl = (sc.exe sdshow $ServiceName | Where-Object { $_ -match 'D:' } | Select-Object -First 1).Trim()
-if ($sddl -and $sddl -notmatch [regex]::Escape($sid)) {
-    $ace = "(A;;RPWPLCLO;;;$sid)"
-    $at = $sddl.IndexOf('S:')
-    $sddl = if ($at -ge 0) { $sddl.Insert($at, $ace) } else { $sddl + $ace }
-    sc.exe sdset $ServiceName $sddl | Out-Null
-    if ($LASTEXITCODE -ne 0) { Warn "Couldn't let $Account restart its own service - after a deploy, start it by hand." }
-}
 
 # ---- 4. File access ----
 Step "Granting $Account access to the app folder and data"

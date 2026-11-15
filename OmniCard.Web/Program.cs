@@ -44,6 +44,13 @@ using Microsoft.Extensions.Hosting.WindowsServices;
 // Kestrel instead of IIS, which on a Windows client OS caps a site at 10 concurrent requests. The SCM
 // starts services in System32, so root the app at its own folder; IIS / dotnet run are unaffected.
 var runningAsService = WindowsServiceHelpers.IsWindowsService();
+
+// A deploy is replacing the app's files (app_offline.htm): exit with a failure code before loading
+// anything else or touching the database. The service's recovery actions (install-service.ps1) start it
+// again a few seconds later, until the deploy removes the file. See AppOfflineWatcher.
+if (runningAsService && AppOfflineWatcher.IsOffline(AppContext.BaseDirectory))
+    return AppOfflineWatcher.RestartExitCode;
+
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     Args = args,
