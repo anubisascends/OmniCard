@@ -255,6 +255,27 @@ certificate; it updates the existing service.
 - The app is always running, so [Keep the app running](#keep-the-app-running-iis) doesn't apply.
   Errors go to the Windows **Application** event log rather than `logs\stdout`.
 
+### Reach it from the internet (Cloudflare Tunnel)
+
+Don't forward a router port to the server. Some ISP gateways (an AT&T/Arris one did) then drop LAN
+connections to the forwarded host port, so the site stops loading inside the house, and it exposes the
+self-signed certificate. A **Cloudflare Tunnel** needs no open port: the `cloudflared` service on the
+server dials out to Cloudflare, which serves your hostname with a real certificate.
+
+1. Put a domain on Cloudflare (buy one in **Domain Registration ▸ Register Domains**, or move an existing
+   domain's nameservers to Cloudflare).
+2. **Zero Trust ▸ Networks ▸ Tunnels ▸ Create a tunnel ▸ Cloudflared**, name it, choose **Windows**, and run
+   the `cloudflared.exe service install <token>` command it shows in an elevated PowerShell on the server
+   (install `cloudflared` first: `winget install --id Cloudflare.cloudflared`).
+3. Add a **public hostname** (e.g. `omnicard.example.com`, path empty) with service type **HTTPS** and URL
+   `localhost:8081` (the app's https port). Under **Additional application settings ▸ TLS** turn on
+   **No TLS Verify** (the origin's certificate is self-signed; the hop is local).
+4. Open `https://omnicard.example.com/app`. OmniCard's own sign-in is the gate; for an extra login in
+   front, add a Cloudflare Access application for the hostname.
+
+The LAN address keeps working. `/mcp` stays local-only through the tunnel unless MCP OAuth is configured
+with `Mcp:PublicBaseUrl` set to the tunnel hostname.
+
 **Caching + compression (any host):** API responses and the SPA are Brotli/gzip-compressed (the ~1.6 MB
 bundle goes out as ~450 KB). Content-hashed `/app/assets/*` files are cached for a year
 (`immutable`), `index.html` is always revalidated so a deploy shows up on the next load, and
@@ -919,7 +940,10 @@ Streamable-HTTP transport, reusing the same services and read paths as the SPA A
 The `/mcp` endpoint runs in one of two modes depending on config:
 
 1. **Loopback only (default, no OAuth configured).** Reachable only from the machine the server runs
-   on (any non-loopback request gets `403`), with no authentication. Good for local use. To allow
+   on (any non-loopback request gets `403`), with no authentication. Good for local use. A request
+   that came through a reverse proxy or tunnel (it carries `Cf-Connecting-IP`, `X-Forwarded-For`,
+   `Forwarded`…) is refused even when the proxy connects from `127.0.0.1`, so a
+   [Cloudflare Tunnel](#reach-it-from-the-internet-cloudflare-tunnel) never publishes it. To allow
    remote clients *without* OAuth (only if you put your own auth in front), set `Mcp:AllowRemote: true`
    — otherwise leave it `false`.
 2. **OAuth resource server (for web/remote access).** When an external identity provider is
