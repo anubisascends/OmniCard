@@ -194,7 +194,7 @@ Any key you leave out of the local file falls back to the default.
 | `UserName` | Server account. Leave it blank to use your Windows login. The password is prompted for; with `RememberPassword` it is saved DPAPI-encrypted (your Windows account on this PC only) in `.vscode/deploy-remote.local.secret`. Delete that file if the password changes. |
 | `PreserveSettings` | Top-level `appsettings.json` sections the server keeps between deploys (default `DataDirectory`, `ConnectionStrings`, `eBay`, `Mcp`). New repo keys still flow through. If the server's copy can't be read, it is left untouched. |
 | `BuildSpa` | Set to `false` to skip `npm install` + `npm run build`. |
-| `ServiceAdminUserName`, `ServiceName`, `ServerAppPath` | Only for **Publish to Remote Server (service)**, below: an administrator account on the server (blank = `UserName`; its remembered password goes in `.vscode/deploy-remote.local.admin.secret` when the names differ), the service name (default `OmniCard`), and the app folder as the server sees it (blank = the folder behind `SharePath`'s share). |
+| `ServiceAdminUserName`, `ServiceName`, `ServerAppPath` | Only for `deploy-remote.ps1 -InstallService`, below: an administrator account on the server (blank = `UserName`; its remembered password goes in `.vscode/deploy-remote.local.admin.secret` when the names differ), the service name (default `OmniCard`), and the app folder as the server sees it (blank = the folder behind `SharePath`'s share). |
 
 One-time server setup is the same as above (Hosting Bundle, app pool, site, SQL Server, data-directory
 grants). In addition:
@@ -245,8 +245,9 @@ certificate; it updates the existing service.
   10 s after the deploy removes the file. The deploy task then waits for the site to answer and fails
   if it doesn't within 2 minutes. Each of these exits is logged as an expected "terminated
   unexpectedly" (event 7034) in the System log. `WebDeploy` needs IIS, so use `Share`.
-- **Publish to Remote Server (service)** deploys and (re)installs the service in one step, without
-  logging in on the server. It connects first over PowerShell remoting as `ServiceAdminUserName`, so a
+- To (re)install the service from this PC without logging in on the server — e.g. to change its ports or
+  certificate — run `powershell -NoProfile -ExecutionPolicy Bypass -File .vscode\deploy-remote.ps1 -InstallService`
+  from the repo root. Use the plain **Publish to Remote Server** task for everyday deploys. It connects first over PowerShell remoting as `ServiceAdminUserName`, so a
   bad setting fails before the build. Then it stops the service, mirrors the build over the share, and
   runs `install-service.ps1` from the app folder on the server, elevated, printing its output in the
   task terminal. The first run also switches an IIS site over to the service. Share method only.

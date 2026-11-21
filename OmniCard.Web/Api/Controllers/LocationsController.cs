@@ -37,7 +37,9 @@ public sealed class LocationsController(
     DeckReturnService deckReturns,
     IDeckReturnPdfExporter deckReturnPdf,
     IDbContextFactory<OmniCardDbContext> dbFactory,
-    IEnumerable<ICardGameService> gameServices) : ApiControllerBase
+    IEnumerable<ICardGameService> gameServices,
+    LocationBulkService bulk,
+    PermissionService permissions) : ApiControllerBase
 {
     private readonly IReadOnlyDictionary<CardGame, ICardGameService> _gameServices = gameServices.ToDictionary(s => s.Game);
 
@@ -470,13 +472,85 @@ public sealed class LocationsController(
     [HttpPut("ignore-for-lists")]
     [RequirePermission(Permissions.LocationsEdit)]
     [RequireSiteAccess(SiteAccessLevel.Write, Location = "Ids")]
-    public IActionResult SetIgnoredForLists([FromBody] LocationsBoolRequest req)
+    public IActionResult SetIgnoredForLists([FromBody] LocationsBoolRequest req) =>
+        Bulk(() => Ok(bulk.SetIgnoredForLists(req.Ids, req.Value)));
+
+    // --- bulk edits (Locations page ▸ Select). All or nothing; 422 lists the locations that can't take it. ---
+
+    /// <summary>Change the game and/or default sets of several locations.</summary>
+    [HttpPut("bulk/card-filter")]
+    [RequirePermission(Permissions.LocationsEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "Ids")]
+    public ActionResult<LocationBulkResultDto> BulkSetCardFilter([FromBody] BulkLocationCardFilterRequest req) =>
+        Bulk(() => Ok(bulk.SetCardFilter(req)));
+
+    /// <summary>Move several locations, with their cards, to one site. Needs write access to the target too.</summary>
+    [HttpPut("bulk/site")]
+    [RequirePermission(Permissions.LocationsEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "Ids")]
+    public ActionResult<LocationBulkResultDto> BulkSetSite([FromBody] BulkLocationSiteRequest req)
     {
-        var ids = req.Ids.Distinct().ToList();
-        if (ids.Count == 0)
-            return BadRequest(new { error = "Choose at least one location." });
-        foreach (var id in ids)
-            containers.SetExcludeFromDeckCheck(id, req.Value);
-        return NoContent();
+        if (sites.Get(req.SiteId) is null || !siteAccess.Current.CanRead(req.SiteId))
+            return BadRequest(new { error = "Unknown site." });
+        if (!siteAccess.Current.CanWrite(req.SiteId))
+            return RequireSiteAccessAttribute.Forbidden();
+        return Bulk(() => Ok(bulk.SetSite(req.Ids, req.SiteId)));
+    }
+
+    /// <summary>Set or unset always-available on several locations (Bulk is left alone).</summary>
+    [HttpPut("bulk/always-available")]
+    [RequirePermission(Permissions.LocationsEdit)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "Ids")]
+    public ActionResult<LocationBulkResultDto> BulkSetAlwaysAvailable([FromBody] LocationsBoolRequest req) =>
+        Bulk(() => Ok(bulk.SetAlwaysAvailable(req.Ids, req.Value)));
+
+    /// <summary>What deleting several locations would do: every game's cards, sealed lots, listings, open
+    /// orders, kiosk holds and list lines per location, plus the fingerprint the delete must send back.</summary>
+    [HttpPost("bulk/delete/preview")]
+    [RequirePermission(Permissions.LocationsDelete)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "Ids")]
+    public async Task<ActionResult<BulkLocationDeletePreviewDto>> BulkDeletePreview([FromBody] BulkLocationDeletePreviewRequest req)
+    {
+        if (!req.MoveCardsToBulk && await DenyCardDelete() is { } denied) return denied;
+        return Bulk(() => Ok(bulk.PreviewDelete(req.Ids, req.MoveCardsToBulk)));
+    }
+
+    /// <summary>Delete several locations after a preview. 409 when anything changed since that preview;
+    /// deleting the cards too also needs <c>collection.delete</c>.</summary>
+    [HttpPost("bulk/delete")]
+    [RequirePermission(Permissions.LocationsDelete)]
+    [RequireSiteAccess(SiteAccessLevel.Write, Location = "Ids")]
+    public async Task<ActionResult<BulkLocationDeleteResultDto>> BulkDelete([FromBody] BulkLocationDeleteRequest req)
+    {
+        if (!req.MoveCardsToBulk && await DenyCardDelete() is { } denied) return denied;
+        return Bulk(() => Ok(bulk.Delete(req, User.Identity?.Name)));
+    }
+
+    /// <summary>Deleting a location's cards is a collection delete as well as a location delete.</summary>
+    private async Task<ActionResult?> DenyCardDelete()
+    {
+        var userId = AppAuthGate.CurrentUserId(HttpContext);
+        return userId is int id && await permissions.HasPermissionAsync(id, Permissions.CollectionDelete)
+            ? null
+            : StatusCode(StatusCodes.Status403Forbidden,
+                new { error = "Deleting the cards too needs permission to delete cards. Move them to Bulk instead." });
+    }
+
+    private ActionResult Bulk(Func<ActionResult> action)
+    {
+        try
+        {
+            return action();
+        }
+        catch (LocationBulkService.LocationBulkException ex)
+        {
+            return ex.Kind switch
+            {
+                LocationBulkService.ErrorKind.NotFound => NotFound(new { error = ex.Message }),
+                LocationBulkService.ErrorKind.Stale => Conflict(new { error = ex.Message }),
+                LocationBulkService.ErrorKind.Failures => UnprocessableEntity(new { error = ex.Message, failures = ex.Failures }),
+                _ => BadRequest(new { error = ex.Message }),
+            };
+        }
     }
 }

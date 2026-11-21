@@ -145,6 +145,73 @@ export interface LocationSearchMatchDto {
   matchCount: number;
 }
 
+// --- Bulk location edits (Locations page ▸ Select) ---
+
+export type BulkGameMode = 'keep' | 'any' | 'set';
+export type BulkSetsMode = 'keep' | 'replace' | 'add' | 'remove' | 'clear';
+
+export interface BulkLocationCardFilterRequest {
+  ids: number[];
+  gameMode: BulkGameMode;
+  game?: string | null;
+  setsMode: BulkSetsMode;
+  sets?: string[];
+}
+
+/** A location a bulk edit couldn't apply to (422 body `failures`). Nothing was saved. */
+export interface LocationBulkFailureDto {
+  id: number;
+  name: string;
+  error: string;
+}
+
+export interface LocationBulkResultDto {
+  changed: number;
+  unchanged: number;
+}
+
+/** A location a bulk delete would remove, with everything hanging off it (every game's cards). */
+export interface BulkDeleteLocationDto {
+  id: number;
+  name: string;
+  /** ContainerType enum name ("Binder", "Box", "DeckBox", "DisplayCase"). */
+  type: string;
+  siteName?: string | null;
+  game?: string | null;
+  lots: number;
+  copies: number;
+  marketValue: number;
+  sealedLots: number;
+  listedCopies: number;
+  openOrderCopies: number;
+  heldCopies: number;
+  listReferences: number;
+  deckLinked: boolean;
+  dividers: number;
+  putBackReports: number;
+}
+
+export interface BulkLocationDeletePreviewDto {
+  moveCardsToBulk: boolean;
+  locations: BulkDeleteLocationDto[];
+  totalLots: number;
+  totalCopies: number;
+  totalMarketValue: number;
+  totalSealedLots: number;
+  totalListedCopies: number;
+  totalOpenOrderCopies: number;
+  totalHeldCopies: number;
+  totalListReferences: number;
+  /** Fingerprint of what was previewed; the delete must send it back. */
+  token: string;
+}
+
+export interface BulkLocationDeleteResultDto {
+  locationsDeleted: number;
+  copiesMovedToBulk: number;
+  copiesDeleted: number;
+}
+
 /** An owned copy that could go into a deck box during a sync. `ignoredReason`: "Location" (its location is
  * ignored for lists — usable, never suggested) or "Listed" (listed for sale — not usable). */
 export interface DeckSyncSourceDto {

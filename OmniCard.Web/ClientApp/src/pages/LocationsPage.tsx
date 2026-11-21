@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Link as RouterLink } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
+  Box,
   Button,
   ButtonBase,
   Chip,
@@ -19,6 +20,7 @@ import {
   Link,
   Menu,
   MenuItem,
+  Paper,
   Stack,
   Switch,
   TextField,
@@ -33,6 +35,9 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import DoNotDisturbOnOutlinedIcon from '@mui/icons-material/DoNotDisturbOnOutlined';
 import LinkIcon from '@mui/icons-material/Link';
+import ChecklistIcon from '@mui/icons-material/Checklist';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
 const COLLAPSED_KEY = 'omnicard.locations.collapsed';
 const HIDE_EMPTY_KEY = 'omnicard.locations.hideEmpty';
@@ -53,6 +58,13 @@ import { DeckBoxGameDialog } from '../components/dialogs/DeckBoxGameDialog';
 import { LocationCardFilterDialog } from '../components/dialogs/LocationCardFilterDialog';
 import { SetMultiSelect } from '../components/SetMultiSelect';
 import { IgnoredLocationsDialog } from '../components/dialogs/IgnoredLocationsDialog';
+import {
+  BulkDeleteLocationsDialog,
+  BulkGameSetsDialog,
+  BulkMoveSiteDialog,
+} from '../components/dialogs/BulkLocationDialogs';
+import type { LocationBulkResultDto } from '../api/types';
+import { usePermissions } from '../context/usePermissions';
 import { useIsPhone } from '../lib/responsive';
 
 import { SelectField } from '../components/SelectField';
@@ -568,6 +580,164 @@ function buildColumns(
   ];
 }
 
+type BulkDialog = 'gameSets' | 'site' | 'delete' | null;
+
+/**
+ * The actions for the locations ticked in selection mode. Bulk is ticked like any location (so it can be
+ * ignored for lists) but left out of the actions it can't take: a game, a site move, always-available, delete.
+ */
+function BulkSelectionBar({
+  selected,
+  totalShown,
+  onSelectAll,
+  onClear,
+  onDone,
+  onChanged,
+}: {
+  selected: LocationSummaryDto[];
+  totalShown: number;
+  onSelectAll: () => void;
+  onClear: () => void;
+  onDone: () => void;
+  onChanged: (message: string) => void;
+}) {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
+  const { can } = usePermissions();
+  const { writable } = useSites();
+  const [dialog, setDialog] = useState<BulkDialog>(null);
+  const [flagsAnchor, setFlagsAnchor] = useState<null | HTMLElement>(null);
+  const editable = selected.filter((l) => !l.isSystem);
+  const bulkLeftOut = editable.length < selected.length;
+  const canEdit = can('locations.edit');
+  const canDelete = can('locations.delete');
+
+  const summarize = (r: LocationBulkResultDto) =>
+    r.unchanged > 0
+      ? t('locations.bulk.resultWithUnchanged', {
+          count: r.changed,
+          countText: fmt.number(r.changed),
+          unchangedText: fmt.number(r.unchanged),
+        })
+      : t('locations.bulk.result', { count: r.changed, countText: fmt.number(r.changed) });
+
+  const flag = useMutation({
+    mutationFn: (op: { kind: 'always' | 'ignore'; value: boolean }) =>
+      op.kind === 'always'
+        ? api.locationsBulkSetAlwaysAvailable(editable.map((l) => l.id), op.value)
+        : api.locationsSetIgnoredForLists(selected.map((l) => l.id), op.value),
+    onSuccess: (r) => onChanged(r ? summarize(r) : ''),
+  });
+
+  return (
+    <Paper
+      variant="outlined"
+      sx={{ p: 1, position: 'sticky', top: { xs: 56, sm: 64 }, zIndex: 3, bgcolor: 'background.paper' }}
+    >
+      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+        <Typography variant="body2" fontWeight={500} sx={{ px: 1 }}>
+          {t('locations.bulk.selectedCount', { count: selected.length, countText: fmt.number(selected.length) })}
+        </Typography>
+        <Button size="small" onClick={onSelectAll} disabled={selected.length === totalShown}>
+          {t('locations.bulk.selectAll')}
+        </Button>
+        <Button size="small" onClick={onClear} disabled={selected.length === 0}>
+          {t('locations.bulk.clear')}
+        </Button>
+        {canEdit && (
+          <>
+            <Button size="small" variant="outlined" disabled={editable.length === 0} onClick={() => setDialog('gameSets')}>
+              {t('locations.menu.gameSets')}
+            </Button>
+            {writable.length > 1 && (
+              <Button size="small" variant="outlined" disabled={editable.length === 0} onClick={() => setDialog('site')}>
+                {t('locations.sites.moveMenu')}
+              </Button>
+            )}
+            <Button
+              size="small"
+              variant="outlined"
+              endIcon={<ArrowDropDownIcon />}
+              disabled={selected.length === 0 || flag.isPending}
+              onClick={(e) => setFlagsAnchor(e.currentTarget)}
+            >
+              {t('locations.bulk.flags')}
+            </Button>
+            <Menu anchorEl={flagsAnchor} open={!!flagsAnchor} onClose={() => setFlagsAnchor(null)}>
+              {(
+                [
+                  ['always', true, 'locations.menu.setAlwaysAvailable'],
+                  ['always', false, 'locations.menu.unsetAlwaysAvailable'],
+                  ['ignore', true, 'locations.menu.ignoreForLists'],
+                  ['ignore', false, 'locations.menu.stopIgnoring'],
+                ] as const
+              ).map(([kind, value, label]) => (
+                <MenuItem
+                  key={`${kind}-${value}`}
+                  disabled={kind === 'always' && editable.length === 0}
+                  onClick={() => {
+                    setFlagsAnchor(null);
+                    flag.mutate({ kind, value });
+                  }}
+                >
+                  {t(label)}
+                </MenuItem>
+              ))}
+            </Menu>
+          </>
+        )}
+        {canDelete && (
+          <Button
+            size="small"
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteOutlineIcon />}
+            disabled={editable.length === 0}
+            onClick={() => setDialog('delete')}
+          >
+            {t('locations.menu.delete')}
+          </Button>
+        )}
+        <Box sx={{ flexGrow: 1 }} />
+        <Button size="small" variant="contained" onClick={onDone}>
+          {t('locations.bulk.done')}
+        </Button>
+      </Stack>
+      {bulkLeftOut && selected.length > 0 && (
+        <Typography variant="caption" color="text.secondary" sx={{ px: 1, display: 'block' }}>
+          {t('locations.bulk.bulkLeftOut')}
+        </Typography>
+      )}
+      {flag.isError && (
+        <Alert severity="error" sx={{ mt: 1 }}>
+          {(flag.error as Error).message}
+        </Alert>
+      )}
+      {dialog === 'gameSets' && (
+        <BulkGameSetsDialog locs={editable} onClose={() => setDialog(null)} onDone={(r) => onChanged(summarize(r))} />
+      )}
+      {dialog === 'site' && (
+        <BulkMoveSiteDialog
+          locs={editable}
+          sites={writable}
+          onClose={() => setDialog(null)}
+          onDone={(r) => onChanged(summarize(r))}
+        />
+      )}
+      {dialog === 'delete' && (
+        <BulkDeleteLocationsDialog
+          locs={editable}
+          onClose={() => setDialog(null)}
+          onDone={(message) => {
+            onClear();
+            onChanged(message);
+          }}
+        />
+      )}
+    </Paper>
+  );
+}
+
 export function LocationsPage() {
   const { t } = useTranslation();
   const fmt = useFormatters();
@@ -656,6 +826,29 @@ export function LocationsPage() {
       .filter((g) => g.items.length > 0);
   }, [data, hideEmpty, matchCounts]);
   const matchedLocations = groups.reduce((n, g) => n + g.items.length, 0);
+
+  // Selection mode: tick locations across every group, then act on them together. Only locations still on
+  // the page stay ticked, so a filter/search change can never leave hidden locations in a bulk action.
+  const { can } = usePermissions();
+  const canBulk = can('locations.edit') || can('locations.delete');
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+  const shown = useMemo(() => groups.flatMap((g) => g.items).filter((l) => l.canWrite), [groups]);
+  const shownKey = shown.map((l) => l.id).join(',');
+  useEffect(() => {
+    const ids = new Set(shown.map((l) => l.id));
+    setSelected((prev) => {
+      const next = new Set([...prev].filter((id) => ids.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shownKey]);
+  const selectedLocs = shown.filter((l) => selected.has(l.id));
+  const stopSelecting = () => {
+    setSelecting(false);
+    setSelected(new Set());
+  };
   const showSiteColumn = multiSite && effectiveSite === ALL_SITES;
   const isPhone = useIsPhone();
   const [addOpen, setAddOpen] = useState(false);
@@ -723,7 +916,32 @@ export function LocationsPage() {
             {t('locations.ignored.button')}
           </Button>
         </Tooltip>
+        {canBulk && !selecting && (
+          <Tooltip title={t('locations.bulk.selectTooltip')}>
+            <Button size="small" startIcon={<ChecklistIcon />} onClick={() => setSelecting(true)}>
+              {t('locations.bulk.select')}
+            </Button>
+          </Tooltip>
+        )}
       </Stack>
+      {bulkMessage && (
+        <Alert severity="success" onClose={() => setBulkMessage(null)}>
+          {bulkMessage}
+        </Alert>
+      )}
+      {selecting && (
+        <BulkSelectionBar
+          selected={selectedLocs}
+          totalShown={shown.length}
+          onSelectAll={() => setSelected(new Set(shown.map((l) => l.id)))}
+          onClear={() => setSelected(new Set())}
+          onDone={stopSelecting}
+          onChanged={(message) => {
+            setBulkMessage(message || null);
+            refresh();
+          }}
+        />
+      )}
       <IgnoredLocationsDialog open={ignoredOpen} onClose={() => setIgnoredOpen(false)} onSaved={refresh} />
       <Stack spacing={1}>
         <Typography variant="body2" color="text.secondary">
@@ -779,6 +997,17 @@ export function LocationsPage() {
                   autoHeight
                   hideFooter
                   disableRowSelectionOnClick
+                  checkboxSelection={selecting}
+                  isRowSelectable={(p) => p.row.canWrite}
+                  rowSelectionModel={selecting ? group.items.filter((l) => selected.has(l.id)).map((l) => l.id) : []}
+                  onRowSelectionModelChange={(model) =>
+                    setSelected((prev) => {
+                      const next = new Set(prev);
+                      for (const l of group.items) next.delete(l.id);
+                      for (const id of model) next.add(Number(id));
+                      return next;
+                    })
+                  }
                   disableColumnMenu
                   initialState={{ sorting: { sortModel: [{ field: 'name', sort: 'asc' }] } }}
                 />
