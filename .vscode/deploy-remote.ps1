@@ -9,7 +9,7 @@
 #   - Share method: the site's physical folder shared with Change permission for the deploy account
 #   - WebDeploy method: Web Deploy's Remote Agent Service (or WMSVC on Windows Server) running
 #
-# -InstallService (the "Publish to Remote Server (service)" task): also runs install-service.ps1 on the
+# -InstallService (run from a terminal; no VS Code task): also runs install-service.ps1 on the
 # server after the copy, elevated over PowerShell remoting, so the Windows service is (re)installed and
 # started with no login on the server. Share method only. One-time setup: Enable-PSRemoting on the
 # server, and the server in this PC's WinRM TrustedHosts (the script prints both if it can't connect).

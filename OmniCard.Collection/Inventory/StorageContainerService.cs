@@ -120,14 +120,30 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
         using var context = dbContextFactory.CreateDbContext();
         var container = context.StorageContainers.Find(containerId)
             ?? throw new InvalidOperationException($"Container {containerId} not found");
+        if (ApplyCardFilter(context, container, game, defaultSets) is { } error)
+            throw new InvalidOperationException(error);
+        context.SaveChanges();
+    }
+
+    /// <summary>The one rule for giving a tracked <paramref name="container"/> a game (null = any game) and
+    /// default sets, shared by the single and bulk edits. Returns why it can't (and changes nothing), or null
+    /// once applied — the caller saves.</summary>
+    public static string? ApplyCardFilter(OmniCardDbContext context, StorageContainer container,
+        CardGame? game, IEnumerable<string>? defaultSets)
+    {
         if (container.IsSystem || container.ContainerType == ContainerType.Bulk)
-            throw new InvalidOperationException("Bulk holds every game, so it can't be given a game or sets.");
+            return "Bulk holds every game, so it can't be given a game or sets.";
         if (container.ContainerType == ContainerType.DeckBox && game is null)
-            throw new InvalidOperationException("A deck box must be assigned a game.");
+            return "A deck box must be assigned a game.";
+
+        var sets = game is null ? null : StorageContainer.JoinSetCodes(defaultSets);
+        if (sets is { Length: > StorageContainer.MaxDefaultSetsLength })
+            return "Too many default sets.";
 
         if (game is CardGame fixedGame && container.Game != fixedGame)
         {
             // The game is a hard rule, so it can't be set over cards that already break it.
+            var containerId = container.Id;
             var conflicting = context.Lots
                 .Where(l => l.LocationId == containerId
                     && l.Product.Category == ProductCategory.Single
@@ -136,19 +152,16 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
                 .Distinct()
                 .ToList();
             if (conflicting.Count > 0)
-                throw new InvalidOperationException(
-                    $"This location already holds cards from another game ({string.Join(", ", conflicting.Select(g => g.DisplayName()))}). " +
-                    "Move those cards out before fixing it to one game.");
+                return $"This location already holds cards from another game ({string.Join(", ", conflicting.Select(g => g.DisplayName()))}). " +
+                    "Move those cards out before fixing it to one game.";
 
             // A deck type belongs to one game, so it can't survive a game change.
             container.DeckTypeId = null;
         }
 
         container.Game = game;
-        container.DefaultSets = game is null ? null : StorageContainer.JoinSetCodes(defaultSets);
-        if (container.DefaultSets is { Length: > StorageContainer.MaxDefaultSetsLength })
-            throw new InvalidOperationException("Too many default sets.");
-        context.SaveChanges();
+        container.DefaultSets = sets;
+        return null;
     }
 
     public List<DeckBoxNeedsGame> GetDeckBoxesMissingGame()
@@ -217,13 +230,27 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
         if (container.IsSystem)
             throw new InvalidOperationException("Cannot delete system container");
 
+        RemoveContainer(context, container, moveCardsToBulk);
+        context.SaveChanges();
+    }
+
+    /// <summary>The one rule for deleting a tracked, non-system <paramref name="container"/>, shared by the
+    /// single and bulk deletes: its singles move to Bulk or are deleted with their eBay listings and flag
+    /// history; sealed lots just lose their location (FK SetNull). Bulk is only looked up when there are cards
+    /// to move (throws when it doesn't exist). The caller saves.</summary>
+    public static void RemoveContainer(OmniCardDbContext context, StorageContainer container, bool moveCardsToBulk)
+    {
+        if (container.IsSystem)
+            throw new InvalidOperationException("Cannot delete system container");
+        var id = container.Id;
         var lots = context.Lots.Include(l => l.Product)
             .Where(l => l.LocationId == id && l.Product.Category == ProductCategory.Single)
             .ToList();
 
-        if (moveCardsToBulk)
+        if (moveCardsToBulk && lots.Count > 0)
         {
-            var bulkId = context.StorageContainers.First(c => c.IsSystem).Id;
+            var bulkId = context.StorageContainers.Where(c => c.IsSystem).Select(c => (int?)c.Id).FirstOrDefault()
+                ?? throw new InvalidOperationException("There's no Bulk location to move the cards to.");
             foreach (var lot in lots)
             {
                 DeckOrigin.BeforeMove(context, lot, bulkId);
@@ -233,7 +260,7 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
                 lot.Section = null;
             }
         }
-        else
+        else if (!moveCardsToBulk)
         {
             var lotIds = lots.Select(l => l.Id).ToList();
             context.EbayListings.RemoveRange(context.EbayListings.Where(e => lotIds.Contains(e.LotId)));
@@ -242,7 +269,6 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
         }
 
         context.StorageContainers.Remove(container);
-        context.SaveChanges();
     }
 
     public int GetCardCount(int containerId)

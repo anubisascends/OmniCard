@@ -167,6 +167,8 @@ Ignored locations are also skipped by **Check decklist** on the Collection page.
 
 ### Delete
 
+To delete several locations at once, see [Edit many locations at once](#edit-many-locations-at-once).
+
 1. Choose **Delete…** and confirm that you want to delete the location.
 2. A second question asks *Move its cards to Bulk?*
    - Click **OK** to keep the cards and move them to Bulk.
@@ -176,6 +178,52 @@ Ignored locations are also skipped by **Check decklist** on the Collection page.
 > Clicking **Cancel** on the second question permanently deletes every card in the location. If you want to keep the cards, click **OK**.
 
 Bulk can't be deleted.
+
+## Edit many locations at once
+
+Click **Select** above the tables to tick several locations and change them together. Each row gets a checkbox. Tick a group's header checkbox to tick every location in that group. Locations in sites you can only view can't be ticked.
+
+A bar above the tables shows how many are ticked, with these actions:
+
+- **Select all shown** and **Clear**.
+- **Game & sets…**: give every ticked location a game, and change their default sets (see below).
+- **Move to site…**: move every ticked location, with all its cards, to one site. Shown when you can write to more than one site.
+- **Flags**: **Set always-available**, **Unset always-available**, **Ignore for lists** or **Stop ignoring for lists**. These apply straight away.
+- **Delete…**: delete every ticked location (see below).
+- **Done** leaves selection mode.
+
+Only locations still on the page stay ticked. If you change the **Site** filter, the game selector or the search, any ticked location that's no longer shown is unticked, so an action never reaches a location you can't see. Bulk can be ticked, but only **Ignore for lists** applies to it.
+
+A message above the tables says how many locations changed, and how many already had that setting.
+
+### Change the game and sets of many locations
+
+In **Game & sets…**:
+
+1. **Game**: **Leave each location's game**, **Any game**, or one game.
+2. **Default sets**: **Leave default sets as they are**, **Replace with these sets**, **Add these sets**, **Remove these sets** or **Clear all default sets**. Replacing, adding and removing need every ticked location to end up on the same game, because set codes belong to one game. So pick a game, or tick locations that already share one.
+3. Click **Apply**.
+
+A location whose game changes loses its old default sets. The same rules as for one location apply. A location can't be given a game while it holds another game's cards, and a deck box must keep a game.
+
+It's all or nothing. If any ticked location can't take the change, **nothing is saved**, and the dialog lists each location with the reason. Click **Apply to the other …** to leave those out and change the rest.
+
+### Delete many locations
+
+Deleting several locations takes three steps, so it can't happen by accident:
+
+1. **Cards**: choose what happens to the cards in them. **Move the cards to Bulk (recommended)** keeps every card. **Delete the cards too** deletes them permanently. It needs permission to delete cards as well as locations.
+2. **Review**: every location is listed with its cards and their market value, counting every game, not just the selected one. **Also affected** shows what else hangs off it: sealed lots, cards listed for sale, on open orders or held at the kiosk, list lines that point at its cards, a deck link, binder dividers and put-back reports. Untick any location you want to keep. The totals update as you go.
+3. **Confirm**: type the number of locations being deleted. When the cards are deleted too, also tick *I understand…* and type the number of cards. Then click **Delete**.
+
+![The Review step of deleting several locations](locations-bulk-delete-review.png)
+
+> [!WARNING]
+> **Delete the cards too** can't be undone. It's refused while any of the cards are listed for sale, on an open order or held at the kiosk. Unlist them or finish those orders first, or move the cards to Bulk instead.
+
+If anything in the locations changes between your review and the delete, for example someone adds a card, nothing is deleted. The review comes back up to date, and you confirm again.
+
+Sealed products stored in a deleted location are kept but no longer have a location. When cards move to Bulk, any that are listed for sale stay listed.
 
 ## Open a location
 

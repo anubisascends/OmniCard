@@ -409,6 +409,105 @@ public sealed record LocationsBoolRequest
     public bool Value { get; init; }
 }
 
+// --- Bulk location edits (Locations page ▸ Select) ---
+
+/// <summary>Changes the game and/or default sets of several locations at once. All or nothing: if any
+/// location can't take the change, nothing is saved and the 422 body lists each one
+/// (<see cref="LocationBulkFailureDto"/>).</summary>
+public sealed record BulkLocationCardFilterRequest
+{
+    public List<int> Ids { get; init; } = [];
+    /// <summary>"keep" (each location keeps its game), "any" (no game) or "set" (<see cref="Game"/>).</summary>
+    public string GameMode { get; init; } = "keep";
+    /// <summary>Game enum id (e.g. "Mtg") when <see cref="GameMode"/> is "set".</summary>
+    public string? Game { get; init; }
+    /// <summary>"keep", "replace", "add", "remove" or "clear". A location whose game changes starts from no
+    /// sets. "replace"/"add" need every location to end up on the same game (the sets are that game's codes).</summary>
+    public string SetsMode { get; init; } = "keep";
+    public IReadOnlyList<string>? Sets { get; init; }
+}
+
+/// <summary>Moves several locations — with all their cards — to one site.</summary>
+public sealed record BulkLocationSiteRequest
+{
+    public List<int> Ids { get; init; } = [];
+    public int SiteId { get; init; }
+}
+
+/// <summary>One location a bulk edit couldn't apply to, and why.</summary>
+public sealed record LocationBulkFailureDto(int Id, string Name, string Error);
+
+/// <summary>How many locations a bulk edit changed (the rest already had the value).</summary>
+public sealed record LocationBulkResultDto(int Changed, int Unchanged);
+
+/// <summary>What deleting several locations would do — changes nothing.</summary>
+public sealed record BulkLocationDeletePreviewRequest
+{
+    public List<int> Ids { get; init; } = [];
+    /// <summary>True keeps the cards (moved to Bulk); false deletes them with the locations.</summary>
+    public bool MoveCardsToBulk { get; init; } = true;
+}
+
+/// <summary>Deletes several locations. Every check is repeated on the server: <see cref="Token"/> must match
+/// a fresh preview (else 409 — something changed since it was reviewed), <see cref="ConfirmLocationCount"/>
+/// must equal the number of locations and, when the cards are deleted too, <see cref="ConfirmCopies"/> must
+/// equal the number of copies.</summary>
+public sealed record BulkLocationDeleteRequest
+{
+    public List<int> Ids { get; init; } = [];
+    public bool MoveCardsToBulk { get; init; } = true;
+    public string Token { get; init; } = "";
+    public int ConfirmLocationCount { get; init; }
+    public int? ConfirmCopies { get; init; }
+}
+
+/// <summary>A location a bulk delete would remove, with everything that hangs off it — every game's cards,
+/// not just the selected game's.</summary>
+public sealed record BulkDeleteLocationDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = "";
+    public string Type { get; init; } = "";
+    public string? SiteName { get; init; }
+    public string? Game { get; init; }
+    /// <summary>Card stacks (single-card lots) and the copies in them.</summary>
+    public int Lots { get; init; }
+    public int Copies { get; init; }
+    /// <summary>Last known market value of those copies.</summary>
+    public decimal MarketValue { get; init; }
+    /// <summary>Sealed-product lots stored here; they're kept but lose their location.</summary>
+    public int SealedLots { get; init; }
+    /// <summary>Copies listed for sale (TCGplayer / eBay / in-store, listed or picked) or live on eBay.</summary>
+    public int ListedCopies { get; init; }
+    /// <summary>Copies on an open (Created / Packed) order.</summary>
+    public int OpenOrderCopies { get; init; }
+    /// <summary>Copies held by a customer at the kiosk.</summary>
+    public int HeldCopies { get; init; }
+    /// <summary>List lines that point at copies here.</summary>
+    public int ListReferences { get; init; }
+    public bool DeckLinked { get; init; }
+    public int Dividers { get; init; }
+    public int PutBackReports { get; init; }
+}
+
+public sealed record BulkLocationDeletePreviewDto
+{
+    public bool MoveCardsToBulk { get; init; }
+    public IReadOnlyList<BulkDeleteLocationDto> Locations { get; init; } = [];
+    public int TotalLots { get; init; }
+    public int TotalCopies { get; init; }
+    public decimal TotalMarketValue { get; init; }
+    public int TotalSealedLots { get; init; }
+    public int TotalListedCopies { get; init; }
+    public int TotalOpenOrderCopies { get; init; }
+    public int TotalHeldCopies { get; init; }
+    public int TotalListReferences { get; init; }
+    /// <summary>Fingerprint of exactly what this preview showed; the delete must send it back.</summary>
+    public string Token { get; init; } = "";
+}
+
+public sealed record BulkLocationDeleteResultDto(int LocationsDeleted, int CopiesMovedToBulk, int CopiesDeleted);
+
 public sealed record NameAvailableDto(bool Available);
 
 /// <summary>

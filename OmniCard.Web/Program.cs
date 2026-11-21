@@ -262,6 +262,8 @@ builder.Services.AddSingleton<LocationImportService>();
 builder.Services.AddSingleton<DeckBoxSyncService>();
 // Deck deconstruct / "return to where it came from" + saved put-back reports (LocationsController deck-return).
 builder.Services.AddSingleton<DeckReturnService>();
+// Locations page ▸ Select: bulk game/sets, site, flags and the verified bulk delete.
+builder.Services.AddSingleton<LocationBulkService>();
 builder.Services.AddSingleton<IDeckReturnPdfExporter, DeckReturnPdfExporter>();
 // Buy Lists: per-game cards the owner wants (flagged in scan + intake, shown on the kiosk). Singleton so
 // its count-down lock is shared.

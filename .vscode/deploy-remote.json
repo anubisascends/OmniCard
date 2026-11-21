@@ -20,7 +20,7 @@
   "UserName": "",
   "RememberPassword": true,
 
-  "//ServiceAdminUserName": "'Publish to Remote Server (service)' only: an ADMINISTRATOR account on the server for PowerShell remoting, which runs install-service.ps1 there. Blank = UserName. Its password is kept apart from UserName's (deploy-remote.local.admin.secret) when the names differ.",
+  "//ServiceAdminUserName": "deploy-remote.ps1 -InstallService only (not a VS Code task; run it from a terminal): an ADMINISTRATOR account on the server for PowerShell remoting, which runs install-service.ps1 there. Blank = UserName. Its password is kept apart from UserName's (deploy-remote.local.admin.secret) when the names differ.",
   "ServiceAdminUserName": "",
   "//ServiceName": "Windows service name (install-service.ps1 -ServiceName).",
   "ServiceName": "OmniCard",

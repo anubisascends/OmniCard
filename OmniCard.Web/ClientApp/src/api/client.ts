@@ -77,6 +77,10 @@ import type {
   ListingDetailDto,
   LocationSearchMatchDto,
   LocationSummaryDto,
+  BulkLocationCardFilterRequest,
+  BulkLocationDeletePreviewDto,
+  BulkLocationDeleteResultDto,
+  LocationBulkResultDto,
   SiteDto,
   SiteGrantDto,
   OrderDetailDto,
@@ -623,7 +627,32 @@ export const api = {
     request<void>(`/api/locations/${id}${qs({ moveToBulk })}`, { method: 'DELETE' }),
   /** Ignore (or stop ignoring) locations when lists and decklist checks look for cards. */
   locationsSetIgnoredForLists: (ids: number[], value: boolean) =>
-    request<void>('/api/locations/ignore-for-lists', { method: 'PUT', body: JSON.stringify({ ids, value }) }),
+    request<LocationBulkResultDto>('/api/locations/ignore-for-lists', { method: 'PUT', body: JSON.stringify({ ids, value }) }),
+  // Bulk edits (Locations page ▸ Select). All or nothing: a 422 carries `failures` (LocationBulkFailureDto[]).
+  locationsBulkSetCardFilter: (body: BulkLocationCardFilterRequest) =>
+    request<LocationBulkResultDto>('/api/locations/bulk/card-filter', { method: 'PUT', body: JSON.stringify(body) }),
+  locationsBulkSetSite: (ids: number[], siteId: number) =>
+    request<LocationBulkResultDto>('/api/locations/bulk/site', { method: 'PUT', body: JSON.stringify({ ids, siteId }) }),
+  locationsBulkSetAlwaysAvailable: (ids: number[], value: boolean) =>
+    request<LocationBulkResultDto>('/api/locations/bulk/always-available', {
+      method: 'PUT',
+      body: JSON.stringify({ ids, value }),
+    }),
+  /** What deleting the locations would do (changes nothing); its `token` must go back with the delete. */
+  locationsBulkDeletePreview: (ids: number[], moveCardsToBulk: boolean) =>
+    request<BulkLocationDeletePreviewDto>('/api/locations/bulk/delete/preview', {
+      method: 'POST',
+      body: JSON.stringify({ ids, moveCardsToBulk }),
+    }),
+  /** 409 when anything changed since the preview — preview again. */
+  locationsBulkDelete: (body: {
+    ids: number[];
+    moveCardsToBulk: boolean;
+    token: string;
+    confirmLocationCount: number;
+    confirmCopies?: number | null;
+  }) =>
+    request<BulkLocationDeleteResultDto>('/api/locations/bulk/delete', { method: 'POST', body: JSON.stringify(body) }),
   locationSetAlwaysAvailable: (id: number, value: boolean) =>
     request<void>(`/api/locations/${id}/always-available`, {
       method: 'PUT',
