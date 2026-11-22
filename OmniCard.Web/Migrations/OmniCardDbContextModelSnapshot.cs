@@ -1673,6 +1673,28 @@ namespace OmniCard.Web.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("OmniCard.Shared.Settings.UserPreference", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Key")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.HasKey("UserId", "Key");
+
+                    b.ToTable("UserPreferences");
+                });
+
             modelBuilder.Entity("OmniCard.Shared.Sites.Site", b =>
                 {
                     b.Property<int>("Id")
@@ -2334,6 +2356,15 @@ namespace OmniCard.Web.Migrations
                     b.HasOne("OmniCard.Shared.Scanning.ScanBatch", null)
                         .WithMany("Items")
                         .HasForeignKey("ScanBatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OmniCard.Shared.Settings.UserPreference", b =>
+                {
+                    b.HasOne("OmniCard.Shared.Settings.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

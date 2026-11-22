@@ -10,8 +10,36 @@ namespace OmniCard.Web.Api.Controllers;
 /// Managing other accounts stays admin-only on <see cref="UsersController"/>. The password change lives on
 /// <see cref="AuthController"/> (<c>/api/auth/change-password</c>).
 /// </summary>
-public sealed class AccountController(UserService users) : ApiControllerBase
+public sealed class AccountController(UserService users, UserPreferenceService preferences) : ApiControllerBase
 {
+    /// <summary>The signed-in user's remembered UI settings (key → value; values are the SPA's own JSON).</summary>
+    [HttpGet("preferences")]
+    public async Task<ActionResult<Dictionary<string, string>>> GetPreferences()
+    {
+        if (AppAuthGate.CurrentUserId(HttpContext) is not int id)
+            return Unauthorized(new { error = "Not authenticated." });
+        return await preferences.GetAllAsync(id);
+    }
+
+    /// <summary>Remember one UI setting for the signed-in user. A blank value forgets it.</summary>
+    [HttpPut("preferences/{key}")]
+    public async Task<IActionResult> SetPreference(string key, [FromBody] SetPreferenceRequest request)
+    {
+        if (AppAuthGate.CurrentUserId(HttpContext) is not int id)
+            return Unauthorized(new { error = "Not authenticated." });
+        if (!UserPreferenceService.IsValidKey(key))
+            return BadRequest(new { error = "Invalid preference key." });
+        try
+        {
+            await preferences.SetAsync(id, key, request.Value);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        return NoContent();
+    }
+
     [HttpGet]
     public async Task<ActionResult<AccountDto>> Get()
     {

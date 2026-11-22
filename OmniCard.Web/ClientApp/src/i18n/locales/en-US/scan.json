@@ -40,7 +40,12 @@
       "addConfirmed_other": "Add {{count}} confirmed cards",
       "addedNote": "Only confirmed & checked scans are added.",
       "addedNoteFiltered": "Only confirmed & checked scans are added, and only those shown by the current filter.",
-      "success": "Added {{count}} card(s) to your collection."
+      "success": "Added {{count}} card(s) to your collection.",
+      "progress": "Adding cards: {{done}} of {{total}} saved…",
+      "progressAudit_one": "Reconciling the location with {{count}} scanned card…",
+      "progressAudit_other": "Reconciling the location with {{count}} scanned cards…",
+      "partial_one": "{{count}} card was added before this error and has left the list.",
+      "partial_other": "{{count}} cards were added before this error and have left the list."
     },
     "saveBatch": {
       "button": "Save as batch",
@@ -147,6 +152,8 @@
     "detail": {
       "uploadedScan": "Uploaded scan",
       "matchedArt": "Matched art",
+      "resizeHint": "Drag to resize the images. Double-click to go back to the default size.",
+      "resizeLabel": "Resize the compare images",
       "viewScan": "View scan",
       "noConfidentMatch": "No confident match. Use “Search catalog” to pick the correct card, or “View scan” to read it.",
       "confirmMatch": "Confirm match",
@@ -162,7 +169,7 @@
     },
     "keyboard": {
       "progress": "Reviewed {{reviewed}} of {{total}}",
-      "hint": "Press Enter to confirm and go to the next card",
+      "hint": "Press Enter to confirm and go to the next card. Hold it to keep going.",
       "tapHint": "Tap a card to review it",
       "waiting_one": "Waiting for {{count}} card to finish matching",
       "waiting_other": "Waiting for {{count}} cards to finish matching",
@@ -173,8 +180,15 @@
       "confirmTooltip": "Confirm and go to the next card (Enter)",
       "searchTooltip": "Search catalog (S)",
       "footnote": "Shortcuts don't work while you're typing in a field. Click an empty part of the page first.",
+      "holdEnter": {
+        "title": "Holding Enter",
+        "help": "While you hold Enter, the next card is confirmed after this much time. It stops at a card without a match.",
+        "off": "Off",
+        "perCard": "{{seconds}} s per card"
+      },
       "keys": {
         "confirm": "Confirm the match and go to the next card to review. On a card with no match, opens Search catalog.",
+        "holdConfirm": "Hold Enter to keep confirming cards, one at a time, at the speed set below.",
         "next": "Next card",
         "previous": "Previous card",
         "search": "Search catalog",

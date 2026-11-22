@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -31,6 +31,9 @@ import {
   Toolbar,
   Tooltip,
   Typography,
+  Slider,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -97,6 +100,7 @@ import { CardHoverPreview, type CardHover } from '../components/CardHoverPreview
 import { Kbd } from '../components/Kbd';
 import { SetMultiSelect } from '../components/SetMultiSelect';
 import { LONG_PRESS_SX, useIsPhone, useLongPress } from '../lib/responsive';
+import { useUserPreference } from '../lib/userPreferences';
 
 import { SelectField } from '../components/SelectField';
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
@@ -675,51 +679,234 @@ function CorrectionSearch({
   );
 }
 
-/** One labelled image pane (half-width) in the detail-panel compare row. */
-function ImagePane({
-  label,
-  src,
-  alt,
-  placeholder,
+/** Cards sent per request when adding confirmed cards (smaller = smoother progress). */
+const COMMIT_CHUNK_SIZE = 25;
+
+/** Add one chunk's commit result to the running total. */
+function mergeCommitResults(
+  a: ScanCommitResultDto & Partial<ScanBatchCommitResultDto>,
+  b: ScanCommitResultDto | ScanBatchCommitResultDto,
+): ScanCommitResultDto & Partial<ScanBatchCommitResultDto> {
+  const sb = b as ScanCommitResultDto & Partial<ScanBatchCommitResultDto>;
+  const buyList =
+    a.buyList && sb.buyList
+      ? {
+          matchedCopies: a.buyList.matchedCopies + sb.buyList.matchedCopies,
+          setAsideCopies: a.buyList.setAsideCopies + sb.buyList.setAsideCopies,
+          setAsideLocations: [...new Set([...a.buyList.setAsideLocations, ...sb.buyList.setAsideLocations])],
+          notSetAside: a.buyList.notSetAside + sb.buyList.notSetAside,
+        }
+      : (a.buyList ?? sb.buyList ?? null);
+  return {
+    imported: a.imported + sb.imported,
+    ruleTagged: (a.ruleTagged ?? 0) + (sb.ruleTagged ?? 0) || undefined,
+    lotIds: a.lotIds || sb.lotIds ? [...(a.lotIds ?? []), ...(sb.lotIds ?? [])] : undefined,
+    buyList,
+    // Only the last chunk can close the batch.
+    batchClosed: sb.batchClosed ?? a.batchClosed,
+  };
+}
+
+/** The signed-in user's remembered review settings (see `useUserPreference`). */
+interface ScanReviewPrefs {
+  /** Height of the compare strip in px; null = the default for the screen size. Not used on phones. */
+  compareHeight: number | null;
+  /** While Enter is held, confirm one card every this many ms; 0 = holding Enter does nothing more. */
+  holdEnterMs: number;
+}
+const SCAN_REVIEW_PREF = 'scan.review';
+const SCAN_REVIEW_DEFAULTS: ScanReviewPrefs = { compareHeight: null, holdEnterMs: 500 };
+const COMPARE_MIN_HEIGHT = 200;
+const COMPARE_MAX_HEIGHT = 1400;
+/** The paces offered for holding Enter (ms per card); 0 = off. */
+const HOLD_ENTER_STEPS = [0, 150, 250, 400, 500, 750, 1000, 1500, 2000, 3000];
+
+const clampCompareHeight = (h: unknown): number | null =>
+  typeof h === 'number' && Number.isFinite(h)
+    ? Math.round(Math.min(COMPARE_MAX_HEIGHT, Math.max(COMPARE_MIN_HEIGHT, h)))
+    : null;
+/** The stored pace snapped to an offered step (a stored value from elsewhere can be anything). */
+const holdEnterPace = (ms: unknown): number => {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) return 0;
+  return HOLD_ENTER_STEPS.reduce((best, s) => (s > 0 && Math.abs(s - ms) < Math.abs(best - ms) ? s : best), 500);
+};
+
+function useScanReviewPrefs() {
+  return useUserPreference<ScanReviewPrefs>(SCAN_REVIEW_PREF, SCAN_REVIEW_DEFAULTS);
+}
+
+/** Card proportions, used to reserve an image's width before it has loaded. */
+const CARD_ASPECT = '63 / 88';
+const COMPARE_PADDING = 8;
+const COMPARE_LABEL_HEIGHT = 22;
+
+/**
+ * Uploaded scan and matched art next to each other in one strip (not each centred in its own half), so the
+ * two are easy to compare. The strip's bottom edge drags to resize it; the height is remembered per user.
+ */
+function ComparePanel({
+  scanSrc,
+  scanAlt,
+  artSrc,
+  artAlt,
+  artPlaceholder,
 }: {
-  label: string;
-  src?: string | null;
-  alt: string;
-  placeholder?: string;
+  scanSrc?: string | null;
+  scanAlt: string;
+  artSrc?: string | null;
+  artAlt: string;
+  artPlaceholder: string;
 }) {
-  return (
-    <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0, alignItems: 'center' }}>
-      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const isPhone = useIsPhone();
+  const isMdUp = useMediaQuery(theme.breakpoints.up('md'));
+  const [prefs, setPrefs] = useScanReviewPrefs();
+  const [dragHeight, setDragHeight] = useState<number | null>(null);
+  const drag = useRef<{ pointerId: number; startY: number; startHeight: number } | null>(null);
+
+  const defaultHeight = isPhone ? 260 : isMdUp ? 420 : 340;
+  const height = dragHeight ?? (isPhone ? null : clampCompareHeight(prefs.compareHeight)) ?? defaultHeight;
+  const imageHeight = height - 2 * COMPARE_PADDING - COMPARE_LABEL_HEIGHT;
+
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = { pointerId: e.pointerId, startY: e.clientY, startHeight: height };
+    setDragHeight(height);
+  };
+  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d || d.pointerId !== e.pointerId) return;
+    setDragHeight(clampCompareHeight(d.startHeight + e.clientY - d.startY));
+  };
+  const endDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d || d.pointerId !== e.pointerId) return;
+    drag.current = null;
+    const final = clampCompareHeight(d.startHeight + e.clientY - d.startY);
+    if (final != null && final !== d.startHeight) setPrefs({ compareHeight: final });
+    setDragHeight(null);
+  };
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    // Handled here: the page's own ArrowUp/Down (move between cards) skips prevented keys.
+    e.preventDefault();
+    const next = clampCompareHeight(height + (e.key === 'ArrowDown' ? 20 : -20));
+    if (next != null) setPrefs({ compareHeight: next });
+  };
+
+  const pane = (label: string, src: string | null | undefined, alt: string, placeholder: string) => (
+    <Stack spacing={0} sx={{ alignItems: 'center', minWidth: 0, maxWidth: { xs: 'calc(50% - 4px)', sm: 'calc(50% - 8px)' } }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        noWrap
+        sx={{ fontWeight: 600, height: COMPARE_LABEL_HEIGHT, lineHeight: `${COMPARE_LABEL_HEIGHT}px`, maxWidth: '100%' }}
+      >
         {label}
       </Typography>
+      {src ? (
+        <Box
+          // A fresh element per image, so the previous card's picture never lingers while this loads.
+          key={src}
+          component="img"
+          src={src}
+          alt={alt}
+          draggable={false}
+          sx={{
+            display: 'block',
+            height: imageHeight,
+            width: 'auto',
+            maxWidth: '100%',
+            // Hold a card-shaped space while loading; the image's own shape once it has (e.g. landscape cards).
+            aspectRatio: `auto ${CARD_ASPECT}`,
+            objectFit: 'contain',
+          }}
+        />
+      ) : (
+        <Box
+          sx={{
+            height: imageHeight,
+            aspectRatio: CARD_ASPECT,
+            maxWidth: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: 1,
+            borderStyle: 'dashed',
+            borderColor: 'divider',
+            borderRadius: 1,
+            p: 1,
+          }}
+        >
+          <Typography variant="body2" color="text.secondary" align="center">
+            {placeholder}
+          </Typography>
+        </Box>
+      )}
+    </Stack>
+  );
+
+  return (
+    <Box>
       <Box
         sx={{
-          width: '100%',
-          height: { xs: 260, sm: 340, md: 420 },
+          height,
+          p: `${COMPARE_PADDING}px`,
           display: 'flex',
-          alignItems: 'center',
           justifyContent: 'center',
+          alignItems: 'flex-start',
+          gap: { xs: 1, sm: 2 },
           bgcolor: 'action.hover',
           borderRadius: 1,
           overflow: 'hidden',
         }}
       >
-        {src ? (
-          <Box
-            // A fresh element per image, so the previous card's picture never lingers while this loads.
-            key={src}
-            component="img"
-            src={src}
-            alt={alt}
-            sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-          />
-        ) : (
-          <Typography variant="body2" color="text.secondary">
-            {placeholder ?? '—'}
-          </Typography>
-        )}
+        {pane(t('scan.detail.uploadedScan'), scanSrc, scanAlt, '—')}
+        {pane(t('scan.detail.matchedArt'), artSrc, artAlt, artPlaceholder)}
       </Box>
-    </Stack>
+      {!isPhone && (
+        <Tooltip title={t('scan.detail.resizeHint')} placement="bottom" enterDelay={600}>
+          <Box
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label={t('scan.detail.resizeLabel')}
+            aria-valuemin={COMPARE_MIN_HEIGHT}
+            aria-valuemax={COMPARE_MAX_HEIGHT}
+            aria-valuenow={height}
+            tabIndex={0}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            onDoubleClick={() => setPrefs({ compareHeight: null })}
+            onKeyDown={onKeyDown}
+            sx={{
+              height: 12,
+              cursor: 'ns-resize',
+              touchAction: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 1,
+              outline: 'none',
+              '& > span': {
+                width: 48,
+                height: 4,
+                borderRadius: 2,
+                bgcolor: dragHeight != null ? 'primary.main' : 'divider',
+                transition: 'background-color 120ms',
+              },
+              '&:hover > span, &:focus-visible > span': { bgcolor: 'primary.main' },
+            }}
+          >
+            <span />
+          </Box>
+        </Tooltip>
+      )}
+    </Box>
   );
 }
 
@@ -1132,16 +1319,14 @@ function DetailPanel({
   return (
     <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 3 }, border: { xs: 0, sm: 1 }, borderColor: { sm: 'divider' } }}>
       <Stack spacing={2}>
-        {/* Side-by-side compare at the top: uploaded scan vs. matched art, each half width. */}
-        <Stack direction="row" spacing={{ xs: 1, sm: 2 }}>
-          <ImagePane label={t('scan.detail.uploadedScan')} src={item.previewUrl} alt={item.fileName} />
-          <ImagePane
-            label={t('scan.detail.matchedArt')}
-            src={id?.imageUri ?? null}
-            alt={id?.name ?? t('scan.status.noMatch')}
-            placeholder={item.status === 'matching' ? t('scan.status.matching') : t('scan.status.noMatch')}
-          />
-        </Stack>
+        {/* Compare at the top: uploaded scan and matched art next to each other. */}
+        <ComparePanel
+          scanSrc={item.previewUrl}
+          scanAlt={item.fileName}
+          artSrc={id?.imageUri ?? null}
+          artAlt={id?.name ?? t('scan.status.noMatch')}
+          artPlaceholder={item.status === 'matching' ? t('scan.status.matching') : t('scan.status.noMatch')}
+        />
 
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
           <ConfidenceChip item={item} />
@@ -1313,6 +1498,7 @@ function isTypingTarget(el: HTMLElement): boolean {
 /** The review keyboard shortcuts, as [keys, i18n key of what they do]. */
 const SHORTCUTS: [string[], string][] = [
   [['Enter'], 'scan.keyboard.keys.confirm'],
+  [['Enter', '…'], 'scan.keyboard.keys.holdConfirm'],
   [['↓', 'J'], 'scan.keyboard.keys.next'],
   [['↑', 'K'], 'scan.keyboard.keys.previous'],
   [['S', '/'], 'scan.keyboard.keys.search'],
@@ -1321,6 +1507,53 @@ const SHORTCUTS: [string[], string][] = [
   [['Ctrl', 'Z'], 'scan.keyboard.keys.undo'],
   [['?'], 'scan.keyboard.keys.help'],
 ];
+
+/** "Off" or "0.5 s per card" for a hold-Enter pace. */
+function holdEnterLabel(t: TFunction, fmt: ReturnType<typeof useFormatters>, ms: number) {
+  return ms <= 0
+    ? t('scan.keyboard.holdEnter.off')
+    : t('scan.keyboard.holdEnter.perCard', { seconds: fmt.number(ms / 1000, { maximumFractionDigits: 2 }) });
+}
+
+/** How fast holding Enter moves through the cards (remembered per user). */
+function HoldEnterSpeed() {
+  const { t } = useTranslation();
+  const fmt = useFormatters();
+  const [prefs, setPrefs] = useScanReviewPrefs();
+  const saved = holdEnterPace(prefs.holdEnterMs);
+  const [index, setIndex] = useState<number | null>(null);
+  const shown = index ?? Math.max(0, HOLD_ENTER_STEPS.indexOf(saved));
+  return (
+    <Box>
+      <Typography variant="subtitle2" id="hold-enter-speed">
+        {t('scan.keyboard.holdEnter.title')}
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        {t('scan.keyboard.holdEnter.help')}
+      </Typography>
+      <Stack direction="row" spacing={2} alignItems="center" sx={{ pt: 0.5 }}>
+        <Slider
+          aria-labelledby="hold-enter-speed"
+          min={0}
+          max={HOLD_ENTER_STEPS.length - 1}
+          step={1}
+          marks
+          value={shown}
+          onChange={(_, v) => setIndex(v as number)}
+          onChangeCommitted={(_, v) => {
+            setIndex(null);
+            setPrefs({ holdEnterMs: HOLD_ENTER_STEPS[v as number] });
+          }}
+          getAriaValueText={(i) => holdEnterLabel(t, fmt, HOLD_ENTER_STEPS[i])}
+          sx={{ flex: 1 }}
+        />
+        <Typography variant="body2" sx={{ minWidth: 104, fontWeight: 600 }}>
+          {holdEnterLabel(t, fmt, HOLD_ENTER_STEPS[shown])}
+        </Typography>
+      </Stack>
+    </Box>
+  );
+}
 
 function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
@@ -1342,6 +1575,8 @@ function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void
           <Typography variant="caption" color="text.secondary" sx={{ pt: 1 }}>
             {t('scan.keyboard.footnote')}
           </Typography>
+          <Divider />
+          <HoldEnterSpeed />
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -1916,41 +2151,75 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   // Only ever act on visible items — a filtered list confirms/commits exactly what's on screen.
   const isVisibleCommittable = (it: ScanItem) => visibleKeys.has(it.key) && isCommittable(it);
 
+  // Adding cards goes in chunks, so a long list shows real progress instead of looking frozen. Each
+  // chunk's cards leave the list as soon as it's saved, so a failure part way never adds a card twice.
+  const [commitProgress, setCommitProgress] = useState<{ done: number; total: number; indeterminate?: boolean } | null>(
+    null,
+  );
+  /** Cards already added when a chunked commit failed part way (shown with the error). */
+  const [commitPartial, setCommitPartial] = useState(0);
+  /** Cards the running (or last) commit has saved so far. */
+  const commitSaved = useRef(0);
   const commit = useMutation<ScanCommitResultDto | AuditCommitResultDto | ScanBatchCommitResultDto>({
     mutationFn: async () => {
-      if (batchStore && batchId != null) {
-        // The server commits its saved copy, so flush pending edits first.
-        await batchStore.sync(itemsRef.current);
-        const ids = items.filter(isVisibleCommittable).map((it) => it.batchItemId!);
-        return api.scanBatchCommit(batchId, containerId as number, ids);
+      const toCommit = items.filter(isVisibleCommittable);
+      const cid = containerId as number;
+      commitSaved.current = 0;
+      setCommitPartial(0);
+      setCommitProgress({ done: 0, total: toCommit.length, indeterminate: auditMode });
+      try {
+        // Audit mode reconciles the whole location against the scan in one step: it can't be split.
+        if (auditMode) {
+          const res = await api.auditCommit(cid, toCommit.map((it) => toCommitItem(it, game)));
+          const keys = new Set(toCommit.map((it) => it.key));
+          dropItems((it) => keys.has(it.key));
+          return res;
+        }
+        // The server commits a batch's saved copy, so flush pending edits first.
+        if (batchStore && batchId != null) await batchStore.sync(itemsRef.current);
+        let merged: ScanCommitResultDto & Partial<ScanBatchCommitResultDto> = { imported: 0 };
+        for (let i = 0; i < toCommit.length; i += COMMIT_CHUNK_SIZE) {
+          const chunk = toCommit.slice(i, i + COMMIT_CHUNK_SIZE);
+          const res =
+            batchStore && batchId != null
+              ? await api.scanBatchCommit(batchId, cid, chunk.map((it) => it.batchItemId!))
+              : await api.scanCommit(cid, chunk.map((it) => toCommitItem(it, game)), false, true);
+          merged = mergeCommitResults(merged, res);
+          // Drop exactly the cards just saved (cards confirmed meanwhile stay for the next add).
+          const keys = new Set(chunk.map((it) => it.key));
+          dropItems((it) => keys.has(it.key));
+          commitSaved.current += chunk.length;
+          setCommitProgress({ done: commitSaved.current, total: toCommit.length });
+        }
+        return merged;
+      } catch (e) {
+        setCommitPartial(commitSaved.current);
+        throw e;
+      } finally {
+        setCommitProgress(null);
       }
-      const payload = items.filter(isVisibleCommittable).map((it) => toCommitItem(it, game));
-      // Audit mode reconciles the location against the scan; normal mode appends lots.
-      return auditMode
-        ? api.auditCommit(containerId as number, payload)
-        : api.scanCommit(containerId as number, payload, false, true);
     },
-    onSuccess: (res) => {
-      // Drop the cards that were just committed; keep everything else (unchecked or unconfirmed).
-      dropItems(isVisibleCommittable);
+    onSettled: (res, err) => {
+      // Refresh whatever the saved chunks changed, even when a later chunk failed.
+      if (!res && commitSaved.current === 0) {
+        if (batch && err instanceof ApiError && err.status === 409) batch.onClaimLost();
+        return;
+      }
       qc.invalidateQueries({ queryKey: ['collection'] });
       qc.invalidateQueries({ queryKey: ['locations'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       qc.invalidateQueries({ queryKey: ['buy-list'] });
       setItems((prev) => prev.map((it) => ({ ...it, buyListSig: undefined })));
-      if (auditMode) {
+      if (auditMode && res) {
         // The audited location's card lists change wholesale — refresh its detail view too.
         qc.invalidateQueries({ queryKey: ['location'] });
         onAuditCommitted?.(res as AuditCommitResultDto);
       }
       if (batch) {
-        if ((res as ScanBatchCommitResultDto).batchClosed) batch.onClosed();
+        if (err instanceof ApiError && err.status === 409) batch.onClaimLost();
+        else if ((res as ScanBatchCommitResultDto | undefined)?.batchClosed) batch.onClosed();
         else batch.onChanged();
       }
-      return res;
-    },
-    onError: (e) => {
-      if (batch && e instanceof ApiError && e.status === 409) batch.onClaimLost();
     },
   });
 
@@ -2530,6 +2799,10 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
   const correcting = correctingKey !== null && correctingKey === selectedKey;
   const setCorrecting = (open: boolean) => setCorrectingKey(open ? selectedKey : null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [reviewPrefs] = useScanReviewPrefs();
+  const holdEnterMs = holdEnterPace(reviewPrefs.holdEnterMs);
+  /** When Enter last confirmed a card (performance.now()), to pace a held Enter. */
+  const lastEnterAt = useRef(0);
   // Cards excluded while reviewing (X / "Exclude from commit"). They count as reviewed, so the
   // review doesn't keep returning to them. Kept for this visit only.
   const [skippedKeys, setSkippedKeys] = useState<ReadonlySet<string>>(() => new Set());
@@ -2688,9 +2961,10 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     if (target?.closest('[role="dialog"], [role="presentation"], [role="menu"], [role="listbox"], [role="combobox"]'))
       return;
     if (confirmDelete || bulkOpen || pickerOpen || webcamOpen || zipOpen || exportAnchor || shortcutsOpen) return;
-    // Holding a key repeats only the moves; holding Enter or X must not run through a string of cards.
+    // Holding a key repeats the moves, and Enter at the user's chosen pace (handled below); holding X or
+    // any other key must not run through a string of cards.
     const isMove = ['ArrowDown', 'ArrowUp', 'j', 'J', 'k', 'K'].includes(e.key);
-    if (e.repeat && !isMove) return;
+    if (e.repeat && !isMove && e.key !== 'Enter') return;
 
     if (e.ctrlKey) {
       if (e.key.toLowerCase() === 'z' && !e.shiftKey && !readOnly) {
@@ -2705,6 +2979,18 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
         // A focused button (e.g. Search catalog after a Tab) keeps its normal Enter behaviour.
         if (target?.closest('button, a, [role="button"]') || !item || readOnly) return;
         e.preventDefault();
+        if (e.repeat) {
+          // Held Enter: confirm the next card once the chosen time has passed since the last one. It stops
+          // (until Enter is pressed again) at a card it can't confirm: no match, still matching, or already
+          // reviewed (the end of the list), and never opens the search.
+          if (holdEnterMs <= 0 || !identityOf(item) || isReviewed(item)) return;
+          const now = performance.now();
+          if (now - lastEnterAt.current < holdEnterMs) return;
+          lastEnterAt.current = now;
+          confirmItem(item);
+          return;
+        }
+        lastEnterAt.current = performance.now();
         if (identityOf(item)) confirmItem(item);
         else if (item.status !== 'matching') setCorrecting(true);
         return;
@@ -3176,7 +3462,29 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                   ? t('scan.commit.addedNoteFiltered')
                   : t('scan.commit.addedNote')}
             </Typography>
-            {commit.error && <Alert severity="error">{(commit.error as Error).message}</Alert>}
+            {commitProgress && (
+              <Box sx={{ flexBasis: '100%' }} role="status" aria-live="polite">
+                <Typography variant="body2" sx={{ mb: 0.5 }}>
+                  {commitProgress.indeterminate
+                    ? t('scan.commit.progressAudit', { count: commitProgress.total })
+                    : t('scan.commit.progress', {
+                        done: fmt.number(commitProgress.done),
+                        total: fmt.number(commitProgress.total),
+                      })}
+                </Typography>
+                <LinearProgress
+                  variant={commitProgress.indeterminate ? 'indeterminate' : 'determinate'}
+                  value={commitProgress.total ? (commitProgress.done / commitProgress.total) * 100 : 0}
+                  sx={{ height: 8, borderRadius: 4 }}
+                />
+              </Box>
+            )}
+            {commit.error && (
+              <Alert severity="error">
+                {commitPartial > 0 && <>{t('scan.commit.partial', { count: commitPartial })} </>}
+                {(commit.error as Error).message}
+              </Alert>
+            )}
             {exportNotice && (
               <Alert severity={exportNotice.severity} onClose={() => setExportNotice(null)}>
                 {exportNotice.text}
