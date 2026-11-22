@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using OmniCard.Api.Contracts;
 using OmniCard.Shared.Sites;
+using OmniCard.Shared.Storage;
 using OmniCard.Web.Api.Infrastructure;
 using OmniCard.Web.Services;
 
@@ -58,7 +59,8 @@ public sealed class SitesController(SiteService sites, RequestSiteAccess siteAcc
     }
 
     /// <summary>Delete a site. Its locations (and their cards) move to <paramref name="moveToSiteId"/>
-    /// (default: the default site). The default site can't be deleted.</summary>
+    /// (default: the default site). The default site can't be deleted. 409 when the target site already has a
+    /// location with the same name and game as one of the moving locations.</summary>
     [HttpDelete("{id:int}")]
     [ApiAuth(RequireAdmin = true)]
     public IActionResult Delete(int id, [FromQuery] int? moveToSiteId = null)
@@ -66,6 +68,10 @@ public sealed class SitesController(SiteService sites, RequestSiteAccess siteAcc
         try
         {
             return sites.Delete(id, moveToSiteId) ? NoContent() : NotFound(new { error = "Site not found." });
+        }
+        catch (LocationNameTakenException ex)
+        {
+            return Conflict(new { error = ex.Message });
         }
         catch (InvalidOperationException ex)
         {

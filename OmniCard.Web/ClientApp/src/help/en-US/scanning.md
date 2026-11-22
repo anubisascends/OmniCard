@@ -311,7 +311,7 @@ The button stays disabled until a location is chosen, at least one card is confi
 If the location doesn't exist yet, you don't have to leave the page:
 
 1. In the location window, click **New location**.
-2. Enter a **New location name**. You'll be warned if *This name is already in use*.
+2. Enter a **New location name**. You'll be warned if *This site already has a location with this name for the same game*.
 3. Choose the **Type** (and the site, if your account can use more than one). For a deck box, also choose its game.
 4. Click **Create & select**.
 

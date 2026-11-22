@@ -182,8 +182,9 @@ public sealed class RecordingContainerService : IStorageContainerService
 
     public List<StorageContainer> GetAll() => Containers;
     public StorageContainer GetBulk() => Bulk;
-    public bool NameExists(string name, int? excludeId = null) =>
-        Containers.Any(c => (excludeId == null || c.Id != excludeId)
+    public bool NameExists(string name, CardGame? game, int? siteId, int? excludeId = null) =>
+        Containers.Any(c => (excludeId == null || c.Id != excludeId) && c.Game == game
+            && c.SiteId == (siteId ?? OmniCard.Shared.Sites.Site.DefaultSiteId)
             && string.Equals(c.Name, name?.Trim(), StringComparison.OrdinalIgnoreCase));
     public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9,
         CardGame? game = null, int? deckTypeId = null, int? siteId = null, IEnumerable<string>? defaultSets = null)

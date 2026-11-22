@@ -504,7 +504,7 @@ public class StorageContainerServiceTests : IDisposable
         var service = CreateService();
         service.Create("Trades", ContainerType.Box);
 
-        var ex = Assert.Throws<InvalidOperationException>(() => service.Create("trades", ContainerType.Binder));
+        var ex = Assert.Throws<LocationNameTakenException>(() => service.Create("trades", ContainerType.Binder));
         Assert.Contains("already exists", ex.Message);
     }
 
@@ -524,7 +524,8 @@ public class StorageContainerServiceTests : IDisposable
         }
         var service = CreateService();
 
-        Assert.Throws<InvalidOperationException>(() => service.Create("bulk", ContainerType.Box));
+        // Bulk is a no-game location in the default site, so only another no-game location there clashes.
+        Assert.Throws<LocationNameTakenException>(() => service.Create("bulk", ContainerType.Box));
     }
 
     [Fact]
@@ -534,7 +535,7 @@ public class StorageContainerServiceTests : IDisposable
         service.Create("Box One", ContainerType.Box);
         var two = service.Create("Box Two", ContainerType.Box);
 
-        Assert.Throws<InvalidOperationException>(() => service.Rename(two.Id, "Box One"));
+        Assert.Throws<LocationNameTakenException>(() => service.Rename(two.Id, "Box One"));
     }
 
     [Fact]
@@ -555,9 +556,101 @@ public class StorageContainerServiceTests : IDisposable
         var service = CreateService();
         var box = service.Create("Shelf", ContainerType.Box);
 
-        Assert.True(service.NameExists("SHELF"));
-        Assert.False(service.NameExists("Shelf", excludeId: box.Id));
-        Assert.False(service.NameExists("Other"));
+        Assert.True(service.NameExists("SHELF", null, null));
+        Assert.False(service.NameExists("Shelf", null, null, excludeId: box.Id));
+        Assert.False(service.NameExists("Other", null, null));
+    }
+
+    // --- Name uniqueness: name + game (no game is its own) + site ---
+
+    private int AddSite(string name)
+    {
+        using var ctx = new OmniCardDbContext(_options);
+        var site = new OmniCard.Shared.Sites.Site { Name = name };
+        ctx.Sites.Add(site);
+        ctx.SaveChanges();
+        return site.Id;
+    }
+
+    [Fact]
+    public void Create_SameNameInDifferentGames_Allowed_ButNotTwiceInOneGame()
+    {
+        var service = CreateService();
+        service.Create("Sales Binder", ContainerType.Binder, game: CardGame.Mtg);
+        service.Create("Sales Binder", ContainerType.Binder, game: CardGame.Pokemon);
+        service.Create("Sales Binder", ContainerType.Binder); // no game is its own slot
+
+        var ex = Assert.Throws<LocationNameTakenException>(() =>
+            service.Create("sales binder ", ContainerType.Box, game: CardGame.Mtg));
+        Assert.Contains("Magic", ex.Message);
+        Assert.Throws<LocationNameTakenException>(() => service.Create("SALES BINDER", ContainerType.Box));
+
+        Assert.True(service.NameExists("Sales Binder", CardGame.Pokemon, null));
+        Assert.False(service.NameExists("Sales Binder", CardGame.YuGiOh, null));
+    }
+
+    [Fact]
+    public void Create_SameNameAndGameInAnotherSite_Allowed()
+    {
+        var service = CreateService();
+        var shop = AddSite("Shop");
+        service.Create("Sales Binder", ContainerType.Binder, game: CardGame.Mtg);
+
+        service.Create("Sales Binder", ContainerType.Binder, game: CardGame.Mtg, siteId: shop);
+
+        Assert.Throws<LocationNameTakenException>(() =>
+            service.Create("Sales Binder", ContainerType.Binder, game: CardGame.Mtg, siteId: shop));
+    }
+
+    [Fact]
+    public void Rename_OnlyClashesWithinTheSameGameAndSite()
+    {
+        var service = CreateService();
+        service.Create("Sales Binder", ContainerType.Binder, game: CardGame.Mtg);
+        var pokemon = service.Create("Trade Binder", ContainerType.Binder, game: CardGame.Pokemon);
+        var mtg = service.Create("Trade Binder", ContainerType.Binder, game: CardGame.Mtg);
+
+        service.Rename(pokemon.Id, "Sales Binder");
+
+        Assert.Throws<LocationNameTakenException>(() => service.Rename(mtg.Id, "Sales Binder"));
+    }
+
+    [Fact]
+    public void SetCardFilter_ToAGameThatAlreadyHasTheName_Throws()
+    {
+        var service = CreateService();
+        service.Create("Sales Binder", ContainerType.Binder, game: CardGame.Mtg);
+        var anyGame = service.Create("Sales Binder", ContainerType.Binder);
+
+        Assert.Throws<LocationNameTakenException>(() => service.SetCardFilter(anyGame.Id, CardGame.Mtg, []));
+        service.SetCardFilter(anyGame.Id, CardGame.Pokemon, []);
+
+        var saved = new OmniCardDbContext(_options).StorageContainers.Single(c => c.Id == anyGame.Id);
+        Assert.Equal(CardGame.Pokemon, saved.Game);
+    }
+
+    [Fact]
+    public void SetDeckBox_ToAGameThatAlreadyHasTheName_Throws()
+    {
+        var service = CreateService();
+        service.Create("Commander", ContainerType.DeckBox, game: CardGame.Mtg);
+        var box = service.Create("Commander", ContainerType.DeckBox, game: CardGame.Pokemon);
+
+        Assert.Throws<LocationNameTakenException>(() => service.SetDeckBox(box.Id, CardGame.Mtg, null));
+    }
+
+    [Fact]
+    public void SetSite_IntoASiteThatHasTheNameForThatGame_Throws()
+    {
+        var service = CreateService();
+        var shop = AddSite("Shop");
+        service.Create("Sales Binder", ContainerType.Binder, game: CardGame.Mtg, siteId: shop);
+        var moving = service.Create("Sales Binder", ContainerType.Binder, game: CardGame.Mtg);
+        var otherGame = service.Create("Sales Binder", ContainerType.Binder, game: CardGame.Pokemon);
+
+        var ex = Assert.Throws<LocationNameTakenException>(() => service.SetSite(moving.Id, shop));
+        Assert.Contains("Shop", ex.Message);
+        service.SetSite(otherGame.Id, shop);
     }
 
     // --- Deck box: game + deck type ---

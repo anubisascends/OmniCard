@@ -430,8 +430,9 @@ public class CsvImportTests : IDisposable
 
         public List<StorageContainer> GetAll() => _containers;
         public StorageContainer GetBulk() => _containers.First(c => c.IsSystem);
-        public bool NameExists(string name, int? excludeId = null) =>
-            _containers.Any(c => (excludeId == null || c.Id != excludeId)
+        public bool NameExists(string name, CardGame? game, int? siteId, int? excludeId = null) =>
+            _containers.Any(c => (excludeId == null || c.Id != excludeId) && c.Game == game
+                && c.SiteId == (siteId ?? OmniCard.Shared.Sites.Site.DefaultSiteId)
                 && string.Equals(c.Name, name?.Trim(), StringComparison.OrdinalIgnoreCase));
         public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9, CardGame? game = null, int? deckTypeId = null, int? siteId = null, IEnumerable<string>? defaultSets = null)
         {

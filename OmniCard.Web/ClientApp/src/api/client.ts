@@ -602,8 +602,10 @@ export const api = {
   }) => request<CardDto[]>('/api/collection/grouped/cards', { method: 'POST', body: JSON.stringify(body) }),
 
   // Location writes
-  locationNameAvailable: (name: string, excludeId?: number) =>
-    request<{ available: boolean }>(`/api/locations/name-available${qs({ name, excludeId })}`),
+  /** Names are unique per name + game ("" / null = no fixed game, its own slot) + site. With `excludeId`
+   * (a rename) the server uses that location's own game and site. */
+  locationNameAvailable: (name: string, opts: { game?: string | null; siteId?: number | null; excludeId?: number } = {}) =>
+    request<{ available: boolean }>(`/api/locations/name-available${qs({ name, ...opts })}`),
   locationCreate: (body: {
     name: string;
     type: string;

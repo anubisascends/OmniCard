@@ -130,16 +130,26 @@ public sealed class LocationsController(
 
     // --- writes ---
 
-    /// <summary>Whether a location name is free (case-insensitive, incl. the reserved Bulk name).
+    /// <summary>Whether a location name is free for <paramref name="game"/> (blank = no fixed game) in
+    /// <paramref name="siteId"/> (default: the default site) — names are unique per name (case-insensitive) +
+    /// game + site, and the Bulk location is a no-game one in the default site. With
+    /// <paramref name="excludeId"/> (a rename) that location is ignored and its own game and site are used.
     /// Backs the live add/rename validation.</summary>
     [HttpGet("name-available")]
     [RequirePermission(Permissions.LocationsView)]
-    public ActionResult<NameAvailableDto> NameAvailable([FromQuery] string name, [FromQuery] int? excludeId) =>
-        new NameAvailableDto(!containers.NameExists(name ?? "", excludeId));
+    public ActionResult<NameAvailableDto> NameAvailable([FromQuery] string name, [FromQuery] string? game,
+        [FromQuery] int? siteId, [FromQuery] int? excludeId)
+    {
+        var parsed = ParseGame(game);
+        if (excludeId is int id && containers.GetAll().FirstOrDefault(c => c.Id == id) is { } renaming)
+            (parsed, siteId) = (renaming.Game, renaming.SiteId);
+        return new NameAvailableDto(!containers.NameExists(name ?? "", parsed, siteId, excludeId));
+    }
 
     /// <summary>Create a new location in <c>req.SiteId</c> (default: the default site), optionally fixed
     /// to a game with default sets. 409 if the name is taken, 400 for an invalid/Bulk type, an unknown
-    /// game, a deck box without a game or an unknown site, 403 without write access to the site.</summary>
+    /// game, a deck box without a game or an unknown site, 403 without write access to the site. The name
+    /// need only be unique for that game (no game counts as its own) within the site.</summary>
     [HttpPost]
     [RequirePermission(Permissions.LocationsCreate)]
     public ActionResult<LocationSummaryDto> Create([FromBody] CreateLocationRequest req)
@@ -171,11 +181,16 @@ public sealed class LocationsController(
         if (DefaultSetsTooLong(req.DefaultSets))
             return BadRequest(new { error = "Too many default sets." });
 
-        if (containers.NameExists(name))
-            return Conflict(new { error = $"A location named \"{name}\" already exists." });
-
-        var created = containers.Create(name, type, req.SlotsPerPage, game,
-            type == ContainerType.DeckBox ? req.DeckTypeId : null, siteId, req.DefaultSets);
+        StorageContainer created;
+        try
+        {
+            created = containers.Create(name, type, req.SlotsPerPage, game,
+                type == ContainerType.DeckBox ? req.DeckTypeId : null, siteId, req.DefaultSets);
+        }
+        catch (LocationNameTakenException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
         return DtoMapping.ToDto(new LocationTileSummary
         {
             Container = created,
@@ -184,7 +199,8 @@ public sealed class LocationsController(
     }
 
     /// <summary>Move a location — with all of its cards — to another site. Needs write access to both
-    /// the current and the target site. 400 for Bulk (always in the default site) or an unknown site.</summary>
+    /// the current and the target site. 400 for Bulk (always in the default site) or an unknown site; 409
+    /// when the target site already has a location of the same name and game.</summary>
     [HttpPut("{id:int}/site")]
     [RequirePermission(Permissions.LocationsEdit)]
     [RequireSiteAccess(SiteAccessLevel.Write, Location = "id")]
@@ -197,6 +213,10 @@ public sealed class LocationsController(
         try
         {
             containers.SetSite(id, req.SiteId);
+        }
+        catch (LocationNameTakenException ex)
+        {
+            return Conflict(new { error = ex.Message });
         }
         catch (InvalidOperationException ex)
         {
@@ -421,7 +441,7 @@ public sealed class LocationsController(
     private bool DeckTypeBelongsToGame(int deckTypeId, CardGame game) =>
         deckTypes.GetById(deckTypeId) is { } dt && dt.Game == game;
 
-    /// <summary>Rename a location. 409 if the new name is taken.</summary>
+    /// <summary>Rename a location. 409 if another location of the same game in the same site has the name.</summary>
     [HttpPut("{id:int}")]
     [RequirePermission(Permissions.LocationsEdit)]
     [RequireSiteAccess(SiteAccessLevel.Write, Location = "id")]
@@ -430,9 +450,14 @@ public sealed class LocationsController(
         var name = (req.Name ?? "").Trim();
         if (name.Length == 0)
             return BadRequest(new { error = "Name is required." });
-        if (containers.NameExists(name, excludeId: id))
-            return Conflict(new { error = $"A location named \"{name}\" already exists." });
-        containers.Rename(id, name);
+        try
+        {
+            containers.Rename(id, name);
+        }
+        catch (LocationNameTakenException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
         return NoContent();
     }
 

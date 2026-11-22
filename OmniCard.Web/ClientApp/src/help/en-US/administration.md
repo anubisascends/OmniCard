@@ -168,6 +168,8 @@ A person gets the higher of their own level and their role's level. Administrato
 2. If the site has locations, choose a site under **Move its locations to**. Its locations and all their cards move there.
 3. Click **Delete**.
 
+If the other site already has a location with the same name and game as one being moved, nothing is deleted and the message names the locations. Rename them, or move them to another site, and try again.
+
 ## Kiosk
 
 Only administrators see this tab. It sets up the [customer kiosk](help:kiosk): whether kiosks are open, which locations customers can browse, the idle timeout, whether prices are shown, and the welcome message. Below the settings, **Kiosk devices** lists every device set up as a kiosk, with **Revoke** to lock one out.

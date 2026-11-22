@@ -98,7 +98,7 @@
       "noMatches": "No matching locations.",
       "gameBlocked": "This location only holds {{game}} cards",
       "newLocationName": "New location name",
-      "nameTaken": "This name is already in use",
+      "nameTaken": "This site already has a location with this name for the same game",
       "createAndSelect": "Create & select",
       "newLocation": "New location"
     },

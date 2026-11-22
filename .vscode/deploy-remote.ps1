@@ -220,14 +220,39 @@ if ($ServerHasSettings) {
     Write-Host "The server has no appsettings.json yet - deploying the repo's copy. Edit it on the server (DataDirectory, ConnectionStrings, ...); later deploys keep those sections." -ForegroundColor Yellow
 }
 
+# A Windows-service install comes back by its recovery actions, but a recovery restart that lands while the
+# copy is still running exits at once (app_offline.htm) and Windows may not try again: on 2026-11-21 a deploy
+# left the service STOPPED with exit code 0 and no further restart. So after the copy, start the service
+# if it's stopped. sc.exe reaches the server's Service Control Manager over the SMB connection the share
+# already uses. No such service (an IIS site) is skipped; a running/starting one is left alone; anything
+# else only warns, since step 6 checks the site either way.
+function Start-StoppedService {
+    $target = "\\$($cfg.Server)"
+    $query = (sc.exe $target query $ServiceName | Out-String)
+    $qcode = $LASTEXITCODE
+    if ($qcode -eq 1060) { return }   # ERROR_SERVICE_DOES_NOT_EXIST: the site runs under IIS
+    if ($qcode -ne 0) {
+        Write-Host "Couldn't check service $ServiceName on the server (sc.exe exit $qcode): $($query.Trim())" -ForegroundColor Yellow
+        return
+    }
+    if ($query -notmatch 'STATE\s+:\s+1\s') { return }   # not STOPPED (1): it's starting or running
+    Write-Host "Service $ServiceName is stopped on the server - starting it" -ForegroundColor Cyan
+    $start = (sc.exe $target start $ServiceName | Out-String)
+    $scode = $LASTEXITCODE
+    if ($scode -notin 0, 1056) {   # 1056 = already running (a recovery restart got there first)
+        Write-Host "Couldn't start service $ServiceName on the server (sc.exe exit $scode): $($start.Trim())" -ForegroundColor Yellow
+    }
+}
+
 # ---- 5. Deploy: replace the site with the staged build, app offline meanwhile ----
 # Both paths delete server files the new build no longer has (stale content-hashed SPA chunks would
 # otherwise pile up), except the ASP.NET Core Module's logs\ folder.
 if ($Method -eq 'Share') {
     # app_offline.htm makes the ASP.NET Core Module stop the app and release its DLL locks. A Windows-
     # service install (install-service.ps1) honors it too: the app exits with a failure code and Windows'
-    # recovery actions restart it ~10 s after the file is removed (each restart before that exits again).
-    # robocopy's retries cover the app's shutdown either way; step 6 checks it came back.
+    # recovery actions restart it ~10 s later (each restart while the file is there exits again). Windows
+    # doesn't always retry after such a restart, so once the copy is done Start-StoppedService starts a
+    # service that was left stopped. robocopy's retries cover the app's shutdown; step 6 checks it came back.
     # -InstallService stops the service outright first instead (install-service.ps1 starts it again);
     # app_offline.htm still covers a first deploy over a live IIS site.
     if ($InstallService) {
@@ -254,6 +279,7 @@ if ($Method -eq 'Share') {
     $code = $LASTEXITCODE   # robocopy: 0-7 = success, 8+ = failure
     if ($code -ge 8) { Fail "robocopy FAILED (exit $code). The site is left offline (app_offline.htm) so nobody hits a half-updated app; run the task again." }
     Remove-Item -LiteralPath $offline
+    if (-not $InstallService) { Start-StoppedService }
 
     if ($InstallService) {
         # A child powershell.exe so the server's execution policy doesn't block the script file; its
@@ -283,7 +309,7 @@ if ($Method -eq 'Share') {
 Close-Share
 Remove-Item -LiteralPath $Staging -Recurse -Force -ErrorAction SilentlyContinue
 
-# ---- 6. Check the app came back (a service install restarts ~10 s after app_offline.htm goes) ----
+# ---- 6. Check the app came back (a service install was started above, or restarts by itself) ----
 # curl.exe (built into Windows 10+) because the site's certificate is usually self-signed. Any status
 # below 500 means the app answered; 5xx is IIS's app_offline / startup page.
 Write-Host "Waiting for $SiteUrl to answer" -ForegroundColor Cyan

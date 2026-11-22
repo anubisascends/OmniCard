@@ -94,7 +94,7 @@ The game selected at the top of the app affects this page:
 
 ## Create a location
 
-1. On the [Locations](/locations) page, type a name in **New location name**. Names must be unique. If the name is already used, you'll see *This name is already in use*.
+1. On the [Locations](/locations) page, type a name in **New location name**. A name only has to be unique for its game within its site. For example, a Magic: The Gathering **Sales Binder** and a Pokémon **Sales Binder** can sit side by side, but one site can't hold two Magic: The Gathering ones. Locations with no game count as one more game. If the name is already used, you'll see *This site already has a location with this name for the same game*.
 2. Pick a **Type**.
 3. If you picked **Deck Box**, choose a **Game** (required) and optionally a **Deck type**. See [Deck boxes](help:deck-boxes). For any other type, leave **Game** on **Any game**, or pick a game to keep the location to that game.
 4. If you picked a game, you can also pick **Default sets**: card searches for this location start on them. See [Game and default sets](#game-and-default-sets).
@@ -138,7 +138,7 @@ To set them, choose **Game & sets…** in the location's **⋮** menu on the Loc
 
 The game and the sets work differently:
 
-- **The game is a rule.** Cards from other games can't be added to the location by any route: **Add card**, binder pockets, moving cards, scanning, importing or syncing a deck. **Add card** is locked to the game (*Locked to this location's game*), and location pickers grey out the location for cards of other games (*This location only holds … cards*). You can't give a location a game while it holds cards of another game. Move those cards out first.
+- **The game is a rule.** Cards from other games can't be added to the location by any route: **Add card**, binder pockets, moving cards, scanning, importing or syncing a deck. **Add card** is locked to the game (*Locked to this location's game*), and location pickers grey out the location for cards of other games (*This location only holds … cards*). You can't give a location a game while it holds cards of another game. Move those cards out first. You also can't change a location to a game that already has a location with the same name in that site. Rename one of them first.
 - **The default sets are only a starting point.** **Add card** on the location's page and the binder's **Sets** filter start on them, but you can still search every set (Alt+A, or remove the chips). Nothing outside the sets is refused or moved.
 
 The location's page shows its game (for example *Magic: The Gathering only*) and its default sets under the title. If it holds cards from other sets, a note says how many, for example *3 cards here aren't in this location's default sets.* Click **Show them** to search for them.
@@ -147,7 +147,7 @@ The location's page shows its game (for example *Magic: The Gathering only*) and
 
 ### Move to another site
 
-Choose **Move to site…**, pick the **Destination site**, and click **Move**. Every card in the location moves with it. This option only appears when you can write to at least one other site.
+Choose **Move to site…**, pick the **Destination site**, and click **Move**. Every card in the location moves with it. This option only appears when you can write to at least one other site. If the destination site already has a location with the same name for the same game, the move is refused. Rename one of them first.
 
 ### Always available
 
@@ -204,7 +204,7 @@ In **Game & sets…**:
 2. **Default sets**: **Leave default sets as they are**, **Replace with these sets**, **Add these sets**, **Remove these sets** or **Clear all default sets**. Replacing, adding and removing need every ticked location to end up on the same game, because set codes belong to one game. So pick a game, or tick locations that already share one.
 3. Click **Apply**.
 
-A location whose game changes loses its old default sets. The same rules as for one location apply. A location can't be given a game while it holds another game's cards, and a deck box must keep a game.
+A location whose game changes loses its old default sets. The same rules as for one location apply. A location can't be given a game while it holds another game's cards, and a deck box must keep a game. Two locations with the same name can't end up on the same game in one site, including two ticked locations.
 
 It's all or nothing. If any ticked location can't take the change, **nothing is saved**, and the dialog lists each location with the reason. Click **Apply to the other …** to leave those out and change the rest.
 

@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using OmniCard.Collection.Inventory;
 using OmniCard.Data;
 using OmniCard.Shared.Sites;
+using OmniCard.Shared.Storage;
 
 namespace OmniCard.Web.Services;
 
@@ -81,8 +83,15 @@ public sealed class SiteService(IDbContextFactory<OmniCardDbContext> factory, Si
         if (targetId == id || !db.Sites.Any(s => s.Id == targetId))
             throw new InvalidOperationException("Choose another existing site to move this site's locations to.");
 
-        foreach (var container in db.StorageContainers.Where(c => c.SiteId == id))
+        var moving = db.StorageContainers.Where(c => c.SiteId == id).ToList();
+        foreach (var container in moving)
             container.SiteId = targetId;
+        // A location's name is unique per game + site, so the target may already use some of these names.
+        var clashes = StorageContainerService.FindNameClashes(db, moving);
+        if (clashes.Count > 0)
+            throw new LocationNameTakenException(
+                $"This site's locations can't move: {string.Join(" ", clashes.Select(c => c.Error))} " +
+                "Rename them first, or move them to another site.");
         db.SiteAccessGrants.RemoveRange(db.SiteAccessGrants.Where(g => g.SiteId == id));
         db.Sites.Remove(site);
         db.SaveChanges();

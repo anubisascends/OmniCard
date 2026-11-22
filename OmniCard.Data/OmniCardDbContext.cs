@@ -130,10 +130,15 @@ public class OmniCardDbContext : DbContext
             e.HasKey(s => s.Id);
             e.Property(s => s.Id).ValueGeneratedOnAdd();
             e.Property(s => s.ContainerType).HasConversion<string>();
-            e.HasIndex(s => s.Name).IsUnique();
+            // A name is unique per game + site (an MTG and a Pokémon "Sales Binder" may share a site). On SQL
+            // Server a null Game counts as one value, so "no game" is its own slot — hence no "[Game] IS NOT NULL"
+            // filter (EF's default for a nullable unique column). The case-insensitive rule (and SQLite, where
+            // nulls never collide) is enforced by StorageContainerService.
+            e.HasIndex(s => new { s.Name, s.Game, s.SiteId }).IsUnique().HasFilter(null);
 
             // The location's fixed game (any type but Bulk); nullable enum stored as string (like InventoryLot.FlagReason).
-            e.Property(s => s.Game).HasConversion<string?>();
+            // Bounded so the (Name, Game, SiteId) index key stays well under SQL Server's 1700-byte limit.
+            e.Property(s => s.Game).HasConversion<string?>().HasMaxLength(32);
             e.Ignore(s => s.DefaultSetCodes);
 
             // Deck boxes may reference a DeckType (format). Deleting the type unsets the reference

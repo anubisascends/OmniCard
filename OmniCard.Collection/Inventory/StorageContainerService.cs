@@ -28,15 +28,77 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
         return context.StorageContainers.First(c => c.IsSystem);
     }
 
-    public bool NameExists(string name, int? excludeId = null)
+    // --- name uniqueness ------------------------------------------------------------------------------
+    // A location's name is unique per name (trimmed, case-insensitive) + game (no game counts as its own) +
+    // site. Every path that changes any of the three checks it here; the DB's unique (Name, Game, SiteId)
+    // index is the backstop.
+
+    /// <summary>The one identity a location name must be unique within.</summary>
+    public static (string Name, CardGame? Game, int SiteId) NameKey(string? name, CardGame? game, int siteId) =>
+        ((name ?? "").Trim().ToUpperInvariant(), game, siteId);
+
+    public static string NameTakenMessage(string name, CardGame? game, string? siteName)
     {
-        var trimmed = (name ?? "").Trim();
+        var where = string.IsNullOrWhiteSpace(siteName) ? "" : $" in {siteName}";
+        return game is CardGame g
+            ? $"A {g.DisplayName()} location named \"{name.Trim()}\" already exists{where}."
+            : $"A location named \"{name.Trim()}\" with no fixed game already exists{where}.";
+    }
+
+    public bool NameExists(string name, CardGame? game, int? siteId, int? excludeId = null)
+    {
         using var context = dbContextFactory.CreateDbContext();
+        return NameExists(context, name, game, siteId ?? Site.DefaultSiteId, excludeId);
+    }
+
+    private static bool NameExists(OmniCardDbContext context, string? name, CardGame? game, int siteId, int? excludeId)
+    {
+        var key = NameKey(name, game, siteId);
         return context.StorageContainers
             .AsNoTracking()
-            .Where(c => excludeId == null || c.Id != excludeId)
+            .Where(c => c.SiteId == siteId && c.Game == game && (excludeId == null || c.Id != excludeId))
+            .Select(c => c.Name)
             .AsEnumerable()
-            .Any(c => string.Equals(c.Name, trimmed, StringComparison.OrdinalIgnoreCase));
+            .Any(n => NameKey(n, game, siteId) == key);
+    }
+
+    private static void ThrowIfNameTaken(OmniCardDbContext context, string name, CardGame? game, int siteId, int? excludeId)
+    {
+        if (NameExists(context, name, game, siteId, excludeId))
+            throw new LocationNameTakenException(
+                NameTakenMessage(name, game, context.Sites.AsNoTracking().FirstOrDefault(s => s.Id == siteId)?.Name));
+    }
+
+    /// <summary>The edited (tracked) <paramref name="changed"/> locations whose name + game + site now clash with
+    /// another location's, or with each other's (the later one by id is reported), each with the reason. For
+    /// edits that change several locations at once, where a per-row check against the database would miss two
+    /// selected locations landing on the same name or wrongly block two swapping games.</summary>
+    public static List<(StorageContainer Container, string Error)> FindNameClashes(
+        OmniCardDbContext context, IReadOnlyCollection<StorageContainer> changed)
+    {
+        var ids = changed.Select(c => c.Id).ToList();
+        var taken = context.StorageContainers.AsNoTracking()
+            .Where(c => !ids.Contains(c.Id))
+            .Select(c => new { c.Name, c.Game, c.SiteId })
+            .AsEnumerable()
+            .Select(c => NameKey(c.Name, c.Game, c.SiteId))
+            .ToHashSet();
+        Dictionary<int, string>? siteNames = null;
+        var clashes = new List<(StorageContainer, string)>();
+        foreach (var c in changed.OrderBy(c => c.Id))
+        {
+            if (taken.Add(NameKey(c.Name, c.Game, c.SiteId))) continue;
+            siteNames ??= context.Sites.AsNoTracking().ToDictionary(s => s.Id, s => s.Name);
+            clashes.Add((c, NameTakenMessage(c.Name, c.Game, siteNames.GetValueOrDefault(c.SiteId))));
+        }
+        return clashes;
+    }
+
+    /// <summary><see cref="FindNameClashes"/> for one edited location: throws <see cref="LocationNameTakenException"/>.</summary>
+    private static void ThrowIfNameClash(OmniCardDbContext context, StorageContainer container)
+    {
+        if (FindNameClashes(context, [container]) is [var clash, ..])
+            throw new LocationNameTakenException(clash.Error);
     }
 
     public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9,
@@ -44,10 +106,9 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
         IEnumerable<string>? defaultSets = null)
     {
         var trimmed = (name ?? "").Trim();
-        if (NameExists(trimmed))
-            throw new InvalidOperationException($"A location named \"{trimmed}\" already exists.");
-
         using var context = dbContextFactory.CreateDbContext();
+        ThrowIfNameTaken(context, trimmed, type == ContainerType.Bulk ? null : game, siteId ?? Site.DefaultSiteId, excludeId: null);
+
         var maxSort = context.StorageContainers.Any()
             ? context.StorageContainers.Max(c => c.SortOrder)
             : 0;
@@ -112,6 +173,7 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
             container.DefaultSets = null;
         container.Game = game;
         container.DeckTypeId = deckTypeId;
+        ThrowIfNameClash(context, container);
         context.SaveChanges();
     }
 
@@ -122,12 +184,14 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
             ?? throw new InvalidOperationException($"Container {containerId} not found");
         if (ApplyCardFilter(context, container, game, defaultSets) is { } error)
             throw new InvalidOperationException(error);
+        ThrowIfNameClash(context, container);
         context.SaveChanges();
     }
 
     /// <summary>The one rule for giving a tracked <paramref name="container"/> a game (null = any game) and
     /// default sets, shared by the single and bulk edits. Returns why it can't (and changes nothing), or null
-    /// once applied — the caller saves.</summary>
+    /// once applied — the caller saves, after checking the new game doesn't clash with another location's name
+    /// (<see cref="FindNameClashes"/>).</summary>
     public static string? ApplyCardFilter(OmniCardDbContext context, StorageContainer container,
         CardGame? game, IEnumerable<string>? defaultSets)
     {
@@ -195,14 +259,12 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
     public void Rename(int id, string newName)
     {
         var trimmed = (newName ?? "").Trim();
-        if (NameExists(trimmed, excludeId: id))
-            throw new InvalidOperationException($"A location named \"{trimmed}\" already exists.");
-
         using var context = dbContextFactory.CreateDbContext();
         var container = context.StorageContainers.Find(id)
             ?? throw new InvalidOperationException($"Container {id} not found");
         if (container.IsSystem)
             throw new InvalidOperationException("Cannot rename system container");
+        ThrowIfNameTaken(context, trimmed, container.Game, container.SiteId, excludeId: id);
 
         container.Name = trimmed;
         context.SaveChanges();
@@ -219,6 +281,7 @@ public sealed class StorageContainerService(IDbContextFactory<OmniCardDbContext>
             throw new InvalidOperationException($"Site {siteId} not found");
 
         container.SiteId = siteId;
+        ThrowIfNameClash(context, container);
         context.SaveChanges();
     }
 

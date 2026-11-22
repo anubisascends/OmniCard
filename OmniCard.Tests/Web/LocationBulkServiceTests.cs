@@ -162,6 +162,42 @@ public class LocationBulkServiceTests : IDisposable
     }
 
     [Fact]
+    public void SetSite_IntoASiteThatHasTheNameForThatGame_FailsAndMovesNothing()
+    {
+        int site;
+        using (var db = Db())
+        {
+            var s = new Site { Name = "Shop" };
+            db.Sites.Add(s);
+            db.SaveChanges();
+            site = s.Id;
+        }
+        AddLocation("Sales Binder", game: CardGame.Mtg, siteId: site);
+        var clash = AddLocation("Sales Binder", game: CardGame.Mtg);
+        var fine = AddLocation("Sales Binder", game: CardGame.Pokemon);
+
+        var ex = Throws(() => _svc.SetSite([clash, fine], site));
+
+        Assert.Equal(ErrorKind.Failures, ex.Kind);
+        Assert.Equal(clash, Assert.Single(ex.Failures).Id);
+        Assert.Equal(Site.DefaultSiteId, Location(fine)!.SiteId);
+    }
+
+    [Fact]
+    public void SetCardFilter_TwoSelectedLocationsLandingOnOneNameAndGame_Fails()
+    {
+        var a = AddLocation("Sales Binder");
+        var b = AddLocation("Sales Binder", game: CardGame.Pokemon);
+
+        var ex = Throws(() => _svc.SetCardFilter(new BulkLocationCardFilterRequest { Ids = [a, b], GameMode = "set", Game = "Mtg" }));
+
+        Assert.Equal(ErrorKind.Failures, ex.Kind);
+        Assert.Single(ex.Failures);
+        Assert.Null(Location(a)!.Game);
+        Assert.Equal(CardGame.Pokemon, Location(b)!.Game);
+    }
+
+    [Fact]
     public void AlwaysAvailable_CountsChangedAndLeavesBulkAlone()
     {
         var a = AddLocation("A");

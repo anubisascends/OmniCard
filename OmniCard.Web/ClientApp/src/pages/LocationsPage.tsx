@@ -94,8 +94,9 @@ function AddLocationBar({ onAdded, siteFilter }: { onAdded: () => void; siteFilt
   const isDeckBox = isDeckBoxType(type);
   const trimmed = name.trim();
   const nameCheck = useQuery({
-    queryKey: ['loc-name-available', trimmed],
-    queryFn: () => api.locationNameAvailable(trimmed),
+    // A name only has to be unique for its game (or no game) within its site.
+    queryKey: ['loc-name-available', trimmed, game, siteId],
+    queryFn: () => api.locationNameAvailable(trimmed, { game, siteId }),
     enabled: trimmed.length > 0,
   });
   const taken = trimmed.length > 0 && nameCheck.data?.available === false;

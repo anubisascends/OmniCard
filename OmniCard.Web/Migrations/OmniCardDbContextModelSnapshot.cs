@@ -1915,7 +1915,8 @@ namespace OmniCard.Web.Migrations
                         .HasColumnType("bit");
 
                     b.Property<string>("Game")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
 
                     b.Property<bool>("IsSystem")
                         .HasColumnType("bit");
@@ -1957,10 +1958,10 @@ namespace OmniCard.Web.Migrations
 
                     b.HasIndex("DeckTypeId");
 
-                    b.HasIndex("Name")
-                        .IsUnique();
-
                     b.HasIndex("SiteId");
+
+                    b.HasIndex("Name", "Game", "SiteId")
+                        .IsUnique();
 
                     b.ToTable("StorageContainers");
                 });

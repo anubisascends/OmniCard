@@ -102,6 +102,7 @@ public sealed class LocationBulkService(
             else if (before != (c.Game, c.DefaultSets, c.DeckTypeId))
                 changed++;
         }
+        AddNameClashes(ctx, containers, failures);
         return Save(ctx, failures, changed, containers.Count);
     }
 
@@ -120,6 +121,7 @@ public sealed class LocationBulkService(
             c.SiteId = siteId;
             changed++;
         }
+        AddNameClashes(ctx, containers, failures);
         return Save(ctx, failures, changed, containers.Count);
     }
 
@@ -335,6 +337,16 @@ public sealed class LocationBulkService(
         if (found.Count != distinct.Count)
             throw new LocationBulkException(ErrorKind.NotFound, "One or more locations no longer exist. Refresh and try again.");
         return found;
+    }
+
+    /// <summary>A location's name is unique per game + site, so a new game or site can collide with another
+    /// location's name — or with another selected location's. Locations that already failed aren't re-reported.</summary>
+    private static void AddNameClashes(OmniCardDbContext ctx, List<StorageContainer> containers, List<LocationBulkFailureDto> failures)
+    {
+        var failed = failures.Select(f => f.Id).ToHashSet();
+        foreach (var (c, error) in StorageContainerService.FindNameClashes(ctx, containers))
+            if (failed.Add(c.Id))
+                failures.Add(new LocationBulkFailureDto(c.Id, c.Name, error));
     }
 
     private static LocationBulkResultDto Save(OmniCardDbContext ctx, List<LocationBulkFailureDto> failures, int changed, int total)

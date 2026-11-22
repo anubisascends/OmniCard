@@ -241,9 +241,10 @@ certificate; it updates the existing service.
 - **Deploys work unchanged** with the `Share` method. The service honors `app_offline.htm` like the
   ASP.NET Core Module does (`AppOfflineWatcher`): the app exits with a failure code so its DLLs can be
   replaced, and the service's recovery actions (restart after 10 s, every time) bring it back. A restart
-  that still finds the file exits again before touching the database, so the service is back about
-  10 s after the deploy removes the file. The deploy task then waits for the site to answer and fails
-  if it doesn't within 2 minutes. Each of these exits is logged as an expected "terminated
+  that still finds the file exits again before touching the database. Windows doesn't always retry
+  after such a restart (a long copy can leave the service stopped), so once the copy is done the deploy
+  task starts the service itself if it's stopped (`sc.exe \\server start`, over the share's connection).
+  The deploy task then waits for the site to answer and fails if it doesn't within 2 minutes. Each of these exits is logged as an expected "terminated
   unexpectedly" (event 7034) in the System log. `WebDeploy` needs IIS, so use `Share`.
 - To (re)install the service from this PC without logging in on the server — e.g. to change its ports or
   certificate — run `powershell -NoProfile -ExecutionPolicy Bypass -File .vscode\deploy-remote.ps1 -InstallService`

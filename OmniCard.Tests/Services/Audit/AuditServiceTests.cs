@@ -338,7 +338,7 @@ public class AuditServiceTests : IDisposable
         // AuditService reads container name from OmniCardDbContext directly — this stub is unused
         public List<StorageContainer> GetAll() => [];
         public StorageContainer GetBulk() => throw new NotImplementedException();
-        public bool NameExists(string name, int? excludeId = null) => false;
+        public bool NameExists(string name, CardGame? game, int? siteId, int? excludeId = null) => false;
         public StorageContainer Create(string name, ContainerType type, int slotsPerPage = 9, CardGame? game = null, int? deckTypeId = null, int? siteId = null, IEnumerable<string>? defaultSets = null) => throw new NotImplementedException();
         public void SetSite(int containerId, int siteId) => throw new NotImplementedException();
         public void SetDeckBox(int containerId, CardGame game, int? deckTypeId) => throw new NotImplementedException();

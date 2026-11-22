@@ -7,6 +7,7 @@ using OmniCard.Shared.Collection;
 using OmniCard.Shared.Games;
 using OmniCard.Shared.ImportExport;
 using OmniCard.Shared.Scanning;
+using OmniCard.Shared.Sites;
 using OmniCard.Shared.Storage;
 
 namespace OmniCard.Collection.ImportExport;
@@ -701,7 +702,16 @@ public class CsvExportImportService(
             }
             else if (card.Container is not null && card.ContainerId is null)
             {
-                var existing = containerService!.GetAll().FirstOrDefault(c => c.Name == card.Container.Name);
+                // Names are unique per game + site, so several locations can share one: take the one fixed to
+                // the card's game, else a no-game one, preferring the default site. None → a new no-game one.
+                var wanted = (card.Container.Name ?? "").Trim();
+                var existing = containerService!.GetAll()
+                    .Where(c => string.Equals(c.Name.Trim(), wanted, StringComparison.OrdinalIgnoreCase)
+                        && (c.Game == card.Game || c.Game is null))
+                    .OrderBy(c => c.Game is null)
+                    .ThenBy(c => c.SiteId != Site.DefaultSiteId)
+                    .ThenBy(c => c.Id)
+                    .FirstOrDefault();
                 if (existing is null)
                 {
                     existing = containerService.Create(card.Container.Name, card.Container.ContainerType);

@@ -3,7 +3,7 @@
     "title": "Locations",
     "addBar": {
       "nameLabel": "New location name",
-      "nameTaken": "This name is already in use"
+      "nameTaken": "This site already has a location with this name for the same game"
     },
     "hideEmpty": "Hide empty locations",
     "newLocation": "New location",

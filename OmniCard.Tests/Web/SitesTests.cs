@@ -168,6 +168,21 @@ public class SitesTests : IDisposable
     }
 
     [Fact]
+    public void Delete_WhenTargetHasALocationOfTheSameNameAndGame_RefusesAndKeepsTheSite()
+    {
+        var a = _sites.Create("A", null);
+        var loc = AddLocation("Shoebox", a.Id);
+        AddLocation("shoebox", Site.DefaultSiteId);
+
+        var ex = Assert.Throws<LocationNameTakenException>(() => _sites.Delete(a.Id, moveToSiteId: null));
+        Assert.Contains("Shoebox", ex.Message);
+
+        using var db = Db();
+        Assert.True(db.Sites.Any(s => s.Id == a.Id));
+        Assert.Equal(a.Id, db.StorageContainers.Single(c => c.Id == loc).SiteId);
+    }
+
+    [Fact]
     public void Delete_DefaultsTargetToDefaultSite()
     {
         var a = _sites.Create("A", null);
