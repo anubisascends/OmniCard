@@ -1814,6 +1814,13 @@ public sealed record PermissionItemDto(string Key, string Action, string Label);
 /// <summary>The signed-in user's own account details, for the Account page.</summary>
 public sealed record AccountDto(int Id, string Username, string? Email, bool IsAdmin, DateTime CreatedAt);
 
+/// <summary>One remembered UI setting of the signed-in user (<c>PUT /api/account/preferences/{key}</c>).
+/// A blank <see cref="Value"/> forgets the setting.</summary>
+public sealed record SetPreferenceRequest
+{
+    public string? Value { get; init; }
+}
+
 /// <summary>Self-service email change from the Account page. A blank <see cref="Email"/> removes it. The
 /// current password is required because the email can be used to sign in.</summary>
 public sealed record ChangeEmailRequest

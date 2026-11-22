@@ -65,6 +65,7 @@ public class OmniCardDbContext : DbContext
     public DbSet<StoreCreditEntry> StoreCreditEntries => Set<StoreCreditEntry>();
     public DbSet<BuyListEntry> BuyListEntries => Set<BuyListEntry>();
     public DbSet<DashboardLayout> DashboardLayouts => Set<DashboardLayout>();
+    public DbSet<UserPreference> UserPreferences => Set<UserPreference>();
 
     public OmniCardDbContext(DbContextOptions<OmniCardDbContext> options) : base(options) { }
 
@@ -624,6 +625,16 @@ public class OmniCardDbContext : DbContext
             e.Ignore(d => d.IsDefault);
             e.HasIndex(d => d.UserId).IsUnique().HasFilter(null);
             e.HasOne<User>().WithMany().HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Per-user remembered UI settings (one row per user + key; they go with their user).
+        modelBuilder.Entity<UserPreference>(e =>
+        {
+            e.HasKey(p => new { p.UserId, p.Key });
+            e.Property(p => p.Key).HasMaxLength(UserPreference.MaxKeyLength);
+            e.Property(p => p.Value).IsRequired().HasMaxLength(UserPreference.MaxValueLength);
+            e.HasOne<User>().WithMany().HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

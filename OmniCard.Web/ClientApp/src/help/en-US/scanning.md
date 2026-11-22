@@ -23,7 +23,7 @@ Nothing is added to your collection until you click the add button. Until then t
 6. Wait for matching to finish. Each row shows a spinner while it is being matched, then a confidence percentage.
 7. Compare **Uploaded scan** with **Matched art** for the selected card. Click **Confirm match** (or press **Enter**) when it is right. OmniCard moves on to the next card. If the match is wrong, click **Search catalog** to pick the correct card. See [Review with the keyboard](#review-with-the-keyboard).
 8. Click **Add to location…** and choose where the cards are going.
-9. Click **Add N confirmed cards**.
+9. Click **Add N confirmed cards**. A progress bar shows how many cards have been saved so far. Saved cards leave the list as they go, so if something goes wrong part way, the cards still in the list are the ones that weren't added.
 
 Only cards that are both **confirmed** and **checked** are added. Everything else stays in the list.
 
@@ -109,7 +109,8 @@ A card on the game's [Buy List](help:buy-list) also gets a gold frame and a chip
 
 Click a row to see it in the detail panel:
 
-- **Uploaded scan** and **Matched art** side by side, so you can compare them.
+- **Uploaded scan** and **Matched art** right next to each other, so you can spot differences.
+- To make the pictures bigger or smaller, drag the bar below them up or down. You can also click the bar and press **↑** or **↓**. Double-click it to go back to the default size. OmniCard remembers the size for your account, on every device. (Phones always use the standard size.)
 - **View scan** opens a large version of your picture so you can read small print.
 - The card's name, set, collector number and rarity.
 - **Confirm match** marks the match as correct (the button then reads **Looks correct**). Confirming also checks the card, then selects the next card that still needs review.
@@ -126,6 +127,7 @@ You can review a whole list without the mouse. The bar above the list shows **Re
 | Key | What it does |
 | --- | --- |
 | **Enter** | Confirm the match and go to the next card that still needs review. On a card with no match, it opens **Search catalog** instead. |
+| **Enter** (held) | Keep confirming: the current card, then one more card each time the chosen time passes. See [Holding Enter](#holding-enter). |
 | **↓** or **J** | Next card |
 | **↑** or **K** | Previous card |
 | **S** or **/** | Open **Search catalog** |
@@ -135,6 +137,12 @@ You can review a whole list without the mouse. The bar above the list shows **Re
 | **?** | Show the list of shortcuts |
 
 "Next" follows the list's current filter and sort, skips cards you have already reviewed and cards still being matched, and starts again from the top when it reaches the end. Sorting by **Confidence**, for example, lets you confirm the strongest matches first.
+
+#### Holding Enter
+
+Hold **Enter** to go through a run of good matches without pressing it once per card. Set how long each card stays on screen under **Holding Enter** at the bottom of **Keyboard shortcuts** (press **?**): from **0.15 s per card** up to **3 s per card**, or **Off**. OmniCard remembers your choice for your account.
+
+Holding Enter stops at a card it can't confirm: a card with no match, one still being matched, or the end of the list. Let go and press **Enter** again to carry on. Holding Enter never opens **Search catalog**.
 
 In the search, type a name or collector number, press **↓** to move into the results, then **Enter** to pick one. The pick confirms the card and moves on.
 

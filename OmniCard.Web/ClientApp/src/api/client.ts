@@ -362,6 +362,13 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ email, currentPassword }),
     }),
+  /** The signed-in user's remembered UI settings (key → the SPA's own JSON). */
+  accountPreferences: () => request<Record<string, string>>('/api/account/preferences'),
+  accountSetPreference: (key: string, value: string | null) =>
+    request<void>(`/api/account/preferences/${encodeURIComponent(key)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
+    }),
 
   // Users (Administration ▸ Users — admin only)
   users: () => request<UserDto[]>('/api/users'),
