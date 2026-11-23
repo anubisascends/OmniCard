@@ -37,6 +37,7 @@ import {
 } from '@mui/material';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import HistoryIcon from '@mui/icons-material/History';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import RequestQuoteIcon from '@mui/icons-material/RequestQuote';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
@@ -67,6 +68,7 @@ import { splitPhotoIntoCards } from '../utils/cardCapture';
 import { ensureCvReady } from '../utils/cvWorker';
 import { ScanValueBadges, ListReprintChip } from '../lib/scanBadges';
 import { ENGLISH, LanguageChip, LanguageSelect, languageName } from '../lib/cardLanguages';
+import { clearScanPicks, recentScanPicks, rememberScanPick } from '../lib/recentScanPicks';
 import {
   EXPORT_FORMATS,
   copyToClipboard,
@@ -549,6 +551,29 @@ function ConfidenceChip({ item }: { item: ScanItem }) {
  * number; results are scoped to the chosen "Sets (art fallback)" (`setCodes`, empty ⇒ all sets) —
  * that selection is the single source of truth for which sets to look through, so there's no
  * per-search set picker. Results are uncapped server-side, so every printing shows. */
+/** Case/accent-insensitive, digit-aware ("2" before "10", "OP01-009" before "OP01-019"). */
+const resultCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+/** Correction search results in the order a person scans them: name, then set code newest-looking
+ * first (descending), then collector number ascending, then English ahead of the same printing's other
+ * languages. Blank values sink to the end of their group. */
+function compareSearchResults(a: ScanSearchResultDto, b: ScanSearchResultDto): number {
+  const text = (x?: string | null, y?: string | null) => {
+    if (!x || !y) return x ? -1 : y ? 1 : 0;
+    return resultCollator.compare(x, y);
+  };
+  // A row without a language is English.
+  const nonEnglish = (r: ScanSearchResultDto) => (r.language && r.language !== 'en' ? 1 : 0);
+  return (
+    text(a.name, b.name) ||
+    // Descending, but still with blanks last.
+    (a.setCode && b.setCode ? resultCollator.compare(b.setCode, a.setCode) : text(a.setCode, b.setCode)) ||
+    text(a.collectorNumber, b.collectorNumber) ||
+    nonEnglish(a) - nonEnglish(b) ||
+    text(a.language, b.language)
+  );
+}
+
 function CorrectionSearch({
   game,
   setCodes,
@@ -586,6 +611,50 @@ function CorrectionSearch({
     queryFn: () => api.scanSearch(game, dq, setCodes, dcn.trim() || undefined),
     enabled: active,
   });
+  const sorted = useMemo(() => (search.data ? [...search.data].sort(compareSearchResults) : undefined), [search.data]);
+  // Printings picked earlier this session that this search found again: listed first (newest pick
+  // first) under their own heading, and left out of the rest.
+  const [recentIds, setRecentIds] = useState(() => recentScanPicks(game));
+  const { recent, others } = useMemo(() => {
+    if (!sorted) return { recent: [], others: [] };
+    const rank = new Map(recentIds.map((id, i) => [id, i]));
+    return {
+      recent: sorted.filter((r) => rank.has(r.gameCardId)).sort((a, b) => rank.get(a.gameCardId)! - rank.get(b.gameCardId)!),
+      others: sorted.filter((r) => !rank.has(r.gameCardId)),
+    };
+  }, [sorted, recentIds]);
+  const pick = (r: ScanSearchResultDto) => {
+    rememberScanPick(game, r.gameCardId);
+    onPick(r);
+  };
+  const resultButton = (r: ScanSearchResultDto) => (
+    <Button
+      key={`${r.gameCardId}-${r.setCode}-${r.collectorNumber}`}
+      data-scan-result
+      size="small"
+      variant="text"
+      startIcon={
+        r.imageUri ? (
+          <Box
+            component="img"
+            src={r.imageUri}
+            alt=""
+            onMouseEnter={(e) => setHover({ el: e.currentTarget, url: r.imageUri!, foil: false })}
+            onMouseLeave={() => setHover(null)}
+            sx={{ width: { xs: 36, sm: 24 }, height: { xs: 50, sm: 34 }, objectFit: 'contain', borderRadius: 0.5 }}
+          />
+        ) : undefined
+      }
+      sx={{ ...LONG_PRESS_SX, justifyContent: 'flex-start', textAlign: 'left', textTransform: 'none' }}
+      {...longPress((el) => r.imageUri && setHover({ el, url: r.imageUri, foil: false, touch: true }))}
+      onClick={() => pick(r)}
+    >
+      {r.name} · {r.setCode.toUpperCase()} #{r.collectorNumber}
+      {r.rarity ? ` · ${r.rarity}` : ''}
+      {/* Language-aware catalogs hold one row per language, so name it to tell them apart. */}
+      {r.language ? ` · ${languageName(t, r.language)}` : ''}
+    </Button>
+  );
   // Keyboard review: Esc cancels; ↓/↑ walk from the search boxes through the results, and Enter on
   // a focused result picks it (it's a button).
   const onKeyDown = (e: ReactKeyboardEvent) => {
@@ -633,43 +702,45 @@ function CorrectionSearch({
           {t('common.states.searching')}
         </Typography>
       )}
-      {search.data && (
+      {sorted && (
         <>
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-            {search.data.length === 0
+            {sorted.length === 0
               ? t('scan.correction.noMatches')
-              : t('scan.correction.matchCount', { count: search.data.length })}
+              : t('scan.correction.matchCount', { count: sorted.length })}
           </Typography>
-          {search.data.length > 0 && (
+          {sorted.length > 0 && (
             <Stack sx={{ mt: 0.5, maxHeight: 320, overflowY: 'auto' }} spacing={0.5}>
-              {search.data.map((r) => (
-                <Button
-                  key={`${r.gameCardId}-${r.setCode}-${r.collectorNumber}`}
-                  data-scan-result
-                  size="small"
-                  variant="text"
-                  startIcon={
-                    r.imageUri ? (
-                      <Box
-                        component="img"
-                        src={r.imageUri}
-                        alt=""
-                        onMouseEnter={(e) => setHover({ el: e.currentTarget, url: r.imageUri!, foil: false })}
-                        onMouseLeave={() => setHover(null)}
-                        sx={{ width: { xs: 36, sm: 24 }, height: { xs: 50, sm: 34 }, objectFit: 'contain', borderRadius: 0.5 }}
-                      />
-                    ) : undefined
-                  }
-                  sx={{ ...LONG_PRESS_SX, justifyContent: 'flex-start', textAlign: 'left', textTransform: 'none' }}
-                  {...longPress((el) => r.imageUri && setHover({ el, url: r.imageUri, foil: false, touch: true }))}
-                  onClick={() => onPick(r)}
-                >
-                  {r.name} · {r.setCode.toUpperCase()} #{r.collectorNumber}
-                  {r.rarity ? ` · ${r.rarity}` : ''}
-                  {/* Language-aware catalogs hold one row per language, so name it to tell them apart. */}
-                  {r.language ? ` · ${languageName(t, r.language)}` : ''}
-                </Button>
-              ))}
+              {recent.length > 0 && (
+                <>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <HistoryIcon fontSize="small" color="action" />
+                    <Typography variant="overline" color="text.secondary" sx={{ flexGrow: 1, lineHeight: 2 }}>
+                      {t('scan.correction.recentlySelected')}
+                    </Typography>
+                    <Button
+                      size="small"
+                      tabIndex={-1}
+                      onClick={() => {
+                        clearScanPicks(game);
+                        setRecentIds([]);
+                      }}
+                    >
+                      {t('scan.correction.clearRecent')}
+                    </Button>
+                  </Stack>
+                  {recent.map(resultButton)}
+                  {others.length > 0 && (
+                    <>
+                      <Divider />
+                      <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 2 }}>
+                        {t('scan.correction.otherResults')}
+                      </Typography>
+                    </>
+                  )}
+                </>
+              )}
+              {others.map(resultButton)}
             </Stack>
           )}
         </>

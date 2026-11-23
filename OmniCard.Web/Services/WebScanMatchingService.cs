@@ -236,11 +236,11 @@ public sealed class WebScanMatchingService : IScanMatcher
     /// <summary>
     /// Decides the copy's language and, for catalogs that hold several languages
     /// (<see cref="ICatalogLanguageAware"/>), swaps the match to that language's printing. The copy's
-    /// language is the printed marker when OCR read one, else the session's choice, else the matched
-    /// row's own language (e.g. a Pokémon Japan product, or a Japanese row the image — or a learned
-    /// correction — matched). Only an explicit language (printed or chosen) triggers a remap; otherwise
-    /// the matched printing stands. MTG's OCR lookup already defaults to the English row when no marker
-    /// is read, so the image only decides the language when OCR couldn't.
+    /// language is the printed marker when OCR read one, else the session's choice, else English.
+    /// Language printings share their art, so an image-only match can land on a foreign row of an
+    /// English card: with no explicit language (printed or chosen) a foreign match is remapped to the
+    /// same printing's English row when the catalog has one. A printing with no English row (a
+    /// Japanese-only alt art, a Pokémon Japan product) keeps its own language.
     /// </summary>
     private async Task<(CardMatch? Match, string? Language)> ResolveLanguageAsync(
         ICardGameService gameService, CardMatch? match, string? detected, string? sessionLanguage)
@@ -253,7 +253,9 @@ public sealed class WebScanMatchingService : IScanMatcher
         var rowLanguage = match.Language
             ?? await RunGatedAsync(() => aware.GetCardLanguage(match.GameSpecificId))
             ?? CardLanguages.English;
-        if (explicitLanguage is { } target && rowLanguage != target)
+        // Nothing says otherwise ⇒ the card is English.
+        var target = explicitLanguage ?? CardLanguages.English;
+        if (rowLanguage != target)
         {
             var variant = await RunGatedAsync(() => aware.FindLanguageVariant(match.GameSpecificId, target));
             if (variant is not null)

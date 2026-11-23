@@ -71,15 +71,39 @@ public class WebScanLanguageTests
     }
 
     [Fact]
-    public async Task NoLanguageChosen_ImageMatchedForeignRow_KeepsItsLanguage()
+    public async Task NoLanguageChosen_ImageMatchedForeignRow_RemapsToEnglish()
     {
+        // Language printings share art, so the image alone can pick the Japanese row of an English card.
         var game = new FakeMultiLanguageGame { PHashReturnsJapanese = true };
+
+        var dto = await Build(new FakeOcr { NoMtgRead = true }, game).MatchAsync(PortraitPng(), CardGame.Mtg, isFoil: false);
+
+        Assert.Equal("en-id", dto.GameCardId);
+        Assert.Equal("en", dto.Language);
+        Assert.False(dto.LanguageDetected);
+    }
+
+    [Fact]
+    public async Task NoLanguageChosen_ForeignOnlyPrinting_KeepsItsLanguage()
+    {
+        // A printing with no English row (Japanese-only alt art, Pokémon Japan) stays as matched.
+        var game = new FakeMultiLanguageGame { PHashReturnsJapanese = true, NoEnglishRow = true };
 
         var dto = await Build(new FakeOcr { NoMtgRead = true }, game).MatchAsync(PortraitPng(), CardGame.Mtg, isFoil: false);
 
         Assert.Equal("ja-id", dto.GameCardId);
         Assert.Equal("ja", dto.Language);
-        Assert.False(dto.LanguageDetected);
+    }
+
+    [Fact]
+    public async Task SessionJapanese_ImageMatchedForeignRow_StaysJapanese()
+    {
+        var game = new FakeMultiLanguageGame { PHashReturnsJapanese = true };
+
+        var dto = await Build(new FakeOcr { NoMtgRead = true }, game).MatchAsync(PortraitPng(), CardGame.Mtg, isFoil: false, language: "ja");
+
+        Assert.Equal("ja-id", dto.GameCardId);
+        Assert.Equal("ja", dto.Language);
     }
 
     [Fact]
@@ -140,6 +164,7 @@ public class WebScanLanguageTests
     private sealed class FakeMultiLanguageGame : FakeGameBase, ICatalogLanguageAware
     {
         public bool PHashReturnsJapanese;
+        public bool NoEnglishRow;
         public string? LastOcrLanguage;
         public override CardGame Game => CardGame.Mtg;
 
@@ -164,7 +189,8 @@ public class WebScanLanguageTests
         public IReadOnlyCollection<string> CatalogLanguages { get; set; } = ["en", "ja"];
         public string? GetCardLanguage(string gameCardId) => gameCardId[..2];
         public CardMatch? FindLanguageVariant(string gameCardId, string language) =>
-            language is "en" or "ja" && !gameCardId.StartsWith(language) ? Row(language) : null;
+            language is "en" or "ja" && !gameCardId.StartsWith(language) && !(language == "en" && NoEnglishRow)
+                ? Row(language) : null;
     }
 
     private sealed class FakeYugiohGame : FakeGameBase
