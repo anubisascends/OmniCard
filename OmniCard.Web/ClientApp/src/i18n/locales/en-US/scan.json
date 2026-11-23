@@ -204,7 +204,10 @@
       "searchingAllSets": "Searching all sets — pick “Sets (art fallback)” above to narrow.",
       "noMatches": "No matches.",
       "matchCount_one": "{{count}} match",
-      "matchCount_other": "{{count}} matches"
+      "matchCount_other": "{{count}} matches",
+      "recentlySelected": "Recently selected",
+      "otherResults": "Other results",
+      "clearRecent": "Clear"
     },
     "bulk": {
       "title_one": "Edit {{count}} selected card",

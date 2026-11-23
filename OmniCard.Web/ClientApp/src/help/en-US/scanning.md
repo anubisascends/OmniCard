@@ -77,7 +77,7 @@ The top panel controls apply to every scan you add **after** you set them:
 - **Game** — which game's catalog to match against. Changing the game clears the set and language choices.
 - **Sets (art fallback)** — pick one or more sets if you know what you are scanning. Type a set code (for example `MH3`) or part of a set name to find a set; a matching code is listed first, so typing the code and pressing Enter picks it. Chosen sets are shown by their codes. Matching is limited to those sets, and so is the catalog search when you correct a card. Leave it on **All sets** to search everything.
 - **Condition** — NM, LP, MP, HP or DMG.
-- **Card language** — **Auto (detect)** reads the language printed on Magic: The Gathering and Yu-Gi-Oh! cards. For other games, pick the language of the cards you are scanning.
+- **Card language** — **Auto (detect)** reads the language printed on Magic: The Gathering and Yu-Gi-Oh! cards. When no language can be read, the card is matched as English, even if the art matched another language's printing. A printing that only exists in another language keeps that language. For other games, or to scan a stack of non-English cards, pick the language of the cards you are scanning.
 - **Foil** — tick this before scanning foil cards. It marks the new scans as foil, helps matching cope with foil shine, and shows the foil market value. Magic: The Gathering cards from Magic 2015 on print their finish themselves: a star (★) between the set code and the language means foil, a dot (•) means non-foil. OmniCard reads that mark and sets **Foil** on each scan to match, whatever this switch says, so you can scan foils and non-foils together.
 
 Changing these later does not change cards already in the list. To change existing cards, edit them individually or in bulk (see [Card properties](#card-properties)).
@@ -182,7 +182,7 @@ To jump to a card, type its number in **Go to #** above the list and press Enter
 
 1. Select the card and click **Search catalog**.
 2. Type at least two letters of the card's name, or enter its **Collector #**, or both.
-3. Each result shows the card name, set, collector number and rarity. If the game's catalog has more than one language, the result also shows the language (for example *English* or *Japanese*). Hover over a result's small picture to see it larger. On a phone, press and hold the result instead.
+3. Each result shows the card name, set, collector number and rarity. If the game's catalog has more than one language, the result also shows the language (for example *English* or *Japanese*). Hover over a result's small picture to see it larger. On a phone, press and hold the result instead. Results are sorted by card name, then by set code from Z to A, then by collector number from lowest to highest (2 comes before 10), with the English printing ahead of the same card in other languages. Printings you've picked earlier in this browser tab are listed first, under **Recently selected**, with the most recent pick at the top. The rest follow under **Other results**. Click **Clear** to forget the recent picks for this game. They're also forgotten when you close the tab.
 4. Click the correct result.
 
 The card is now marked **Corrected**, and it is confirmed and checked. The next card that needs review is selected. Click **Cancel** to close the search without changing anything.
