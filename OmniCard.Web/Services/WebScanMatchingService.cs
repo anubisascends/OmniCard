@@ -43,6 +43,9 @@ public sealed class WebScanMatchingService : IScanMatcher
     // still binds, so an uncertain read can't drag in a wrong-set match.
     private const double OcrSetOverrideConfidence = 0.95;
 
+    // A parsed Cyberpunk number read: as trusted as the other games' structured reads (below the set override).
+    private const double CyberpunkReadConfidence = 0.9;
+
     // MatchDiagnostics.DecisionPhase a game service reports when its collector-number read decided the match.
     private const string OcrCollectorNumberPhase = "OcrCollectorNumber";
 
@@ -333,6 +336,15 @@ public sealed class WebScanMatchingService : IScanMatcher
                         cn = NormalizeCollectorRead(game, cn, languageEvidence);
                         return await ApplyCollectorOcrAsync(gameService, hash, artHashes, edgeHash, setFilter, cn, conf, current);
                     }
+                case CardGame.Cyberpunk:
+                    {
+                        // Lower-left corner: the vertical product code ("MS01 - WNC [A]") and the diagonal number
+                        // ("120", "β120" on Beta). The number finds the rows; the set code narrows them, since
+                        // bare numbers repeat across sets (CyberpunkService.NarrowOcrCandidates).
+                        var code = await _ocrService.ReadCyberpunkCodeAsync(imageBytes);
+                        return await ApplyCollectorOcrAsync(gameService, hash, artHashes, edgeHash, setFilter,
+                            code.CatalogNumber, code.CatalogNumber is null ? 0 : CyberpunkReadConfidence, current, code.SetCode);
+                    }
                 default: // MTG
                     {
                         // Ground truth: bottom-left (set, collector) uniquely identifies a Scryfall printing.
@@ -456,11 +468,11 @@ public sealed class WebScanMatchingService : IScanMatcher
 
     private async Task<CardMatch?> ApplyCollectorOcrAsync(
         ICardGameService gameService, ulong hash, ulong[]? artHashes, ulong? edgeHash,
-        IReadOnlySet<string>? setFilter, string? collectorNumber, double conf, CardMatch? current)
+        IReadOnlySet<string>? setFilter, string? collectorNumber, double conf, CardMatch? current, string? setCode = null)
     {
         if (collectorNumber is null || conf < 0.5)
             return current;
-        var ocr = new OcrMatchResult { CollectorNumber = collectorNumber, CollectorNumberConfidence = conf };
+        var ocr = new OcrMatchResult { CollectorNumber = collectorNumber, CollectorNumberConfidence = conf, SetCode = setCode };
         // A very confident collector-number read overrides the set filter (see EffectiveFilter).
         var ocrMatch = await FindMatchAsync(() => gameService.FindClosestMatch(hash, artHashes, ocr, EffectiveFilter(setFilter, conf), null, scanEdgeHash: edgeHash));
         return ocrMatch is not null && (current is null || ocrMatch.GameSpecificId != current.GameSpecificId)
@@ -619,6 +631,18 @@ public sealed class WebScanMatchingService : IScanMatcher
                         if (cn is not null && conf >= 0.5) ocr = new OcrMatchResult { CollectorNumber = cn, CollectorNumberConfidence = conf };
                         break;
                     }
+                case CardGame.Cyberpunk:
+                    {
+                        var code = await _ocrService.ReadCyberpunkCodeAsync(rotatedBytes);
+                        if (code.CatalogNumber is not null)
+                            ocr = new OcrMatchResult
+                            {
+                                CollectorNumber = code.CatalogNumber,
+                                CollectorNumberConfidence = CyberpunkReadConfidence,
+                                SetCode = code.SetCode,
+                            };
+                        break;
+                    }
             }
 
             ulong? rotatedEdge = isFoil && IsEdgeHashGame(game)
@@ -662,7 +686,8 @@ public sealed class WebScanMatchingService : IScanMatcher
     }
 
     private static bool IsEdgeHashGame(CardGame game) =>
-        game is CardGame.OnePiece or CardGame.Riftbound or CardGame.Pokemon or CardGame.YuGiOh or CardGame.FinalFantasy;
+        game is CardGame.OnePiece or CardGame.Riftbound or CardGame.Pokemon or CardGame.YuGiOh or CardGame.FinalFantasy
+            or CardGame.Cyberpunk;
 
     /// <summary>Lazily loads the MTG set-symbol hashes into the OCR service (needed for symbol
     /// detection). Cheap no-op after the first call.</summary>

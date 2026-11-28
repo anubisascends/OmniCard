@@ -11,7 +11,7 @@ namespace OmniCard.Web.Helpers;
 /// the exact product page; otherwise it falls back to a name search scoped to the game's product
 /// line.
 ///
-/// For the TCGCSV-backed games (Pokémon, Yu-Gi-Oh!, FFTCG, Riftbound) the card's
+/// For the TCGCSV-backed games (Pokémon, Yu-Gi-Oh!, FFTCG, Cyberpunk, Riftbound) the card's
 /// <see cref="Product.GameCardId"/> <em>is</em> the TCGplayer product id, so no extra lookup is
 /// needed. MTG stores the Scryfall id in <c>GameCardId</c>, so its real product id is resolved
 /// separately (from scryfall.db) and passed in via <paramref name="resolvedProductId"/>. One Piece
@@ -65,6 +65,7 @@ public static class TcgPlayerLink
         CardGame.Pokemon => "pokemon",
         CardGame.YuGiOh => "yugioh",
         CardGame.FinalFantasy => "final-fantasy-tcg",
+        CardGame.Cyberpunk => "cyberpunk-tcg",
         _ => "all",
     };
 }

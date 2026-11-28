@@ -2,7 +2,7 @@
 
 A web app for scanning and managing trading card collections. Upload card images (or snap them with your phone) and OmniCard identifies them via perceptual hashing + OCR, then tracks them across storage locations, sealed-product inventory, and sales/fulfillment — all from any device on your network.
 
-Supports **Magic: The Gathering** (Scryfall), **One Piece TCG**, **Riftbound**, **Pokémon**, **Yu-Gi-Oh!**, and **Final Fantasy TCG** (the last three via TCGCSV).
+Supports **Magic: The Gathering** (Scryfall), **One Piece TCG**, **Riftbound**, **Pokémon**, **Yu-Gi-Oh!**, **Final Fantasy TCG**, and **Cyberpunk TCG** (every game but MTG via TCGCSV).
 
 > OmniCard started as a WPF desktop app with a read-only web companion. It has since been rebuilt as a full read/write web app (ASP.NET Core API + React/TypeScript SPA) backed by SQL Server, and the desktop app has been retired — everything now runs through `OmniCard.Web`.
 
@@ -137,7 +137,7 @@ folder with `docker-compose.yml` and `.env`:
 MSSQL_SA_PASSWORD=$(sed -n 's/^MSSQL_SA_PASSWORD=//p' .env)
 mkdir -p backup
 docker compose exec mssql mkdir -p /var/opt/mssql/backup
-for db in OmniCard OmniCard_Scryfall OmniCard_Optcg OmniCard_Riftbound OmniCard_Pokemon OmniCard_Yugioh OmniCard_FinalFantasy; do
+for db in OmniCard OmniCard_Scryfall OmniCard_Optcg OmniCard_Riftbound OmniCard_Pokemon OmniCard_Yugioh OmniCard_FinalFantasy OmniCard_Cyberpunk; do
   docker compose exec mssql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -b \
     -Q "BACKUP DATABASE [$db] TO DISK = N'/var/opt/mssql/backup/$db.bak' WITH COPY_ONLY, INIT, CHECKSUM"
 done
@@ -164,7 +164,7 @@ docker run --rm -v omnicard_omnicard-data:/data -v "$PWD/backup":/backup alpine 
   sh -c 'rm -rf /data/* && tar xzf /backup/omnicard-data.tgz -C /data && chown -R 1654:1654 /data'
 docker run --rm -v omnicard_mssql-data:/v -v "$PWD/backup":/backup alpine \
   sh -c 'mkdir -p /v/backup && cp /backup/*.bak /v/backup/ && chown -R 10001:10001 /v/backup'
-for db in OmniCard OmniCard_Scryfall OmniCard_Optcg OmniCard_Riftbound OmniCard_Pokemon OmniCard_Yugioh OmniCard_FinalFantasy; do
+for db in OmniCard OmniCard_Scryfall OmniCard_Optcg OmniCard_Riftbound OmniCard_Pokemon OmniCard_Yugioh OmniCard_FinalFantasy OmniCard_Cyberpunk; do
   docker compose exec mssql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -b \
     -Q "RESTORE DATABASE [$db] FROM DISK = N'/var/opt/mssql/backup/$db.bak' WITH REPLACE"
 done

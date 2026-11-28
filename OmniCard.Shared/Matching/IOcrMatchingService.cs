@@ -50,6 +50,11 @@ public interface IOcrMatchingService
     /// and non-OCR implementations needn't implement it; the real service overrides it.</summary>
     Task<(string? Edition, double Confidence)> DetectYugiohEditionAsync(byte[] imageData)
         => Task.FromResult<(string?, double)>((null, 0));
+    /// <summary>Reads a Cyberpunk TCG card's lower-left corner: the vertical product code ("MS01 - WNC [A]")
+    /// and the diagonal collector number in the yellow box ("120", "β120" on Beta). Default
+    /// <see cref="CyberpunkPrintedCode.Empty"/> so test doubles needn't implement it.</summary>
+    Task<CyberpunkPrintedCode> ReadCyberpunkCodeAsync(byte[] imageData)
+        => Task.FromResult(CyberpunkPrintedCode.Empty);
     /// <summary>Reads the printing cues of an old-frame (pre-2015) MTG card — title, border colour and the
     /// bottom credit/copyright line — for when there is no set code + collector number to OCR. Default
     /// returns no evidence so test doubles needn't implement it; the real service overrides it.</summary>

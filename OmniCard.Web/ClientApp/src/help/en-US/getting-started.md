@@ -23,6 +23,7 @@ OmniCard supports these games:
 | Yu-Gi-Oh! | English catalog from TCGplayer |
 | Final Fantasy TCG | English catalog from TCGplayer |
 | Riftbound | English catalog from TCGplayer |
+| Cyberpunk TCG | English catalog from TCGplayer |
 
 ## Sign in
 

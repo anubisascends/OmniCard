@@ -86,6 +86,9 @@ Changing these later does not change cards already in the list. To change existi
 
 OmniCard compares each picture with the catalog's card artwork and also reads the printed text on the card, such as the set code and collector number, to pin down the exact printing. A card scanned upside down is usually still recognized.
 
+> [!NOTE]
+> On Cyberpunk TCG cards, OmniCard reads the bottom-left corner: the code running up the left edge (for example *MS01 - WNC [A]*, where *WNC* is Welcome to Night City) and the number in the yellow box beside it. A β before the number marks the Beta printing, which has the same art as the Retail one. If a Beta card comes up as Retail, correct it to the Beta printing.
+
 The colored chip on each row tells you how sure the match is:
 
 | Chip | Meaning |

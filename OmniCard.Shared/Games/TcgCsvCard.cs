@@ -1,7 +1,7 @@
 using OmniCard.Shared.Cards;
 namespace OmniCard.Shared.Games;
 
-// Shared persistence entity for all TCGCSV-backed games (Pokémon, Yu-Gi-Oh!, Final Fantasy TCG).
+// Shared persistence entity for all TCGCSV-backed games (Pokémon, Yu-Gi-Oh!, Final Fantasy TCG, Cyberpunk TCG).
 // One row per printing (per TCGplayer productId). Populated by TcgCsvGameService subclasses.
 public class TcgCsvCard
 {

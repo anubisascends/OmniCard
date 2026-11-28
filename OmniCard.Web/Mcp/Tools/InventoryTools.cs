@@ -19,7 +19,7 @@ public sealed class InventoryTools(
     [Description("List sealed-product inventory (boxes, cases, packs, bundles) with total owned quantity. " +
         "Singles live in the collection and are excluded unless category=Single is passed.")]
     public IReadOnlyList<ProductDto> ListInventoryProducts(
-        [Description("Optional game filter: mtg, pokemon, optcg, riftbound, yugioh, finalfantasy.")]
+        [Description("Optional game filter: mtg, pokemon, optcg, riftbound, yugioh, finalfantasy, cyberpunk.")]
         string? game = null,
         [Description("Optional category: Single, Case, Box, Pack, Deck, Bundle, Other.")]
         string? category = null)
@@ -51,7 +51,7 @@ public sealed class InventoryTools(
     [McpServerTool(Name = "inventory_valuation")]
     [Description("Total sealed-product inventory valuation: unit count, total cost, and current market value.")]
     public InventoryValuationDto InventoryValuation(
-        [Description("Optional game filter: mtg, pokemon, optcg, riftbound, yugioh, finalfantasy.")]
+        [Description("Optional game filter: mtg, pokemon, optcg, riftbound, yugioh, finalfantasy, cyberpunk.")]
         string? game = null,
         [Description("Optional category: Single, Case, Box, Pack, Deck, Bundle, Other.")]
         string? category = null) =>

@@ -14,7 +14,7 @@ whole app — the original WPF desktop app has been retired.
   Server for true multi-user concurrency (shadow `rowversion` tokens on the edited entities). EF
   migrations under `Migrations/` are applied automatically at startup.
 - **Per-game catalogs on SQL Server** — one database per game (`OmniCard_Scryfall`, `OmniCard_Optcg`,
-  `OmniCard_Riftbound`, `OmniCard_Pokemon`, `OmniCard_Yugioh`, `OmniCard_FinalFantasy`). They're
+  `OmniCard_Riftbound`, `OmniCard_Pokemon`, `OmniCard_Yugioh`, `OmniCard_FinalFantasy`, `OmniCard_Cyberpunk`). They're
   disposable reference caches (refresh wipes + reloads), so they use `EnsureCreated` at startup, not
   migrations. Refreshed in-place via the catalog "refresh" operations (Settings → Catalog data).
 - **Per-user accounts + granular permissions** — two-step sign-in (username **or email**, then
@@ -40,6 +40,9 @@ whole app — the original WPF desktop app has been retired.
   printed set code + collector number; pre-2015 ("old") frames, which print neither, are identified by
   title OCR and their printing picked from border colour, the copyright line/year, any printed collector
   number and flavor text (`OmniCard.CardMatching/OldFrame`), since same-art reprints hash identically.
+  Cyberpunk TCG cards are read from the lower-left corner (`OmniCard.Imaging/CyberpunkCodeReader`): the
+  vertical product code (`MS01 - WNC [A]`, set code `WNC`) and the diagonal number in the yellow box (`120`;
+  Beta prints `β120`, stored as `B120`). The set code is matched to the initials of TCGplayer's set name.
 - **Server-hosted artwork** — card images cached under `{dataDir}/card-images`, served at
   `/card-images` (see [Catalog data](#catalog-data)).
 - **Localized UI** — every SPA string runs through `react-i18next`; the display language follows the
@@ -303,7 +306,7 @@ scratch. Columns added in later versions (e.g. the catalog `Lang` column) are ad
 catalog DBs automatically at startup.
 
 **Sources.** MTG comes from Scryfall. Every other game — One Piece, Riftbound, Pokémon, Yu-Gi-Oh!,
-Final Fantasy TCG — comes from [TCGCSV](https://tcgcsv.com) (TCGplayer data, republished daily).
+Final Fantasy TCG, Cyberpunk TCG — comes from [TCGCSV](https://tcgcsv.com) (TCGplayer data, republished daily).
 One Piece and Riftbound used to come from poneglyph / Riftcodex. Their existing catalog rows are matched
 by TCGplayer product id and keep their ids (so owned copies are unaffected) and their own card data, which
 is more accurate than TCGplayer's listing; TCGCSV only gives them prices and fills fields they lack. Rows
@@ -352,7 +355,7 @@ the code (`Intl.DisplayNames`), else the code itself. Add a translation to `comm
 | MTG | all Scryfall languages | Scryfall `all_cards` (~400 MB gz) instead of `default_cards` once any non-English language is ticked | Same set + collector number as English; prices fall back to the English printing; placeholder scans borrow English art |
 | One Piece | English only | TCGCSV (English) | Japanese/French rows downloaded earlier from poneglyph (`OP01-001@ja`) are kept, with an English price fallback |
 | Pokémon | en, ja | TCGCSV category 85 "Pokemon Japan" | Separate sets (codes prefixed `JP-`), Japanese art, **real prices** |
-| Yu-Gi-Oh!, FFTCG, Riftbound | English only | — | Copies can still be tagged with any printed language |
+| Yu-Gi-Oh!, FFTCG, Riftbound, Cyberpunk | English only | — | Copies can still be tagged with any printed language |
 
 When scanning, a copy's language is: the language **printed on the card** where OCR can read it (MTG's
 `• JP` marker next to the set code; Yu-Gi-Oh!'s `-DE`/`-JP` region code, which is also swapped to `-EN`

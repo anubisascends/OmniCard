@@ -60,6 +60,8 @@ import { BinderDividerDialog, BinderDividerMarker, BinderDividerTabs, sectionOf 
 import { useFormatters } from '../i18n/format';
 
 import { SelectField } from '../components/SelectField';
+// By CardGame ordinal. Cyberpunk (6) has no card-back image yet, so its reverse pockets show none —
+// add /img/card-back-cyberpunk.png and 'cyberpunk' here to enable it.
 const CARD_BACK_SLUGS = ['mtg', 'optcg', 'riftbound', 'pokemon', 'yugioh', 'fftcg'];
 const cardBackSrc = (game: number): string | undefined => {
   const slug = CARD_BACK_SLUGS[game];
@@ -68,7 +70,7 @@ const cardBackSrc = (game: number): string | undefined => {
 
 // CardGame enum names by ordinal (matches OmniCard.Shared.Cards.CardGame) — used to seed the
 // Add-card dialog's game selector from a card already in the binder.
-const GAME_NAMES = ['Mtg', 'OnePiece', 'Riftbound', 'Pokemon', 'YuGiOh', 'FinalFantasy'];
+const GAME_NAMES = ['Mtg', 'OnePiece', 'Riftbound', 'Pokemon', 'YuGiOh', 'FinalFantasy', 'Cyberpunk'];
 const gameName = (game?: number | null): string =>
   (game != null && GAME_NAMES[game]) || 'Mtg';
 

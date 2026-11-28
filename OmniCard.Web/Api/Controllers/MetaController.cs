@@ -134,7 +134,7 @@ public sealed class MetaController(IEnumerable<ICardGameService> gameServices) :
 
             // ── Card data & imagery providers ───────────────────────────────────
             new("Data providers", "Scryfall (Magic: The Gathering data & images)", "API", "See provider terms", "https://scryfall.com", "https://scryfall.com/docs/api"),
-            new("Data providers", "TCGCSV (Pokémon, Yu-Gi-Oh!, Final Fantasy TCG data)", "API", "See provider terms", "https://tcgcsv.com", "https://tcgcsv.com"),
+            new("Data providers", "TCGCSV (Pokémon, Yu-Gi-Oh!, Final Fantasy TCG, Cyberpunk TCG data)", "API", "See provider terms", "https://tcgcsv.com", "https://tcgcsv.com"),
         };
 
         return components;

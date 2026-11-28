@@ -266,7 +266,23 @@ Element shorthands: `f` Fire, `i` Ice, `l` Lightning, `w` Water, `wi` Wind, `ea`
 > [!WARNING]
 > In Final Fantasy TCG, `e:` means element, not set. Use `s:` or `set:` to search by set.
 
-For Pokémon, Yu-Gi-Oh! and Final Fantasy TCG, `<` and `>` compare numbers when both sides are numbers. In card search, `set:` matches the set code or set name.
+## Cyberpunk TCG
+
+| Field | Short forms | Example | What it matches |
+|---|---|---|---|
+| color | `c` | `c:red` | Color: Red, Green, Blue or Yellow. |
+| cost | | `cost<=3` | Cost. Supports < >. |
+| power | `pow` | `power>=6` | Power. Supports < >. |
+| ram | | `ram<=2` | RAM. Supports < >. |
+| trait | `traits` | `trait:arasaka` | Trait, for example Arasaka, Merc or Samurai. |
+| eddies | `eddie` | `eddies:true` | Whether the card has the Eddies icon (`true` or `false`). |
+| text | `o`, `oracle` | `o:blocker` | Rules text. |
+
+Color shorthands: `r` Red, `g` Green, `b` Blue, `y` Yellow. So `c:g` finds Green cards.
+
+Sets without a code on TCGplayer use a number as their code (for example `set:24855`). In card search, `set:` also matches the set name, for example `set:"night city"`.
+
+For Pokémon, Yu-Gi-Oh!, Final Fantasy TCG and Cyberpunk TCG, `<` and `>` compare numbers when both sides are numbers. In card search, `set:` matches the set code or set name.
 
 ## Searching with All Games selected
 
@@ -291,6 +307,7 @@ Select a single game for the full set of short forms.
 | `hp>=200 stage:basic` | Basic Pokémon with 200+ HP. |
 | `level>=8 attr:dark` | Level 8+ DARK monsters (Yu-Gi-Oh!). |
 | `might>=5 domain:body` | Body cards with 5+ might (Riftbound). |
+| `c:r ram<=2 trait:merc` | Red Mercs with RAM 2 or less (Cyberpunk TCG). |
 | `t:dragon order:usd direction:desc` | Dragons, most expensive first (Magic card search). |
 
 ## Troubleshooting
