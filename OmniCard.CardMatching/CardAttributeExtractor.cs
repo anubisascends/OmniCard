@@ -17,6 +17,7 @@ public static class CardAttributeExtractor
             CardGame.Pokemon => (match.Source as TcgCsvCard)?.CardType,
             CardGame.YuGiOh => (match.Source as TcgCsvCard)?.CardType,
             CardGame.FinalFantasy => (match.Source as TcgCsvCard)?.CardType,
+            CardGame.Cyberpunk => TcgCsvAttribute(match.Source as TcgCsvCard, "Color"),
             _ => null
         };
     }
@@ -44,9 +45,15 @@ public static class CardAttributeExtractor
             CardGame.Pokemon => (match.Source as TcgCsvCard)?.CardType,
             CardGame.YuGiOh => (match.Source as TcgCsvCard)?.CardType,
             CardGame.FinalFantasy => (match.Source as TcgCsvCard)?.CardType,
+            CardGame.Cyberpunk => (match.Source as TcgCsvCard)?.CardType,
             _ => null
         };
     }
+
+    /// <summary>A TCGCSV extendedData attribute of the printing (e.g. Cyberpunk's "Color"), or null.</summary>
+    private static string? TcgCsvAttribute(TcgCsvCard? card, string name) =>
+        card is null ? null
+        : ExtendedDataParser.ParseToLookup(card.ExtendedDataJson).TryGetValue(name, out var v) && v.Length > 0 ? v : null;
 
     private static string ExtractMtgColor(Card? card)
     {

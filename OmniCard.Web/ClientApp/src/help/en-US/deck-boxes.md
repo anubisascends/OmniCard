@@ -106,10 +106,12 @@ OmniCard uses two special tags to understand your deck. Add them in a card's det
 | Pokémon | Standard, Expanded, Unlimited |
 | Yu-Gi-Oh! | Advanced, Traditional |
 | Final Fantasy TCG | Standard, Classic |
+| Cyberpunk TCG | Constructed, Sealed |
 
 A few things to know about the built-in rules:
 
 - In Commander, Brawl and Oathbreaker, basic lands are exempt from the singleton rule.
+- In Cyberpunk TCG Constructed, tag your three Legends `commander`. They count toward the deck size, so the deck is 43 to 53 cards in all.
 - In One Piece, copies are counted by card number, so alternate arts of the same number count as the same card.
 - The checks cover deck size, copy limits and commanders only. They don't check banned lists or card legality in a format.
 

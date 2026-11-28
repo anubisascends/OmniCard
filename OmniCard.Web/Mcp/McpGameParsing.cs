@@ -5,7 +5,7 @@ namespace OmniCard.Web.Mcp;
 
 /// <summary>Game-string parsing for the MCP tools, reusing the exact same parser the SPA controllers
 /// use (<see cref="LocationsController.ParseGame"/>) so the accepted identifiers (<c>mtg</c>,
-/// <c>pokemon</c>, <c>optcg</c>, <c>riftbound</c>, <c>yugioh</c>, <c>finalfantasy</c>) stay in sync.</summary>
+/// <c>pokemon</c>, <c>optcg</c>, <c>riftbound</c>, <c>yugioh</c>, <c>finalfantasy</c>, <c>cyberpunk</c>) stay in sync.</summary>
 internal static class McpGameParsing
 {
     /// <summary>Optional game filter — null/blank/unknown yields <c>null</c> (all games).</summary>
@@ -15,5 +15,5 @@ internal static class McpGameParsing
     public static CardGame RequireGame(string? game) =>
         LocationsController.ParseGame(game)
         ?? throw new ArgumentException(
-            $"Unknown game '{game}'. Use one of: mtg, pokemon, optcg, riftbound, yugioh, finalfantasy.");
+            $"Unknown game '{game}'. Use one of: mtg, pokemon, optcg, riftbound, yugioh, finalfantasy, cyberpunk.");
 }

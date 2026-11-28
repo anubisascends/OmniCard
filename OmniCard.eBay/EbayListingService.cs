@@ -468,6 +468,7 @@ public class EbayListingService : IEbayListingService
         CardGame.OnePiece => "One Piece Card Game",
         CardGame.FinalFantasy => "Final Fantasy Trading Card Game",
         CardGame.Riftbound => "Riftbound",
+        CardGame.Cyberpunk => "Cyberpunk TCG",
         _ => "Magic: The Gathering",
     };
 

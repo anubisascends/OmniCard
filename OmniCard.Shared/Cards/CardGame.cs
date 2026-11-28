@@ -7,5 +7,6 @@ public enum CardGame
     Riftbound,
     Pokemon,
     YuGiOh,
-    FinalFantasy
+    FinalFantasy,
+    Cyberpunk
 }

@@ -48,7 +48,7 @@ public static partial class CardLanguages
     // The languages each game's catalog source can download (see ICatalogLanguageAware):
     //   MTG       — Scryfall all_cards, every language it serves.
     //   Pokémon   — TCGCSV category 85 "Pokemon Japan" (separate sets, real TCGplayer prices).
-    // One Piece / Riftbound / Yu-Gi-Oh! / FFTCG sources (TCGCSV) are English-only; owned copies can still
+    // One Piece / Riftbound / Yu-Gi-Oh! / FFTCG / Cyberpunk sources (TCGCSV) are English-only; owned copies can still
     // be tagged with any printed language, and Yu-Gi-Oh! region codes are read from the scan
     // (YugiohService). One Piece keeps any Japanese/French rows downloaded earlier from poneglyph.
     private static readonly Dictionary<CardGame, string[]> DownloadableBuiltIn = new()

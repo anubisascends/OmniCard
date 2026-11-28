@@ -28,6 +28,8 @@ public static class FoilTypes
 
     private static readonly IReadOnlyList<string> Riftbound = ["Foil", "Other"];
 
+    private static readonly IReadOnlyList<string> Cyberpunk = ["Foil", "Other"];
+
     private static readonly IReadOnlyList<string> OnePiece =
         ["Foil", "Alternate Art", "Manga", "Parallel", "Other"];
 
@@ -40,6 +42,7 @@ public static class FoilTypes
         CardGame.FinalFantasy => FinalFantasy,
         CardGame.Riftbound => Riftbound,
         CardGame.OnePiece => OnePiece,
+        CardGame.Cyberpunk => Cyberpunk,
         _ => ["Foil"],
     };
 

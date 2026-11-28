@@ -52,6 +52,27 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, ILowPriceS
     /// so it must stay off there to avoid matching the count as a number).</summary>
     protected virtual bool SplitReprintNumbers => false;
 
+    /// <summary>When true, groups that share an abbreviation within a category get distinct set codes
+    /// (<c>{abbreviation}-{groupId}</c>) instead of being merged under one code — Cyberpunk TCG's
+    /// "Pre-Release Retail" and "Pre-Release Beta" are both <c>PRR</c> with overlapping numbers. Off by
+    /// default: turning it on for a game with stored data would rewrite its existing set codes.</summary>
+    protected virtual bool DisambiguateSharedSetCodes => false;
+
+    /// <summary>Narrows the catalog rows sharing an OCR'd collector number using the rest of the read — e.g.
+    /// Cyberpunk TCG's printed set code, since its bare numbers ("006") repeat across sets. Whatever is left
+    /// is settled by image hash. Default keeps every candidate.</summary>
+    protected virtual List<TcgCsvCard> NarrowOcrCandidates(List<TcgCsvCard> candidates, OcrMatchResult ocr,
+        ulong imageHash, int maxDistance) => candidates;
+
+    /// <summary>A group's set code: its abbreviation, or its GroupId when it has none. With
+    /// <paramref name="abbreviationShared"/> (see <see cref="DisambiguateSharedSetCodes"/>) the GroupId is
+    /// appended so each group stays its own set.</summary>
+    internal static string SetCodeFor(TcgCsvGroup group, bool abbreviationShared)
+    {
+        if (string.IsNullOrWhiteSpace(group.Abbreviation)) return group.GroupId.ToString();
+        return abbreviationShared ? $"{group.Abbreviation.Trim()}-{group.GroupId}" : group.Abbreviation;
+    }
+
     // TCGCSV returns camelCase JSON.
     protected static readonly JsonSerializerOptions TcgCsvJsonOptions = new()
     {
@@ -227,6 +248,16 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, ILowPriceS
         }
         _logger.LogInformation("Discovered {Count} {Game} groups", groupList.Count, Game);
 
+        // Abbreviations used by more than one group of the same category (only consulted when the game
+        // opts in to keeping such groups apart).
+        var sharedAbbreviations = DisambiguateSharedSetCodes
+            ? groupList.Where(g => !string.IsNullOrWhiteSpace(g.Group.Abbreviation))
+                .GroupBy(g => (g.CategoryId, Abbreviation: g.Group.Abbreviation!.Trim().ToUpperInvariant()))
+                .Where(g => g.Select(x => x.Group.GroupId).Distinct().Count() > 1)
+                .Select(g => g.Key)
+                .ToHashSet()
+            : [];
+
         var allCards = new List<TcgCsvCard>();
         var cardsLock = new object();
         var done = 0;
@@ -239,7 +270,8 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, ILowPriceS
                 {
                     var products = await client.GetFromJsonAsync<TcgCsvProductsResponse>(
                         $"{TcgCsvBaseUrl}/tcgplayer/{categoryId}/{group.GroupId}/products", TcgCsvJsonOptions, token);
-                    var setCode = string.IsNullOrWhiteSpace(group.Abbreviation) ? group.GroupId.ToString() : group.Abbreviation!;
+                    var setCode = SetCodeFor(group, sharedAbbreviations.Contains(
+                        (categoryId, (group.Abbreviation ?? "").Trim().ToUpperInvariant())));
                     var setName = group.Name;
                     if (lang != CardLanguages.English)
                     {
@@ -706,6 +738,7 @@ public abstract class TcgCsvGameService<TContext> : ICardGameService, ILowPriceS
                 }
                 var candidates = query.ToList();
                 if (setFilter is not null) candidates = candidates.Where(c => setFilter.Contains(c.SetCode)).ToList();
+                if (candidates.Count > 1) candidates = NarrowOcrCandidates(candidates, ocrResult, imageHash, maxDistance);
 
                 if (candidates.Count == 1)
                 {

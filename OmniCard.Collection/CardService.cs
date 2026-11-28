@@ -195,7 +195,8 @@ public sealed class CardService : ICardService
         // compute a color-robust edge hash so matching can use it (One Piece, Riftbound).
         ulong? scanEdgeHash = null;
         if (DefaultIsFoil && (SelectedGame == CardGame.OnePiece || SelectedGame == CardGame.Riftbound
-            || SelectedGame == CardGame.Pokemon || SelectedGame == CardGame.YuGiOh || SelectedGame == CardGame.FinalFantasy))
+            || SelectedGame == CardGame.Pokemon || SelectedGame == CardGame.YuGiOh || SelectedGame == CardGame.FinalFantasy
+            || SelectedGame == CardGame.Cyberpunk))
         {
             scanEdgeHash = _hashService.ComputeEdgeHash(new MemoryStream(rawBytes));
         }
@@ -480,7 +481,8 @@ public sealed class CardService : ICardService
                         // Structure rotates too — recompute the edge hash on the rotated bytes for foil One Piece/Riftbound scans
                         ulong? rotatedEdgeHash = null;
                         if (scannedCard.IsFoil && (game == CardGame.OnePiece || game == CardGame.Riftbound
-                            || game == CardGame.Pokemon || game == CardGame.YuGiOh || game == CardGame.FinalFantasy))
+                            || game == CardGame.Pokemon || game == CardGame.YuGiOh || game == CardGame.FinalFantasy
+                            || game == CardGame.Cyberpunk))
                             rotatedEdgeHash = _hashService.ComputeEdgeHash(new MemoryStream(rotatedBytes));
 
                         var (rotatedMatch, rotatedGame) = FindBestMatch(rotatedHash, null, rotatedOcr, capturedSetFilter, null, rotatedEdgeHash);

@@ -82,6 +82,19 @@ public sealed class ScanBatchUploadService(
         var originalName = Truncate(string.IsNullOrWhiteSpace(fileName) ? "scan" + extension : Path.GetFileName(fileName), 260);
         var hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
 
+        // The browser retries an upload whose answer it never got (a dropped connection, a phone that
+        // locked its screen); when the first attempt did arrive, this batch already holds the scan at
+        // that place, so the retry is the same scan, not an exact copy to set aside.
+        var received = ctx.ScanBatchItems.AsNoTracking()
+            .Where(i => i.ScanBatchId == batchId && i.Sequence == sequence && i.ContentHash == hash)
+            .Select(i => new { i.State })
+            .FirstOrDefault();
+        if (received is not null)
+        {
+            Touch(ctx, batchId, now);
+            return received.State == ScanBatchItemState.Duplicate;
+        }
+
         if (ScanFolderIngestor.FindOriginal(ctx, batch.Game, hash) is { } original)
         {
             ctx.ScanBatchItems.Add(new ScanBatchItem

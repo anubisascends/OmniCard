@@ -397,6 +397,7 @@ public sealed class LocationImportService(
         CardGame.Pokemon => "Pokémon",
         CardGame.YuGiOh => "Yu-Gi-Oh!",
         CardGame.FinalFantasy => "Final Fantasy TCG",
+        CardGame.Cyberpunk => "Cyberpunk TCG",
         _ => game.ToString(),
     };
 

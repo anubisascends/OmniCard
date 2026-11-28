@@ -128,7 +128,7 @@ On a phone, **Take photo** on the Scan page opens the rear camera. OmniCard find
 - Hold the phone **above the cards**. A slight angle is fine; OmniCard straightens it out.
 - Use **even light**. Avoid glare and reflections, especially on foils and cards in sleeves or top-loaders. Tilting the card slightly away from a lamp often helps.
 - Put the card on a **plain, dark background** that contrasts with its border.
-- Make sure the bottom of the card, where the set code and collector number are, is **in focus**. That's what OmniCard reads to find the exact printing.
+- Make sure the bottom of the card, where the set code and collector number are, is **in focus**. That's what OmniCard reads to find the exact printing. On Cyberpunk TCG cards it's the bottom-left corner.
 - Before scanning a pile, set **Condition**, **Card language** and **Foil** at the top of the Scan page. Each new photo gets those settings.
 
 See [Scanning cards](help:scanning).

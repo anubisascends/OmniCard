@@ -12,6 +12,7 @@ public class CardBackAssetsTests
     [InlineData(CardGame.Pokemon, "pokemon")]
     [InlineData(CardGame.YuGiOh, "yugioh")]
     [InlineData(CardGame.FinalFantasy, "fftcg")]
+    [InlineData(CardGame.Cyberpunk, "cyberpunk")]
     public void Slug_CoversEveryGame(CardGame game, string expected)
     {
         Assert.Equal(expected, CardBackAssets.Slug(game));

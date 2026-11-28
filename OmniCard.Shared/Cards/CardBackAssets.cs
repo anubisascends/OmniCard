@@ -19,6 +19,7 @@ public static class CardBackAssets
         CardGame.Pokemon => "pokemon",
         CardGame.YuGiOh => "yugioh",
         CardGame.FinalFantasy => "fftcg",
+        CardGame.Cyberpunk => "cyberpunk",
         _ => "mtg",
     };
 

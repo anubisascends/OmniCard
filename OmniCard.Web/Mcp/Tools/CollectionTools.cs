@@ -44,7 +44,7 @@ public sealed class CollectionTools(
     public PagedResult<CardDto> SearchCollection(
         [Description("Scryfall-style query. Empty returns everything. Example: 't:creature c:u r>=rare'.")]
         string? query = null,
-        [Description("Optional game filter: mtg, pokemon, optcg, riftbound, yugioh, finalfantasy.")]
+        [Description("Optional game filter: mtg, pokemon, optcg, riftbound, yugioh, finalfantasy, cyberpunk.")]
         string? game = null,
         [Description("Optional storage-location (container) id to restrict to.")]
         int? containerId = null,
@@ -103,7 +103,7 @@ public sealed class CollectionTools(
         "Each location belongs to one site (siteId/siteName) — a major physical location such as a home; " +
         "pass 'site' to list only that site's locations.")]
     public async Task<IReadOnlyList<LocationSummaryDto>> ListLocations(
-        [Description("Optional game filter: mtg, pokemon, optcg, riftbound, yugioh, finalfantasy.")]
+        [Description("Optional game filter: mtg, pokemon, optcg, riftbound, yugioh, finalfantasy, cyberpunk.")]
         string? game = null,
         [Description("Optional site id or name (see list_sites).")]
         string? site = null)

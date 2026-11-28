@@ -626,6 +626,77 @@ public sealed class OcrMatchingService : IOcrMatchingService, IDisposable
         }
     }
 
+    public Task<CyberpunkPrintedCode> ReadCyberpunkCodeAsync(byte[] imageData)
+        => Task.Run(() => ReadCyberpunkCodeWithReads(imageData).Code);
+
+    /// <summary>Reads a Cyberpunk TCG card's product code and collector number (see
+    /// <see cref="CyberpunkCodeReader"/>). Each straightened line is OCR'd as a line and as a word; the
+    /// parsed reads vote. Also returns the raw reads, for diagnostics and tests.</summary>
+    internal (CyberpunkPrintedCode Code, List<string> ProductReads, List<string> NumberReads) ReadCyberpunkCodeWithReads(byte[] imageData)
+    {
+        var productReads = new List<string>();
+        var numberReads = new List<string>();
+        if (!_ocrAvailable) return (CyberpunkPrintedCode.Empty, productReads, numberReads);
+        try
+        {
+            using var bitmap = ImageOps.Decode(imageData);
+            PageSegMode[] modes = [PageSegMode.SingleLine, PageSegMode.SingleWord];
+
+            var productVotes = new Dictionary<(string Product, string SetCode, string? Variant), int>();
+            var productLines = CyberpunkCodeReader.RenderProductLines(bitmap);
+            try
+            {
+                foreach (var line in productLines)
+                    foreach (var psm in modes)
+                    {
+                        var (text, _) = RunOcr(line, psm, CyberpunkCodeReader.ProductWhitelist);
+                        productReads.Add(text);
+                        if (CyberpunkCodeReader.ParseProduct(text) is { } p)
+                            productVotes[p] = productVotes.GetValueOrDefault(p) + 1;
+                    }
+            }
+            finally
+            {
+                foreach (var line in productLines) line.Dispose();
+            }
+
+            var numberVotes = new Dictionary<(string Number, bool Beta), int>();
+            var numberLines = CyberpunkCodeReader.RenderNumberLines(bitmap);
+            try
+            {
+                foreach (var line in numberLines)
+                    foreach (var psm in modes)
+                    {
+                        var (text, _) = RunOcr(line, psm, CyberpunkCodeReader.NumberWhitelist);
+                        numberReads.Add(text);
+                        if (CyberpunkCodeReader.ParseNumber(text) is { } n)
+                            numberVotes[n] = numberVotes.GetValueOrDefault(n) + 1;
+                    }
+            }
+            finally
+            {
+                foreach (var line in numberLines) line.Dispose();
+            }
+
+            // Most votes wins; a read with the variant beats the same set without it.
+            var product = productVotes.Count == 0 ? ((string, string, string?)?)null
+                : productVotes.OrderByDescending(v => v.Value).ThenByDescending(v => v.Key.Variant is not null).First().Key;
+            var number = numberVotes.Count == 0 ? ((string, bool)?)null
+                : numberVotes.OrderByDescending(v => v.Value).First().Key;
+
+            var code = new CyberpunkPrintedCode(product?.Item1, product?.Item2, product?.Item3, number?.Item1, number?.Item2 ?? false);
+            _logger.LogInformation("Cyberpunk code read: {Product} {Set} [{Variant}] {Number} (product reads: {ProductReads}; number reads: {NumberReads})",
+                code.Product, code.SetCode, code.Variant, code.CatalogNumber,
+                string.Join(" | ", productReads), string.Join(" | ", numberReads));
+            return (code, productReads, numberReads);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cyberpunk code read failed");
+            return (CyberpunkPrintedCode.Empty, productReads, numberReads);
+        }
+    }
+
     // Yu-Gi-Oh! edition text location varies by frame era:
     //  • Modern (2020+): bottom line next to the password — "{8-digit password} 1st Edition".
     //  • Older reprints (e.g. Legendary Collection): just ABOVE the effect box on the LEFT.

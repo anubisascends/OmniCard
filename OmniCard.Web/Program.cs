@@ -147,6 +147,8 @@ builder.Services.AddDbContextFactory<YugiohDbContext>(options =>
     Sdb.ConfigureCatalog(options, Sdb.CatalogConnectionString(builder.Configuration, "Yugioh")));
 builder.Services.AddDbContextFactory<FinalFantasyDbContext>(options =>
     Sdb.ConfigureCatalog(options, Sdb.CatalogConnectionString(builder.Configuration, "FinalFantasy")));
+builder.Services.AddDbContextFactory<CyberpunkDbContext>(options =>
+    Sdb.ConfigureCatalog(options, Sdb.CatalogConnectionString(builder.Configuration, "Cyberpunk")));
 
 // Infrastructure services needed by game services
 builder.Services.AddSingleton<IDataPathService>(new WebDataPathService(dataDir));
@@ -171,6 +173,8 @@ builder.Services.AddSingleton<YugiohService>();
 builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<YugiohService>());
 builder.Services.AddSingleton<FinalFantasyService>();
 builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<FinalFantasyService>());
+builder.Services.AddSingleton<CyberpunkService>();
+builder.Services.AddSingleton<ICardGameService>(sp => sp.GetRequiredService<CyberpunkService>());
 
 // Card & decklist services
 builder.Services.AddSingleton<ICardService, WebCardService>();
@@ -392,6 +396,7 @@ builder.Services.AddSingleton(_ =>
     [
         (CardGame.Mtg, "Scryfall"), (CardGame.OnePiece, "Optcg"), (CardGame.Riftbound, "Riftbound"),
         (CardGame.Pokemon, "Pokemon"), (CardGame.YuGiOh, "Yugioh"), (CardGame.FinalFantasy, "FinalFantasy"),
+        (CardGame.Cyberpunk, "Cyberpunk"),
     ];
     return new DashboardSqlRunner(
     [
@@ -524,6 +529,7 @@ using (var scope = app.Services.CreateScope())
     EnsureCatalog<PokemonDbContext>();
     EnsureCatalog<YugiohDbContext>();
     EnsureCatalog<FinalFantasyDbContext>();
+    EnsureCatalog<CyberpunkDbContext>();
 }
 
 // One-time rewrite of MTG Product.CardType to the full catalog type line, so t:vampire/t:legendary

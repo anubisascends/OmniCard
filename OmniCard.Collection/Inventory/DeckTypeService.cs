@@ -188,6 +188,12 @@ public sealed class DeckTypeService(IDbContextFactory<OmniCardDbContext> dbConte
         list.Add(Def(CardGame.FinalFantasy, "fftcg.standard", "Standard", sort++, 50, 50, 3));
         list.Add(Def(CardGame.FinalFantasy, "fftcg.classic", "Classic", sort++, 50, 50, 3));
 
+        // --- Cyberpunk TCG (3 Legends + 40–50 cards, max 3) ---
+        // The Legends are tagged "commander" and count toward the size, hence 43–53.
+        sort = 0;
+        list.Add(Def(CardGame.Cyberpunk, "cyberpunk.constructed", "Constructed", sort++, 43, 53, 3, commanderSlots: 3));
+        list.Add(Def(CardGame.Cyberpunk, "cyberpunk.sealed", "Sealed", sort++));
+
         return list;
     }
 }

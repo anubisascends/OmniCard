@@ -23,7 +23,7 @@ public sealed class CatalogTools(
     [Description("Search a game's card catalog (all printings, regardless of ownership). Returns name, " +
         "set, collector number, rarity, and image for each match.")]
     public IReadOnlyList<CatalogCardResult> LookupCardCatalog(
-        [Description("Game: mtg, pokemon, optcg, riftbound, yugioh, finalfantasy.")] string game,
+        [Description("Game: mtg, pokemon, optcg, riftbound, yugioh, finalfantasy, cyberpunk.")] string game,
         [Description("Card name or query text.")] string query,
         [Description("Max results. Default 20, max 100.")] int maxResults = 20)
     {
@@ -42,7 +42,7 @@ public sealed class CatalogTools(
     [Description("The full checklist for one set in a game: every printing annotated with owned quantity " +
         "and current prices, sorted by collector number.")]
     public async Task<SetChecklistDto> SetChecklist(
-        [Description("Game: mtg, pokemon, optcg, riftbound, yugioh, finalfantasy.")] string game,
+        [Description("Game: mtg, pokemon, optcg, riftbound, yugioh, finalfantasy, cyberpunk.")] string game,
         [Description("Set code, e.g. 'MH3' (MTG) or 'OP01' (One Piece).")] string setCode)
     {
         var g = McpGameParsing.RequireGame(game);
@@ -53,7 +53,7 @@ public sealed class CatalogTools(
     [McpServerTool(Name = "card_price")]
     [Description("Current catalog market price for a specific printing, by its game-specific card id.")]
     public decimal? CardPrice(
-        [Description("Game: mtg, pokemon, optcg, riftbound, yugioh, finalfantasy.")] string game,
+        [Description("Game: mtg, pokemon, optcg, riftbound, yugioh, finalfantasy, cyberpunk.")] string game,
         [Description("The game-specific card id (GameCardId), as returned by lookup_card_catalog or search_collection.")]
         string gameCardId,
         [Description("Whether to price the foil finish. Default false.")] bool foil = false)
