@@ -61,6 +61,8 @@
       "nameHelp": "Leave blank to use your name and the current time.",
       "save": "Save batch",
       "saving": "Saving {{done}} of {{total}}…",
+      "retrying": "The connection dropped; retrying…",
+      "keepOpen": "Keep this page open until it finishes.",
       "failed": "The batch wasn't saved, and your scans are still here. {{error}}",
       "success_one": "Saved {{count}} scan as the batch “{{name}}”. Anyone can review it from Scan batches.",
       "success_other": "Saved {{count}} scans as the batch “{{name}}”. Anyone can review it from Scan batches.",

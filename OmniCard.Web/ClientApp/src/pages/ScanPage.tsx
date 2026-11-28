@@ -76,6 +76,7 @@ import {
   formatAvailableFor,
   textListLine,
 } from '../lib/exportFormats';
+import { holdScreenWakeLock, inMemoryCopy, withRetry } from '../lib/resilientUpload';
 import { ScanSessionStore } from '../lib/scanSessionStore';
 import { BatchItemStore } from '../lib/batchItemStore';
 import { usePermissions } from '../context/usePermissions';
@@ -2798,12 +2799,17 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
 
   // --- Save as batch: store every local scan on the server as a scan batch, released for anyone to
   // review, and clear them from this page. Images go up one per request (each under the server's
-  // request limit); if any fails, the half-sent batch is thrown away and the scans stay here. ---
+  // request limit). Each upload has a time limit and is retried when the connection drops or the
+  // screen locks (phones), with the screen kept on meanwhile; the server takes a repeated upload of
+  // the same scan as the one it already has. Only when a scan still can't be sent is the half-sent
+  // batch thrown away, and the scans stay here. ---
   const canSaveBatch = !auditMode && !batch && !intake;
   const savableItems = useMemo(() => items.filter((it) => it.file), [items]);
   const [saveBatchOpen, setSaveBatchOpen] = useState(false);
   const [saveBatchName, setSaveBatchName] = useState('');
-  const [saveProgress, setSaveProgress] = useState<{ done: number; total: number } | null>(null);
+  const [saveProgress, setSaveProgress] = useState<{ done: number; total: number; retrying?: boolean } | null>(
+    null,
+  );
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedBatch, setSavedBatch] = useState<ScanBatchUploadFinishedDto | null>(null);
   const saveAsBatch = async () => {
@@ -2814,6 +2820,7 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
     setSavedBatch(null);
     setSaveProgress({ done: 0, total: toSave.length });
     let batchIdSaving: number | null = null;
+    const releaseWakeLock = holdScreenWakeLock();
     try {
       const started = await api.scanBatchUploadStart({
         name: saveBatchName.trim() || null,
@@ -2834,7 +2841,11 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
           const next = queue.shift();
           if (!next) return;
           try {
-            await api.scanBatchUploadItem(started.id, next.it.file!, toUploadItem(next.it, next.sequence));
+            const image = await inMemoryCopy(next.it.file!);
+            const upload = toUploadItem(next.it, next.sequence);
+            await withRetry((signal) => api.scanBatchUploadItem(started.id, image, upload, signal), {
+              onRetry: () => setSaveProgress({ done, total: toSave.length, retrying: true }),
+            });
             setSaveProgress({ done: ++done, total: toSave.length });
           } catch (e) {
             // Stop the other workers too, and only cancel once nothing is still in flight.
@@ -2856,8 +2867,9 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
       invalidateScanBatches(qc);
     } catch (e) {
       if (batchIdSaving != null) void api.scanBatchUploadCancel(batchIdSaving).catch(() => undefined);
-      setSaveError((e as Error).message);
+      setSaveError(e instanceof Error && e.message ? e.message : String(e));
     } finally {
+      releaseWakeLock();
       setSaveProgress(null);
     }
   };
@@ -3347,6 +3359,10 @@ export function ScanPage({ lockedContainerId, auditMode = false, onAuditCommitte
                     done: fmt.number(saveProgress.done),
                     total: fmt.number(saveProgress.total),
                   })}
+                  {saveProgress.retrying && <> {t('scan.saveBatch.retrying')}</>}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  {t('scan.saveBatch.keepOpen')}
                 </Typography>
               </Box>
             )}

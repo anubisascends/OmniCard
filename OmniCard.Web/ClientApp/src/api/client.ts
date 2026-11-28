@@ -237,7 +237,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     credentials: 'same-origin',
   });
   if (!res.ok) {
-    let message = res.statusText;
+    let message = res.statusText || `HTTP ${res.status}`;
     let body: unknown;
     try {
       body = await res.json();
@@ -252,10 +252,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 /** POST a multipart/form-data body (for endpoints that accept file uploads). */
-async function postForm<T>(path: string, form: FormData): Promise<T> {
-  const res = await fetch(path, { method: 'POST', body: form, credentials: 'same-origin' });
+async function postForm<T>(path: string, form: FormData, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(path, { method: 'POST', body: form, credentials: 'same-origin', signal });
   if (!res.ok) {
-    let message = res.statusText;
+    let message = res.statusText || `HTTP ${res.status}`;
     let b: { error?: string } | undefined;
     try {
       b = await res.json();
@@ -283,7 +283,7 @@ function postDownload(path: string, body: unknown, fallbackName: string): Promis
 async function download(path: string, fallbackName: string, init?: RequestInit): Promise<void> {
   const res = await fetch(path, { ...init, credentials: 'same-origin' });
   if (!res.ok) {
-    let message = res.statusText;
+    let message = res.statusText || `HTTP ${res.status}`;
     try {
       const b = await res.json();
       if (b?.error) message = b.error;
@@ -309,7 +309,7 @@ async function download(path: string, fallbackName: string, init?: RequestInit):
 async function requestText(path: string): Promise<string> {
   const res = await fetch(path, { credentials: 'same-origin' });
   if (!res.ok) {
-    let message = res.statusText;
+    let message = res.statusText || `HTTP ${res.status}`;
     try {
       const b = await res.json();
       if (b?.error) message = b.error;
@@ -946,7 +946,7 @@ export const api = {
       credentials: 'same-origin',
     });
     if (!res.ok) {
-      let message = res.statusText;
+      let message = res.statusText || `HTTP ${res.status}`;
       try {
         const b = await res.json();
         if (b?.error) message = b.error;
@@ -977,7 +977,7 @@ export const api = {
       credentials: 'same-origin',
     });
     if (!res.ok) {
-      let message = res.statusText;
+      let message = res.statusText || `HTTP ${res.status}`;
       try {
         const b = await res.json();
         if (b?.error) message = b.error;
@@ -1179,7 +1179,7 @@ export const api = {
       credentials: 'same-origin',
     });
     if (!res.ok) {
-      let message = res.statusText;
+      let message = res.statusText || `HTTP ${res.status}`;
       try {
         const b = await res.json();
         if (b?.error) message = b.error;
@@ -1310,11 +1310,11 @@ export const api = {
   // finish (released for anyone to review) — or cancel to throw a half-sent one away.
   scanBatchUploadStart: (req: ScanBatchUploadStartRequest) =>
     request<{ id: number; name: string }>('/api/scan/batches/upload', { method: 'POST', body: JSON.stringify(req) }),
-  scanBatchUploadItem: (id: number, image: File, item: ScanBatchUploadItem) => {
+  scanBatchUploadItem: (id: number, image: Blob, item: ScanBatchUploadItem, signal?: AbortSignal) => {
     const form = new FormData();
-    form.append('image', image);
+    form.append('image', image, image instanceof File && image.name ? image.name : 'scan.jpg');
     form.append('item', JSON.stringify(item));
-    return postForm<{ duplicate: boolean }>(`/api/scan/batches/${id}/upload`, form);
+    return postForm<{ duplicate: boolean }>(`/api/scan/batches/${id}/upload`, form, signal);
   },
   scanBatchUploadFinish: (id: number) =>
     request<ScanBatchUploadFinishedDto>(`/api/scan/batches/${id}/upload/finish`, { method: 'POST' }),

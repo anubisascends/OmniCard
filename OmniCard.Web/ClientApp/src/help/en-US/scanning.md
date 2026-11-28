@@ -362,7 +362,9 @@ What goes with the batch:
 - Scans that are still matching (or failed to match) are matched on the server instead, so you don't have to wait for them.
 - The session's game, **Sets (art fallback)**, **Condition**, **Card language** and **Foil**. If you've chosen a location in **Add to location…**, it's pre-selected when the batch is reviewed.
 
-If saving fails part-way (for example the connection drops), nothing is saved and your scans stay in the list, so you can try again.
+Keep the page open until saving finishes. On a phone, OmniCard keeps the screen on while it saves, if the browser allows it. If the connection drops for a moment, or you switch away from the page, *The connection dropped; retrying…* appears and saving picks up where it left off.
+
+If a scan still can't be saved after several tries, nothing is saved and your scans stay in the list, so you can try again.
 
 > [!NOTE]
 > An image that is an exact copy of one already in a batch for the same game is skipped, as it is for watched folders. See [Duplicate images are skipped](help:scan-batches#duplicate-images-are-skipped).

@@ -162,6 +162,34 @@ public sealed class ScanBatchUploadServiceTests : IDisposable
     }
 
     [Fact]
+    public void AddItem_RetriedUpload_IsTheSameScanNotACopy()
+    {
+        var id = Start();
+        Assert.False(Add(id, [5, 5], Item(1, Match("c1"))));
+
+        // The browser never got the answer and sends it again.
+        Assert.False(Add(id, [5, 5], Item(1, Match("c1"))));
+
+        var item = Assert.Single(Items(id));
+        Assert.Equal(ScanBatchItemState.Open, item.State);
+        Assert.Equal(1, _uploads.Finish(id, Alice).Items);
+    }
+
+    [Fact]
+    public void AddItem_RetriedDuplicate_StaysOneDuplicate()
+    {
+        var id = Start();
+        Add(id, [5, 5], Item(1, Match("c1")));
+        Assert.True(Add(id, [5, 5], Item(2, Match("c1"))));
+
+        Assert.True(Add(id, [5, 5], Item(2, Match("c1"))));
+
+        var items = Items(id);
+        Assert.Equal(2, items.Count);
+        Assert.Equal(ScanBatchItemState.Duplicate, items[1].State);
+    }
+
+    [Fact]
     public void AddItem_RefusesOtherUsersAndFinishedBatches()
     {
         var id = Start();
